@@ -947,6 +947,9 @@ fn main() {
             .arg(&max_genesis_archive_unpacked_size_arg)
         )
         .subcommand(
+            SubCommand::with_name("good-bad")
+        )
+        .subcommand(
             SubCommand::with_name("parse_full_frozen")
             .about("Parses log for information about critical events about \
                     ancestors of the given `ending_slot`")
@@ -1655,6 +1658,72 @@ fn main() {
                     Ok(_) => println!("Slot {} dead", slot),
                     Err(err) => eprintln!("Failed to set slot {} dead slot: {}", slot, err),
                 }
+            }
+        }
+        ("good-bad", _) => {
+            let good = PathBuf::from("/home/carl_solana_com/solana/DebugTds/warehouse.txt");
+            let bad = PathBuf::from("/home/carl_solana_com/solana/DebugTds/tsc.txt");
+
+            fn parse_log(path: &Path) -> BTreeMap<Pubkey, (Hash, u64)> {
+                let pubkey_regex = Regex::new(r"x: (\w*)").unwrap();
+                let hash_regex = Regex::new(r"y: (\w*)").unwrap();
+                let balance_regex = Regex::new(r"z: (\d*)").unwrap();
+                let f = BufReader::new(File::open(path).unwrap());
+                let mut results = BTreeMap::new();
+                let mut lines = f.lines();
+                loop {
+                    let line = lines.next();
+                    if let Some(Ok(line)) = line {
+                        if let Some(pubkey) = pubkey_regex.captures_iter(&line).next() {
+                            let line = lines.next().unwrap().unwrap();
+                            let hash = hash_regex.captures_iter(&line).next().unwrap();
+                            let line = lines.next().unwrap().unwrap();
+                            let balance = balance_regex.captures_iter(&line).next().unwrap();
+
+                            let pubkey = Pubkey::from_str(
+                                pubkey.get(1).expect("Only one match group").as_str(),
+                            )
+                            .unwrap();
+                            let hash =
+                                Hash::from_str(hash.get(1).expect("Only one match group").as_str())
+                                    .unwrap();
+                            let balance = balance
+                                .get(1)
+                                .expect("Only one match group")
+                                .as_str()
+                                .parse::<u64>()
+                                .unwrap();
+
+                            assert!(results.insert(pubkey, (hash, balance)).is_none());
+                        }
+                    } else {
+                        break;
+                    }
+                }
+                results
+            }
+
+            let bad_results = parse_log(&bad);
+            let mut good_results = parse_log(&good);
+
+            println!("good results len: {}", good_results.len());
+            println!("bad results len: {}", bad_results.len());
+            for result in &bad_results {
+                let good_result = good_results.remove(&result.0);
+                if let Some(good_value) = good_result {
+                    if good_value != *result.1 {
+                        println!(
+                            "Value mismatch for pubkey: {:?}, good_value: {:?}, bad_value: {:?}",
+                            result.0, good_value, result.1
+                        );
+                    }
+                } else {
+                    println!("Good results missing: {:?}", result);
+                }
+            }
+
+            for leftover in good_results {
+                println!("extra keys in good: {:?}", leftover);
             }
         }
         ("parse_full_frozen", Some(arg_matches)) => {

@@ -102,7 +102,7 @@ const CACHE_VIRTUAL_STORED_SIZE: usize = 0;
 #[cfg(not(test))]
 const ABSURD_CONSECUTIVE_FAILED_ITERATIONS: usize = 100;
 
-type DashMapVersionHash = DashMap<Pubkey, (u64, Hash)>;
+type DashMapVersionHash = DashMap<Pubkey, (u64, u64, Hash)>;
 
 lazy_static! {
     // FROZEN_ACCOUNT_PANIC is used to signal local_cluster that an AccountsDb panic has occurred,
@@ -4248,6 +4248,16 @@ impl AccountsDb {
         let (calculated_hash, calculated_lamports) =
             self.calculate_accounts_hash(slot, ancestors, true)?;
 
+        println!(
+            "calculated hash: {:?}, expected: {:?}",
+            calculated_hash,
+            self.bank_hashes
+                .read()
+                .unwrap()
+                .get(&slot)
+                .map(|x| x.snapshot_hash)
+        );
+
         if calculated_lamports != total_lamports {
             warn!(
                 "Mismatched total lamports: {} calculated: {}",
@@ -4318,19 +4328,25 @@ impl AccountsDb {
     pub fn get_accounts_delta_hash(&self, slot: Slot) -> Hash {
         let mut scan = Measure::start("scan");
 
-        let scan_result: ScanStorageResult<(Pubkey, Hash), DashMapVersionHash> = self
+        let scan_result: ScanStorageResult<(Pubkey, (u64, u64, Hash)), DashMapVersionHash> = self
             .scan_account_storage(
                 slot,
                 |loaded_account: LoadedAccount| {
                     // Cache only has one version per key, don't need to worry about versioning
-                    Some((*loaded_account.pubkey(), loaded_account.loaded_hash()))
+                    Some((
+                        *loaded_account.pubkey(),
+                        loaded_account.loaded_hash(),
+                        loaded_account.lamports(),
+                        loaded_account.write_version(),
+                    ))
                 },
-                |accum: &DashMap<Pubkey, (u64, Hash)>, loaded_account: LoadedAccount| {
+                |accum: &DashMap<Pubkey, (u64, u64, Hash)>, loaded_account: LoadedAccount| {
+                    let lamports = loaded_account.lamports();
                     let loaded_write_version = loaded_account.write_version();
                     let loaded_hash = loaded_account.loaded_hash();
                     let should_insert =
                         if let Some(existing_entry) = accum.get(loaded_account.pubkey()) {
-                            loaded_write_version > existing_entry.value().version()
+                            loaded_write_version > existing_entry.value().1
                         } else {
                             true
                         };
@@ -4339,13 +4355,17 @@ impl AccountsDb {
                         match accum.entry(*loaded_account.pubkey()) {
                             // Double check in case another thread interleaved a write between the read + write.
                             Occupied(mut occupied_entry) => {
-                                if loaded_write_version > occupied_entry.get().version() {
-                                    occupied_entry.insert((loaded_write_version, loaded_hash));
+                                if loaded_write_version > occupied_entry.get().1 {
+                                    occupied_entry.insert((
+                                        lamports,
+                                        loaded_write_version,
+                                        loaded_hash,
+                                    ));
                                 }
                             }
 
                             Vacant(vacant_entry) => {
-                                vacant_entry.insert((loaded_write_version, loaded_hash));
+                                vacant_entry.insert((lamports, loaded_write_version, loaded_hash));
                             }
                         }
                     }
@@ -4354,14 +4374,25 @@ impl AccountsDb {
         scan.stop();
 
         let mut accumulate = Measure::start("accumulate");
-        let hashes: Vec<_> = match scan_result {
-            ScanStorageResult::Cached(cached_result) => cached_result,
+        let hashes: Vec<(Pubkey, Hash, u64)> = match scan_result {
+            ScanStorageResult::Cached(cached_result) => cached_result
+                .into_iter()
+                .map(|(pubkey, hash, lamports, _latest_write_version)| (pubkey, hash, lamports))
+                .collect(),
             ScanStorageResult::Stored(stored_result) => stored_result
                 .into_iter()
-                .map(|(pubkey, (_latest_write_version, hash))| (pubkey, hash))
+                .map(|(pubkey, (lamports, _latest_write_version, hash))| (pubkey, hash, lamports))
                 .collect(),
         };
-        let dirty_keys = hashes.iter().map(|(pubkey, _hash)| *pubkey).collect();
+        let dirty_keys = hashes
+            .iter()
+            .map(|(pubkey, hash, lamports)| {
+                println!("x: {:?}", pubkey);
+                println!("y: {:?}", hash);
+                println!("z: {:?}", lamports);
+                *pubkey
+            })
+            .collect();
 
         let ret = AccountsHash::accumulate_account_hashes(hashes);
         accumulate.stop();

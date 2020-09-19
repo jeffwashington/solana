@@ -814,6 +814,7 @@ impl Accounts {
             .expect("No bank hash was found for this bank, that should not be possible")
             .clone();
         hash_info.hash = delta_hash;
+        println!("bank hash info: {:?}", hash_info);
         hash_info
     }
 
