@@ -4387,9 +4387,10 @@ impl AccountsDb {
         let dirty_keys = hashes
             .iter()
             .map(|(pubkey, hash, lamports)| {
-                println!("x: {:?}", pubkey);
+                // Only enable for finding account diff mismatch
+                /*println!("x: {:?}", pubkey);
                 println!("y: {:?}", hash);
-                println!("z: {:?}", lamports);
+                println!("z: {:?}", lamports);*/
                 *pubkey
             })
             .collect();
