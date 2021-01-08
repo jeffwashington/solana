@@ -2467,3 +2467,58 @@ fn setup_snapshot_validator_config(
         validator_config,
     }
 }
+
+#[test]
+#[serial]
+fn test_hashes_per_tick_increase_feature() {
+    solana_logger::setup();
+    let num_nodes = 2;
+    let mut validator_config = ValidatorConfig::default();
+    let debug_votes = false;
+    if debug_votes {
+        let mut debug_keys = HashSet::new();
+        debug_keys.insert(solana_vote_program::id());
+        validator_config.debug_keys = Some(Arc::new(debug_keys));
+    }
+    let mut validator_configs = vec![validator_config.clone(); num_nodes - 1];
+    validator_configs.push(validator_config);
+    let slots_per_epoch = 32;
+    let slot_to_activate_feature = slots_per_epoch * 1;
+
+    let test_stop_slot = slot_to_activate_feature + slots_per_epoch * 10;
+
+    let mut poh_config = PohConfig::default();
+    let mut config = ClusterConfig {
+        cluster_lamports: 10_000,
+        poh_config: PohConfig::new_sleep(Duration::from_millis(20)),
+        node_stakes: vec![100; num_nodes],
+        validator_configs,
+        slots_per_epoch,
+        stakers_slot_offset: slots_per_epoch,
+        skip_warmup_slots: true,
+        ..ClusterConfig::default()
+    };
+    warn!("Starting cluster..");
+    let cluster = LocalCluster::new(&mut config);
+
+    let keys = cluster.get_node_pubkeys();
+    warn!("Waiting for cluster..");
+    let mut slot = 0;
+    'top: for _j in 0..200 {
+        for (_, key) in keys.iter().enumerate() {
+            let client = cluster.get_validator_client(&key).unwrap();
+
+            let rpc_client = RpcClient::new_socket(cluster.entry_point_info.rpc);
+
+            if let Ok(the_slot) = client.get_slot_with_commitment(CommitmentConfig::recent()) {
+                slot = the_slot;
+                if slot >= test_stop_slot {
+                    break 'top;
+                }
+            }
+        }
+        sleep(Duration::from_secs(2));
+    }
+    // todo: how to test that the hashes_per_tick updated
+    assert!(slot >= test_stop_slot);
+}
