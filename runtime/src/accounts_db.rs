@@ -156,7 +156,7 @@ impl Versioned for (u64, Hash) {
     }
 }
 
-impl Versioned for (u64, Hash, u64) {
+impl Versioned for (u64, Hash, u64, u64) {
     fn version(&self) -> u64 {
         self.0
     }
@@ -1913,6 +1913,7 @@ impl AccountsDB {
         B: Send + Default,
     {
         if let Some(slot_cache) = self.accounts_cache.slot_cache(slot) {
+            warn!("Cached account: {}", slot);
             // If we see the slot in the cache, then all the account information
             // is in this cached slot
             let mut retval = B::default();
@@ -1928,6 +1929,7 @@ impl AccountsDB {
             }
             vec![retval]
         } else {
+            warn!("NON Cached account: {}", slot);
             // If the slot is not in the cache, then all the account information must have
             // been flushed. This is guaranteed because we only remove the rooted slot from
             // the cache *after* we've finished flushing in `flush_slot_cache`.
@@ -3204,16 +3206,18 @@ impl AccountsDB {
         slot: Slot,
         ancestors: &Ancestors,
         simple_capitalization_enabled: bool,
-    ) -> HashMap<Pubkey, (u64, Hash, u64)> {
+    ) -> HashMap<Pubkey, (u64, Hash, u64, u64)> {
         let mut scan = Measure::start("scan");
-        let mut accumulator: Vec<HashMap<Pubkey, (u64, Hash, u64)>> = self.scan_account_storage(
+        let mismatch_found = AtomicU64::new(0);
+        let mut accumulator: Vec<HashMap<Pubkey, (u64, Hash, u64, u64)>> = self.scan_account_storage(
             slot,
             |loaded_account: LoadedAccount,
                 _store_id: AppendVecId,
-                accum: &mut HashMap<Pubkey, (u64, Hash, u64)>| {
+                accum: &mut HashMap<Pubkey, (u64, Hash, u64, u64)>| {
                 //let accounts = self.slot.store.accounts.accounts(0);                    
                 //if let Some((mut account, _)) = accounts.load_slow(&ancestors, loaded_account.pubkey()) {
 
+                mismatch_found.fetch_add(1, Ordering::Relaxed);
                 let la2 = loaded_account;
                 let executable = la2.executable();
                 let owner = la2.owner();
@@ -3233,17 +3237,104 @@ impl AccountsDB {
                     (
                         wv,
                         *lh,
-                        balance
+                        balance,
+                        lamports,
                     ),
                 );
             },
         );
+        warn!("checking ancestors in all previous slots: {}", self.storage.all_slots().len());
+        for s in self.storage.all_slots() {
+            if s >= slot {
+                continue;
+            }
+            warn!("checking ancestors in previous slot: {}", s);
+            let mut accumulator_dummy: Vec<HashMap<Pubkey, (u64, Hash, u64, u64)>> = self.scan_account_storage(
+                s,
+                |loaded_account: LoadedAccount,
+                    _store_id: AppendVecId,
+                    accum: &mut HashMap<Pubkey, (u64, Hash, u64, u64)>| {
+                    //let accounts = self.slot.store.accounts.accounts(0);                    
+                    //if let Some((mut account, _)) = accounts.load_slow(&ancestors, loaded_account.pubkey()) {
+                    mismatch_found.fetch_add(1, Ordering::Relaxed);
+
+                    let la2 = loaded_account;
+                    let executable = la2.executable();
+                    let owner = la2.owner();
+                    let lamports = la2.lamports();
+                    let pk = la2.pubkey();
+                    let wv = la2.write_version();
+                    let lh = la2.loaded_hash();
+                    let balance = Self::account_balance_for_capitalization(
+                        lamports,
+                        owner,
+                        executable,
+                        simple_capitalization_enabled,
+                    );
+
+                    accum.insert(
+                        *pk,
+                        (
+                            wv,
+                            *lh,
+                            balance,
+                            lamports,
+                        ),
+                    );
+                },
+            );
+            warn!("adding items: {}", accumulator_dummy.len());
+            accumulator.extend(accumulator_dummy);
+        }
+
+        warn!("checking ancestors: {}, slot: {}, found accounts so far (could have duplicates): {}", ancestors.len(), slot, mismatch_found.load(Ordering::Relaxed));
+        for s in ancestors.keys() {
+            warn!("checking ancestors: {}", *s);
+            let mut accumulator_dummy: Vec<HashMap<Pubkey, (u64, Hash, u64, u64)>> = self.scan_account_storage(
+                *s,
+                |loaded_account: LoadedAccount,
+                    _store_id: AppendVecId,
+                    accum: &mut HashMap<Pubkey, (u64, Hash, u64, u64)>| {
+                    //let accounts = self.slot.store.accounts.accounts(0);                    
+                    //if let Some((mut account, _)) = accounts.load_slow(&ancestors, loaded_account.pubkey()) {
+
+                    let la2 = loaded_account;
+                    let executable = la2.executable();
+                    let owner = la2.owner();
+                    let lamports = la2.lamports();
+                    let pk = la2.pubkey();
+                    let wv = la2.write_version();
+                    let lh = la2.loaded_hash();
+                    let balance = Self::account_balance_for_capitalization(
+                        lamports,
+                        owner,
+                        executable,
+                        simple_capitalization_enabled,
+                    );
+
+                    accum.insert(
+                        *pk,
+                        (
+                            wv,
+                            *lh,
+                            balance,
+                            lamports,
+                        ),
+                    );
+                },
+            );
+            warn!("adding items: {}", accumulator_dummy.len());
+            accumulator.extend(accumulator_dummy);
+        }
+
+
         scan.stop();
         let mut merge = Measure::start("merge");
         let mut account_maps = HashMap::new();
         while let Some(maps) = accumulator.pop() {
             AccountsDB::merge(&mut account_maps, &maps);
         }
+        warn!("Found {} unique accounts", account_maps.len());
         merge.stop();
         account_maps
     }
@@ -3261,19 +3352,22 @@ impl AccountsDB {
 
         let account_maps = self.get_accounts2(slot, ancestors, simple_capitalization_enabled);
 
-        let mut accumulate = Measure::start("accumulate");
+        let accumulate = Measure::start("accumulate");
         let hashes: Vec<_> = account_maps
             .into_iter()
-            .filter_map(|(pubkey, (_, hash, lamports))| {
-                if lamports > 0 {
+            .filter_map(|(pubkey, (_, hash, lamports, original_lamports))| {
+                if original_lamports != 0 {
+                    //warn!("USING {} because it has {} lamports", pubkey, lamports);
                     Some((pubkey, hash, lamports))
                 }
                 else{
+                    //warn!("Ignoring {} because it has 0 lamports", pubkey);
                     None
                 }
             })
             .collect();
         let hashes_bkup = hashes.clone();
+        warn!("there are {} entries", hashes_bkup.len());
         let ret = Self::accumulate_account_hashes_and_capitalization(hashes, slot, false);
         Ok((ret.0, ret.1, hashes_bkup))
     }
@@ -3320,6 +3414,7 @@ impl AccountsDB {
                                         loaded_account.executable(),
                                         simple_capitalization_enabled,
                                     );
+                                    warn!("using account {} with lamports: {}", pubkey, balance);
 
                                     if check_hash {
                                         let computed_hash = loaded_account.compute_hash(
@@ -3404,7 +3499,7 @@ impl AccountsDB {
             assert_eq!(other.1, total_lamports, "hashes different: {}, {}, lens: {}, {}", other.0, accumulated_hash, len1, len2);
         }
         else{
-            assert!(false, "Well what do you know? They were equal: hashes: {}, total lamports: {}", hashes_bkup.len(), total_lamports)
+            //assert!(false, "Well what do you know? They were equal: hashes: {}, total lamports: {}", hashes_bkup.len(), total_lamports)
         }
 
         Ok((accumulated_hash, total_lamports))

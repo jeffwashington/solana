@@ -4285,6 +4285,7 @@ impl Bank {
     /// calculation and could shield other real accounts.
     pub fn verify_snapshot_bank(&self) -> bool {
         if self.slot() > 0 {
+            warn!("Cleaning accounts: {}", self.slot());
             self.clean_accounts(true);
             self.shrink_all_slots();
         }
@@ -7875,10 +7876,12 @@ pub(crate) mod tests {
         info!("transfer 0 {} mint: {}", pubkey, mint_keypair.pubkey());
         bank0.transfer(1_000, &mint_keypair, &pubkey).unwrap();
 
+        warn!("line#: {}", line!());
         let bank0_state = bank0.hash_internal_state();
         let bank0 = Arc::new(bank0);
         // Checkpointing should result in a new state while freezing the parent
         let bank2 = Bank::new_from_parent(&bank0, &solana_sdk::pubkey::new_rand(), 1);
+        warn!("line#: {}", line!());
         assert_ne!(bank0_state, bank2.hash_internal_state());
         // Checkpointing should modify the checkpoint's state when freezed
         assert_ne!(bank0_state, bank0.hash_internal_state());
@@ -7886,17 +7889,24 @@ pub(crate) mod tests {
         // Checkpointing should never modify the checkpoint's state once frozen
         let bank0_state = bank0.hash_internal_state();
         bank2.update_accounts_hash();
+        warn!("line#: {}", line!());
         assert!(bank2.verify_bank_hash());
         let bank3 = Bank::new_from_parent(&bank0, &solana_sdk::pubkey::new_rand(), 2);
+        warn!("line#: {}", line!());
         assert_eq!(bank0_state, bank0.hash_internal_state());
         assert!(bank2.verify_bank_hash());
+        warn!("line#: {}", line!());
         bank3.update_accounts_hash();
+        warn!("line#: {}", line!());
         assert!(bank3.verify_bank_hash());
 
         let pubkey2 = solana_sdk::pubkey::new_rand();
         info!("transfer 2 {}", pubkey2);
+        warn!("line#: {}", line!());
         bank2.transfer(10, &mint_keypair, &pubkey2).unwrap();
+        warn!("line#: {}", line!());
         bank2.update_accounts_hash();
+        warn!("line#: {}", line!());
         assert!(bank2.verify_bank_hash());
         assert!(bank3.verify_bank_hash());
     }
@@ -7910,7 +7920,8 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn test_verify_snapshot_bank() {
+    fn test_verify_snapshot_bank() { // fails because there are no stores
+        solana_logger::setup();
         let pubkey = solana_sdk::pubkey::new_rand();
         let (genesis_config, mint_keypair) = create_genesis_config(2_000);
         let bank = Bank::new(&genesis_config);
