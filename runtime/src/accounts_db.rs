@@ -156,6 +156,12 @@ impl Versioned for (u64, Hash) {
     }
 }
 
+impl Versioned for (u64, Hash, u64) {
+    fn version(&self) -> u64 {
+        self.0
+    }
+}
+
 impl Versioned for (u64, AccountInfo) {
     fn version(&self) -> u64 {
         self.0
@@ -255,6 +261,16 @@ impl<'a> LoadedAccount<'a> {
             LoadedAccount::Cached((_, cached_account)) => match cached_account {
                 Cow::Owned(cached_account) => cached_account.account,
                 Cow::Borrowed(cached_account) => cached_account.account.clone(),
+            },
+        }
+    }
+
+    pub fn lamports(&self) -> u64 {
+        match self {
+            LoadedAccount::Stored(stored_account_meta) => stored_account_meta.clone_account().lamports,
+            LoadedAccount::Cached((_, cached_account)) => match cached_account {
+                Cow::Owned(cached_account) => cached_account.account.lamports,
+                Cow::Borrowed(cached_account) => cached_account.account.lamports,
             },
         }
     }
@@ -3183,6 +3199,85 @@ impl AccountsDB {
         }
     }
 
+    fn get_accounts2(
+        &self,
+        slot: Slot,
+        ancestors: &Ancestors,
+        simple_capitalization_enabled: bool,
+    ) -> HashMap<Pubkey, (u64, Hash, u64)> {
+        let mut scan = Measure::start("scan");
+        let mut accumulator: Vec<HashMap<Pubkey, (u64, Hash, u64)>> = self.scan_account_storage(
+            slot,
+            |loaded_account: LoadedAccount,
+                _store_id: AppendVecId,
+                accum: &mut HashMap<Pubkey, (u64, Hash, u64)>| {
+                //let accounts = self.slot.store.accounts.accounts(0);                    
+                //if let Some((mut account, _)) = accounts.load_slow(&ancestors, loaded_account.pubkey()) {
+
+                let la2 = loaded_account;
+                let executable = la2.executable();
+                let owner = la2.owner();
+                let lamports = la2.lamports();
+                let pk = la2.pubkey();
+                let wv = la2.write_version();
+                let lh = la2.loaded_hash();
+                let balance = Self::account_balance_for_capitalization(
+                    lamports,
+                    owner,
+                    executable,
+                    simple_capitalization_enabled,
+                );
+
+                accum.insert(
+                    *pk,
+                    (
+                        wv,
+                        *lh,
+                        balance
+                    ),
+                );
+            },
+        );
+        scan.stop();
+        let mut merge = Measure::start("merge");
+        let mut account_maps = HashMap::new();
+        while let Some(maps) = accumulator.pop() {
+            AccountsDB::merge(&mut account_maps, &maps);
+        }
+        merge.stop();
+        account_maps
+    }
+
+    // modeled after get_accounts_delta_hash
+    // intended to be faster than calculate_accounts_hash
+    fn calculate_accounts_hash2(
+        &self,
+        slot: Slot,
+        ancestors: &Ancestors,
+        check_hash: bool,
+        simple_capitalization_enabled: bool,
+    ) -> Result<(Hash, u64, Vec<(Pubkey, Hash, u64)>), BankHashVerificationError> {
+        use BankHashVerificationError::*;
+
+        let account_maps = self.get_accounts2(slot, ancestors, simple_capitalization_enabled);
+
+        let mut accumulate = Measure::start("accumulate");
+        let hashes: Vec<_> = account_maps
+            .into_iter()
+            .filter_map(|(pubkey, (_, hash, lamports))| {
+                if lamports > 0 {
+                    Some((pubkey, hash, lamports))
+                }
+                else{
+                    None
+                }
+            })
+            .collect();
+        let hashes_bkup = hashes.clone();
+        let ret = Self::accumulate_account_hashes_and_capitalization(hashes, slot, false);
+        Ok((ret.0, ret.1, hashes_bkup))
+    }
+
     fn calculate_accounts_hash(
         &self,
         slot: Slot,
@@ -3264,6 +3359,7 @@ impl AccountsDB {
         let hash_total = hashes.len();
 
         let mut accumulate = Measure::start("accumulate");
+        let hashes_bkup = hashes.clone();
         let (accumulated_hash, total_lamports) =
             Self::accumulate_account_hashes_and_capitalization(hashes, slot, false);
         accumulate.stop();
@@ -3273,6 +3369,44 @@ impl AccountsDB {
             ("hash_accumulate", accumulate.as_us(), i64),
             ("hash_total", hash_total, i64),
         );
+
+        // run a second algorithm and compare the results
+        let other = self.calculate_accounts_hash2(slot, ancestors, check_hash, simple_capitalization_enabled).unwrap();
+        if other.0 != accumulated_hash || other.1 != total_lamports {
+            let mut keys1 = hashes_bkup.into_iter().map(|(i, _, _)| {
+                let r: Pubkey = i;
+                r
+            }).collect::<Vec<_>>();
+            keys1.sort();
+            let mut keys2 = other.2.into_iter().map(|(i, _, _)| i).collect::<Vec<_>>();
+            keys2.sort();
+            let mut hk1 = HashSet::<Pubkey>::new();
+            let mut hk2 = HashSet::<Pubkey>::new();
+            let len1 = keys1.len();
+            let len2 = keys2.len();
+            hk1.extend(keys1.clone());
+            hk2.extend(keys2.clone());
+            let hl1 = hk1.len();
+            let hl2 = hk2.len();
+            warn!("len 1, 2: {}, {}", len1, len2);
+            for key in keys1 {
+                if hk2.get(&key).is_none() {
+                    warn!("Missing in 2: {}", key);
+                }
+            }
+            for key in keys2 {
+                if hk1.get(&key).is_none() {
+                    warn!("Missing in 1: {}", key);
+                }
+            }
+            assert!(false, "hashes different: {}, {}, lens: {}, {}, lamports: {}, {}, hash lens: {}, {}", other.0, accumulated_hash, len1, len2, other.1, total_lamports, hl1, hl2);
+            assert_eq!(other.0, accumulated_hash, "hashes different: {}, {}, lens: {}, {}, lamports: {}, {}, hash lens: {}, {}", other.0, accumulated_hash, len1, len2, other.1, total_lamports, hl1, hl2);
+            assert_eq!(other.1, total_lamports, "hashes different: {}, {}, lens: {}, {}", other.0, accumulated_hash, len1, len2);
+        }
+        else{
+            assert!(false, "Well what do you know? They were equal: hashes: {}, total lamports: {}", hashes_bkup.len(), total_lamports)
+        }
+
         Ok((accumulated_hash, total_lamports))
     }
 
