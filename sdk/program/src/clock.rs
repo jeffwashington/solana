@@ -11,7 +11,7 @@ pub const MS_PER_TICK: u64 = 1000 / DEFAULT_TICKS_PER_SECOND;
 pub const DEFAULT_TICKS_PER_SLOT: u64 = 64;
 
 // GCP n1-standard hardware and also a xeon e5-2520 v4 are about this rate of hashes/s
-pub const DEFAULT_HASHES_PER_SECOND: u64 = 2_000_000;
+pub const DEFAULT_HASHES_PER_SECOND: u64 = 50000;
 
 pub const DEFAULT_HASHES_PER_TICK: u64 = DEFAULT_HASHES_PER_SECOND / DEFAULT_TICKS_PER_SECOND;
 

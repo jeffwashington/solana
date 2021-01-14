@@ -51,6 +51,7 @@ use std::{
         Arc, Mutex, RwLock,
     },
     thread,
+    time::Instant,
 };
 
 pub struct Tvu {
@@ -96,7 +97,7 @@ impl Tvu {
         cluster_info: &Arc<ClusterInfo>,
         sockets: Sockets,
         blockstore: Arc<Blockstore>,
-        ledger_signal_receiver: Receiver<bool>,
+        ledger_signal_receiver: Receiver<Instant>,
         subscriptions: &Arc<RpcSubscriptions>,
         poh_recorder: &Arc<Mutex<PohRecorder>>,
         tower: Tower,

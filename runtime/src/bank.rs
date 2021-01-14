@@ -1998,6 +1998,8 @@ impl Bank {
     }
 
     pub fn freeze(&self) {
+        let mut times = String::new();
+        let mut time = Measure::start("replay_active_banks_time");
         // This lock prevents any new commits from BankingStage
         // `process_and_record_transactions_locked()` from coming
         // in after the last tick is observed. This is because in
@@ -2010,20 +2012,44 @@ impl Bank {
         // record and commit are finished, those transactions will be
         // committed before this write lock can be obtained here.
         let mut hash = self.hash.write().unwrap();
+        time.stop();
+        if time.as_ms() > 0 {times.push_str(&format!("{}\t{}, ", line!(), time.as_ms()));}
+        time = Measure::start("dummy");
         if *hash == Hash::default() {
             // finish up any deferred changes to account state
             self.collect_rent_eagerly();
-            self.collect_fees();
+            time.stop();
+            if time.as_ms() > 0 {times.push_str(&format!("{}\t{}, ", line!(), time.as_ms()));}
+            time = Measure::start("dummy");
+                self.collect_fees();
             self.distribute_rent();
-            self.update_slot_history();
+            time.stop();
+            if time.as_ms() > 0 {times.push_str(&format!("{}\t{}, ", line!(), time.as_ms()));}
+            time = Measure::start("dummy");
+                self.update_slot_history();
             self.run_incinerator();
-
+            time.stop();
+            if time.as_ms() > 0 {times.push_str(&format!("{}\t{}, ", line!(), time.as_ms()));}
+            time = Measure::start("dummy");
+    
             // freeze is a one-way trip, idempotent
             self.freeze_started.store(true, Relaxed);
-            *hash = self.hash_internal_state();
-            self.rc.accounts.accounts_db.mark_slot_frozen(self.slot());
+            time.stop();
+            if time.as_ms() > 0 {times.push_str(&format!("{}\t{}, ", line!(), time.as_ms()));}
+            time = Measure::start("dummy");
+                *hash = self.hash_internal_state();
+            time.stop();
+            if time.as_ms() > 0 {times.push_str(&format!("{}\t{}, ", line!(), time.as_ms()));}
+            time = Measure::start("dummy");
+                self.rc.accounts.accounts_db.mark_slot_frozen(self.slot());
+            time.stop();
+            if time.as_ms() > 0 {times.push_str(&format!("{}\t{}, ", line!(), time.as_ms()));}
+            time = Measure::start("dummy");
+            }
+            if times.len() > 0{
+                warn!("bank.freeze times: {}", times);
+            }
         }
-    }
 
     // Should not be called outside of startup, will race with
     // concurrent cleaning logic in AccountsBackgroundService

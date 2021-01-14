@@ -60,6 +60,7 @@ use std::{
         Arc, Mutex, RwLock,
     },
     time::Duration,
+    time::Instant,
 };
 use thiserror::Error;
 use trees::{Tree, TreeWalk};
@@ -120,7 +121,7 @@ pub struct CompletedDataSetInfo {
 
 pub struct BlockstoreSignals {
     pub blockstore: Blockstore,
-    pub ledger_signal_receiver: Receiver<bool>,
+    pub ledger_signal_receiver: Receiver<Instant>,
     pub completed_slots_receiver: CompletedSlotsReceiver,
 }
 
@@ -144,7 +145,7 @@ pub struct Blockstore {
     perf_samples_cf: LedgerColumn<cf::PerfSamples>,
     last_root: Arc<RwLock<Slot>>,
     insert_shreds_lock: Arc<Mutex<()>>,
-    pub new_shreds_signals: Vec<SyncSender<bool>>,
+    pub new_shreds_signals: Vec<SyncSender<Instant>>,
     pub completed_slots_senders: Vec<SyncSender<Vec<Slot>>>,
     pub lowest_cleanup_slot: Arc<RwLock<u64>>,
     no_compaction: bool,
@@ -378,7 +379,7 @@ impl Blockstore {
             recovery_mode,
             enforce_ulimit_nofile,
         )?;
-        let (ledger_signal_sender, ledger_signal_receiver) = sync_channel(1);
+        let (ledger_signal_sender, ledger_signal_receiver) = sync_channel::<Instant>(10000);
         let (completed_slots_sender, completed_slots_receiver) =
             sync_channel(MAX_COMPLETED_SLOTS_IN_CHANNEL);
         blockstore.new_shreds_signals = vec![ledger_signal_sender];
@@ -927,6 +928,10 @@ impl Blockstore {
         self.db.write(write_batch)?;
         start.stop();
         let write_batch_elapsed = start.as_us();
+
+        if should_signal {
+            // TODO self.timer = Instant::now();
+        }
 
         send_signals(
             &self.new_shreds_signals,
@@ -2993,14 +2998,16 @@ fn is_valid_write_to_slot_0(slot_to_write: u64, parent_slot: Slot, last_root: u6
 }
 
 fn send_signals(
-    new_shreds_signals: &[SyncSender<bool>],
+    new_shreds_signals: &[SyncSender<Instant>],
     completed_slots_senders: &[SyncSender<Vec<u64>>],
     should_signal: bool,
     newly_completed_slots: Vec<u64>,
 ) {
     if should_signal {
+        let now = Instant::now();
+        //warn!("Signaling: {:?}", now);
         for signal in new_shreds_signals {
-            let _ = signal.try_send(true);
+            let _ = signal.try_send(now);
         }
     }
 

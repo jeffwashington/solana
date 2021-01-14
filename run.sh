@@ -11,9 +11,7 @@ set -e
 cd "$(dirname "$0")/"
 
 profile=debug
-if [[ -n $NDEBUG ]]; then
-  profile=release
-fi
+profile=release
 PATH=$PWD/target/$profile:$PATH
 
 ok=true

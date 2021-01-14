@@ -60,7 +60,7 @@ pub struct WorkingBank {
 pub struct PohRecorder {
     pub poh: Arc<Mutex<Poh>>,
     tick_height: u64,
-    clear_bank_signal: Option<SyncSender<bool>>,
+    clear_bank_signal: Option<SyncSender<Instant>>,
     start_slot: Slot,              // parent slot
     start_tick_height: u64,        // first tick_height this recorder will observe
     tick_cache: Vec<(Entry, u64)>, // cache of entry and its tick_height
@@ -95,7 +95,7 @@ impl PohRecorder {
             self.leader_last_tick_height = leader_last_tick_height;
         }
         if let Some(ref signal) = self.clear_bank_signal {
-            let _ = signal.try_send(true);
+            let _ = signal.try_send(Instant::now());
         }
     }
 
@@ -440,7 +440,7 @@ impl PohRecorder {
         ticks_per_slot: u64,
         id: &Pubkey,
         blockstore: &Arc<Blockstore>,
-        clear_bank_signal: Option<SyncSender<bool>>,
+        clear_bank_signal: Option<SyncSender<Instant>>,
         leader_schedule_cache: &Arc<LeaderScheduleCache>,
         poh_config: &Arc<PohConfig>,
     ) -> (Self, Receiver<WorkingBankEntry>) {

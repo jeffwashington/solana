@@ -40,7 +40,7 @@ impl Default for Config {
             threads: 4,
             num_nodes: 1,
             duration: Duration::new(std::u64::MAX, 0),
-            tx_count: 50_000,
+            tx_count: 5_000,
             keypair_multiplier: 8,
             thread_batch_sleep_ms: 1000,
             sustained: false,

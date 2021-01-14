@@ -1072,6 +1072,8 @@ impl Tower {
     }
 
     pub fn save(&self, node_keypair: &Arc<Keypair>) -> Result<()> {
+        let mut times = String::new();
+        let mut time = Measure::start("replay_active_banks_time");
         let mut measure = Measure::start("tower_save-ms");
 
         if self.node_pubkey != node_keypair.pubkey() {
@@ -1088,8 +1090,14 @@ impl Tower {
             // overwrite anything if exists
             let mut file = File::create(&new_filename)?;
             let saved_tower = SavedTower::new(self, node_keypair)?;
-            bincode::serialize_into(&mut file, &saved_tower)?;
-            // file.sync_all() hurts performance; pipeline sync-ing and submitting votes to the cluster!
+            time.stop();
+            if time.as_ms() > 0 {times.push_str(&format!("{}\t{}, ", line!(), time.as_ms()));}
+            time = Measure::start("dummy");
+                bincode::serialize_into(&mut file, &saved_tower)?;
+                time.stop();
+                if time.as_ms() > 0 {times.push_str(&format!("{}\t{}, ", line!(), time.as_ms()));}
+                time = Measure::start("dummy");
+                    // file.sync_all() hurts performance; pipeline sync-ing and submitting votes to the cluster!
         }
         trace!("persisted votes: {:?}", self.voted_slots());
         fs::rename(&new_filename, &filename)?;
@@ -1097,6 +1105,9 @@ impl Tower {
 
         measure.stop();
         inc_new_counter_info!("tower_save-ms", measure.as_ms() as usize);
+        if times.len() > 0{
+            warn!("tower save times: {}", times);
+        }
 
         Ok(())
     }

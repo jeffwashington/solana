@@ -52,6 +52,7 @@ use solana_runtime::{
     hardened_unpack::{open_genesis_config, MAX_GENESIS_ARCHIVE_UNPACKED_SIZE},
 };
 use solana_sdk::{
+    clock::DEFAULT_HASHES_PER_TICK,
     clock::Slot,
     epoch_schedule::MAX_LEADER_SCHEDULE_EPOCH_OFFSET,
     genesis_config::GenesisConfig,
@@ -781,7 +782,14 @@ fn active_vote_account_exists_in_bank(bank: &Arc<Bank>, vote_account: &Pubkey) -
 }
 
 fn check_poh_speed(genesis_config: &GenesisConfig, maybe_hash_samples: Option<u64>) {
-    if let Some(hashes_per_tick) = genesis_config.hashes_per_tick() {
+    let mut hashes_per_tick = solana_sdk::clock::DEFAULT_HASHES_PER_TICK;
+    if let Some(hashes_per_tick2) = genesis_config.hashes_per_tick() {
+        hashes_per_tick = hashes_per_tick2;
+    }
+    else{
+        warn!("hashes per tick is none!");
+    }
+    {
         let ticks_per_slot = genesis_config.ticks_per_slot();
         let hashes_per_slot = hashes_per_tick * ticks_per_slot;
 
@@ -789,9 +797,9 @@ fn check_poh_speed(genesis_config: &GenesisConfig, maybe_hash_samples: Option<u6
         let hash_time_ns = compute_hash_time_ns(hash_samples);
 
         let my_ns_per_slot = (hash_time_ns * hashes_per_slot) / hash_samples;
-        debug!("computed: ns_per_slot: {}", my_ns_per_slot);
+        info!("computed: ns_per_slot: {}", my_ns_per_slot);
         let target_ns_per_slot = genesis_config.ns_per_slot() as u64;
-        debug!(
+        info!(
             "cluster ns_per_hash: {}ns ns_per_slot: {}",
             target_ns_per_slot / hashes_per_slot,
             target_ns_per_slot
@@ -801,8 +809,12 @@ fn check_poh_speed(genesis_config: &GenesisConfig, maybe_hash_samples: Option<u6
             info!("PoH speed check: Will sleep {}ns per slot.", extra_ns);
         } else {
             error!(
-                "PoH is slower than cluster target tick rate! mine: {} cluster: {}. If you wish to continue, try --no-poh-speed-test",
+                "PoH is slower than cluster target tick rate! mine: {} cluster: {}. If you wish to continue, try --no-poh-speed-test, hash samples: {}, hashes per slot: {}, ticks per slot: {}, achieved hashes/s {}",
                 my_ns_per_slot, target_ns_per_slot,
+                hash_samples,
+                hashes_per_slot, ticks_per_slot,
+                hash_samples as f64 / hash_time_ns as f64 * 1_000_000_000 as f64,
+                
             );
             abort();
         }
@@ -906,7 +918,7 @@ fn new_banks_from_ledger(
     GenesisConfig,
     BankForks,
     Arc<Blockstore>,
-    Receiver<bool>,
+    Receiver<Instant>,
     CompletedSlotsReceiver,
     LeaderScheduleCache,
     Option<(Slot, Hash)>,

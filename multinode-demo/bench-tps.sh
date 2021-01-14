@@ -14,7 +14,7 @@ usage() {
   echo
   echo " Run bench-tps "
   echo
-  echo "   extra args: additional arguments are pass along to solana-bench-tps"
+  echo "   extra args: additional arguments are passed along to solana-bench-tps"
   echo
   exit 1
 }
@@ -24,7 +24,7 @@ if [[ -z $1 ]]; then # default behavior
     --entrypoint 127.0.0.1:8001 \
     --faucet 127.0.0.1:9900 \
     --duration 90 \
-    --tx_count 50000 \
+    --tx_count 5000 \
     --thread-batch-sleep-ms 0 \
 
 else

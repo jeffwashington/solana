@@ -89,7 +89,9 @@ pub fn compute_hash_time_ns(hashes_sample_size: u64) -> u64 {
     for _ in 0..hashes_sample_size {
         v = hash(&v.as_ref());
     }
-    start.elapsed().as_nanos() as u64
+    let re = start.elapsed().as_nanos() as u64;
+    info!("Running {} hashes.... {}", hashes_sample_size, re);
+    re
 }
 
 pub fn compute_hashes_per_tick(duration: Duration, hashes_sample_size: u64) -> u64 {

@@ -19,6 +19,7 @@ use crate::{
     rewards_recorder_service::RewardsRecorderSender,
     rpc_subscriptions::RpcSubscriptions,
 };
+use rand::prelude::*;
 use solana_ledger::{
     block_error::BlockError,
     blockstore::Blockstore,
@@ -53,6 +54,7 @@ use std::{
     },
     thread::{self, Builder, JoinHandle},
     time::Duration,
+    time::Instant,
 };
 
 pub const MAX_ENTRY_RECV_PER_ITER: usize = 512;
@@ -108,7 +110,7 @@ pub struct ReplayStageConfig {
     pub bank_notification_sender: Option<BankNotificationSender>,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct ReplayTiming {
     last_print: u64,
     collect_frozen_banks_elapsed: u64,
@@ -161,7 +163,11 @@ impl ReplayTiming {
         self.bank_count += bank_count;
         let now = timestamp();
         let elapsed_ms = now - self.last_print;
-        if elapsed_ms > 1000 {
+        if true { //elapsed_ms > 1000 {
+            if replay_active_banks_elapsed > 10_000 {
+                warn!("timings: {:?}", self);
+            }
+            if false {
             datapoint_info!(
                 "replay-loop-timing-stats",
                 ("total_elapsed_us", elapsed_ms * 1000, i64),
@@ -224,10 +230,10 @@ impl ReplayTiming {
                 ),
                 ("bank_count", self.bank_count as i64, i64),
             );
-
-            *self = ReplayTiming::default();
-            self.last_print = now;
         }
+        *self = ReplayTiming::default();
+        self.last_print = now;
+    }
     }
 }
 
@@ -243,7 +249,7 @@ impl ReplayStage {
         blockstore: Arc<Blockstore>,
         bank_forks: Arc<RwLock<BankForks>>,
         cluster_info: Arc<ClusterInfo>,
-        ledger_signal_receiver: Receiver<bool>,
+        ledger_signal_receiver: Receiver<Instant>,
         poh_recorder: Arc<Mutex<PohRecorder>>,
         mut tower: Tower,
         vote_tracker: Arc<VoteTracker>,
@@ -296,6 +302,11 @@ impl ReplayStage {
                 let mut partition_exists = false;
                 let mut skipped_slots_info = SkippedSlotsInfo::default();
                 let mut replay_timing = ReplayTiming::default();
+                let mut last_time = Instant::now();
+                let mut rng = rand::thread_rng();
+
+                let id: u8 = rng.gen();
+    
                 loop {
                     let allocated = thread_mem_usage::Allocatedp::default();
 
@@ -322,14 +333,16 @@ impl ReplayStage {
                     let mut tpu_has_bank = poh_recorder.lock().unwrap().has_bank();
 
                     let start = allocated.get();
+                    let mut cl = transaction_status_sender.clone();
                     let mut replay_active_banks_time = Measure::start("replay_active_banks_time");
+
                     let did_complete_bank = Self::replay_active_banks(
                         &blockstore,
                         &bank_forks,
                         &my_pubkey,
                         &vote_account,
                         &mut progress,
-                        transaction_status_sender.clone(),
+                        cl,
                         &verify_recyclers,
                         &mut heaviest_subtree_fork_choice,
                         &replay_vote_sender,
@@ -464,6 +477,11 @@ impl ReplayStage {
                                 &votable_leader,
                             );
                         }
+                        voting_time.stop();
+                        let vt = voting_time.as_ms();
+                        if vt > 30 {
+                            warn!("Voting time\t {}", vt);
+                        }
 
                         Self::handle_votable_bank(
                             &vote_bank,
@@ -516,6 +534,12 @@ impl ReplayStage {
                                     i64
                                 ),
                             );
+
+                            warn!("Waited: {:?}, {:?}, slot: {}, current leader: {:?}", last_time.elapsed(), id, reset_bank.slot(), current_leader);
+                            if last_time.elapsed().as_millis() > 200 {
+                                panic!("too long");
+                            }
+
                             Self::reset_poh_recorder(
                                 &my_pubkey,
                                 &blockstore,
@@ -600,7 +624,30 @@ impl ReplayStage {
                         match result {
                             Err(RecvTimeoutError::Timeout) => (),
                             Err(_) => break,
-                            Ok(_) => trace!("blockstore signal"),
+                            Ok(last_time2) => {
+                                last_time = last_time2;
+                                trace!("blockstore signal");
+                                loop {
+                                    let result = ledger_signal_receiver.try_recv();
+                                    match result {
+                                        Err(_) => break,
+                                        Ok(last_time2) => {
+                                            last_time = last_time2;
+                                        },
+                                    };
+                                };
+                            }
+                        };
+                    }
+                    else {
+                        loop {
+                            let result = ledger_signal_receiver.try_recv();
+                            match result {
+                                Err(_) => break,
+                                Ok(last_time2) => {
+                                    last_time = last_time2;
+                                },
+                            };
                         };
                     }
                     wait_receive_time.stop();
@@ -1084,6 +1131,7 @@ impl ReplayStage {
         cache_block_time_sender: &Option<CacheBlockTimeSender>,
         bank_notification_sender: &Option<BankNotificationSender>,
     ) {
+
         if bank.is_empty() {
             inc_new_counter_info!("replay_stage-voted_empty_bank", 1);
         }
@@ -1091,11 +1139,16 @@ impl ReplayStage {
         let (vote, tower_index) = tower.new_vote_from_bank(bank, vote_account_pubkey);
         let new_root = tower.record_bank_vote(vote);
         let last_vote = tower.last_vote_and_timestamp();
+        let mut times = String::new();
+        let mut time = Measure::start("replay_active_banks_time");
 
         if let Err(err) = tower.save(&cluster_info.keypair) {
             error!("Unable to save tower: {:?}", err);
             std::process::exit(1);
         }
+        time.stop();
+        if time.as_ms() > 0 {times.push_str(&format!("{}\t{}, ", line!(), time.as_ms()));}
+        time = Measure::start("dummy");
 
         if let Some(new_root) = new_root {
             // get the root bank before squash
@@ -1105,14 +1158,23 @@ impl ReplayStage {
                 .get(new_root)
                 .expect("Root bank doesn't exist")
                 .clone();
-            let mut rooted_banks = root_bank.parents();
+                time.stop();
+                if time.as_ms() > 0 {times.push_str(&format!("{}\t{}, ", line!(), time.as_ms()));}
+                time = Measure::start("dummy");
+                let mut rooted_banks = root_bank.parents();
             rooted_banks.push(root_bank.clone());
+            time.stop();
+            if time.as_ms() > 0 {times.push_str(&format!("{}\t{}, ", line!(), time.as_ms()));}
+            time = Measure::start("dummy");
             let rooted_slots: Vec<_> = rooted_banks.iter().map(|bank| bank.slot()).collect();
             // Call leader schedule_cache.set_root() before blockstore.set_root() because
             // bank_forks.root is consumed by repair_service to update gossip, so we don't want to
             // get shreds for repair on gossip before we update leader schedule, otherwise they may
             // get dropped.
             leader_schedule_cache.set_root(rooted_banks.last().unwrap());
+            time.stop();
+            if time.as_ms() > 0 {times.push_str(&format!("{}\t{}, ", line!(), time.as_ms()));}
+            time = Measure::start("dummy");
             blockstore
                 .set_roots(&rooted_slots)
                 .expect("Ledger set roots failed");
@@ -1122,12 +1184,18 @@ impl ReplayStage {
                 &rooted_slots,
                 cache_block_time_sender,
             );
+            time.stop();
+            if time.as_ms() > 0 {times.push_str(&format!("{}\t{}, ", line!(), time.as_ms()));}
+            time = Measure::start("dummy");
             let highest_confirmed_root = Some(
                 block_commitment_cache
                     .read()
                     .unwrap()
                     .highest_confirmed_root(),
             );
+            time.stop();
+            if time.as_ms() > 0 {times.push_str(&format!("{}\t{}, ", line!(), time.as_ms()));}
+            time = Measure::start("dummy");
             Self::handle_new_root(
                 new_root,
                 &bank_forks,
@@ -1137,12 +1205,21 @@ impl ReplayStage {
                 highest_confirmed_root,
                 heaviest_subtree_fork_choice,
             );
+            time.stop();
+            if time.as_ms() > 0 {times.push_str(&format!("{}\t{}, ", line!(), time.as_ms()));}
+            time = Measure::start("dummy");
             subscriptions.notify_roots(rooted_slots);
+            time.stop();
+            if time.as_ms() > 0 {times.push_str(&format!("{}\t{}, ", line!(), time.as_ms()));}
+            time = Measure::start("dummy");
             if let Some(sender) = bank_notification_sender {
                 sender
                     .send(BankNotification::Root(root_bank))
                     .unwrap_or_else(|err| warn!("bank_notification_sender failed: {:?}", err));
             }
+            time.stop();
+            if time.as_ms() > 0 {times.push_str(&format!("{}\t{}, ", line!(), time.as_ms()));}
+            time = Measure::start("dummy");
             latest_root_senders.iter().for_each(|s| {
                 if let Err(e) = s.send(new_root) {
                     trace!("latest root send failed: {:?}", e);
@@ -1150,6 +1227,9 @@ impl ReplayStage {
             });
             info!("new root {}", new_root);
         }
+            time.stop();
+            if time.as_ms() > 0 {times.push_str(&format!("{}\t{}, ", line!(), time.as_ms()));}
+            time = Measure::start("dummy");
 
         Self::update_commitment_cache(
             bank.clone(),
@@ -1157,6 +1237,9 @@ impl ReplayStage {
             progress.get_fork_stats(bank.slot()).unwrap().total_stake,
             lockouts_sender,
         );
+            time.stop();
+            if time.as_ms() > 0 {times.push_str(&format!("{}\t{}, ", line!(), time.as_ms()));}
+            time = Measure::start("dummy");
         Self::push_vote(
             cluster_info,
             bank,
@@ -1166,7 +1249,14 @@ impl ReplayStage {
             tower_index,
             switch_fork_decision,
         );
-    }
+            time.stop();
+            if time.as_ms() > 0 {times.push_str(&format!("{}\t{}, ", line!(), time.as_ms()));}
+            time = Measure::start("dummy");
+
+            if times.len() > 0{
+                warn!("voting times: {}", times);
+            }
+        }
 
     fn push_vote(
         cluster_info: &ClusterInfo,
@@ -1313,12 +1403,17 @@ impl ReplayStage {
         bank_notification_sender: &Option<BankNotificationSender>,
         rewards_recorder_sender: &Option<RewardsRecorderSender>,
     ) -> bool {
+        let mut times = String::new();
         let mut did_complete_bank = false;
         let mut tx_count = 0;
+        let mut time = Measure::start("replay_active_banks_time");
         let active_banks = bank_forks.read().unwrap().active_banks();
         trace!("active banks {:?}", active_banks);
+        //warn!("active banks: {}", active_banks.len());
 
         for bank_slot in &active_banks {
+            let mut voting_time = Measure::start("voting_time");
+    
             // If the fork was marked as dead, don't replay it
             if progress.get(bank_slot).map(|p| p.is_dead).unwrap_or(false) {
                 debug!("bank_slot {:?} is marked dead", *bank_slot);
@@ -1338,6 +1433,7 @@ impl ReplayStage {
                     stats.num_dropped_blocks_on_fork + new_dropped_blocks;
                 (num_blocks_on_fork, num_dropped_blocks_on_fork)
             };
+
             // Insert a progress entry even for slots this node is the leader for, so that
             // 1) confirm_forks can report confirmation, 2) we can cache computations about
             // this bank in `select_forks()`
@@ -1351,6 +1447,10 @@ impl ReplayStage {
                     num_dropped_blocks_on_fork,
                 )
             });
+
+            time.stop();
+            if time.as_ms() > 0 {times.push_str(&format!("{}\t{}, ", line!(), time.as_ms()));}
+            time = Measure::start("dummy");
             if bank.collector_id() != my_pubkey {
                 let replay_result = Self::replay_blockstore_into_bank(
                     &bank,
@@ -1371,19 +1471,34 @@ impl ReplayStage {
                 }
             }
             assert_eq!(*bank_slot, bank.slot());
+            time.stop();
+            if time.as_ms() > 0 {times.push_str(&format!("{}\t{}, ", line!(), time.as_ms()));}
+            time = Measure::start("dummy");
             if bank.is_complete() {
                 if !blockstore.has_duplicate_shreds_in_slot(bank.slot()) {
-                    bank_progress.replay_stats.report_stats(
+                    time.stop();
+                    if time.as_ms() > 0 {times.push_str(&format!("{}\t{}, ", line!(), time.as_ms()));}
+                    time = Measure::start("dummy");
+                            bank_progress.replay_stats.report_stats(
                         bank.slot(),
                         bank_progress.replay_progress.num_entries,
                         bank_progress.replay_progress.num_shreds,
                     );
+                    time.stop();
+                    if time.as_ms() > 0 {times.push_str(&format!("{}\t{}, ", line!(), time.as_ms()));}
+                    time = Measure::start("dummy");
                     did_complete_bank = true;
                     info!("bank frozen: {}", bank.slot());
                     bank.freeze();
+                    time.stop();
+                    if time.as_ms() > 0 {times.push_str(&format!("{}\t{}, ", line!(), time.as_ms()));}
+                    time = Measure::start("dummy");
                     heaviest_subtree_fork_choice
                         .add_new_leaf_slot(bank.slot(), Some(bank.parent_slot()));
-                    if let Some(sender) = bank_notification_sender {
+                    time.stop();
+                    if time.as_ms() > 0 {times.push_str(&format!("{}\t{}, ", line!(), time.as_ms()));}
+                    time = Measure::start("dummy");
+                        if let Some(sender) = bank_notification_sender {
                         sender
                             .send(BankNotification::Frozen(bank.clone()))
                             .unwrap_or_else(|err| {
@@ -1391,8 +1506,14 @@ impl ReplayStage {
                             });
                     }
 
-                    Self::record_rewards(&bank, &rewards_recorder_sender);
-                } else {
+                    time.stop();
+                    if time.as_ms() > 0 {times.push_str(&format!("{}\t{}, ", line!(), time.as_ms()));}
+                    time = Measure::start("dummy");
+                            Self::record_rewards(&bank, &rewards_recorder_sender);
+                            time.stop();
+                            if time.as_ms() > 0 {times.push_str(&format!("{}\t{}, ", line!(), time.as_ms()));}
+                            time = Measure::start("dummy");
+                                } else {
                     Self::mark_dead_slot(
                         blockstore,
                         bank_progress,
@@ -1400,20 +1521,32 @@ impl ReplayStage {
                         &BlockstoreProcessorError::InvalidBlock(BlockError::DuplicateBlock),
                         true,
                     );
-                    warn!(
+                    time.stop();
+                    if time.as_ms() > 0 {times.push_str(&format!("{}\t{}, ", line!(), time.as_ms()));}
+                    time = Measure::start("dummy");
+                            warn!(
                         "{} duplicate shreds detected, not freezing bank {}",
                         my_pubkey,
                         bank.slot()
                     );
                 }
             } else {
-                trace!(
+                time.stop();
+                if time.as_ms() > 0 {times.push_str(&format!("{}\t{}, ", line!(), time.as_ms()));}
+                time = Measure::start("dummy");
+                    trace!(
                     "bank {} not completed tick_height: {}, max_tick_height: {}",
                     bank.slot(),
                     bank.tick_height(),
                     bank.max_tick_height()
                 );
             }
+
+            //warn!("bank times: {:?}", times);
+                
+        }
+        if times.len() > 0{
+            warn!("bank times: {}", times);
         }
         inc_new_counter_info!("replay_stage-replay_transactions", tx_count);
         did_complete_bank

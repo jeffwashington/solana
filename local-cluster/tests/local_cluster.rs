@@ -2472,7 +2472,7 @@ fn setup_snapshot_validator_config(
 #[serial]
 fn test_hashes_per_tick_increase_feature() {
     solana_logger::setup();
-    let num_nodes = 2;
+    let num_nodes = 3;
     let mut validator_config = ValidatorConfig::default();
     let debug_votes = false;
     if debug_votes {
