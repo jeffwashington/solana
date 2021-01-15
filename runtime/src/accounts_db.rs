@@ -3453,8 +3453,11 @@ impl AccountsDB {
 
         // run a second algorithm and compare the results
         // TODO: remove this
-        let other =
-            self.calculate_accounts_hash_using_store(slot, ancestors, simple_capitalization_enabled);
+        let other = self.calculate_accounts_hash_using_store(
+            slot,
+            ancestors,
+            simple_capitalization_enabled,
+        );
         if other.0 != accumulated_hash || other.1 != total_lamports {
             let mut keys1 = hashes_bkup
                 .into_iter()
