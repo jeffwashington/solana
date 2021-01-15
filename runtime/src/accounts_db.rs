@@ -146,6 +146,8 @@ type ReclaimResult = (AccountSlots, AppendVecOffsets);
 type StorageFinder<'a> = Box<dyn Fn(Slot, usize) -> Arc<AccountStorageEntry> + 'a>;
 type ShrinkCandidates = HashMap<Slot, HashMap<AppendVecId, Arc<AccountStorageEntry>>>;
 
+type CalculateHashIntermediate = (u64, Hash, u64, u64);
+
 trait Versioned {
     fn version(&self) -> u64;
 }
@@ -156,7 +158,7 @@ impl Versioned for (u64, Hash) {
     }
 }
 
-impl Versioned for (u64, Hash, u64, u64) {
+impl Versioned for CalculateHashIntermediate {
     fn version(&self) -> u64 {
         self.0
     }
@@ -3207,7 +3209,7 @@ impl AccountsDB {
         slot: Slot,
         ancestors: &Ancestors,
         simple_capitalization_enabled: bool,
-    ) -> HashMap<Pubkey, (u64, Hash, u64, u64)> {
+    ) -> HashMap<Pubkey, CalculateHashIntermediate> {
         let mismatch_found = AtomicU64::new(0);
         let mut scanned_slots = HashSet::<Slot>::new();
 
@@ -3215,7 +3217,7 @@ impl AccountsDB {
 
         // scan this slot
         let mut accumulator =
-            self.scan_slot::<(u64, Hash, u64, u64)>(slot, simple_capitalization_enabled, None);
+            self.scan_slot::<CalculateHashIntermediate>(slot, simple_capitalization_enabled, None);
         scanned_slots.insert(slot);
 
         while let Some(maps) = accumulator.pop() {
@@ -3276,15 +3278,15 @@ impl AccountsDB {
         slot: Slot,
         simple_capitalization_enabled: bool,
         known_accounts: Option<&HashMap<Pubkey, T>>,
-    ) -> Vec<HashMap<Pubkey, (u64, Hash, u64, u64)>>
+    ) -> Vec<HashMap<Pubkey, CalculateHashIntermediate>>
     where
         T: Versioned + Clone + Sync + Send,
     {
-        let accumulator: Vec<HashMap<Pubkey, (u64, Hash, u64, u64)>> = self.scan_account_storage(
+        let accumulator: Vec<HashMap<Pubkey, CalculateHashIntermediate>> = self.scan_account_storage(
             slot,
             |loaded_account: LoadedAccount,
              _store_id: AppendVecId,
-             accum: &mut HashMap<Pubkey, (u64, Hash, u64, u64)>| {
+             accum: &mut HashMap<Pubkey, CalculateHashIntermediate>| {
                 let public_key = loaded_account.pubkey();
                 let version = loaded_account.write_version();
                 if known_accounts.is_some() {
