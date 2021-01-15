@@ -3232,11 +3232,14 @@ impl AccountsDB {
 
         // scan all slots
         let len = AtomicUsize::new(0);
-        let accumulators: Vec<_> = scanned_slots.into_par_iter().map(|slot| {
-            let accumulator = self.scan_slot(slot, simple_capitalization_enabled);
-            len.fetch_add(accumulator.len(), Ordering::Relaxed);
-            accumulator
-        }).collect();
+        let accumulators: Vec<_> = scanned_slots
+            .into_par_iter()
+            .map(|slot| {
+                let accumulator = self.scan_slot(slot, simple_capitalization_enabled);
+                len.fetch_add(accumulator.len(), Ordering::Relaxed);
+                accumulator
+            })
+            .collect();
 
         let mut account_maps = HashMap::with_capacity(len.load(Ordering::Relaxed));
         for accumulator in accumulators {
@@ -3251,30 +3254,29 @@ impl AccountsDB {
     fn scan_slot(
         &self,
         slot: Slot,
-        simple_capitalization_enabled: bool
+        simple_capitalization_enabled: bool,
     ) -> Vec<Vec<(Pubkey, CalculateHashIntermediate)>> {
-        let accumulator: Vec<Vec<(Pubkey, CalculateHashIntermediate)>> = self
-            .scan_account_storage(
-                slot,
-                |loaded_account: LoadedAccount,
-                 _store_id: AppendVecId,
-                 accum: &mut Vec<(Pubkey, CalculateHashIntermediate)>| {
-                    let public_key = loaded_account.pubkey();
-                    let version = loaded_account.write_version();
-                    let lamports = loaded_account.lamports();
-                    let balance = Self::account_balance_for_capitalization(
-                        lamports,
-                        loaded_account.owner(),
-                        loaded_account.executable(),
-                        simple_capitalization_enabled,
-                    );
+        let accumulator: Vec<Vec<(Pubkey, CalculateHashIntermediate)>> = self.scan_account_storage(
+            slot,
+            |loaded_account: LoadedAccount,
+             _store_id: AppendVecId,
+             accum: &mut Vec<(Pubkey, CalculateHashIntermediate)>| {
+                let public_key = loaded_account.pubkey();
+                let version = loaded_account.write_version();
+                let lamports = loaded_account.lamports();
+                let balance = Self::account_balance_for_capitalization(
+                    lamports,
+                    loaded_account.owner(),
+                    loaded_account.executable(),
+                    simple_capitalization_enabled,
+                );
 
-                    accum.push(
-                        (*public_key,
-                        (version, *loaded_account.loaded_hash(), balance, lamports)),
-                    );
-                },
-            );
+                accum.push((
+                    *public_key,
+                    (version, *loaded_account.loaded_hash(), balance, lamports),
+                ));
+            },
+        );
         accumulator
     }
 
@@ -3286,7 +3288,6 @@ impl AccountsDB {
         ancestors: &Ancestors,
         simple_capitalization_enabled: bool,
     ) -> (Hash, u64) {
-
         let mut scan = Measure::start("accumulate");
         let account_maps = self.get_accounts(slot, ancestors, simple_capitalization_enabled);
         scan.stop();
@@ -3302,7 +3303,7 @@ impl AccountsDB {
                 }
             })
             .collect();
-            zeros.stop();
+        zeros.stop();
         let hash_total = hashes.len();
         info!("there are {} entries", hashes.len());
         let mut accumulate = Measure::start("accumulate");
@@ -4063,7 +4064,7 @@ impl AccountsDB {
                         // replace the item
                         dest_item.insert(source_item.clone());
                     }
-                },
+                }
                 std::collections::hash_map::Entry::Vacant(v) => {
                     v.insert(source_item.clone());
                 }
@@ -4082,7 +4083,7 @@ impl AccountsDB {
                         // replace the item
                         dest_item.insert(source_item.clone());
                     }
-                },
+                }
                 std::collections::hash_map::Entry::Vacant(v) => {
                     v.insert(source_item.clone());
                 }
