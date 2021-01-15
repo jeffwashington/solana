@@ -4285,7 +4285,6 @@ impl Bank {
     /// calculation and could shield other real accounts.
     pub fn verify_snapshot_bank(&self) -> bool {
         if self.slot() > 0 {
-            warn!("Cleaning accounts: {}", self.slot());
             self.clean_accounts(true);
             self.shrink_all_slots();
         }
