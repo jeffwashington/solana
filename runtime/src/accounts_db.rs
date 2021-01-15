@@ -3167,7 +3167,7 @@ impl AccountsDB {
         let res = Self::compute_merkle_root(hashes, fanout);
         hash_time.stop();
 
-        debug!("{} {} {}", sort_time, hash_time, sum_time);
+        info!("{} {} {}", sort_time, hash_time, sum_time);
 
         (res, cap)
     }
@@ -3210,50 +3210,17 @@ impl AccountsDB {
         ancestors: &Ancestors,
         simple_capitalization_enabled: bool,
     ) -> HashMap<Pubkey, CalculateHashIntermediate> {
-        let mismatch_found = AtomicU64::new(0);
         let mut scanned_slots = HashSet::<Slot>::new();
 
-        let mut account_maps = HashMap::new();
-
-        // scan this slot
-        let mut accumulator =
-            self.scan_slot::<CalculateHashIntermediate>(slot, simple_capitalization_enabled, None);
         scanned_slots.insert(slot);
 
-        while let Some(maps) = accumulator.pop() {
-            AccountsDB::merge(&mut account_maps, &maps);
-        }
-
-        // scan all known storage slots prior to 'slot'
-        info!(
-            "checking items in all previous slots: {}",
-            self.storage.all_slots().len()
-        );
         for storage_slot in self.storage.all_slots() {
             if !self.accounts_index.is_root(storage_slot) {
                 continue;
             }
 
             scanned_slots.insert(storage_slot);
-            info!("checking items in previous slot: {}", storage_slot);
-            let accumulator_sub = self.scan_slot(
-                storage_slot,
-                simple_capitalization_enabled,
-                Some(&account_maps),
-            );
-            accumulator.extend(accumulator_sub);
         }
-
-        while let Some(maps) = accumulator.pop() {
-            AccountsDB::merge(&mut account_maps, &maps);
-        }
-
-        info!(
-            "checking ancestors: {}, slot: {}, found accounts so far (could have duplicates): {}",
-            ancestors.len(),
-            slot,
-            mismatch_found.load(Ordering::Relaxed)
-        );
 
         // scan ancestors
         for ancestor_slot in ancestors.keys() {
@@ -3261,60 +3228,39 @@ impl AccountsDB {
                 continue;
             }
             scanned_slots.insert(*ancestor_slot);
+        }
 
-            info!("checking ancestors: {}", *ancestor_slot);
-            let accumulator_sub = self.scan_slot(
-                *ancestor_slot,
-                simple_capitalization_enabled,
-                Some(&account_maps),
-            );
-            accumulator.extend(accumulator_sub);
+        // scan all slots
+        let len = AtomicUsize::new(0);
+        let accumulators: Vec<_> = scanned_slots.into_par_iter().map(|slot| {
+            let accumulator = self.scan_slot(slot, simple_capitalization_enabled);
+            len.fetch_add(accumulator.len(), Ordering::Relaxed);
+            accumulator
+        }).collect();
+
+        let mut account_maps = HashMap::with_capacity(len.load(Ordering::Relaxed));
+        for accumulator in accumulators {
+            for item in accumulator {
+                AccountsDB::merge2(&mut account_maps, &item);
+            }
         }
 
         account_maps
     }
 
-    fn scan_slot<T>(
+    fn scan_slot(
         &self,
         slot: Slot,
-        simple_capitalization_enabled: bool,
-        known_accounts: Option<&HashMap<Pubkey, T>>,
-    ) -> Vec<HashMap<Pubkey, CalculateHashIntermediate>>
-    where
-        T: Versioned + Clone + Sync + Send,
-    {
-        let accumulator: Vec<HashMap<Pubkey, CalculateHashIntermediate>> = self
+        simple_capitalization_enabled: bool
+    ) -> Vec<Vec<(Pubkey, CalculateHashIntermediate)>> {
+        let accumulator: Vec<Vec<(Pubkey, CalculateHashIntermediate)>> = self
             .scan_account_storage(
                 slot,
                 |loaded_account: LoadedAccount,
                  _store_id: AppendVecId,
-                 accum: &mut HashMap<Pubkey, CalculateHashIntermediate>| {
+                 accum: &mut Vec<(Pubkey, CalculateHashIntermediate)>| {
                     let public_key = loaded_account.pubkey();
                     let version = loaded_account.write_version();
-                    if let Some(known_accounts) = known_accounts {
-                        if let Some(result) = known_accounts.get(public_key) {
-                            if result.version() >= version {
-                                return;
-                            }
-                        }
-                    }
-
-                    /* maybe something like this:
-                    if check_hash {
-                        let computed_hash = loaded_account.compute_hash(
-                            *slot,
-                            &self.cluster_type.expect(
-                                "Cluster type must be set at initialization",
-                            ),
-                            pubkey,
-                        );
-                        if computed_hash != *loaded_hash {
-                            mismatch_found.fetch_add(1, Ordering::Relaxed);
-                            return None;
-                        }
-                    }
-                    */
-
                     let lamports = loaded_account.lamports();
                     let balance = Self::account_balance_for_capitalization(
                         lamports,
@@ -3323,9 +3269,9 @@ impl AccountsDB {
                         simple_capitalization_enabled,
                     );
 
-                    accum.insert(
-                        *public_key,
-                        (version, *loaded_account.loaded_hash(), balance, lamports),
+                    accum.push(
+                        (*public_key,
+                        (version, *loaded_account.loaded_hash(), balance, lamports)),
                     );
                 },
             );
@@ -3339,9 +3285,13 @@ impl AccountsDB {
         slot: Slot,
         ancestors: &Ancestors,
         simple_capitalization_enabled: bool,
-    ) -> (Hash, u64, Vec<(Pubkey, Hash, u64)>) {
-        let account_maps = self.get_accounts(slot, ancestors, simple_capitalization_enabled);
+    ) -> (Hash, u64) {
 
+        let mut scan = Measure::start("accumulate");
+        let account_maps = self.get_accounts(slot, ancestors, simple_capitalization_enabled);
+        scan.stop();
+
+        let mut zeros = Measure::start("eliminate zeros");
         let hashes: Vec<_> = account_maps
             .into_iter()
             .filter_map(|(pubkey, (_, hash, lamports, original_lamports))| {
@@ -3352,10 +3302,22 @@ impl AccountsDB {
                 }
             })
             .collect();
-        let hashes_bkup = hashes.clone();
-        info!("there are {} entries", hashes_bkup.len());
+            zeros.stop();
+        let hash_total = hashes.len();
+        info!("there are {} entries", hashes.len());
+        let mut accumulate = Measure::start("accumulate");
         let ret = Self::accumulate_account_hashes_and_capitalization(hashes, slot, false);
-        (ret.0, ret.1, hashes_bkup)
+
+        accumulate.stop();
+        datapoint_info!(
+            "calculate_accounts_hash_using_store",
+            ("accounts_scan", scan.as_us(), i64),
+            ("hash_accumulate", accumulate.as_us(), i64),
+            ("eliminate_zeros", zeros.as_us(), i64),
+            ("hash_total", hash_total, i64),
+        );
+
+        ret
     }
 
     fn calculate_accounts_hash(
@@ -3400,7 +3362,7 @@ impl AccountsDB {
                                         loaded_account.executable(),
                                         simple_capitalization_enabled,
                                     );
-                                    info!("using account {} with lamports: {}", pubkey, balance);
+                                    // info!("using account {} with lamports: {}", pubkey, balance);
 
                                     if check_hash {
                                         let computed_hash = loaded_account.compute_hash(
@@ -3440,7 +3402,7 @@ impl AccountsDB {
         let hash_total = hashes.len();
 
         let mut accumulate = Measure::start("accumulate");
-        let hashes_bkup = hashes.clone();
+        // let hashes_bkup = hashes.clone();
         let (accumulated_hash, total_lamports) =
             Self::accumulate_account_hashes_and_capitalization(hashes, slot, false);
         accumulate.stop();
@@ -3451,6 +3413,7 @@ impl AccountsDB {
             ("hash_total", hash_total, i64),
         );
 
+        /*
         // run a second algorithm and compare the results
         // TODO: remove this
         let other = self.calculate_accounts_hash_using_store(
@@ -3467,7 +3430,8 @@ impl AccountsDB {
                 })
                 .collect::<Vec<_>>();
             keys1.sort();
-            let mut keys2 = other.2.into_iter().map(|(i, _, _)| i).collect::<Vec<_>>();
+            let account_maps = self.get_accounts(slot, ancestors, simple_capitalization_enabled);
+            let mut keys2 = account_maps.into_iter().map(|(i, _)| i).collect::<Vec<_>>();
             keys2.sort();
             let mut hk1 = HashSet::<Pubkey>::new();
             let mut hk2 = HashSet::<Pubkey>::new();
@@ -3493,6 +3457,7 @@ impl AccountsDB {
                 other.0, accumulated_hash, len1, len2, other.1, total_lamports, hl1, hl2
             );
         }
+        */
 
         Ok((accumulated_hash, total_lamports))
     }
@@ -4087,17 +4052,41 @@ impl AccountsDB {
             .collect()
     }
 
+    fn merge2<X>(dest: &mut HashMap<Pubkey, X>, source: &Vec<(Pubkey, X)>)
+    where
+        X: Versioned + Clone,
+    {
+        for (key, source_item) in source.iter() {
+            match dest.entry(*key) {
+                std::collections::hash_map::Entry::Occupied(mut dest_item) => {
+                    if dest_item.get_mut().version() <= source_item.version() {
+                        // replace the item
+                        dest_item.insert(source_item.clone());
+                    }
+                },
+                std::collections::hash_map::Entry::Vacant(v) => {
+                    v.insert(source_item.clone());
+                }
+            };
+        }
+    }
+
     fn merge<X>(dest: &mut HashMap<Pubkey, X>, source: &HashMap<Pubkey, X>)
     where
         X: Versioned + Clone,
     {
         for (key, source_item) in source.iter() {
-            if let Some(dest_item) = dest.get(key) {
-                if dest_item.version() > source_item.version() {
-                    continue;
+            match dest.entry(*key) {
+                std::collections::hash_map::Entry::Occupied(mut dest_item) => {
+                    if dest_item.get_mut().version() <= source_item.version() {
+                        // replace the item
+                        dest_item.insert(source_item.clone());
+                    }
+                },
+                std::collections::hash_map::Entry::Vacant(v) => {
+                    v.insert(source_item.clone());
                 }
-            }
-            dest.insert(*key, source_item.clone());
+            };
         }
     }
 
