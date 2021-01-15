@@ -3230,10 +3230,6 @@ impl AccountsDB {
             self.storage.all_slots().len()
         );
         for storage_slot in self.storage.all_slots() {
-            if storage_slot >= slot {
-                continue;
-            }
-
             if !self.accounts_index.is_root(storage_slot) {
                 continue;
             }
