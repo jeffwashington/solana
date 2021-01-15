@@ -3334,7 +3334,7 @@ impl AccountsDB {
         &self,
         slot: Slot,
         ancestors: &Ancestors,
-        check_hash: bool, // TODO - use this
+        _check_hash: bool, // TODO - use this
         simple_capitalization_enabled: bool,
     ) -> Result<(Hash, u64, Vec<(Pubkey, Hash, u64)>), BankHashVerificationError> {
         let account_maps = self.get_accounts(slot, ancestors, simple_capitalization_enabled);
