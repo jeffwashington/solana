@@ -3244,7 +3244,7 @@ impl AccountsDB {
         let mut account_maps = HashMap::with_capacity(len.load(Ordering::Relaxed));
         for accumulator in accumulators {
             for item in accumulator {
-                AccountsDB::merge2(&mut account_maps, &item);
+                AccountsDB::merge_array(&mut account_maps, &item);
             }
         }
 
@@ -4053,7 +4053,7 @@ impl AccountsDB {
             .collect()
     }
 
-    fn merge2<X>(dest: &mut HashMap<Pubkey, X>, source: &Vec<(Pubkey, X)>)
+    fn merge_array<X>(dest: &mut HashMap<Pubkey, X>, source: &[(Pubkey, X)])
     where
         X: Versioned + Clone,
     {
