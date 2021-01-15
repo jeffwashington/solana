@@ -7862,8 +7862,8 @@ pub(crate) mod tests {
         let pubkey2 = solana_sdk::pubkey::new_rand();
         info!("transfer 2 {}", pubkey2);
         bank2.transfer(10, &mint_keypair, &pubkey2).unwrap();
-        // TODO - temporary bank2.update_accounts_hash();
-        // assert!(bank2.verify_bank_hash());
+        bank2.update_accounts_hash();
+        assert!(bank2.verify_bank_hash());
     }
 
     #[test]
