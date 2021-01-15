@@ -3489,8 +3489,7 @@ impl AccountsDB {
                     warn!("Missing in 1: {}", key);
                 }
             }
-            assert!(
-                false,
+            panic!(
                 "hashes different: {}, {}, lens: {}, {}, lamports: {}, {}, hash lens: {}, {}",
                 other.0, accumulated_hash, len1, len2, other.1, total_lamports, hl1, hl2
             );
