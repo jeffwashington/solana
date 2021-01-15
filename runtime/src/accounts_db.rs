@@ -3350,7 +3350,7 @@ impl AccountsDB {
                                         loaded_account.executable(),
                                         simple_capitalization_enabled,
                                     );
-                                    warn!("using account {} with lamports: {}", pubkey, balance);
+                                    info!("using account {} with lamports: {}", pubkey, balance);
 
                                     if check_hash {
                                         let computed_hash = loaded_account.compute_hash(
