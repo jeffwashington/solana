@@ -3208,7 +3208,6 @@ impl AccountsDB {
         &self,
         slot: Slot,
         ancestors: &Ancestors,
-        _check_hash: bool,
         simple_capitalization_enabled: bool,
     ) -> HashMap<Pubkey, CalculateHashIntermediate> {
         let mismatch_found = AtomicU64::new(0);
@@ -3234,7 +3233,7 @@ impl AccountsDB {
             if storage_slot >= slot {
                 continue;
             }
-            
+
             if !self.accounts_index.is_root(storage_slot) {
                 continue;
             }
@@ -3342,10 +3341,9 @@ impl AccountsDB {
         &self,
         slot: Slot,
         ancestors: &Ancestors,
-        check_hash: bool,
         simple_capitalization_enabled: bool,
-    ) -> Result<(Hash, u64, Vec<(Pubkey, Hash, u64)>), BankHashVerificationError> {
-        let account_maps = self.get_accounts(slot, ancestors, check_hash, simple_capitalization_enabled);
+    ) -> (Hash, u64, Vec<(Pubkey, Hash, u64)>) {
+        let account_maps = self.get_accounts(slot, ancestors, simple_capitalization_enabled);
 
         let hashes: Vec<_> = account_maps
             .into_iter()
@@ -3360,7 +3358,7 @@ impl AccountsDB {
         let hashes_bkup = hashes.clone();
         info!("there are {} entries", hashes_bkup.len());
         let ret = Self::accumulate_account_hashes_and_capitalization(hashes, slot, false);
-        Ok((ret.0, ret.1, hashes_bkup))
+        (ret.0, ret.1, hashes_bkup)
     }
 
     fn calculate_accounts_hash(
@@ -3462,10 +3460,8 @@ impl AccountsDB {
             .calculate_accounts_using_store(
                 slot,
                 ancestors,
-                check_hash,
                 simple_capitalization_enabled,
-            )
-            .unwrap();
+            );
         if other.0 != accumulated_hash || other.1 != total_lamports {
             let mut keys1 = hashes_bkup
                 .into_iter()
