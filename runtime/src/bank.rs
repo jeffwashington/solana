@@ -7910,7 +7910,7 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn test_verify_snapshot_bank() { // fails because there are no stores
+    fn test_verify_snapshot_bank() {
         solana_logger::setup();
         let pubkey = solana_sdk::pubkey::new_rand();
         let (genesis_config, mint_keypair) = create_genesis_config(2_000);
