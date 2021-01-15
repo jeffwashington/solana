@@ -3287,51 +3287,52 @@ impl AccountsDB {
     where
         T: Versioned + Clone + Sync + Send,
     {
-        let accumulator: Vec<HashMap<Pubkey, CalculateHashIntermediate>> = self.scan_account_storage(
-            slot,
-            |loaded_account: LoadedAccount,
-             _store_id: AppendVecId,
-             accum: &mut HashMap<Pubkey, CalculateHashIntermediate>| {
-                let public_key = loaded_account.pubkey();
-                let version = loaded_account.write_version();
-                if let Some(known_accounts) = known_accounts {
-                    if let Some(result) = known_accounts.get(public_key) {
-                        if result.version() >= version {
-                            return;
+        let accumulator: Vec<HashMap<Pubkey, CalculateHashIntermediate>> = self
+            .scan_account_storage(
+                slot,
+                |loaded_account: LoadedAccount,
+                 _store_id: AppendVecId,
+                 accum: &mut HashMap<Pubkey, CalculateHashIntermediate>| {
+                    let public_key = loaded_account.pubkey();
+                    let version = loaded_account.write_version();
+                    if let Some(known_accounts) = known_accounts {
+                        if let Some(result) = known_accounts.get(public_key) {
+                            if result.version() >= version {
+                                return;
+                            }
                         }
                     }
-                }
 
-                /* maybe something like this:
-                if check_hash {
-                    let computed_hash = loaded_account.compute_hash(
-                        *slot,
-                        &self.cluster_type.expect(
-                            "Cluster type must be set at initialization",
-                        ),
-                        pubkey,
-                    );
-                    if computed_hash != *loaded_hash {
-                        mismatch_found.fetch_add(1, Ordering::Relaxed);
-                        return None;
+                    /* maybe something like this:
+                    if check_hash {
+                        let computed_hash = loaded_account.compute_hash(
+                            *slot,
+                            &self.cluster_type.expect(
+                                "Cluster type must be set at initialization",
+                            ),
+                            pubkey,
+                        );
+                        if computed_hash != *loaded_hash {
+                            mismatch_found.fetch_add(1, Ordering::Relaxed);
+                            return None;
+                        }
                     }
-                }
-                */
+                    */
 
-                let lamports = loaded_account.lamports();
-                let balance = Self::account_balance_for_capitalization(
-                    lamports,
-                    loaded_account.owner(),
-                    loaded_account.executable(),
-                    simple_capitalization_enabled,
-                );
+                    let lamports = loaded_account.lamports();
+                    let balance = Self::account_balance_for_capitalization(
+                        lamports,
+                        loaded_account.owner(),
+                        loaded_account.executable(),
+                        simple_capitalization_enabled,
+                    );
 
-                accum.insert(
-                    *public_key,
-                    (version, *loaded_account.loaded_hash(), balance, lamports),
-                );
-            },
-        );
+                    accum.insert(
+                        *public_key,
+                        (version, *loaded_account.loaded_hash(), balance, lamports),
+                    );
+                },
+            );
         accumulator
     }
 
@@ -3456,12 +3457,8 @@ impl AccountsDB {
 
         // run a second algorithm and compare the results
         // TODO: remove this
-        let other = self
-            .calculate_accounts_using_store(
-                slot,
-                ancestors,
-                simple_capitalization_enabled,
-            );
+        let other =
+            self.calculate_accounts_using_store(slot, ancestors, simple_capitalization_enabled);
         if other.0 != accumulated_hash || other.1 != total_lamports {
             let mut keys1 = hashes_bkup
                 .into_iter()
