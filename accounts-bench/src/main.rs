@@ -1,3 +1,4 @@
+#[macro_use] extern crate log;
 use clap::{crate_description, crate_name, value_t, App, Arg};
 use rayon::prelude::*;
 use solana_measure::measure::Measure;
@@ -51,6 +52,7 @@ fn main() {
 
     let path = PathBuf::from(env::var("FARF_DIR").unwrap_or_else(|_| "farf".to_owned()))
         .join("accounts-bench");
+    println!("cleaning file system: {:?}", path);
     if fs::remove_dir_all(path.clone()).is_err() {
         println!("Warning: Couldn't remove {:?}", path);
     }
@@ -97,12 +99,24 @@ fn main() {
         } else {
             let mut pubkeys: Vec<Pubkey> = vec![];
             let mut time = Measure::start("hash");
-            let hash = accounts
-                .accounts_db
-                .update_accounts_hash(0, &ancestors, true)
-                .0;
+            let mut hash = solana_sdk::hash::Hash::default();
+            if true {
+                hash = accounts
+                    .accounts_db
+                    .update_accounts_hash(0, &ancestors, true)
+                    .0;
+            }
             time.stop();
-            println!("hash: {} {}", hash, time);
+            let mut time2 = Measure::start("hash");
+            let hash2 = accounts
+                .accounts_db
+                .calculate_accounts_hash_using_store(0, &ancestors, true)
+                .0;
+            time2.stop();
+            if hash != hash2 {
+                error!("hashes different: \n{}\n{}", hash, hash2);
+            }
+            println!("hash,{},{},{},{}", hash, time.as_ms(), time2.as_ms(), time2.as_us() as f64/time.as_us() as f64 * 100.0f64);
             create_test_accounts(&accounts, &mut pubkeys, 1, 0);
         }
     }
