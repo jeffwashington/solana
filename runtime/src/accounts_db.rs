@@ -3208,6 +3208,7 @@ impl AccountsDB {
         &self,
         slot: Slot,
         ancestors: &Ancestors,
+        _check_hash: bool,
         simple_capitalization_enabled: bool,
     ) -> HashMap<Pubkey, CalculateHashIntermediate> {
         let mismatch_found = AtomicU64::new(0);
@@ -3233,6 +3234,11 @@ impl AccountsDB {
             if storage_slot >= slot {
                 continue;
             }
+            
+            if !self.accounts_index.is_root(storage_slot) {
+                continue;
+            }
+
             scanned_slots.insert(storage_slot);
             info!("checking items in previous slot: {}", storage_slot);
             let accumulator_sub = self.scan_slot(
@@ -3289,8 +3295,8 @@ impl AccountsDB {
              accum: &mut HashMap<Pubkey, CalculateHashIntermediate>| {
                 let public_key = loaded_account.pubkey();
                 let version = loaded_account.write_version();
-                if known_accounts.is_some() {
-                    if let Some(result) = known_accounts.unwrap().get(public_key) {
+                if let Some(known_accounts) = known_accounts {
+                    if let Some(result) = known_accounts.get(public_key) {
                         if result.version() >= version {
                             return;
                         }
@@ -3336,10 +3342,10 @@ impl AccountsDB {
         &self,
         slot: Slot,
         ancestors: &Ancestors,
-        _check_hash: bool, // TODO - use this
+        check_hash: bool,
         simple_capitalization_enabled: bool,
     ) -> Result<(Hash, u64, Vec<(Pubkey, Hash, u64)>), BankHashVerificationError> {
-        let account_maps = self.get_accounts(slot, ancestors, simple_capitalization_enabled);
+        let account_maps = self.get_accounts(slot, ancestors, check_hash, simple_capitalization_enabled);
 
         let hashes: Vec<_> = account_maps
             .into_iter()
