@@ -103,7 +103,7 @@ fn main() {
             if true {
                 hash = accounts
                     .accounts_db
-                    .update_accounts_hash(0, &ancestors, true)
+                    .update_accounts_hash(false, 0, &ancestors, true)
                     .0;
             }
             time.stop();
