@@ -4271,8 +4271,9 @@ impl Bank {
         self.rc.accounts.accounts_db.get_accounts_hash(self.slot)
     }
 
-    pub fn update_accounts_hash(&self) -> Hash {
+    pub fn update_accounts_hash(&self, use_store: bool) -> Hash {
         let (hash, total_lamports) = self.rc.accounts.accounts_db.update_accounts_hash(
+            use_store,
             self.slot(),
             &self.ancestors,
             self.simple_capitalization_enabled(),

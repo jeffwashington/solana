@@ -3471,13 +3471,19 @@ impl AccountsDB {
 
     pub fn update_accounts_hash(
         &self,
+        use_store: bool,
         slot: Slot,
         ancestors: &Ancestors,
         simple_capitalization_enabled: bool,
     ) -> (Hash, u64) {
-        let (hash, total_lamports) = self
-            .calculate_accounts_hash(slot, ancestors, false, simple_capitalization_enabled)
-            .unwrap();
+        let (hash, total_lamports) = if use_store {
+            self
+                .calculate_accounts_hash(slot, ancestors, false, simple_capitalization_enabled)
+                .unwrap()
+        }
+        else {
+            self.calculate_accounts_hash_using_store(slot, ancestors, false, simple_capitalization_enabled)
+        }
         let mut bank_hashes = self.bank_hashes.write().unwrap();
         let mut bank_hash_info = bank_hashes.get_mut(&slot).unwrap();
         bank_hash_info.snapshot_hash = hash;
