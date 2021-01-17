@@ -3089,11 +3089,94 @@ impl AccountsDB {
     }
 
     pub fn compute_merkle_root(hashes: Vec<(Pubkey, Hash, u64)>, fanout: usize) -> Hash {
+        let hashes_orig = hashes.clone();
+        let mut time2 = Measure::start("time");
         let hashes: Vec<_> = hashes
             .into_iter()
             .map(|(_pubkey, hash, _lamports)| hash)
             .collect();
+            let hashes: Vec<_> = hashes
+            .into_iter()
+            .map(|hash| hash)
+            .collect();
+            let hashes: Vec<_> = hashes
+            .into_iter()
+            .map(|hash| hash)
+            .collect();
+            let hashes: Vec<_> = hashes
+            .into_iter()
+            .map(|hash| hash)
+            .collect();
+            let hashes: Vec<_> = hashes
+            .into_iter()
+            .map(|hash| hash)
+            .collect();
+            let hashes: Vec<_> = hashes
+            .into_iter()
+            .map(|hash| hash)
+            .collect();
+            let hashes: Vec<_> = hashes
+            .into_iter()
+            .map(|hash| hash)
+            .collect();
+            let hashes: Vec<_> = hashes
+            .into_iter()
+            .map(|hash| hash)
+            .collect();
+            let hashes: Vec<_> = hashes
+            .into_iter()
+            .map(|hash| hash)
+            .collect();
+            let hashes: Vec<_> = hashes
+            .into_iter()
+            .map(|hash| hash)
+            .collect();
+            let hashes: Vec<_> = hashes
+            .into_iter()
+            .map(|hash| hash)
+            .collect();
+            let mut l1 = hashes.len();
+        time2.stop();
+        let mut time4 = Measure::start("time");
+        let mut hashes: Vec::<(Hash)> = Vec::with_capacity(hashes_orig.len());
+        hashes.extend(hashes_orig.into_iter().map(|(_pubkey, hash, _lamports)| hash));
+        let hashes_prev = hashes;
+        let mut hashes: Vec::<(Hash)> = Vec::with_capacity(hashes_prev.len());
+        hashes.extend(hashes_prev.into_iter());
+        let hashes_prev = hashes;
+        let mut hashes: Vec::<(Hash)> = Vec::with_capacity(hashes_prev.len());
+        hashes.extend(hashes_prev.into_iter());
+        let hashes_prev = hashes;
+        let mut hashes: Vec::<(Hash)> = Vec::with_capacity(hashes_prev.len());
+        hashes.extend(hashes_prev.into_iter());
+        let hashes_prev = hashes;
+        let mut hashes: Vec::<(Hash)> = Vec::with_capacity(hashes_prev.len());
+        hashes.extend(hashes_prev.into_iter());
+        let hashes_prev = hashes;
+        let mut hashes: Vec::<(Hash)> = Vec::with_capacity(hashes_prev.len());
+        hashes.extend(hashes_prev.into_iter());
+        let hashes_prev = hashes;
+        let mut hashes: Vec::<(Hash)> = Vec::with_capacity(hashes_prev.len());
+        hashes.extend(hashes_prev.into_iter());
+        let hashes_prev = hashes;
+        let mut hashes: Vec::<(Hash)> = Vec::with_capacity(hashes_prev.len());
+        hashes.extend(hashes_prev.into_iter());
+        let hashes_prev = hashes;
+        let mut hashes: Vec::<(Hash)> = Vec::with_capacity(hashes_prev.len());
+        hashes.extend(hashes_prev.into_iter());
+        let hashes_prev = hashes;
+        let mut hashes: Vec::<(Hash)> = Vec::with_capacity(hashes_prev.len());
+        hashes.extend(hashes_prev.into_iter());
+        let hashes_prev = hashes;
+        let mut hashes: Vec::<(Hash)> = Vec::with_capacity(hashes_prev.len());
+        hashes.extend(hashes_prev.into_iter());
+        let mut l2 = hashes.len();
+        time4.stop();
+        let mut time3 = Measure::start("time");
+
         let mut hashes: Vec<_> = hashes.chunks(fanout).map(|x| x.to_vec()).collect();
+        time3.stop();
+        let mut time4 = Measure::start("time");
         while hashes.len() > 1 {
             let mut time = Measure::start("time");
             let new_hashes: Vec<Hash> = hashes
@@ -3114,6 +3197,9 @@ impl AccountsDB {
         hashes.into_iter().flatten().for_each(|hash| {
             hasher.hash(hash.as_ref());
         });
+        time4.stop();
+        error!("compute_merkle_root,{},{},{},{},{},{},{}", time2.as_ms(), time4.as_ms(), l1, l2, time3.as_ms(), fanout, time4.as_ms());
+        //info!("compute_merkle_root,{},{},{},{},{}", time2.as_ms(), time4.as_ms(), time3.as_ms(), fanout, time4.as_ms());
         hasher.result()
     }
 
