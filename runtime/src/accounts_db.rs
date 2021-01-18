@@ -3181,7 +3181,7 @@ impl AccountsDB {
         hasher.result()
     }
 
-    pub fn compute_merkle_root2(hashes: Vec<(Pubkey, Hash, u64, u64)>, fanout: usize) -> (Hash, u64) {
+    pub fn compute_merkle_root2(hashes: Vec<(Pubkey, Hash, u64)>, fanout: usize) -> (Hash, u64) {
         let mut value = 0u64;
         //Self::test_times(&hashes);
         let mut time2 = Measure::start("time");
@@ -3194,11 +3194,7 @@ impl AccountsDB {
         let mut chunk = 0;
         let mut slice = Vec::with_capacity(fanout);
         for i in hashes {
-            let (_, h, cv, v) = i;
-            if v == 0 {
-                continue
-            }
-
+            let (_, h, cv) = i;
             value += cv;
             if chunk >= fanout {
                 chunk  = 0;
@@ -3277,23 +3273,16 @@ impl AccountsDB {
             }
         }
         let mut sum_time = Measure::start("cap");
-        let cap = if calculate_cap {
-            Some(Self::checked_sum_for_capitalization(
-                hashes.iter().map(|(_, _, lamports)| *lamports),
-            ))
-        } else {
-            None
-        };
         sum_time.stop();
 
         let mut hash_time = Measure::start("hash");
         let fanout = 16;
-        let res = Self::compute_merkle_root(hashes, fanout);
+        let res = Self::compute_merkle_root2(hashes, fanout);
         hash_time.stop();
 
         info!("{} {} {}", sort_time, hash_time, sum_time);
 
-        (res, cap)
+        (res.0, Some(res.1))
     }
 
     pub fn checked_sum_for_capitalization<T: Iterator<Item = u64>>(balances: T) -> u64 {
