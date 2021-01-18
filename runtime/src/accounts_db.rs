@@ -3182,33 +3182,22 @@ impl AccountsDB {
     }
 
     pub fn compute_merkle_root2(hashes: Vec<(Pubkey, Hash, u64)>, fanout: usize) -> (Hash, u64) {
-        let mut value = 0u64;
         //Self::test_times(&hashes);
         let mut time2 = Measure::start("time");
+        let mut value = 0u64;
+        let hashes: Vec<_> = hashes
+            .into_iter()
+            .map(|(_pubkey, hash, _lamports)| {
+                value += cv;
+                hash
+            }
+            )
+            .collect();
+        let mut hashes: Vec<_> = hashes.chunks(fanout).map(|x| x.to_vec()).collect();
         time2.stop();
         let mut time4 = Measure::start("time");
         time4.stop();
         let mut time3 = Measure::start("time");
-
-        let mut out: Vec<Vec<Hash>> = Vec::with_capacity(hashes.len() / fanout + 1);
-        let mut chunk = 0;
-        let mut slice = Vec::with_capacity(fanout);
-        for i in hashes {
-            let (_, h, cv) = i;
-            value += cv;
-            if chunk >= fanout {
-                chunk  = 0;
-                out.push(slice);
-                slice = Vec::with_capacity(fanout);
-            }
-
-            chunk += 1;
-            slice.push(h);
-        }
-        if chunk > 0 {
-            out.push(slice);
-        }
-        let mut hashes = out;
         time3.stop();
         let mut time4 = Measure::start("time");
         while hashes.len() > 1 {
