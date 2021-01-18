@@ -3187,8 +3187,8 @@ impl AccountsDB {
         let mut value = 0u64;
         let hashes: Vec<_> = hashes
             .into_iter()
-            .map(|(_pubkey, hash, _lamports)| {
-                value += cv;
+            .map(|(_pubkey, hash, lamports)| {
+                value += lamports;
                 hash
             }
             )
