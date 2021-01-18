@@ -3268,7 +3268,7 @@ impl AccountsDB {
         debug: bool,
     ) -> (Hash, Option<u64>) {
         let mut sort_time = Measure::start("sort");
-        hashes.par_sort_by(|a, b| a.0.cmp(&b.0));
+        hashes.par_sort_unstable_by(|a, b| a.0.cmp(&b.0));
         sort_time.stop();
 
         if debug {
