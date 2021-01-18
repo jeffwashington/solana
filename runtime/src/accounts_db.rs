@@ -3088,93 +3088,71 @@ impl AccountsDB {
         );
     }
 
-    pub fn compute_merkle_root(hashes: Vec<(Pubkey, Hash, u64)>, fanout: usize) -> Hash {
-        let hashes_orig = hashes.clone();
+    fn test_times(hashes: &Vec<(Pubkey, Hash, u64)>) -> Vec<Vec<Hash>> {
+
+        let mut result = Vec::<Vec<Hash>>::new();
+        let mut src = Vec::<Vec<(Pubkey, Hash, u64)>>::new();
+        let iter = 10;
+        for _i in 0..iter*3 {
+            src.push(hashes.clone());
+        }
+
+        let mut i = 0;
         let mut time2 = Measure::start("time");
-        let hashes: Vec<_> = hashes
+        for _j in 0..iter {
+            let hashes_orig = std::mem::replace(& mut src[i], Vec::<(Pubkey, Hash, u64)>::default());
+
+            let hashes: Vec<_> = hashes_orig
             .into_iter()
             .map(|(_pubkey, hash, _lamports)| hash)
             .collect();
-            let hashes: Vec<_> = hashes
-            .into_iter()
-            .map(|hash| hash)
-            .collect();
-            let hashes: Vec<_> = hashes
-            .into_iter()
-            .map(|hash| hash)
-            .collect();
-            let hashes: Vec<_> = hashes
-            .into_iter()
-            .map(|hash| hash)
-            .collect();
-            let hashes: Vec<_> = hashes
-            .into_iter()
-            .map(|hash| hash)
-            .collect();
-            let hashes: Vec<_> = hashes
-            .into_iter()
-            .map(|hash| hash)
-            .collect();
-            let hashes: Vec<_> = hashes
-            .into_iter()
-            .map(|hash| hash)
-            .collect();
-            let hashes: Vec<_> = hashes
-            .into_iter()
-            .map(|hash| hash)
-            .collect();
-            let hashes: Vec<_> = hashes
-            .into_iter()
-            .map(|hash| hash)
-            .collect();
-            let hashes: Vec<_> = hashes
-            .into_iter()
-            .map(|hash| hash)
-            .collect();
-            let hashes: Vec<_> = hashes
-            .into_iter()
-            .map(|hash| hash)
-            .collect();
-            let mut l1 = hashes.len();
+            i = i + 1;
+            result.push(hashes);
+        }
+        time2.stop();
+
+        let mut time4 = Measure::start("time");
+
+        for _j in 0..iter {
+            let hashes_orig = std::mem::replace(& mut src[i], Vec::<(Pubkey, Hash, u64)>::default());
+            let mut hashes: Vec::<Hash> = Vec::with_capacity(hashes_orig.len());
+            hashes.extend(hashes_orig.into_iter().map(|(_pubkey, hash, _lamports)| hash));
+            i = i + 1;
+            result.push(hashes);
+        }
+        time4.stop();
+        let mut time5 = Measure::start("time");
+
+        for _j in 0..iter {
+            let hashes_orig = std::mem::replace(& mut src[i], Vec::<(Pubkey, Hash, u64)>::default());
+            let mut hashes: Vec::<Hash> = Vec::with_capacity(hashes_orig.len());
+            for item in hashes_orig {
+                hashes.push(item.1);
+            }
+            i = i + 1;
+            result.push(hashes);
+        }
+        time5.stop();
+        error!("compute_merkle_root,{},{}, {}", time2.as_ms(), time4.as_ms(), time5.as_ms());
+       result
+    }
+
+    pub fn compute_merkle_root(hashes: Vec<(Pubkey, Hash, u64)>, fanout: usize) -> Hash {
+        //Self::test_times(&hashes);
+        let mut time2 = Measure::start("time");
         time2.stop();
         let mut time4 = Measure::start("time");
-        let mut hashes: Vec::<(Hash)> = Vec::with_capacity(hashes_orig.len());
-        hashes.extend(hashes_orig.into_iter().map(|(_pubkey, hash, _lamports)| hash));
-        let hashes_prev = hashes;
-        let mut hashes: Vec::<(Hash)> = Vec::with_capacity(hashes_prev.len());
-        hashes.extend(hashes_prev.into_iter());
-        let hashes_prev = hashes;
-        let mut hashes: Vec::<(Hash)> = Vec::with_capacity(hashes_prev.len());
-        hashes.extend(hashes_prev.into_iter());
-        let hashes_prev = hashes;
-        let mut hashes: Vec::<(Hash)> = Vec::with_capacity(hashes_prev.len());
-        hashes.extend(hashes_prev.into_iter());
-        let hashes_prev = hashes;
-        let mut hashes: Vec::<(Hash)> = Vec::with_capacity(hashes_prev.len());
-        hashes.extend(hashes_prev.into_iter());
-        let hashes_prev = hashes;
-        let mut hashes: Vec::<(Hash)> = Vec::with_capacity(hashes_prev.len());
-        hashes.extend(hashes_prev.into_iter());
-        let hashes_prev = hashes;
-        let mut hashes: Vec::<(Hash)> = Vec::with_capacity(hashes_prev.len());
-        hashes.extend(hashes_prev.into_iter());
-        let hashes_prev = hashes;
-        let mut hashes: Vec::<(Hash)> = Vec::with_capacity(hashes_prev.len());
-        hashes.extend(hashes_prev.into_iter());
-        let hashes_prev = hashes;
-        let mut hashes: Vec::<(Hash)> = Vec::with_capacity(hashes_prev.len());
-        hashes.extend(hashes_prev.into_iter());
-        let hashes_prev = hashes;
-        let mut hashes: Vec::<(Hash)> = Vec::with_capacity(hashes_prev.len());
-        hashes.extend(hashes_prev.into_iter());
-        let hashes_prev = hashes;
-        let mut hashes: Vec::<(Hash)> = Vec::with_capacity(hashes_prev.len());
-        hashes.extend(hashes_prev.into_iter());
-        let mut l2 = hashes.len();
         time4.stop();
         let mut time3 = Measure::start("time");
 
-        let mut hashes: Vec<_> = hashes.chunks(fanout).map(|x| x.to_vec()).collect();
+        let mut hashes: Vec<Vec<Hash>> = hashes.chunks(fanout).map(|x| {
+            let mut vec = Vec::with_capacity(fanout);
+            for a in x {
+                let (_, a, _) = *a;
+                vec.push(a);
+            }
+            vec
+        }).collect();
         time3.stop();
         let mut time4 = Measure::start("time");
         while hashes.len() > 1 {
@@ -3198,9 +3176,68 @@ impl AccountsDB {
             hasher.hash(hash.as_ref());
         });
         time4.stop();
-        error!("compute_merkle_root,{},{},{},{},{},{},{}", time2.as_ms(), time4.as_ms(), l1, l2, time3.as_ms(), fanout, time4.as_ms());
+        error!("compute_merkle_root,{},{},{},{},{}", time2.as_ms(), time4.as_ms(), time3.as_ms(), fanout, time4.as_ms());
         //info!("compute_merkle_root,{},{},{},{},{}", time2.as_ms(), time4.as_ms(), time3.as_ms(), fanout, time4.as_ms());
         hasher.result()
+    }
+
+    pub fn compute_merkle_root2(hashes: Vec<(Pubkey, Hash, u64, u64)>, fanout: usize) -> (Hash, u64) {
+        let mut value = 0u64;
+        //Self::test_times(&hashes);
+        let mut time2 = Measure::start("time");
+        time2.stop();
+        let mut time4 = Measure::start("time");
+        time4.stop();
+        let mut time3 = Measure::start("time");
+
+        let mut out: Vec<Vec<Hash>> = Vec::with_capacity(hashes.len() / fanout + 1);
+        let mut chunk = 0;
+        let mut slice = Vec::with_capacity(fanout);
+        for i in hashes {
+            let (_, h, _, v) = i;
+            if v == 0 {
+                continue
+            }
+
+            if chunk >= fanout {
+                chunk  = 0;
+                out.push(slice);
+                slice = Vec::with_capacity(fanout);
+            }
+
+            chunk += 1;
+            slice.push(h);
+        }
+        if chunk >= 0 {
+            out.push(slice);
+        }
+        let mut hashes = out;
+        time3.stop();
+        let mut time4 = Measure::start("time");
+        while hashes.len() > 1 {
+            let mut time = Measure::start("time");
+            let new_hashes: Vec<Hash> = hashes
+                .par_iter()
+                .map(|h| {
+                    let mut hasher = Hasher::default();
+                    for v in h.iter() {
+                        hasher.hash(v.as_ref());
+                    }
+                    hasher.result()
+                })
+                .collect();
+            time.stop();
+            debug!("hashing {} {}", hashes.len(), time);
+            hashes = new_hashes.chunks(fanout).map(|x| x.to_vec()).collect();
+        }
+        let mut hasher = Hasher::default();
+        hashes.into_iter().flatten().for_each(|hash| {
+            hasher.hash(hash.as_ref());
+        });
+        time4.stop();
+        error!("compute_merkle_root,{},{},{},{},{}", time2.as_ms(), time4.as_ms(), time3.as_ms(), fanout, time4.as_ms());
+        //info!("compute_merkle_root,{},{},{},{},{}", time2.as_ms(), time4.as_ms(), time3.as_ms(), fanout, time4.as_ms());
+        (hasher.result(), value)
     }
 
     fn accumulate_account_hashes(
