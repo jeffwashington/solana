@@ -3194,11 +3194,12 @@ impl AccountsDB {
         let mut chunk = 0;
         let mut slice = Vec::with_capacity(fanout);
         for i in hashes {
-            let (_, h, _, v) = i;
+            let (_, h, cv, v) = i;
             if v == 0 {
                 continue
             }
 
+            value += cv;
             if chunk >= fanout {
                 chunk  = 0;
                 out.push(slice);
@@ -3208,7 +3209,7 @@ impl AccountsDB {
             chunk += 1;
             slice.push(h);
         }
-        if chunk >= 0 {
+        if chunk > 0 {
             out.push(slice);
         }
         let mut hashes = out;
