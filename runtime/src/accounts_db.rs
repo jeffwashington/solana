@@ -3185,28 +3185,56 @@ impl AccountsDB {
         //Self::test_times(&hashes);
         let mut time2 = Measure::start("time");
         let mut value = 0u64;
+        
+        /*
         let hashes: Vec<_> = hashes
-            .into_iter()
-            .map(|(_pubkey, hash, lamports)| {
-                value += lamports;
-                hash
-            }
-            )
-            .collect();
-        let mut hashes: Vec<_> = hashes.chunks(fanout).map(|x| x.to_vec()).collect();
+        .into_iter()
+        .map(|(_pubkey, hash, _lamports)| hash)
+        .collect();
+        let mut hashes_temp = hashes.chunks(fanout).map(|x:&[Hash]| x.to_vec()).collect();
+        */
+
         time2.stop();
         let mut time4 = Measure::start("time");
         time4.stop();
         let mut time3 = Measure::start("time");
         time3.stop();
         let mut time4 = Measure::start("time");
+        let total_hashes = hashes.len();
+        let initial_chunks = total_hashes / fanout + 1;
+
+        //let mut sums = vec![0; initial_chunks];
+        //let mut hashes2 = vec![Hash::default(); initial_chunks];
+
+        let result: Vec<_> = (0..initial_chunks).into_par_iter().map(|i| {
+            let start_index = i * fanout;
+            let end_index = std::cmp::min(start_index + fanout, total_hashes);
+
+            let mut hasher = Hasher::default();
+            let mut this_sum = 0u64;
+            for j in start_index..end_index {
+                let (_, h, lamports) = hashes[j];
+                this_sum += lamports;
+                hasher.hash(h.as_ref());
+            }
+
+            (this_sum, hasher.result())
+            //sums[i] = this_sum;
+            //hashes2[i] = hasher.result();
+        }).collect();
+        //value = result.into_iter().map(|(sum, _)| sum).sum();
+        let hashes:Vec<_> = result.into_iter().map(|(sum, h)| {
+            value += sum;
+            h
+        }).collect();
+        let mut hashes: Vec<_> = hashes.chunks(fanout).map(|x| x.to_vec()).collect();//result.chunks(fanout).map(|x| x.to_vec().into_iter().map(|(_, h)| h).collect()).collect();
         while hashes.len() > 1 {
             let mut time = Measure::start("time");
             let new_hashes: Vec<Hash> = hashes
                 .par_iter()
                 .map(|h| {
                     let mut hasher = Hasher::default();
-                    for v in h.iter() {
+                    for v in h {
                         hasher.hash(v.as_ref());
                     }
                     hasher.result()
@@ -3248,7 +3276,7 @@ impl AccountsDB {
 
     fn do_accumulate_account_hashes_and_capitalization(
         mut hashes: Vec<(Pubkey, Hash, u64)>,
-        calculate_cap: bool,
+        _calculate_cap: bool,
         slot: Slot,
         debug: bool,
     ) -> (Hash, Option<u64>) {
