@@ -1,3 +1,5 @@
+#[macro_use]
+extern crate log;
 use clap::{crate_description, crate_name, value_t, App, Arg};
 use rayon::prelude::*;
 use solana_measure::measure::Measure;
@@ -51,6 +53,7 @@ fn main() {
 
     let path = PathBuf::from(env::var("FARF_DIR").unwrap_or_else(|_| "farf".to_owned()))
         .join("accounts-bench");
+    println!("cleaning file system: {:?}", path);
     if fs::remove_dir_all(path.clone()).is_err() {
         println!("Warning: Couldn't remove {:?}", path);
     }
@@ -84,6 +87,8 @@ fn main() {
         ancestors.insert(i as u64, i - 1);
         accounts.add_root(i as u64);
     }
+    let mut elapsed = vec![0; iterations];
+    let mut elapsed_store = vec![0; iterations];
     for x in 0..iterations {
         if clean {
             let mut time = Measure::start("clean");
@@ -97,13 +102,24 @@ fn main() {
         } else {
             let mut pubkeys: Vec<Pubkey> = vec![];
             let mut time = Measure::start("hash");
-            let hash = accounts
+            let results = accounts
                 .accounts_db
-                .update_accounts_hash(0, &ancestors, true)
-                .0;
+                .update_accounts_hash(0, &ancestors, true);
             time.stop();
-            println!("hash: {} {}", hash, time);
+            println!(
+                "hash,{},{}",
+                results.0,
+                time,
+            );
             create_test_accounts(&accounts, &mut pubkeys, 1, 0);
+            elapsed[x] = time.as_us();
         }
+    }
+
+    for x in elapsed {
+        info!("update_accounts_hash(us),{}", x);
+    }
+    for x in elapsed_store {
+        info!("calculate_accounts_hash_using_store(us),{}", x);
     }
 }
