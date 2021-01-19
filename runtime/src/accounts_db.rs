@@ -3068,19 +3068,72 @@ impl AccountsDB {
         );
     }
 
-    pub fn compute_merkle_root(hashes: Vec<(Pubkey, Hash, u64)>, fanout: usize) -> Hash {
+    pub fn compute_merkle_root2(hashes: Vec<(Pubkey, Hash, u64)>, fanout: usize) -> (Hash, u64) {
+        //Self::test_times(&hashes);
+        let mut time2 = Measure::start("time");
+        
+        /*
         let hashes: Vec<_> = hashes
-            .into_iter()
-            .map(|(_pubkey, hash, _lamports)| hash)
-            .collect();
-        let mut hashes: Vec<_> = hashes.chunks(fanout).map(|x| x.to_vec()).collect();
+        .into_iter()
+        .map(|(_pubkey, hash, _lamports)| hash)
+        .collect();
+        let mut hashes_temp = hashes.chunks(fanout).map(|x:&[Hash]| x.to_vec()).collect();
+        */
+
+        let mut time4 = Measure::start("time");
+        time4.stop();
+        let mut time3 = Measure::start("time");
+        time3.stop();
+        let mut time4 = Measure::start("time");
+        let total_hashes = hashes.len();
+        let initial_chunks = total_hashes / fanout + 1;
+
+        //let mut sums = vec![0; initial_chunks];
+        //let mut hashes2 = vec![Hash::default(); initial_chunks];
+
+        let value : Mutex::<u128> = Mutex::new(0);
+
+        let mut time = Measure::start("time");
+        let result: Vec<_> = (0..initial_chunks).into_par_iter().map(|i| {
+            let start_index = i * fanout;
+            let end_index = std::cmp::min(start_index + fanout, total_hashes);
+
+            let mut hasher = Hasher::default();
+            let mut this_sum = 0u128;
+            for j in start_index..end_index {
+                let (_, h, lamports) = hashes[j];
+                this_sum += lamports as u128;
+                hasher.hash(h.as_ref());
+            }
+
+            *value.lock().unwrap() += this_sum;
+
+            hasher.result()
+            //sums[i] = this_sum;
+            //hashes2[i] = hasher.result();
+        }).collect();
+        time.stop();
+        debug!("hashing {} {}", hashes.len(), time);
+
+        let value: u128 = *value.lock().unwrap();
+        let value: u64 = value.try_into().expect("overflow is detected while summing capitalization");
+        //let value = value.load(Ordering::Relaxed);
+        //value = result.into_iter().map(|(sum, _)| sum).sum();
+        /*
+        let hashes:Vec<_> = result.into_iter().map(|(sum, h)| {
+            value += sum;
+            h
+        }).collect();
+        */
+        let mut hashes: Vec<_> = result.chunks(fanout).map(|x| x.to_vec()).collect();//result.chunks(fanout).map(|x| x.to_vec().into_iter().map(|(_, h)| h).collect()).collect();
+        time2.stop();
         while hashes.len() > 1 {
             let mut time = Measure::start("time");
             let new_hashes: Vec<Hash> = hashes
                 .par_iter()
                 .map(|h| {
                     let mut hasher = Hasher::default();
-                    for v in h.iter() {
+                    for v in h {
                         hasher.hash(v.as_ref());
                     }
                     hasher.result()
@@ -3094,7 +3147,10 @@ impl AccountsDB {
         hashes.into_iter().flatten().for_each(|hash| {
             hasher.hash(hash.as_ref());
         });
-        hasher.result()
+        time4.stop();
+        error!("compute_merkle_root,{},{},{},{},{}", time2.as_ms(), time4.as_ms(), time3.as_ms(), fanout, time4.as_ms());
+        //info!("compute_merkle_root,{},{},{},{},{}", time2.as_ms(), time4.as_ms(), time3.as_ms(), fanout, time4.as_ms());
+        (hasher.result(), value)
     }
 
     fn accumulate_account_hashes(
@@ -3119,7 +3175,7 @@ impl AccountsDB {
 
     fn do_accumulate_account_hashes_and_capitalization(
         mut hashes: Vec<(Pubkey, Hash, u64)>,
-        calculate_cap: bool,
+        _calculate_cap: bool,
         slot: Slot,
         debug: bool,
     ) -> (Hash, Option<u64>) {
@@ -3133,23 +3189,16 @@ impl AccountsDB {
             }
         }
         let mut sum_time = Measure::start("cap");
-        let cap = if calculate_cap {
-            Some(Self::checked_sum_for_capitalization(
-                hashes.iter().map(|(_, _, lamports)| *lamports),
-            ))
-        } else {
-            None
-        };
         sum_time.stop();
 
         let mut hash_time = Measure::start("hash");
         let fanout = 16;
-        let res = Self::compute_merkle_root(hashes, fanout);
+        let res = Self::compute_merkle_root2(hashes, fanout);
         hash_time.stop();
 
-        debug!("{} {} {}", sort_time, hash_time, sum_time);
+        info!("{} {} {}", sort_time, hash_time, sum_time);
 
-        (res, cap)
+        (res.0, Some(res.1))
     }
 
     pub fn checked_sum_for_capitalization<T: Iterator<Item = u64>>(balances: T) -> u64 {
