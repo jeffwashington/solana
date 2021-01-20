@@ -2099,7 +2099,7 @@ impl AccountsDB {
             let mut missing = 0;
             let mut different_values = 0;
             let max = 40000;
-            let mut differences = HashMap::new();
+            let mut differences:HashMap<Pubkey, (Pubkey, Hash, u64)> = HashMap::new();
             loop {
                 let donei = i >= hashes.len();
                 let donej = j >= verify.len();
@@ -2165,7 +2165,12 @@ impl AccountsDB {
                 }
             };
             if differences.len() > 0 {
+                warn!("jwash:Scan differences, {:?}", differences.len());
                 self.check_scan_differences(slot, &ancestors, differences);
+                warn!("jwash:Scan differences");
+            }
+            else{
+
             }
             warn!("jwash: different values: {}, total different: {}, missing: {}", different_values, failures, missing);
         }
@@ -2276,8 +2281,9 @@ impl AccountsDB {
         warn!("jwash:threads: {}, unis of works: {}, chunk size: {}", num_threads, num_units_of_work, chunk_size);
         let scanned_slots: Vec<Slot> = scanned_slots.into_iter().collect();
         let scanned_slots: Vec<Vec<Slot>> = scanned_slots.chunks(chunk_size).map(|x| x.to_vec()).collect();
+        let do_verify = verify.is_some();
         let v = verify.unwrap_or_default();
-        let do_verify = v.len() > 0;
+        warn!("jwash: verify:{}", do_verify);
         let accumulators: Vec<_> = scanned_slots
             .into_par_iter()
             .map(|slots| {
