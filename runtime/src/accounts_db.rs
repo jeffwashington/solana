@@ -2291,7 +2291,7 @@ impl AccountsDB {
                     lamports,
                 );
                 if loaded_account.meta.pubkey == *bad_hash_1 {
-                    warn!("jwash:scanning slot: {}, {}, Found {:?}", slot, inloaded_account.meta.pubkey, data);
+                    warn!("jwash:scanning slot: {}, {}, Found {:?}", slot, loaded_account.meta.pubkey, data);
                 }
 
                 accum.push((
