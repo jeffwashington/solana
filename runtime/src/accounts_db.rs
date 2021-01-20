@@ -113,6 +113,7 @@ type ReclaimResult = (AccountSlots, AppendVecOffsets);
 type StorageFinder<'a> = Box<dyn Fn(Slot) -> Arc<AccountStorageEntry> + 'a>;
 
 type CalculateHashIntermediate = (u64, Hash, u64, u64);
+type Verify = Option<(Vec<(Pubkey, Hash, u64)>, Slot, Ancestors)>;
 
 trait Versioned {
     fn version(&self) -> u64;
@@ -2045,43 +2046,48 @@ impl AccountsDB {
         hasher.result()
     }
 
-    fn accumulate_account_hashes(hashes: Vec<(Pubkey, Hash, u64)>) -> Hash {
-        let (hash, ..) = Self::do_accumulate_account_hashes_and_capitalization(hashes, false);
+    fn accumulate_account_hashes(&self, hashes: Vec<(Pubkey, Hash, u64)>) -> Hash {
+        let (hash, ..) = self.do_accumulate_account_hashes_and_capitalization(hashes, false);
         hash
     }
 
     fn accumulate_account_hashes_and_capitalization(
+        &self,
         hashes: Vec<(Pubkey, Hash, u64)>,
     ) -> (Hash, u64) {
-        let (hash, cap) = Self::do_accumulate_account_hashes_and_capitalization(hashes, true);
+        let (hash, cap) = self.do_accumulate_account_hashes_and_capitalization(hashes, true);
         (hash, cap.unwrap())
     }
 
     fn accumulate_account_hashes_and_capitalization_verify(
+        &self,
         hashes: Vec<(Pubkey, Hash, u64)>,
-        verify: Vec<(Pubkey, Hash, u64)>,
+        verify: Verify,
     ) -> (Hash, u64) {
-        let (hash, cap) = Self::do_accumulate_account_hashes_and_capitalization_verify(hashes, true, verify);
+        let (hash, cap) = self.do_accumulate_account_hashes_and_capitalization_verify(hashes, true, verify);
         (hash, cap.unwrap())
     }
 
     fn do_accumulate_account_hashes_and_capitalization(
+        &self,
         hashes: Vec<(Pubkey, Hash, u64)>,
         calculate_cap: bool,
     ) -> (Hash, Option<u64>) {
-        let verify: Vec<(Pubkey, Hash, u64)> = Vec::new();
-        Self::do_accumulate_account_hashes_and_capitalization_verify(hashes, calculate_cap, verify)
+        let verify = None;
+        self.do_accumulate_account_hashes_and_capitalization_verify(hashes, calculate_cap, verify)
     }
 
     fn do_accumulate_account_hashes_and_capitalization_verify(
+        &self,
         mut hashes: Vec<(Pubkey, Hash, u64)>,
         calculate_cap: bool,
-        verify: Vec<(Pubkey, Hash, u64)>,
+        verify: Verify,
     ) -> (Hash, Option<u64>) {
         let mut sort_time = Measure::start("sort");
         hashes.par_sort_by(|a, b| a.0.cmp(&b.0));
         sort_time.stop();
-        if verify.len() > 0 {
+        if verify.is_some() {
+            let (verify, slot, ancestors) = verify.unwrap();
             warn!("jwash: verifying: {}, {}", hashes.len(), verify.len());
             let mut verify = verify.clone();
             verify.par_sort_by(|a, b| a.0.cmp(&b.0));
@@ -2092,7 +2098,7 @@ impl AccountsDB {
             let mut failures = 0;
             let mut missing = 0;
             let mut different_values = 0;
-            let max = 4000;
+            let max = 40000;
             let mut differences = HashMap::new();
             loop {
                 let donei = i >= hashes.len();
@@ -2133,7 +2139,7 @@ impl AccountsDB {
                                 j += 1;
                                 if missing < max {
                                     warn!("jwash: in right: {:?}", valj);
-                                    differences.insert(hashes[i].0, hashes[i].clone());
+                                    differences.insert(verify[j].0, verify[j].clone());
                                 }
                                 missing += 1;
                             }
@@ -2141,7 +2147,7 @@ impl AccountsDB {
                                 i += 1;
                                 if missing < max {
                                     warn!("jwash: in left: {:?}", vali);
-                                    differences.insert(verify[j].0, verify[j].clone());
+                                    differences.insert(hashes[i].0, hashes[i].clone());
                                 }
                                 missing += 1;                                
                             }
@@ -2158,9 +2164,9 @@ impl AccountsDB {
                     }
                 }
             };
-            //if differences.len() > 0 {
-                //Self::check_scan_differences()
-            //}
+            if differences.len() > 0 {
+                self.check_scan_differences(slot, &ancestors, differences);
+            }
             warn!("jwash: different values: {}, total different: {}, missing: {}", different_values, failures, missing);
         }
 
@@ -2217,6 +2223,10 @@ impl AccountsDB {
         }
     }
 
+    fn check_scan_differences(&self, slot: Slot, ancestors:& Ancestors, differences:HashMap<Pubkey, (Pubkey, Hash, u64)>) {
+        self.get_accounts_verify(slot, ancestors, true, Some(differences));
+    }
+
     // get accounts using slots
     fn get_accounts(
         &self,
@@ -2224,6 +2234,18 @@ impl AccountsDB {
         ancestors: &Ancestors,
         simple_capitalization_enabled: bool,
     ) -> HashMap<Pubkey, CalculateHashIntermediate> {
+        self.get_accounts_verify(slot, ancestors, simple_capitalization_enabled, None)
+    }
+
+    // get accounts using slots
+    fn get_accounts_verify(
+        &self,
+        slot: Slot,
+        ancestors: &Ancestors,
+        simple_capitalization_enabled: bool,
+        verify: Option<HashMap<Pubkey, (Pubkey, Hash, u64)>>,
+    ) -> HashMap<Pubkey, CalculateHashIntermediate> {
+
         let mut scanned_slots = HashSet::<Slot>::new();
 
         scanned_slots.insert(slot);
@@ -2254,12 +2276,29 @@ impl AccountsDB {
         warn!("jwash:threads: {}, unis of works: {}, chunk size: {}", num_threads, num_units_of_work, chunk_size);
         let scanned_slots: Vec<Slot> = scanned_slots.into_iter().collect();
         let scanned_slots: Vec<Vec<Slot>> = scanned_slots.chunks(chunk_size).map(|x| x.to_vec()).collect();
+        let v = verify.unwrap_or_default();
+        let do_verify = v.len() > 0;
         let accumulators: Vec<_> = scanned_slots
             .into_par_iter()
             .map(|slots| {
                 let mut master_accumulator: Vec<Vec<(Pubkey, CalculateHashIntermediate)>> = Vec::new();
                 for slot in slots {
                     let accumulator = self.scan_slot(slot, simple_capitalization_enabled);
+                    if do_verify{
+
+                        for vec in accumulator.clone() {
+                            for (pk, d) in vec {
+                                let l = v.get(&pk);
+                                if l.is_some() {
+                                    let l = l.unwrap();
+                                    let same = d.1 == l.1 && d.2 == l.2;
+                                    warn!("jwash:found {}, slot {}, same: {}, found: {:?}, difference item: {:?}",
+                                    pk, slot, same, d, l,
+                                );
+                                }
+                            }
+                        }
+                    }
                     master_accumulator.extend(accumulator);
                 }
                 len.fetch_add(master_accumulator.len(), Ordering::Relaxed);
@@ -2323,7 +2362,7 @@ impl AccountsDB {
         ancestors: &Ancestors,
         simple_capitalization_enabled: bool,
     ) -> (Hash, u64) {
-        let verify: Vec<(Pubkey, Hash, u64)> = Vec::new();
+        let verify = None;
         self.calculate_accounts_hash_using_store_check(slot, ancestors, simple_capitalization_enabled, verify)
     }
 
@@ -2350,7 +2389,7 @@ impl AccountsDB {
         slot: Slot,
         ancestors: &Ancestors,
         simple_capitalization_enabled: bool,
-        _verify: Vec<(Pubkey, Hash, u64)>,
+        _verify: Verify,
     ) -> (Hash, u64) {
         warn!("jwash:calculate_accounts_hash_using_store: {}, {}, {}", slot, ancestors.len(), simple_capitalization_enabled);
         let mut scan = Measure::start("accumulate");
@@ -2365,7 +2404,7 @@ impl AccountsDB {
         let accounts_with_zero = account_len - hash_total;
         warn!("jwash:non-zero accounts: {}, zero accounts:{}", hash_total, accounts_with_zero);
         let mut accumulate = Measure::start("accumulate");
-        let ret = Self::accumulate_account_hashes_and_capitalization(hashes);
+        let ret = self.accumulate_account_hashes_and_capitalization(hashes);
 
         accumulate.stop();
         datapoint_info!(
@@ -2387,7 +2426,7 @@ impl AccountsDB {
         check_hash: bool,
         simple_capitalization_enabled: bool,
     ) -> Result<(Hash, u64), BankHashVerificationError> {
-        let verify: Vec<(Pubkey, Hash, u64)> = Vec::new();
+        let verify = None;
         self.calculate_accounts_hash_verify(slot, ancestors, check_hash, simple_capitalization_enabled, verify)
     }
 
@@ -2397,7 +2436,7 @@ impl AccountsDB {
         ancestors: &Ancestors,
         check_hash: bool,
         simple_capitalization_enabled: bool,
-        verify: Vec<(Pubkey, Hash, u64)>,
+        verify: Verify,
     ) -> Result<(Hash, u64), BankHashVerificationError> {
         use BankHashVerificationError::*;
         let mut scan = Measure::start("scan");
@@ -2474,7 +2513,7 @@ impl AccountsDB {
 
         let mut accumulate = Measure::start("accumulate");
         let (accumulated_hash, total_lamports) =
-            Self::accumulate_account_hashes_and_capitalization_verify(hashes, verify);
+            self.accumulate_account_hashes_and_capitalization_verify(hashes, verify);
         accumulate.stop();
         datapoint_info!(
             "jwash:update_accounts_hash",
@@ -2568,7 +2607,7 @@ impl AccountsDB {
                 let account_maps = self.get_accounts(slot, ancestors, simple_capitalization_enabled);
                 error!("jwash:account count: {}", account_maps.len());
                 let hashes = Self::remove_zero_balance_accounts(account_maps);
-                self.calculate_accounts_hash_verify(slot, ancestors, false, simple_capitalization_enabled, hashes).unwrap();
+                self.calculate_accounts_hash_verify(slot, ancestors, false, simple_capitalization_enabled, Some((hashes, slot, ancestors.clone()))).unwrap();
 
             }
             else{
@@ -2646,7 +2685,7 @@ impl AccountsDB {
             .into_iter()
             .map(|(pubkey, (_, hash))| (pubkey, hash, 0))
             .collect();
-        let ret = Self::accumulate_account_hashes(hashes);
+        let ret = self.accumulate_account_hashes(hashes);
         accumulate.stop();
         self.stats
             .delta_hash_scan_time_total_us
