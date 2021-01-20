@@ -2090,8 +2090,10 @@ impl AccountsDB {
             let mut i = 0;
             let mut j = 0;
             let mut failures = 0;
+            let mut missing = 0;
             let mut different_values = 0;
-            let max = 100;
+            let max = 4000;
+            let mut differences = HashMap::new();
             loop {
                 let donei = i >= hashes.len();
                 let donej = j >= verify.len();
@@ -2101,15 +2103,19 @@ impl AccountsDB {
 
                 failures += 1;
                 if donej {
-                    if failures < max {
+                    if missing < max {
                         warn!("jwash: in left: {:?}", hashes[i]);
+                        differences.insert(hashes[i].0, hashes[i].clone());
                     }
+                    missing += 1;
                     i += 1;
                 }
                 else if donei {
-                    if failures < max {
+                    if missing < max {
                         warn!("jwash: in right: {:?}", verify[j]);
+                        differences.insert(verify[j].0, verify[j].clone());
                     }
+                    missing += 1;
                     j += 1;
                 }
                 else{
@@ -2125,20 +2131,25 @@ impl AccountsDB {
                         if !publ {
                             if vali > valj{
                                 j += 1;
-                                if failures < max {
+                                if missing < max {
                                     warn!("jwash: in right: {:?}", valj);
+                                    differences.insert(hashes[i].0, hashes[i].clone());
                                 }
+                                missing += 1;
                             }
                             else {
                                 i += 1;
-                                if failures < max {
+                                if missing < max {
                                     warn!("jwash: in left: {:?}", vali);
+                                    differences.insert(verify[j].0, verify[j].clone());
                                 }
+                                missing += 1;                                
                             }
                         }
                         else{
                             if failures < max {
                                 warn!("jwash: different: {:?}, {:?}", vali, valj);
+                                differences.insert(hashes[i].0, hashes[i].clone());
                             }
                             i += 1;
                             j += 1;
@@ -2147,7 +2158,10 @@ impl AccountsDB {
                     }
                 }
             };
-            warn!("jwash: different values: {}, total different: {}", different_values, failures);
+            //if differences.len() > 0 {
+                //Self::check_scan_differences()
+            //}
+            warn!("jwash: different values: {}, total different: {}, missing: {}", different_values, failures, missing);
         }
 
         let mut sum_time = Measure::start("cap");
@@ -3039,7 +3053,17 @@ impl AccountsDB {
                     if *key == *bad_hash_1 {
                         warn!("jwash:Found {}, {:?}, existing: {:?}", *key, source_item, dest_item.get_mut());
                     }
-                    if dest_item.get_mut().version() <= source_item.version() {
+                    let dest_version = dest_item.get_mut().version();
+                    let source_version = source_item.version();
+                    if *key == *bad_hash_1 {
+                        warn!("jwash:Found {}, {:?}, existing: {:?}", *key, source_item, dest_item.get_mut());
+                    }
+
+                    if dest_version == source_version {
+                        warn!("jwash:Found equal versions {}, {:?}, existing: {:?}", *key, source_item, dest_item.get_mut());
+                    }
+
+                    if dest_version <= source_version {
                         // replace the item
                         dest_item.insert(source_item.clone());
                     }
