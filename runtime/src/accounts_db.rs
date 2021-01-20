@@ -2047,15 +2047,16 @@ impl AccountsDB {
     }
 
     fn accumulate_account_hashes(&self, hashes: Vec<(Pubkey, Hash, u64)>) -> Hash {
-        let (hash, ..) = self.do_accumulate_account_hashes_and_capitalization(hashes, false);
+        let (hash, ..) = self.do_accumulate_account_hashes_and_capitalization(hashes, false, false);
         hash
     }
 
     fn accumulate_account_hashes_and_capitalization(
         &self,
         hashes: Vec<(Pubkey, Hash, u64)>,
+        unstable_sort: bool,
     ) -> (Hash, u64) {
-        let (hash, cap) = self.do_accumulate_account_hashes_and_capitalization(hashes, true);
+        let (hash, cap) = self.do_accumulate_account_hashes_and_capitalization(hashes, true, unstable_sort);
         (hash, cap.unwrap())
     }
 
@@ -2063,8 +2064,9 @@ impl AccountsDB {
         &self,
         hashes: Vec<(Pubkey, Hash, u64)>,
         verify: Verify,
+        unstable_sort: bool,
     ) -> (Hash, u64) {
-        let (hash, cap) = self.do_accumulate_account_hashes_and_capitalization_verify(hashes, true, verify);
+        let (hash, cap) = self.do_accumulate_account_hashes_and_capitalization_verify(hashes, true, verify, unstable_sort);
         (hash, cap.unwrap())
     }
 
@@ -2072,9 +2074,10 @@ impl AccountsDB {
         &self,
         hashes: Vec<(Pubkey, Hash, u64)>,
         calculate_cap: bool,
+        unstable_sort: bool,
     ) -> (Hash, Option<u64>) {
         let verify = None;
-        self.do_accumulate_account_hashes_and_capitalization_verify(hashes, calculate_cap, verify)
+        self.do_accumulate_account_hashes_and_capitalization_verify(hashes, calculate_cap, verify, unstable_sort)
     }
 
     fn do_accumulate_account_hashes_and_capitalization_verify(
@@ -2082,9 +2085,15 @@ impl AccountsDB {
         mut hashes: Vec<(Pubkey, Hash, u64)>,
         calculate_cap: bool,
         verify: Verify,
+        unstable_sort: bool,
     ) -> (Hash, Option<u64>) {
         let mut sort_time = Measure::start("sort");
-        hashes.par_sort_by(|a, b| a.0.cmp(&b.0));
+        if unstable_sort {
+            hashes.par_sort_unstable_by(|a, b| a.0.cmp(&b.0));
+        }
+        else{
+            hashes.par_sort_by(|a, b| a.0.cmp(&b.0));
+        }
         sort_time.stop();
         if verify.is_some() {
             let (verify, slot, ancestors) = verify.unwrap();
@@ -2253,7 +2262,6 @@ impl AccountsDB {
     ) -> HashMap<Pubkey, CalculateHashIntermediate> {
 
         let mut scanned_slots = HashSet::<Slot>::new();
-        assert!(self.accounts_index.is_root(slot));
 
         scanned_slots.insert(slot);
 
@@ -2412,7 +2420,7 @@ impl AccountsDB {
         let accounts_with_zero = account_len - hash_total;
         warn!("jwash:non-zero accounts: {}, zero accounts:{}", hash_total, accounts_with_zero);
         let mut accumulate = Measure::start("accumulate");
-        let ret = self.accumulate_account_hashes_and_capitalization(hashes);
+        let ret = self.accumulate_account_hashes_and_capitalization(hashes, true);
 
         accumulate.stop();
         datapoint_info!(
@@ -2521,7 +2529,7 @@ impl AccountsDB {
 
         let mut accumulate = Measure::start("accumulate");
         let (accumulated_hash, total_lamports) =
-            self.accumulate_account_hashes_and_capitalization_verify(hashes, verify);
+            self.accumulate_account_hashes_and_capitalization_verify(hashes, verify, false);
         accumulate.stop();
         datapoint_info!(
             "jwash:update_accounts_hash",
