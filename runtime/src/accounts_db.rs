@@ -2110,7 +2110,7 @@ impl AccountsDB {
                 failures += 1;
                 if donej {
                     if missing < max {
-                        warn!("jwash: in left: {:?}", hashes[i]);
+                        warn!("jwash: in left1: {:?}", hashes[i]);
                         differences.insert(hashes[i].0, hashes[i].clone());
                     }
                     missing += 1;
@@ -2118,7 +2118,7 @@ impl AccountsDB {
                 }
                 else if donei {
                     if missing < max {
-                        warn!("jwash: in right: {:?}", verify[j]);
+                        warn!("jwash: in right1: {:?}", verify[j]);
                         differences.insert(verify[j].0, verify[j].clone());
                     }
                     missing += 1;
@@ -2170,6 +2170,7 @@ impl AccountsDB {
                 warn!("jwash:Scan differences");
             }
             else{
+                warn!("jwash: no differences?");
 
             }
             warn!("jwash: different values: {}, total different: {}, missing: {}", different_values, failures, missing);
@@ -2262,6 +2263,7 @@ impl AccountsDB {
 
             scanned_slots.insert(storage_slot);
         }
+        warn!("jwash:Looking in {} slots after storage,slot {}", scanned_slots.len(), slot);
 
         // scan ancestors
         for ancestor_slot in ancestors.keys() {
@@ -2271,14 +2273,14 @@ impl AccountsDB {
             scanned_slots.insert(*ancestor_slot);
         }
 
-        warn!("jwash:Looking in {} slots", scanned_slots.len());
+        warn!("jwash:Looking in {} slots after ancestors", scanned_slots.len());
         
         // scan all slots
         let len = AtomicUsize::new(0);
         let num_threads = std::cmp::max(2, num_cpus::get() / 4);
         let num_units_of_work = num_threads * 100;
         let chunk_size = std::cmp::max(1, scanned_slots.len() / num_units_of_work);
-        warn!("jwash:threads: {}, unis of works: {}, chunk size: {}", num_threads, num_units_of_work, chunk_size);
+        warn!("jwash:threads: {}, units of works: {}, chunk size: {}", num_threads, num_units_of_work, chunk_size);
         let scanned_slots: Vec<Slot> = scanned_slots.into_iter().collect();
         let scanned_slots: Vec<Vec<Slot>> = scanned_slots.chunks(chunk_size).map(|x| x.to_vec()).collect();
         let do_verify = verify.is_some();

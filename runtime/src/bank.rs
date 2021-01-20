@@ -4223,6 +4223,7 @@ impl Bank {
                 &self.ancestors,
                 self.simple_capitalization_enabled(),
             );
+            /*
         if !debug_verify_store {
             if total_lamports != self.capitalization(){
                 error!("jwash:Cap is different: {}, {}", total_lamports, self.capitalization());
@@ -4240,7 +4241,11 @@ impl Bank {
                     );
             }
         }
-        assert_eq!(total_lamports, self.capitalization());
+        */
+        if !use_store{
+            assert_eq!(total_lamports, self.capitalization());
+        }
+        
         hash
     }
 
