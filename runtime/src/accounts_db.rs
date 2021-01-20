@@ -2253,12 +2253,13 @@ impl AccountsDB {
     ) -> HashMap<Pubkey, CalculateHashIntermediate> {
 
         let mut scanned_slots = HashSet::<Slot>::new();
+        assert!(self.accounts_index.is_root(slot));
 
         scanned_slots.insert(slot);
 
         for storage_slot in self.storage.all_slots() {
             assert!(!(storage_slot > slot && self.accounts_index.is_root(storage_slot)));
-            if storage_slot > slot || !self.accounts_index.is_root(storage_slot) {
+            if storage_slot > slot || !self.accounts_index.is_root(*storage_slot) {
                 continue;
             }
 
@@ -2271,6 +2272,7 @@ impl AccountsDB {
             if scanned_slots.contains(ancestor_slot) {
                 continue;
             }
+            assert!(self.accounts_index.is_root(ancestor_slot));
             scanned_slots.insert(*ancestor_slot);
         }
 
