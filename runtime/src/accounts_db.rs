@@ -2258,7 +2258,9 @@ impl AccountsDB {
         scanned_slots.insert(slot);
 
         for storage_slot in self.storage.all_slots() {
-            assert!(!(storage_slot > slot && self.accounts_index.is_root(storage_slot)));
+            if storage_slot > slot && self.accounts_index.is_root(storage_slot) {
+                warn!("Ignoring slot that is > and rooted: {}, {}", storage_slot, slot);
+            }
             if storage_slot > slot || !self.accounts_index.is_root(storage_slot) {
                 continue;
             }
