@@ -866,7 +866,7 @@ impl<T: 'static + Clone + IsCached> AccountsIndex<T> {
             }
             !should_purge
         });
-        if (purged_slots.len() > 100) {
+        if purged_slots.len() > 100 {
             warn!("purging slots_or: {}", purged_slots.len());
         }
 

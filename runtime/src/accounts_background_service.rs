@@ -197,7 +197,7 @@ impl SnapshotRequestHandler {
                 purge_old_snapshots_time.stop();
                 total_time.stop();
 
-                if (true)
+                if true
                 {
                     let a2 = AccountsDB::get_sorted_accounts_from_stores(snapshot_root_bank.get_snapshot_storages(), snapshot_root_bank.simple_capitalization_enabled());
                     warn!("jwash:Comparing in accounts_bg_service4");

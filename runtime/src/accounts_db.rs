@@ -3380,14 +3380,19 @@ impl AccountsDB {
             if let Some(datar) = hr.get(&key) {
                 let lc = (datal.0, datal.1, datal.2, datal.3, datal.5);
                 let rc = (datar.0, datar.1, datar.2, datar.3, datar.5);
-                let lcnovers = (datal.0, datal.1, datal.2, datal.5);
-                let rcnovers = (datar.0, datar.1, datar.2, datar.5);
+                let lcnovers = (datal.1, datal.2, datal.3, datal.5);
+                let rcnovers = (datar.1, datar.2, datar.3, datar.5);
+                let lcnostoredi = (datal.0, datal.1, datal.2, datal.3, datal.4);
+                let rcnostoredi = (datar.0, datar.1, datar.2, datar.3, datar.4);
                 if lc != rc {
                     if lcnovers == rcnovers {
-                        warn!("jwash:only_version_changed: {:?} {:?}, {:?}, versions: {}", key, datal, datar.3, datar.3 - datal.3);
+                        warn!("jwash:only_version_changed: {:?} {:?}, {:?}, versions: {}", key, datal, datar.3, datar.0 - datal.0);
+                    }
+                    else if lcnostoredi == rcnostoredi {
+                        warn!("jwash:only_storage ids_changed: {:?} {:?}, {:?}, storage ids: {}", key, datal, datar.3, datar.5 - datal.5);
                     }
                     else{
-                        warn!("jwash:different2: {:?} {:?}, {:?}, versions: {}", key, datal, datar, datar.3 - datal.3);
+                        warn!("jwash:different2: {:?} {:?}, {:?}, versions: {}", key, datal, datar, datar.0 - datal.0);
                     }
                     //failed=true;
                     //Self::print(&left, &right, key);
@@ -3462,7 +3467,6 @@ impl AccountsDB {
         warn!("min slot: {}", min);
 
 
-        let len = AtomicUsize::new(0);
         // scan all slots
         // this chunking is necessary so we don't overflow the stack in the par_iter below.
         let num_threads = std::cmp::max(2, num_cpus::get() / 4); // stolen from make_min_priority_thread_pool, which is the thread pool I assume we're running in
@@ -3478,9 +3482,9 @@ impl AccountsDB {
 
         let mut map: DashMap<Pubkey, CalculateHashIntermediate> = DashMap::new();
 
-        let accumulators: Vec<_> = scanned_slots
+        scanned_slots
             .into_par_iter()
-            .map(|slots| {
+            .for_each(|slots| {
                 for slot in slots {
                     let accumulator = self.scan_slot(slot, simple_capitalization_enabled);
                     accumulator.into_iter().for_each(|accumulator| {
@@ -3501,7 +3505,7 @@ impl AccountsDB {
                 }
                 ()
             })
-            .collect();
+            ;//.collect();
         time.stop();
         let mut time_accumulate = Measure::start("accumulate");
         /*
@@ -3527,7 +3531,7 @@ impl AccountsDB {
         slot: Slot,
         ancestors: &Ancestors,
         simple_capitalization_enabled: bool,
-    ) -> (DashMap<(Pubkey, u64), CalculateHashIntermediate>, Measure, Measure) {
+    ) -> Vec<(Pubkey, Hash, u64, u64, u64, Slot, AppendVecId)> {
         let mut scanned_slots = HashSet::<Slot>::new();
 
         scanned_slots.insert(slot);
@@ -3566,7 +3570,6 @@ impl AccountsDB {
         warn!("min slot: {}", min);
 
 
-        let len = AtomicUsize::new(0);
         // scan all slots
         // this chunking is necessary so we don't overflow the stack in the par_iter below.
         let num_threads = std::cmp::max(2, num_cpus::get() / 4); // stolen from make_min_priority_thread_pool, which is the thread pool I assume we're running in
@@ -3580,62 +3583,29 @@ impl AccountsDB {
             .collect();
         let mut time = Measure::start("scan all accounts");
 
-        let mut map: DashMap<(Pubkey, u64), CalculateHashIntermediate> = DashMap::new();
-
         let accumulators: Vec<_> = scanned_slots
             .into_par_iter()
             .map(|slots| {
-                let mut keep_adding = true;
+                let mut big = Vec::new();
                 for slot in slots {
                     let accumulator = self.scan_slot(slot, simple_capitalization_enabled);
-                    let mut keep_adding = true;
-                    if keep_adding {
-                        let ln = map.len();
-                        keep_adding = ln < MAX_ACCOUNTS;
-                    }
                     
-                    accumulator.into_iter().for_each(|accumulator| {
-                        for (key, source_item) in accumulator.iter() {
-                            let key2 = (*key, source_item.version());
-                            match map.entry(key2) {
-                                Occupied(mut dest_item) => {
-                                    warn!("jwash:error2: {:?}", source_item);
-                                    if dest_item.get_mut().version() <= source_item.version() {
-                                        // replace the item
-                                        dest_item.insert(source_item.clone());
-                                    }
-                                }
-                                Vacant(v) => {
-                                    if keep_adding {
-                                        v.insert(source_item.clone());
-                                    }
-                                }
-                            };
-                        }
-                    })
+                    let data:Vec<_> =
+                    accumulator.into_iter().flatten().map(|(key, source_item)| {
+                        
+                    //) -> (Vec<(Pubkey, Hash, u64, u64, u64, Slot, AppendVecId)> {
+                        //type CalculateHashIntermediate = (u64, Hash, u64, u64, Slot, AppendVecId);
+                        (key, source_item.1, source_item.2, source_item.0, source_item.3, source_item.4, source_item.5)
+                        
+                    }).collect();
+                    big.extend(data);
                 }
-                ()
+                big
             })
+            .flatten()
             .collect();
         time.stop();
-        let mut time_accumulate = Measure::start("accumulate");
-        /*
-        let mut account_maps = DashMap::with_capacity(len.load(Ordering::Relaxed));
-        for accumulator in accumulators {
-            for item in accumulator {
-                AccountsDB::merge_array_old(&mut account_maps, &item);
-            }
-        }
-        */
-        time_accumulate.stop();
-
-        /*
-                let account_maps: Vec<_> = map.into_iter().map(|x| {
-                    let (pubkey, (version, hash, balance, raw_lamports)) = x;
-                    (pubkey, hash, balance, raw_lamports)
-                });
-        */
-        (map, time, time_accumulate)
+        accumulators
     }
 
     fn merge_array_old<X>(dest: &mut HashMap<Pubkey, X>, source: &[(Pubkey, X)])
@@ -3677,12 +3647,11 @@ impl AccountsDB {
     ) -> (DashMap<Pubkey, CalculateHashIntermediate>, Measure, Measure) {
         let mut map: DashMap<Pubkey, CalculateHashIntermediate> = DashMap::new();
         let mut time = Measure::start("scan all accounts");
-        let accumulator: Vec<Vec<(Pubkey, CalculateHashIntermediate)>> =
             Self::scan_account_storage_no_bank_2(
                 storage,
                 |loaded_account: LoadedAccount,
                  _store_id: AppendVecId,
-                 accum: &mut Vec<(Pubkey, CalculateHashIntermediate)>| {
+                _accum: &mut Vec<(Pubkey, CalculateHashIntermediate)>| {
                     let public_key = loaded_account.pubkey();
                     let version = loaded_account.write_version();
                     let lamports = loaded_account.lamports();
@@ -3735,20 +3704,13 @@ impl AccountsDB {
     fn scan_slot_using_snapshot2(
         storage: SnapshotStorages,
         simple_capitalization_enabled: bool,
-    ) -> (DashMap<(Pubkey, u64), CalculateHashIntermediate>, Measure, Measure) {
-        let mut map: DashMap<(Pubkey, u64), CalculateHashIntermediate> = DashMap::new();
-        let mut time = Measure::start("scan all accounts");
-        let mut keep_adding = true;
-        if keep_adding {
-            let ln = map.len();
-            keep_adding = ln < MAX_ACCOUNTS;
-        }
-        let accumulator: Vec<Vec<(Pubkey, CalculateHashIntermediate)>> =
+    ) -> Vec<(Pubkey, Hash, u64, u64, u64, Slot, AppendVecId)> {
+        let accumulator: Vec<Vec<(Pubkey, Hash, u64, u64, u64, Slot, AppendVecId)>> =
             Self::scan_account_storage_no_bank_2(
                 storage,
                 |loaded_account: LoadedAccount,
                  _store_id: AppendVecId,
-                 accum: &mut Vec<(Pubkey, CalculateHashIntermediate)>| {
+                 accum: &mut Vec<(Pubkey, Hash, u64, u64, u64, Slot, AppendVecId)>| {
                     let public_key = loaded_account.pubkey();
                     let version = loaded_account.write_version();
                     let lamports = loaded_account.lamports();
@@ -3759,43 +3721,14 @@ impl AccountsDB {
                         simple_capitalization_enabled,
                     );
 
-                    let key = (*public_key, version);
                     let source_item = (version, *loaded_account.loaded_hash(), balance, lamports, 1111, _store_id);
-                    match map.entry(key) {
-                        Occupied(mut dest_item) => {
-                            warn!("jwash:occupied!: {:?}", source_item);
-                            if dest_item.get_mut().version() <= source_item.version() {
-                                // replace the item
-                                dest_item.insert(source_item.clone());
-                            }
-                        }
-                        Vacant(v) => {
-                            if keep_adding {
-                                v.insert(source_item.clone());
-                            }
-                        }
-                    };
+                    let data =
+                        (*public_key, source_item.1, source_item.2, source_item.0, source_item.3, source_item.4, source_item.5);
+                    accum.push(data);
                 },
             );
-
-        let mut time_accumulate = Measure::start("accumulate");
-        /*
-        let mut account_maps = DashMap::with_capacity(len.load(Ordering::Relaxed));
-        for accumulator in accumulators {
-            for item in accumulator {
-                AccountsDB::merge_array_old(&mut account_maps, &item);
-            }
-        }
-        */
-        time_accumulate.stop();
-
-        /*
-            let account_maps: Vec<_> = map.into_iter().map(|x| {
-                let (pubkey, (version, hash, balance, raw_lamports)) = x;
-                (pubkey, hash, balance, raw_lamports)
-            });
-        */
-        (map, time, time_accumulate)
+        let accumulator:Vec<_> = accumulator.into_iter().flatten().collect();
+        accumulator
     }
 
     fn scan_slot(
@@ -3974,47 +3907,19 @@ impl AccountsDB {
     }
 
     fn remove_zero_balance_accounts2(
-        account_maps: DashMap<(Pubkey, u64), CalculateHashIntermediate>,
+        account_maps: Vec<(Pubkey, Hash, u64, u64, u64, Slot, AppendVecId)>,
     ) -> Vec<(Pubkey, Hash, u64, u64, u64, Slot, AppendVecId)> {
-        let shards: Vec<_> = account_maps
-            .shards()
-            .into_iter()
-            .map(|x| x.clone())
-            .collect();
-
-        warn!("# shards: {}", shards.len());
-        let hashes: Vec<_> = shards
-            .par_iter()
-            .map(|x| {
-                //let abc: u32 = x.read().deref();
-                let a: dashmap::lock::RwLockReadGuard<HashMap<_, _>> = x.read();
-                //let b= a.borrow();
-                let res: Vec<_> = a
-                    .iter()
-                    .filter_map(
+        let hashes: Vec<_> = account_maps.into_iter().filter_map(
                         //|(pubkey, (_, hash, lamports, original_lamports))| {
                         |inp| {
-                            let ((pubkey, _), sv) = inp;
-                            let (version, hash, lamports, original_lamports, last, last2) = sv.get();
-                            if *original_lamports != 0 {
-                                Some((*pubkey, *hash, *lamports, *version, *original_lamports, *last, *last2))
+                            if inp.4 != 0 {
+                                Some(inp)
                             } else {
                                 None
                             }
                         },
                     )
                     .collect();
-                res
-            })
-            //.into_iter()
-            /*
-            .map(|x| {
-                let a:HashMap<_,_> = x;
-                a.into_iter().collect::<Vec<_>>()
-                //x
-            })*/
-            .flatten()
-            .collect();
         hashes
     }
 
@@ -4074,7 +3979,7 @@ impl AccountsDB {
             let n:Vec<(Pubkey, Hash, u64, u64, u64, Slot, AppendVecId)> = Vec::new();
             return n;
         }
-        let (x, ..) = self.get_accounts_using_stores2(slot, ancestors, simple_capitalization_enabled);
+        let x = self.get_accounts_using_stores2(slot, ancestors, simple_capitalization_enabled);
 
         warn!("jwash: get_sorted_accounts2, {}, {}", slot, MAX_ACCOUNTS);
         let mut hashes = Self::remove_zero_balance_accounts2(x);
@@ -4097,7 +4002,7 @@ impl AccountsDB {
             return n;
         }
 
-        let (x, ..) = Self::scan_slot_using_snapshot2(storages, simple_capitalization_enabled);
+        let x = Self::scan_slot_using_snapshot2(storages, simple_capitalization_enabled);
 
         let mut zeros = Measure::start("eliminate zeros");
         let mut hashes = Self::remove_zero_balance_accounts2(x);
@@ -4928,7 +4833,7 @@ impl AccountsDB {
                     .read()
                     .unwrap()
                     .values()
-                    .filter(|x| true)
+                    .filter(|_x| true)
                     .cloned()
                     .collect()
             })
