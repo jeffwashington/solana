@@ -3458,7 +3458,7 @@ impl Bank {
             acct.push(pubkey.clone());
         }
         self.collected_rent.fetch_add(rent, Relaxed);
-        warn!("jwash:collect_rent_eagerly, {:?}", acct);
+        warn!("collect_rent_eagerly, {:?}", acct);
         //datapoint_info!("collect_rent_eagerly", ("accounts", account_count, i64));
     }
 
@@ -3466,7 +3466,7 @@ impl Bank {
     // start_index..=end_index. But it has some exceptional cases, including
     // this important and valid one:
     //   0..=0: the first partition in the new epoch when crossing epochs
-    fn pubkey_range_from_partition(
+    pub fn pubkey_range_from_partition(
         (start_index, end_index, partition_count): Partition,
     ) -> RangeInclusive<Pubkey> {
         assert!(start_index <= end_index);
