@@ -3441,7 +3441,6 @@ impl Bank {
             .rc
             .accounts
             .load_to_collect_rent_eagerly(&self.ancestors, subrange);
-        let account_count = accounts.len();
 
         let mut acct = Vec::new();
         // parallelize?

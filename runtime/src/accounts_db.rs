@@ -3480,7 +3480,7 @@ impl AccountsDB {
             .collect();
         let mut time = Measure::start("scan all accounts");
 
-        let mut map: DashMap<Pubkey, CalculateHashIntermediate> = DashMap::new();
+        let map: DashMap<Pubkey, CalculateHashIntermediate> = DashMap::new();
 
         scanned_slots
             .into_par_iter()
@@ -3608,25 +3608,6 @@ impl AccountsDB {
         accumulators
     }
 
-    fn merge_array_old<X>(dest: &mut HashMap<Pubkey, X>, source: &[(Pubkey, X)])
-    where
-        X: Versioned + Clone,
-    {
-        for (key, source_item) in source.iter() {
-            match dest.entry(*key) {
-                std::collections::hash_map::Entry::Occupied(mut dest_item) => {
-                    if dest_item.get_mut().version() <= source_item.version() {
-                        // replace the item
-                        dest_item.insert(source_item.clone());
-                    }
-                }
-                std::collections::hash_map::Entry::Vacant(v) => {
-                    v.insert(source_item.clone());
-                }
-            };
-        }
-    }
-
     /* new
     fn scan_slot(
         &self,
@@ -3645,8 +3626,8 @@ impl AccountsDB {
         storage: SnapshotStorages,
         simple_capitalization_enabled: bool,
     ) -> (DashMap<Pubkey, CalculateHashIntermediate>, Measure, Measure) {
-        let mut map: DashMap<Pubkey, CalculateHashIntermediate> = DashMap::new();
-        let mut time = Measure::start("scan all accounts");
+        let map: DashMap<Pubkey, CalculateHashIntermediate> = DashMap::new();
+        let time = Measure::start("scan all accounts");
             Self::scan_account_storage_no_bank_2(
                 storage,
                 |loaded_account: LoadedAccount,
@@ -4837,7 +4818,7 @@ impl AccountsDB {
                     .cloned()
                     .collect()
             })
-            .filter(|snapshot_storage: &SnapshotStorage| true)
+            .filter(|_snapshot_storage: &SnapshotStorage| true)
             .collect();
 
         let result:SnapshotStorages  =self.storage
