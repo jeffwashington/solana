@@ -3426,10 +3426,12 @@ impl AccountsDB {
     ) -> (DashMap<Pubkey, CalculateHashIntermediate>, Measure, Measure) {
         let mut scanned_slots = HashSet::<Slot>::new();
 
-        let mut time = Measure::start("scan all accounts");
-        self.accounts_index.get_all_account_keys();
-        time.stop();
-        warn!("jwash:scan_all_account_keys: {}ms", time.as_ms());
+        if false {
+            let mut time = Measure::start("scan all accounts");
+            self.accounts_index.get_all_account_keys();
+            time.stop();
+            warn!("jwash:scan_all_account_keys: {}ms", time.as_ms());
+        }
 
         scanned_slots.insert(slot);
 
@@ -3966,8 +3968,11 @@ impl AccountsDB {
         let mut hashes = Self::remove_zero_balance_accounts2(x);
         zeros.stop();
 
+
+        let mut zeros2 = Measure::start("eliminate zeros");
         hashes.par_sort_by(|a, b| (a.0, a.3).cmp(&(b.0, b.3)));
-        warn!("jwash: DONE get_sorted_accounts, {}, {}ms", slot, zeros.as_ms());
+        zeros2.stop();
+        warn!("jwash: DONE get_sorted_accounts, {}, scan and zeros:{}ms, sort took: {}ms", slot, zeros.as_ms(), zeros2.as_ms());
 
         hashes
     }
@@ -3990,7 +3995,7 @@ impl AccountsDB {
         zeros.stop();
 
         hashes.par_sort_by(|a, b| (a.0, a.3).cmp(&(b.0, b.3)));
-        warn!("jwash: DONE get_sorted_accounts_from_stores {}ms", zeros.as_ms());
+        warn!("jwash: DONE get_sorted_accounts_from_stores {}ms, total entries: {}", zeros.as_ms(), hashes.len());
 
         hashes
     }
