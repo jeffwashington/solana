@@ -3706,7 +3706,7 @@ mut r:usize){
         warn!("min slot: {}", min);
 
 
-        let max_pubkey = Bank::pubkey_range_from_partition((0, , MAX_ACCOUNTS));
+        //let max_pubkey = Bank::pubkey_range_from_partition((0, , MAX_ACCOUNTS));
 
 
         // scan all slots
