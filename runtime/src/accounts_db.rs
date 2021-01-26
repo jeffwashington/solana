@@ -3254,10 +3254,10 @@ impl AccountsDB {
 
     fn print(left:&Vec<(Pubkey, Hash, u64, u64, u64, Slot, AppendVecId)>,
     right:&Vec<(Pubkey, Hash, u64, u64, u64, Slot, AppendVecId)>,
-    key: Pubkey){
+    key: Pubkey,
+mut l:usize,
+mut r:usize){
         let mut found =false;
-        let mut l = 0;
-        let mut r = 0;
         warn!("difft:checking:{}", key);
         loop {
             let ldone = l >= left.len();
@@ -3384,6 +3384,8 @@ impl AccountsDB {
         let mut r_good = usize::MAX;
         let mut right_count = 0;
         let mut last_right = Pubkey::default();
+        let mut lstart = 0;
+        let mut rstart = 0;
         loop {
             let ldone = l >= left.len();
             let rdone = r >= right.len();
@@ -3453,10 +3455,12 @@ impl AccountsDB {
                     if print {
                         //warn!("jwash:different45: {:?}", current_key);
                         failed=true;
-                        Self::print(&left, &right, current_key);
+                        Self::print(&left, &right, current_key, lstart, rstart);
                     }
                 }
 
+                lstart = l;
+                rstart = r;
                 current_key = Pubkey::default();
                 l_good = usize::MAX;
                 r_good = usize::MAX;
