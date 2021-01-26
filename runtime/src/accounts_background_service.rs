@@ -137,6 +137,7 @@ impl SnapshotRequestHandler {
                 let clean_time = times[0].as_us();
                 let hash_time = times[1].as_us();
 
+                if false
                 {
                     let a2 = AccountsDB::get_sorted_accounts_from_stores(snapshot_root_bank.get_snapshot_storages(), snapshot_root_bank.simple_capitalization_enabled());
                     warn!("jwash:Comparing in accounts_bg_service");
@@ -185,6 +186,7 @@ impl SnapshotRequestHandler {
 
                 log(&snapshot_root_bank, line!());
 
+                if false
                 {
                     //let a2 = AccountsDB::get_sorted_accounts_from_stores(snapshot_root_bank.get_snapshot_storages(), snapshot_root_bank.simple_capitalization_enabled());
                     warn!("jwash:Comparing in accounts_bg_service3");
@@ -197,7 +199,7 @@ impl SnapshotRequestHandler {
                 purge_old_snapshots_time.stop();
                 total_time.stop();
 
-                if true
+                if false
                 {
                     let a2 = AccountsDB::get_sorted_accounts_from_stores(snapshot_root_bank.get_snapshot_storages(), snapshot_root_bank.simple_capitalization_enabled());
                     warn!("jwash:Comparing in accounts_bg_service4");
