@@ -3382,6 +3382,8 @@ impl AccountsDB {
         let mut l_good = usize::MAX;
         let mut failed = false;
         let mut r_good = usize::MAX;
+        let mut right_count = 0;
+        let mut last_right = Pubkey::default();
         loop {
             let ldone = l >= left.len();
             let rdone = r >= right.len();
@@ -3437,7 +3439,11 @@ impl AccountsDB {
                             print = false;
                         }
                         else if l_good != usize::MAX {
-                            warn!("jwash:different4 right is missing: {:?}", left[l_good]);
+                            if right_count < 100 {
+                                warn!("jwash:different4 right is missing: {:?}", left[l_good]);
+                            }
+                            last_right = current_key;
+                            right_count += 1;
                             print = false;
                         }
                         else {
@@ -3536,7 +3542,7 @@ impl AccountsDB {
         }
         */
         m.stop();
-        warn!("jwash: compare done, {}ms", m.as_ms());
+        warn!("jwash: compare done, {}ms, right missing: {}, failed: {}, last right: {}", m.as_ms(), right_count, failed, last_right);
         //failed
         false
     }
