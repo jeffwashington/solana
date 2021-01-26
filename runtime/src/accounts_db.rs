@@ -3391,10 +3391,12 @@ impl AccountsDB {
                 break;
             }
             if ldone {
-                return false; // lazy here
+                warn!("jwash:left done before right, {}", right.len() - l);
+                break;//return false; // lazy here
             }
             if rdone {
-                return false; // lazy here
+                warn!("jwash:right done before left, {}", left.len() - r);
+                break;//return false; // lazy here
             }
             let l_v = left[l];
             let r_v = right[r];
