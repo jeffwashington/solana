@@ -4384,7 +4384,7 @@ impl AccountsDB {
                     last = now;
                 }
                 if count == 0 {
-                    dead_slots.insert(*slot);
+                    dead_slots.insert(*slot); // TODO this is useless
                 } else if self.caching_enabled
                     && (self.page_align(store.alive_bytes() as u64) as f64
                         / store.total_bytes() as f64)
@@ -4429,6 +4429,9 @@ impl AccountsDB {
             true
         });
 
+        if dead_slots.len() > 0{
+            warn!("jwash:dead_slots: {:?}", dead_slots);
+        }
         dead_slots
     }
 

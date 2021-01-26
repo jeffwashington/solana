@@ -1983,6 +1983,7 @@ impl Bank {
     // still being stake-weighted.
     // Ref: distribute_rent_to_validators
     fn collect_fees(&self) {
+        warn!("bank:collect_fees");
         let collector_fees = self.collector_fees.load(Relaxed) as u64;
 
         if collector_fees != 0 {
@@ -2018,6 +2019,8 @@ impl Bank {
     }
 
     pub fn freeze(&self) {
+        warn!("jwash::bank:freeze");
+
         // This lock prevents any new commits from BankingStage
         // `process_and_record_transactions_locked()` from coming
         // in after the last tick is observed. This is because in
@@ -3460,7 +3463,7 @@ impl Bank {
             acct.push((pubkey.clone(), this_rent, account.lamports));
         }
         self.collected_rent.fetch_add(rent, Relaxed);
-        warn!("collect_rent_eagerly, slot: {}, {:?}", self.slot(), acct);
+        warn!("jwash:collect_rent_eagerly, slot: {}, {:?}, thread: {}", self.slot(), acct, std::thread::current().name().unwrap_or_default());
         //datapoint_info!("collect_rent_eagerly", ("accounts", account_count, i64));
     }
 
