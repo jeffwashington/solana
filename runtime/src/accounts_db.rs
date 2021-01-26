@@ -419,6 +419,8 @@ impl AccountStorageEntry {
 
     pub fn recycle(&self, slot: Slot, id: usize) {
         let mut count_and_status = self.count_and_status.write().unwrap();
+        //assert!(!self.hs.read().unwrap().contains(&id), "wrote to storage that is in snapshot2: {}, len: {}", id, self.hs.read().unwrap().len());
+
         self.accounts.reset();
         *count_and_status = (0, AccountStorageStatus::Available);
         self.slot.store(slot, Ordering::Release);
@@ -4531,6 +4533,8 @@ mut r:usize){
                     "AccountDB::accounts_index corrupted. Storage pointed to: {}, expected: {}, should only point to one slot",
                     store.slot(), *slot
                 );
+                assert!(!self.hs.read().unwrap().contains(&account_info.store_id), "wrote to storage that is in snapshot: {}, len: {}", account_info.store_id, self.hs.read().unwrap().len());
+
                 let count = store.remove_account(account_info.stored_size);
                 let now = (*slot, account_info.lamports, account_info.store_id);
                 if now != last {
