@@ -2019,7 +2019,7 @@ impl Bank {
     }
 
     pub fn freeze(&self) {
-        warn!("jwash::bank:freeze");
+        warn!("jwash::bank:freeze, slot: {}", self.slot());
 
         // This lock prevents any new commits from BankingStage
         // `process_and_record_transactions_locked()` from coming
