@@ -3382,8 +3382,8 @@ impl AccountsDB {
                 let rc = (datar.0, datar.1, datar.2, datar.3, datar.5);
                 let lcnovers = (datal.1, datal.2, datal.3, datal.5);
                 let rcnovers = (datar.1, datar.2, datar.3, datar.5);
-                let lcnostoredi = (datal.0, datal.1, datal.2, datal.3, datal.4);
-                let rcnostoredi = (datar.0, datar.1, datar.2, datar.3, datar.4);
+                let lcnostoredi = (datal.0, datal.1, datal.2, datal.3);
+                let rcnostoredi = (datar.0, datar.1, datar.2, datar.3);
                 if lc != rc {
                     if lcnovers == rcnovers {
                         warn!("jwash:only_version_changed: {:?} {:?}, {:?}, versions: {}", key, datal, datar.3, datar.0 - datal.0);
@@ -3957,14 +3957,14 @@ impl AccountsDB {
     ) -> Vec<(Pubkey, Hash, u64, u64, u64, Slot, AppendVecId)> {
 
         let mut zeros = Measure::start("eliminate zeros");
-        warn!("jwash: get_sorted_accounts, {}, {}", slot, MAX_ACCOUNTS);
+        warn!("jwash: get_sorted_accounts, {}", slot);
         if MAX_ACCOUNTS == 0 {
             let n:Vec<(Pubkey, Hash, u64, u64, u64, Slot, AppendVecId)> = Vec::new();
             return n;
         }
         let x = self.get_accounts_using_stores2(slot, ancestors, simple_capitalization_enabled);
 
-        warn!("jwash: get_sorted_accounts2, {}, {}", slot, MAX_ACCOUNTS);
+        warn!("jwash: get_sorted_accounts2, {}", slot);
         let mut hashes = Self::remove_zero_balance_accounts2(x);
         zeros.stop();
 

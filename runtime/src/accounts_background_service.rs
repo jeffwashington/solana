@@ -212,7 +212,7 @@ impl SnapshotRequestHandler {
                 //snapshot_root_bank.update_accounts_hash_with_store_option(true, true, true);
 
                 //snapshot_root_bank.update_accounts_hash_with_store_option(true, false, true);
-                warn!("extra time before done");
+                warn!("extra time before done - account cleanup service");
 
                 datapoint_info!(
                     "handle_snapshot_requests-timing",

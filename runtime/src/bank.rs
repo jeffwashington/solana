@@ -3435,6 +3435,7 @@ impl Bank {
     }
 
     fn collect_rent_in_partition(&self, partition: Partition) {
+        warn!("start collect_rent_in_partition, {}", self.slot());
         let subrange = Self::pubkey_range_from_partition(partition);
 
         let accounts = self
@@ -3446,18 +3447,20 @@ impl Bank {
         // parallelize?
         let mut rent = 0;
         for (pubkey, mut account) in accounts {
-            rent += self.rent_collector.collect_from_existing_account(
+            let this_rent =
+            self.rent_collector.collect_from_existing_account(
                 &pubkey,
                 &mut account,
                 self.cumulative_rent_related_fixes_enabled(),
             );
+            rent += this_rent;
             // Store all of them unconditionally to purge old AppendVec,
             // even if collected rent is 0 (= not updated).
-            self.store_account(&pubkey, &account);
-            acct.push(pubkey.clone());
+            self.store_account(&pubkey, &account, account.lamports);
+            acct.push((pubkey.clone(), this_rent));
         }
         self.collected_rent.fetch_add(rent, Relaxed);
-        warn!("collect_rent_eagerly, {:?}", acct);
+        warn!("collect_rent_eagerly, slot: {}, {:?}", self.slot(), acct);
         //datapoint_info!("collect_rent_eagerly", ("accounts", account_count, i64));
     }
 
