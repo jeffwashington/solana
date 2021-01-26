@@ -3419,7 +3419,7 @@ impl AccountsDB {
 
                     if !print {
                         let l_d = left[l_good];
-                        let r_d = right[l_good];
+                        let r_d = right[r_good];
                         if l_d.1 != r_d.1 {
                             warn!("jwash:different4 because hash: {}, {}, {}", current_key, l_d.1, r_d.1);
                             print = true;
