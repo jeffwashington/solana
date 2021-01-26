@@ -3373,6 +3373,7 @@ impl AccountsDB {
     pub fn compare2(left:Vec<(Pubkey, Hash, u64, u64, u64, Slot, AppendVecId)>,
     right:Vec<(Pubkey, Hash, u64, u64, u64, Slot, AppendVecId)>,
     ) -> bool {
+        warn!("jwash: compare start");
 
         let mut l = 0;
         let mut r = 0;
@@ -3420,11 +3421,16 @@ impl AccountsDB {
                         let l_d = left[l_good];
                         let r_d = right[l_good];
                         if l_d.1 != r_d.1 {
+                            warn!("different because hash: {}, {}, {}", current_key, l_d.1, r_d.1);
                             print = true;
                         }
                         else if l_d.2 != r_d.2 {
+                            warn!("different because lamports: {}, {}, {}", current_key, l_d.2, r_d.2);
                             print = true;
                         }
+                    }
+                    else {
+                        warn!("different because good: {}, {}, {}", current_key, l_good, r_good);
                     }
                     if print {
                         warn!("jwash:different45: {:?}", current_key);
