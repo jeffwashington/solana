@@ -3967,7 +3967,8 @@ impl AccountsDB {
         let x = self.get_accounts_using_stores2(slot, ancestors, simple_capitalization_enabled);
 
         warn!("jwash: get_sorted_accounts2, {}", slot);
-        let mut hashes = Self::remove_zero_balance_accounts2(x);
+        //let mut hashes = Self::remove_zero_balance_accounts2(x);
+        let hashes = x;
         zeros.stop();
 
 
@@ -3993,7 +3994,8 @@ impl AccountsDB {
         let x = Self::scan_slot_using_snapshot2(storages, simple_capitalization_enabled);
 
         let mut zeros = Measure::start("eliminate zeros");
-        let mut hashes = Self::remove_zero_balance_accounts2(x);
+        //let mut hashes = Self::remove_zero_balance_accounts2(x);
+        let hashes = x;
         zeros.stop();
 
         hashes.par_sort_by(|a, b| (a.0, a.3).cmp(&(b.0, b.3)));
@@ -4358,6 +4360,7 @@ impl AccountsDB {
         let mut dead_slots = HashSet::new();
         let mut new_shrink_candidates: ShrinkCandidates = HashMap::new();
         let mut last:(Slot, u64, usize) = (0, 0, 0);
+        //let mut 
         for (slot, account_info) in reclaims {
             // No cached accounts should make it here
             assert_ne!(account_info.store_id, CACHE_VIRTUAL_STORAGE_ID);
@@ -4382,7 +4385,7 @@ impl AccountsDB {
                 let count = store.remove_account(account_info.stored_size);
                 let now = (*slot, account_info.lamports, account_info.store_id);
                 if now != last {
-                    warn!("rm_acct, {}, {}, {}, {:?}, {}", slot, account_info.lamports, account_info.store_id, std::thread::current().name().unwrap_or_default(), count);
+                    //warn!("rm_acct, {}, {}, {}, {:?}, {}", slot, account_info.lamports, account_info.store_id, std::thread::current().name().unwrap_or_default(), count);
                     last = now;
                 }
                 if count == 0 {
