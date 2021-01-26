@@ -3396,7 +3396,7 @@ impl Bank {
         }
 
         let mut measure = Measure::start("collect_rent_eagerly-ms");
-        warn!("jwash:collect_rent_eagerly, partition len: {}, use_fixed: {}", self.rent_collection_partitions().len(), self.use_fixed_collection_cycle());
+        //warn!("jwash:collect_rent_eagerly, partition len: {}, use_fixed: {}", self.rent_collection_partitions().len(), self.use_fixed_collection_cycle());
         for partition in self.rent_collection_partitions() {
             self.collect_rent_in_partition(partition);
         }
@@ -3439,7 +3439,7 @@ impl Bank {
     }
 
     fn collect_rent_in_partition(&self, partition: Partition) {
-        warn!("start collect_rent_in_partition, {}", self.slot());
+        //warn!("start collect_rent_in_partition, {}", self.slot());
         let subrange = Self::pubkey_range_from_partition(partition);
 
         let accounts = self
@@ -3464,7 +3464,7 @@ impl Bank {
             acct.push((pubkey.clone(), this_rent, account.lamports));
         }
         self.collected_rent.fetch_add(rent, Relaxed);
-        warn!("jwash:collect_rent_eagerly, slot: {}, {:?}, thread: {}", self.slot(), acct, std::thread::current().name().unwrap_or_default());
+        //warn!("collect_rent_eagerly, slot: {}, {:?}, thread: {}", self.slot(), acct, std::thread::current().name().unwrap_or_default());
         //datapoint_info!("collect_rent_eagerly", ("accounts", account_count, i64));
     }
 

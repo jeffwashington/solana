@@ -73,19 +73,19 @@ pub const DEFAULT_NUM_THREADS: u32 = 8;
 pub const DEFAULT_NUM_DIRS: u32 = 4;
 pub const SHRINK_RATIO: f64 = 0.80;
 
-// A specially reserved storage id just for entries in the cache, so that
+// A specially reser_ved storage id just for entries in the cache, so that
 // operations that take a storage entry can maintain a common interface
 // when interacting with cached accounts. This id is "virtual" in that it
 // doesn't actually refer to an actual storage entry.
 const CACHE_VIRTUAL_STORAGE_ID: usize = AppendVecId::MAX;
 
-// A specially reserved write version (identifier for ordering writes in an AppendVec)
+// A specially reser_ved write version (identifier for ordering writes in an AppendVec)
 // for entries in the cache, so that  operations that take a storage entry can maintain
 // a common interface when interacting with cached accounts. This version is "virtual" in
 // that it doesn't actually map to an entry in an AppendVec.
 const CACHE_VIRTUAL_WRITE_VERSION: u64 = 0;
 
-// A specially reserved offset (represents an offset into an AppendVec)
+// A specially reser_ved offset (represents an offset into an AppendVec)
 // for entries in the cache, so that  operations that take a storage entry can maintain
 // a common interface when interacting with cached accounts. This version is "virtual" in
 // that it doesn't actually map to an entry in an AppendVec.
@@ -96,7 +96,7 @@ type DashMapVersionHash = DashMap<Pubkey, (u64, Hash)>;
 
 lazy_static! {
     // FROZEN_ACCOUNT_PANIC is used to signal local_cluster that an AccountsDB panic has occurred,
-    // as |cargo test| cannot observe panics in other threads
+    // as |cargo test| cannot obser_ve panics in other threads
     pub static ref FROZEN_ACCOUNT_PANIC: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
 }
 
@@ -2472,7 +2472,7 @@ impl AccountsDB {
                 // the slot and from the Accounts Index
                 self.purge_slot_cache_keys(*remove_slot, slot_cache);
             } else if let Some((_, slot_removed_storages)) = self.storage.0.remove(&remove_slot) {
-                // Because AccountsBackgroundService synchronously flushes from the accounts cache
+                // Because AccountsBackgroundSer_vice synchronously flushes from the accounts cache
                 // and handles all Bank::drop() (the cleanup function that leads to this
                 // function call), then we don't need to worry above an overlapping cache flush
                 // with this function call. This means, if we get into this case, we can be
@@ -2803,14 +2803,14 @@ impl AccountsDB {
             storage_find.stop();
             total_storage_find_us += storage_find.as_us();
             let mut append_accounts = Measure::start("append_accounts");
-            let rvs = storage.accounts.append_accounts(
+            let r_vs = storage.accounts.append_accounts(
                 &accounts_and_meta_to_store[infos.len()..],
                 &hashes[infos.len()..],
             );
-            assert!(!rvs.is_empty());
+            assert!(!r_vs.is_empty());
             append_accounts.stop();
             total_append_accounts_us += append_accounts.as_us();
-            if rvs.len() == 1 {
+            if r_vs.len() == 1 {
                 storage.set_status(AccountStorageStatus::Full);
 
                 // See if an account overflows the append vecs in the slot.
@@ -2835,7 +2835,7 @@ impl AccountsDB {
                 continue;
             }
 
-            for (offsets, (_, account)) in rvs
+            for (offsets, (_, account)) in r_vs
                 .windows(2)
                 .zip(&accounts_and_meta_to_store[infos.len()..])
             {
@@ -3279,20 +3279,20 @@ impl AccountsDB {
                 l += 1;
                 continue;
             }
-            let lv = left[l];
-            let rv = right[r];
-            let lv2 = (lv.1, lv.2, lv.3, lv.4, lv.6);
-            let rv2 = (rv.1, rv.2, rv.3, rv.4, rv.6);
+            let l_v = left[l];
+            let r_v = right[r];
+            let l_v2 = (l_v.1, l_v.2, l_v.3, l_v.4, l_v.6);
+            let r_v2 = (r_v.1, r_v.2, r_v.3, r_v.4, r_v.6);
 
-            if found && lv.0 != key && rv.0 != key {
+            if found && l_v.0 != key && r_v.0 != key {
                 return;
             }
 
-            let lvnot5 = (lv.1, lv.2, lv.3, lv.4, lv.6);
-            let rvnot5 = (rv.1, rv.2, rv.3, rv.4, rv.6);
-            if lv.0 != key {
+            let l_vnot5 = (l_v.1, l_v.2, l_v.3, l_v.4, l_v.6);
+            let r_vnot5 = (r_v.1, r_v.2, r_v.3, r_v.4, r_v.6);
+            if l_v.0 != key {
                 if found {
-                    warn!("difft:Only in right2:,{:?}", rvnot5);
+                    warn!("difft:Only in right2:,{:?}", r_vnot5);
                     r += 1;
                 }
                 else {
@@ -3300,9 +3300,9 @@ impl AccountsDB {
                 }
                 continue;
             }
-            else if rv.0 != key {
+            else if r_v.0 != key {
                 if found {
-                    warn!("difft:Only in left2:,{:?}", lvnot5);
+                    warn!("difft:Only in left2:,{:?}", l_vnot5);
                     l += 1;
                 }
                 else {
@@ -3312,36 +3312,36 @@ impl AccountsDB {
             }
             found = true;
 
-            let same = lv == rv || lv2 == rv2 || (lvnot5 == rvnot5 && (lv.5 == 1111 || rv.5 == 1111));
-            let ls = (lv.0, lv.3);
-            let rs = (rv.0, rv.3);
-            let lv = (lv.1, lv.2, lv.3, lv.4, lv.5, lv.6);
-            let rv = (rv.1, rv.2, rv.3, rv.4, rv.5, rv.6);
+            let same = l_v == r_v || l_v2 == r_v2 || (l_vnot5 == r_vnot5 && (l_v.5 == 1111 || r_v.5 == 1111));
+            let ls = (l_v.0, l_v.3);
+            let rs = (r_v.0, r_v.3);
+            let l_v = (l_v.1, l_v.2, l_v.3, l_v.4, l_v.5, l_v.6);
+            let r_v = (r_v.1, r_v.2, r_v.3, r_v.4, r_v.5, r_v.6);
             if same {
-                warn!("difft:same,{:?},{:?}", lv,rv);
+                warn!("difft:same,{:?},{:?}", l_v,r_v);
                 l += 1;
                 r += 1;
             }
             else if ls == rs {
                 // cut out pb key
                 found=true;
-                warn!("difft:different:,{:?},{:?}", lv, rv);
+                warn!("difft:different:,{:?},{:?}", l_v, r_v);
                 l += 1;
                 r += 1;
 
             }
             else{
                 // at least cut out hashes
-                //let lv = (lv.0, lv.2, lv.3, lv.4, lv.5, lv.6);
-                //let rv = (rv.0, rv.2, rv.3, rv.4, rv.5, rv.6);
+                //let l_v = (l_v.0, l_v.2, l_v.3, l_v.4, l_v.5, l_v.6);
+                //let r_v = (r_v.0, r_v.2, r_v.3, r_v.4, r_v.5, r_v.6);
 
                 if ls < rs {
-                    warn!("difft:Only in left:,{:?}", lvnot5);
+                    warn!("difft:Only in left:,{:?}", l_vnot5);
                     l += 1;
                     continue;
                 }
                 else {
-                    warn!("difft:Only in right:,{:?}", rvnot5);
+                    warn!("difft:Only in right:,{:?}", r_vnot5);
                     r += 1;
                     continue;
                 }
@@ -3374,6 +3374,101 @@ impl AccountsDB {
     right:Vec<(Pubkey, Hash, u64, u64, u64, Slot, AppendVecId)>,
     ) -> bool {
 
+        let mut l = 0;
+        let mut r = 0;
+        let mut current_key = Pubkey::default();
+        let mut l_good = usize::MAX;
+        let mut failed = false;
+        let mut r_good = usize::MAX;
+        let mut l_is_good = false;
+        let mut r_is_good = false;
+        loop {
+            let ldone = l >= left.len();
+            let rdone = r >= right.len();
+            if ldone && rdone {
+                break;
+            }
+            if ldone {
+                return false; // lazy here
+            }
+            if rdone {
+                return false; // lazy here
+            }
+            let l_v = left[l];
+            let r_v = right[r];
+            let l_v2 = (l_v.1, l_v.2, l_v.3, l_v.4, l_v.6);
+            let r_v2 = (r_v.1, r_v.2, r_v.3, r_v.4, r_v.6);
+
+            let lkey = l_v.0;
+            let rkey = r_v.0;
+            let mut l_update = false;
+            let mut r_update = false;
+            if current_key == Pubkey::default() {
+                current_key = lkey;
+            }
+            if lkey == current_key && rkey == current_key {
+                l_update = true;
+                r_update = true;
+            }
+            else if lkey != current_key && rkey != current_key {
+                if current_key != Pubkey::default() {
+                    // report out here
+                    let mut print=false;
+                    print = l_good == usize::MAX || r_good == usize::MAX;
+
+                    if !print {
+                        let l_d = left[l_good];
+                        let r_d = right[l_good];
+                        if l_d.1 != r_d.1 {
+                            print = true;
+                        }
+                        else if l_d.2 != r_d.2 {
+                            print = true;
+                        }
+                    }
+                    if print {
+                        warn!("jwash:different45: {:?}", current_key);
+                        failed=true;
+                        Self::print(&left, &right, current_key);
+                    }
+                }
+
+                current_key = Pubkey::default();
+                // don't advance, start over
+                continue;
+            }
+            else if lkey == current_key {
+                l_update = true;
+            }
+            else {
+                r_update = true;
+            }
+
+            if l_update {
+                l_update = usize::MAX == l_good;
+                if !l_update {
+                    // is l_v.version > version of previously selected
+                    l_update = l_v.3 >= left[l_good].3;
+                }
+                if l_update {
+                    l_good = l;
+                }
+                l += 1;
+            }
+            if r_update {
+                r_update = usize::MAX == r_good;
+                if !r_update {
+                    // is r_v.version > version of previously selected
+                    r_update = r_v.3 >= right[r_good].3;
+                }
+                if r_update {
+                    r_good = l;
+                }
+                r += 1;
+            }
+        };
+/*
+        
         let hl = Self::build(&left);
         let hr = Self::build(&right);
         let mut failed = false;
@@ -3419,6 +3514,7 @@ impl AccountsDB {
                 }
             }
         }
+        */
         warn!("jwash: compare done");
         failed
     }
