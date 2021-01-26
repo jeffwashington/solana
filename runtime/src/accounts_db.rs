@@ -3433,12 +3433,17 @@ mut r:usize){
                     }
                     else {
                         if r_good == usize::MAX && left[l_good].2 == 0 {
-                            warn!("missing account in right, but left account is 0 lamports: {}, {:?}", current_key, left[l_good]);
+                            //warn!("missing account in right, but left account is 0 lamports: {}, {:?}", current_key, left[l_good]);
                             print = false;
                         }
                         else if r_good != usize::MAX {
-                            warn!("jwash:different4 left is missing: {:?}", right[r_good]);
-                            print = false;
+                            if right[r_good].2 == 0 {
+                                // only in right, but 0 lamports
+                                print = false;
+                            }
+                            else {
+                                warn!("jwash:different4 left is missing: {:?}", right[r_good]);
+                            }
                         }
                         else if l_good != usize::MAX {
                             if right_count < 100 {
