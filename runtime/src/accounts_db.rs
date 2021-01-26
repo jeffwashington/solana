@@ -3381,8 +3381,6 @@ impl AccountsDB {
         let mut l_good = usize::MAX;
         let mut failed = false;
         let mut r_good = usize::MAX;
-        let mut l_is_good = false;
-        let mut r_is_good = false;
         loop {
             let ldone = l >= left.len();
             let rdone = r >= right.len();
@@ -3440,6 +3438,8 @@ impl AccountsDB {
                 }
 
                 current_key = Pubkey::default();
+                l_good = usize::MAX;
+                r_good = usize::MAX;
                 // don't advance, start over
                 continue;
             }
@@ -4098,9 +4098,9 @@ impl AccountsDB {
             return n;
         }
 
+        let mut zeros = Measure::start("eliminate zeros");
         let x = Self::scan_slot_using_snapshot2(storages, simple_capitalization_enabled);
 
-        let mut zeros = Measure::start("eliminate zeros");
         //let mut hashes = Self::remove_zero_balance_accounts2(x);
         let mut hashes = x;
         zeros.stop();

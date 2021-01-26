@@ -2033,7 +2033,7 @@ impl Bank {
         // committed before this write lock can be obtained here.
         let mut hash = self.hash.write().unwrap();
         if *hash == Hash::default() {
-            warn!("jwash::bank:freeze, slot: {}", self.slot());
+            warn!("bank:freeze, slot: {}", self.slot());
             // finish up any deferred changes to account state
             self.collect_rent_eagerly();
             self.collect_fees();
