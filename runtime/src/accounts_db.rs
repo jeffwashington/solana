@@ -3428,7 +3428,13 @@ impl AccountsDB {
                         }
                     }
                     else {
-                        warn!("jwash:different4 because good: {}, {}, {}", current_key, l_good, r_good);
+                        if r_good == usize::MAX && left[l_good].2 == 0 {
+                            warn!("missing account in right, but left account is 0 lamports: {}, {:?}", current_key, left[l_good]);
+                            print = false;
+                        }
+                        else {
+                            warn!("jwash:different4 because good: {}, {}, {}", current_key, l_good, r_good);
+                        }
                     }
                     if print {
                         //warn!("jwash:different45: {:?}", current_key);
@@ -3761,7 +3767,15 @@ impl AccountsDB {
                     match map.entry(*key) {
                         Occupied(mut dest_item) => {
                             if dest_item.get_mut().version() == source_item.version() {
-                                warn!("jwash:error3: {:?}", source_item);
+                                if dest_item.get_mut().1 != source_item.1 {
+                                    warn!("jwash:error! same version, but hash is different: {:?}, {:?}", source_item, dest_item.get_mut());
+                                }
+                                else if dest_item.get_mut().2 != source_item.2 {
+                                    warn!("jwash:error! same version, but lamports are different: {:?}, {:?}", source_item, dest_item.get_mut());
+                                }
+                                else {
+                                    warn!("jwash:same version, but looks the same: {:?}, {:?}", source_item, dest_item.get_mut());
+                                }
                             }
                             if dest_item.get_mut().version() <= source_item.version() {
                                 // replace the item
