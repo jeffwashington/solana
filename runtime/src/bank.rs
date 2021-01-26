@@ -3396,6 +3396,7 @@ impl Bank {
         }
 
         let mut measure = Measure::start("collect_rent_eagerly-ms");
+        warn!("jwash:collect_rent_eagerly, partition len: {}, use_fixed: {}", self.rent_collection_partitions().len(), self.use_fixed_collection_cycle());
         for partition in self.rent_collection_partitions() {
             self.collect_rent_in_partition(partition);
         }
