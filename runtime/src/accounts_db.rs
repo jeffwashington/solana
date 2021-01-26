@@ -3390,7 +3390,7 @@ impl AccountsDB {
                         warn!("jwash:only_version_changed: {:?} {:?}, {:?}, versions: {}", key, datal, datar.3, datar.0 - datal.0);
                     }
                     else if lcnostoredi == rcnostoredi {
-                        warn!("jwash:only_storage ids_changed: {:?} {:?}, {:?}, storage ids: {}", key, datal, datar.6, datar.6 as i64 - datal.6 as i64);
+                        warn!("jwash:only_storage ids_changed: {:?} {:?}, {:?}, storage ids: {}", key, datal, datar.5, datar.5 as i64 - datal.5 as i64);
                     }
                     else{
                         warn!("jwash:different2: {:?} {:?}, {:?}, versions: {}", key, datal, datar, datar.0 - datal.0);
