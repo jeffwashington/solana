@@ -5020,7 +5020,7 @@ mut r:usize){
             .collect();
             warn!("scan_account_storage_no_bank_2 from get snapshot, storages: {}", storage_maps.len());
 
-        warn!("get_snapshot_storages: raw: {}, after: {}, is root: {}, slot: {}", result_raw.len(), result.len(), self.accounts_index.is_root(snapshot_slot), snapshot_slot);
+        warn!("get_snapshot_storages: raw: {}, after: {}, is root: {}, slot: {}, ids: {}", result_raw.len(), result.len(), self.accounts_index.is_root(snapshot_slot), snapshot_slot, hs.len());
 
         let mut slot_stores = self.hs.write().unwrap();
         slot_stores.clear();
