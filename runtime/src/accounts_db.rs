@@ -3468,7 +3468,7 @@ impl AccountsDB {
                     r_update = r_v.3 >= right[r_good].3;
                 }
                 if r_update {
-                    r_good = l;
+                    r_good = r;
                 }
                 r += 1;
             }
