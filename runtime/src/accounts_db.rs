@@ -3773,6 +3773,9 @@ impl AccountsDB {
                                 else if dest_item.get_mut().2 != source_item.2 {
                                     warn!("jwash:error! same version, but lamports are different: {:?}, {:?}", source_item, dest_item.get_mut());
                                 }
+                                else if dest_item.get_mut().5 != source_item.5 {
+                                    //warn!("jwash:error! same version, but slot ids are different: {:?}, {:?}", source_item, dest_item.get_mut());
+                                }
                                 else {
                                     warn!("jwash:same version, but looks the same: {:?}, {:?}", source_item, dest_item.get_mut());
                                 }
