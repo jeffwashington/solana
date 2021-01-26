@@ -3456,8 +3456,8 @@ impl Bank {
             rent += this_rent;
             // Store all of them unconditionally to purge old AppendVec,
             // even if collected rent is 0 (= not updated).
-            self.store_account(&pubkey, &account, account.lamports);
-            acct.push((pubkey.clone(), this_rent));
+            self.store_account(&pubkey, &account);
+            acct.push((pubkey.clone(), this_rent, account.lamports));
         }
         self.collected_rent.fetch_add(rent, Relaxed);
         warn!("collect_rent_eagerly, slot: {}, {:?}", self.slot(), acct);
