@@ -3421,19 +3421,19 @@ impl AccountsDB {
                         let l_d = left[l_good];
                         let r_d = right[l_good];
                         if l_d.1 != r_d.1 {
-                            warn!("different because hash: {}, {}, {}", current_key, l_d.1, r_d.1);
+                            warn!("jwash:different4 because hash: {}, {}, {}", current_key, l_d.1, r_d.1);
                             print = true;
                         }
                         else if l_d.2 != r_d.2 {
-                            warn!("different because lamports: {}, {}, {}", current_key, l_d.2, r_d.2);
+                            warn!("jwash:different4 because lamports: {}, {}, {}", current_key, l_d.2, r_d.2);
                             print = true;
                         }
                     }
                     else {
-                        warn!("different because good: {}, {}, {}", current_key, l_good, r_good);
+                        warn!("jwash:different4 because good: {}, {}, {}", current_key, l_good, r_good);
                     }
                     if print {
-                        warn!("jwash:different45: {:?}", current_key);
+                        //warn!("jwash:different45: {:?}", current_key);
                         failed=true;
                         Self::print(&left, &right, current_key);
                     }
