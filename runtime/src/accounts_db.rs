@@ -60,7 +60,7 @@ use std::{
 };
 use tempfile::TempDir;
 
-const MAX_ACCOUNTS: usize = 0;// usize::MAX;// 100_000;
+const MAX_ACCOUNTS: usize = usize::MAX;// 100_000;
 const PAGE_SIZE: u64 = 4 * 1024;
 const MAX_RECYCLE_STORES: usize = 0;
 const STORE_META_OVERHEAD: usize = 256;
@@ -3704,6 +3704,9 @@ mut r:usize){
             }
         };
         warn!("min slot: {}", min);
+
+
+        let max_pubkey = Bank::pubkey_range_from_partition((0, , MAX_ACCOUNTS));
 
 
         // scan all slots
