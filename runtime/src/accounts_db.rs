@@ -3433,10 +3433,12 @@ impl AccountsDB {
                             print = false;
                         }
                         else if r_good != usize::MAX {
-                            warn!("jwash:different4 left is missing: {}, {}, {}", current_key, right[r_good]);
+                            warn!("jwash:different4 left is missing: {:?}", right[r_good]);
+                            print = false;
                         }
                         else if l_good != usize::MAX {
-                            warn!("jwash:different4 right is missing: {}, {}, {}", current_key, left[l_good]);
+                            warn!("jwash:different4 right is missing: {:?}", left[l_good]);
+                            print = false;
                         }
                         else {
                             warn!("jwash:different4 because good: {}, {}, {}", current_key, l_good, r_good);
