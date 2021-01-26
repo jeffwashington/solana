@@ -3412,14 +3412,13 @@ impl AccountsDB {
             else if lkey != current_key && rkey != current_key {
                 if current_key != Pubkey::default() {
                     // report out here
-                    let mut print=false;
-                    print = l_good == usize::MAX || r_good == usize::MAX;
+                    let mut print = l_good == usize::MAX || r_good == usize::MAX;
 
                     if !print {
                         let l_d = left[l_good];
                         let r_d = right[r_good];
                         if l_d.1 != r_d.1 {
-                            warn!("jwash:different4 because hash: {}, {}, {}", current_key, l_d.1, r_d.1);
+                            warn!("jwash:different4 because hash: {}, {}, {}, good: {}, {}", current_key, l_d.1, r_d.1, l_good, r_good);
                             print = true;
                         }
                         else if l_d.2 != r_d.2 {
