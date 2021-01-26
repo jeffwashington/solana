@@ -330,10 +330,6 @@ impl BankRc {
     }
 
     pub fn get_snapshot_storages(&self, slot: Slot) -> SnapshotStorages {
-        {
-            let mut hash = self.hash.write().unwrap();
-            warn("jwash:get_snapshot_storages, slot: {}, hash is default: {}", self.slot(), *hash == Hash::default());
-        }
         self.accounts.accounts_db.get_snapshot_storages(slot)
     }
 }
@@ -4261,6 +4257,10 @@ impl Bank {
     }
 
     pub fn get_snapshot_storages(&self) -> SnapshotStorages {
+        {
+            let mut hash = self.hash.write().unwrap();
+            warn!("jwash:get_snapshot_storages, slot: {}, hash is default: {}", self.slot(), *hash == Hash::default());
+        }
         self.rc
             .get_snapshot_storages(self.slot())
             .into_iter()

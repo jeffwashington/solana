@@ -846,7 +846,7 @@ impl AccountsDB {
 
         let mut measure = Measure::start("clean_old_root_reclaims");
         let mut reclaim_result = (HashMap::new(), HashMap::new());
-        warn!("jwash:clean_old_rooted_accounts: slot: {}", self.slot());
+        warn!("jwash:clean_old_rooted_accounts");
         self.handle_reclaims(&reclaims, None, false, Some(&mut reclaim_result));
         measure.stop();
         debug!("{} {}", clean_rooted, measure);
@@ -2593,7 +2593,7 @@ impl AccountsDB {
             }
         }
 
-        warn!("jwash:remove_unrooted_slot, {}", self.slot());
+        warn!("jwash:remove_unrooted_slot, {}", remove_slot);
         // 1) Remove old bank hash from self.bank_hashes
         // 2) Purge this slot's storage entries from self.storage
         self.handle_reclaims(&reclaims, Some(remove_slot), false, None);
