@@ -4788,7 +4788,7 @@ impl AccountsDB {
         // From 1) and 2) we guarantee passing Some(slot), true is safe
         // hit thiswarn!("jwash:store_accounts_custom");
         let mut handle_reclaims_time = Measure::start("handle_reclaims");
-        warn!("jwash:hdl_rclm_st, slot: {}, {}", slot, self.slot());
+        warn!("jwash:hdl_rclm_st, slot: {}, {}", slot, slot);
         self.handle_reclaims(&reclaims, Some(slot), true, None);
         //warn!("jwash:hdl_rclm_st done");
         handle_reclaims_time.stop();
