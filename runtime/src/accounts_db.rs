@@ -3670,6 +3670,13 @@ impl AccountsDb {
                         .as_mut()
                         .map(|should_flush_f| should_flush_f(key, account))
                         .unwrap_or(true);
+                    println!(
+                        "flush slot cache slot: {}, key: {}, hash: {} lamports: {}",
+                        slot,
+                        key,
+                        iter_item.value().hash(),
+                        iter_item.value().account.lamports()
+                    );
                     if should_flush {
                         let hash = iter_item.value().hash();
                         total_size += (account.data().len() + STORE_META_OVERHEAD) as u64;
@@ -4328,7 +4335,7 @@ impl AccountsDb {
     pub fn get_accounts_delta_hash(&self, slot: Slot) -> Hash {
         let mut scan = Measure::start("scan");
 
-        let scan_result: ScanStorageResult<(Pubkey, (u64, u64, Hash)), DashMapVersionHash> = self
+        let scan_result: ScanStorageResult<(Pubkey, Hash, u64, u64), DashMapVersionHash> = self
             .scan_account_storage(
                 slot,
                 |loaded_account: LoadedAccount| {
@@ -4387,14 +4394,20 @@ impl AccountsDb {
         let dirty_keys = hashes
             .iter()
             .map(|(pubkey, hash, lamports)| {
-                // Only enable for finding account diff mismatch
-                /*println!("x: {:?}", pubkey);
-                println!("y: {:?}", hash);
-                println!("z: {:?}", lamports);*/
                 *pubkey
             })
             .collect();
 
+        let hashes = hashes
+            .iter()
+            .map(|(pubkey, hash, lamports)| {
+                // Only enable for finding account diff mismatch
+                println!("x: {:?}", pubkey);
+                println!("y: {:?}", hash);
+                println!("z: {:?}", lamports);
+                (*pubkey, *hash)
+            })
+            .collect();
         let ret = AccountsHash::accumulate_account_hashes(hashes);
         accumulate.stop();
         let mut uncleaned_time = Measure::start("uncleaned_index");
