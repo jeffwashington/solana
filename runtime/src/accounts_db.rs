@@ -1232,7 +1232,7 @@ impl AccountsDB {
     where
         I: Iterator<Item = &'a Arc<AccountStorageEntry>>,
     {
-        debug!("do_shrink_slot_stores: slot: {}", slot);
+        warn!("do_shrink_slot_stores: slot: {}", slot);
         let mut stored_accounts = vec![];
         for store in stores {
             let mut start = 0;
@@ -2367,6 +2367,7 @@ impl AccountsDB {
     /// # Arguments
     /// * `removed_slots` - Slots that were previously rooted but just removed
     fn purge_removed_slots_from_store(&self, removed_slots: &HashSet<Slot>) {
+        warn!("purge_removed_slots_from_store: {:?}", removed_slots);
         // Check all slots `removed_slots` are no longer rooted
         let mut safety_checks_elapsed = Measure::start("safety_checks_elapsed");
         for slot in removed_slots.iter() {
@@ -3389,7 +3390,7 @@ impl AccountsDB {
                         warn!("jwash:only_version_changed: {:?} {:?}, {:?}, versions: {}", key, datal, datar.3, datar.0 - datal.0);
                     }
                     else if lcnostoredi == rcnostoredi {
-                        warn!("jwash:only_storage ids_changed: {:?} {:?}, {:?}, storage ids: {}", key, datal, datar.3, datar.5 - datal.5);
+                        warn!("jwash:only_storage ids_changed: {:?} {:?}, {:?}, storage ids: {}", key, datal, datar.5, datar.5 as i64 - datal.5 as i64);
                     }
                     else{
                         warn!("jwash:different2: {:?} {:?}, {:?}, versions: {}", key, datal, datar, datar.0 - datal.0);
