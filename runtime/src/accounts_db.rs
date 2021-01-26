@@ -3373,6 +3373,7 @@ impl AccountsDB {
     pub fn compare2(left:Vec<(Pubkey, Hash, u64, u64, u64, Slot, AppendVecId)>,
     right:Vec<(Pubkey, Hash, u64, u64, u64, Slot, AppendVecId)>,
     ) -> bool {
+        let mut m = Measure::start("a");
         warn!("jwash: compare start");
 
         let mut l = 0;
@@ -3520,7 +3521,8 @@ impl AccountsDB {
             }
         }
         */
-        warn!("jwash: compare done");
+        m.stop();
+        warn!("jwash: compare done, {}ms", m.as_ms());
         failed
     }
 
