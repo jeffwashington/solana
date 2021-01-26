@@ -3523,7 +3523,8 @@ impl AccountsDB {
         */
         m.stop();
         warn!("jwash: compare done, {}ms", m.as_ms());
-        failed
+        //failed
+        false
     }
 
 
