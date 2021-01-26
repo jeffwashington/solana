@@ -3400,21 +3400,19 @@ impl AccountsDB {
             }
             let l_v = left[l];
             let r_v = right[r];
-            let l_v2 = (l_v.1, l_v.2, l_v.3, l_v.4, l_v.6);
-            let r_v2 = (r_v.1, r_v.2, r_v.3, r_v.4, r_v.6);
 
             let lkey = l_v.0;
             let rkey = r_v.0;
-            let mut l_update = false;
-            let mut r_update = false;
             if current_key == Pubkey::default() {
-                current_key = lkey;
+                current_key = if lkey < rkey {
+                    lkey
+                }else {
+                    rkey
+                };
             }
-            if lkey == current_key && rkey == current_key {
-                l_update = true;
-                r_update = true;
-            }
-            else if lkey != current_key && rkey != current_key {
+            let mut l_update = lkey == current_key;
+            let mut r_update = rkey == current_key;
+            if !l_update && !r_update {
                 if current_key != Pubkey::default() {
                     // report out here
                     let mut print = l_good == usize::MAX || r_good == usize::MAX;
@@ -3464,12 +3462,6 @@ impl AccountsDB {
                 r_good = usize::MAX;
                 // don't advance, start over
                 continue;
-            }
-            else if lkey == current_key {
-                l_update = true;
-            }
-            else {
-                r_update = true;
             }
 
             if l_update {
