@@ -3391,7 +3391,7 @@ impl AccountsDB {
                         warn!("jwash:only_version_changed: {:?} {:?}, {:?}, versions: {}", key, datal, datar.3, datar.0 - datal.0);
                     }
                     else if lcnostoredi == rcnostoredi {
-                        warn!("jwash:only_storage ids_changed: {:?} {:?}, {:?}, storage ids: {}", key, datal, datar.5, datar.5 as i64 - datal.5 as i64);
+                        //warn!("jwash:only_storage ids_changed: {:?} {:?}, {:?}, storage ids: {}", key, datal, datar.5, datar.5 as i64 - datal.5 as i64);
                     }
                     else{
                         warn!("jwash:different2: {:?} {:?}, {:?}, versions: {}", key, datal, datar, datar.0 - datal.0);
@@ -3409,9 +3409,14 @@ impl AccountsDB {
                 
             }
             else{
-                warn!("jwash:Only in left34: {:?}", (key, datal));
-                failed=true;
-                Self::print(&left, &right, key);
+                if datal.2 == 0 && datal.3 == 0 {
+                    warn!("jwash:zero lamport account Only in left34 - probably ok: {:?}", (key, datal));
+                }
+                else{
+                    warn!("jwash:Only in left34: {:?}", (key, datal));
+                    failed=true;
+                    Self::print(&left, &right, key);
+                }
             }
         }
         warn!("jwash: compare done");
