@@ -3968,7 +3968,7 @@ impl AccountsDB {
 
         warn!("jwash: get_sorted_accounts2, {}", slot);
         //let mut hashes = Self::remove_zero_balance_accounts2(x);
-        let hashes = x;
+        let mut hashes = x;
         zeros.stop();
 
 
@@ -3995,7 +3995,7 @@ impl AccountsDB {
 
         let mut zeros = Measure::start("eliminate zeros");
         //let mut hashes = Self::remove_zero_balance_accounts2(x);
-        let hashes = x;
+        let mut hashes = x;
         zeros.stop();
 
         hashes.par_sort_by(|a, b| (a.0, a.3).cmp(&(b.0, b.3)));
