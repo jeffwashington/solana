@@ -3374,7 +3374,7 @@ impl AccountsDB {
     right:Vec<(Pubkey, Hash, u64, u64, u64, Slot, AppendVecId)>,
     ) -> bool {
         let mut m = Measure::start("a");
-        warn!("jwash: compare start");
+        warn!("jwash: compare start, {}, {}", left.len(), right.len());
 
         let mut l = 0;
         let mut r = 0;
@@ -3431,6 +3431,12 @@ impl AccountsDB {
                         if r_good == usize::MAX && left[l_good].2 == 0 {
                             warn!("missing account in right, but left account is 0 lamports: {}, {:?}", current_key, left[l_good]);
                             print = false;
+                        }
+                        else if r_good != usize::MAX {
+                            warn!("jwash:different4 left is missing: {}, {}, {}", current_key, right[r_good]);
+                        }
+                        else if l_good != usize::MAX {
+                            warn!("jwash:different4 right is missing: {}, {}, {}", current_key, left[l_good]);
                         }
                         else {
                             warn!("jwash:different4 because good: {}, {}, {}", current_key, l_good, r_good);
