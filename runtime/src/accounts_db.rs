@@ -604,6 +604,7 @@ pub struct AccountsDB {
     /// Keeps tracks of index into AppendVec on a per slot basis
     pub accounts_index: AccountsIndex<AccountInfo>,
 
+    pub hs: RwLock<HashSet<AppendVecId>>,
     pub storage: AccountStorage,
 
     pub accounts_cache: AccountsCache,
@@ -730,6 +731,7 @@ impl Default for AccountsDB {
             cluster_type: None,
             account_indexes: HashSet::new(),
             caching_enabled: false,
+            hs:RwLock::new(HashSet::new()),
         }
     }
 }
@@ -2808,6 +2810,7 @@ impl AccountsDB {
                 &hashes[infos.len()..],
             );
             assert!(!r_vs.is_empty());
+            assert!(!self.hs.read().unwrap().contains(&storage.append_vec_id()), "wrote to storage that is in snapshot: {}, len: {}", storage.append_vec_id(), self.hs.read().unwrap().len());
             append_accounts.stop();
             total_append_accounts_us += append_accounts.as_us();
             if r_vs.len() == 1 {
@@ -4980,6 +4983,8 @@ mut r:usize){
             .filter(|_snapshot_storage: &SnapshotStorage| true)
             .collect();
 
+        let mut hs = HashSet::new();
+
         let result:SnapshotStorages  =self.storage
             .0
             .iter()
@@ -4993,7 +4998,10 @@ mut r:usize){
                     .read()
                     .unwrap()
                     .values()
-                    .filter(|x| x.has_accounts())
+                    .filter(|x| { 
+                        hs.insert(x.append_vec_id());
+                         x.has_accounts()
+                    })
                     .cloned()
                     .collect()
             })
@@ -5009,6 +5017,10 @@ mut r:usize){
             warn!("scan_account_storage_no_bank_2 from get snapshot, storages: {}", storage_maps.len());
 
         warn!("get_snapshot_storages: raw: {}, after: {}, is root: {}, slot: {}", result_raw.len(), result.len(), self.accounts_index.is_root(snapshot_slot), snapshot_slot);
+
+        let mut slot_stores = self.hs.write().unwrap();
+        slot_stores.clear();
+        slot_stores.extend(hs);
 
         result
     }
