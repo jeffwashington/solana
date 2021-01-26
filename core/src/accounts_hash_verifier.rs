@@ -108,7 +108,7 @@ impl AccountsHashVerifier {
         let simple_capitalization_enabled = true; // ??? TODO
         let hash = AccountsDB::calculate_accounts_hash_using_stores_only(accounts_package.storages.clone(), simple_capitalization_enabled, accounts_package.slot);
         start.stop();
-        warn!("process_accounts_package - calculate hash: {:?}, took(ms): {}, equal hash: {}", hash, start.as_ms(), accounts_package.hash == hash);
+        warn!("process_accounts_package - calculate hash: {:?}, took(ms): {}, equal hash: {}", hash, start.as_ms(), accounts_package.hash == hash.0);
 
         let a3 = AccountsDB::get_sorted_accounts_from_stores(accounts_package.storages.clone(), true);
         let others = accounts_package.data.clone();
