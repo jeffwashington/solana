@@ -3442,7 +3442,7 @@ impl AccountsDB {
                         }
                         else if l_good != usize::MAX {
                             if right_count < 100 {
-                                warn!("jwash:different4 right is missing: {:?}", left[l_good]);
+                                warn!("jwash:different4 right is missing: {:?}, r is: {}", left[l_good], r);
                             }
                             last_right = current_key;
                             right_count += 1;
