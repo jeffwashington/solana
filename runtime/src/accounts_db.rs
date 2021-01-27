@@ -606,7 +606,8 @@ pub struct AccountsDB {
     /// Keeps tracks of index into AppendVec on a per slot basis
     pub accounts_index: AccountsIndex<AccountInfo>,
 
-    pub hs: RwLock<HashSet<AppendVecId>>,
+    pub hs: RwLock<HashSet<(AppendVecId, u64)>>,
+    pub hs2: RwLock<HashSet<AppendVecId>>,
     pub storage: AccountStorage,
 
     pub accounts_cache: AccountsCache,
@@ -734,6 +735,7 @@ impl Default for AccountsDB {
             account_indexes: HashSet::new(),
             caching_enabled: false,
             hs:RwLock::new(HashSet::new()),
+            hs2:RwLock::new(HashSet::new()),
         }
     }
 }
@@ -2812,7 +2814,7 @@ impl AccountsDB {
                 &hashes[infos.len()..],
             );
             assert!(!r_vs.is_empty());
-            assert!(!self.hs.read().unwrap().contains(&storage.append_vec_id()), "wrote to storage that is in snapshot: {}, len: {}", storage.append_vec_id(), self.hs.read().unwrap().len());
+            assert!(!self.hs2.read().unwrap().contains(&storage.append_vec_id()), "wrote to storage that is in snapshot: {}, len: {}", storage.append_vec_id(), self.hs.read().unwrap().len());
             append_accounts.stop();
             total_append_accounts_us += append_accounts.as_us();
             if r_vs.len() == 1 {
@@ -4533,7 +4535,10 @@ mut r:usize){
                     "AccountDB::accounts_index corrupted. Storage pointed to: {}, expected: {}, should only point to one slot",
                     store.slot(), *slot
                 );
-                assert!(!self.hs.read().unwrap().contains(&account_info.store_id), "wrote to storage that is in snapshot: {}, len: {}", account_info.store_id, self.hs.read().unwrap().len());
+                if self.hs.read().unwrap().contains(&(account_info.store_id, account_info.lamports)) {
+                    warn!("Error: removing account from active store: {:?}", (account_info.store_id, account_info.lamports));
+                }
+                //assert!(!self.hs.read().unwrap().contains(&account_info.store_id), "wrote to storage that is in snapshot: {}, len: {}", account_info.store_id, self.hs.read().unwrap().len());
 
                 let count = store.remove_account(account_info.stored_size);
                 let now = (*slot, account_info.lamports, account_info.store_id);
@@ -5039,8 +5044,10 @@ mut r:usize){
                     }
                 }
                 else {
-                    let store_id = items[highest_version_index].6;
-                    hs.insert(store_id);
+                    let high = items[highest_version_index];
+                    let d = high.2;
+                    let store_id = high.6;
+                    hs.insert((store_id, d));
                     current_key = val.0;
                     highest_version_index = i;
                 }
@@ -5049,9 +5056,13 @@ mut r:usize){
 
         warn!("get_snapshot_storages: raw: {}, after: {}, is root: {}, slot: {}, ids: {}", result_raw.len(), result.len(), self.accounts_index.is_root(snapshot_slot), snapshot_slot, hs.len());
 
+        let bk = hs.clone();
         let mut slot_stores = self.hs.write().unwrap();
         slot_stores.clear();
         slot_stores.extend(hs);
+        let mut slot_stores2 = self.hs2.write().unwrap();
+        slot_stores2.clear();
+        slot_stores2.extend(bk.into_iter().map(|(a,b)| a));
 
         result
     }
