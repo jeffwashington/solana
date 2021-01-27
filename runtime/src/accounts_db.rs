@@ -5003,7 +5003,6 @@ mut r:usize){
                     .unwrap()
                     .values()
                     .filter(|x| { 
-                        hs.insert(x.append_vec_id());
                          x.has_accounts()
                     })
                     .cloned()
@@ -5019,6 +5018,32 @@ mut r:usize){
             .map(|x| x.clone())
             .collect();
             warn!("scan_account_storage_no_bank_2 from get snapshot, storages: {}", storage_maps.len());
+
+        let accts = Self::get_sorted_accounts_from_stores(result.clone(), true);
+
+        let items:Vec<(Pubkey, Hash, u64, u64, u64, Slot, AppendVecId)> = accts;
+        let mut current_key = Pubkey::default();
+        let mut highest_version_index = 0;
+        if items.len() > 0 {
+            for i in (0..=items.len()) {
+                let last = i == items.len();
+                let val = &items[if last { 0} else {i}];
+                if current_key == Pubkey::default(){
+                    current_key = val.0;
+                    highest_version_index = i;
+                }
+                else if !last && val.0 == current_key {
+                    let highest = items[highest_version_index];
+                    if highest.3 < val.3 {
+                        highest_version_index = i;
+                    }
+                }
+                else {
+                    let store_id = items[highest_version_index].6;
+                    hs.insert(store_id);
+                }
+            }
+    }
 
         warn!("get_snapshot_storages: raw: {}, after: {}, is root: {}, slot: {}, ids: {}", result_raw.len(), result.len(), self.accounts_index.is_root(snapshot_slot), snapshot_slot, hs.len());
 
