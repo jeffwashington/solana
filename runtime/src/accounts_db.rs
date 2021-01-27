@@ -4001,7 +4001,7 @@ impl AccountsDB {
     pub fn rest_of_hash_calculation(
         accounts: (DashMap<Pubkey, CalculateHashIntermediate>, Measure),
     ) -> (Hash, u64) {
-        let (account_maps, time_scan, time_accumulate) = accounts;
+        let (account_maps, time_scan) = accounts;
 
         let len = account_maps.len();
 
