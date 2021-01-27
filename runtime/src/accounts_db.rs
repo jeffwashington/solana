@@ -4535,7 +4535,7 @@ mut r:usize){
                     "AccountDB::accounts_index corrupted. Storage pointed to: {}, expected: {}, should only point to one slot",
                     store.slot(), *slot
                 );
-                if self.hs.read().unwrap().contains(&(account_info.store_id, account_info.lamports)) {
+                if self.hs2.read().unwrap().contains(&account_info.store_id) {
                     warn!("Error: removing account from active store: {:?}", (account_info.store_id, account_info.lamports));
                 }
                 //assert!(!self.hs.read().unwrap().contains(&account_info.store_id), "wrote to storage that is in snapshot: {}, len: {}", account_info.store_id, self.hs.read().unwrap().len());
@@ -5008,6 +5008,7 @@ mut r:usize){
                     .unwrap()
                     .values()
                     .filter(|x| { 
+                        hs.insert(x.append_vec_id());
                          x.has_accounts()
                     })
                     .cloned()
@@ -5024,6 +5025,7 @@ mut r:usize){
             .collect();
             warn!("scan_account_storage_no_bank_2 from get snapshot, storages: {}", storage_maps.len());
 
+            /*
         let accts = Self::get_sorted_accounts_from_stores(result.clone(), true);
 
         let items:Vec<(Pubkey, Hash, u64, u64, u64, Slot, AppendVecId)> = accts;
@@ -5053,16 +5055,18 @@ mut r:usize){
                 }
             }
         }
-
+*/
         warn!("get_snapshot_storages: raw: {}, after: {}, is root: {}, slot: {}, ids: {}", result_raw.len(), result.len(), self.accounts_index.is_root(snapshot_slot), snapshot_slot, hs.len());
 
+        /*
         let bk = hs.clone();
         let mut slot_stores = self.hs.write().unwrap();
         slot_stores.clear();
         slot_stores.extend(hs);
+        */
         let mut slot_stores2 = self.hs2.write().unwrap();
         slot_stores2.clear();
-        slot_stores2.extend(bk.into_iter().map(|(a,b)| a));
+        slot_stores2.extend(hs);
 
         result
     }
