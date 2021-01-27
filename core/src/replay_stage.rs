@@ -21,7 +21,7 @@ use crate::{
 };
 use solana_ledger::{
     block_error::BlockError,
-    blockstore::Blockstore,
+    blockstore::{Blockstore, CompletedSlotsChannelContents, CompletedSlotsReceiver},
     blockstore_processor::{self, BlockstoreProcessorError, TransactionStatusSender},
     entry::VerifyRecyclers,
     leader_schedule_cache::LeaderScheduleCache,
@@ -53,6 +53,7 @@ use std::{
     },
     thread::{self, Builder, JoinHandle},
     time::Duration,
+    time::Instant,
 };
 
 pub const MAX_ENTRY_RECV_PER_ITER: usize = 512;
@@ -125,6 +126,7 @@ pub struct ReplayTiming {
     wait_receive_elapsed: u64,
     heaviest_fork_failures_elapsed: u64,
     bank_count: u64,
+    delay_since_ready: Vec<u64>,
 }
 impl ReplayTiming {
     #[allow(clippy::too_many_arguments)]
@@ -144,6 +146,7 @@ impl ReplayTiming {
         wait_receive_elapsed: u64,
         heaviest_fork_failures_elapsed: u64,
         bank_count: u64,
+        delay_since_ready: Option<u64>,
     ) {
         self.collect_frozen_banks_elapsed += collect_frozen_banks_elapsed;
         self.compute_bank_stats_elapsed += compute_bank_stats_elapsed;
@@ -159,11 +162,33 @@ impl ReplayTiming {
         self.wait_receive_elapsed += wait_receive_elapsed;
         self.heaviest_fork_failures_elapsed += heaviest_fork_failures_elapsed;
         self.bank_count += bank_count;
+        if let Some(delay) = delay_since_ready {
+            self.delay_since_ready.push(delay);
+        }
+
         let now = timestamp();
         let elapsed_ms = now - self.last_print;
         if elapsed_ms > 1000 {
             datapoint_info!(
                 "replay-loop-timing-stats",
+                (
+                    "average_delay_blockstore_to_reset_us",
+                    {
+                        let len = self.delay_since_ready.len();
+                        if len > 0 {
+                            (self.delay_since_ready.clone().into_iter().sum::<u64>() as f64
+                                / len as f64) as i64
+                        } else {
+                            0
+                        }
+                    },
+                    i64
+                ),
+                (
+                    "collect_frozen_banks_elapsed",
+                    self.collect_frozen_banks_elapsed as i64,
+                    i64
+                ),
                 ("total_elapsed_us", elapsed_ms * 1000, i64),
                 (
                     "collect_frozen_banks_elapsed",
@@ -251,6 +276,7 @@ impl ReplayStage {
         retransmit_slots_sender: RetransmitSlotsSender,
         duplicate_slots_reset_receiver: DuplicateSlotsResetReceiver,
         replay_vote_sender: ReplayVoteSender,
+        completed_slots_receiver: CompletedSlotsReceiver,
     ) -> Self {
         let ReplayStageConfig {
             my_pubkey,
@@ -296,7 +322,9 @@ impl ReplayStage {
                 let mut partition_exists = false;
                 let mut skipped_slots_info = SkippedSlotsInfo::default();
                 let mut replay_timing = ReplayTiming::default();
+                let mut slot_time_queue: std::collections::VecDeque<(Slot, Instant)> = std::collections::VecDeque::new();
                 loop {
+                    let mut delay_since_ready:Option<u64> = None;
                     let allocated = thread_mem_usage::Allocatedp::default();
 
                     thread_mem_usage::datapoint("solana-replay-stage");
@@ -516,6 +544,9 @@ impl ReplayStage {
                                     i64
                                 ),
                             );
+
+                            let time_now = Instant::now();
+
                             Self::reset_poh_recorder(
                                 &my_pubkey,
                                 &blockstore,
@@ -557,6 +588,60 @@ impl ReplayStage {
                                     partition_exists = false;
                                     inc_new_counter_info!("replay_stage-partition_resolved", 1);
                                 }
+                            }
+                            let mut count = 0;
+                            let mut message = false;
+                            let mut all_slots:Vec<Slot> = vec![];
+                            let mut thrown_away = vec![];
+                            let mut found: Option<(Slot, Instant)> = None;
+                            'outer: loop {
+                                loop {
+                                    match slot_time_queue.pop_front() {
+                                        Some(item) => {
+                                            count += 1;
+                                            let target = reset_bank.slot();
+                                            if item.0 == target {
+                                                found = Some(item);
+                                                message = true;
+                                                break 'outer;
+                                            }
+                                            else if item.0 > target {
+                                                warn!("Delay between blockstore, Found too large: {}, {}", item.0, target);
+                                                slot_time_queue.push_front(item);
+                                                break 'outer;
+                                            }
+                                            else{
+                                                thrown_away.push(item.0);
+                                            }
+                                        },
+                                        None => {break;}
+                                    }
+                                };
+
+                                let result = completed_slots_receiver.try_recv();
+                                match result {
+                                    Err(_) => break,
+                                    Ok(item) => {
+                                        for slot in &item.0 {
+                                            slot_time_queue.push_back((slot.clone(), item.1));
+                                        }
+                                        warn!("Delay between blockstore, adding slots: {:?}", item.0);
+                                        let mut foo:Vec<_> = slot_time_queue.into_iter().collect();
+                                        foo.sort();
+                                        slot_time_queue = std::collections::VecDeque::new();
+                                        slot_time_queue.extend(foo);
+                                    },
+                                };
+                            }
+                            if message {
+                                let found = found.unwrap();
+                                let notification_time = found.1;
+                                let delay = time_now - notification_time;
+                                warn!("Delay between blockstore deciding slot was ready and poh reset(ms): {}, slot: {}, time_now: {:?}, notificaiton time: {:?}, thrown away: {:?}", delay.as_millis(), reset_bank.slot(), time_now, notification_time, thrown_away);
+                                delay_since_ready = Some(delay.as_micros() as u64);
+                            }
+                            else {
+                                warn!("Delay between blockstore Cannot find blockstore ready time, so cannot calculate delay to poh reset, found count: {}, {:?}, looking for: {}, thrown away: {:?}", count, all_slots, reset_bank.slot(), thrown_away);
                             }
                         }
                         Self::report_memory(&allocated, "reset_bank", start);
@@ -620,6 +705,7 @@ impl ReplayStage {
                         wait_receive_time.as_us(),
                         heaviest_fork_failures_time.as_us(),
                         if did_complete_bank {1} else {0},
+                        delay_since_ready,
                     );
                 }
                 Ok(())
