@@ -369,6 +369,8 @@ pub struct AccountStorageEntry {
     alive_bytes: AtomicUsize,
 
     hash: Mutex<Hash>,
+
+    in_snapshot: AtomicBool,
 }
 
 impl AccountStorageEntry {
@@ -385,6 +387,7 @@ impl AccountStorageEntry {
             approx_store_count: AtomicUsize::new(0),
             alive_bytes: AtomicUsize::new(0),
             hash: Mutex::new(Hash::default()),
+            in_snapshot: AtomicBool::new(false),
         }
     }
 
@@ -397,6 +400,7 @@ impl AccountStorageEntry {
             approx_store_count: AtomicUsize::new(0),
             alive_bytes: AtomicUsize::new(0),
             hash: Mutex::new(Hash::default()),
+            in_snapshot: AtomicBool::new(false),
         }
     }
 
@@ -416,6 +420,7 @@ impl AccountStorageEntry {
             //
             self.accounts.reset();
             *self.hash.lock().unwrap() = Hash::default();
+            assert!(!self.in_snapshot.load(Ordering::Relaxed));
             status = AccountStorageStatus::Available;
         }
 
@@ -424,9 +429,8 @@ impl AccountStorageEntry {
 
     pub fn recycle(&self, slot: Slot, id: usize) {
         let mut count_and_status = self.count_and_status.write().unwrap();
-        //assert!(!self.hs.read().unwrap().contains(&id), "wrote to storage that is in snapshot2: {}, len: {}", id, self.hs.read().unwrap().len());
-
         *self.hash.lock().unwrap() = Hash::default();
+        assert!(!self.in_snapshot.load(Ordering::Relaxed));
         self.accounts.reset();
         *count_and_status = (0, AccountStorageStatus::Available);
         self.slot.store(slot, Ordering::Release);
@@ -559,6 +563,7 @@ impl AccountStorageEntry {
     pub fn update_hash(&self) {
         let hash = self.hash();
         let mut current_hash = self.hash.lock().unwrap();
+        self.in_snapshot.store(true, Ordering::Relaxed);
         if *current_hash == Hash::default() {
             *current_hash = hash;
         } else {
@@ -569,6 +574,10 @@ impl AccountStorageEntry {
     pub fn check_hash(&self) {
         let hash = self.hash();
         assert_eq!(*self.hash.lock().unwrap(), hash);
+    }
+
+    pub fn release_snapshot(&self) {
+       self.in_snapshot.store(false, Ordering::Relaxed);
     }
 }
 

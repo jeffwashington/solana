@@ -374,6 +374,10 @@ pub fn archive_snapshot_package(snapshot_package: &AccountsPackage) -> Result<()
 
     purge_old_snapshot_archives(snapshot_package.tar_output_file.parent().unwrap());
 
+    for storage in snapshot_package.storages.iter().flatten() {
+        storage.release_snapshot();
+    }
+
     timer.stop();
     info!(
         "Successfully created {:?}. slot: {}, elapsed ms: {}, size={}",
