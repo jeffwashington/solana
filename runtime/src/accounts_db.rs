@@ -2814,7 +2814,7 @@ impl AccountsDB {
                 &hashes[infos.len()..],
             );
             assert!(!r_vs.is_empty());
-            assert!(!self.hs2.read().unwrap().contains(&storage.append_vec_id()), "wrote to storage that is in snapshot: {}, len: {}", storage.append_vec_id(), self.hs.read().unwrap().len());
+            //assert!(!self.hs2.read().unwrap().contains(&storage.append_vec_id()), "wrote to storage that is in snapshot: {}, len: {}", storage.append_vec_id(), self.hs.read().unwrap().len());
             append_accounts.stop();
             total_append_accounts_us += append_accounts.as_us();
             if r_vs.len() == 1 {
@@ -4535,8 +4535,10 @@ mut r:usize){
                     "AccountDB::accounts_index corrupted. Storage pointed to: {}, expected: {}, should only point to one slot",
                     store.slot(), *slot
                 );
-                if self.hs2.read().unwrap().contains(&account_info.store_id) {
-                    warn!("Error: removing account from active store: {:?}", (account_info.store_id, account_info.lamports));
+                if false {
+                    if self.hs2.read().unwrap().contains(&account_info.store_id) {
+                        warn!("Error: removing account from active store: {:?}", (account_info.store_id, account_info.lamports));
+                    }
                 }
                 //assert!(!self.hs.read().unwrap().contains(&account_info.store_id), "wrote to storage that is in snapshot: {}, len: {}", account_info.store_id, self.hs.read().unwrap().len());
 
