@@ -895,6 +895,9 @@ pub fn snapshot_bank(
     archive_format: &ArchiveFormat,
 ) -> Result<()> {
     let storages: Vec<_> = root_bank.get_snapshot_storages();
+    for store in storages.iter().flatten() {
+        store.acquire_in_snapshot();
+    }
     let mut add_snapshot_time = Measure::start("add-snapshot-ms");
     add_snapshot(snapshot_path, &root_bank, &storages, snapshot_version)?;
     add_snapshot_time.stop();
@@ -965,7 +968,7 @@ pub fn bank_to_snapshot_archive<P: AsRef<Path>, Q: AsRef<Path>>(
     )?;
 
     archive_snapshot_package(&package)?;
-    Ok(package.tar_output_file)
+    Ok(package.tar_output_file.clone())
 }
 
 #[cfg(test)]

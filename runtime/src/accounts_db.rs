@@ -55,7 +55,7 @@ use std::{
     io::{Error as IOError, Result as IOResult},
     ops::RangeBounds,
     path::{Path, PathBuf},
-    sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
+    sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, AtomicIsize, Ordering},
     sync::{Arc, Mutex, MutexGuard, RwLock},
     time::Instant,
 };
@@ -385,6 +385,8 @@ pub struct AccountStorageEntry {
     alive_bytes: AtomicUsize,
 
     hash: Mutex<Hash>,
+
+    in_snapshot: AtomicIsize,
 }
 
 impl AccountStorageEntry {
@@ -401,6 +403,7 @@ impl AccountStorageEntry {
             approx_store_count: AtomicUsize::new(0),
             alive_bytes: AtomicUsize::new(0),
             hash: Mutex::new(Hash::default()),
+            in_snapshot: AtomicIsize::new(0),
         }
     }
 
@@ -413,6 +416,7 @@ impl AccountStorageEntry {
             approx_store_count: AtomicUsize::new(0),
             alive_bytes: AtomicUsize::new(0),
             hash: Mutex::new(Hash::default()),
+            in_snapshot: AtomicIsize::new(0),
         }
     }
 
@@ -430,6 +434,8 @@ impl AccountStorageEntry {
             //          **and**
             //  the append_vec has previously been completely full
             //
+            assert!(!self.in_snapshot());
+            *self.hash.lock().unwrap() = Hash::default();
             self.accounts.reset();
             status = AccountStorageStatus::Available;
         }
@@ -438,7 +444,9 @@ impl AccountStorageEntry {
     }
 
     pub fn recycle(&self, slot: Slot, id: usize) {
+        *self.hash.lock().unwrap() = Hash::default();
         let mut count_and_status = self.count_and_status.write().unwrap();
+        assert!(!self.in_snapshot());
         self.accounts.reset();
         *count_and_status = (0, AccountStorageStatus::Available);
         self.slot.store(slot, Ordering::Release);
@@ -526,6 +534,8 @@ impl AccountStorageEntry {
             //
             // otherwise, the storage may be in flight with a store()
             //   call
+            assert!(!self.in_snapshot());
+            *self.hash.lock().unwrap() = Hash::default();
             self.accounts.reset();
             status = AccountStorageStatus::Available;
         }
@@ -574,6 +584,7 @@ impl AccountStorageEntry {
     pub fn update_hash(&self) {
         let hash = self.hash();
         let mut current_hash = self.hash.lock().unwrap();
+        *current_hash = hash;
         if *current_hash == Hash::default() {
             *current_hash = hash;
         } else {
@@ -584,6 +595,18 @@ impl AccountStorageEntry {
     pub fn check_hash(&self) {
         let hash = self.hash();
         assert_eq!(*self.hash.lock().unwrap(), hash);
+    }
+
+    pub fn in_snapshot(&self) -> bool {
+        self.in_snapshot.load(Ordering::Relaxed) > 0
+    }
+
+    pub fn acquire_in_snapshot(&self) {
+        self.in_snapshot.fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub fn release_in_snapshot(&self) {
+        assert!(self.in_snapshot.fetch_sub(1, Ordering::Relaxed) >= 0);
     }
 }
 
@@ -2557,6 +2580,7 @@ impl AccountsDB {
         let mut recycle_stores = self.recycle_stores.write().unwrap();
         for (i, store) in recycle_stores.iter().enumerate() {
             if Arc::strong_count(store) == 1 {
+                assert!(!store.in_snapshot());
                 max = std::cmp::max(store.accounts.capacity(), max);
                 min = std::cmp::min(store.accounts.capacity(), min);
                 avail += 1;
