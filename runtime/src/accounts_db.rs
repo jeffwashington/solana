@@ -367,6 +367,8 @@ pub struct AccountStorageEntry {
     approx_store_count: AtomicUsize,
 
     alive_bytes: AtomicUsize,
+
+    hash: Mutex<Hash>,
 }
 
 impl AccountStorageEntry {
@@ -382,6 +384,7 @@ impl AccountStorageEntry {
             count_and_status: RwLock::new((0, AccountStorageStatus::Available)),
             approx_store_count: AtomicUsize::new(0),
             alive_bytes: AtomicUsize::new(0),
+            hash: Mutex::new(Hash::default()),
         }
     }
 
@@ -393,6 +396,7 @@ impl AccountStorageEntry {
             count_and_status: RwLock::new((0, AccountStorageStatus::Available)),
             approx_store_count: AtomicUsize::new(0),
             alive_bytes: AtomicUsize::new(0),
+            hash: Mutex::new(Hash::default()),
         }
     }
 
@@ -411,6 +415,7 @@ impl AccountStorageEntry {
             //  the append_vec has previously been completely full
             //
             self.accounts.reset();
+            *self.hash.lock().unwrap() = Hash::default();
             status = AccountStorageStatus::Available;
         }
 
@@ -421,6 +426,7 @@ impl AccountStorageEntry {
         let mut count_and_status = self.count_and_status.write().unwrap();
         //assert!(!self.hs.read().unwrap().contains(&id), "wrote to storage that is in snapshot2: {}, len: {}", id, self.hs.read().unwrap().len());
 
+        *self.hash.lock().unwrap() = Hash::default();
         self.accounts.reset();
         *count_and_status = (0, AccountStorageStatus::Available);
         self.slot.store(slot, Ordering::Release);
@@ -537,6 +543,32 @@ impl AccountStorageEntry {
 
     pub fn get_path(&self) -> PathBuf {
         self.accounts.get_path()
+    }
+
+    pub fn hash(&self) -> Hash {
+        let mut hasher = Hasher::default();
+        for account in self.accounts.accounts(0) {
+            let hash_to_add =
+                AccountsDB::hash_stored_account(0, &account, &ClusterType::Development);
+            //hasher.hash(account.hash.as_ref());
+            hasher.hash(hash_to_add.as_ref());
+        }
+        hasher.result()
+    }
+
+    pub fn update_hash(&self) {
+        let hash = self.hash();
+        let mut current_hash = self.hash.lock().unwrap();
+        if *current_hash == Hash::default() {
+            *current_hash = hash;
+        } else {
+            assert_eq!(*current_hash, hash);
+        }
+    }
+
+    pub fn check_hash(&self) {
+        let hash = self.hash();
+        assert_eq!(*self.hash.lock().unwrap(), hash);
     }
 }
 

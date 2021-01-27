@@ -270,8 +270,10 @@ pub fn archive_snapshot_package(snapshot_package: &AccountsPackage) -> Result<()
         &staging_snapshots_dir,
     )?;
 
+    let mut storages_len = 0;
     // Add the AppendVecs into the compressible list
-    for storage in snapshot_package.storages.iter().flatten() {
+    for (i, storage) in snapshot_package.storages.iter().flatten().enumerate() {
+        storage.check_hash();
         storage.flush()?;
         let storage_path = storage.get_path();
         let output_path =
@@ -288,7 +290,12 @@ pub fn archive_snapshot_package(snapshot_package: &AccountsPackage) -> Result<()
         if !output_path.is_file() {
             return Err(SnapshotError::StoragePathSymlinkInvalid);
         }
+        storages_len = i;
     }
+    info!(
+        "Finished storage flush slot: {} storages.len: {}",
+        snapshot_package.slot, storages_len
+    );
 
     // Write version file
     {
@@ -905,6 +912,15 @@ pub fn snapshot_bank(
     let latest_slot_snapshot_paths = slot_snapshot_paths
         .last()
         .expect("no snapshots found in config snapshot_path");
+
+    info!(
+        "updating hash for snapshot stores slot: {}",
+        root_bank.slot()
+    );
+    for s in storages.iter().flatten() {
+        s.update_hash();
+    }
+    info!("Done hash for snapshot stores slot: {}", root_bank.slot());
 
     let package = package_snapshot(
         &root_bank,
