@@ -641,7 +641,7 @@ impl ReplayStage {
                                 delay_since_ready = Some(delay.as_micros() as u64);
                             }
                             else {
-                                warn!("Delay between blockstore Cannot find blockstore ready time, so cannot calculate delay to poh reset, found count: {}, {:?}, looking for: {}, thrown away: {:?}, items: {:?}", count, all_slots, reset_bank.slot(), thrown_away), slot_time_queue.len());
+                                warn!("Delay between blockstore Cannot find blockstore ready time, so cannot calculate delay to poh reset, found count: {}, {:?}, looking for: {}, thrown away: {:?}, items: {:?}", count, all_slots, reset_bank.slot(), thrown_away, slot_time_queue.len());
                             }
                         }
                         Self::report_memory(&allocated, "reset_bank", start);
