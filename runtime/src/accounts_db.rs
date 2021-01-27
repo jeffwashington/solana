@@ -3997,7 +3997,7 @@ impl AccountsDB {
     }
 
     pub fn rest_of_hash_calculation(
-        accounts: (DashMap<Pubkey, CalculateHashIntermediate>, Measure, Measure),
+        accounts: (DashMap<Pubkey, CalculateHashIntermediate>, Measure),
     ) -> (Hash, u64) {
         let (account_maps, time_scan) = accounts;
 
@@ -4016,12 +4016,10 @@ impl AccountsDB {
         datapoint_info!(
             "calculate_accounts_hash_using_stores",
             ("accounts_scan", time_scan.as_us(), i64),
-            ("hash_accumulate", time_accumulate.as_us(), i64),
             ("eliminate_zeros", zeros.as_us(), i64),
             ("hash", hash_time.as_us(), i64),
             ("sort", sort_time.as_us(), i64),
             ("hash_total", hash_total, i64),
-            ("scan", time_scan.as_us(), i64),
         );
         warn!(
             "hashes including zeros: {}, after removal: {}, lamports: {}, hash: {}",
@@ -4091,7 +4089,7 @@ impl AccountsDB {
     fn scan_slot_using_snapshot(
         storage: SnapshotStorages,
         simple_capitalization_enabled: bool,
-    ) -> (DashMap<Pubkey, CalculateHashIntermediate>, Measure, Measure) {
+    ) -> (DashMap<Pubkey, CalculateHashIntermediate>, Measure) {
         let map: DashMap<Pubkey, CalculateHashIntermediate> = DashMap::new();
         let mut time = Measure::start("scan all accounts");
         Self::scan_account_storage_no_bank(
@@ -4131,9 +4129,7 @@ impl AccountsDB {
         );
         time.stop();
 
-        let mut time_accumulate = Measure::start("accumulate");
-        time_accumulate.stop();
-        (map, time, time_accumulate)
+        (map, time)
     }
 
     // modeled after get_accounts_delta_hash
