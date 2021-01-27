@@ -5041,9 +5041,11 @@ mut r:usize){
                 else {
                     let store_id = items[highest_version_index].6;
                     hs.insert(store_id);
+                    current_key = val.0;
+                    highest_version_index = i;
                 }
             }
-    }
+        }
 
         warn!("get_snapshot_storages: raw: {}, after: {}, is root: {}, slot: {}, ids: {}", result_raw.len(), result.len(), self.accounts_index.is_root(snapshot_slot), snapshot_slot, hs.len());
 
