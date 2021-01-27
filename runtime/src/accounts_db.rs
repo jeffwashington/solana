@@ -519,6 +519,8 @@ impl AccountStorageEntry {
             // otherwise, the storage may be in flight with a store()
             //   call
             self.accounts.reset();
+            *self.hash.lock().unwrap() = Hash::default();
+            assert!(!self.in_snapshot.load(Ordering::Relaxed));
             status = AccountStorageStatus::Available;
         }
 
@@ -578,6 +580,10 @@ impl AccountStorageEntry {
 
     pub fn release_snapshot(&self) {
        self.in_snapshot.store(false, Ordering::Relaxed);
+    }
+
+    pub fn in_snapshot(&self) -> bool {
+       self.in_snapshot.load(Ordering::Relaxed)
     }
 }
 
@@ -2171,7 +2177,7 @@ impl AccountsDB {
         let mut avail = 0;
         let mut recycle_stores = self.recycle_stores.write().unwrap();
         for (i, store) in recycle_stores.iter().enumerate() {
-            if Arc::strong_count(store) == 1 {
+            if Arc::strong_count(store) == 1 && !store.in_snapshot() {
                 max = std::cmp::max(store.accounts.capacity(), max);
                 min = std::cmp::min(store.accounts.capacity(), min);
                 avail += 1;
