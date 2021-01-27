@@ -320,6 +320,7 @@ impl Validator {
             blockstore,
             ledger_signal_receiver,
             completed_slots_receiver,
+            completed_slots_receiver_2,
             leader_schedule_cache,
             snapshot_hash,
             TransactionHistoryServices {
@@ -618,6 +619,7 @@ impl Validator {
             &leader_schedule_cache,
             &exit,
             completed_slots_receiver,
+            completed_slots_receiver_2,
             block_commitment_cache,
             config.enable_partition.clone(),
             transaction_status_sender.clone(),
@@ -922,6 +924,7 @@ fn new_banks_from_ledger(
     Arc<Blockstore>,
     Receiver<bool>,
     CompletedSlotsReceiver,
+    CompletedSlotsReceiver,
     LeaderScheduleCache,
     Option<(Slot, Hash)>,
     TransactionHistoryServices,
@@ -952,6 +955,7 @@ fn new_banks_from_ledger(
         mut blockstore,
         ledger_signal_receiver,
         completed_slots_receiver,
+        completed_slots_receiver_2,
         ..
     } = Blockstore::open_with_signal(
         ledger_path,
@@ -1071,6 +1075,7 @@ fn new_banks_from_ledger(
         blockstore,
         ledger_signal_receiver,
         completed_slots_receiver,
+        completed_slots_receiver_2,
         leader_schedule_cache,
         snapshot_hash,
         transaction_history_services,
