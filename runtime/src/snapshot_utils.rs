@@ -185,6 +185,7 @@ pub fn package_snapshot<P: AsRef<Path>, Q: AsRef<Path>>(
         bank.get_accounts_hash(),
         archive_format,
         snapshot_version,
+        bank.capitalization(),
     );
 
     Ok(package)
