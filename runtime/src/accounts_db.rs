@@ -3869,6 +3869,7 @@ impl AccountsDB {
             .keys()
             .cloned()
             .collect();
+        let l1 = keys.len();
         let mismatch_found = AtomicU64::new(0);
         let hashes: Vec<(Pubkey, Hash, u64)> = {
             self.thread_pool_clean.install(|| {
@@ -3944,6 +3945,7 @@ impl AccountsDB {
             ("sort", sort_time.as_us(), i64),
             ("hash_total", hash_total, i64),
         );
+        warn!("results: {}, {}, len: {}", accumulated_hash, total_lamports, l1);
         Ok((accumulated_hash, total_lamports))
     }
 
@@ -4104,7 +4106,7 @@ impl AccountsDB {
                 simple_capitalization_enabled,
             )
         } else {
-            self.calculate_accounts_hash(slot, ancestors, false, simple_capitalization_enabled)
+            self.calculate_accounts_hash(slot, ancestors, true, simple_capitalization_enabled)
                 .unwrap()
         }
     }
@@ -4176,6 +4178,10 @@ impl AccountsDB {
                 );
                 match map.entry(*key) {
                     Occupied(mut dest_item) => {
+                        if dest_item.get_mut().version() == source_item.version() {
+                            assert!(dest_item.get_mut().1 == *loaded_account.loaded_hash() && dest_item.get_mut().2==balance && dest_item.get_mut().3 == raw_lamports);
+                        }
+
                         if dest_item.get_mut().version() <= source_item.version() {
                             // replace the item
                             dest_item.insert(source_item);
