@@ -3100,7 +3100,7 @@ impl AccountsDB {
         if slot > Self::get_blake3_slot(cluster_type) {
             Self::blake3_hash_account_data(
                 slot,
-                account.account_meta.lamports,
+                std::cmp::max(1, account.account_meta.lamports),
                 &account.account_meta.owner,
                 account.account_meta.executable,
                 account.account_meta.rent_epoch,
