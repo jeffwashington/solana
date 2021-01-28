@@ -4053,16 +4053,6 @@ impl AccountsDB {
             .collect()
     }
 
-    fn get_storage_maps(&self, slot: Slot) -> Vec<Arc<AccountStorageEntry>> {
-        let storage_maps: Vec<Arc<AccountStorageEntry>> = self
-            .storage
-            .get_slot_stores(slot)
-            .map(|res| res.read().unwrap().values().cloned().collect())
-            .unwrap_or_default();
-            warn!("get_storage_maps, found maps: {}", storage_maps.len());
-        storage_maps
-    }
-
     fn remove_zero_balance_accounts(
         account_maps: DashMap<Pubkey, CalculateHashIntermediate>,
     ) -> Vec<(Pubkey, Hash, u64)> {
@@ -4138,10 +4128,9 @@ impl AccountsDB {
         simple_capitalization_enabled: bool,
     ) -> (Hash, u64) {
         if use_store {
-            let combined_maps = vec![self.get_storage_maps(slot)];
-
+            let storages = self.get_snapshot_storages(slot);
             Self::calculate_accounts_hash_using_stores_only(
-                combined_maps,
+                storages,
                 simple_capitalization_enabled,
             )
         } else {
