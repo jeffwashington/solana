@@ -521,7 +521,7 @@ impl AccountStorageEntry {
     }
 
     fn remove_account(&self, num_bytes: usize, reset_accounts: bool) -> usize {
-        if !self.in_snapshot() {
+        if self.in_snapshot() {
         warn!("ahv:remove_account while in snapshot!!!!!!!!!");
         //assert!(!self.in_snapshot());
         }
