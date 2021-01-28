@@ -87,6 +87,11 @@ impl SnapshotRequestHandler {
                     status_cache_slot_deltas,
                 } = snapshot_request;
 
+                let storages: Vec<_> = snapshot_root_bank.get_snapshot_storages();
+                for store in storages.iter().flatten() {
+                    store.acquire_in_snapshot();
+                }
+
                 snapshot_root_bank.mark_for_clean(true);
                 // TODO - get rid of this as we move it to accounts_hash_verifier
                 let mut hash_time = Measure::start("hash_time");
@@ -162,6 +167,10 @@ impl SnapshotRequestHandler {
                 let mut purge_old_snapshots_time = Measure::start("purge_old_snapshots_time");
                 snapshot_utils::purge_old_snapshots(&self.snapshot_config.snapshot_path);
                 purge_old_snapshots_time.stop();
+
+                for store in storages.iter().flatten() {
+                    store.release_in_snapshot();
+                }
 
                 datapoint_info!(
                     "handle_snapshot_requests-timing",
