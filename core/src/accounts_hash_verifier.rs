@@ -91,6 +91,8 @@ impl AccountsHashVerifier {
         let hash = AccountsDB::calculate_accounts_hash_using_stores_only(
             accounts_package.storages.clone(),
             simple_capitalization_enabled,
+            vec![],
+            Hash::default(),
         );
         time.stop();
 

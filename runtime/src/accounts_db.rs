@@ -421,6 +421,7 @@ impl AccountStorageEntry {
     }
 
     pub fn set_status(&self, mut status: AccountStorageStatus) {
+        assert!(!self.in_snapshot());
         let mut count_and_status = self.count_and_status.write().unwrap();
 
         let count = count_and_status.0;
@@ -500,6 +501,7 @@ impl AccountStorageEntry {
     }
 
     fn add_account(&self, num_bytes: usize) {
+        assert!(!self.in_snapshot());
         let mut count_and_status = self.count_and_status.write().unwrap();
         *count_and_status = (count_and_status.0 + 1, count_and_status.1);
         self.approx_store_count.fetch_add(1, Ordering::Relaxed);
@@ -519,6 +521,7 @@ impl AccountStorageEntry {
     }
 
     fn remove_account(&self, num_bytes: usize, reset_accounts: bool) -> usize {
+        assert!(!self.in_snapshot());
         let mut count_and_status = self.count_and_status.write().unwrap();
         let (mut count, mut status) = *count_and_status;
 
@@ -556,6 +559,7 @@ impl AccountStorageEntry {
     }
 
     pub fn set_file<P: AsRef<Path>>(&mut self, path: P) -> IOResult<()> {
+        assert!(!self.in_snapshot());
         let num_accounts = self.accounts.set_file(path)?;
         self.approx_store_count
             .store(num_accounts, Ordering::Relaxed);
@@ -576,6 +580,8 @@ impl AccountStorageEntry {
             let hash_to_add =
                 AccountsDB::hash_stored_account2(0, &account, &ClusterType::Development);
                 hasher.hash(&account.meta.write_version.to_le_bytes());
+                //hasher.hash(&account.count_and_status.read().unwrap().0.to_le_bytes());
+                //hasher.hash(&account.count_and_status.read().unwrap().1.to_le_bytes());
                 //hasher.hash(account.meta.pubkey.as_ref());
                 //hasher.hash(account.meta.data_len.as_ref());
                 hasher.hash(account.hash.as_ref());           
@@ -585,6 +591,7 @@ impl AccountStorageEntry {
     }
 
     pub fn update_hash(&self) {
+        assert!(!self.in_snapshot());
         let hash = self.hash();
         let mut current_hash = self.hash.lock().unwrap();
         *current_hash = hash;
@@ -3907,7 +3914,7 @@ impl AccountsDB {
         ancestors: &Ancestors,
         check_hash: bool,
         simple_capitalization_enabled: bool,
-    ) -> Result<(Hash, u64), BankHashVerificationError> {
+    ) -> Result<(Hash, u64, Vec<(Pubkey, Hash, u64)>), BankHashVerificationError> {
         use BankHashVerificationError::*;
         let mut scan = Measure::start("scan");
         let keys: Vec<_> = self
@@ -3984,6 +3991,7 @@ impl AccountsDB {
         let hash_total = hashes.len();
 
         let mut accumulate = Measure::start("accumulate");
+        let bk = hashes.clone();
         let ((accumulated_hash, total_lamports), (sort_time, hash_time)) =
             Self::accumulate_account_hashes_and_capitalization(hashes, slot, false, false);
         accumulate.stop();
@@ -3996,7 +4004,7 @@ impl AccountsDB {
             ("hash_total", hash_total, i64),
         );
         warn!("results: {}, {}, len: {}", accumulated_hash, total_lamports, l1);
-        Ok((accumulated_hash, total_lamports))
+        Ok((accumulated_hash, total_lamports, bk))
     }
 
     pub fn get_accounts_hash(&self, slot: Slot) -> Hash {
@@ -4100,6 +4108,8 @@ impl AccountsDB {
 
     pub fn rest_of_hash_calculation(
         accounts: (DashMap<Pubkey, CalculateHashIntermediate>, Measure),
+        hs_good: Vec<(Pubkey, Hash, u64)>,
+        hash_good: Hash,
     ) -> (Hash, u64) {
         let (account_maps, time_scan) = accounts;
 
@@ -4109,6 +4119,8 @@ impl AccountsDB {
         let hashes = Self::remove_zero_balance_accounts(account_maps);
         zeros.stop();
         let hash_total = hashes.len();
+
+        let mut hs = hashes.clone();
         let (ret, (sort_time, hash_time)) = Self::accumulate_account_hashes_and_capitalization(
             hashes,
             Slot::default(),
@@ -4128,6 +4140,42 @@ impl AccountsDB {
             len, hash_total, ret.1, ret.0
         );
 
+        if ret.0 != hash_good && hash_good != Hash::default() {
+            warn!(
+                "ahv:hashes are different: {}, {}", ret.0, hash_good);
+                warn!(
+                    "ahv:hashes are different: {}, {}", hs.len(), hs_good.len());
+
+            let mut hs_good = hs_good.clone();
+            AccountsDB::sort_hashes_by_pubkey(&mut hs_good);
+            AccountsDB::sort_hashes_by_pubkey(&mut hs);
+            let mut diff = 0;
+            let ln = hs.len();
+            for i in 0..ln {
+                let l = hs_good[i];
+                let r = hs[i];
+                if l == r {
+                    continue;
+                }
+                diff += 1;
+                if diff < 100 {
+                    if l.0 == l.0 {
+                        if l.1 == l.1 {
+                            warn!("ahv:lamports different: {:?}, {:?}", l, r);
+                        }
+                        else {
+                            warn!("ahv:hashes different: {:?}, {:?}", l, r);
+                        }
+                    }
+                    else {
+                        warn!("ahv:pubkeys different: {:?}, {:?}", l, r);
+                    }
+                }
+            }
+             warn!("ahv: differences: {}", diff);
+    
+        }
+
         ret
     }
 
@@ -4143,11 +4191,32 @@ impl AccountsDB {
             Self::calculate_accounts_hash_using_stores_only(
                 storages,
                 simple_capitalization_enabled,
+                vec![],
+                Hash::default(),
             )
         } else {
-            self.calculate_accounts_hash(slot, ancestors, true, simple_capitalization_enabled)
-                .unwrap()
+            let r = self.calculate_accounts_hash(slot, ancestors, true, simple_capitalization_enabled)
+                .unwrap();
+            (r.0, r.1)
         }
+    }
+
+    pub fn update_accounts_hash_with_store_option2(
+        &self,
+        slot: Slot,
+        ancestors: &Ancestors,
+        simple_capitalization_enabled: bool,
+        s: SnapshotStorages,
+    ){
+        let r = self.calculate_accounts_hash(slot, ancestors, true, simple_capitalization_enabled)
+        .unwrap();
+
+        Self::calculate_accounts_hash_using_stores_only(
+            s,
+            simple_capitalization_enabled,
+            r.2,
+            r.0,
+        );
     }
 
     pub fn update_accounts_hash_with_store_option(
@@ -4252,10 +4321,12 @@ impl AccountsDB {
     pub fn calculate_accounts_hash_using_stores_only(
         storages: SnapshotStorages,
         simple_capitalization_enabled: bool,
+        hs_good: Vec<(Pubkey, Hash, u64)>,
+        hash_good: Hash,
     ) -> (Hash, u64) {
         let result = Self::scan_slot_using_snapshot(storages, simple_capitalization_enabled);
 
-        Self::rest_of_hash_calculation(result)
+        Self::rest_of_hash_calculation(result, hs_good, hash_good)
     }
 
     pub fn verify_bank_hash_and_lamports(
@@ -4267,7 +4338,7 @@ impl AccountsDB {
     ) -> Result<(), BankHashVerificationError> {
         use BankHashVerificationError::*;
 
-        let (calculated_hash, calculated_lamports) =
+        let (calculated_hash, calculated_lamports, _) =
             self.calculate_accounts_hash(slot, ancestors, true, simple_capitalization_enabled)?;
 
         if calculated_lamports != total_lamports {

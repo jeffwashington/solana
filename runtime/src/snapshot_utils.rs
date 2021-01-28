@@ -926,7 +926,13 @@ pub fn snapshot_bank(
     let hash = crate::accounts_db::AccountsDB::calculate_accounts_hash_using_stores_only(
         storages.clone(),
         true,
+        vec![],
+        Hash::default(),
     );
+
+    if hash.0 != root_bank.get_accounts_hash() {
+        root_bank.update_accounts_hash_with_store_option2(storages.clone());
+    }
 
     assert_eq!(hash.0, root_bank.get_accounts_hash());
 

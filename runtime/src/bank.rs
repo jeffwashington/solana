@@ -4299,6 +4299,22 @@ impl Bank {
         self.rc.accounts.accounts_db.get_accounts_hash(self.slot)
     }
 
+    pub fn update_accounts_hash_with_store_option2(
+        &self,
+        s: SnapshotStorages,
+    ) {
+        self
+            .rc
+            .accounts
+            .accounts_db
+            .update_accounts_hash_with_store_option2(
+                self.slot(),
+                &self.ancestors,
+                self.simple_capitalization_enabled(),
+                s
+            );
+    }
+
     pub fn update_accounts_hash_with_store_option(
         &self,
         use_store: bool,
