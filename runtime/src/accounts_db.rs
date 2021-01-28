@@ -1426,10 +1426,10 @@ impl AccountsDB {
         let mut x = self.marked_for_use.write().unwrap();
         if set {
             assert!(*x == Slot::default());
-            *x = snapshot_slot;
+            *x = snapshot_slot - 1;
         }
         else{
-            assert!(*x == snapshot_slot);
+            assert!(*x == snapshot_slot - 1);
             *x = Slot::default();
         }/*
         self.storage
