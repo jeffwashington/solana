@@ -4048,7 +4048,7 @@ impl AccountsDB {
             .into_par_iter()
             .flatten()
             .map(|storage| {
-                storage.check_hash();
+                //storage.check_hash();
                 
                 let accounts = storage.accounts.accounts(0);
                 let mut retval = B::default();
