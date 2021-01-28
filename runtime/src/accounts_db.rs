@@ -624,10 +624,10 @@ impl AccountStorageEntry {
         let mut x = self.mark_for_clean.write().unwrap();
         if mark {
             assert!(*x == Slot::default());
-            *x = slot;
+            *x = slot - 1;
         }
         else{
-            assert!(*x == slot);
+            assert!(*x == slot - 1);
             *x = Slot::default();
         }
     }
