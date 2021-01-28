@@ -592,6 +592,10 @@ impl AccountStorageEntry {
 
     pub fn update_hash(&self) {
         assert!(!self.in_snapshot());
+        self.update_hash_internal();
+    }
+
+    pub fn update_hash_internal(&self) {
         let hash = self.hash();
         let mut current_hash = self.hash.lock().unwrap();
         *current_hash = hash;
@@ -615,7 +619,9 @@ impl AccountStorageEntry {
     }
 
     pub fn acquire_in_snapshot(&self) {
-        self.in_snapshot.fetch_add(1, Ordering::Relaxed);
+        if self.in_snapshot.fetch_add(1, Ordering::Relaxed) == 0 {
+            self.update_hash_internal();
+        }
     }
 
     pub fn release_in_snapshot(&self) {

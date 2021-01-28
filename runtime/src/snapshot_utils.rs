@@ -919,7 +919,7 @@ pub fn snapshot_bank(
         root_bank.slot()
     );
     for store in storages.iter().flatten() {
-        store.update_hash();
+        //store.update_hash();
     }
     info!("Done hash for snapshot stores slot: {}", root_bank.slot());
 
