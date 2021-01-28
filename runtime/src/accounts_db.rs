@@ -575,7 +575,10 @@ impl AccountStorageEntry {
         for account in self.accounts.accounts(0) {
             let hash_to_add =
                 AccountsDB::hash_stored_account(0, &account, &ClusterType::Development);
-            hasher.hash(account.hash.as_ref());
+                hasher.hash(&account.meta.write_version.to_le_bytes());
+                //hasher.hash(account.meta.pubkey.as_ref());
+                //hasher.hash(account.meta.data_len.as_ref());
+                hasher.hash(account.hash.as_ref());
             hasher.hash(hash_to_add.as_ref());
         }
         hasher.result()
@@ -3077,6 +3080,38 @@ impl AccountsDB {
             Self::hash_account_data(
                 slot,
                 account.account_meta.lamports,
+                &account.account_meta.owner,
+                account.account_meta.executable,
+                account.account_meta.rent_epoch,
+                account.data,
+                &account.meta.pubkey,
+                include_owner,
+            )
+        }
+    }
+
+    pub fn hash_stored_account2(
+        slot: Slot,
+        account: &StoredAccountMeta,
+        cluster_type: &ClusterType,
+    ) -> Hash {
+        let include_owner = Self::include_owner(cluster_type, slot);
+
+        if slot > Self::get_blake3_slot(cluster_type) {
+            Self::blake3_hash_account_data(
+                slot,
+                account.account_meta.lamports,
+                &account.account_meta.owner,
+                account.account_meta.executable,
+                account.account_meta.rent_epoch,
+                account.data,
+                &account.meta.pubkey,
+                include_owner,
+            )
+        } else {
+            Self::hash_account_data(
+                slot,
+                std::cmp::max(1, account.account_meta.lamports),
                 &account.account_meta.owner,
                 account.account_meta.executable,
                 account.account_meta.rent_epoch,
