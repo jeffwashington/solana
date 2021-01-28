@@ -3712,7 +3712,7 @@ impl AccountsDB {
     ) -> (Hash, u64) {
         let len = hashes.len();
         let res = Self::compute_merkle_root_and_capitalization_loop(hashes, fanout, |t| (t.1, t.2));
-        warn!("ahv:compute_merkle_root_and_capitalization: {}, result: {:?}", hashes.len(), res);
+        warn!("ahv:compute_merkle_root_and_capitalization: {}, result: {:?}", len, res);
         res
     }
 
