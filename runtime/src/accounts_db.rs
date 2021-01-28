@@ -521,7 +521,10 @@ impl AccountStorageEntry {
     }
 
     fn remove_account(&self, num_bytes: usize, reset_accounts: bool) -> usize {
-        assert!(!self.in_snapshot());
+        if !self.in_snapshot() {
+        warn!("ahv:remove_account while in snapshot!!!!!!!!!");
+        //assert!(!self.in_snapshot());
+        }
         let mut count_and_status = self.count_and_status.write().unwrap();
         let (mut count, mut status) = *count_and_status;
 
