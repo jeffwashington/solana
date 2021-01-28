@@ -4136,6 +4136,16 @@ impl AccountsDB {
             assert_eq!(total_lamports, total_lamports_other);
             warn!("Verified: {}, {}", hash, total_lamports_other);
         }
+        else {
+            let (hash_other, total_lamports_other) = self.calculate_accounts_hash_helper(
+                !use_store,
+                slot,
+                ancestors,
+                simple_capitalization_enabled,
+            );
+
+            warn!("calculated other way: {}, {}", hash_other, total_lamports_other);
+        }
         let mut bank_hashes = self.bank_hashes.write().unwrap();
         let mut bank_hash_info = bank_hashes.get_mut(&slot).unwrap();
         bank_hash_info.snapshot_hash = hash;
