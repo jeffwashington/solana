@@ -4145,8 +4145,8 @@ impl AccountsDB {
             ("hash_total", hash_total, i64),
         );
         warn!(
-            "hashes including zeros: {}, after removal: {}, lamports: {}, hash: {}",
-            len, hash_total, ret.1, ret.0
+            "hashes including zeros: {}, after removal: {}, lamports: {}, hash: {}, checking: {:?}",
+            len, hash_total, ret.1, ret.0, hash_good
         );
 
         if ret.0 != hash_good && hash_good != Hash::default() {
@@ -4168,8 +4168,8 @@ impl AccountsDB {
                 }
                 diff += 1;
                 if diff < 100 {
-                    if l.0 == l.0 {
-                        if l.1 == l.1 {
+                    if l.0 == r.0 {
+                        if l.1 == r.1 {
                             warn!("ahv:lamports different: {:?}, {:?}", l, r);
                         }
                         else {
@@ -4220,6 +4220,7 @@ impl AccountsDB {
         let r = self.calculate_accounts_hash(slot, ancestors, true, simple_capitalization_enabled)
         .unwrap();
 
+        warn!("ahv: checking: {}, {}", r.2.len(), r.0);
         Self::calculate_accounts_hash_using_stores_only(
             s,
             simple_capitalization_enabled,
