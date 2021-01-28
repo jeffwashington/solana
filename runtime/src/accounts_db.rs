@@ -387,6 +387,7 @@ pub struct AccountStorageEntry {
     hash: Mutex<Hash>,
 
     in_snapshot: AtomicIsize,
+    mark_for_clean: RwLock<Slot>,
 }
 
 impl AccountStorageEntry {
@@ -404,6 +405,7 @@ impl AccountStorageEntry {
             alive_bytes: AtomicUsize::new(0),
             hash: Mutex::new(Hash::default()),
             in_snapshot: AtomicIsize::new(0),
+            mark_for_clean: RwLock::new(Slot::default()),
         }
     }
 
@@ -417,6 +419,7 @@ impl AccountStorageEntry {
             alive_bytes: AtomicUsize::new(0),
             hash: Mutex::new(Hash::default()),
             in_snapshot: AtomicIsize::new(0),
+            mark_for_clean: RwLock::new(Slot::default()),
         }
     }
 
@@ -617,6 +620,18 @@ impl AccountStorageEntry {
         assert_eq!(*self.hash.lock().unwrap(), hash);
     }
 
+    pub fn mark_for_clean(&self, slot:Slot, mark: bool) {
+        let mut x = self.mark_for_clean.write().unwrap();
+        if mark {
+            assert!(*x == Slot::default());
+            *x = slot;
+        }
+        else{
+            assert!(*x == slot);
+            *x = Slot::default();
+        }
+    }
+
     pub fn in_snapshot(&self) -> bool {
         self.in_snapshot.load(Ordering::Relaxed) > 0
     }
@@ -708,6 +723,7 @@ pub struct AccountsDB {
     pub next_id: AtomicUsize,
     pub shrink_candidate_slots: Mutex<ShrinkCandidates>,
     pub shrink_candidate_slots_v1: Mutex<Vec<Slot>>,
+    pub marked_for_use: RwLock<Slot>,
 
     pub(crate) write_version: AtomicU64,
 
@@ -1092,6 +1108,7 @@ impl Default for AccountsDB {
             cluster_type: None,
             account_indexes: HashSet::new(),
             caching_enabled: false,
+            marked_for_use: RwLock::new(Slot::default()),
         }
     }
 }
@@ -1404,12 +1421,50 @@ impl AccountsDB {
         pubkeys
     }
 
+    pub fn mark_for_clean(&self, snapshot_slot: Slot, set: bool){
+        let mut x = self.marked_for_use.write().unwrap();
+        if set {
+            assert!(*x == Slot::default());
+            *x = snapshot_slot;
+        }
+        else{
+            assert!(*x == snapshot_slot);
+            *x = Slot::default();
+        }/*
+        self.storage
+            .0
+            .iter()
+            .filter(|iter_item| {
+                let slot = *iter_item.key();
+                slot <= snapshot_slot && self.accounts_index.is_root(slot)
+            })
+            .map(|iter_item| {
+                iter_item
+                    .value()
+                    .read()
+                    .unwrap()
+                    .values()
+                    .filter(|x| x.has_accounts())
+                    .for_each(|x| {
+                        x.mark_for_clean(snapshot_slot, set);
+                        ()
+                    })
+            });
+            //.collect()
+            */
+    }
+
     // Purge zero lamport accounts and older rooted account states as garbage
     // collection
     // Only remove those accounts where the entire rooted history of the account
     // can be purged because there are no live append vecs in the ancestors
     pub fn clean_accounts(&self, max_clean_root: Option<Slot>) {
         warn!("ahv:start_clean: {:?}", max_clean_root);
+        let x = self.marked_for_use.read().unwrap();
+        if *x != Slot::default() && *x != max_clean_root.unwrap_or(Slot::default()) {
+            assert!(false, "re-entry on clean");
+        }
+
         let max_clean_root = self.max_clean_root(max_clean_root);
 
         // hold a lock to prevent slot shrinking from running because it might modify some rooted

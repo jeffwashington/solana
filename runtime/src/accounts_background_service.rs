@@ -87,6 +87,7 @@ impl SnapshotRequestHandler {
                     status_cache_slot_deltas,
                 } = snapshot_request;
 
+                snapshot_root_bank.mark_for_clean(true);
                 // TODO - get rid of this as we move it to accounts_hash_verifier
                 let mut hash_time = Measure::start("hash_time");
                 snapshot_root_bank.update_accounts_hash_with_store_option(false, false);
@@ -154,6 +155,8 @@ impl SnapshotRequestHandler {
                     );
                 }
                 snapshot_time.stop();
+
+                snapshot_root_bank.mark_for_clean(false);
 
                 // Cleanup outdated snapshots
                 let mut purge_old_snapshots_time = Measure::start("purge_old_snapshots_time");

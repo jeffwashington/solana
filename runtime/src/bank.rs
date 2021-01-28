@@ -4299,6 +4299,10 @@ impl Bank {
         self.rc.accounts.accounts_db.get_accounts_hash(self.slot)
     }
 
+    pub fn mark_for_clean(&self, set:bool) {
+        self.rc.accounts.accounts_db.mark_for_clean(self.slot, set);
+    }
+
     pub fn update_accounts_hash_with_store_option2(
         &self,
         s: SnapshotStorages,
