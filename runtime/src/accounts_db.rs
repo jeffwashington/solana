@@ -578,7 +578,7 @@ impl AccountStorageEntry {
                 hasher.hash(&account.meta.write_version.to_le_bytes());
                 //hasher.hash(account.meta.pubkey.as_ref());
                 //hasher.hash(account.meta.data_len.as_ref());
-                hasher.hash(account.hash.as_ref());
+                hasher.hash(account.hash.as_ref());           
             hasher.hash(hash_to_add.as_ref());
         }
         hasher.result()
@@ -3747,7 +3747,9 @@ impl AccountsDB {
     ) -> (Hash, u64) {
         let len = hashes.len();
         let res = Self::compute_merkle_root_and_capitalization_loop(hashes, fanout, |t| (t.1, t.2));
+        if len == 0 || len > 1000000 {
         warn!("ahv:compute_merkle_root_and_capitalization: {}, result: {:?}", len, res);
+        }
         res
     }
 
