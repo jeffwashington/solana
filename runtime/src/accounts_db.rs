@@ -3905,6 +3905,7 @@ impl AccountsDB {
                                             pubkey,
                                         );
                                         if computed_hash != *loaded_hash {
+                                            panic!("mismatched hashes");
                                             mismatch_found.fetch_add(1, Ordering::Relaxed);
                                             return None;
                                         }
