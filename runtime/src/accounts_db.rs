@@ -597,6 +597,9 @@ impl AccountStorageEntry {
 
     pub fn check_hash(&self) {
         let hash = self.hash();
+        if *self.hash.lock().unwrap() != hash {
+            error!("ahv: hashes different!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+        }
         assert_eq!(*self.hash.lock().unwrap(), hash);
     }
 

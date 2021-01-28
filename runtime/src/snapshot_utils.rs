@@ -895,6 +895,10 @@ pub fn snapshot_bank(
     snapshot_version: SnapshotVersion,
     archive_format: &ArchiveFormat,
 ) -> Result<()> {
+    let old_hash = root_bank.get_accounts_hash();
+    root_bank.update_accounts_hash_with_store_option(false, false);
+    assert_eq!(old_hash, root_bank.get_accounts_hash());
+
     let storages: Vec<_> = root_bank.get_snapshot_storages();
     for store in storages.iter().flatten() {
         store.acquire_in_snapshot();
@@ -918,6 +922,13 @@ pub fn snapshot_bank(
         store.update_hash();
     }
     info!("Done hash for snapshot stores slot: {}", root_bank.slot());
+
+    let hash = crate::accounts_db::AccountsDB::calculate_accounts_hash_using_stores_only(
+        storages.clone(),
+        true,
+    );
+
+    assert_eq!(hash.0, root_bank.get_accounts_hash());
 
     let package = package_snapshot(
         &root_bank,
