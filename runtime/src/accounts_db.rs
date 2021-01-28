@@ -1462,7 +1462,7 @@ impl AccountsDB {
         warn!("ahv:start_clean: {:?}", max_clean_root);
         let x = self.marked_for_use.read().unwrap();
         if *x != Slot::default() && *x != max_clean_root.unwrap_or(Slot::default()) {
-            assert!(false, "re-entry on clean");
+            assert!(false, "re-entry on clean: {}, {:?}", *x, max_clean_root);
         }
 
         let max_clean_root = self.max_clean_root(max_clean_root);
