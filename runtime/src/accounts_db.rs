@@ -3851,6 +3851,12 @@ impl AccountsDB {
             }
         }
 
+        for i in 1..hashes.len() {
+            let l = &hashes[i-1];
+            let r = &hashes[i];
+            assert!(l.0 < r.0);
+        };
+
         let mut hash_time = Measure::start("hash");
         let fanout = 16;
         let res = Self::compute_merkle_root_and_capitalization(hashes, fanout);
@@ -4039,6 +4045,8 @@ impl AccountsDB {
             .into_par_iter()
             .flatten()
             .map(|storage| {
+                storage.check_hash();
+                
                 let accounts = storage.accounts.accounts(0);
                 let mut retval = B::default();
                 accounts.into_iter().for_each(|stored_account| {
@@ -4174,7 +4182,7 @@ impl AccountsDB {
                 simple_capitalization_enabled,
             );
 
-            warn!("calculated other way: {}, {}", hash_other, total_lamports_other);
+            warn!("calculated other way: {}, {}, same3:{}", hash_other, total_lamports_other, hash_other==hash);
         }
         let mut bank_hashes = self.bank_hashes.write().unwrap();
         let mut bank_hash_info = bank_hashes.get_mut(&slot).unwrap();
