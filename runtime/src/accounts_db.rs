@@ -1409,6 +1409,7 @@ impl AccountsDB {
     // Only remove those accounts where the entire rooted history of the account
     // can be purged because there are no live append vecs in the ancestors
     pub fn clean_accounts(&self, max_clean_root: Option<Slot>) {
+        warn!("ahv:start_clean: {:?}", max_clean_root);
         let max_clean_root = self.max_clean_root(max_clean_root);
 
         // hold a lock to prevent slot shrinking from running because it might modify some rooted
@@ -1589,6 +1590,8 @@ impl AccountsDB {
         reclaims_time.stop();
 
         self.clean_accounts_stats.report();
+        warn!("ahv:stop_clean: {:?}", max_clean_root);
+
         datapoint_info!(
             "clean_accounts",
             (
