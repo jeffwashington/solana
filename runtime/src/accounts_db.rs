@@ -1464,7 +1464,7 @@ impl AccountsDB {
         let x = self.marked_for_use.read().unwrap();
         if *x != Slot::default() && *x != max_clean_root.unwrap_or(Slot::default()) {
             warn!("ahv:re-entry on clean - avoided: already cleaning: {}, current request: {:?}, thread: {:?}", *x, max_clean_root, std::thread::current().name().unwrap_or_default());
-            assert!(false, "re-entry on clean: {}, {:?}", *x, max_clean_root);
+            //assert!(false, "re-entry on clean: {}, {:?}", *x, max_clean_root);
             return;
             //assert!(false, "re-entry on clean: {}, {:?}", *x, max_clean_root);
         }
