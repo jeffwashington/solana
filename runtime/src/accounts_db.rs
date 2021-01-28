@@ -4563,7 +4563,8 @@ impl AccountsDB {
                     store.slot(), *slot
                 );
                 if store.in_snapshot() {
-                    warn!("ahv:remove_account while in snapshot, slot: {}, lamports: {}, thread: {:?}", slot, account_info.lamports, std::thread::current().name().unwrap_or_default());
+                    let m = store.get_stored_account_meta(account_info.offset).unwrap();
+                    warn!("ahv:remove_account while in snapshot, slot: {}, lamports: {}, pk: {}, hash: {}, vers: {}, thread: {:?}", slot, account_info.lamports, m.meta.pubkey, m.hash, m.meta.write_version, std::thread::current().name().unwrap_or_default());
                 }
                 let count = store.remove_account(account_info.stored_size, no_dead_slot);
                 if count == 0 {
