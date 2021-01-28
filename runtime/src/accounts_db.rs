@@ -1422,7 +1422,7 @@ impl AccountsDB {
     }
 
     pub fn mark_for_clean(&self, snapshot_slot: Slot, set: bool){
-        warn!("ahv:mark_for_clean: {:?}", snapshot_slot, set);
+        warn!("ahv:mark_for_clean: {:?}, {}", snapshot_slot, set);
         let mut x = self.marked_for_use.write().unwrap();
         if set {
             assert!(*x == Slot::default());
