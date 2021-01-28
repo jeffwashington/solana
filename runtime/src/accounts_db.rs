@@ -525,7 +525,7 @@ impl AccountStorageEntry {
 
     fn remove_account(&self, num_bytes: usize, reset_accounts: bool) -> usize {
         if self.in_snapshot() {
-        warn!("ahv:remove_account while in snapshot!!!!!!!!!");
+        //warn!("ahv:remove_account while in snapshot!!!!!!!!!, thread: {:?}, reset: {}", std::thread::current().name().unwrap_or_default(), reset_accounts);
         //assert!(!self.in_snapshot());
         }
         let mut count_and_status = self.count_and_status.write().unwrap();
@@ -4562,6 +4562,9 @@ impl AccountsDB {
                     "AccountDB::accounts_index corrupted. Storage pointed to: {}, expected: {}, should only point to one slot",
                     store.slot(), *slot
                 );
+                if store.in_snapshot() {
+                    warn!("ahv:remove_account while in snapshot, slot: {}, lamports: {}, thread: {:?}", slot, account_info.lamports, std::thread::current().name().unwrap_or_default());
+                }
                 let count = store.remove_account(account_info.stored_size, no_dead_slot);
                 if count == 0 {
                     dead_slots.insert(*slot);
