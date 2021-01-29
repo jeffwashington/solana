@@ -87,10 +87,12 @@ impl SnapshotRequestHandler {
                     status_cache_slot_deltas,
                 } = snapshot_request;
 
+                /*
                 let storages: Vec<_> = snapshot_root_bank.get_snapshot_storages();
                 for store in storages.iter().flatten() {
                     store.acquire_in_snapshot();
                 }
+                */
 
                 snapshot_root_bank.mark_for_clean(true);
                 // TODO - get rid of this as we move it to accounts_hash_verifier
@@ -135,11 +137,13 @@ impl SnapshotRequestHandler {
                 snapshot_root_bank.clean_accounts(true);
                 clean_time.stop();
 
+                /*
                 warn!("ahv: after clean");
                 {
                     let storages: Vec<_> = snapshot_root_bank.get_snapshot_storages();
                     assert!(snapshot_root_bank.get_accounts_hash() == snapshot_root_bank.update_accounts_hash_with_store_option2(storages.clone()).0);
                 }
+                */
 
                 if accounts_db_caching_enabled {
                     shrink_time = Measure::start("shrink_time");
@@ -174,9 +178,11 @@ impl SnapshotRequestHandler {
                 snapshot_utils::purge_old_snapshots(&self.snapshot_config.snapshot_path);
                 purge_old_snapshots_time.stop();
 
+                /*
                 for store in storages.iter().flatten() {
                     store.release_in_snapshot();
                 }
+                */
 
                 datapoint_info!(
                     "handle_snapshot_requests-timing",
