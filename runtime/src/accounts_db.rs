@@ -1110,7 +1110,7 @@ impl AccountsDB {
         let num_roots = self.accounts_index.num_roots();
         loop {
             if let Some(slot) = self.do_next_shrink_slot(candidates) {
-                let reset_accounts = true; // always? does this parameter go higher?
+                let reset_accounts = false; // always? does this parameter go higher in the stack?
                 shrunken_account_total += self.do_shrink_stale_slot(slot, reset_accounts);
             } else {
                 return 0;
@@ -2829,7 +2829,7 @@ impl AccountsDB {
                     "AccountDB::accounts_index corrupted. Storage pointed to: {}, expected: {}, should only point to one slot",
                     store.slot, *slot
                 );
-                let count = store.remove_account(no_dead_slot || reset_accounts);
+                let count = store.remove_account(no_dead_slot && reset_accounts);
                 if count == 0 {
                     dead_slots.insert(*slot);
                 }
