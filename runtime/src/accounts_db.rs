@@ -4245,7 +4245,10 @@ impl AccountsDB {
             len, hash_total, ret.1, ret.0, hash_good
         );
 
-        if ret.0 != hash_good && hash_good != Hash::default() {
+        if ret.0 != hash_good {
+            warn!("ahv:hashes are the same! {}, {}", ret.0, hash_good);
+        }
+        else if hash_good != Hash::default() {
             warn!("ahv:hashes are different: {}, {}", ret.0, hash_good);
             warn!(
                 "ahv:hash lens may be different: {}, {}",
