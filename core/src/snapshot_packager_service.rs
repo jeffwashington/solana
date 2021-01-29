@@ -170,6 +170,7 @@ mod tests {
             Hash::default(),
             ArchiveFormat::TarBzip2,
             SnapshotVersion::default(),
+            0,
         );
 
         // Make tarball from packageable snapshot

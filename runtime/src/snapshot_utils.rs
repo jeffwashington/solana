@@ -189,6 +189,7 @@ pub fn package_snapshot<P: AsRef<Path>, Q: AsRef<Path>>(
         bank.get_accounts_hash(),
         archive_format,
         snapshot_version,
+        bank.capitalization(),
     );
 
     Ok(package)
@@ -269,8 +270,10 @@ pub fn archive_snapshot_package(snapshot_package: &AccountsPackage) -> Result<()
         &staging_snapshots_dir,
     )?;
 
+    let mut storages_len = 0;
     // Add the AppendVecs into the compressible list
-    for storage in snapshot_package.storages.iter().flatten() {
+    for (i, storage) in snapshot_package.storages.iter().flatten().enumerate() {
+        storage.check_hash();
         storage.flush()?;
         let storage_path = storage.get_path();
         let output_path = staging_accounts_dir.join(
@@ -287,7 +290,12 @@ pub fn archive_snapshot_package(snapshot_package: &AccountsPackage) -> Result<()
         if !output_path.is_file() {
             return Err(SnapshotError::StoragePathSymlinkInvalid);
         }
+        storages_len = i;
     }
+    info!(
+        "Finished storage flush slot: {} storages.len: {}",
+        snapshot_package.slot, storages_len
+    );
 
     // Write version file
     {
@@ -893,7 +901,18 @@ pub fn snapshot_bank(
     snapshot_version: SnapshotVersion,
     archive_format: &ArchiveFormat,
 ) -> Result<()> {
+    let old_hash = root_bank.get_accounts_hash();
+
     let storages: Vec<_> = root_bank.get_snapshot_storages();
+
+    assert!(root_bank.get_accounts_hash() == root_bank.update_accounts_hash_with_store_option2(storages.clone()).0);
+
+    //root_bank.update_accounts_hash_with_store_option(false, false);
+    //assert_eq!(old_hash, root_bank.get_accounts_hash());
+
+    for store in storages.iter().flatten() {
+        store.acquire_in_snapshot();
+    }
     let mut add_snapshot_time = Measure::start("add-snapshot-ms");
     add_snapshot(snapshot_path, &root_bank, &storages, snapshot_version)?;
     add_snapshot_time.stop();
@@ -904,6 +923,28 @@ pub fn snapshot_bank(
     let latest_slot_snapshot_paths = slot_snapshot_paths
         .last()
         .expect("no snapshots found in config snapshot_path");
+
+    info!(
+        "updating hash for snapshot stores slot: {}",
+        root_bank.slot()
+    );
+    for store in storages.iter().flatten() {
+        //store.update_hash();
+    }
+    info!("Done hash for snapshot stores slot: {}", root_bank.slot());
+
+    let hash = crate::accounts_db::AccountsDB::calculate_accounts_hash_using_stores_only(
+        storages.clone(),
+        true,
+        vec![],
+        Hash::default(),
+    );
+
+    if hash.0 != root_bank.get_accounts_hash() {
+        root_bank.update_accounts_hash_with_store_option2(storages.clone());
+    }
+
+    assert_eq!(hash.0, root_bank.get_accounts_hash());
 
     let package = package_snapshot(
         &root_bank,

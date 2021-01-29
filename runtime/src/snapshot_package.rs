@@ -24,6 +24,7 @@ pub struct AccountsPackage {
     pub hash: Hash,
     pub archive_format: ArchiveFormat,
     pub snapshot_version: SnapshotVersion,
+    pub capitalization: u64,
 }
 
 impl AccountsPackage {
@@ -37,6 +38,7 @@ impl AccountsPackage {
         hash: Hash,
         archive_format: ArchiveFormat,
         snapshot_version: SnapshotVersion,
+        capitalization: u64,
     ) -> Self {
         Self {
             slot,
@@ -48,6 +50,7 @@ impl AccountsPackage {
             hash,
             archive_format,
             snapshot_version,
+            capitalization,
         }
     }
 }
