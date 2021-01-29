@@ -4948,7 +4948,7 @@ pub mod tests {
         solana_logger::setup();
 
         let key = Pubkey::new_unique();
-        let mut account_maps: DashMap<Pubkey, CalculateHashIntermediate> = DashMap::new();
+        let account_maps: DashMap<Pubkey, CalculateHashIntermediate> = DashMap::new();
         let hash = Hash::new(&[1u8; 32]);
         let val = (0, hash, 88, 490, Slot::default());
         account_maps.insert(key, val);
@@ -4968,7 +4968,7 @@ pub mod tests {
     fn test_accountsdb_handle_one_loaded_account() {
         solana_logger::setup();
 
-        let mut account_maps: DashMap<Pubkey, CalculateHashIntermediate> = DashMap::new();
+        let account_maps: DashMap<Pubkey, CalculateHashIntermediate> = DashMap::new();
         let key = Pubkey::new_unique();
         let hash = Hash::new_unique();
         let val = (1, hash, 1, 2, 1);
@@ -4990,7 +4990,7 @@ pub mod tests {
 
         // slot same, vers >
         let hash4 = Hash::new_unique();
-        let val4 = (2, hash3, 6, 7, 1);
+        let val4 = (2, hash4, 6, 7, 1);
         AccountsDB::handle_one_loaded_account(&key, val4, &account_maps);
         assert_eq!(*account_maps.get(&key).unwrap(), val4);
 
@@ -5007,7 +5007,7 @@ pub mod tests {
 
         let key = Pubkey::new_unique();
         let hash = Hash::new_unique();
-        let mut account_maps: DashMap<Pubkey, CalculateHashIntermediate> = DashMap::new();
+        let account_maps: DashMap<Pubkey, CalculateHashIntermediate> = DashMap::new();
         let val = (0, hash, 1, 2, Slot::default());
         account_maps.insert(key, val);
 
@@ -5015,7 +5015,7 @@ pub mod tests {
         assert_eq!(result, vec![(key, val.1, val.2)]);
 
         // zero original lamports
-        let mut account_maps: DashMap<Pubkey, CalculateHashIntermediate> = DashMap::new();
+        let account_maps: DashMap<Pubkey, CalculateHashIntermediate> = DashMap::new();
         let val = (0, hash, 1, 0, Slot::default());
         account_maps.insert(key, val);
 
@@ -5027,14 +5027,14 @@ pub mod tests {
     fn test_accountsdb_calculate_accounts_hash_using_stores_only_simple() {
         solana_logger::setup();
 
-        let (storages, size, slot_expected) = sample_storage();
+        let (storages, _size, _slot_expected) = sample_storage();
         let result = AccountsDB::calculate_accounts_hash_using_stores_only(storages, true);
         let expected_hash = Hash::from_str("GKot5hBsd81kMupNCXHaqbhv3huEbxAFMLnpcX2hniwn").unwrap();
         assert_eq!(result, (expected_hash, 0));
     }
 
     fn sample_storage() -> (SnapshotStorages, usize, Slot) {
-        let (temp_dirs, paths) = get_temp_accounts_paths(1).unwrap();
+        let (_temp_dirs, paths) = get_temp_accounts_paths(1).unwrap();
         let slot_expected: Slot = 0;
         let size: usize = 123;
         let data = AccountStorageEntry::new(&paths[0], slot_expected, 0, size as u64);
@@ -5048,17 +5048,20 @@ pub mod tests {
     fn test_accountsdb_scan_account_storage_no_bank() {
         solana_logger::setup();
 
+        let expected = 1;
         let (storages, size, slot_expected) = sample_storage();
         let result = AccountsDB::scan_account_storage_no_bank(
             storages,
             |loaded_account: LoadedAccount,
              _store_id: AppendVecId,
-             accum: &mut Vec<(Pubkey, CalculateHashIntermediate)>,
+             accum: &mut Vec<u64>,
              slot: Slot| {
                 assert_eq!(loaded_account.stored_size(), size);
                 assert_eq!(slot_expected, slot);
+                accum.push(expected);
             },
         );
+        assert_eq!(result, vec![vec![expcted]]);
     }
 
     #[test]
