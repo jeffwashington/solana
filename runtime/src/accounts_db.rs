@@ -4258,13 +4258,34 @@ impl AccountsDB {
             AccountsDB::sort_hashes_by_pubkey(&mut hs);
             let mut diff = 0;
             let ln = hs.len();
-            for i in 0..ln {
-                let l = hs_good[i];
-                let r = hs[i];
+            let mut li = 0;
+            let mut ri = 0;
+            loop {
+                if li >= hs_good.len(){
+                    let diff2 = hs.len() - ri;
+                    if diff2 > 0 {
+                        warn!("ahv:pubkeys only in right: {:?}", diff);
+                    }
+                    diff += diff2;
+                    break;
+                }
+                if ri >= hs.len() {
+                    let diff2 = hs_good.len() - li;
+                    if diff2 > 0 {
+                        warn!("ahv:pubkeys only in left: {:?}", diff);
+                    }
+                    diff += diff2;
+                    break;
+                }
+                let l = hs_good[li];
+                let r = hs[ri];
+                li += 1;
+                ri += 1;
                 if l == r {
                     continue;
                 }
                 diff += 1;
+
                 if diff < 100 {
                     if l.0 == r.0 {
                         if l.1 == r.1 {
@@ -4273,7 +4294,14 @@ impl AccountsDB {
                             warn!("ahv:hashes different: {:?}, {:?}", l, r);
                         }
                     } else {
-                        warn!("ahv:pubkeys different: {:?}, {:?}", l, r);
+                        if l.0 < r.0 {
+                            warn!("ahv:pubkey only in left: {:?}", l);
+                            ri -= 1;
+                        }
+                        else{
+                            warn!("ahv:pubkey only in right: {:?}", l);
+                            li -= 1;
+                        }
                     }
                 }
             }
