@@ -329,11 +329,11 @@ impl AccountStorageEntry {
         }
     }
 
-    fn remove_account(&self) -> usize {
+    fn remove_account(&self, reset_accounts: bool) -> usize {
         let mut count_and_status = self.count_and_status.write().unwrap();
         let (mut count, mut status) = *count_and_status;
 
-        if count == 1 && status == AccountStorageStatus::Full {
+        if count == 1 && status == AccountStorageStatus::Full && reset_accounts {
             // this case arises when we remove the last account from the
             //  storage, but we've learned from previous write attempts that
             //  the storage is full
@@ -1050,7 +1050,7 @@ impl AccountsDB {
                 (None, None)
             };
         let dead_slots =
-            self.remove_dead_accounts(reclaims, expected_single_dead_slot, reclaimed_offsets);
+            self.remove_dead_accounts(reclaims, expected_single_dead_slot, reclaimed_offsets, no_dead_slot);
         if no_dead_slot {
             assert!(dead_slots.is_empty());
         } else if let Some(expected_single_dead_slot) = expected_single_dead_slot {
@@ -2799,6 +2799,7 @@ impl AccountsDB {
         reclaims: SlotSlice<AccountInfo>,
         expected_slot: Option<Slot>,
         mut reclaimed_offsets: Option<&mut AppendVecOffsets>,
+        no_dead_slot: bool,
     ) -> HashSet<Slot> {
         let mut dead_slots = HashSet::new();
         for (slot, account_info) in reclaims {
@@ -2820,7 +2821,7 @@ impl AccountsDB {
                     "AccountDB::accounts_index corrupted. Storage pointed to: {}, expected: {}, should only point to one slot",
                     store.slot, *slot
                 );
-                let count = store.remove_account();
+                let count = store.remove_account(no_dead_slot);
                 if count == 0 {
                     dead_slots.insert(*slot);
                 }
@@ -5393,7 +5394,7 @@ pub mod tests {
             .values()
             .next()
             .unwrap()
-            .remove_account();
+            .remove_account(true);
         assert!(db.get_snapshot_storages(after_slot).is_empty());
     }
 
@@ -5414,8 +5415,8 @@ pub mod tests {
             .next()
             .unwrap()
             .clone();
-        storage_entry.remove_account();
-        storage_entry.remove_account();
+        storage_entry.remove_account(true);
+        storage_entry.remove_account(true);
     }
 
     #[test]
