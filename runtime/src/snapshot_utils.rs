@@ -972,6 +972,8 @@ pub fn process_accounts_package_pre(accounts_package: AccountsPackagePre) -> Acc
         assert_eq!(expected_hash, hash);
     };
 
+    warn!("accounts_hash_verifier: Verified equal {:?}, {:?}, {:?}, {:?}", accounts_package.expected_capitalization, lamports, hash, accounts_package.hash_for_testing);
+
     datapoint_info!(
         "accounts_hash_verifier",
         ("calculate_hash", time.as_us(), i64),
