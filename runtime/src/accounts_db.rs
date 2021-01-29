@@ -345,6 +345,10 @@ impl AccountStorageEntry {
             //
             // otherwise, the storage may be in flight with a store()
             //   call
+            if self.in_snapshot() {
+                warn!("trying to remove account while in snapshot");
+                return 0; // leaking?
+            }
             assert!(!self.in_snapshot());
             *self.hash.lock().unwrap() = Hash::default();
             self.accounts.reset();
