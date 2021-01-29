@@ -2503,9 +2503,9 @@ impl AccountsDB {
 
         if ret.0 != hash_good && hash_good != Hash::default() {
             warn!(
-                "ahv:hashes are different: {}, {}", ret.0, hash_good);
+                "ahv:hashes may be different: {}, {}", ret.0, hash_good);
                 warn!(
-                    "ahv:hashes are different: {}, {}", hs.len(), hs_good.len());
+                    "ahv:hash lens may be different: {}, {}", hs.len(), hs_good.len());
 
             let mut hs_good = hs_good.clone();
             AccountsDB::sort_hashes_by_pubkey(&mut hs_good);
@@ -2618,6 +2618,7 @@ impl AccountsDB {
             assert_eq!(total_lamports, total_lamports_other);
             warn!("Verified: {}, {}", hash, total_lamports_other);
         }
+        /*
         else {
             let (hash_other, total_lamports_other) = self.calculate_accounts_hash_helper(
                 !use_store,
@@ -2628,6 +2629,7 @@ impl AccountsDB {
 
             warn!("calculated other way: {}, {}, same3:{}", hash_other, total_lamports_other, hash_other==hash);
         }
+        */
         let mut bank_hashes = self.bank_hashes.write().unwrap();
         let mut bank_hash_info = bank_hashes.get_mut(&slot).unwrap();
         bank_hash_info.snapshot_hash = hash;
