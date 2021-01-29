@@ -4741,10 +4741,12 @@ impl AccountsDB {
                     "AccountDB::accounts_index corrupted. Storage pointed to: {}, expected: {}, should only point to one slot",
                     store.slot(), *slot
                 );
+                /*
                 if store.in_snapshot() {
                     let m = store.get_stored_account_meta(account_info.offset).unwrap();
                     warn!("ahv:remove_account while in snapshot, slot: {}, lamports: {}, pk: {}, hash: {}, vers: {}, thread: {:?}", slot, account_info.lamports, m.meta.pubkey, m.hash, m.meta.write_version, std::thread::current().name().unwrap_or_default());
                 }
+                */
                 let count =
                     store.remove_account(account_info.stored_size, no_dead_slot || reset_accounts);
                 if count == 0 {
