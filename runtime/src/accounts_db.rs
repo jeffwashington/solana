@@ -2558,7 +2558,7 @@ impl AccountsDB {
         } else {
             let r = self.calculate_accounts_hash(slot, ancestors, true, simple_capitalization_enabled)
                 .unwrap();
-
+/*
             let s = self.get_snapshot_storages(slot);
             Self::calculate_accounts_hash_using_stores_only(
                 s,
@@ -2566,6 +2566,7 @@ impl AccountsDB {
                 r.2,
                 r.0,
             );
+            */
         
             (r.0, r.1)
         }
