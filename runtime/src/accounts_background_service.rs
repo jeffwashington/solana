@@ -53,7 +53,7 @@ impl SnapshotRequestHandler {
 
                 let storages: Vec<_> = snapshot_root_bank.get_snapshot_storages();
                 for store in storages.iter().flatten() {
-                    store.acquire_in_snapshot();
+                    //store.acquire_in_snapshot();
                 }
 
                 // TODO - get rid of this as we move it to accounts_hash_verifier
@@ -105,7 +105,7 @@ impl SnapshotRequestHandler {
                 purge_old_snapshots_time.stop();
 
                 for store in storages.iter().flatten() {
-                    store.release_in_snapshot();
+                    //store.release_in_snapshot();
                 }
 
                 datapoint_info!(
