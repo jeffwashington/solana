@@ -110,7 +110,7 @@ type AppendVecOffsets = HashMap<AppendVecId, HashSet<usize>>;
 type ReclaimResult = (AccountSlots, AppendVecOffsets);
 type StorageFinder<'a> = Box<dyn Fn(Slot) -> Arc<AccountStorageEntry> + 'a>;
 
-type CalculateHashIntermediate = (u64, Hash, u64, u64);
+type CalculateHashIntermediate = (u64, Hash, u64, u64, Slot);
 
 trait Versioned {
     fn version(&self) -> u64;
@@ -2409,7 +2409,7 @@ impl AccountsDB {
         scan_func: F,
     ) -> Vec<B>
     where
-        F: Fn(StoredAccount, AppendVecId, &mut B) + Send + Sync,
+        F: Fn(StoredAccount, AppendVecId, &mut B, Slot) + Send + Sync,
         B: Send + Default,
     {
         snapshot_storages
@@ -2420,7 +2420,12 @@ impl AccountsDB {
                 let accounts = storage.accounts.accounts(0);
                 let mut retval = B::default();
                 accounts.into_iter().for_each(|stored_account| {
-                    scan_func(stored_account, storage.append_vec_id(), &mut retval)
+                    scan_func(
+                        stored_account,
+                        storage.append_vec_id(),
+                        &mut retval,
+                        storage.slot,
+                    )
                 });
                 retval
             })
@@ -2432,7 +2437,7 @@ impl AccountsDB {
     ) -> Vec<(Pubkey, Hash, u64)> {
         let hashes: Vec<_> = account_maps
             .into_iter()
-            .filter_map(|(k, (_, hash, lamports, raw_lamports))| {
+            .filter_map(|(k, (_version, hash, lamports, raw_lamports, _slot))| {
                 if raw_lamports != 0 {
                     Some((k, hash, lamports))
                 } else {
@@ -2651,7 +2656,8 @@ impl AccountsDB {
             storage,
             |loaded_account: StoredAccount,
              _store_id: AppendVecId,
-             _accum: &mut Vec<(Pubkey, CalculateHashIntermediate)>| {
+             _accum: &mut Vec<(Pubkey, CalculateHashIntermediate)>,
+             slot: Slot| {
                 let public_key = loaded_account.meta.pubkey;
                 let version = loaded_account.meta.write_version;
                 let raw_lamports = loaded_account.account_meta.lamports;
@@ -2663,18 +2669,13 @@ impl AccountsDB {
                 );
 
                 let key = public_key;
-                let source_item = (version, *loaded_account.hash, balance, raw_lamports);
+                let source_item = (version, *loaded_account.hash, balance, raw_lamports, slot);
                 match map.entry(key) {
                     Occupied(mut dest_item) => {
-                        if dest_item.get_mut().version() == source_item.version() {
-                            assert!(
-                                dest_item.get_mut().1 == *loaded_account.hash
-                                    && dest_item.get_mut().2 == balance
-                                    && dest_item.get_mut().3 == raw_lamports
-                            );
-                        }
-
-                        if dest_item.get_mut().version() <= source_item.version() {
+                        let contents = dest_item.get();
+                        let mut replace = contents.4 < slot
+                            || (contents.4 == slot && contents.version() <= source_item.version());
+                        if replace {
                             // replace the item
                             dest_item.insert(source_item);
                         }
