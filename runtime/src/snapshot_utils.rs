@@ -896,10 +896,14 @@ pub fn snapshot_bank(
     archive_format: &ArchiveFormat,
 ) -> Result<()> {
     let old_hash = root_bank.get_accounts_hash();
-    root_bank.update_accounts_hash_with_store_option(false, false);
-    assert_eq!(old_hash, root_bank.get_accounts_hash());
 
     let storages: Vec<_> = root_bank.get_snapshot_storages();
+
+    assert!(root_bank.get_accounts_hash() == root_bank.update_accounts_hash_with_store_option2(storages.clone()).0);
+
+    //root_bank.update_accounts_hash_with_store_option(false, false);
+    //assert_eq!(old_hash, root_bank.get_accounts_hash());
+
     for store in storages.iter().flatten() {
         store.acquire_in_snapshot();
     }

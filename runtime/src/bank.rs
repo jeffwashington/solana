@@ -4306,7 +4306,7 @@ impl Bank {
     pub fn update_accounts_hash_with_store_option2(
         &self,
         s: SnapshotStorages,
-    ) {
+    ) -> (Hash, u64) {
         self
             .rc
             .accounts
@@ -4316,7 +4316,7 @@ impl Bank {
                 &self.ancestors,
                 self.simple_capitalization_enabled(),
                 s
-            );
+            )
     }
 
     pub fn update_accounts_hash_with_store_option(

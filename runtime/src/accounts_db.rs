@@ -4146,6 +4146,16 @@ impl AccountsDB {
     fn remove_zero_balance_accounts(
         account_maps: DashMap<Pubkey, CalculateHashIntermediate>,
     ) -> Vec<(Pubkey, Hash, u64)> {
+        let hashes: Vec<_> = account_maps.into_iter()
+        .filter_map(|(k, (_, hash, lamports, raw_lamports))| {
+            if raw_lamports != 0 {
+                Some((k, hash, lamports))
+            } else {
+                None
+            }
+        })
+        .collect();
+        /*
         type ShardType = dashmap::lock::RwLock<
             std::collections::HashMap<
                 solana_sdk::pubkey::Pubkey,
@@ -4174,6 +4184,7 @@ impl AccountsDB {
             })
             .flatten()
             .collect();
+            */
         hashes
     }
 
@@ -4287,7 +4298,7 @@ impl AccountsDB {
         ancestors: &Ancestors,
         simple_capitalization_enabled: bool,
         s: SnapshotStorages,
-    ){
+    )-> (Hash, u64){
         let r = self.calculate_accounts_hash(slot, ancestors, true, simple_capitalization_enabled)
         .unwrap();
 
@@ -4297,7 +4308,7 @@ impl AccountsDB {
             simple_capitalization_enabled,
             r.2,
             r.0,
-        );
+        )
     }
 
     pub fn update_accounts_hash_with_store_option(

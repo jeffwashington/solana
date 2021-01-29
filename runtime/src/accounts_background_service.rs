@@ -135,6 +135,12 @@ impl SnapshotRequestHandler {
                 snapshot_root_bank.clean_accounts(true);
                 clean_time.stop();
 
+                warn!("ahv: after clean");
+                {
+                    let storages: Vec<_> = snapshot_root_bank.get_snapshot_storages();
+                    assert!(snapshot_root_bank.get_accounts_hash() == snapshot_root_bank.update_accounts_hash_with_store_option2(storages.clone()).0);
+                }
+
                 if accounts_db_caching_enabled {
                     shrink_time = Measure::start("shrink_time");
                     snapshot_root_bank.shrink_candidate_slots();
