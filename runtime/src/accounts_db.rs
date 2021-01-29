@@ -50,7 +50,7 @@ use std::{
     iter::FromIterator,
     ops::RangeBounds,
     path::{Path, PathBuf},
-    sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, AtomicIsize, Ordering},
+    sync::atomic::{AtomicBool, AtomicIsize, AtomicU64, AtomicUsize, Ordering},
     sync::{Arc, Mutex, MutexGuard, RwLock},
     time::Instant,
 };
@@ -345,10 +345,6 @@ impl AccountStorageEntry {
             //
             // otherwise, the storage may be in flight with a store()
             //   call
-            if self.in_snapshot() {
-                warn!("trying to remove account while in snapshot");
-                return 0; // leaking?
-            }
             assert!(!self.in_snapshot());
             *self.hash.lock().unwrap() = Hash::default();
             self.accounts.reset();
@@ -387,12 +383,12 @@ impl AccountStorageEntry {
         for account in self.accounts.accounts(0) {
             let hash_to_add =
                 AccountsDB::hash_stored_account2(0, &account, &ClusterType::Development);
-                hasher.hash(&account.meta.write_version.to_le_bytes());
-                //hasher.hash(&account.count_and_status.read().unwrap().0.to_le_bytes());
-                //hasher.hash(&account.count_and_status.read().unwrap().1.to_le_bytes());
-                //hasher.hash(account.meta.pubkey.as_ref());
-                //hasher.hash(account.meta.data_len.as_ref());
-                hasher.hash(account.hash.as_ref());           
+            hasher.hash(&account.meta.write_version.to_le_bytes());
+            //hasher.hash(&account.count_and_status.read().unwrap().0.to_le_bytes());
+            //hasher.hash(&account.count_and_status.read().unwrap().1.to_le_bytes());
+            //hasher.hash(account.meta.pubkey.as_ref());
+            //hasher.hash(account.meta.data_len.as_ref());
+            hasher.hash(account.hash.as_ref());
             hasher.hash(hash_to_add.as_ref());
         }
         hasher.result()
@@ -728,7 +724,7 @@ impl AccountsDB {
 
         let mut measure = Measure::start("clean_old_root_reclaims");
         let mut reclaim_result = (HashMap::new(), HashMap::new());
-        self.handle_reclaims(&reclaims, None, false, Some(&mut reclaim_result));
+        self.handle_reclaims(&reclaims, None, false, Some(&mut reclaim_result), false);
         measure.stop();
         debug!("{} {}", clean_rooted, measure);
         inc_new_counter_info!("clean-old-root-reclaim-ms", measure.as_ms() as usize);
@@ -1006,7 +1002,7 @@ impl AccountsDB {
         self.accounts_index
             .handle_dead_keys(&dead_keys, &self.account_indexes);
 
-        self.handle_reclaims(&reclaims, None, false, None);
+        self.handle_reclaims(&reclaims, None, false, None, true);
 
         reclaims_time.stop();
         datapoint_info!(
@@ -1043,6 +1039,7 @@ impl AccountsDB {
         expected_single_dead_slot: Option<Slot>,
         no_dead_slot: bool,
         reclaim_result: Option<&mut ReclaimResult>,
+        reset_accounts: bool,
     ) {
         if reclaims.is_empty() {
             return;
@@ -1053,8 +1050,13 @@ impl AccountsDB {
             } else {
                 (None, None)
             };
-        let dead_slots =
-            self.remove_dead_accounts(reclaims, expected_single_dead_slot, reclaimed_offsets, no_dead_slot);
+        let dead_slots = self.remove_dead_accounts(
+            reclaims,
+            expected_single_dead_slot,
+            reclaimed_offsets,
+            no_dead_slot,
+            reset_accounts,
+        );
         if no_dead_slot {
             assert!(dead_slots.is_empty());
         } else if let Some(expected_single_dead_slot) = expected_single_dead_slot {
@@ -1093,12 +1095,12 @@ impl AccountsDB {
         );
     }
 
-    fn do_shrink_stale_slot(&self, slot: Slot) -> usize {
-        self.do_shrink_slot(slot, false)
+    fn do_shrink_stale_slot(&self, slot: Slot, reset_accounts: bool) -> usize {
+        self.do_shrink_slot(slot, false, reset_accounts)
     }
 
     fn do_shrink_slot_forced(&self, slot: Slot) {
-        self.do_shrink_slot(slot, true);
+        self.do_shrink_slot(slot, true, false);
     }
 
     fn shrink_stale_slot(&self, candidates: &mut MutexGuard<Vec<Slot>>) -> usize {
@@ -1108,7 +1110,8 @@ impl AccountsDB {
         let num_roots = self.accounts_index.num_roots();
         loop {
             if let Some(slot) = self.do_next_shrink_slot(candidates) {
-                shrunken_account_total += self.do_shrink_stale_slot(slot);
+                let reset_accounts = true; // always? does this parameter go higher?
+                shrunken_account_total += self.do_shrink_stale_slot(slot, reset_accounts);
             } else {
                 return 0;
             }
@@ -1128,7 +1131,7 @@ impl AccountsDB {
 
     // Reads all accounts in given slot's AppendVecs and filter only to alive,
     // then create a minimum AppendVec filled with the alive.
-    fn do_shrink_slot(&self, slot: Slot, forced: bool) -> usize {
+    fn do_shrink_slot(&self, slot: Slot, forced: bool, reset_accounts: bool) -> usize {
         trace!("shrink_stale_slot: slot: {}", slot);
 
         let mut stored_accounts = vec![];
@@ -1275,6 +1278,7 @@ impl AccountsDB {
                 &hashes,
                 Some(Box::new(move |_| shrunken_store.clone())),
                 Some(Box::new(write_versions.into_iter())),
+                reset_accounts,
             );
 
             let mut start = Measure::start("write_storage_elapsed");
@@ -1386,7 +1390,7 @@ impl AccountsDB {
     #[cfg(test)]
     fn shrink_all_stale_slots(&self) {
         for slot in self.all_slots_in_storage() {
-            self.do_shrink_stale_slot(slot);
+            self.do_shrink_stale_slot(slot, false);
         }
     }
 
@@ -1752,7 +1756,7 @@ impl AccountsDB {
 
         // 1) Remove old bank hash from self.bank_hashes
         // 2) Purge this slot's storage entries from self.storage
-        self.handle_reclaims(&reclaims, Some(remove_slot), false, None);
+        self.handle_reclaims(&reclaims, Some(remove_slot), false, None, false);
         assert!(self.storage.get_slot_stores(remove_slot).is_none());
     }
 
@@ -2113,7 +2117,10 @@ impl AccountsDB {
         let len = hashes.len();
         let res = Self::compute_merkle_root_and_capitalization_loop(hashes, fanout, |t| (t.1, t.2));
         if len == 0 || len > 1000000 {
-        warn!("ahv:compute_merkle_root_and_capitalization: {}, result: {:?}", len, res);
+            warn!(
+                "ahv:compute_merkle_root_and_capitalization: {}, result: {:?}",
+                len, res
+            );
         }
         res
     }
@@ -2217,10 +2224,10 @@ impl AccountsDB {
         }
 
         for i in 1..hashes.len() {
-            let l = &hashes[i-1];
+            let l = &hashes[i - 1];
             let r = &hashes[i];
             assert!(l.0 < r.0);
-        };
+        }
 
         let mut hash_time = Measure::start("hash");
         let fanout = 16;
@@ -2353,7 +2360,10 @@ impl AccountsDB {
             ("sort", sort_time.as_us(), i64),
             ("hash_total", hash_total, i64),
         );
-        warn!("results: {}, {}, len: {}", accumulated_hash, total_lamports, l1);
+        warn!(
+            "results: {}, {}, len: {}",
+            accumulated_hash, total_lamports, l1
+        );
         Ok((accumulated_hash, total_lamports, bk))
     }
 
@@ -2407,15 +2417,10 @@ impl AccountsDB {
             .flatten()
             .map(|storage| {
                 //storage.check_hash();
-                
                 let accounts = storage.accounts.accounts(0);
                 let mut retval = B::default();
                 accounts.into_iter().for_each(|stored_account| {
-                    scan_func(
-                        stored_account,
-                        storage.append_vec_id(),
-                        &mut retval,
-                    )
+                    scan_func(stored_account, storage.append_vec_id(), &mut retval)
                 });
                 retval
             })
@@ -2425,15 +2430,16 @@ impl AccountsDB {
     fn remove_zero_balance_accounts(
         account_maps: DashMap<Pubkey, CalculateHashIntermediate>,
     ) -> Vec<(Pubkey, Hash, u64)> {
-        let hashes: Vec<_> = account_maps.into_iter()
-        .filter_map(|(k, (_, hash, lamports, raw_lamports))| {
-            if raw_lamports != 0 {
-                Some((k, hash, lamports))
-            } else {
-                None
-            }
-        })
-        .collect();
+        let hashes: Vec<_> = account_maps
+            .into_iter()
+            .filter_map(|(k, (_, hash, lamports, raw_lamports))| {
+                if raw_lamports != 0 {
+                    Some((k, hash, lamports))
+                } else {
+                    None
+                }
+            })
+            .collect();
         /*
         type ShardType = dashmap::lock::RwLock<
             std::collections::HashMap<
@@ -2502,10 +2508,12 @@ impl AccountsDB {
         );
 
         if ret.0 != hash_good && hash_good != Hash::default() {
+            warn!("ahv:hashes may be different: {}, {}", ret.0, hash_good);
             warn!(
-                "ahv:hashes may be different: {}, {}", ret.0, hash_good);
-                warn!(
-                    "ahv:hash lens may be different: {}, {}", hs.len(), hs_good.len());
+                "ahv:hash lens may be different: {}, {}",
+                hs.len(),
+                hs_good.len()
+            );
 
             let mut hs_good = hs_good.clone();
             AccountsDB::sort_hashes_by_pubkey(&mut hs_good);
@@ -2523,18 +2531,15 @@ impl AccountsDB {
                     if l.0 == r.0 {
                         if l.1 == r.1 {
                             warn!("ahv:lamports different: {:?}, {:?}", l, r);
-                        }
-                        else {
+                        } else {
                             warn!("ahv:hashes different: {:?}, {:?}", l, r);
                         }
-                    }
-                    else {
+                    } else {
                         warn!("ahv:pubkeys different: {:?}, {:?}", l, r);
                     }
                 }
             }
-             warn!("ahv: differences: {}", diff);
-    
+            warn!("ahv: differences: {}", diff);
         }
 
         ret
@@ -2556,9 +2561,10 @@ impl AccountsDB {
                 Hash::default(),
             )
         } else {
-            let r = self.calculate_accounts_hash(slot, ancestors, true, simple_capitalization_enabled)
+            let r = self
+                .calculate_accounts_hash(slot, ancestors, true, simple_capitalization_enabled)
                 .unwrap();
-/*
+            /*
             let s = self.get_snapshot_storages(slot);
             Self::calculate_accounts_hash_using_stores_only(
                 s,
@@ -2567,7 +2573,6 @@ impl AccountsDB {
                 r.0,
             );
             */
-        
             (r.0, r.1)
         }
     }
@@ -2578,17 +2583,13 @@ impl AccountsDB {
         ancestors: &Ancestors,
         simple_capitalization_enabled: bool,
         s: SnapshotStorages,
-    )-> (Hash, u64){
-        let r = self.calculate_accounts_hash(slot, ancestors, true, simple_capitalization_enabled)
-        .unwrap();
+    ) -> (Hash, u64) {
+        let r = self
+            .calculate_accounts_hash(slot, ancestors, true, simple_capitalization_enabled)
+            .unwrap();
 
         warn!("ahv: checking: {}, {}", r.2.len(), r.0);
-        Self::calculate_accounts_hash_using_stores_only(
-            s,
-            simple_capitalization_enabled,
-            r.2,
-            r.0,
-        )
+        Self::calculate_accounts_hash_using_stores_only(s, simple_capitalization_enabled, r.2, r.0)
     }
 
     pub fn update_accounts_hash_with_store_option(
@@ -2662,16 +2663,15 @@ impl AccountsDB {
                 );
 
                 let key = public_key;
-                let source_item = (
-                    version,
-                    *loaded_account.hash,
-                    balance,
-                    raw_lamports,
-                );
+                let source_item = (version, *loaded_account.hash, balance, raw_lamports);
                 match map.entry(key) {
                     Occupied(mut dest_item) => {
                         if dest_item.get_mut().version() == source_item.version() {
-                            assert!(dest_item.get_mut().1 == *loaded_account.hash && dest_item.get_mut().2==balance && dest_item.get_mut().3 == raw_lamports);
+                            assert!(
+                                dest_item.get_mut().1 == *loaded_account.hash
+                                    && dest_item.get_mut().2 == balance
+                                    && dest_item.get_mut().3 == raw_lamports
+                            );
                         }
 
                         if dest_item.get_mut().version() <= source_item.version() {
@@ -2807,6 +2807,7 @@ impl AccountsDB {
         expected_slot: Option<Slot>,
         mut reclaimed_offsets: Option<&mut AppendVecOffsets>,
         no_dead_slot: bool,
+        reset_accounts: bool,
     ) -> HashSet<Slot> {
         let mut dead_slots = HashSet::new();
         for (slot, account_info) in reclaims {
@@ -3011,6 +3012,7 @@ impl AccountsDB {
             hashes,
             None::<StorageFinder>,
             None::<Box<dyn Iterator<Item = u64>>>,
+            false,
         );
     }
 
@@ -3021,6 +3023,7 @@ impl AccountsDB {
         hashes: &[Hash],
         storage_finder: Option<StorageFinder<'a>>,
         write_version_producer: Option<Box<dyn Iterator<Item = u64>>>,
+        reset_accounts: bool,
     ) -> StoreAccountsTiming {
         let storage_finder: StorageFinder<'a> = storage_finder
             .unwrap_or_else(|| Box::new(move |slot| self.find_storage_candidate(slot)));
@@ -3067,7 +3070,7 @@ impl AccountsDB {
         //
         // From 1) and 2) we guarantee passing Some(slot), true is safe
         let mut handle_reclaims_time = Measure::start("handle_reclaims");
-        self.handle_reclaims(&reclaims, Some(slot), true, None);
+        self.handle_reclaims(&reclaims, Some(slot), true, None, reset_accounts);
         handle_reclaims_time.stop();
         self.stats
             .store_handle_reclaims
