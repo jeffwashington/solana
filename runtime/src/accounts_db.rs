@@ -3897,7 +3897,7 @@ impl AccountsDB {
         ancestors: &Ancestors,
         simple_capitalization_enabled: bool,
     ) -> (Hash, u64) {
-        self.update_accounts_hash_with_store_option(
+        self.update_accounts_hash_with_index_option(
             false,
             false,
             slot,
@@ -3912,7 +3912,7 @@ impl AccountsDB {
         ancestors: &Ancestors,
         simple_capitalization_enabled: bool,
     ) -> (Hash, u64) {
-        self.update_accounts_hash_with_store_option(
+        self.update_accounts_hash_with_index_option(
             false,
             true,
             slot,
@@ -3999,7 +3999,7 @@ impl AccountsDB {
             true,
         );
         datapoint_info!(
-            "calculate_accounts_hash_using_stores",
+            "calculate_accounts_hash_without_index",
             ("accounts_scan", time_scan.as_us(), i64),
             ("eliminate_zeros", zeros.as_us(), i64),
             ("hash", hash_time.as_us(), i64),
@@ -4012,15 +4012,15 @@ impl AccountsDB {
 
     fn calculate_accounts_hash_helper(
         &self,
-        use_store: bool,
+        do_not_use_index: bool,
         slot: Slot,
         ancestors: &Ancestors,
         simple_capitalization_enabled: bool,
     ) -> (Hash, u64) {
-        if use_store {
+        if do_not_use_index {
             let combined_maps = self.get_snapshot_storages(slot);
 
-            Self::calculate_accounts_hash_using_stores_only(
+            Self::calculate_accounts_hash_without_index(
                 combined_maps,
                 simple_capitalization_enabled,
             )
@@ -4030,24 +4030,24 @@ impl AccountsDB {
         }
     }
 
-    pub fn update_accounts_hash_with_store_option(
+    pub fn update_accounts_hash_with_index_option(
         &self,
-        use_store: bool,
-        debug_verify_store: bool,
+        do_not_use_index: bool,
+        debug_verify: bool,
         slot: Slot,
         ancestors: &Ancestors,
         simple_capitalization_enabled: bool,
     ) -> (Hash, u64) {
         let (hash, total_lamports) = self.calculate_accounts_hash_helper(
-            use_store,
+            do_not_use_index,
             slot,
             ancestors,
             simple_capitalization_enabled,
         );
-        if debug_verify_store {
+        if debug_verify {
             // calculate the other way (store or non-store) and verify results match.
             let (hash_other, total_lamports_other) = self.calculate_accounts_hash_helper(
-                !use_store,
+                !do_not_use_index,
                 slot,
                 ancestors,
                 simple_capitalization_enabled,
@@ -4123,7 +4123,7 @@ impl AccountsDB {
 
     // modeled after get_accounts_delta_hash
     // intended to be faster than calculate_accounts_hash
-    pub fn calculate_accounts_hash_using_stores_only(
+    pub fn calculate_accounts_hash_without_index(
         storages: SnapshotStorages,
         simple_capitalization_enabled: bool,
     ) -> (Hash, u64) {
@@ -5024,11 +5024,11 @@ pub mod tests {
     }
 
     #[test]
-    fn test_accountsdb_calculate_accounts_hash_using_stores_only_simple() {
+    fn test_accountsdb_calculate_accounts_hash_without_index_simple() {
         solana_logger::setup();
 
         let (storages, _size, _slot_expected) = sample_storage();
-        let result = AccountsDB::calculate_accounts_hash_using_stores_only(storages, true);
+        let result = AccountsDB::calculate_accounts_hash_without_index(storages, true);
         let expected_hash = Hash::from_str("GKot5hBsd81kMupNCXHaqbhv3huEbxAFMLnpcX2hniwn").unwrap();
         assert_eq!(result, (expected_hash, 0));
     }
@@ -5061,7 +5061,7 @@ pub mod tests {
                 accum.push(expected);
             },
         );
-        assert_eq!(result, vec![vec![expcted]]);
+        assert_eq!(result, vec![vec![expected]]);
     }
 
     #[test]
