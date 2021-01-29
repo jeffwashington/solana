@@ -35,14 +35,6 @@ impl Drop for AccountsPackage {
     }
 }
 
-impl Drop for AccountsPackage {
-    fn drop(&mut self) {
-        for store in self.storages.iter().flatten() {
-            store.release_in_snapshot();
-        }
-    }
-}
-
 impl AccountsPackage {
     pub fn new(
         slot: Slot,
