@@ -55,7 +55,7 @@ use std::{
     io::{Error as IOError, Result as IOResult},
     ops::RangeBounds,
     path::{Path, PathBuf},
-    sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, AtomicIsize, Ordering},
+    sync::atomic::{AtomicBool, AtomicIsize, AtomicU64, AtomicUsize, Ordering},
     sync::{Arc, Mutex, MutexGuard, RwLock},
     time::Instant,
 };
@@ -289,9 +289,7 @@ impl<'a> LoadedAccount<'a> {
 
     pub fn lamports(&self) -> u64 {
         match self {
-            LoadedAccount::Stored(stored_account_meta) => {
-                stored_account_meta.account_meta.lamports
-            }
+            LoadedAccount::Stored(stored_account_meta) => stored_account_meta.account_meta.lamports,
             LoadedAccount::Cached((_, cached_account)) => match cached_account {
                 Cow::Owned(cached_account) => cached_account.account.lamports,
                 Cow::Borrowed(cached_account) => cached_account.account.lamports,
@@ -526,8 +524,8 @@ impl AccountStorageEntry {
 
     fn remove_account(&self, num_bytes: usize, reset_accounts: bool) -> usize {
         if self.in_snapshot() {
-        //warn!("ahv:remove_account while in snapshot!!!!!!!!!, thread: {:?}, reset: {}", std::thread::current().name().unwrap_or_default(), reset_accounts);
-        //assert!(!self.in_snapshot());
+            //warn!("ahv:remove_account while in snapshot!!!!!!!!!, thread: {:?}, reset: {}", std::thread::current().name().unwrap_or_default(), reset_accounts);
+            //assert!(!self.in_snapshot());
         }
         let mut count_and_status = self.count_and_status.write().unwrap();
         let (mut count, mut status) = *count_and_status;
@@ -586,12 +584,12 @@ impl AccountStorageEntry {
         for account in self.accounts.accounts(0) {
             let hash_to_add =
                 AccountsDB::hash_stored_account2(0, &account, &ClusterType::Development);
-                hasher.hash(&account.meta.write_version.to_le_bytes());
-                //hasher.hash(&account.count_and_status.read().unwrap().0.to_le_bytes());
-                //hasher.hash(&account.count_and_status.read().unwrap().1.to_le_bytes());
-                //hasher.hash(account.meta.pubkey.as_ref());
-                //hasher.hash(account.meta.data_len.as_ref());
-                hasher.hash(account.hash.as_ref());           
+            hasher.hash(&account.meta.write_version.to_le_bytes());
+            //hasher.hash(&account.count_and_status.read().unwrap().0.to_le_bytes());
+            //hasher.hash(&account.count_and_status.read().unwrap().1.to_le_bytes());
+            //hasher.hash(account.meta.pubkey.as_ref());
+            //hasher.hash(account.meta.data_len.as_ref());
+            hasher.hash(account.hash.as_ref());
             hasher.hash(hash_to_add.as_ref());
         }
         hasher.result()
@@ -621,13 +619,12 @@ impl AccountStorageEntry {
         assert_eq!(*self.hash.lock().unwrap(), hash);
     }
 
-    pub fn mark_for_clean(&self, slot:Slot, mark: bool) {
+    pub fn mark_for_clean(&self, slot: Slot, mark: bool) {
         let mut x = self.mark_for_clean.write().unwrap();
         if mark {
             assert!(*x == Slot::default());
             *x = slot - 1;
-        }
-        else{
+        } else {
             assert!(*x == slot - 1);
             *x = Slot::default();
         }
@@ -1422,38 +1419,42 @@ impl AccountsDB {
         pubkeys
     }
 
-    pub fn mark_for_clean(&self, snapshot_slot: Slot, set: bool){
-        warn!("ahv:mark_for_clean: {:?}, {}, thread: {:?}", snapshot_slot, set, std::thread::current().name().unwrap_or_default());
+    pub fn mark_for_clean(&self, snapshot_slot: Slot, set: bool) {
+        warn!(
+            "ahv:mark_for_clean: {:?}, {}, thread: {:?}",
+            snapshot_slot,
+            set,
+            std::thread::current().name().unwrap_or_default()
+        );
         let mut x = self.marked_for_use.write().unwrap();
         if set {
             assert!(*x == Slot::default());
             *x = snapshot_slot - 1;
-        }
-        else{
+        } else {
             assert!(*x == snapshot_slot - 1);
             *x = Slot::default();
-        }/*
-        self.storage
-            .0
-            .iter()
-            .filter(|iter_item| {
-                let slot = *iter_item.key();
-                slot <= snapshot_slot && self.accounts_index.is_root(slot)
-            })
-            .map(|iter_item| {
-                iter_item
-                    .value()
-                    .read()
-                    .unwrap()
-                    .values()
-                    .filter(|x| x.has_accounts())
-                    .for_each(|x| {
-                        x.mark_for_clean(snapshot_slot, set);
-                        ()
-                    })
-            });
-            //.collect()
-            */
+        } /*
+          self.storage
+              .0
+              .iter()
+              .filter(|iter_item| {
+                  let slot = *iter_item.key();
+                  slot <= snapshot_slot && self.accounts_index.is_root(slot)
+              })
+              .map(|iter_item| {
+                  iter_item
+                      .value()
+                      .read()
+                      .unwrap()
+                      .values()
+                      .filter(|x| x.has_accounts())
+                      .for_each(|x| {
+                          x.mark_for_clean(snapshot_slot, set);
+                          ()
+                      })
+              });
+              //.collect()
+              */
     }
 
     // Purge zero lamport accounts and older rooted account states as garbage
@@ -1461,7 +1462,11 @@ impl AccountsDB {
     // Only remove those accounts where the entire rooted history of the account
     // can be purged because there are no live append vecs in the ancestors
     pub fn clean_accounts(&self, max_clean_root: Option<Slot>) {
-        warn!("ahv:start_clean: {:?}, thread: {:?}", max_clean_root, std::thread::current().name().unwrap_or_default());
+        warn!(
+            "ahv:start_clean: {:?}, thread: {:?}",
+            max_clean_root,
+            std::thread::current().name().unwrap_or_default()
+        );
         let x = self.marked_for_use.read().unwrap();
         if *x != Slot::default() && *x != max_clean_root.unwrap_or(Slot::default()) {
             warn!("ahv:re-entry on clean - avoided: already cleaning: {}, current request: {:?}, thread: {:?}", *x, max_clean_root, std::thread::current().name().unwrap_or_default());
@@ -3835,7 +3840,10 @@ impl AccountsDB {
         let len = hashes.len();
         let res = Self::compute_merkle_root_and_capitalization_loop(hashes, fanout, |t| (t.1, t.2));
         if len == 0 || len > 1000000 {
-        warn!("ahv:compute_merkle_root_and_capitalization: {}, result: {:?}", len, res);
+            warn!(
+                "ahv:compute_merkle_root_and_capitalization: {}, result: {:?}",
+                len, res
+            );
         }
         res
     }
@@ -3938,17 +3946,18 @@ impl AccountsDB {
             }
         }
         for i in 1..hashes.len() {
-            let l = &hashes[i-1];
+            let l = &hashes[i - 1];
             let r = &hashes[i];
             assert!(l.0 < r.0);
-        };
+        }
 
         let res = Self::do_compute_merkle_root_and_capitalization(hashes);
         (res.0, (sort_time, res.1))
     }
 
-    fn do_compute_merkle_root_and_capitalization(hashes: Vec<(Pubkey, Hash, u64)>
-        ) -> ((Hash, u64), Measure) {
+    fn do_compute_merkle_root_and_capitalization(
+        hashes: Vec<(Pubkey, Hash, u64)>,
+    ) -> ((Hash, u64), Measure) {
         let mut hash_time = Measure::start("hash");
         let fanout = 16;
         let res = Self::compute_merkle_root_and_capitalization(hashes, fanout);
@@ -4085,7 +4094,10 @@ impl AccountsDB {
             ("sort", sort_time.as_us(), i64),
             ("hash_total", hash_total, i64),
         );
-        warn!("results: {}, {}, len: {}", accumulated_hash, total_lamports, l1);
+        warn!(
+            "results: {}, {}, len: {}",
+            accumulated_hash, total_lamports, l1
+        );
         Ok((accumulated_hash, total_lamports, bk))
     }
 
@@ -4139,7 +4151,6 @@ impl AccountsDB {
             .flatten()
             .map(|storage| {
                 //storage.check_hash();
-                
                 let accounts = storage.accounts.accounts(0);
                 let mut retval = B::default();
                 accounts.into_iter().for_each(|stored_account| {
@@ -4235,10 +4246,12 @@ impl AccountsDB {
         );
 
         if ret.0 != hash_good && hash_good != Hash::default() {
+            warn!("ahv:hashes are different: {}, {}", ret.0, hash_good);
             warn!(
-                "ahv:hashes are different: {}, {}", ret.0, hash_good);
-                warn!(
-                    "ahv:hashes are different: {}, {}", hs.len(), hs_good.len());
+                "ahv:hash lens may be different: {}, {}",
+                hs.len(),
+                hs_good.len()
+            );
 
             let mut hs_good = hs_good.clone();
             AccountsDB::sort_hashes_by_pubkey(&mut hs_good);
@@ -4256,18 +4269,15 @@ impl AccountsDB {
                     if l.0 == r.0 {
                         if l.1 == r.1 {
                             warn!("ahv:lamports different: {:?}, {:?}", l, r);
-                        }
-                        else {
+                        } else {
                             warn!("ahv:hashes different: {:?}, {:?}", l, r);
                         }
-                    }
-                    else {
+                    } else {
                         warn!("ahv:pubkeys different: {:?}, {:?}", l, r);
                     }
                 }
             }
-             warn!("ahv: differences: {}", diff);
-    
+            warn!("ahv: differences: {}", diff);
         }
 
         ret
@@ -4279,35 +4289,36 @@ impl AccountsDB {
         let (account_maps, time_scan) = accounts;
 
         let mut zeros = Measure::start("eliminate zeros");
-        let mut account_maps:Vec<CalculateHashIntermediate2> = account_maps.into_iter().flatten().collect();
+        let mut account_maps: Vec<CalculateHashIntermediate2> =
+            account_maps.into_iter().flatten().collect();
 
-        account_maps.par_sort_unstable_by(|a, b| {
-            match a.4.cmp(&b.4).reverse() {
-                std::cmp::Ordering::Equal => a.0.cmp(&b.0).reverse(),
-                other => other,
-            }            
+        account_maps.par_sort_unstable_by(|a, b| match a.4.cmp(&b.4).reverse() {
+            std::cmp::Ordering::Equal => a.0.cmp(&b.0).reverse(),
+            other => other,
         });
 
-        let hashes: Vec<_> = (0..account_maps.len()).into_iter().filter_map(|i| {
-            let mut keep = false;
-            let item = account_maps[i];
-            let key = item.5;
-            if item.3 != 0 { // raw lamports
-                keep = i == 0;
-                if !keep {
-                    let last_key = account_maps[i-1].5;
-                    keep = last_key != key;
+        let hashes: Vec<_> = (0..account_maps.len())
+            .into_iter()
+            .filter_map(|i| {
+                let mut keep = false;
+                let item = account_maps[i];
+                let key = item.5;
+                if item.3 != 0 {
+                    // raw lamports
+                    keep = i == 0;
+                    if !keep {
+                        let last_key = account_maps[i - 1].5;
+                        keep = last_key != key;
+                    }
                 }
-            }
-            if keep {
-                Some((key, item.1, item.2))
-            } else {
-                None
-            }
-        })
-        .collect();
+                if keep {
+                    Some((key, item.1, item.2))
+                } else {
+                    None
+                }
+            })
+            .collect();
         zeros.stop();
-        
         let hash_total = hashes.len();
         let (ret, (sort_time, hash_time)) = Self::accumulate_account_hashes_and_capitalization(
             hashes,
@@ -4343,7 +4354,8 @@ impl AccountsDB {
                 Hash::default(),
             )
         } else {
-            let r = self.calculate_accounts_hash(slot, ancestors, true, simple_capitalization_enabled)
+            let r = self
+                .calculate_accounts_hash(slot, ancestors, true, simple_capitalization_enabled)
                 .unwrap();
 
             let s = self.get_snapshot_storages(slot);
@@ -4353,7 +4365,6 @@ impl AccountsDB {
                 r.2,
                 r.0,
             );
-        
             (r.0, r.1)
         }
     }
@@ -4364,17 +4375,13 @@ impl AccountsDB {
         ancestors: &Ancestors,
         simple_capitalization_enabled: bool,
         s: SnapshotStorages,
-    )-> (Hash, u64){
-        let r = self.calculate_accounts_hash(slot, ancestors, true, simple_capitalization_enabled)
-        .unwrap();
+    ) -> (Hash, u64) {
+        let r = self
+            .calculate_accounts_hash(slot, ancestors, true, simple_capitalization_enabled)
+            .unwrap();
 
         warn!("ahv: checking: {}, {}", r.2.len(), r.0);
-        Self::calculate_accounts_hash_using_stores_only(
-            s,
-            simple_capitalization_enabled,
-            r.2,
-            r.0,
-        )
+        Self::calculate_accounts_hash_using_stores_only(s, simple_capitalization_enabled, r.2, r.0)
     }
 
     pub fn update_accounts_hash_with_store_option(
@@ -4403,8 +4410,7 @@ impl AccountsDB {
             assert_eq!(hash, hash_other);
             assert_eq!(total_lamports, total_lamports_other);
             warn!("Verified: {}, {}", hash, total_lamports_other);
-        }
-        else {
+        } else {
             let (hash_other, total_lamports_other) = self.calculate_accounts_hash_helper(
                 !use_store,
                 slot,
@@ -4412,7 +4418,12 @@ impl AccountsDB {
                 simple_capitalization_enabled,
             );
 
-            warn!("calculated other way: {}, {}, same3:{}", hash_other, total_lamports_other, hash_other==hash);
+            warn!(
+                "calculated other way: {}, {}, same3:{}",
+                hash_other,
+                total_lamports_other,
+                hash_other == hash
+            );
         }
         let mut bank_hashes = self.bank_hashes.write().unwrap();
         let mut bank_hash_info = bank_hashes.get_mut(&slot).unwrap();
@@ -4703,7 +4714,8 @@ impl AccountsDB {
                     let m = store.get_stored_account_meta(account_info.offset).unwrap();
                     warn!("ahv:remove_account while in snapshot, slot: {}, lamports: {}, pk: {}, hash: {}, vers: {}, thread: {:?}", slot, account_info.lamports, m.meta.pubkey, m.hash, m.meta.write_version, std::thread::current().name().unwrap_or_default());
                 }
-                let count = store.remove_account(account_info.stored_size, no_dead_slot || reset_accounts);
+                let count =
+                    store.remove_account(account_info.stored_size, no_dead_slot || reset_accounts);
                 if count == 0 {
                     dead_slots.insert(*slot);
                 } else if self.caching_enabled
