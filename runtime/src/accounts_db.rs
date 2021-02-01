@@ -3978,7 +3978,7 @@ impl AccountsDB {
 
     /// Scan through all the account storage in parallel
     fn scan_account_storage_no_bank<F, B>(
-        snapshot_storages: SnapshotStorages,
+        snapshot_storages: &SnapshotStorages,
         scan_func: F,
     ) -> Vec<B>
     where
@@ -3986,7 +3986,7 @@ impl AccountsDB {
         B: Send + Default,
     {
         snapshot_storages
-            .into_par_iter()
+            .par_iter()
             .flatten()
             .map(|storage| {
                 let accounts = storage.accounts.accounts(0);
@@ -4226,7 +4226,7 @@ impl AccountsDB {
         let map: DashMap<Pubkey, CalculateHashIntermediate> = DashMap::new();
         let mut time = Measure::start("scan all accounts");
         Self::scan_account_storage_no_bank(
-            storage,
+            &storage,
             |loaded_account: LoadedAccount,
              _store_id: AppendVecId,
              _accum: &mut Vec<(Pubkey, CalculateHashIntermediate)>,
@@ -4256,7 +4256,7 @@ impl AccountsDB {
     }
 
     fn scan_snapshot_stores2(
-        storage: SnapshotStorages,
+        storage: &SnapshotStorages,
         simple_capitalization_enabled: bool,
     ) -> (Vec<Vec<CalculateHashIntermediate2>>, Measure) {
         let mut time = Measure::start("scan all accounts");
@@ -4302,7 +4302,7 @@ impl AccountsDB {
 
         let res = Self::rest_of_hash_calculation(result);
         if true {   
-            let result = Self::scan_snapshot_stores2(storages, simple_capitalization_enabled);
+            let result = Self::scan_snapshot_stores2(&storages, simple_capitalization_enabled);
 
             let res2 = Self::rest_of_hash_calculation2(result);
             assert_eq!(res, res2, "difft: {:?}, {:?}", res, res2);
@@ -4316,7 +4316,7 @@ impl AccountsDB {
         storages: SnapshotStorages,
         simple_capitalization_enabled: bool,
     ) -> (Hash, u64) {
-        let result = Self::scan_snapshot_stores2(storages, simple_capitalization_enabled);
+        let result = Self::scan_snapshot_stores2(&storages, simple_capitalization_enabled);
 
         Self::rest_of_hash_calculation2(result)
     }
