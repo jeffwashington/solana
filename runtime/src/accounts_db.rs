@@ -4082,7 +4082,7 @@ impl AccountsDB {
 
         let mut sort_time = Measure::start("sort");
         account_maps.par_sort_unstable_by(|a, b| {
-            match a.pubkey.cmp(&b.pubkey).reverse() {
+            match a.pubkey.cmp(&b.pubkey) {
                 std::cmp::Ordering::Equal => 
                 {
                     match a.slot.cmp(&b.slot).reverse() {
