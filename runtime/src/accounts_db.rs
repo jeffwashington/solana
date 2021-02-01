@@ -3729,7 +3729,9 @@ impl AccountsDB {
         }
 
         //error!("Hashes: {:?}", hashes);
+        if hashes.len() > 10_000_000 {
         error!("hash len: {}, first: {:?}", hashes.len(), hashes[0]);
+        }
         let mut time = Measure::start("time");
 
         let total_hashes = hashes.len();
