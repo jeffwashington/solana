@@ -170,17 +170,17 @@ struct CalculateHashIntermediate {
     pub version: u64,
     pub hash: Hash,
     pub lamports: u64,
-    pub raw_lamports: u64,
+    pub zero_raw_lamports: bool,
     pub slot: Slot,
 }
 
 impl CalculateHashIntermediate {
-    pub fn new(version: u64, hash: Hash, lamports: u64, raw_lamports: u64, slot: Slot) -> Self {
+    pub fn new(version: u64, hash: Hash, lamports: u64, zero_raw_lamports: bool, slot: Slot) -> Self {
         Self {
             version,
             hash,
             lamports,
-            raw_lamports,
+            zero_raw_lamports,
             slot,
         }
     }
@@ -191,18 +191,18 @@ struct CalculateHashIntermediate2 {
     pub version: u64,
     pub hash: Hash,
     pub lamports: u64,
-    pub raw_lamports: u64,
+    pub zero_raw_lamports: bool,
     pub slot: Slot,
     pub pubkey: Pubkey,
 }
 
 impl CalculateHashIntermediate2 {
-    pub fn new(version: u64, hash: Hash, lamports: u64, raw_lamports: u64, slot: Slot, pubkey: Pubkey) -> Self {
+    pub fn new(version: u64, hash: Hash, lamports: u64, zero_raw_lamports: bool, slot: Slot, pubkey: Pubkey) -> Self {
         Self {
             version,
             hash,
             lamports,
-            raw_lamports,
+            zero_raw_lamports,
             slot,
             pubkey,
         }
@@ -3728,10 +3728,6 @@ impl AccountsDB {
             return (Hasher::default().result(), 0);
         }
 
-        //error!("Hashes: {:?}", hashes);
-        if hashes.len() > 10_000_000 {
-        error!("hash len: {}, first: {:?}", hashes.len(), hashes[0]);
-        }
         let mut time = Measure::start("time");
 
         let total_hashes = hashes.len();
@@ -3929,6 +3925,13 @@ impl AccountsDB {
         scan.stop();
         let hash_total = hashes.len();
 
+        for i in 1..hash_total {
+            if hashes[i-1].0 >= hashes[i].0 {
+                error!("pubkeys were not sorted coming out: {}, {}, {}", i, hashes[i-1].0, hashes[i].0);
+                break;
+            }
+        }
+
         let mut accumulate = Measure::start("accumulate");
         let ((accumulated_hash, total_lamports), (sort_time, hash_time)) =
             Self::accumulate_account_hashes_and_capitalization(hashes, slot, false, false);
@@ -4028,7 +4031,7 @@ impl AccountsDB {
                     .filter_map(|inp| {
                         let (pubkey, sv) = inp;
                         let item = sv.get();
-                        if item.raw_lamports != 0 {
+                        if !item.zero_raw_lamports {
                             Some((*pubkey, item.hash, item.lamports))
                         } else {
                             None
@@ -4095,7 +4098,6 @@ impl AccountsDB {
         });
         sort_time.stop();
 
-        //error!("accounts: {:?}", account_maps);
 
         let mut zeros = Measure::start("eliminate zeros");
         let max = 1;
@@ -4110,7 +4112,7 @@ impl AccountsDB {
                     // at start of loop, item at 'j' is the first entry for a given pubkey
                     let now = &account_maps[j];
                     let last = now.pubkey;
-                    if now.raw_lamports != 0 {
+                    if !now.zero_raw_lamports {
                         result.push(now.hash);
                         sum += now.lamports as u128;
                     }
@@ -4148,7 +4150,7 @@ impl AccountsDB {
             ("sort", sort_time.as_us(), i64),
             ("hash_total", hash_total, i64),
             ("flatten", flatten_time.as_us(), i64),
-            ("unreduced entries", len, i64),
+            ("unreduced entries", len as i64, i64),
         );
 
         let sum = *overall_sum.lock().unwrap();
@@ -4243,18 +4245,19 @@ impl AccountsDB {
              slot: Slot| {
                 let version = loaded_account.write_version();
                 let raw_lamports = loaded_account.lamports();
-                let balance = Self::account_balance_for_capitalization(
+                let zero_raw_lamports = raw_lamports == 0;
+                let balance = if zero_raw_lamports {0} else {Self::account_balance_for_capitalization(
                     raw_lamports,
                     loaded_account.owner(),
                     loaded_account.executable(),
                     simple_capitalization_enabled,
-                );
+                )};
 
                 let source_item = CalculateHashIntermediate::new(
                     version,
                     *loaded_account.loaded_hash(),
                     balance,
-                    raw_lamports,
+                    zero_raw_lamports,
                     slot,
                 );
                 Self::handle_one_loaded_account(loaded_account.pubkey(), source_item, &map);
@@ -4278,22 +4281,22 @@ impl AccountsDB {
              slot: Slot| {
                 let version = loaded_account.write_version();
                 let raw_lamports = loaded_account.lamports();
-                let balance = Self::account_balance_for_capitalization(
+                let zero_raw_lamports = raw_lamports == 0;
+                let balance = if zero_raw_lamports {0} else {Self::account_balance_for_capitalization(
                     raw_lamports,
                     loaded_account.owner(),
                     loaded_account.executable(),
                     simple_capitalization_enabled,
-                );
+                )};
 
                 let source_item = CalculateHashIntermediate2::new(
                     version,
                     *loaded_account.loaded_hash(),
                     balance,
-                    raw_lamports,
+                    zero_raw_lamports,
                     slot,
                     *loaded_account.pubkey(),
                 );
-                //error!("found: {:?}",source_item);
                 accum.push(source_item);
             },
         );
@@ -4317,6 +4320,7 @@ impl AccountsDB {
             let res2 = Self::rest_of_hash_calculation2(result);
             if res != res2 {
                 error!("difft: {:?}, {:?}", res, res2);
+                panic!("different");
             }
         }
         return res
@@ -5155,29 +5159,80 @@ pub mod tests {
         let key = Pubkey::new(&[11u8; 32]);
         let account_maps: DashMap<Pubkey, CalculateHashIntermediate> = DashMap::new();
         let hash = Hash::new(&[1u8; 32]);
-        let val = CalculateHashIntermediate::new(0, hash, 88, 490, Slot::default());
+        let val = CalculateHashIntermediate::new(0, hash, 88, false, Slot::default());
         account_maps.insert(key, val);
 
         // 2nd key - zero lamports, so will be removed
         let key = Pubkey::new(&[12u8; 32]);
         let hash = Hash::new(&[2u8; 32]);
-        let val = CalculateHashIntermediate::new(0, hash, 1, 0, Slot::default());
+        let val = CalculateHashIntermediate::new(0, hash, 1, true, Slot::default());
         account_maps.insert(key, val);
 
-        let result =
+        let result = 
             AccountsDB::rest_of_hash_calculation((account_maps.clone(), Measure::start("")));
+        let expected_hash = Hash::from_str("8j9ARGFv4W2GfML7d3sVJK2MePwrikqYnu6yqer28cCa").unwrap();
+        assert_eq!(result, (expected_hash, 88));
+
+        let account_maps2: Vec<_> = account_maps.iter().map(|rm| {
+            let k = rm.key();
+            let x = rm.value();
+                CalculateHashIntermediate2::new(x.version, x.hash, x.lamports, x.zero_raw_lamports, x.slot, *k)
+
+            })
+            .collect();
+        let account_maps2 = vec![account_maps2];
+
+        let result = AccountsDB::rest_of_hash_calculation2((account_maps2, Measure::start("")));
         let expected_hash = Hash::from_str("8j9ARGFv4W2GfML7d3sVJK2MePwrikqYnu6yqer28cCa").unwrap();
         assert_eq!(result, (expected_hash, 88));
 
         // 3rd key - with pubkey value before 1st key so it will be sorted first
         let key = Pubkey::new(&[10u8; 32]);
         let hash = Hash::new(&[2u8; 32]);
-        let val = CalculateHashIntermediate::new(0, hash, 20, 20, Slot::default());
+        let val = CalculateHashIntermediate::new(0, hash, 20, false, Slot::default());
         account_maps.insert(key, val);
 
-        let result = AccountsDB::rest_of_hash_calculation((account_maps, Measure::start("")));
+        let result = AccountsDB::rest_of_hash_calculation((account_maps.clone(), Measure::start("")));
         let expected_hash = Hash::from_str("EHv9C5vX7xQjjMpsJMzudnDTzoTSRwYkqLzY8tVMihGj").unwrap();
         assert_eq!(result, (expected_hash, 108));
+
+        let account_maps2: Vec<_> = account_maps.iter().map(|rm| {
+            let k = rm.key();
+            let x = rm.value();
+                CalculateHashIntermediate2::new(x.version, x.hash, x.lamports, x.zero_raw_lamports, x.slot, *k)
+
+            })
+            .collect();
+        let account_maps2 = vec![account_maps2];
+
+        let result = AccountsDB::rest_of_hash_calculation2((account_maps2, Measure::start("")));
+        let expected_hash = Hash::from_str("EHv9C5vX7xQjjMpsJMzudnDTzoTSRwYkqLzY8tVMihGj").unwrap();
+        assert_eq!(result, (expected_hash, 108));
+
+        // 3rd key - with later slot
+        let key = Pubkey::new(&[10u8; 32]);
+        let hash = Hash::new(&[99u8; 32]);
+        let val = CalculateHashIntermediate::new(0, hash, 30, false, Slot::default() + 1);
+        account_maps.insert(key, val);
+
+        let result = AccountsDB::rest_of_hash_calculation((account_maps.clone(), Measure::start("")));
+        let expected_hash = Hash::from_str("7NNPg5A8Xsg1uv4UFm6KZNwsipyyUnmgCrznP6MBWoBZ").unwrap();
+        assert_eq!(result, (expected_hash, 118));
+
+        let account_maps2: Vec<_> = account_maps.iter().map(|rm| {
+            let k = rm.key();
+            let x = rm.value();
+                CalculateHashIntermediate2::new(x.version, x.hash, x.lamports, x.zero_raw_lamports, x.slot, *k)
+
+            })
+            .collect();
+        let account_maps2:Vec<_> = account_maps2.into_iter().map(|x| {
+            vec![x]
+        }).collect();
+
+        let result = AccountsDB::rest_of_hash_calculation2((account_maps2, Measure::start("")));
+        let expected_hash = Hash::from_str("7NNPg5A8Xsg1uv4UFm6KZNwsipyyUnmgCrznP6MBWoBZ").unwrap();
+        assert_eq!(result, (expected_hash, 118));
     }
 
     #[test]
@@ -5187,32 +5242,32 @@ pub mod tests {
         let account_maps: DashMap<Pubkey, CalculateHashIntermediate> = DashMap::new();
         let key = Pubkey::new_unique();
         let hash = Hash::new_unique();
-        let val = CalculateHashIntermediate::new(1, hash, 1, 2, 1);
+        let val = CalculateHashIntermediate::new(1, hash, 1, false, 1);
 
         AccountsDB::handle_one_loaded_account(&key, val.clone(), &account_maps);
         assert_eq!(*account_maps.get(&key).unwrap(), val);
 
         // slot same, version <
         let hash2 = Hash::new_unique();
-        let val2 = CalculateHashIntermediate::new(0, hash2, 4, 5, 1);
+        let val2 = CalculateHashIntermediate::new(0, hash2, 4, false, 1);
         AccountsDB::handle_one_loaded_account(&key, val2, &account_maps);
         assert_eq!(*account_maps.get(&key).unwrap(), val);
 
         // slot same, vers =
         let hash3 = Hash::new_unique();
-        let val3 = CalculateHashIntermediate::new(1, hash3, 2, 3, 1);
+        let val3 = CalculateHashIntermediate::new(1, hash3, 2, false, 1);
         AccountsDB::handle_one_loaded_account(&key, val3.clone(), &account_maps);
         assert_eq!(*account_maps.get(&key).unwrap(), val3);
 
         // slot same, vers >
         let hash4 = Hash::new_unique();
-        let val4 = CalculateHashIntermediate::new(2, hash4, 6, 7, 1);
+        let val4 = CalculateHashIntermediate::new(2, hash4, 6, false, 1);
         AccountsDB::handle_one_loaded_account(&key, val4.clone(), &account_maps);
         assert_eq!(*account_maps.get(&key).unwrap(), val4);
 
         // slot >, version <
         let hash5 = Hash::new_unique();
-        let val5 = CalculateHashIntermediate::new(0, hash5, 8, 9, 2);
+        let val5 = CalculateHashIntermediate::new(0, hash5, 8, false, 2);
         AccountsDB::handle_one_loaded_account(&key, val5.clone(), &account_maps);
         assert_eq!(*account_maps.get(&key).unwrap(), val5);
     }
@@ -5224,7 +5279,7 @@ pub mod tests {
         let key = Pubkey::new_unique();
         let hash = Hash::new_unique();
         let account_maps: DashMap<Pubkey, CalculateHashIntermediate> = DashMap::new();
-        let val = CalculateHashIntermediate::new(0, hash, 1, 2, Slot::default());
+        let val = CalculateHashIntermediate::new(0, hash, 1, false, Slot::default());
         account_maps.insert(key, val.clone());
 
         let result = AccountsDB::remove_zero_balance_accounts(account_maps);
@@ -5232,7 +5287,7 @@ pub mod tests {
 
         // zero original lamports
         let account_maps: DashMap<Pubkey, CalculateHashIntermediate> = DashMap::new();
-        let val = CalculateHashIntermediate::new(0, hash, 1, 0, Slot::default());
+        let val = CalculateHashIntermediate::new(0, hash, 1, true, Slot::default());
         account_maps.insert(key, val);
 
         let result = AccountsDB::remove_zero_balance_accounts(account_maps);
@@ -5260,6 +5315,7 @@ pub mod tests {
         (storages, size, slot_expected)
     }
 
+    /*
     #[test]
     fn test_accountsdb_scan_account_storage_no_bank() {
         solana_logger::setup();
@@ -5302,6 +5358,7 @@ pub mod tests {
         assert_eq!(calls.load(Ordering::Relaxed), 1);
         assert_eq!(result, vec![vec![expected]]);
     }
+    */
 
     #[test]
     fn test_accountsdb_compute_merkle_root_and_capitalization() {
