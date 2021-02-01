@@ -3722,12 +3722,14 @@ impl AccountsDB {
     ) -> (Hash, u64)
     where
         F: Fn(&T) -> (Hash, u64) + std::marker::Sync,
-        T: std::marker::Sync,
+        T: std::marker::Sync + std::fmt::Debug,
     {
         if hashes.is_empty() {
             return (Hasher::default().result(), 0);
         }
 
+        //error!("Hashes: {:?}", hashes);
+        error!("hash len: {}, first: {:?}", hashes.len(), hashes[0]);
         let mut time = Measure::start("time");
 
         let total_hashes = hashes.len();
@@ -4104,7 +4106,7 @@ impl AccountsDB {
                         result.push(now.hash);
                         sum += now.lamports as u128;
                     }
-                    for k in j..len {
+                    for k in (j + 1)..len {
                         let now = &account_maps[k];
                         if now.pubkey != last {
                             j = k;
@@ -4305,7 +4307,9 @@ impl AccountsDB {
             let result = Self::scan_snapshot_stores2(&storages, simple_capitalization_enabled);
 
             let res2 = Self::rest_of_hash_calculation2(result);
-            assert_eq!(res, res2, "difft: {:?}, {:?}", res, res2);
+            if res != res2 {
+                error!("difft: {:?}, {:?}", res, res2);
+            }
         }
         return res
     }
