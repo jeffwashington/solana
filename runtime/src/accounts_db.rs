@@ -3863,7 +3863,7 @@ impl AccountsDB {
             .cloned()
             .collect();
         let mismatch_found = AtomicU64::new(0);
-        let hashes: Vec<(Pubkey, Hash, u64)> = {
+        let hashes: Vec<(Hash, u64)> = {
             self.thread_pool_clean.install(|| {
                 keys.par_iter()
                     .filter_map(|pubkey| {
@@ -3902,7 +3902,7 @@ impl AccountsDB {
                                         }
                                     }
 
-                                    Some((*pubkey, *loaded_hash, balance))
+                                    Some((*loaded_hash, balance))
                                 })
                             } else {
                                 None
@@ -3924,24 +3924,14 @@ impl AccountsDB {
 
         scan.stop();
         let hash_total = hashes.len();
-
-        for i in 1..hash_total {
-            if hashes[i-1].0 >= hashes[i].0 {
-                error!("pubkeys were not sorted coming out: {}, {}, {}", i, hashes[i-1].0, hashes[i].0);
-                break;
-            }
-        }
-
-        let mut accumulate = Measure::start("accumulate");
-        let ((accumulated_hash, total_lamports), (sort_time, hash_time)) =
-            Self::accumulate_account_hashes_and_capitalization(hashes, slot, false, false);
-        accumulate.stop();
+        let mut hash_time = Measure::start("hash");
+        let fanout = 16;
+        let (accumulated_hash, total_lamports) = Self::compute_merkle_root_and_capitalization_recurse(hashes, fanout);
+        hash_time.stop();
         datapoint_info!(
             "update_accounts_hash",
             ("accounts_scan", scan.as_us(), i64),
-            ("hash_accumulate", accumulate.as_us(), i64),
             ("hash", hash_time.as_us(), i64),
-            ("sort", sort_time.as_us(), i64),
             ("hash_total", hash_total, i64),
         );
         Ok((accumulated_hash, total_lamports))
