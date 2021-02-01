@@ -4131,13 +4131,14 @@ impl AccountsDB {
         hash_time.stop();
 
         datapoint_info!(
-            "calculate_accounts_hash_using_stores",
+            "calculate_accounts_hash_without_index2",
             ("accounts_scan", time_scan.as_us(), i64),
             ("eliminate_zeros", zeros.as_us(), i64),
             ("hash", hash_time.as_us(), i64),
             ("sort", sort_time.as_us(), i64),
             ("hash_total", hash_total, i64),
-            ("flatten", flatten_time.as_us(), i64)
+            ("flatten", flatten_time.as_us(), i64),
+            ("unreduced entries", len, i64),
         );
 
         let sum = *overall_sum.lock().unwrap();
@@ -4297,16 +4298,16 @@ impl AccountsDB {
         storages: SnapshotStorages,
         simple_capitalization_enabled: bool,
     ) -> (Hash, u64) {
-        if false {
-        let result = Self::scan_snapshot_stores(storages, simple_capitalization_enabled);
+        let result = Self::scan_snapshot_stores(storages.clone(), simple_capitalization_enabled);
 
-        Self::rest_of_hash_calculation(result)
-        }
-        else{   
+        let res = Self::rest_of_hash_calculation(result);
+        if true {   
             let result = Self::scan_snapshot_stores2(storages, simple_capitalization_enabled);
 
-            Self::rest_of_hash_calculation2(result)
+            let res2 = Self::rest_of_hash_calculation2(result);
+            assert_eq!(res, res2, "difft: {:?}, {:?}", res, res2);
         }
+        return res
     }
 
     // modeled after get_accounts_delta_hash
