@@ -4082,10 +4082,18 @@ impl AccountsDB {
 
         let mut sort_time = Measure::start("sort");
         account_maps.par_sort_unstable_by(|a, b| {
-            match a.slot.cmp(&b.slot).reverse() {
-                std::cmp::Ordering::Equal => a.version.cmp(&b.version).reverse(),
-                other => other,
+            match a.pubkey.cmp(&b.pubkey).reverse() {
+                std::cmp::Ordering::Equal => 
+                {
+                    match a.slot.cmp(&b.slot).reverse() {
+                        std::cmp::Ordering::Equal => a.version.cmp(&b.version).reverse(),
+                        other => other,
+                    }
             }            
+                    }
+                },
+                other => other,
+            }
         });
         sort_time.stop();
 
