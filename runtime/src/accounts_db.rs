@@ -186,6 +186,31 @@ impl CalculateHashIntermediate {
     }
 }
 
+#[derive(Default, Debug, PartialEq, Clone)]
+struct CalculateHashIntermediate2 {
+    pub version: u64,
+    pub hash: Hash,
+    pub lamports: u64,
+    pub raw_lamports: u64,
+    pub slot: Slot,
+    pub pubkey: Pubkey,
+}
+
+impl CalculateHashIntermediate2 {
+    pub fn new(version: u64, hash: Hash, lamports: u64, raw_lamports: u64, slot: Slot, pubkey: Pubkey) -> Self {
+        Self {
+            version,
+            hash,
+            lamports,
+            raw_lamports,
+            slot,
+            pubkey,
+        }
+    }
+}
+
+
+
 trait Versioned {
     fn version(&self) -> u64;
 }
@@ -4040,6 +4065,85 @@ impl AccountsDB {
         ret
     }
 
+    fn rest_of_hash_calculation2(
+        accounts: (Vec<Vec<CalculateHashIntermediate2>>, Measure),
+    ) -> (Hash, u64) {
+        let (account_maps, time_scan) = accounts;
+
+        //error!("accounts: {:?}", account_maps);
+
+        let mut flatten_time = Measure::start("sort");
+        let mut account_maps:Vec<_> = account_maps.into_iter().flatten().collect();
+        flatten_time.stop();
+
+        let mut sort_time = Measure::start("sort");
+        account_maps.par_sort_unstable_by(|a, b| {
+            match a.slot.cmp(&b.slot).reverse() {
+                std::cmp::Ordering::Equal => a.version.cmp(&b.version).reverse(),
+                other => other,
+            }            
+        });
+        sort_time.stop();
+
+        //error!("accounts: {:?}", account_maps);
+
+        let mut zeros = Measure::start("eliminate zeros");
+        let max = 1;
+        let len = account_maps.len();
+        let overall_sum = Mutex::new(0u64);
+        let hashes: Vec<Hash> = (0..max).into_iter().map(|_i| {
+            let mut result: Vec<Hash> = Vec::with_capacity(len);
+            let mut j = 0;
+            let mut sum: u128 = 0;
+            if len > 0 {
+                'outer: loop {
+                    // at start of loop, item at 'j' is the first entry for a given pubkey
+                    let now = &account_maps[j];
+                    let last = now.pubkey;
+                    if now.raw_lamports != 0 {
+                        result.push(now.hash);
+                        sum += now.lamports as u128;
+                    }
+                    for k in j..len {
+                        let now = &account_maps[k];
+                        if now.pubkey != last {
+                            j = k;
+                            continue 'outer;
+                        }
+                    }
+
+                    break; // ran out of items
+                }
+            }
+            let mut overall = overall_sum.lock().unwrap();
+            *overall = Self::checked_cast_for_capitalization(sum + *overall as u128);
+                
+            result
+        }).flatten().collect();
+        zeros.stop();
+        let hash_total = hashes.len();
+
+        let mut hash_time = Measure::start("hashes");
+        let fanout = 16;
+        let ret = Self::compute_merkle_root_and_capitalization_loop(hashes, fanout, |t: &Hash| {
+            (*t, 0)
+        });
+        hash_time.stop();
+
+        datapoint_info!(
+            "calculate_accounts_hash_using_stores",
+            ("accounts_scan", time_scan.as_us(), i64),
+            ("eliminate_zeros", zeros.as_us(), i64),
+            ("hash", hash_time.as_us(), i64),
+            ("sort", sort_time.as_us(), i64),
+            ("hash_total", hash_total, i64),
+            ("flatten", flatten_time.as_us(), i64)
+        );
+
+        let sum = *overall_sum.lock().unwrap();
+        (ret.0, sum)
+    }
+
     fn calculate_accounts_hash_helper(
         &self,
         do_not_use_index: bool,
@@ -4150,15 +4254,70 @@ impl AccountsDB {
         (map, time)
     }
 
+    fn scan_snapshot_stores2(
+        storage: SnapshotStorages,
+        simple_capitalization_enabled: bool,
+    ) -> (Vec<Vec<CalculateHashIntermediate2>>, Measure) {
+        let mut time = Measure::start("scan all accounts");
+        let result: Vec<Vec<CalculateHashIntermediate2>> = Self::scan_account_storage_no_bank(
+            storage,
+            |loaded_account: LoadedAccount,
+             _store_id: AppendVecId,
+             accum: &mut Vec<CalculateHashIntermediate2>,
+             slot: Slot| {
+                let version = loaded_account.write_version();
+                let raw_lamports = loaded_account.lamports();
+                let balance = Self::account_balance_for_capitalization(
+                    raw_lamports,
+                    loaded_account.owner(),
+                    loaded_account.executable(),
+                    simple_capitalization_enabled,
+                );
+
+                let source_item = CalculateHashIntermediate2::new(
+                    version,
+                    *loaded_account.loaded_hash(),
+                    balance,
+                    raw_lamports,
+                    slot,
+                    *loaded_account.pubkey(),
+                );
+                //error!("found: {:?}",source_item);
+                accum.push(source_item);
+            },
+        );
+        time.stop();
+
+        (result, time)
+    }
+
     // modeled after get_accounts_delta_hash
     // intended to be faster than calculate_accounts_hash
     pub fn calculate_accounts_hash_without_index(
         storages: SnapshotStorages,
         simple_capitalization_enabled: bool,
     ) -> (Hash, u64) {
+        if false {
         let result = Self::scan_snapshot_stores(storages, simple_capitalization_enabled);
 
         Self::rest_of_hash_calculation(result)
+        }
+        else{   
+            let result = Self::scan_snapshot_stores2(storages, simple_capitalization_enabled);
+
+            Self::rest_of_hash_calculation2(result)
+        }
+    }
+
+    // modeled after get_accounts_delta_hash
+    // intended to be faster than calculate_accounts_hash
+    pub fn calculate_accounts_hash_using_stores_only2(
+        storages: SnapshotStorages,
+        simple_capitalization_enabled: bool,
+    ) -> (Hash, u64) {
+        let result = Self::scan_snapshot_stores2(storages, simple_capitalization_enabled);
+
+        Self::rest_of_hash_calculation2(result)
     }
 
     pub fn verify_bank_hash_and_lamports(
