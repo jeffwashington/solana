@@ -4089,8 +4089,6 @@ impl AccountsDB {
                         std::cmp::Ordering::Equal => a.version.cmp(&b.version).reverse(),
                         other => other,
                     }
-            }            
-                    }
                 },
                 other => other,
             }
