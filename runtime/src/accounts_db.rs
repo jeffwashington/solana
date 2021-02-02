@@ -4138,7 +4138,7 @@ impl AccountsDB {
 
         let mut zeros = Measure::start("eliminate zeros");
         let max = 1;
-        let len = account_maps.len();
+        let len = indices.len();
         let overall_sum = Mutex::new(0u64);
         let hashes: Vec<Hash> = (0..max).into_iter().map(|_i| {
             let mut result: Vec<Hash> = Vec::with_capacity(len);
