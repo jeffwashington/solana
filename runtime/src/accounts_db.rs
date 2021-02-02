@@ -5230,7 +5230,7 @@ pub mod tests {
         solana_logger::setup();
 
         let key = Pubkey::new(&[11u8; 32]);
-        let count = 10_000_000u64;
+        let count = 1_000_000u64;
         let slot = Slot::default();
         let account_maps: Vec<Vec<CalculateHashIntermediate2>> = vec![(0..count).into_iter().map(|_| CalculateHashIntermediate2::new(0, Hash::new_unique(), 1, false, slot, Pubkey::new_unique())).collect()];
 
