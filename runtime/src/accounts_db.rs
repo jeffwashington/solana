@@ -5277,7 +5277,7 @@ pub mod tests {
         ancestors
     }
 
-    pub const smilar_byps: usize = 80;
+    pub const smilar_byps: usize = 72;
     #[derive(
         Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, AbiExample, Debug,
     )]
