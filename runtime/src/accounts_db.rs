@@ -4136,28 +4136,41 @@ impl AccountsDB {
         sort_time.stop();
 
         let mut zeros = Measure::start("eliminate zeros");
-        let max = 1;
+        let max = 10;
         let len = account_maps.len();
+        let chunk_size = len / max;
         let overall_sum = Mutex::new(0u64);
         let hashes: Vec<Hash> = (0..max)
-            .into_iter()
-            .map(|_i| {
+            .into_par_iter()
+            .map(|i| {
                 let mut result: Vec<Hash> = Vec::with_capacity(len);
-                let mut j = 0;
+                let mut j = i * chunk_size;
+                let mut end = j + chunk_size;
+                if i == max - 1 {
+                    end = len;
+                }
+                let len = end;
                 let mut sum: u128 = 0;
+                let mut look_for_first = i > 0;
+                if look_for_first {
+                    j -= 1;
+                }
                 if len > 0 {
                     'outer: loop {
                         // at start of loop, item at 'j' is the first entry for a given pubkey
                         let now = &account_maps[j];
                         let last = now.pubkey;
-                        if !now.zero_raw_lamports {
-                            result.push(now.hash);
-                            sum += now.lamports as u128;
+                        if !look_for_first {
+                            if !now.zero_raw_lamports {
+                                result.push(now.hash);
+                                sum += now.lamports as u128;
+                            }
                         }
                         for k in (j + 1)..len {
                             let now = &account_maps[k];
                             if now.pubkey != last {
                                 j = k;
+                                look_for_first = false;
                                 continue 'outer;
                             }
                         }
