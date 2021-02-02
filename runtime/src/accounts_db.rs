@@ -105,6 +105,21 @@ pub enum ScanStorageResult<R, B> {
     Stored(B),
 }
 
+struct EvilPtr<T> {
+    ptr: *mut T,
+}
+impl<T> EvilPtr<T> {
+    fn new(inp: &mut T) -> Self {
+        EvilPtr { ptr: inp as *mut T }
+    }
+    unsafe fn deref(&self) -> *mut T {
+        return self.ptr;
+    }
+}
+
+unsafe impl<T> Sync for EvilPtr<T> {}
+unsafe impl<T> Send for EvilPtr<T> {}
+
 #[derive(Debug, Default)]
 pub struct ErrorCounters {
     pub total: usize,
@@ -4108,20 +4123,75 @@ impl AccountsDB {
     fn rest_of_hash_calculation2(
         accounts: (Vec<Vec<CalculateHashIntermediate2>>, Measure),
     ) -> (Hash, u64) {
-        let (account_maps, time_scan) = accounts;
+        let (mut account_maps, time_scan) = accounts;
 
         //error!("accounts: {:?}", account_maps);
 
+        let lensub1 = account_maps.len();
         let mut flatten_time = Measure::start("sort");
         let mut size: usize = 0;
         account_maps.iter().for_each(|v| {
             size += v.len();
         });
 
+        let mut cumulative_len: Vec<usize> = Vec::with_capacity(lensub1);
+        cumulative_len.push(0);
+        error!("{}", lensub1);
+        for i in 1..lensub1 {
+            cumulative_len.push(cumulative_len[i-1] + account_maps[i-1].len());
+        }
+
         let mut account_maps2: Vec<CalculateHashIntermediate2> = Vec::with_capacity(size);
-        account_maps
-            .into_iter()
-            .for_each(|v| account_maps2.extend(v));
+        account_maps2.push(CalculateHashIntermediate2::default()); // so we can deref 0
+
+        let mut eps:Vec<_> = (0..lensub1).into_iter().map(|i| {
+            let e2 = EvilPtr::new(&mut account_maps[i][0]);         
+            e2
+        }).collect();
+
+        let e = EvilPtr::new(&mut account_maps2[0]);            
+        (0..lensub1).into_par_iter().
+        for_each(|i|
+        {
+            let bytes = std::mem::size_of::<CalculateHashIntermediate2>();
+            /*
+            
+            unsafe {
+            let d = e.deref();
+            let v = &sd[i];
+            for j in 0..size_small {
+                unsafe { *d.add(i*size_small*bytes) = v[j];}
+            }
+            */
+            let src = &account_maps[i];
+            let src_len = src.len();
+            unsafe {
+                //let dst_ptr = dst.as_mut_ptr().offset(dst_len as isize);
+                //let src_ptr = src.as_ptr();
+                let e2 = &eps[i];//EvilPtr::new(&mut eps[i]);         
+                let dst_ptr = e.deref().add(cumulative_len[i]);
+                let src_ptr = e2.deref();
+
+                // Truncate `src` without dropping its contents. We do this first,
+                // to avoid problems in case something further down panics.
+                // ??? why? src.set_len(0);
+        
+                // The two regions cannot overlap because mutable references do
+                // not alias, and two different vectors cannot own the same
+                // memory.
+                std::ptr::copy_nonoverlapping(src_ptr, dst_ptr, src_len);
+            }
+        });        
+        unsafe {
+            account_maps2.set_len(size);
+        }
+        if rand::thread_rng().gen::<u8>() > 128 {
+            let mut am3: Vec<CalculateHashIntermediate2> = Vec::with_capacity(size);        
+            account_maps
+                .into_iter()
+                .for_each(|v| am3.extend(v));
+            assert_eq!(am3, account_maps2);
+        }
         let mut account_maps = account_maps2;
         flatten_time.stop();
 
@@ -4136,8 +4206,8 @@ impl AccountsDB {
         sort_time.stop();
 
         let mut zeros = Measure::start("eliminate zeros");
-        let max = 10;
         let len = account_maps.len();
+        let max = if len > 10 {10} else {1};
         let chunk_size = len / max;
         let overall_sum = Mutex::new(0u64);
         let hashes: Vec<Hash> = (0..max)
@@ -5254,21 +5324,6 @@ pub mod tests {
     }
     */
 
-    struct EvilPtr<T> {
-        ptr: *mut T,
-    }
-    impl<T> EvilPtr<T> {
-        fn new(inp: &mut T) -> Self {
-            EvilPtr { ptr: inp as *mut T }
-        }
-        unsafe fn deref(&self) -> *mut T {
-            return self.ptr;
-        }
-    }
-    
-    unsafe impl<T> Sync for EvilPtr<T> {}
-    unsafe impl<T> Send for EvilPtr<T> {}
-
     fn src_data() -> Vec<Vec<Foo>> {
         let size_small = size22 / factor22;
         let mut d = Vec::with_capacity(factor22);
@@ -5496,6 +5551,7 @@ fn test_uninit() {
         assert_eq!(result, (expected_hash, 118));
     }
 
+    /*
     #[test]
     fn test_accountsdb_rest_of_hash_calculation_perf() {
         solana_logger::setup();
@@ -5533,6 +5589,7 @@ fn test_uninit() {
         let avg = times.iter().sum::<u64>() as f64 / len;
         error!("avg us: {}", avg);
     }
+    */
 
     #[test]
     fn test_accountsdb_handle_one_loaded_account() {
