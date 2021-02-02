@@ -4181,7 +4181,7 @@ impl AccountsDB {
         unsafe {
             account_maps2.set_len(size);
         }
-        if rand::thread_rng().gen::<u8>() > 128 {
+        if false && rand::thread_rng().gen::<u8>() > 128 {
             let mut am3: Vec<CalculateHashIntermediate2> = Vec::with_capacity(size);        
             account_maps
                 .into_iter()
