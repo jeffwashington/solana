@@ -4069,8 +4069,9 @@ impl AccountsDB {
 
         //error!("accounts: {:?}", account_maps);
 
-        let lens: Vec<_> = account_maps.iter().map(|x| x.len()).collect();
+        //let lens: Vec<_> = account_maps.iter().map(|x| x.len()).collect();
         let mut flatten_time = Measure::start("sort");
+        /*
         let num_subs = lens.len();
         let max_index = num_subs - 1;
         let mut cumulative_sums = Vec::with_capacity(max_index);
@@ -4081,6 +4082,7 @@ impl AccountsDB {
             cumulative_sums[i-1] = cumulative_sums[i-2] + lens[i-1];
         }
         let sum: usize = cumulative_sums.last().unwrap() + lens.last().unwrap();
+        */
         let mut indices: Vec<(usize, usize)> = account_maps.iter().enumerate().map(|(i, v)| v.iter().enumerate().map(|(i2, v2)| (i, i2)).collect::<Vec<_>>()).flatten().collect();
         //let mut account_maps:Vec<_> = account_maps.into_iter().flatten().collect();
         flatten_time.stop();
