@@ -4069,12 +4069,57 @@ impl AccountsDB {
 
         //error!("accounts: {:?}", account_maps);
 
+        let lens: Vec<_> = account_maps.iter().map(|x| x.len()).collect();
         let mut flatten_time = Measure::start("sort");
-        let mut account_maps:Vec<_> = account_maps.into_iter().flatten().collect();
+        let num_subs = lens.len();
+        let max_index = num_subs - 1;
+        let mut cumulative_sums = Vec::with_capacity(max_index);
+        if num_subs > 1 {
+            cumulative_sums.push(lens[0]);
+        }
+        for i in 2..num_subs {
+            cumulative_sums[i-1] = cumulative_sums[i-2] + lens[i-1];
+        }
+        let sum: usize = cumulative_sums.last().unwrap() + lens.last().unwrap();
+        let mut indices: Vec<(usize, usize)> = account_maps.iter().enumerate().map(|(i, v)| v.iter().enumerate().map(|(i2, v2)| (i, i2)).collect::<Vec<_>>()).flatten().collect();
+        //let mut account_maps:Vec<_> = account_maps.into_iter().flatten().collect();
         flatten_time.stop();
 
+        let start_index = max_index / 2;
+        
+/*
+        let find = |x: &usize| {
+            let l = 0;
+            let r = max_index;
+            let check = start_index;
+            loop {
+                let x = *x;
+                let offset = cumulative_sums[check];
+                if x < offset {
+                    r = check;
+                }
+                else if x > offset {
+                    l = check;
+                }
+                else if x == offset {
+                    return (check, x - offset);
+                }
+                let range = r - l;
+                if range == 1 {
+                    return (check, x - cumulative_sums[l]);
+                }
+                check = (l + r) / 2;
+            };
+
+        };
+        */
+
         let mut sort_time = Measure::start("sort");
-        account_maps.par_sort_unstable_by(|a, b| {
+        indices.par_sort_unstable_by(|a, b| {
+            //let a = find(a);
+            //let b = find(b);
+            let a = &account_maps[a.0][a.1];
+            let b = &account_maps[b.0][b.1];
             match a.pubkey.cmp(&b.pubkey) {
                 std::cmp::Ordering::Equal => 
                 {
@@ -4100,14 +4145,16 @@ impl AccountsDB {
             if len > 0 {
                 'outer: loop {
                     // at start of loop, item at 'j' is the first entry for a given pubkey
-                    let now = &account_maps[j];
+                    let idxs = indices[j];
+                    let now = &account_maps[idxs.0][idxs.1];
                     let last = now.pubkey;
                     if !now.zero_raw_lamports {
                         result.push(now.hash);
                         sum += now.lamports as u128;
                     }
                     for k in (j + 1)..len {
-                        let now = &account_maps[k];
+                        let idxs = indices[k];
+                        let now = &account_maps[idxs.0][idxs.1];
                         if now.pubkey != last {
                             j = k;
                             continue 'outer;
