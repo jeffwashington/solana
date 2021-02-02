@@ -5276,20 +5276,37 @@ pub mod tests {
         }
         ancestors
     }
-    #[derive(Debug, Default, Clone, Copy, PartialEq)]
+
+    pub const smilar_byps: usize = 80;
+    #[derive(
+        Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, AbiExample, Debug,
+    )]
+    #[repr(transparent)]
+    pub struct similar_data([u8; smilar_byps]);
+
+    
+
+    #[derive(Debug, Clone, Copy, PartialEq)]
     struct Foo {    
         /*
         pub data:i32,
         */
         pub version: u64,
-        pub hash: Hash,
         pub lamports: u64,
-        pub zero_raw_lamports: bool,
-        pub slot: Slot,
-        pub pubkey: Pubkey,
-    
+        pub raw_data: [u8; smilar_byps],
     }
-    
+
+    impl Default for Foo {
+        fn default() -> Self {
+            Foo {
+            version:0,
+            lamports:0,
+            raw_data:vec![0u8; smilar_byps].try_into().unwrap(),
+        }
+    }
+    }
+
+
     const size22:usize = 10_000_000;
     const factor22:usize = 100;
     struct junk {
@@ -5297,7 +5314,7 @@ pub mod tests {
     }
     impl junk {
         fn new() -> junk {
-            error!("{}", line!());
+            
             Self {
                 data: unsafe { std::mem::MaybeUninit::uninit().assume_init() },
             }
@@ -5345,7 +5362,7 @@ fn test_uninit() {
     error!("{}, {}", line!(), std::mem::size_of::<Foo>());
     use std::mem::MaybeUninit;
 
-            error!("{}", line!());
+            
             let mut t1 = Measure::start("maybeuninit");
             // Create an array of uninitialized values.
 
@@ -5363,16 +5380,16 @@ fn test_uninit() {
             array_other_o.extend(vec![Foo::default(); size22]);
             //init(&mut array);
             t1.stop();
-            error!("{}", line!());
+            
             let mut t2 = Measure::start("maybeuninit");
             // Create an array of uninitialized values.
             //let mut array2= Vec::with_capacity(size22);
             //init(&mut array2);
             t2.stop();
-            error!("{}", line!());
+            
             //let mut array3= Vec::with_capacity(size22);
             //init(&mut array3);
-            error!("{}", line!());
+            
             
             let mut sd = src_data();
 
@@ -5382,7 +5399,7 @@ fn test_uninit() {
                 array.extend(v);
             }
             t3.stop();
-            error!("{}", line!());
+            
     
             let mut t4 = Measure::start("maybeuninit");
 
@@ -5432,7 +5449,7 @@ fn test_uninit() {
   //              *element = array2[i];
     //        }
             t4.stop();
-            error!("{}", line!());
+            
 
             error!("{:?}", (t1.as_us(), t2.as_us(), t3.as_us(), t4.as_us(), array.len()));
             assert_eq!(array, array_other_o);
