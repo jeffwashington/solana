@@ -5226,6 +5226,27 @@ pub mod tests {
     }
 
     #[test]
+    fn test_accountsdb_rest_of_hash_calculation_perf() {
+        solana_logger::setup();
+
+        let key = Pubkey::new(&[11u8; 32]);
+        let count = 10_000_000u64;
+        let slot = Slot::default();
+        let account_maps: Vec<Vec<CalculateHashIntermediate2>> = vec![(0..count).into_iter().map(|_| CalculateHashIntermediate2::new(0, Hash::new_unique(), 1, false, slot, Pubkey::new_unique())).collect()];
+
+        let mut times: Vec<_> = (0..10).into_iter().map(|_| {
+        let mut me = Measure::start("try");
+        let result = 
+            AccountsDB::rest_of_hash_calculation2((account_maps.clone(), Measure::start("")));
+            me.stop();
+            me.as_us()
+        }).collect();
+        let len = times.len() as f64;
+        let avg = times.iter().sum::<u64>() as f64 / len;
+        error!("avg us: {}", avg);
+    }
+
+    #[test]
     fn test_accountsdb_handle_one_loaded_account() {
         solana_logger::setup();
 
