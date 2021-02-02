@@ -4888,7 +4888,7 @@ impl AccountsDB {
             None::<StorageFinder>,
             None::<Box<dyn Iterator<Item = u64>>>,
             is_cached_store,
-            false,
+            true,
         );
     }
 
