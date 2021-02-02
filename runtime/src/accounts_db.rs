@@ -105,6 +105,8 @@ pub enum ScanStorageResult<R, B> {
     Stored(B),
 }
 
+const PUBKEY_DIVISIONS: usize = 24;
+
 struct EvilPtr<T> {
     ptr: *mut T,
 }
@@ -4022,38 +4024,6 @@ impl AccountsDB {
             })
             .collect()
     }
-    /*
-    /// Scan through all the account storage in parallel
-    fn scan_account_storage_no_bank2<F, B>(
-        snapshot_storages: &SnapshotStorages,
-        scan_func: F,
-    ) -> Vec<B>
-    where
-        F: Fn(LoadedAccount, AppendVecId, &mut B, Slot) + Send + Sync,
-        B: Send + Default,
-    {
-        snapshot_storages
-            .par_iter()
-            .flatten()
-            .map(|storage| {
-                (storage.slot(), storage.accounts.accounts(0))})
-            .into_iter()
-            .map(|(stored_account|
-                scan_func(LoadedAccount::Stored(stored_account),
-                let mut retval = B::default();
-                accounts.into_iter().for_each(|stored_account| {
-                    scan_func(
-                        LoadedAccount::Stored(stored_account),
-                        storage.append_vec_id(),
-                        &mut retval,
-                        storage.slot(),
-                    )
-                });
-                retval
-            })
-            .collect()
-    }
-    */
 
     fn remove_zero_balance_accounts(
         account_maps: DashMap<Pubkey, CalculateHashIntermediate>,
@@ -4275,6 +4245,198 @@ impl AccountsDB {
         (ret.0, sum)
     }
 
+    fn rest_of_hash_calculation3(
+        accounts: (Vec<Vec<Vec<CalculateHashIntermediate2>>>, Measure),
+    ) -> (Hash, u64) {
+        let (mut account_maps, time_scan) = accounts;
+
+        //error!("accounts: {:?}", account_maps);
+
+        let lensub1 = account_maps.len();
+        let mut flatten_time = Measure::start("sort");
+
+        let mut account_maps2: Vec<Vec<CalculateHashIntermediate2>> = vec![Vec::new(); PUBKEY_DIVISIONS];
+        account_maps
+            .into_iter()
+            .for_each(|v| {
+                for i in 0..PUBKEY_DIVISIONS {
+                    account_maps2[i].extend(v[i].clone());
+                }
+            });
+
+        /*
+        let mut size: usize = 0;
+        account_maps.iter().for_each(|v| {
+            size += v.len();
+        });
+
+        let mut cumulative_len: Vec<usize> = Vec::with_capacity(lensub1);
+        cumulative_len.push(0);
+        error!("{}", lensub1);
+        for i in 1..lensub1 {
+            cumulative_len.push(cumulative_len[i-1] + account_maps[i-1].len());
+        }
+
+        let mut account_maps2: Vec<CalculateHashIntermediate2> = Vec::with_capacity(size);
+        account_maps2.push(CalculateHashIntermediate2::default()); // so we can deref 0
+
+        let mut eps:Vec<_> = (0..lensub1).into_iter().map(|i| {
+            let e2 = EvilPtr::new(&mut account_maps[i][0]);         
+            e2
+        }).collect();
+
+        let e = EvilPtr::new(&mut account_maps2[0]);            
+        (0..lensub1).into_par_iter().
+        for_each(|i|
+        {
+            let bytes = std::mem::size_of::<CalculateHashIntermediate2>();
+            /*
+            
+            unsafe {
+            let d = e.deref();
+            let v = &sd[i];
+            for j in 0..size_small {
+                unsafe { *d.add(i*size_small*bytes) = v[j];}
+            }
+            */
+            let src = &account_maps[i];
+            let src_len = src.len();
+            unsafe {
+                //let dst_ptr = dst.as_mut_ptr().offset(dst_len as isize);
+                //let src_ptr = src.as_ptr();
+                let e2 = &eps[i];//EvilPtr::new(&mut eps[i]);         
+                let dst_ptr = e.deref().add(cumulative_len[i]);
+                let src_ptr = e2.deref();
+
+                // Truncate `src` without dropping its contents. We do this first,
+                // to avoid problems in case something further down panics.
+                // ??? why? src.set_len(0);
+        
+                // The two regions cannot overlap because mutable references do
+                // not alias, and two different vectors cannot own the same
+                // memory.
+                std::ptr::copy_nonoverlapping(src_ptr, dst_ptr, src_len);
+            }
+        });        
+        unsafe {
+            account_maps2.set_len(size);
+        }
+        if rand::thread_rng().gen::<u8>() > 128 {
+            let mut am3: Vec<CalculateHashIntermediate2> = Vec::with_capacity(size);        
+            account_maps
+                .into_iter()
+                .for_each(|v| am3.extend(v));
+            assert_eq!(am3, account_maps2);
+        }
+        */
+        let mut account_maps = account_maps2;
+        flatten_time.stop();
+
+        let mut sort_time = Measure::start("sort");
+        let account_maps:Vec<Vec<_>> = account_maps.into_par_iter().map(|mut pk_range| {
+            pk_range.par_sort_unstable_by(|a, b| match a.pubkey.cmp(&b.pubkey) {
+                std::cmp::Ordering::Equal => match a.slot.cmp(&b.slot).reverse() {
+                    std::cmp::Ordering::Equal => a.version.cmp(&b.version).reverse(),
+                    other => other,
+                },
+                other => other,
+            });
+            pk_range
+        }).collect();
+        /*
+        account_maps.par_sort_unstable_by(|a, b| match a.pubkey.cmp(&b.pubkey) {
+            std::cmp::Ordering::Equal => match a.slot.cmp(&b.slot).reverse() {
+                std::cmp::Ordering::Equal => a.version.cmp(&b.version).reverse(),
+                other => other,
+            },
+            other => other,
+        });
+        */
+        sort_time.stop();
+
+        let mut zeros = Measure::start("eliminate zeros");
+        let overall_sum = Mutex::new(0u64);
+        let hashes: Vec<Hash> = (0..PUBKEY_DIVISIONS)
+            .into_par_iter()
+            .map(|i| {
+                let pubkey_division = &account_maps[i];
+                let len = pubkey_division.len();
+                let max = if len > 10 {10} else {1};
+                let chunk_size = len / max;
+                let hashes: Vec<Hash> = (0..max)
+                .into_par_iter()
+                .map(|i| {
+                    let mut result: Vec<Hash> = Vec::with_capacity(len);
+                    let mut j = i * chunk_size;
+                    let mut end = j + chunk_size;
+                    if i == max - 1 {
+                        end = len;
+                    }
+                    let len = end;
+                    let mut sum: u128 = 0;
+                    let mut look_for_first = i > 0;
+                    if look_for_first {
+                        j -= 1;
+                    }
+                    if len > 0 {
+                        'outer: loop {
+                            // at start of loop, item at 'j' is the first entry for a given pubkey
+                            let now = &pubkey_division[j];
+                            let last = now.pubkey;
+                            if !look_for_first {
+                                if now.lamports != ZERO_RAW_LAMPORTS_SENTINEL {
+                                    result.push(now.hash);
+                                    sum += now.lamports as u128;
+                                }
+                            }
+                            for k in (j + 1)..len {
+                                let now = &pubkey_division[k];
+                                if now.pubkey != last {
+                                    j = k;
+                                    look_for_first = false;
+                                    continue 'outer;
+                                }
+                            }
+
+                            break; // ran out of items
+                        }
+                    }
+                    let mut overall = overall_sum.lock().unwrap();
+                    *overall = Self::checked_cast_for_capitalization(sum + *overall as u128);
+
+                    result
+                })
+                .flatten()
+                .collect();
+                hashes
+            })
+            .flatten()
+            .collect();
+
+        zeros.stop();
+        let hash_total = hashes.len();
+
+        let mut hash_time = Measure::start("hashes");
+        let fanout = 16;
+        let ret =
+            Self::compute_merkle_root_and_capitalization_loop(hashes, fanout, |t: &Hash| (*t, 0));
+        hash_time.stop();
+
+        datapoint_info!(
+            "calculate_accounts_hash_without_index3",
+            ("accounts_scan", time_scan.as_us(), i64),
+            ("eliminate_zeros", zeros.as_us(), i64),
+            ("hash", hash_time.as_us(), i64),
+            ("sort", sort_time.as_us(), i64),
+            ("hash_total", hash_total, i64),
+            ("flatten", flatten_time.as_us(), i64),
+            //("unreduced_entries", len as i64, i64),
+        );
+
+        let sum = *overall_sum.lock().unwrap();
+        (ret.0, sum)
+    }
+
     fn calculate_accounts_hash_helper(
         &self,
         do_not_use_index: bool,
@@ -4425,6 +4587,75 @@ impl AccountsDB {
         (result, time)
     }
 
+    fn calc_ranges() -> Vec<Pubkey> {
+        let count = 0;
+        let divisions = 4;
+        let mut parts:Vec<_> = Vec::new();
+        parts.push(crate::bank::Bank::pubkey_range_from_partition((0, 0, divisions)).start().clone());
+        for i in 1..divisions {
+            parts.push(crate::bank::Bank::pubkey_range_from_partition((i, i, divisions)).start().clone());
+        }
+        parts
+    }
+
+    fn find_range(ranges: &Vec<Pubkey>, pubkey: Pubkey) -> usize {
+        // could do binary search
+        for i in 1..PUBKEY_DIVISIONS-1 {
+            let val = ranges[i];
+            if pubkey < val {
+                return i - 1;
+            }
+        }
+        return PUBKEY_DIVISIONS - 1;
+    }
+
+    fn scan_snapshot_stores3(
+        storage: &SnapshotStorages,
+        simple_capitalization_enabled: bool,
+    ) -> (Vec<Vec<Vec<CalculateHashIntermediate2>>>, Measure) {
+        let mut time = Measure::start("scan all accounts");
+        let ranges = Self::calc_ranges();
+
+        let result: Vec<Vec<Vec<CalculateHashIntermediate2>>> = Self::scan_account_storage_no_bank(
+            storage,
+            |loaded_account: LoadedAccount,
+             accum: &mut Vec<Vec<CalculateHashIntermediate2>>,
+             slot: Slot| {
+                let version = loaded_account.write_version();
+                let raw_lamports = loaded_account.lamports();
+                let zero_raw_lamports = raw_lamports == 0;
+                let balance = if zero_raw_lamports {
+                    ZERO_RAW_LAMPORTS_SENTINEL
+                } else {
+                    Self::account_balance_for_capitalization(
+                        raw_lamports,
+                        loaded_account.owner(),
+                        loaded_account.executable(),
+                        simple_capitalization_enabled,
+                    )
+                };
+
+                let pubkey = *loaded_account.pubkey();
+                let rng_index = Self::find_range(&ranges, pubkey);
+                let source_item = CalculateHashIntermediate2::new(
+                    version,
+                    *loaded_account.loaded_hash(),
+                    balance,
+                    slot,
+                    pubkey,
+                );
+                let max = accum.len();
+                if max == 0 {
+                    accum.extend(vec![Vec::new(); PUBKEY_DIVISIONS]);
+                }
+                accum[rng_index].push(source_item);
+            },
+        );
+        time.stop();
+
+        (result, time)
+    }
+
     // modeled after get_accounts_delta_hash
     // intended to be faster than calculate_accounts_hash
     pub fn calculate_accounts_hash_without_index(
@@ -4443,18 +4674,16 @@ impl AccountsDB {
                 panic!("different");
             }
         }
+        if true {
+            let result = Self::scan_snapshot_stores3(&storages, simple_capitalization_enabled);
+
+            let res2 = Self::rest_of_hash_calculation3(result);
+            if res != res2 {
+                error!("difft: {:?}, {:?}", res, res2);
+                panic!("different 3");
+            }
+        }
         return res;
-    }
-
-    // modeled after get_accounts_delta_hash
-    // intended to be faster than calculate_accounts_hash
-    pub fn calculate_accounts_hash_using_stores_only2(
-        storages: SnapshotStorages,
-        simple_capitalization_enabled: bool,
-    ) -> (Hash, u64) {
-        let result = Self::scan_snapshot_stores2(&storages, simple_capitalization_enabled);
-
-        Self::rest_of_hash_calculation2(result)
     }
 
     pub fn verify_bank_hash_and_lamports(
@@ -5355,6 +5584,19 @@ fn test_uninit() {
     solana_logger::setup();
     error!("{}, {}", line!(), std::mem::size_of::<Foo>());
     use std::mem::MaybeUninit;
+
+    let count = 0;
+    let divisions = 4;
+    let mut parts:Vec<_> = Vec::new();
+    parts.push(crate::bank::Bank::pubkey_range_from_partition((0, 0, divisions)).start().clone());
+    for i in 1..divisions {
+        parts.push(crate::bank::Bank::pubkey_range_from_partition((i, i, divisions)).start().clone());
+    }
+    for i in &parts {
+        error!("{:?}", i);
+    }
+
+    return;
 
             
             let mut t1 = Measure::start("maybeuninit");
