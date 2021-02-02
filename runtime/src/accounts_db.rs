@@ -4189,7 +4189,7 @@ impl AccountsDB {
             ("sort", sort_time.as_us(), i64),
             ("hash_total", hash_total, i64),
             ("flatten", flatten_time.as_us(), i64),
-            ("unreduced entries", len as i64, i64),
+            ("unreduced_entries", len as i64, i64),
         );
 
         let sum = *overall_sum.lock().unwrap();
