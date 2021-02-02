@@ -5206,6 +5206,188 @@ pub mod tests {
         }
         ancestors
     }
+    #[derive(Debug, Default, Clone, Copy, PartialEq)]
+    struct Foo {    
+        /*
+        pub data:i32,
+        */
+        pub version: u64,
+        pub hash: Hash,
+        pub lamports: u64,
+        pub zero_raw_lamports: bool,
+        pub slot: Slot,
+        pub pubkey: Pubkey,
+    
+    }
+    
+    const size22:usize = 10_000_000;
+    const factor22:usize = 100;
+    struct junk {
+        pub data: Vec<Foo>,
+    }
+    impl junk {
+        fn new() -> junk {
+            error!("{}", line!());
+            Self {
+                data: unsafe { std::mem::MaybeUninit::uninit().assume_init() },
+            }
+        }
+    }
+    
+
+    fn init(d: &mut Vec<Foo>){
+        d.extend(vec![Foo::default(); size22]);
+    }
+
+    use std::mem::MaybeUninit;
+
+    unsafe fn make_vec(out: *mut Vec<Foo>) {
+        // `write` does not drop the old contents, which is important.
+        out.write(vec![Foo::default(); size22]);
+    }  
+    /*
+    unsafe fn get_new() -> MaybeUninit<Vec<Foo>> {
+        let mut data: [MaybeUninit<Foo>; size22] = unsafe {
+            MaybeUninit::uninit().assume_init()
+        };
+        data        
+    }
+    */
+
+    struct EvilPtr<T> {
+        ptr: *mut T,
+    }
+    impl<T> EvilPtr<T> {
+        fn new(inp: &mut T) -> Self {
+            EvilPtr { ptr: inp as *mut T }
+        }
+        unsafe fn deref(&self) -> *mut T {
+            return self.ptr;
+        }
+    }
+    
+    unsafe impl<T> Sync for EvilPtr<T> {}
+    unsafe impl<T> Send for EvilPtr<T> {}
+
+    fn src_data() -> Vec<Vec<Foo>> {
+        let size_small = size22 / factor22;
+        let mut d = Vec::with_capacity(factor22);
+        for j in 0..factor22{
+            let v:Vec<_> = (0..size_small).into_iter().map(|i| {
+                let mut f = Foo::default();
+                f.version = (j * factor22 + i) as u64;
+                f.lamports = (j * factor22 + i) as u64;
+                f
+            } ).collect();
+            d.push(v);
+        }
+        d
+    }
+
+#[test]
+fn test_uninit() {
+    solana_logger::setup();
+    error!("{}", line!());
+    use std::mem::MaybeUninit;
+
+            error!("{}", line!());
+            let mut t1 = Measure::start("maybeuninit");
+            // Create an array of uninitialized values.
+
+            //let mut j = junk::new();
+/*
+            let mut v:MaybeUninit<Vec<Foo>> = MaybeUninit::uninit();
+            unsafe { make_vec(v.as_mut_ptr()); }
+            let v = unsafe { v.assume_init() };
+            assert_eq!(&v, &[1, 2, 3]);
+            */
+
+            let mut array:Vec<Foo>= Vec::with_capacity(size22);//[MaybeUninit<Foo>; size22] = unsafe { MaybeUninit::uninit().assume_init() };
+            let mut array_other_o:Vec<Foo>= Vec::with_capacity(size22);//[MaybeUninit<Foo>; size22] = unsafe { MaybeUninit::uninit().assume_init() };
+            array_other_o.extend(vec![Foo::default(); size22]);
+            //init(&mut array);
+            t1.stop();
+            error!("{}", line!());
+            let mut t2 = Measure::start("maybeuninit");
+            // Create an array of uninitialized values.
+            //let mut array2= Vec::with_capacity(size22);
+            //init(&mut array2);
+            t2.stop();
+            error!("{}", line!());
+            //let mut array3= Vec::with_capacity(size22);
+            //init(&mut array3);
+            error!("{}", line!());
+            
+            let mut sd = src_data();
+
+            //let a2c = array2.clone();
+            let mut t3 = Measure::start("maybeuninit");
+            for v in &sd {
+                array.extend(v);
+            }
+            t3.stop();
+            error!("{}", line!());
+    
+            let mut t4 = Measure::start("maybeuninit");
+
+            let mut eps:Vec<_> = (0..factor22).into_iter().map(|i| {
+                let e2 = EvilPtr::new(&mut sd[i][0]);         
+                e2
+            }).collect();
+
+            let e = EvilPtr::new(&mut array_other_o[0]);            
+            let mut dst = &mut array_other_o;
+            (0..factor22).into_par_iter().
+            for_each(|i|
+            {
+                let size_small = size22 / factor22;
+                let bytes = std::mem::size_of::<Foo>();
+                /*
+                
+                unsafe {
+                let d = e.deref();
+                let v = &sd[i];
+                for j in 0..size_small {
+                    unsafe { *d.add(i*size_small*bytes) = v[j];}
+                }
+                */
+                let src = &sd[i];
+                let src_len = src.len();
+                unsafe {
+                    let dst_len = src_len * i * bytes;
+                    //let dst_ptr = dst.as_mut_ptr().offset(dst_len as isize);
+                    //let src_ptr = src.as_ptr();
+                    let e2 = &eps[i];//EvilPtr::new(&mut eps[i]);         
+                    let dst_ptr = e.deref().add(size_small * i);
+                    let src_ptr = e2.deref();
+
+                    // Truncate `src` without dropping its contents. We do this first,
+                    // to avoid problems in case something further down panics.
+                    // ??? why? src.set_len(0);
+            
+                    // The two regions cannot overlap because mutable references do
+                    // not alias, and two different vectors cannot own the same
+                    // memory.
+                    std::ptr::copy_nonoverlapping(src_ptr, dst_ptr, src_len);
+                }
+            });
+            
+//            for (i, element) in array3.iter_mut().enumerate() {
+  //              *element = array2[i];
+    //        }
+            t4.stop();
+            error!("{}", line!());
+
+            error!("{:?}", (t1.as_us(), t2.as_us(), t3.as_us(), t4.as_us(), array.len()));
+            assert_eq!(array, array_other_o);
+            //let arr = unsafe { std::mem::transmute::<_, [Foo; size22]>(array) };
+    /*
+        for element in arr.iter() {
+            //error!("{:?}", element);
+        }
+        */
+    
+}
 
     #[test]
     fn test_accountsdb_rest_of_hash_calculation() {
