@@ -175,7 +175,13 @@ struct CalculateHashIntermediate {
 }
 
 impl CalculateHashIntermediate {
-    pub fn new(version: u64, hash: Hash, lamports: u64, zero_raw_lamports: bool, slot: Slot) -> Self {
+    pub fn new(
+        version: u64,
+        hash: Hash,
+        lamports: u64,
+        zero_raw_lamports: bool,
+        slot: Slot,
+    ) -> Self {
         Self {
             version,
             hash,
@@ -197,7 +203,14 @@ struct CalculateHashIntermediate2 {
 }
 
 impl CalculateHashIntermediate2 {
-    pub fn new(version: u64, hash: Hash, lamports: u64, zero_raw_lamports: bool, slot: Slot, pubkey: Pubkey) -> Self {
+    pub fn new(
+        version: u64,
+        hash: Hash,
+        lamports: u64,
+        zero_raw_lamports: bool,
+        slot: Slot,
+        pubkey: Pubkey,
+    ) -> Self {
         Self {
             version,
             hash,
@@ -208,8 +221,6 @@ impl CalculateHashIntermediate2 {
         }
     }
 }
-
-
 
 trait Versioned {
     fn version(&self) -> u64;
@@ -3926,7 +3937,8 @@ impl AccountsDB {
         let hash_total = hashes.len();
         let mut hash_time = Measure::start("hash");
         let fanout = 16;
-        let (accumulated_hash, total_lamports) = Self::compute_merkle_root_and_capitalization_recurse(hashes, fanout);
+        let (accumulated_hash, total_lamports) =
+            Self::compute_merkle_root_and_capitalization_recurse(hashes, fanout);
         hash_time.stop();
         datapoint_info!(
             "update_accounts_hash",
@@ -3979,7 +3991,7 @@ impl AccountsDB {
         scan_func: F,
     ) -> Vec<B>
     where
-        F: Fn(LoadedAccount, AppendVecId, &mut B, Slot) + Send + Sync,
+        F: Fn(LoadedAccount, &mut B, Slot) + Send + Sync,
         B: Send + Default,
     {
         snapshot_storages
@@ -3991,7 +4003,6 @@ impl AccountsDB {
                 accounts.into_iter().for_each(|stored_account| {
                     scan_func(
                         LoadedAccount::Stored(stored_account),
-                        storage.append_vec_id(),
                         &mut retval,
                         storage.slot(),
                     )
@@ -4000,7 +4011,7 @@ impl AccountsDB {
             })
             .collect()
     }
-/*
+    /*
     /// Scan through all the account storage in parallel
     fn scan_account_storage_no_bank2<F, B>(
         snapshot_storages: &SnapshotStorages,
@@ -4016,9 +4027,8 @@ impl AccountsDB {
             .map(|storage| {
                 (storage.slot(), storage.accounts.accounts(0))})
             .into_iter()
-            .map(|(stored_account| 
+            .map(|(stored_account|
                 scan_func(LoadedAccount::Stored(stored_account),
-                
                 let mut retval = B::default();
                 accounts.into_iter().for_each(|stored_account| {
                     scan_func(
@@ -4104,70 +4114,71 @@ impl AccountsDB {
 
         let mut flatten_time = Measure::start("sort");
         let mut size: usize = 0;
-        account_maps.iter().for_each(|v| {size += v.len();});
+        account_maps.iter().for_each(|v| {
+            size += v.len();
+        });
 
-        let mut account_maps2:Vec<CalculateHashIntermediate2> = Vec::with_capacity(size);
-        account_maps.into_iter().for_each(|v| account_maps2.extend(v));
+        let mut account_maps2: Vec<CalculateHashIntermediate2> = Vec::with_capacity(size);
+        account_maps
+            .into_iter()
+            .for_each(|v| account_maps2.extend(v));
         let mut account_maps = account_maps2;
         flatten_time.stop();
 
         let mut sort_time = Measure::start("sort");
-        account_maps.par_sort_unstable_by(|a, b| {
-            match a.pubkey.cmp(&b.pubkey) {
-                std::cmp::Ordering::Equal => 
-                {
-                    match a.slot.cmp(&b.slot).reverse() {
-                        std::cmp::Ordering::Equal => a.version.cmp(&b.version).reverse(),
-                        other => other,
-                    }
-                },
+        account_maps.par_sort_unstable_by(|a, b| match a.pubkey.cmp(&b.pubkey) {
+            std::cmp::Ordering::Equal => match a.slot.cmp(&b.slot).reverse() {
+                std::cmp::Ordering::Equal => a.version.cmp(&b.version).reverse(),
                 other => other,
-            }
+            },
+            other => other,
         });
         sort_time.stop();
-
 
         let mut zeros = Measure::start("eliminate zeros");
         let max = 1;
         let len = account_maps.len();
         let overall_sum = Mutex::new(0u64);
-        let hashes: Vec<Hash> = (0..max).into_iter().map(|_i| {
-            let mut result: Vec<Hash> = Vec::with_capacity(len);
-            let mut j = 0;
-            let mut sum: u128 = 0;
-            if len > 0 {
-                'outer: loop {
-                    // at start of loop, item at 'j' is the first entry for a given pubkey
-                    let now = &account_maps[j];
-                    let last = now.pubkey;
-                    if !now.zero_raw_lamports {
-                        result.push(now.hash);
-                        sum += now.lamports as u128;
-                    }
-                    for k in (j + 1)..len {
-                        let now = &account_maps[k];
-                        if now.pubkey != last {
-                            j = k;
-                            continue 'outer;
+        let hashes: Vec<Hash> = (0..max)
+            .into_iter()
+            .map(|_i| {
+                let mut result: Vec<Hash> = Vec::with_capacity(len);
+                let mut j = 0;
+                let mut sum: u128 = 0;
+                if len > 0 {
+                    'outer: loop {
+                        // at start of loop, item at 'j' is the first entry for a given pubkey
+                        let now = &account_maps[j];
+                        let last = now.pubkey;
+                        if !now.zero_raw_lamports {
+                            result.push(now.hash);
+                            sum += now.lamports as u128;
                         }
-                    }
+                        for k in (j + 1)..len {
+                            let now = &account_maps[k];
+                            if now.pubkey != last {
+                                j = k;
+                                continue 'outer;
+                            }
+                        }
 
-                    break; // ran out of items
+                        break; // ran out of items
+                    }
                 }
-            }
-            let mut overall = overall_sum.lock().unwrap();
-            *overall = Self::checked_cast_for_capitalization(sum + *overall as u128);
-                
-            result
-        }).flatten().collect();
+                let mut overall = overall_sum.lock().unwrap();
+                *overall = Self::checked_cast_for_capitalization(sum + *overall as u128);
+
+                result
+            })
+            .flatten()
+            .collect();
         zeros.stop();
         let hash_total = hashes.len();
 
         let mut hash_time = Measure::start("hashes");
         let fanout = 16;
-        let ret = Self::compute_merkle_root_and_capitalization_loop(hashes, fanout, |t: &Hash| {
-            (*t, 0)
-        });
+        let ret =
+            Self::compute_merkle_root_and_capitalization_loop(hashes, fanout, |t: &Hash| (*t, 0));
         hash_time.stop();
 
         datapoint_info!(
@@ -4267,19 +4278,20 @@ impl AccountsDB {
         let mut time = Measure::start("scan all accounts");
         Self::scan_account_storage_no_bank(
             &storage,
-            |loaded_account: LoadedAccount,
-             _store_id: AppendVecId,
-             _accum: &mut Vec<(Pubkey, CalculateHashIntermediate)>,
-             slot: Slot| {
+            |loaded_account: LoadedAccount, _accum: &mut u32, slot: Slot| {
                 let version = loaded_account.write_version();
                 let raw_lamports = loaded_account.lamports();
                 let zero_raw_lamports = raw_lamports == 0;
-                let balance = if zero_raw_lamports {0} else {Self::account_balance_for_capitalization(
-                    raw_lamports,
-                    loaded_account.owner(),
-                    loaded_account.executable(),
-                    simple_capitalization_enabled,
-                )};
+                let balance = if zero_raw_lamports {
+                    0
+                } else {
+                    Self::account_balance_for_capitalization(
+                        raw_lamports,
+                        loaded_account.owner(),
+                        loaded_account.executable(),
+                        simple_capitalization_enabled,
+                    )
+                };
 
                 let source_item = CalculateHashIntermediate::new(
                     version,
@@ -4304,18 +4316,21 @@ impl AccountsDB {
         let result: Vec<Vec<CalculateHashIntermediate2>> = Self::scan_account_storage_no_bank(
             storage,
             |loaded_account: LoadedAccount,
-             _store_id: AppendVecId,
              accum: &mut Vec<CalculateHashIntermediate2>,
              slot: Slot| {
                 let version = loaded_account.write_version();
                 let raw_lamports = loaded_account.lamports();
                 let zero_raw_lamports = raw_lamports == 0;
-                let balance = if zero_raw_lamports {0} else {Self::account_balance_for_capitalization(
-                    raw_lamports,
-                    loaded_account.owner(),
-                    loaded_account.executable(),
-                    simple_capitalization_enabled,
-                )};
+                let balance = if zero_raw_lamports {
+                    0
+                } else {
+                    Self::account_balance_for_capitalization(
+                        raw_lamports,
+                        loaded_account.owner(),
+                        loaded_account.executable(),
+                        simple_capitalization_enabled,
+                    )
+                };
 
                 let source_item = CalculateHashIntermediate2::new(
                     version,
@@ -4342,7 +4357,7 @@ impl AccountsDB {
         let result = Self::scan_snapshot_stores(storages.clone(), simple_capitalization_enabled);
 
         let res = Self::rest_of_hash_calculation(result);
-        if true {   
+        if true {
             let result = Self::scan_snapshot_stores2(&storages, simple_capitalization_enabled);
 
             let res2 = Self::rest_of_hash_calculation2(result);
@@ -4351,7 +4366,7 @@ impl AccountsDB {
                 panic!("different");
             }
         }
-        return res
+        return res;
     }
 
     // modeled after get_accounts_delta_hash
@@ -4526,8 +4541,7 @@ impl AccountsDB {
                     "AccountDB::accounts_index corrupted. Storage pointed to: {}, expected: {}, should only point to one slot",
                     store.slot(), *slot
                 );
-                let count =
-                    store.remove_account(account_info.stored_size, reset_accounts);
+                let count = store.remove_account(account_info.stored_size, reset_accounts);
                 if count == 0 {
                     dead_slots.insert(*slot);
                 } else if self.caching_enabled
@@ -5196,16 +5210,24 @@ pub mod tests {
         let val = CalculateHashIntermediate::new(0, hash, 1, true, Slot::default());
         account_maps.insert(key, val);
 
-        let result = 
+        let result =
             AccountsDB::rest_of_hash_calculation((account_maps.clone(), Measure::start("")));
         let expected_hash = Hash::from_str("8j9ARGFv4W2GfML7d3sVJK2MePwrikqYnu6yqer28cCa").unwrap();
         assert_eq!(result, (expected_hash, 88));
 
-        let account_maps2: Vec<_> = account_maps.iter().map(|rm| {
-            let k = rm.key();
-            let x = rm.value();
-                CalculateHashIntermediate2::new(x.version, x.hash, x.lamports, x.zero_raw_lamports, x.slot, *k)
-
+        let account_maps2: Vec<_> = account_maps
+            .iter()
+            .map(|rm| {
+                let k = rm.key();
+                let x = rm.value();
+                CalculateHashIntermediate2::new(
+                    x.version,
+                    x.hash,
+                    x.lamports,
+                    x.zero_raw_lamports,
+                    x.slot,
+                    *k,
+                )
             })
             .collect();
         let account_maps2 = vec![account_maps2];
@@ -5220,15 +5242,24 @@ pub mod tests {
         let val = CalculateHashIntermediate::new(0, hash, 20, false, Slot::default());
         account_maps.insert(key, val);
 
-        let result = AccountsDB::rest_of_hash_calculation((account_maps.clone(), Measure::start("")));
+        let result =
+            AccountsDB::rest_of_hash_calculation((account_maps.clone(), Measure::start("")));
         let expected_hash = Hash::from_str("EHv9C5vX7xQjjMpsJMzudnDTzoTSRwYkqLzY8tVMihGj").unwrap();
         assert_eq!(result, (expected_hash, 108));
 
-        let account_maps2: Vec<_> = account_maps.iter().map(|rm| {
-            let k = rm.key();
-            let x = rm.value();
-                CalculateHashIntermediate2::new(x.version, x.hash, x.lamports, x.zero_raw_lamports, x.slot, *k)
-
+        let account_maps2: Vec<_> = account_maps
+            .iter()
+            .map(|rm| {
+                let k = rm.key();
+                let x = rm.value();
+                CalculateHashIntermediate2::new(
+                    x.version,
+                    x.hash,
+                    x.lamports,
+                    x.zero_raw_lamports,
+                    x.slot,
+                    *k,
+                )
             })
             .collect();
         let account_maps2 = vec![account_maps2];
@@ -5243,20 +5274,27 @@ pub mod tests {
         let val = CalculateHashIntermediate::new(0, hash, 30, false, Slot::default() + 1);
         account_maps.insert(key, val);
 
-        let result = AccountsDB::rest_of_hash_calculation((account_maps.clone(), Measure::start("")));
+        let result =
+            AccountsDB::rest_of_hash_calculation((account_maps.clone(), Measure::start("")));
         let expected_hash = Hash::from_str("7NNPg5A8Xsg1uv4UFm6KZNwsipyyUnmgCrznP6MBWoBZ").unwrap();
         assert_eq!(result, (expected_hash, 118));
 
-        let account_maps2: Vec<_> = account_maps.iter().map(|rm| {
-            let k = rm.key();
-            let x = rm.value();
-                CalculateHashIntermediate2::new(x.version, x.hash, x.lamports, x.zero_raw_lamports, x.slot, *k)
-
+        let account_maps2: Vec<_> = account_maps
+            .iter()
+            .map(|rm| {
+                let k = rm.key();
+                let x = rm.value();
+                CalculateHashIntermediate2::new(
+                    x.version,
+                    x.hash,
+                    x.lamports,
+                    x.zero_raw_lamports,
+                    x.slot,
+                    *k,
+                )
             })
             .collect();
-        let account_maps2:Vec<_> = account_maps2.into_iter().map(|x| {
-            vec![x]
-        }).collect();
+        let account_maps2: Vec<_> = account_maps2.into_iter().map(|x| vec![x]).collect();
 
         let result = AccountsDB::rest_of_hash_calculation2((account_maps2, Measure::start("")));
         let expected_hash = Hash::from_str("7NNPg5A8Xsg1uv4UFm6KZNwsipyyUnmgCrznP6MBWoBZ").unwrap();
@@ -5270,15 +5308,32 @@ pub mod tests {
         let key = Pubkey::new(&[11u8; 32]);
         let count = 1_000_000u64;
         let slot = Slot::default();
-        let account_maps: Vec<Vec<CalculateHashIntermediate2>> = vec![(0..count).into_iter().map(|_| CalculateHashIntermediate2::new(0, Hash::new_unique(), 1, false, slot, Pubkey::new_unique())).collect()];
+        let account_maps: Vec<Vec<CalculateHashIntermediate2>> = vec![(0..count)
+            .into_iter()
+            .map(|_| {
+                CalculateHashIntermediate2::new(
+                    0,
+                    Hash::new_unique(),
+                    1,
+                    false,
+                    slot,
+                    Pubkey::new_unique(),
+                )
+            })
+            .collect()];
 
-        let mut times: Vec<_> = (0..10).into_iter().map(|_| {
-        let mut me = Measure::start("try");
-        let result = 
-            AccountsDB::rest_of_hash_calculation2((account_maps.clone(), Measure::start("")));
-            me.stop();
-            me.as_us()
-        }).collect();
+        let mut times: Vec<_> = (0..10)
+            .into_iter()
+            .map(|_| {
+                let mut me = Measure::start("try");
+                let result = AccountsDB::rest_of_hash_calculation2((
+                    account_maps.clone(),
+                    Measure::start(""),
+                ));
+                me.stop();
+                me.as_us()
+            })
+            .collect();
         let len = times.len() as f64;
         let avg = times.iter().sum::<u64>() as f64 / len;
         error!("avg us: {}", avg);
