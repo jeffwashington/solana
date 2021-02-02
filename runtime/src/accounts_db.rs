@@ -5342,7 +5342,7 @@ pub mod tests {
 #[test]
 fn test_uninit() {
     solana_logger::setup();
-    error!("{}", line!());
+    error!("{}, {}", line!(), std::mem::size_of::<Foo>());
     use std::mem::MaybeUninit;
 
             error!("{}", line!());
@@ -5357,6 +5357,7 @@ fn test_uninit() {
             assert_eq!(&v, &[1, 2, 3]);
             */
 
+            let results:Vec<_> = (0..10).into_iter().map(|_| {
             let mut array:Vec<Foo>= Vec::with_capacity(size22);//[MaybeUninit<Foo>; size22] = unsafe { MaybeUninit::uninit().assume_init() };
             let mut array_other_o:Vec<Foo>= Vec::with_capacity(size22);//[MaybeUninit<Foo>; size22] = unsafe { MaybeUninit::uninit().assume_init() };
             array_other_o.extend(vec![Foo::default(); size22]);
@@ -5392,8 +5393,8 @@ fn test_uninit() {
 
             let e = EvilPtr::new(&mut array_other_o[0]);            
             let mut dst = &mut array_other_o;
-            (0..factor22).into_par_iter().
-            for_each(|i|
+            (0..factor22).into_iter()//.into_par_iter().
+            .for_each(|i|
             {
                 let size_small = size22 / factor22;
                 let bytes = std::mem::size_of::<Foo>();
@@ -5435,6 +5436,11 @@ fn test_uninit() {
 
             error!("{:?}", (t1.as_us(), t2.as_us(), t3.as_us(), t4.as_us(), array.len()));
             assert_eq!(array, array_other_o);
+            t4.as_us() as f64
+            }).collect();
+            let count = results.len() as f64;
+            let sum:f64 = results.iter().sum();
+            error!("avg us: {}", sum/count);
             //let arr = unsafe { std::mem::transmute::<_, [Foo; size22]>(array) };
     /*
         for element in arr.iter() {
