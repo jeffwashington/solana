@@ -4087,7 +4087,7 @@ impl AccountsDB {
         //let mut account_maps:Vec<_> = account_maps.into_iter().flatten().collect();
         flatten_time.stop();
 
-        let start_index = max_index / 2;
+        //let start_index = max_index / 2;
         
 /*
         let find = |x: &usize| {
