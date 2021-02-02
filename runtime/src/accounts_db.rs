@@ -4000,6 +4000,39 @@ impl AccountsDB {
             })
             .collect()
     }
+/*
+    /// Scan through all the account storage in parallel
+    fn scan_account_storage_no_bank2<F, B>(
+        snapshot_storages: &SnapshotStorages,
+        scan_func: F,
+    ) -> Vec<B>
+    where
+        F: Fn(LoadedAccount, AppendVecId, &mut B, Slot) + Send + Sync,
+        B: Send + Default,
+    {
+        snapshot_storages
+            .par_iter()
+            .flatten()
+            .map(|storage| {
+                (storage.slot(), storage.accounts.accounts(0))})
+            .into_iter()
+            .map(|(stored_account| 
+                scan_func(LoadedAccount::Stored(stored_account),
+                
+                let mut retval = B::default();
+                accounts.into_iter().for_each(|stored_account| {
+                    scan_func(
+                        LoadedAccount::Stored(stored_account),
+                        storage.append_vec_id(),
+                        &mut retval,
+                        storage.slot(),
+                    )
+                });
+                retval
+            })
+            .collect()
+    }
+    */
 
     fn remove_zero_balance_accounts(
         account_maps: DashMap<Pubkey, CalculateHashIntermediate>,
@@ -4070,7 +4103,12 @@ impl AccountsDB {
         //error!("accounts: {:?}", account_maps);
 
         let mut flatten_time = Measure::start("sort");
-        let mut account_maps:Vec<_> = account_maps.into_iter().flatten().collect();
+        let mut size: usize = 0;
+        account_maps.iter().for_each(|v| {size += v.len();});
+
+        let mut account_maps2:Vec<CalculateHashIntermediate2> = Vec::with_capacity(size);
+        account_maps.into_iter().for_each(|v| account_maps2.extend(v));
+        let mut account_maps = account_maps2;
         flatten_time.stop();
 
         let mut sort_time = Measure::start("sort");
@@ -5223,6 +5261,27 @@ pub mod tests {
         let result = AccountsDB::rest_of_hash_calculation2((account_maps2, Measure::start("")));
         let expected_hash = Hash::from_str("7NNPg5A8Xsg1uv4UFm6KZNwsipyyUnmgCrznP6MBWoBZ").unwrap();
         assert_eq!(result, (expected_hash, 118));
+    }
+
+    #[test]
+    fn test_accountsdb_rest_of_hash_calculation_perf() {
+        solana_logger::setup();
+
+        let key = Pubkey::new(&[11u8; 32]);
+        let count = 1_000_000u64;
+        let slot = Slot::default();
+        let account_maps: Vec<Vec<CalculateHashIntermediate2>> = vec![(0..count).into_iter().map(|_| CalculateHashIntermediate2::new(0, Hash::new_unique(), 1, false, slot, Pubkey::new_unique())).collect()];
+
+        let mut times: Vec<_> = (0..10).into_iter().map(|_| {
+        let mut me = Measure::start("try");
+        let result = 
+            AccountsDB::rest_of_hash_calculation2((account_maps.clone(), Measure::start("")));
+            me.stop();
+            me.as_us()
+        }).collect();
+        let len = times.len() as f64;
+        let avg = times.iter().sum::<u64>() as f64 / len;
+        error!("avg us: {}", avg);
     }
 
     #[test]
