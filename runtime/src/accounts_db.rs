@@ -4589,14 +4589,17 @@ impl AccountsDB {
         let mut evil_ptrs_src: Vec<_> = Vec::with_capacity(hashes.len());
         let mut offset = 0;
         for i in 0..hashes.len() {
-            let mut v = &mut hashes[i];
-            let len = v.len();
-            if len == 0 {
-                continue;
+            let v = &mut hashes[i];
+            for j in 0..v.len() {
+                let v = &mut v[j];
+                let len = v.len();
+                if len == 0 {
+                    continue;
+                }
+                let evil_ptr = EvilPtr::new(&mut v[0]);
+                evil_ptrs_src.push((offset, evil_ptr, i, j));
+                offset += len;
             }
-            let evil_ptr = EvilPtr::new(&mut v[0]);
-            evil_ptrs_src.push((offset, evil_ptr, i));
-            offset += len;
         };
         let mut final_out: Vec<Hash> = Vec::with_capacity(offset);
         final_out.push(Hash::default());
@@ -4604,10 +4607,10 @@ impl AccountsDB {
 
         evil_ptrs_src
         .into_iter()//par_iter()
-        .for_each(|(dest_offset, evil_ptr_src, src_index)| {
+        .for_each(|(dest_offset, evil_ptr_src, src_index, src_index_2)| {
 
             
-            let src = &hashes[src_index];
+            let src = &hashes[src_index][src_index_2];
             let src_len = src.len();
             let e2 = &evil_ptr_src;//EvilPtr::new(&mut eps[i]);         
             unsafe {
