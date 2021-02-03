@@ -4587,7 +4587,7 @@ impl AccountsDB {
         zeros.stop();
         let mut flat2_time = Measure::start("flalt2");
 
-        let fanout = 12;
+        let fanout = 16;
 
         let mut cumulative_offsets: Vec<_> = Vec::with_capacity(hashes.len());
         let mut offset = 0;
@@ -4621,10 +4621,11 @@ impl AccountsDB {
                 if remainder > 0 {
                     start_index += fanout - remainder; // start index must be at a fanout boundary
                 }
-                if start_index >= total_hashes {
+                if start_index >= total_hashes || start_index >= end_index {
                     return vec![];
                 }
 
+                //error!("{}, {}, {}, {}, divisions: {}", end_index, start_index, fanout, end_index, divisions);
                 let mut accum: Vec<Hash> = Vec::with_capacity((end_index-start_index)/fanout + 1);
                 let mut sub_array_index = 0;
                 let mut current_sub_array = cumulative_offsets[sub_array_index];
@@ -6036,6 +6037,7 @@ fn test_uninit() {
     fn test_accountsdb_rest_of_hash_calculation() {
         solana_logger::setup();
 
+        /*
         let range_count = 4;
         let ranges = AccountsDB::calc_ranges(range_count);
         let mut counts = vec![0;range_count as usize];
@@ -6062,8 +6064,8 @@ fn test_uninit() {
             v2
         }).collect();
         let result = AccountsDB::rest_of_hash_calculation3((data, Measure::start("")));
-
-        return;
+*/
+        //return;
 
 
         let key = Pubkey::new(&[11u8; 32]);
