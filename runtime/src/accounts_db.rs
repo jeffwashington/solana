@@ -4768,6 +4768,7 @@ impl AccountsDB {
     fn find_range(ranges: &Vec<Pubkey>, pubkey: Pubkey) -> usize {
         let mut l = 0;
         let mut r = ranges.len();
+        return pubkey.as_ref()[0] as usize * r / 256;
         loop {
             let width = r-l;
             if width <= 1 {
