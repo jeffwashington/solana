@@ -4256,6 +4256,7 @@ impl AccountsDB {
         let mut flatten_time = Measure::start("sort");
 
         let mut account_maps2: Vec<Vec<CalculateHashIntermediate2>> = vec![Vec::new(); PUBKEY_DIVISIONS];
+        /*
         account_maps
             .into_iter()
             .for_each(|v| {
@@ -4263,6 +4264,83 @@ impl AccountsDB {
                     account_maps2[i].extend(v[i].clone());
                 }
             });
+*/
+        let mut sizes: Vec<usize> = vec![0; PUBKEY_DIVISIONS];
+        account_maps
+            .iter()
+            .for_each(|v| {
+                for i in 0..PUBKEY_DIVISIONS {
+                    sizes[i] += v[i].len();
+                }
+            });
+
+        let mut cumulative_len: Vec<Vec<usize>> = Vec::with_capacity(lensub1);
+        for pk_range_index in 0..PUBKEY_DIVISIONS {
+            cumulative_len[pk_range_index].push(0);
+            error!("{}", lensub1);
+            for i in 1..lensub1 {
+                let len = &((&account_maps[i-1])[pk_range_index]).len();
+                let new_value = cumulative_len[pk_range_index][i-1] + len;
+                cumulative_len[pk_range_index].push(new_value);
+            }
+        }
+
+        let mut account_maps2: Vec<Vec<CalculateHashIntermediate2>> = sizes.iter().map(|sz| Vec::with_capacity(*sz)).collect();
+        for pk_range_index in 0..PUBKEY_DIVISIONS {
+            account_maps2[pk_range_index].push(CalculateHashIntermediate2::default()); // so we can deref 0
+        }
+
+        let mut eps:Vec<Vec<_>> = (0..PUBKEY_DIVISIONS).into_iter().map(|pk_range_index| {
+            let eps:Vec<_> = (0..lensub1).into_iter().map(|i| {
+                let e2 = EvilPtr::new(&mut account_maps[i][0]);         
+                e2
+            }).collect();
+            eps
+        }).collect();
+
+        let e:Vec<_> = (0..PUBKEY_DIVISIONS).into_iter().map(|pk_range_index| EvilPtr::new(&mut account_maps2[pk_range_index])).collect();            
+
+        (0..PUBKEY_DIVISIONS).into_par_iter().for_each(|pk_range_index| {
+            (0..lensub1).into_par_iter().
+            for_each(|i|
+            {
+                let bytes = std::mem::size_of::<CalculateHashIntermediate2>();
+                /*
+                
+                unsafe {
+                let d = e.deref();
+                let v = &sd[i];
+                for j in 0..size_small {
+                    unsafe { *d.add(i*size_small*bytes) = v[j];}
+                }
+                */
+                let src = &account_maps[i][pk_range_index];
+                let src_len = src.len();
+                unsafe {
+                    //let dst_ptr = dst.as_mut_ptr().offset(dst_len as isize);
+                    //let src_ptr = src.as_ptr();
+                    let e2 = &eps[pk_range_index][i];//EvilPtr::new(&mut eps[i]);         
+                    let dst_ptr = e[pk_range_index].deref().add(cumulative_len[pk_range_index][i]);
+                    let src_ptr = e2.deref();
+
+                    // Truncate `src` without dropping its contents. We do this first,
+                    // to avoid problems in case something further down panics.
+                    // ??? why? src.set_len(0);
+            
+                    // The two regions cannot overlap because mutable references do
+                    // not alias, and two different vectors cannot own the same
+                    // memory.
+                    std::ptr::copy_nonoverlapping(src_ptr, dst_ptr, src_len);
+                }
+            });        
+        });
+
+        (0..PUBKEY_DIVISIONS).into_iter().for_each(|pk_range_index| {
+            unsafe {
+                account_maps2[pk_range_index].set_len(sizes[pk_range_index]);
+            }
+        });
+
 
         /*
         let mut size: usize = 0;
