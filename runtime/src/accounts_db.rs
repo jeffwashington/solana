@@ -3889,7 +3889,11 @@ impl AccountsDB {
         let mismatch_found = AtomicU64::new(0);
         let hashes: Vec<(Hash, u64)> = {
             self.thread_pool_clean.install(|| {
-                keys.par_iter()
+            keys
+            .par_chunks(10_000)
+            .map(|keys| {
+                let accum: Vec<(Hash, u64)> = keys
+                    .iter()
                     .filter_map(|pubkey| {
                         if let Some((lock, index)) =
                             self.accounts_index.get(pubkey, Some(ancestors), Some(slot))
@@ -3935,8 +3939,10 @@ impl AccountsDB {
                             None
                         }
                     })
-                    .collect()
-            })
+                    .collect();
+                    accum
+                    }).flatten().collect()
+                })
         };
         if mismatch_found.load(Ordering::Relaxed) > 0 {
             warn!(
@@ -4013,7 +4019,7 @@ impl AccountsDB {
         .collect();
 
         items
-            .par_chunks(10_000)
+            .par_chunks(5_000)
             .map(|storages: &[&Arc<AccountStorageEntry>]| {
                 let mut retval = B::default();
 
