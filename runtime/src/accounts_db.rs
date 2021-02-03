@@ -3890,7 +3890,7 @@ impl AccountsDB {
         let hashes: Vec<(Hash, u64)> = {
             self.thread_pool_clean.install(|| {
             keys
-            .par_chunks(10_000)
+            .par_chunks(5_000)
             .map(|keys| {
                 let accum: Vec<(Hash, u64)> = keys
                     .iter()
