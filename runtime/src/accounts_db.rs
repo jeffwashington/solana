@@ -4276,6 +4276,7 @@ impl AccountsDB {
 
         let mut cumulative_len: Vec<Vec<usize>> = Vec::with_capacity(lensub1);
         for pk_range_index in 0..PUBKEY_DIVISIONS {
+            cumulative_len.push(Vec::new());
             cumulative_len[pk_range_index].push(0);
             error!("{}", lensub1);
             for i in 1..lensub1 {
