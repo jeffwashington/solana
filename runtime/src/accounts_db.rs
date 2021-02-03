@@ -4132,7 +4132,6 @@ impl AccountsDB {
         (0..lensub1).into_par_iter().
         for_each(|i|
         {
-            let bytes = std::mem::size_of::<CalculateHashIntermediate2>();
             /*
             
             unsafe {
@@ -4286,7 +4285,6 @@ impl AccountsDB {
         (0..lensub1).into_par_iter().
         for_each(|i|
         {
-            let bytes = std::mem::size_of::<CalculateHashIntermediate2>();
             /*
             
             unsafe {
@@ -4373,7 +4371,7 @@ impl AccountsDB {
         }
 
         let mut dummy = CalculateHashIntermediate2::default();
-        let mut eps:Vec<Vec<EvilPtr<CalculateHashIntermediate2>>> = (0..PUBKEY_DIVISIONS).into_iter().map(|pk_range_index| {
+        let eps:Vec<Vec<EvilPtr<CalculateHashIntermediate2>>> = (0..PUBKEY_DIVISIONS).into_iter().map(|pk_range_index| {
             let eps:Vec<_> = (0..lensub1).into_iter().map(|i| {
                 if account_maps[i].len() > pk_range_index && account_maps[i][pk_range_index].len() > 0 {
                     EvilPtr::new(&mut account_maps[i][pk_range_index][0])
@@ -4394,7 +4392,6 @@ impl AccountsDB {
                 if account_maps[i].len() <= pk_range_index {
                     return;
                 }
-                let bytes = std::mem::size_of::<CalculateHashIntermediate2>();
                 /*
                 
                 unsafe {
@@ -4497,7 +4494,7 @@ impl AccountsDB {
             assert_eq!(am3, account_maps2);
         }
         */
-        let mut account_maps = account_maps2;
+        let account_maps = account_maps2;
         flatten_time.stop();
 
         let mut sort_time = Measure::start("sort");
@@ -5825,13 +5822,13 @@ fn test_uninit() {
     
             let mut t4 = Measure::start("maybeuninit");
 
-            let mut eps:Vec<_> = (0..factor22).into_iter().map(|i| {
+            let eps:Vec<_> = (0..factor22).into_iter().map(|i| {
                 let e2 = EvilPtr::new(&mut sd[i][0]);         
                 e2
             }).collect();
 
             let e = EvilPtr::new(&mut array_other_o[0]);            
-            let mut dst = &mut array_other_o;
+            let dst = &mut array_other_o;
             (0..factor22).into_iter()//.into_par_iter().
             .for_each(|i|
             {
@@ -5892,6 +5889,24 @@ fn test_uninit() {
     #[test]
     fn test_accountsdb_rest_of_hash_calculation() {
         solana_logger::setup();
+
+        let range_count = 4;
+        let ranges = AccountsDB::calc_ranges(range_count);
+        let mut counts = vec![0;range_count as usize];
+        let iter_count = 10_000;
+        for i in 0..range_count {
+            error!("{}, {}", 0, AccountsDB::find_range(&ranges, Pubkey::new(&[(i * 0xff / 4 + 1) as u8; 32])));
+        }
+        error!("{}, {}", range_count-1, AccountsDB::find_range(&ranges, Pubkey::new(&[0xffu8; 32])));
+
+        for i in 0..iter_count {
+            let idx = AccountsDB::find_range(&ranges, Pubkey::new_rand());
+            counts[idx] += 1;
+        }
+
+        error!("counts: {:?}", counts);
+        return;
+
 
         let key = Pubkey::new(&[11u8; 32]);
         let account_maps: DashMap<Pubkey, CalculateHashIntermediate> = DashMap::new();
