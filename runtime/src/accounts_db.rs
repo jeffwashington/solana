@@ -4586,6 +4586,72 @@ impl AccountsDB {
 
         zeros.stop();
         let mut flat2_time = Measure::start("flalt2");
+
+        let fanout = 12;
+
+        let mut cumulative_offsets: Vec<_> = Vec::with_capacity(hashes.len());
+        let mut offset = 0;
+        for i in 0..hashes.len() {
+            let mut v = &mut hashes[i];
+            for j in 0..v.len() {
+                let len = v.len();
+                if len == 0 {
+                    continue;
+                }
+                cumulative_offsets.push((offset, i, j, offset + len));
+                offset += len;
+            }
+        };
+
+        let total_hashes = offset;
+        // we need div_ceil here
+        let chunks = Self::div_ceil(total_hashes, fanout);
+        let divisions = 10_000;
+        let chunks2 = Self::div_ceil(total_hashes, divisions);
+        let mut final_out: Vec<Hash> = Vec::with_capacity(chunks);
+
+        let hashes: Vec<Hash> = (0..divisions)
+            .into_par_iter()
+            .map(|division_index| {
+
+                let mut start_index = division_index * chunks2;
+                start_index += start_index % fanout; // start index is alays at a fanout boundary
+                let end_index = std::cmp::min(start_index + chunks2, total_hashes);
+
+                let mut accum: Vec<Hash> = Vec::with_capacity((end_index-start_index)/fanout + 1);
+                let mut sub_array_index = 0;
+                let mut current_sub_array = cumulative_offsets[sub_array_index];
+                let mut current_source = &hashes[current_sub_array.1][current_sub_array.2];
+                let mut current_source_index = 0;
+                let mut i = start_index;
+                loop {
+                    if i >= end_index {
+                        break;
+                    }
+                    let mut hasher = Hasher::default();
+                    for this_fanout in 0..fanout {
+                        if i >= current_sub_array.3 {
+                            sub_array_index += 1;
+                            if sub_array_index >= cumulative_offsets.len() {
+                                break;
+                            }
+                            current_sub_array = cumulative_offsets[sub_array_index];
+                            current_source = &hashes[current_sub_array.1][current_sub_array.2];
+                            current_source_index = i - current_sub_array.0;
+                        }
+                        let h = current_source[current_source_index];
+                        i += 1;
+                        current_source_index += 1;
+                        hasher.hash(h.as_ref());
+                    }
+                    accum.push(hasher.result());
+                }
+                accum
+            })
+            .flatten()
+            .collect();
+        
+        /*
         let mut evil_ptrs_src: Vec<_> = Vec::with_capacity(hashes.len());
         let mut offset = 0;
         for i in 0..hashes.len() {
@@ -4633,6 +4699,7 @@ impl AccountsDB {
             final_out.set_len(offset);
         }
         let hashes = final_out;
+        */
         flat2_time.stop();
 
 
@@ -4658,6 +4725,14 @@ impl AccountsDB {
 
         let sum = *overall_sum.lock().unwrap();
         (ret.0, sum)
+    }
+
+    fn div_ceil(x: usize, y: usize) -> usize {
+        let mut chunks = x / y;
+        if x % y != 0 {
+            chunks += 1;
+        }
+        chunks
     }
 
     fn calculate_accounts_hash_helper(
