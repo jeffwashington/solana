@@ -4528,7 +4528,7 @@ impl AccountsDB {
 
         let mut zeros = Measure::start("eliminate zeros");
         let overall_sum = Mutex::new(0u64);
-        let hashes: Vec<_> = (0..PUBKEY_DIVISIONS)
+        let mut hashes: Vec<_> = (0..PUBKEY_DIVISIONS)
             .into_par_iter()
             .map(|i| {
                 let pubkey_division = &account_maps[i];
@@ -4586,7 +4586,50 @@ impl AccountsDB {
 
         zeros.stop();
         let mut flat2_time = Measure::start("flalt2");
-        let hashes:Vec<_> = hashes.into_iter().flatten().into_iter().flatten().collect();
+        let mut evil_ptrs_src: Vec<_> = Vec::with_capacity(hashes.len());
+        let mut offset = 0;
+        for i in 0..hashes.len() {
+            let mut v = &mut hashes[i];
+            let len = v.len();
+            if len == 0 {
+                continue;
+            }
+            let evil_ptr = EvilPtr::new(&mut v[0]);
+            evil_ptrs_src.push((offset, evil_ptr, i));
+            offset += len;
+        };
+        let mut final_out: Vec<Hash> = Vec::with_capacity(offset);
+        final_out.push(Hash::default());
+        let e_dest = EvilPtr::new(&mut final_out);            
+
+        evil_ptrs_src
+        .into_par_iter()
+        .for_each(|(dest_offset, evil_ptr_src, src_index)| {
+
+            
+            let src = &hashes[src_index];
+            let src_len = src.len();
+            let e2 = &evil_ptr_src;//EvilPtr::new(&mut eps[i]);         
+            unsafe {
+                //let dst_ptr = dst.as_mut_ptr().offset(dst_len as isize);
+                //let src_ptr = src.as_ptr();
+                let dst_ptr = e_dest.deref().add(dest_offset);
+                let src_ptr = e2.deref();
+
+                // Truncate `src` without dropping its contents. We do this first,
+                // to avoid problems in case something further down panics.
+                // ??? why? src.set_len(0);
+        
+                // The two regions cannot overlap because mutable references do
+                // not alias, and two different vectors cannot own the same
+                // memory.
+                std::ptr::copy_nonoverlapping(src_ptr, dst_ptr, src_len);
+            }
+        });        
+        unsafe {
+            final_out.set_len(offset);
+        }
+        let hashes = final_out;
         flat2_time.stop();
 
 
