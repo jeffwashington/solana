@@ -4617,13 +4617,13 @@ impl AccountsDB {
 
                 let mut start_index = division_index * chunks2;
                 let remainder = start_index % fanout;
+                let end_index = std::cmp::min(start_index + chunks2, total_hashes);
                 if remainder > 0 {
-                    start_index += (fanout - remainder); // start index must be at a fanout boundary
+                    start_index += fanout - remainder; // start index must be at a fanout boundary
                 }
                 if start_index >= total_hashes {
                     return vec![];
                 }
-                let end_index = std::cmp::min(start_index + chunks2, total_hashes);
 
                 let mut accum: Vec<Hash> = Vec::with_capacity((end_index-start_index)/fanout + 1);
                 let mut sub_array_index = 0;
@@ -4631,21 +4631,25 @@ impl AccountsDB {
                 let mut current_source = &hashes[current_sub_array.1][current_sub_array.2];
                 let mut current_source_index = 0;
                 let mut i = start_index;
-                loop {
-                    if i >= end_index {
-                        break;
-                    }
+                let mut iterations = 0;
+                while i >= end_index {
                     let mut hasher = Hasher::default();
                     for this_fanout in 0..fanout {
                         if i >= current_sub_array.3 {
-                            sub_array_index += 1;
-                            if sub_array_index >= cumulative_offsets.len() {
-                                break;
+                            loop {
+                                sub_array_index += 1;
+                                if sub_array_index >= cumulative_offsets.len() {
+                                    break;
+                                }
+                                current_sub_array = cumulative_offsets[sub_array_index];
+                                if i < current_sub_array.3{
+                                    break;
+                                }
                             }
-                            current_sub_array = cumulative_offsets[sub_array_index];
                             current_source = &hashes[current_sub_array.1][current_sub_array.2];
                             current_source_index = i - current_sub_array.0;
-                            assert!(current_source_index < current_source.len())
+                            assert!(current_source_index < current_source.len(), "{}, {}, i: {}, this_fanout {}, division_index {}, total Hashes: {}, chunks2: {}, remainder: {}, iterations: {}, start: {}, end: {}",
+                             current_source_index, current_source.len(), i, this_fanout, division_index, total_hashes, chunks2, remainder, iterations, start_index, end_index);
                         }
                         let h = current_source[current_source_index];
                         i += 1;
@@ -4653,6 +4657,7 @@ impl AccountsDB {
                         hasher.hash(h.as_ref());
                     }
                     accum.push(hasher.result());
+                    iterations += 1;
                 }
                 accum
             })
@@ -6047,9 +6052,9 @@ fn test_uninit() {
 
         error!("counts: {:?}", counts);
 
-        let data: Vec<_> = (0..100).into_iter().map(|i| {
-            let v2: Vec<_> = (0..100).into_iter().map(|j| {
-                let v3: Vec<_> = (0..100).into_iter().map(|k| {
+        let data: Vec<_> = (0..101).into_iter().map(|i| {
+            let v2: Vec<_> = (0..1003).into_iter().map(|j| {
+                let v3: Vec<_> = (0..105).into_iter().map(|k| {
                     CalculateHashIntermediate2::new(0, Hash::new_unique(), i * j, Slot::default(), Pubkey::new_unique())
                 }).collect();
                 v3
