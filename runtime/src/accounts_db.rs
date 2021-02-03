@@ -4359,15 +4359,15 @@ impl AccountsDB {
             account_maps2[pk_range_index].push(CalculateHashIntermediate2::default()); // so we can deref 0
         }
 
-        let mut eps:Vec<Vec<_>> = (0..PUBKEY_DIVISIONS).into_iter().map(|pk_range_index| {
+        let mut eps:Vec<Vec<EvilPtr<CalculateHashIntermediate2>>> = (0..PUBKEY_DIVISIONS).into_iter().map(|pk_range_index| {
             let eps:Vec<_> = (0..lensub1).into_iter().map(|i| {
-                let e2 = EvilPtr::new(&mut account_maps[i][0]);         
+                let e2 = EvilPtr::new(&mut account_maps[i][pk_range_index][0]);         
                 e2
             }).collect();
             eps
         }).collect();
 
-        let e:Vec<_> = (0..PUBKEY_DIVISIONS).into_iter().map(|pk_range_index| EvilPtr::new(&mut account_maps2[pk_range_index])).collect();            
+        let e:Vec<EvilPtr<CalculateHashIntermediate2>> = (0..PUBKEY_DIVISIONS).into_iter().map(|pk_range_index| EvilPtr::new(&mut account_maps2[pk_range_index][0])).collect();            
 
         (0..PUBKEY_DIVISIONS).into_par_iter().for_each(|pk_range_index| {
             (0..lensub1).into_par_iter().
@@ -4388,10 +4388,10 @@ impl AccountsDB {
                 */
                 let src = &account_maps[i][pk_range_index];
                 let src_len = src.len();
+                let e2 = &eps[pk_range_index][i];//EvilPtr::new(&mut eps[i]);         
                 unsafe {
                     //let dst_ptr = dst.as_mut_ptr().offset(dst_len as isize);
                     //let src_ptr = src.as_ptr();
-                    let e2 = &eps[pk_range_index][i];//EvilPtr::new(&mut eps[i]);         
                     let dst_ptr = e[pk_range_index].deref().add(cumulative_len[pk_range_index][i]);
                     let src_ptr = e2.deref();
 
