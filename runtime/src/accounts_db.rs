@@ -4721,10 +4721,16 @@ impl AccountsDB {
 
         let mut hash_time = Measure::start("hashes");
         let fanout = 16;
-        let ret =
-            Self::compute_merkle_root_and_capitalization_loop(hashes, fanout, |t: &Hash| (*t, 0));
+        let mut ret = (Hash::default(), 0);
+        if hashes.len() != 1 {
+            ret =
+                Self::compute_merkle_root_and_capitalization_loop(hashes, fanout, |t: &Hash| (*t, 0));
+        }
+        else if hashes.len() == 1 {
+            ret = (hashes[0], 0)
+        }
         hash_time.stop();
-
+        
         datapoint_info!(
             "calculate_accounts_hash_without_index3",
             ("accounts_scan", time_scan.as_us(), i64),
