@@ -4594,6 +4594,7 @@ impl AccountsDB {
         for i in 0..hashes.len() {
             let mut v = &mut hashes[i];
             for j in 0..v.len() {
+                let mut v = &mut v[j];
                 let len = v.len();
                 if len == 0 {
                     continue;
@@ -4611,11 +4612,17 @@ impl AccountsDB {
         let mut final_out: Vec<Hash> = Vec::with_capacity(chunks);
 
         let hashes: Vec<Hash> = (0..divisions)
-            .into_par_iter()
+            .into_iter()//par_iter()
             .map(|division_index| {
 
                 let mut start_index = division_index * chunks2;
-                start_index += start_index % fanout; // start index is alays at a fanout boundary
+                let remainder = start_index % fanout;
+                if remainder > 0 {
+                    start_index += (fanout - remainder); // start index must be at a fanout boundary
+                }
+                if start_index >= total_hashes {
+                    return vec![];
+                }
                 let end_index = std::cmp::min(start_index + chunks2, total_hashes);
 
                 let mut accum: Vec<Hash> = Vec::with_capacity((end_index-start_index)/fanout + 1);
@@ -4638,6 +4645,7 @@ impl AccountsDB {
                             current_sub_array = cumulative_offsets[sub_array_index];
                             current_source = &hashes[current_sub_array.1][current_sub_array.2];
                             current_source_index = i - current_sub_array.0;
+                            assert!(current_source_index < current_source.len())
                         }
                         let h = current_source[current_source_index];
                         i += 1;
@@ -6038,6 +6046,18 @@ fn test_uninit() {
         }
 
         error!("counts: {:?}", counts);
+
+        let data: Vec<_> = (0..100).into_iter().map(|i| {
+            let v2: Vec<_> = (0..100).into_iter().map(|j| {
+                let v3: Vec<_> = (0..100).into_iter().map(|k| {
+                    CalculateHashIntermediate2::new(0, Hash::new_unique(), i * j, Slot::default(), Pubkey::new_unique())
+                }).collect();
+                v3
+            }).collect();
+            v2
+        }).collect();
+        let result = AccountsDB::rest_of_hash_calculation3((data, Measure::start("")));
+
         return;
 
 
