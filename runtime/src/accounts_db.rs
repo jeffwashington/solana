@@ -4755,9 +4755,8 @@ impl AccountsDB {
         (result, time)
     }
 
-    fn calc_ranges() -> Vec<Pubkey> {
+    fn calc_ranges(divisions: u64) -> Vec<Pubkey> {
         let count = 0;
-        let divisions = 4;
         let mut parts:Vec<_> = Vec::new();
         parts.push(crate::bank::Bank::pubkey_range_from_partition((0, 0, divisions)).start().clone());
         for i in 1..divisions {
@@ -4767,7 +4766,24 @@ impl AccountsDB {
     }
 
     fn find_range(ranges: &Vec<Pubkey>, pubkey: Pubkey) -> usize {
+        let mut l = 0;
+        let mut r = ranges.len();
+        loop {
+            let width = r-l;
+            if width <= 1 {
+                return l;
+            }
+            let half = (l + r) / 2;
+            let val = ranges[half];
+            if pubkey <= val {
+                r = half;
+            }
+            else {
+                l = half;
+            }
+        };
         // could do binary search
+        /*
         for i in 1..PUBKEY_DIVISIONS-1 {
             let val = ranges[i];
             if pubkey < val {
@@ -4775,6 +4791,7 @@ impl AccountsDB {
             }
         }
         return PUBKEY_DIVISIONS - 1;
+        */
     }
 
     fn scan_snapshot_stores3(
@@ -4782,7 +4799,7 @@ impl AccountsDB {
         simple_capitalization_enabled: bool,
     ) -> (Vec<Vec<Vec<CalculateHashIntermediate2>>>, Measure) {
         let mut time = Measure::start("scan all accounts");
-        let ranges = Self::calc_ranges();
+        let ranges = Self::calc_ranges(PUBKEY_DIVISIONS as u64);
 
         let result: Vec<Vec<Vec<CalculateHashIntermediate2>>> = Self::scan_account_storage_no_bank(
             storage,
