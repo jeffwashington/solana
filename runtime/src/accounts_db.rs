@@ -4162,7 +4162,7 @@ impl AccountsDB {
                 // The two regions cannot overlap because mutable references do
                 // not alias, and two different vectors cannot own the same
                 // memory.
-                std::ptr::copy_nonoverlapping(src_ptr, dst_ptr, src_len);
+                std::ptr::copy_nonoverlapping::<CalculateHashIntermediate2>(src_ptr, dst_ptr, src_len);
             }
         });        
         unsafe {
@@ -4528,7 +4528,7 @@ impl AccountsDB {
 
         let mut zeros = Measure::start("eliminate zeros");
         let overall_sum = Mutex::new(0u64);
-        let mut hashes: Vec<_> = (0..PUBKEY_DIVISIONS)
+        let mut hashes: Vec<Vec<Vec<Hash>>> = (0..PUBKEY_DIVISIONS)
             .into_par_iter()
             .map(|i| {
                 let pubkey_division = &account_maps[i];
@@ -4600,10 +4600,10 @@ impl AccountsDB {
         };
         let mut final_out: Vec<Hash> = Vec::with_capacity(offset);
         final_out.push(Hash::default());
-        let e_dest = EvilPtr::new(&mut final_out);            
+        let e_dest = EvilPtr::new(&mut final_out[0]);            
 
         evil_ptrs_src
-        .into_par_iter()
+        .into_iter()//par_iter()
         .for_each(|(dest_offset, evil_ptr_src, src_index)| {
 
             
@@ -4623,7 +4623,7 @@ impl AccountsDB {
                 // The two regions cannot overlap because mutable references do
                 // not alias, and two different vectors cannot own the same
                 // memory.
-                std::ptr::copy_nonoverlapping(src_ptr, dst_ptr, src_len);
+                std::ptr::copy_nonoverlapping::<Hash>(src_ptr, dst_ptr, src_len);
             }
         });        
         unsafe {
@@ -5994,8 +5994,8 @@ fn test_uninit() {
                 )
             })
             .collect();
-        let account_maps2 = vec![account_maps2];
-        let account_maps2 = vec![account_maps2];
+        let account_maps2 = vec![account_maps2;100];
+        let account_maps2 = vec![account_maps2;100];
 
         let result = AccountsDB::rest_of_hash_calculation3((account_maps2, Measure::start("")));
         let expected_hash = Hash::from_str("8j9ARGFv4W2GfML7d3sVJK2MePwrikqYnu6yqer28cCa").unwrap();
