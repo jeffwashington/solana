@@ -4359,10 +4359,15 @@ impl AccountsDB {
             account_maps2[pk_range_index].push(CalculateHashIntermediate2::default()); // so we can deref 0
         }
 
+        let mut dummy = CalculateHashIntermediate2::default();
         let mut eps:Vec<Vec<EvilPtr<CalculateHashIntermediate2>>> = (0..PUBKEY_DIVISIONS).into_iter().map(|pk_range_index| {
             let eps:Vec<_> = (0..lensub1).into_iter().map(|i| {
-                let e2 = EvilPtr::new(&mut account_maps[i][pk_range_index][0]);         
-                e2
+                if account_maps[i].len() > pk_range_index && account_maps[i][pk_range_index].len() > 0 {
+                    EvilPtr::new(&mut account_maps[i][pk_range_index][0])
+                }
+                else {
+                    EvilPtr::new(&mut dummy)
+                }
             }).collect();
             eps
         }).collect();
