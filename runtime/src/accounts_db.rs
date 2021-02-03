@@ -105,7 +105,7 @@ pub enum ScanStorageResult<R, B> {
     Stored(B),
 }
 
-const PUBKEY_DIVISIONS: usize = 24;
+const PUBKEY_DIVISIONS: usize = 64;
 
 struct EvilPtr<T> {
     ptr: *mut T,
@@ -3890,7 +3890,7 @@ impl AccountsDB {
         let hashes: Vec<Vec<(Hash, u64)>> = {
             self.thread_pool_clean.install(|| {
             keys
-            .par_chunks(20_000)
+            .par_chunks(10_000)
             .map(|keys| {
                 let accum: Vec<(Hash, u64)> = keys
                     .iter()
