@@ -4245,6 +4245,69 @@ impl AccountsDB {
         (ret.0, sum)
     }
 
+    fn unsafe_collect<T>(mut account_maps: Vec<Vec<T>>) -> Vec<T> 
+    where
+        T: Default + Sync
+    {
+        let lensub1 = account_maps.len();
+        let mut size: usize = 0;
+        account_maps.iter().for_each(|v| {
+            size += v.len();
+        });
+
+        let mut cumulative_len: Vec<usize> = Vec::with_capacity(lensub1);
+        cumulative_len.push(0);
+        for i in 1..lensub1 {
+            cumulative_len.push(cumulative_len[i-1] + account_maps[i-1].len());
+        }
+
+        let mut account_maps2: Vec<T> = Vec::with_capacity(size);
+        account_maps2.push(T::default()); // so we can deref 0
+
+        let mut eps:Vec<_> = (0..lensub1).into_iter().map(|i| {
+            let e2 = EvilPtr::new(&mut account_maps[i][0]);         
+            e2
+        }).collect();
+
+        let e = EvilPtr::new(&mut account_maps2[0]);            
+        (0..lensub1).into_par_iter().
+        for_each(|i|
+        {
+            let bytes = std::mem::size_of::<CalculateHashIntermediate2>();
+            /*
+            
+            unsafe {
+            let d = e.deref();
+            let v = &sd[i];
+            for j in 0..size_small {
+                unsafe { *d.add(i*size_small*bytes) = v[j];}
+            }
+            */
+            let src = &account_maps[i];
+            let src_len = src.len();
+            unsafe {
+                //let dst_ptr = dst.as_mut_ptr().offset(dst_len as isize);
+                //let src_ptr = src.as_ptr();
+                let e2 = &eps[i];//EvilPtr::new(&mut eps[i]);         
+                let dst_ptr = e.deref().add(cumulative_len[i]);
+                let src_ptr = e2.deref();
+
+                // Truncate `src` without dropping its contents. We do this first,
+                // to avoid problems in case something further down panics.
+                // todo: src.set_len(0);
+        
+                // The two regions cannot overlap because mutable references do
+                // not alias, and two different vectors cannot own the same
+                // memory.
+                std::ptr::copy_nonoverlapping(src_ptr, dst_ptr, src_len);
+            }
+        });        
+        unsafe {
+            account_maps2.set_len(size);
+        }
+                account_maps2
+    }
+
     fn rest_of_hash_calculation3(
         accounts: (Vec<Vec<Vec<CalculateHashIntermediate2>>>, Measure),
     ) -> (Hash, u64) {
@@ -4269,7 +4332,7 @@ impl AccountsDB {
         account_maps
             .iter()
             .for_each(|v| {
-                for i in 0..PUBKEY_DIVISIONS {
+                for i in 0..std::cmp::min(PUBKEY_DIVISIONS, v.len()) {
                     sizes[i] += v[i].len();
                 }
             });
@@ -4278,9 +4341,14 @@ impl AccountsDB {
         for pk_range_index in 0..PUBKEY_DIVISIONS {
             cumulative_len.push(Vec::new());
             cumulative_len[pk_range_index].push(0);
-            error!("{}", lensub1);
             for i in 1..lensub1 {
-                let len = &((&account_maps[i-1])[pk_range_index]).len();
+                let len = 
+                if account_maps[i-1].len() > pk_range_index {
+                    ((&account_maps[i-1])[pk_range_index]).len()
+                }
+                else{
+                    0
+                };
                 let new_value = cumulative_len[pk_range_index][i-1] + len;
                 cumulative_len[pk_range_index].push(new_value);
             }
@@ -4305,6 +4373,9 @@ impl AccountsDB {
             (0..lensub1).into_par_iter().
             for_each(|i|
             {
+                if account_maps[i].len() <= pk_range_index {
+                    return;
+                }
                 let bytes = std::mem::size_of::<CalculateHashIntermediate2>();
                 /*
                 
@@ -5800,6 +5871,27 @@ fn test_uninit() {
 
         let result =
             AccountsDB::rest_of_hash_calculation((account_maps.clone(), Measure::start("")));
+        let expected_hash = Hash::from_str("8j9ARGFv4W2GfML7d3sVJK2MePwrikqYnu6yqer28cCa").unwrap();
+        assert_eq!(result, (expected_hash, 88));
+
+        let account_maps2: Vec<_> = account_maps
+            .iter()
+            .map(|rm| {
+                let k = rm.key();
+                let x = rm.value();
+                CalculateHashIntermediate2::new(
+                    x.version,
+                    x.hash,
+                    x.lamports,
+                    x.slot,
+                    *k,
+                )
+            })
+            .collect();
+        let account_maps2 = vec![account_maps2];
+        let account_maps2 = vec![account_maps2];
+
+        let result = AccountsDB::rest_of_hash_calculation3((account_maps2, Measure::start("")));
         let expected_hash = Hash::from_str("8j9ARGFv4W2GfML7d3sVJK2MePwrikqYnu6yqer28cCa").unwrap();
         assert_eq!(result, (expected_hash, 88));
 
