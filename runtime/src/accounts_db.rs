@@ -3887,10 +3887,10 @@ impl AccountsDB {
             .cloned()
             .collect();
         let mismatch_found = AtomicU64::new(0);
-        let hashes: Vec<(Hash, u64)> = {
+        let hashes: Vec<Vec<(Hash, u64)>> = {
             self.thread_pool_clean.install(|| {
             keys
-            .par_chunks(5_000)
+            .par_chunks(20_000)
             .map(|keys| {
                 let accum: Vec<(Hash, u64)> = keys
                     .iter()
@@ -3941,9 +3941,14 @@ impl AccountsDB {
                     })
                     .collect();
                     accum
-                    }).flatten().collect()
+                    }).collect()
                 })
         };
+        scan.stop();
+        let mut flatten = Measure::start("flatten");
+        let hashes:Vec<(Hash, u64)> = hashes.into_iter()
+        .flatten().collect();
+        flatten.stop();
         if mismatch_found.load(Ordering::Relaxed) > 0 {
             warn!(
                 "{} mismatched account hash(es) found",
@@ -3952,7 +3957,6 @@ impl AccountsDB {
             return Err(MismatchedAccountHash);
         }
 
-        scan.stop();
         let hash_total = hashes.len();
         let mut hash_time = Measure::start("hash");
         let fanout = 16;
@@ -3964,6 +3968,7 @@ impl AccountsDB {
             ("accounts_scan", scan.as_us(), i64),
             ("hash", hash_time.as_us(), i64),
             ("hash_total", hash_total, i64),
+            ("flatten", flatten.as_us(), i64),
         );
         Ok((accumulated_hash, total_lamports))
     }
@@ -4348,6 +4353,8 @@ impl AccountsDB {
                 }
             });
 
+            error!("3dist: {:?}", sizes);
+
         let mut cumulative_len: Vec<Vec<usize>> = Vec::with_capacity(lensub1);
         for pk_range_index in 0..PUBKEY_DIVISIONS {
             cumulative_len.push(Vec::new());
@@ -4521,14 +4528,15 @@ impl AccountsDB {
 
         let mut zeros = Measure::start("eliminate zeros");
         let overall_sum = Mutex::new(0u64);
-        let hashes: Vec<Hash> = (0..PUBKEY_DIVISIONS)
+        let hashes: Vec<_> = (0..PUBKEY_DIVISIONS)
             .into_par_iter()
             .map(|i| {
                 let pubkey_division = &account_maps[i];
                 let len = pubkey_division.len();
+                let chunk = 10;
                 let max = if len > 10 {10} else {1};
                 let chunk_size = len / max;
-                let hashes: Vec<Hash> = (0..max)
+                let hashes: Vec<Vec<Hash>> = (0..max)
                 .into_par_iter()
                 .map(|i| {
                     let mut result: Vec<Hash> = Vec::with_capacity(len);
@@ -4571,14 +4579,17 @@ impl AccountsDB {
 
                     result
                 })
-                .flatten()
                 .collect();
                 hashes
             })
-            .flatten()
             .collect();
 
         zeros.stop();
+        let mut flat2_time = Measure::start("flalt2");
+        let hashes:Vec<_> = hashes.into_iter().flatten().into_iter().flatten().collect();
+        flat2_time.stop();
+
+
         let hash_total = hashes.len();
 
         let mut hash_time = Measure::start("hashes");
@@ -4595,6 +4606,7 @@ impl AccountsDB {
             ("sort", sort_time.as_us(), i64),
             ("hash_total", hash_total, i64),
             ("flatten", flatten_time.as_us(), i64),
+            ("flatten2", flat2_time.as_us(), i64),
             //("unreduced_entries", len as i64, i64),
         );
 
