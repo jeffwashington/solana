@@ -4007,19 +4007,26 @@ impl AccountsDB {
         F: Fn(LoadedAccount, &mut B, Slot) + Send + Sync,
         B: Send + Default,
     {
-        snapshot_storages
-            .par_iter()
-            .flatten()
-            .map(|storage| {
-                let accounts = storage.accounts.accounts(0);
+        let items: Vec<_> =         snapshot_storages
+        .iter()
+        .flatten()
+        .collect();
+
+        items
+            .par_chunks(10_000)
+            .map(|storages: &[&Arc<AccountStorageEntry>]| {
                 let mut retval = B::default();
-                accounts.into_iter().for_each(|stored_account| {
-                    scan_func(
-                        LoadedAccount::Stored(stored_account),
-                        &mut retval,
-                        storage.slot(),
-                    )
-                });
+
+                for storage in storages{
+                    let accounts = storage.accounts.accounts(0);
+                    accounts.into_iter().for_each(|stored_account| {
+                        scan_func(
+                            LoadedAccount::Stored(stored_account),
+                            &mut retval,
+                            storage.slot(),
+                        )
+                    });
+                }
                 retval
             })
             .collect()
