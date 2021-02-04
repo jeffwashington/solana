@@ -3720,6 +3720,7 @@ impl AccountsDB {
         slot: Slot,
         ancestors: &Ancestors,
         simple_capitalization_enabled: bool,
+        expected_capitalization: u64,
     ) -> (Hash, u64) {
         let (hash, total_lamports) = self.calculate_accounts_hash_helper(
             do_not_use_index,
@@ -3736,8 +3737,8 @@ impl AccountsDB {
                 simple_capitalization_enabled,
             );
 
-            assert_eq!(hash, hash_other);
-            assert_eq!(total_lamports, total_lamports_other);
+            let fail = expected_capitalization != total_lamports || hash != hash_other || total_lamports != total_lamports_other;
+            assert!(fail, "verifying hashes: {:?}, {:?}, lamports: {:?}, {:?}, expected: {:?}", hash, hash_other, total_lamports, total_lamports_other, expected_capitalization);
         }
         let mut bank_hashes = self.bank_hashes.write().unwrap();
         let mut bank_hash_info = bank_hashes.get_mut(&slot).unwrap();
