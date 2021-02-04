@@ -3486,7 +3486,7 @@ impl AccountsDB {
         ancestors: &Ancestors,
         check_hash: bool,
         simple_capitalization_enabled: bool,
-    ) -> Result<(Hash, u64), BankHashVerificationError> {
+    ) -> Result<(Hash, u64, Vec<(Pubkey, Hash, u64)>), BankHashVerificationError> {
         use BankHashVerificationError::*;
         let mut scan = Measure::start("scan");
         let keys: Vec<_> = self
@@ -3498,7 +3498,7 @@ impl AccountsDB {
             .cloned()
             .collect();
         let mismatch_found = AtomicU64::new(0);
-        let hashes: Vec<(Hash, u64)> = {
+        let hashes: Vec<(Pubkey, Hash, u64)> = {
             self.thread_pool_clean.install(|| {
                 keys.par_iter()
                     .filter_map(|pubkey| {
@@ -3537,7 +3537,7 @@ impl AccountsDB {
                                         }
                                     }
 
-                                    Some((*loaded_hash, balance))
+                                    Some((*pubkey, *loaded_hash, balance))
                                 })
                             } else {
                                 None
@@ -3560,8 +3560,9 @@ impl AccountsDB {
         scan.stop();
         let hash_total = hashes.len();
         let mut hash_time = Measure::start("hash");
+        let bk = hashes.clone();
         let (accumulated_hash, total_lamports) =
-            Self::compute_merkle_root_and_capitalization_recurse(hashes, MERKLE_FANOUT);
+            Self::compute_merkle_root_and_capitalization(hashes, MERKLE_FANOUT);
         hash_time.stop();
         datapoint_info!(
             "update_accounts_hash",
@@ -3569,7 +3570,7 @@ impl AccountsDB {
             ("hash", hash_time.as_us(), i64),
             ("hash_total", hash_total, i64),
         );
-        Ok((accumulated_hash, total_lamports))
+        Ok((accumulated_hash, total_lamports, bk))
     }
 
     pub fn get_accounts_hash(&self, slot: Slot) -> Hash {
@@ -3710,8 +3711,9 @@ impl AccountsDB {
                 simple_capitalization_enabled,
             )
         } else {
-            self.calculate_accounts_hash(slot, ancestors, false, simple_capitalization_enabled)
-                .unwrap()
+            let (a, b, _) = self.calculate_accounts_hash(slot, ancestors, false, simple_capitalization_enabled)
+                .unwrap();
+            (a, b)
         }
     }
 
@@ -3740,6 +3742,12 @@ impl AccountsDB {
             );
 
             let fail = expected_capitalization.unwrap_or(total_lamports) != total_lamports || hash != hash_other || total_lamports != total_lamports_other;
+            if fail {
+                let (h3, l3, raw) = self.calculate_accounts_hash(slot, ancestors, true, simple_capitalization_enabled).unwrap();
+                assert_eq!(h3, hash_other);
+                assert_eq!(l3, total_lamports_other);
+
+            }
             assert!(fail, "verifying hashes: {:?}, {:?}, lamports: {:?}, {:?}, expected: {:?}", hash, hash_other, total_lamports, total_lamports_other, expected_capitalization);
         }
         let mut bank_hashes = self.bank_hashes.write().unwrap();
@@ -3826,7 +3834,7 @@ impl AccountsDB {
     ) -> Result<(), BankHashVerificationError> {
         use BankHashVerificationError::*;
 
-        let (calculated_hash, calculated_lamports) =
+        let (calculated_hash, calculated_lamports, _) =
             self.calculate_accounts_hash(slot, ancestors, true, simple_capitalization_enabled)?;
 
         if calculated_lamports != total_lamports {

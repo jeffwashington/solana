@@ -80,7 +80,7 @@ impl SnapshotRequestHandler {
     pub fn handle_snapshot_requests(
         &self,
         accounts_db_caching_enabled: bool,
-        test_hash_calculation: bool,
+        mut test_hash_calculation: bool,
     ) -> Option<u64> {
         self.snapshot_request_receiver
             .try_iter()
@@ -91,6 +91,7 @@ impl SnapshotRequestHandler {
                     status_cache_slot_deltas,
                 } = snapshot_request;
 
+                test_hash_calculation = true;
                 snapshot_root_bank.update_accounts_hash_with_index_option(true, test_hash_calculation);
                 let hash_for_testing = Some(snapshot_root_bank.get_accounts_hash());
 
