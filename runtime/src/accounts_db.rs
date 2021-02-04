@@ -3749,8 +3749,13 @@ impl AccountsDB {
 
                 let combined_maps = self.get_snapshot_storages(slot);
                 let (dashmap, _) = Self::scan_snapshot_stores(combined_maps, simple_capitalization_enabled);
-                let mut data: Vec<_> = dashmap.into_iter().map(|(k, v)| {
-                    (k, v.hash, v.lamports, v.version, v.slot)
+                let mut data: Vec<_> = dashmap.into_iter().filter_map(|(k, v)| {
+                    if v.raw_lamports == 0 {
+                        None
+                    }
+                    else {
+                        Some((k, v.hash, v.lamports, v.version, v.slot))
+                    }
                 }).collect();
                 data.par_sort_unstable_by(|a, b| a.0.cmp(&b.0));
 
