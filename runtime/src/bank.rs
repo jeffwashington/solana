@@ -4314,7 +4314,7 @@ impl Bank {
                 self.slot(),
                 &self.ancestors,
                 self.simple_capitalization_enabled(),
-                self.capitalization(),
+                Some(self.capitalization()),
             );
         assert_eq!(total_lamports, self.capitalization());
         hash
