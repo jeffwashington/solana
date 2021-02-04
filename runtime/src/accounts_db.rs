@@ -3749,48 +3749,54 @@ impl AccountsDB {
 
                 let combined_maps = self.get_snapshot_storages(slot);
                 let (dashmap, _) = Self::scan_snapshot_stores(combined_maps, simple_capitalization_enabled);
-                let data: Vec<_> = dashmap.into_iter().map(|(k, v)| {
-                    (*k, v.hash, v.lamports, v.version, v.slot)
+                let mut data: Vec<_> = dashmap.into_iter().map(|(k, v)| {
+                    (k, v.hash, v.lamports, v.version, v.slot)
                 }).collect();
+                data.par_sort_unstable_by(|a, b| a.0.cmp(&b.0));
 
+                let mut count = 0;
                 let mut l = 0;
                 let mut r = 0;
+                let max = 100;
                 while true {
                     let ldone = l >= raw.len();
                     let rdone = r >= data.len();
                     if ldone && rdone {
                         break;
                     }
+                    count += 1;
                     if ldone {
-                        error!("jwash:only in right: {:?}", data[r]);
+                        if count < max {error!("jwash:only in right: {:?}", data[r]);}
                         r += 1;
                         continue;
                     }
                     if rdone {
-                        error!("jwash:only in left: {:?}", raw[l]);
+                        if count < max {error!("jwash:only in left: {:?}", raw[l]);}
                         l += 1;
                         continue;
                     }
                     let ld = raw[l];
                     let rd = data[r];
                     if ld.0 < rd.0 {
-                        error!("jwash:only in left: {:?}", raw[l]);
+                        if count < max {error!("jwash:only in left: {:?}", raw[l]);}
                         l += 1;
                         continue;
                     }
                     else if ld.0 > rd.0 {
-                        error!("jwash:only in right: {:?}", data[r]);
+                        if count < max {error!("jwash:only in right: {:?}", data[r]);}
                         r += 1;
                         continue;
                     }
                     l += 1;
                     r += 1;
                     if ld.0 == rd.0 && ld.1 == rd.1 && ld.2 == rd.2 {
+                        count -= 1;
                         continue;
                     }
 
-                    error!("jwash:Different: {:?}, {:?}", ld, rd);
+                    if count < max {error!("jwash:Different: {:?}, {:?}", ld, rd);}
                 }
+                error!("jwash: different. count: {}, lcount: {}, rcount: {}", count, raw.len(), data.len());
 
 
             }
