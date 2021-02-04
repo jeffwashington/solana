@@ -3748,7 +3748,7 @@ impl AccountsDB {
                 assert_eq!(l3, total_lamports_other);
 
             }
-            assert!(fail, "verifying hashes: {:?}, {:?}, lamports: {:?}, {:?}, expected: {:?}", hash, hash_other, total_lamports, total_lamports_other, expected_capitalization);
+            assert!(!fail, "verifying hashes: {:?}, {:?}, lamports: {:?}, {:?}, expected: {:?}", hash, hash_other, total_lamports, total_lamports_other, expected_capitalization);
         }
         let mut bank_hashes = self.bank_hashes.write().unwrap();
         let mut bank_hash_info = bank_hashes.get_mut(&slot).unwrap();
