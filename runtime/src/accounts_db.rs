@@ -36,7 +36,6 @@ use lazy_static::lazy_static;
 use log::*;
 use rand::{prelude::SliceRandom, thread_rng, Rng};
 use rayon::{prelude::*, ThreadPool};
-use serde_json::{Result, Value};
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use solana_measure::measure::Measure;
@@ -3825,6 +3824,15 @@ impl AccountsDB {
         (hashes, flat2_time, hash_total)
     }
 
+    pub fn test() {
+        /*
+        let d = std::fs::read("/users/jeffreywashington/dev/s3/lorem_ipsum.json").unwrap();
+        //let serialized = serde_json::to_string(&data_sections_by_pubkey);
+        let arr = serde_json::from_str(std::str::from_utf8(d));
+      panic!("{:?}", arr);
+      */
+    }
+
     // input:
     // vec: unordered, created by parallelism
     //   vec: [0..bins] - where bins are pubkey ranges
@@ -3833,10 +3841,11 @@ impl AccountsDB {
     fn rest_of_hash_calculation(
         accounts: (Vec<Vec<CalculateHashIntermediate>>, Measure),
     ) -> (Hash, u64) {
+        Self::test();
         let (data_sections_by_pubkey, time_scan) = accounts;
 
-        let serialized = serde_json::to_string(&data_sections_by_pubkey);
-        std::fs::write("/home/jwash/sol/solana/mainnet-beta/accounts.json", serialized.unwrap()).unwrap();
+        let serialized = bincode::serialize(&data_sections_by_pubkey);
+        std::fs::write("/home/jwash/sol/solana/mainnet-beta/accounts.bytes", serialized.unwrap()).unwrap();
 
         let (outer, flatten_time, raw_len) =
             Self::flatten_hash_intermediate(data_sections_by_pubkey);
