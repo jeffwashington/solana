@@ -3836,7 +3836,7 @@ impl AccountsDB {
         let (data_sections_by_pubkey, time_scan) = accounts;
 
         let serialized = serde_json::to_string(&data_sections_by_pubkey);
-        std::fs::write("/users/jeffreywashington/dev/s3/lorem_ipsum.json", serialized.unwrap()).unwrap();
+        std::fs::write("/home/jwash/sol/solana/mainnet-beta/accounts.json", serialized.unwrap()).unwrap();
 
         let (outer, flatten_time, raw_len) =
             Self::flatten_hash_intermediate(data_sections_by_pubkey);
