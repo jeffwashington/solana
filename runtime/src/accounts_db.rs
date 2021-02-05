@@ -36,7 +36,9 @@ use lazy_static::lazy_static;
 use log::*;
 use rand::{prelude::SliceRandom, thread_rng, Rng};
 use rayon::{prelude::*, ThreadPool};
+use serde_json::{Result, Value};
 use serde::{Deserialize, Serialize};
+use std::fs::File;
 use solana_measure::measure::Measure;
 use solana_rayon_threadlimit::get_thread_count;
 use solana_sdk::{
@@ -169,7 +171,7 @@ type ShrinkCandidates = HashMap<Slot, HashMap<AppendVecId, Arc<AccountStorageEnt
 
 const ZERO_RAW_LAMPORTS_SENTINEL: u64 = std::u64::MAX;
 
-#[derive(Default, Debug, PartialEq, Clone)]
+#[derive(Default, Debug, PartialEq, Clone, Serialize, Deserialize)]
 struct CalculateHashIntermediate {
     pub version: u64,
     pub hash: Hash,
@@ -501,7 +503,7 @@ impl AccountStorageEntry {
         self.id.load(Ordering::Relaxed)
     }
 
-    pub fn flush(&self) -> Result<(), IOError> {
+    pub fn flush(&self) -> std::result::Result<(), IOError> {
         self.accounts.flush()
     }
 
@@ -3525,7 +3527,7 @@ impl AccountsDB {
         ancestors: &Ancestors,
         check_hash: bool,
         simple_capitalization_enabled: bool,
-    ) -> Result<(Hash, u64), BankHashVerificationError> {
+    ) -> std::result::Result<(Hash, u64), BankHashVerificationError> {
         use BankHashVerificationError::*;
         let mut scan = Measure::start("scan");
         let keys: Vec<_> = self
@@ -3833,6 +3835,9 @@ impl AccountsDB {
     ) -> (Hash, u64) {
         let (data_sections_by_pubkey, time_scan) = accounts;
 
+        let serialized = serde_json::to_string(&data_sections_by_pubkey);
+        std::fs::write("/users/jeffreywashington/dev/s3/lorem_ipsum.json", serialized.unwrap()).unwrap();
+
         let (outer, flatten_time, raw_len) =
             Self::flatten_hash_intermediate(data_sections_by_pubkey);
 
@@ -3977,7 +3982,7 @@ impl AccountsDB {
         ancestors: &Ancestors,
         total_lamports: u64,
         simple_capitalization_enabled: bool,
-    ) -> Result<(), BankHashVerificationError> {
+    ) -> std::result::Result<(), BankHashVerificationError> {
         use BankHashVerificationError::*;
 
         let (calculated_hash, calculated_lamports) =
