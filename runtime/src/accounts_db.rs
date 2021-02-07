@@ -3919,10 +3919,6 @@ impl AccountsDB {
                 let file = format!("accounts_by_bin_idex.bytes");
                 let serialized = bincode::serialize(&idx);
                 std::fs::write(file, serialized.unwrap()).unwrap();
-
-                let serialized = bincode::serialize(&data_sections_by_pubkey);
-                std::fs::write("accounts_by_bin.bytes", serialized.unwrap()).unwrap();
-                panic!("Wrote file");
             }
         } else {
             let idx_file = std::fs::read("accounts_by_bin_idex.bytes").unwrap();
