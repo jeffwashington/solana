@@ -3411,7 +3411,7 @@ impl AccountsDB {
         let total_hashes = hashes.len();
 
         let target = fanout * fanout * fanout;
-        let triple = false;//total_hashes >= target;
+        let triple = total_hashes >= target;
         let fanout_use = if triple {target} else {fanout};
         // we need div_ceil here
         let mut chunks = total_hashes / fanout_use;
