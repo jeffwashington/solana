@@ -3945,11 +3945,15 @@ impl AccountsDB {
                 arr[i].push(des);
             });
             error!("starting");
+
+            let thread_pool = make_min_priority_thread_pool()            ;
+            thread_pool.install(|| {
             for _ in 0..10 {
                 let arr = arr.clone();
                 const PUBKEY_BINS_FOR_CALCULATING_HASHES: usize = 64;
                 Self::rest_of_hash_calculation((arr, Measure::start(""), 0, Measure::start("")), PUBKEY_BINS_FOR_CALCULATING_HASHES);
             };
+            });
 
             panic!("got it: {}", arr.len());
         }
