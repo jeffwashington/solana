@@ -3409,8 +3409,12 @@ impl AccountsDB {
         let mut time = Measure::start("time");
 
         let total_hashes = hashes.len();
+
+        let target = fanout * fanout * fanout;
+        let triple = false;//total_hashes >= target;
+        let fanout_use = if triple {target} else {fanout};
         // we need div_ceil here
-        let mut chunks = total_hashes / fanout;
+        let mut chunks = total_hashes / fanout_use;
         if total_hashes % fanout != 0 {
             chunks += 1;
         }
@@ -3418,16 +3422,46 @@ impl AccountsDB {
         let result: Vec<_> = (0..chunks)
             .into_par_iter()
             .map(|i| {
-                let start_index = i * fanout;
-                let end_index = std::cmp::min(start_index + fanout, total_hashes);
+                let start_index = i * fanout_use;
+                let end_index = std::cmp::min(start_index + fanout_use, total_hashes);
 
-                let mut hasher = Hasher::default();
                 let mut this_sum = 0u128;
-                for item in hashes.iter().take(end_index).skip(start_index) {
-                    let (h, l) = extractor(&item);
-                    this_sum += l as u128;
-                    hasher.hash(h.as_ref());
+
+                let mut i = start_index;
+                let mut hasher = Hasher::default();
+
+                if triple {
+                    for j in 0..fanout {
+                        let mut hasher_j = Hasher::default();
+                        for k in 0..fanout {
+                            let mut hasher_k = Hasher::default();
+                            let end = std::cmp::min(i + fanout, end_index);
+                            let amt = end - i;
+                            for item in hashes.iter().take(end).skip(i) {
+                                let (h, l) = extractor(&item);
+                                this_sum += l as u128;
+                                hasher_k.hash(h.as_ref());
+                            }
+                            i += amt;
+                            hasher_j.hash(hasher_k.result().as_ref());
+                            if i >= end_index {
+                                break;
+                            }
+                        }
+                        hasher.hash(hasher_j.result().as_ref());
+                        if i >= end_index {
+                            break;
+                        }
+                    }
                 }
+                else {
+                    for item in hashes.iter().take(end_index).skip(start_index) {
+                        let (h, l) = extractor(&item);
+                        this_sum += l as u128;
+                        hasher.hash(h.as_ref());
+                        i += 1;
+                    }
+                };
 
                 (
                     hasher.result(),
@@ -3859,7 +3893,7 @@ impl AccountsDB {
     }
 
     pub fn test() {
-        if true {
+        if false {
             let d = std::fs::read("accounts_by_bin.bytes").unwrap();
             //let serialized = serde_json::to_string(&data_sections_by_pubkey);
             error!("len: {}", d.len());
@@ -3940,11 +3974,10 @@ impl AccountsDB {
         ),
         bins: usize,
     ) -> (Hash, u64) {
-        //Self::test();
         let (data_sections_by_pubkey, time_scan, num_snapshot_storage, time_pre_scan_flatten) =
             accounts;
 
-        if true {
+        if false {
             let mut idx: Vec<(usize, usize)> = Vec::new();
             for i in 0..data_sections_by_pubkey.len() {
                 for j in 0..data_sections_by_pubkey.len() {
@@ -5355,6 +5388,12 @@ pub mod tests {
     }
 
     #[test]
+    fn test_accounts_db_test_profiling() {
+        solana_logger::setup();
+        AccountsDB::test();
+    }
+
+    #[test]
     fn test_accountsdb_rest_of_hash_calculation() {
         solana_logger::setup();
 
@@ -5521,7 +5560,12 @@ pub mod tests {
                     );
                     assert_eq!(
                         hashes2.iter().flatten().collect::<Vec<_>>(),
-                        hashes4.iter().flatten().into_iter().flatten().collect::<Vec<_>>()
+                        hashes4
+                            .iter()
+                            .flatten()
+                            .into_iter()
+                            .flatten()
+                            .collect::<Vec<_>>()
                     );
                     assert_eq!(lamports2, lamports3);
                     assert_eq!(lamports2, lamports4);
@@ -5592,7 +5636,10 @@ pub mod tests {
             .collect();
         let expected = hashes.clone();
 
-        assert_eq!(AccountsDB::flatten_hashes(vec![vec![hashes.clone()]]).0, expected);
+        assert_eq!(
+            AccountsDB::flatten_hashes(vec![vec![hashes.clone()]]).0,
+            expected
+        );
         for in_first in 1..COUNT - 1 {
             assert_eq!(
                 AccountsDB::flatten_hashes(vec![vec![
@@ -5757,14 +5804,15 @@ pub mod tests {
             3,
             Pubkey::new_unique(),
         )]]];
-        const BINS:usize = 1;
+        const BINS: usize = 1;
         let (result, _, len) = AccountsDB::flatten_hash_intermediate(test.clone(), BINS);
         assert_eq!(result, test[0]);
         assert_eq!(len, 1);
 
-        let (result, _, len) = AccountsDB::flatten_hash_intermediate(vec![
-            vec![vec![CalculateHashIntermediate::default(); 0]]
-        ], BINS);
+        let (result, _, len) = AccountsDB::flatten_hash_intermediate(
+            vec![vec![vec![CalculateHashIntermediate::default(); 0]]],
+            BINS,
+        );
         assert_eq!(result.len(), 0);
         assert_eq!(len, 0);
 
@@ -5779,8 +5827,8 @@ pub mod tests {
                 5,
                 6,
                 Pubkey::new_unique(),
-            )]]
-        ];
+            )],
+        ]];
         let (result, _, len) = AccountsDB::flatten_hash_intermediate(test.clone(), BINS);
         let expected = test.into_iter().flatten().collect::<Vec<_>>();
         assert_eq!(result, expected);
