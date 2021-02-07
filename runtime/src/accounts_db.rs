@@ -3859,11 +3859,71 @@ impl AccountsDB {
     }
 
     pub fn test() {
-        let d = std::fs::read("accounts_by_bin.bytes").unwrap();
-        //let serialized = serde_json::to_string(&data_sections_by_pubkey);
-        error!("len: {}", d.len());
-        let arr = bincode::deserialize::<Vec<Vec<CalculateHashIntermediate>>>(&d).unwrap();
-      panic!("got it: {}, {:?}", arr.len(), arr[0].len());
+        if true {
+            let d = std::fs::read("accounts_by_bin.bytes").unwrap();
+            //let serialized = serde_json::to_string(&data_sections_by_pubkey);
+            error!("len: {}", d.len());
+            let arr = bincode::deserialize::<Vec<Vec<Vec<CalculateHashIntermediate>>>>(&d).unwrap();
+            /*
+            for _ in 0..10 {
+                let arr = arr.clone();
+                Self::rest_of_hash_calculation((arr, Measure::start(""), 0, Measure::start("")), 1);
+            };
+            */
+            if true {
+                let data_sections_by_pubkey = arr;
+                let mut idx: Vec<(usize, usize)> = Vec::new();
+                for i in 0..data_sections_by_pubkey.len() {
+                    let arr2 = &data_sections_by_pubkey[i];
+                    for j in 0..arr2.len() {
+                        idx.push((i, j));
+                        let file = format!("accounts_by_bin_{}_{}.bytes", i, j);
+                        let serialized = bincode::serialize(&arr2[j]);
+                        std::fs::write(file, serialized.unwrap()).unwrap();
+                    }
+                }
+                let file = format!("accounts_by_bin_idex.bytes");
+                let serialized = bincode::serialize(&idx);
+                std::fs::write(file, serialized.unwrap()).unwrap();
+
+                let serialized = bincode::serialize(&data_sections_by_pubkey);
+                std::fs::write("accounts_by_bin.bytes", serialized.unwrap()).unwrap();
+                panic!("Wrote file");
+            }
+        } else {
+            let idx_file = std::fs::read("accounts_by_bin_idex.bytes").unwrap();
+            //let serialized = serde_json::to_string(&data_sections_by_pubkey);
+            let idx = bincode::deserialize::<Vec<(usize, usize)>>(&idx_file).unwrap();
+
+            let mut arr: Vec<Vec<Vec<CalculateHashIntermediate>>> = Vec::new();
+
+            let out: Vec<(usize, usize, Vec<CalculateHashIntermediate>)> = idx
+                .into_par_iter()
+                .map(|(i, j)| {
+                    let file = format!("accounts_by_bin_{}_{}.bytes", i, j);
+                    let d = std::fs::read(file).unwrap();
+                    let des = bincode::deserialize::<Vec<CalculateHashIntermediate>>(&d).unwrap();
+                    (i, j, des)
+                })
+                .collect();
+
+            out.into_iter().for_each(|(i, j, des)| {
+                if j == 0 {
+                    let n: Vec<Vec<CalculateHashIntermediate>> = Vec::new();
+                    arr.push(n);
+                }
+                arr[i].push(des);
+            });
+            error!("starting");
+            for _ in 0..10 {
+                let arr = arr.clone();
+                const PUBKEY_BINS_FOR_CALCULATING_HASHES: usize = 64;
+                Self::rest_of_hash_calculation((arr, Measure::start(""), 0, Measure::start("")), PUBKEY_BINS_FOR_CALCULATING_HASHES);
+            };
+
+            panic!("got it: {}", arr.len());
+        }
+        panic!("got it2");
     }
 
     // input:
@@ -3884,11 +3944,20 @@ impl AccountsDB {
         let (data_sections_by_pubkey, time_scan, num_snapshot_storage, time_pre_scan_flatten) =
             accounts;
 
-            if false {
-        let serialized = bincode::serialize(&data_sections_by_pubkey);
-        std::fs::write("accounts_by_bin.bytes", serialized.unwrap()).unwrap();
-        panic!("Wrote file");
+        if true {
+            let mut idx: Vec<(usize, usize)> = Vec::new();
+            for i in 0..data_sections_by_pubkey.len() {
+                for j in 0..data_sections_by_pubkey.len() {
+                    idx.push((i, j));
+                    let file = format!("accounts_by_bin_{}_{}.bytes", i, j);
+                    let serialized = bincode::serialize(&data_sections_by_pubkey);
+                    std::fs::write("accounts_by_bin.bytes", serialized.unwrap()).unwrap();
+                }
             }
+            let serialized = bincode::serialize(&data_sections_by_pubkey);
+            std::fs::write("accounts_by_bin.bytes", serialized.unwrap()).unwrap();
+            panic!("Wrote file");
+        }
         let (outer, flatten_time, raw_len) =
             Self::flatten_hash_intermediate(data_sections_by_pubkey, bins);
 
