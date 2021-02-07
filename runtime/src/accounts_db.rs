@@ -3940,7 +3940,7 @@ impl AccountsDB {
         ),
         bins: usize,
     ) -> (Hash, u64) {
-        Self::test();
+        //Self::test();
         let (data_sections_by_pubkey, time_scan, num_snapshot_storage, time_pre_scan_flatten) =
             accounts;
 
