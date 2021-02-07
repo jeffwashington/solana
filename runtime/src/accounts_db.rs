@@ -3393,6 +3393,83 @@ impl AccountsDB {
 
     // For the first iteration, there could be more items in the tuple than just hash and lamports.
     // Using extractor allows us to avoid an unnecessary array copy on the first iteration.
+    fn compute_merkle_root_and_capitalization_loop2(
+        hashes: Vec<Hash>,
+        fanout: usize,
+    ) -> (Hash, u64)
+    {
+        if hashes.is_empty() {
+            return (Hasher::default().result(), 0);
+        }
+
+        let mut time = Measure::start("time");
+
+        let total_hashes = hashes.len();
+
+        let target = fanout * fanout * fanout;
+        let triple = total_hashes >= target;
+        let fanout_use = if triple {target} else {fanout};
+        // we need div_ceil here
+        let mut chunks = total_hashes / fanout_use;
+        if total_hashes % fanout != 0 {
+            chunks += 1;
+        }
+
+        let result: Vec<_> = (0..chunks)
+            .into_par_iter()
+            .map(|i| {
+                let start_index = i * fanout_use;
+                let end_index = std::cmp::min(start_index + fanout_use, total_hashes);
+
+                let mut i = start_index;
+                let mut hasher = Hasher::default();
+
+                if triple {
+                    for j in 0..fanout {
+                        let mut hasher_j = Hasher::default();
+                        for k in 0..fanout {
+                            let mut hasher_k = Hasher::default();
+                            let end = std::cmp::min(i + fanout, end_index);
+                            let amt = end - i;
+                            for item in hashes.iter().take(end).skip(i) {
+                                hasher_k.hash(item.as_ref());
+                            }
+                            i += amt;
+                            hasher_j.hash(hasher_k.result().as_ref());
+                            if i >= end_index {
+                                break;
+                            }
+                        }
+                        hasher.hash(hasher_j.result().as_ref());
+                        if i >= end_index {
+                            break;
+                        }
+                    }
+                }
+                else {
+                    for item in hashes.iter().take(end_index).skip(start_index) {
+                        hasher.hash(item.as_ref());
+                    }
+                };
+
+                (
+                    hasher.result(),
+                    0 as u64,
+                )
+            })
+            .collect();
+        time.stop();
+        debug!("hashing {} {}", total_hashes, time);
+
+        if result.len() == 1 {
+            result[0]
+        } else {
+            Self::compute_merkle_root_and_capitalization_recurse(result, fanout)
+        }
+    }
+
+    // For the first iteration, there could be more items in the tuple than just hash and lamports.
+    // Using extractor allows us to avoid an unnecessary array copy on the first iteration.
     fn compute_merkle_root_and_capitalization_loop<T, F>(
         hashes: Vec<T>,
         fanout: usize,
@@ -4003,9 +4080,7 @@ impl AccountsDB {
 
         let mut hash_time = Measure::start("hashes");
         let (hash, _) =
-            Self::compute_merkle_root_and_capitalization_loop(hashes, MERKLE_FANOUT, |t: &Hash| {
-                (*t, 0)
-            });
+            Self::compute_merkle_root_and_capitalization_loop2(hashes, MERKLE_FANOUT);
         hash_time.stop();
         datapoint_info!(
             "calculate_accounts_hash_without_index",
