@@ -4082,6 +4082,7 @@ impl AccountsDB {
         let (hash, _) =
             Self::compute_merkle_root_and_capitalization_loop2(hashes, MERKLE_FANOUT);
         hash_time.stop();
+        let total_time = time_scan.as_us() + zeros.as_us() + hash_time.as_us() + sort_time.as_us() + flatten_time.as_us() + flat2_time.as_us() + time_pre_scan_flatten.as_us();
         datapoint_info!(
             "calculate_accounts_hash_without_index",
             ("accounts_scan", time_scan.as_us(), i64),
@@ -4098,6 +4099,9 @@ impl AccountsDB {
                 time_pre_scan_flatten.as_us() as i64,
                 i64
             ),
+            ("total_time", total_time, i64),
+            ("bins", bins as i64, i64),
+            ("categories", bins as i64, i64),
         );
 
         (hash, total_lamports)
