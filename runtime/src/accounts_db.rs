@@ -3927,6 +3927,7 @@ impl AccountsDB {
 
     fn de_dup_and_eliminate_zeros(
         sorted_data_by_pubkey: Vec<Vec<CalculateHashIntermediate>>,
+        chunks: usize,
     ) -> (Vec<Vec<Vec<Hash>>>, Measure, u64) {
         // 1. eliminate zero lamport accounts
         // 2. pick the highest slot or (slot = and highest version) of each pubkey
@@ -3936,11 +3937,10 @@ impl AccountsDB {
         //     vec: individual hashes in pubkey order
         let mut zeros = Measure::start("eliminate zeros");
         let overall_sum = Mutex::new(0u64);
-        const CHUNKS: usize = 32;
         let hashes: Vec<Vec<Vec<Hash>>> = sorted_data_by_pubkey
             .into_iter()
             .map(|pubkey_division| {
-                let (hashes, sum) = Self::de_dup_accounts_in_parallel(&pubkey_division, CHUNKS);
+                let (hashes, sum) = Self::de_dup_accounts_in_parallel(&pubkey_division, chunks);
                 let mut overall = overall_sum.lock().unwrap();
                 *overall = Self::checked_cast_for_capitalization(sum as u128 + *overall as u128);
                 hashes
@@ -4001,6 +4001,7 @@ impl AccountsDB {
         let len = slice.len();
         let mut result: Vec<Hash> = Vec::with_capacity(len);
 
+        //error!("slice: {}", len);
         let mut sum: u128 = 0;
         if len > 0 {
             let mut i = 0;
@@ -4173,8 +4174,9 @@ impl AccountsDB {
 
         let (sorted_data_by_pubkey, sort_time) = Self::sort_hash_intermediate(outer);
 
+        let zero_chunks = 10;
         let (hashes, zeros, total_lamports) =
-            Self::de_dup_and_eliminate_zeros(sorted_data_by_pubkey);
+            Self::de_dup_and_eliminate_zeros(sorted_data_by_pubkey, zero_chunks);
 
         let (hashes, flat2_time, hash_total) = Self::flatten_hashes(hashes);
 
@@ -4201,7 +4203,7 @@ impl AccountsDB {
             ),
             ("total_time", total_time, i64),
             ("bins", bins as i64, i64),
-            ("categories", bins as i64, i64),
+            ("zero_chunks", zero_chunks as i64, i64),
         );
 
         (hash, total_lamports)
@@ -5731,7 +5733,7 @@ pub mod tests {
                     let (hashes2, lamports2) = AccountsDB::de_dup_accounts_in_parallel(slice, 1);
                     let (hashes3, lamports3) = AccountsDB::de_dup_accounts_in_parallel(slice, 2);
                     let (hashes4, _, lamports4) =
-                        AccountsDB::de_dup_and_eliminate_zeros(vec![slice.to_vec()]);
+                        AccountsDB::de_dup_and_eliminate_zeros(vec![slice.to_vec()], 10);
 
                     assert_eq!(
                         hashes2.iter().flatten().collect::<Vec<_>>(),
