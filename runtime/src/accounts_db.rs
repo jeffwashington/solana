@@ -4175,11 +4175,16 @@ impl AccountsDB {
 
         let (sorted_data_by_pubkey, sort_time) = Self::sort_hash_intermediate(outer);
 
-        let m = Measure::start("Jeff");
+        let mut m = Measure::start("Jeff");
         let mut sum = 0;
+        let mut last = Pubkey::default();
         sorted_data_by_pubkey.iter().map(|v| {
             v.iter().map(|v| { 
-                sum += v.len();
+                let now = v;
+                if now.pubkey != last {
+                    last = now.pubkey;
+                }
+                sum += 1;
             });
         });
         m.stop();
