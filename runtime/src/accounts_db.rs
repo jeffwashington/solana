@@ -4186,7 +4186,7 @@ impl AccountsDB {
                 let now = v;
                 let a1 = now.pubkey;//.as_ref();
                 let a2 = last;//.as_ref();
-                if a1 > a2 {
+                if a1 != a2 {
                     last2 = last;
                     last = now.pubkey;
                 }
