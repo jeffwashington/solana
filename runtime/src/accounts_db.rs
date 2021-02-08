@@ -4182,7 +4182,7 @@ impl AccountsDB {
         let mut last2 = Pubkey::default();
         let mut last3 = Pubkey::default();
         sorted_data_by_pubkey.iter().for_each(|v| {
-            v.iter().for_each(|v| { 
+            for v in &v[0..v.len()] {
                 if v.pubkey.as_ref()[0] == 1 {
                     sum2 += 1;
                 }
@@ -4213,7 +4213,7 @@ impl AccountsDB {
                 }
                 */
                 sum += 1;
-            });
+            }
         });
         m.stop();
         error!("sum: {}, time: {}, l: {}, {}", sum, m.as_us(), sorted_data_by_pubkey.len(), sum2);
