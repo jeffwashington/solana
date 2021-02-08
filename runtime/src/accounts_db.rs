@@ -4180,10 +4180,11 @@ impl AccountsDB {
         let mut last = Pubkey::default();
         sorted_data_by_pubkey.iter().for_each(|v| {
             v.iter().for_each(|v| { 
+                /*
                 let now = v;
                 if now.pubkey != last {
                     last = now.pubkey;
-                }
+                }*/
                 sum += 1;
             });
         });
