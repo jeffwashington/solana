@@ -3607,6 +3607,7 @@ impl AccountsDB {
                             }
 
                             hasher_k.hash(data[data_index].as_ref());
+                            data_index += 1;
                             i += 1;
                         }
                         hasher_j.hash(hasher_k.result().as_ref());
