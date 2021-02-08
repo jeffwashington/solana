@@ -4188,14 +4188,14 @@ impl AccountsDB {
                     last2 = last;
                     last = now.pubkey;
                 }
-                if last != last2 {
-                    last3 = last2;
+                if now.pubkey != last2 {
+                    sum2 += 1;
                 }
                 sum += 1;
             });
         });
         m.stop();
-        error!("sum: {}, time: {}, l: {}", sum, m.as_us(), sorted_data_by_pubkey.len());
+        error!("sum: {}, time: {}, l: {}, {}", sum, m.as_us(), sorted_data_by_pubkey.len(), sum2);
 
         let zero_chunks = 1;
         let (hashes, zeros, total_lamports) =
