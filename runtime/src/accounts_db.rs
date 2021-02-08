@@ -4178,8 +4178,8 @@ impl AccountsDB {
         let mut m = Measure::start("Jeff");
         let mut sum = 0;
         let mut last = Pubkey::default();
-        sorted_data_by_pubkey.iter().map(|v| {
-            v.iter().map(|v| { 
+        sorted_data_by_pubkey.iter().for_each(|v| {
+            v.iter().for_each(|v| { 
                 let now = v;
                 if now.pubkey != last {
                     last = now.pubkey;
