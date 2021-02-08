@@ -4184,16 +4184,20 @@ impl AccountsDB {
         sorted_data_by_pubkey.iter().for_each(|v| {
             v.iter().for_each(|v| { 
                 let now = v;
-                if now.pubkey != last {
+                let a1 = now.pubkey.as_ref();
+                let a2 = last.as_ref();
+                if a1 != a2 {
                     last2 = last;
                     last = now.pubkey;
                 }
+                /*
                 if now.pubkey != last2 {
                     sum2 += 1;
                 }
                 if now.pubkey != last3 {
                     sum2 += 2;
                 }
+                */
                 sum += 1;
             });
         });
