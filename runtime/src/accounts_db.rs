@@ -3598,7 +3598,7 @@ impl AccountsDB {
                         let mut hasher_k = Hasher::default();
                         let end = std::cmp::min(i + fanout, end_index);
                         let amt = end - i;
-                        for l in 0..end {
+                        for l in i..end {
                             if data_index >= data_len {
                                 // fetch next slice
                                 data = get_hashes(i, total_hashes);
