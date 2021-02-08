@@ -4183,7 +4183,10 @@ impl AccountsDB {
         let mut last3 = Pubkey::default();
         sorted_data_by_pubkey.iter().for_each(|v| {
             v.iter().for_each(|v| { 
-                if sum % 1000 == 0 {
+                if v.pubkey.as_ref()[0] == 1 {
+                    sum2 += 1;
+                }
+                if false {
                     let now = v;
                     //let a1 = now.pubkey;//.as_ref();
                     //let a2 = last;//.as_ref();
