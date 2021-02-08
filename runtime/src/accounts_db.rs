@@ -4055,7 +4055,7 @@ impl AccountsDB {
                         return &hashes[index.0][index.1][start..end];
                     }
                 }
-                panic!("didn't find: {}, {}", start, end);
+                panic!("didn't find: {}, {}, len: {}", start, end, size);
             };
             out = Self::compute_merkle_root_and_capitalization_loop3(size, MERKLE_FANOUT, get_slice);
         }
