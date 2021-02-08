@@ -3566,11 +3566,14 @@ impl AccountsDB {
     where
         F: Fn(usize, usize) -> &'a[Hash] + std::marker::Sync,
     {
-        assert!(total_hashes > fanout);
+        assert!(total_hashes > fanout * fanout * fanout);
 
         let mut time = Measure::start("time");
 
-        let mut chunks = total_hashes / fanout;
+        let target = fanout * fanout * fanout;
+        let fanout_use = target;
+        // we need div_ceil here
+        let mut chunks = total_hashes / fanout_use;
         if total_hashes % fanout != 0 {
             chunks += 1;
         }
@@ -3578,20 +3581,42 @@ impl AccountsDB {
         let result: Vec<_> = (0..chunks)
             .into_par_iter()
             .map(|i| {
-                let start_index = i * fanout;
-                let end_index = std::cmp::min(start_index + fanout, total_hashes);
+                let start_index = i * fanout_use;
+                let end_index = std::cmp::min(start_index + fanout_use, total_hashes);
+
+                let mut this_sum = 0u128;
 
                 let mut i = start_index;
                 let mut hasher = Hasher::default();
+                let mut data_len = 0;
+                let mut data = get_hashes(i, total_hashes);
+                let mut data_index = 0;
 
-                while i < end_index {
-                    let data = get_hashes(i, end_index - 1);
-                    for hash in data {
-                        hasher.hash(hash.as_ref());
-                        i += 1;
+                for j in 0..fanout {
+                    let mut hasher_j = Hasher::default();
+                    for k in 0..fanout {
+                        let mut hasher_k = Hasher::default();
+                        let end = std::cmp::min(i + fanout, end_index);
+                        let amt = end - i;
+                        for l in 0..end {
+                            if data_index >= data_len {
+                                // fetch next slice
+                                data = get_hashes(i, total_hashes);
+                                data_len = data.len();
+                                data_index = 0;
+                            }
+
+                            hasher_k.hash(data[data_index].as_ref());
+                            i += 1;
+                        }
+                        hasher_j.hash(hasher_k.result().as_ref());
                         if i >= end_index {
                             break;
-                        } 
+                        }
+                    }
+                    hasher.hash(hasher_j.result().as_ref());
+                    if i >= end_index {
+                        break;
                     }
                 }
 
@@ -4020,7 +4045,7 @@ impl AccountsDB {
             })
         });
 
-        if size > MERKLE_FANOUT * MERKLE_FANOUT {
+        if size > MERKLE_FANOUT * MERKLE_FANOUT * MERKLE_FANOUT {
             let get_slice = |start: usize, end: usize| -> &[Hash] {
                 for index in &cumulative_len {
                     if start >= index.2 && start < index.3 {
