@@ -4183,7 +4183,7 @@ impl AccountsDB {
         let mut last3 = Pubkey::default();
         sorted_data_by_pubkey.iter().for_each(|v| {
             for v in &v[0..v.len()] {
-                if v.pubkey.as_ref()[0] == 1 {
+                if v.lamports == 1 {
                     sum2 += 1;
                 }
                 if false {
