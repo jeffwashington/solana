@@ -4183,22 +4183,24 @@ impl AccountsDB {
         let mut last3 = Pubkey::default();
         sorted_data_by_pubkey.iter().for_each(|v| {
             v.iter().for_each(|v| { 
-                let now = v;
-                //let a1 = now.pubkey;//.as_ref();
-                //let a2 = last;//.as_ref();
-                match now.pubkey.partial_cmp(&last) {
-                    Some(order) => {
-                        match order {
-                            std::cmp::Ordering::Equal => (),
-                            _ => {
-                                sum2 += 1;
-                                //last2 = last;
-                                last = now.pubkey;
-                            }
-                        };
-                    },
-                    _ => (),
-                };
+                if j % 3 == 0 {
+                    let now = v;
+                    //let a1 = now.pubkey;//.as_ref();
+                    //let a2 = last;//.as_ref();
+                    match now.pubkey.partial_cmp(&last) {
+                        Some(order) => {
+                            match order {
+                                std::cmp::Ordering::Equal => (),
+                                _ => {
+                                    sum2 += 1;
+                                    //last2 = last;
+                                    last = now.pubkey;
+                                }
+                            };
+                        },
+                        _ => (),
+                    };
+                }
                 /*
                 if now.pubkey != last2 {
                     sum2 += 1;
