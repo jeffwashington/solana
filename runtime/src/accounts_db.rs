@@ -4175,6 +4175,16 @@ impl AccountsDB {
 
         let (sorted_data_by_pubkey, sort_time) = Self::sort_hash_intermediate(outer);
 
+        let m = Measure::start("Jeff");
+        let mut sum = 0;
+        sorted_data_by_pubkey.iter().map(|v| {
+            v.iter().map(|v| { 
+                sum += v.len();
+            });
+        });
+        m.stop();
+        error!("sum: {}, time: {}", sum, m.as_us());
+
         let zero_chunks = 1;
         let (hashes, zeros, total_lamports) =
             Self::de_dup_and_eliminate_zeros(sorted_data_by_pubkey, zero_chunks);
