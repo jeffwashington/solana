@@ -4191,6 +4191,9 @@ impl AccountsDB {
                 if now.pubkey != last2 {
                     sum2 += 1;
                 }
+                if now.pubkey != last3 {
+                    sum2 += 2;
+                }
                 sum += 1;
             });
         });
