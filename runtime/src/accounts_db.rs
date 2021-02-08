@@ -4223,7 +4223,7 @@ impl AccountsDB {
         let mut last2 = Pubkey::default();
         let mut last3 = Pubkey::default();
         (0..sample.len()/800).into_iter().for_each(|i|{
-            if sample[i * 800] == 1 {
+            if sample[i] == 1 {
                 sum2 += 1;
             }
         }
