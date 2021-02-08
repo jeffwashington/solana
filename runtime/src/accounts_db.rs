@@ -3983,14 +3983,14 @@ impl AccountsDB {
                     chunk_index == 0,
                     &pubkey_division[start_index..end_index],
                 );
-                let mut overall = overall_sum.lock().unwrap();
-                *overall = Self::checked_cast_for_capitalization(sum + *overall as u128);
+                //let mut overall = overall_sum.lock().unwrap();
+                //*overall = Self::checked_cast_for_capitalization(sum + *overall as u128);
 
                 result
             })
             .collect();
 
-        let sum = *overall_sum.lock().unwrap();
+        let sum = 0u64;//*overall_sum.lock().unwrap();
         (hashes, sum)
     }
 
