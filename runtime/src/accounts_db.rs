@@ -4051,7 +4051,7 @@ impl AccountsDB {
                     if start >= index.2 && start < index.3 {
                         let start = start - index.2;
                         let end = std::cmp::min(end, index.3) - index.2;
-                        return &hashes[index.0][index.1][start..end)];
+                        return &hashes[index.0][index.1][start..end];
                     }
                 }
                 panic!("didn't find: {}, {}", start, end);
