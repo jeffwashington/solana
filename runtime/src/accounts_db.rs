@@ -4020,7 +4020,8 @@ impl AccountsDB {
                     result.push(now.hash);
                     sum += now.lamports as u128;
                 }
-                for (k, now) in slice.iter().enumerate().skip(i + 1) {
+                for k in (i+1)..len {
+                    let now = &slice[k];
                     if now.pubkey != last {
                         i = k;
                         look_for_first_key = false;
