@@ -4215,7 +4215,7 @@ impl AccountsDB {
                 sum += 1;
             }
         });
-        let sample = vec![0u8; 1_500_000_000];
+        let sample = vec![0u8; 80 * 1_500_000];
         let mut m = Measure::start("Jeff");
         let mut sum = 0;
         let mut sum2 = 0;
