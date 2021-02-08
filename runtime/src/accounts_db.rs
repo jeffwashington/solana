@@ -4050,7 +4050,7 @@ impl AccountsDB {
                 for index in &cumulative_len {
                     if start >= index.2 && start < index.3 {
                         let start = start - index.2;
-                        let end = start - index.2;
+                        let end = end - index.2;
                         return &hashes[index.0][index.1][start..std::cmp::min(end, index.3)];
                     }
                 }
