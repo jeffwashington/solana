@@ -3556,6 +3556,54 @@ impl AccountsDB {
         }
     }
 
+    // For the first iteration, there could be more items in the tuple than just hash and lamports.
+    // Using extractor allows us to avoid an unnecessary array copy on the first iteration.
+    fn compute_merkle_root_and_capitalization_loop3<'a, F>(
+        total_hashes: usize,
+        fanout: usize,
+        get_hashes: F,
+    ) -> Vec<Hash>
+    where
+        F: Fn(usize, usize) -> &'a[Hash] + std::marker::Sync,
+    {
+        assert!(total_hashes > fanout);
+
+        let mut time = Measure::start("time");
+
+        let mut chunks = total_hashes / fanout;
+        if total_hashes % fanout != 0 {
+            chunks += 1;
+        }
+
+        let result: Vec<_> = (0..chunks)
+            .into_par_iter()
+            .map(|i| {
+                let start_index = i * fanout;
+                let end_index = std::cmp::min(start_index + fanout, total_hashes);
+
+                let mut i = start_index;
+                let mut hasher = Hasher::default();
+
+                while i < end_index {
+                    let data = get_hashes(i, end_index - 1);
+                    for hash in data {
+                        hasher.hash(hash.as_ref());
+                        i += 1;
+                        if i >= end_index {
+                            break;
+                        } 
+                    }
+                }
+
+                hasher.result()
+            })
+            .collect();
+        time.stop();
+        debug!("hashing {} {}", total_hashes, time);
+
+        result
+    }
+
     fn accumulate_account_hashes(
         hashes: Vec<(Pubkey, Hash, u64)>,
         slot: Slot,
@@ -3960,13 +4008,39 @@ impl AccountsDB {
     }
 
     fn flatten_hashes(hashes: Vec<Vec<Vec<Hash>>>) -> (Vec<Hash>, Measure, usize) {
-        // flatten vec/vec into 1d vec of hashes in order
         let mut flat2_time = Measure::start("flat2");
-        let hashes: Vec<Hash> = hashes.into_iter().flatten().into_iter().flatten().collect();
-        flat2_time.stop();
-        let hash_total = hashes.len();
+        let mut size: usize = 0;
+        let mut cumulative_len = Vec::new();
+        let out:Vec<Hash>;
+        hashes.iter().enumerate().for_each(|(i, v)| {
+            v.iter().enumerate().for_each(|(j, v)| {
+                let len = v.len();
+                cumulative_len.push((i, j, size, size + len));
+                size += len;
+            })
+        });
 
-        (hashes, flat2_time, hash_total)
+        if size > MERKLE_FANOUT * MERKLE_FANOUT {
+            let get_slice = |start: usize, end: usize| -> &[Hash] {
+                for index in &cumulative_len {
+                    if start >= index.2 && start < index.3 {
+                        let start = start - index.2;
+                        let end = start - index.2;
+                        return &hashes[index.0][index.1][start..std::cmp::min(end, index.3)];
+                    }
+                }
+                panic!("didn't find: {}, {}", start, end);
+            };
+            out = Self::compute_merkle_root_and_capitalization_loop3(size, MERKLE_FANOUT, get_slice);
+        }
+        else {
+            // flatten vec/vec into 1d vec of hashes in order
+            out = hashes.into_iter().flatten().into_iter().flatten().collect();
+        }
+
+        flat2_time.stop();
+
+        (out, flat2_time, size)
     }
 
     pub fn test() {
