@@ -4011,17 +4011,17 @@ impl AccountsDB {
             //  the first key we encounter in our slice. Note that if this is true,
             //  our slice begins one index prior to the 'actual' start of our logical range.
             let mut look_for_first_key = !is_first_slice;
+            let mut now = &slice[i];
             'outer: loop {
                 // at start of loop, item at 'i' is the first entry for a given pubkey - unless look_for_first
-                let now = &slice[i];
                 let last = now.pubkey;
                 if !look_for_first_key && now.lamports != ZERO_RAW_LAMPORTS_SENTINEL {
                     // first entry for this key that starts in our slice
                     //result.push(now.hash);
-                    sum += now.lamports as u128;
+                    // sum += now.lamports as u128;
                 }
                 for k in (i+1)..len {
-                    let now = &slice[k];
+                    now = &slice[k];
                     if now.pubkey != last {
                         i = k;
                         look_for_first_key = false;
