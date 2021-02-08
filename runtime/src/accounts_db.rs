@@ -4032,6 +4032,7 @@ impl AccountsDB {
                 break; // ran out of items in our slice, so our slice is done
             }
         }
+        error!("{}", len);
         (result, sum)
     }
 
