@@ -4222,7 +4222,7 @@ impl AccountsDB {
         let mut last = Pubkey::default();
         let mut last2 = Pubkey::default();
         let mut last3 = Pubkey::default();
-        (0..sample.len()/800).into_iter().for_each(|i|{
+        (0..sample.len()/8).into_iter().for_each(|i|{
             if sample[i] == 1 {
                 sum2 += 1;
             }
