@@ -3965,7 +3965,7 @@ impl AccountsDB {
         let chunk_size = len / max;
         let overall_sum = Mutex::new(0u64);
         let hashes: Vec<Vec<Hash>> = (0..max)
-            .into_par_iter()
+            .into_iter()
             .map(|chunk_index| {
                 let mut start_index = chunk_index * chunk_size;
                 let mut end_index = start_index + chunk_size;
