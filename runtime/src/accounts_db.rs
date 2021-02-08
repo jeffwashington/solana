@@ -4222,11 +4222,12 @@ impl AccountsDB {
         let mut last = Pubkey::default();
         let mut last2 = Pubkey::default();
         let mut last3 = Pubkey::default();
-        sample.iter().for_each(|v| {
-            if *v == 1 {
+        (0..sample.len()/80).into_iter().for_each(|i|{
+            if *v[i * 80] == 1 {
                 sum2 += 1;
             }
-        });        
+        }
+        );
         m.stop();
         error!("sum2: {}, time: {}, l: {}, {}", sum, m.as_us(), sorted_data_by_pubkey.len(), sum2);
 
