@@ -4017,7 +4017,7 @@ impl AccountsDB {
                 let last = now.pubkey;
                 if !look_for_first_key && now.lamports != ZERO_RAW_LAMPORTS_SENTINEL {
                     // first entry for this key that starts in our slice
-                    result.push(now.hash);
+                    //result.push(now.hash);
                     sum += now.lamports as u128;
                 }
                 for k in (i+1)..len {
