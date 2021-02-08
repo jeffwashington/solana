@@ -4188,7 +4188,7 @@ impl AccountsDB {
             });
         });
         m.stop();
-        error!("sum: {}, time: {}", sum, m.as_us());
+        error!("sum: {}, time: {}, l: {}", sum, m.as_us(), sorted_data_by_pubkey.len());
 
         let zero_chunks = 1;
         let (hashes, zeros, total_lamports) =
