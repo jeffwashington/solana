@@ -3588,8 +3588,8 @@ impl AccountsDB {
 
                 let mut i = start_index;
                 let mut hasher = Hasher::default();
-                let mut data_len = 0;
                 let mut data = get_hashes(i, total_hashes);
+                let mut data_len = data.len();
                 let mut data_index = 0;
 
                 for j in 0..fanout {
