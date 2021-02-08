@@ -4184,9 +4184,9 @@ impl AccountsDB {
         sorted_data_by_pubkey.iter().for_each(|v| {
             v.iter().for_each(|v| { 
                 let now = v;
-                let a1 = now.pubkey.as_ref();
-                let a2 = last.as_ref();
-                if a1 != a2 {
+                let a1 = now.pubkey;//.as_ref();
+                let a2 = last;//.as_ref();
+                if a1 > a2 {
                     last2 = last;
                     last = now.pubkey;
                 }
