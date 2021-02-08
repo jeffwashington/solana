@@ -3936,7 +3936,7 @@ impl AccountsDB {
         //     vec: individual hashes in pubkey order
         let mut zeros = Measure::start("eliminate zeros");
         let overall_sum = Mutex::new(0u64);
-        const CHUNKS: usize = 10;
+        const CHUNKS: usize = 32;
         let hashes: Vec<Vec<Vec<Hash>>> = sorted_data_by_pubkey
             .into_iter()
             .map(|pubkey_division| {
