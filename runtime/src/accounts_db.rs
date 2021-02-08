@@ -4215,8 +4215,20 @@ impl AccountsDB {
                 sum += 1;
             }
         });
+        let sample = vec![0u8; 1_500_000_000];
+        let mut m = Measure::start("Jeff");
+        let mut sum = 0;
+        let mut sum2 = 0;
+        let mut last = Pubkey::default();
+        let mut last2 = Pubkey::default();
+        let mut last3 = Pubkey::default();
+        sample.iter().for_each(|v| {
+            if v == 1 {
+                sum2 += 1;
+            }
+        });        
         m.stop();
-        error!("sum: {}, time: {}, l: {}, {}", sum, m.as_us(), sorted_data_by_pubkey.len(), sum2);
+        error!("sum2: {}, time: {}, l: {}, {}", sum, m.as_us(), sorted_data_by_pubkey.len(), sum2);
 
         let zero_chunks = 1;
         let (hashes, zeros, total_lamports) =
