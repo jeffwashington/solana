@@ -1,17 +1,8 @@
-use std::time::Instant;
-
-fn main() {
-let mut factor = 1;
-let mut size = 0;
-loop {
-    factor = factor * 10;
-    if factor > 5_000_000 {
-        break;
-    }
-    size += 10;
-
+fn foo() -> u64 {
+    let mut factor = 1_000_000;
+    let mut size = 60;
+    
     let sample = vec![0u8; size * 15_000_000];
-    let now = Instant::now();
     let mut sum2 = 0;
     let factor = 1;
     for i in 0..(sample.len()/size) {
@@ -19,7 +10,8 @@ loop {
             sum2 += 1;
         }
     }
-    let then = Instant::now();
-    let dur = then - now;
-    println!("sum2: {}, time: {:?}, factor: {}, size: {}", sum2, dur, factor, size);
-}}
+    sum2
+}
+fn main() {
+    println!("{}", foo());
+}
