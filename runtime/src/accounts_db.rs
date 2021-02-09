@@ -4467,7 +4467,7 @@ impl AccountsDB {
             error!("sum2: {}, time: {}, l: {}, {}, factor: {}, size: {}", sum, m.as_us(), sorted_data_by_pubkey.len(), sum2, factor, size);
         }
 */
-        let zero_chunks = 1;
+        let zero_chunks = 10;
         let (hashes, zeros, total_lamports) =
             Self::de_dup_and_eliminate_zeros2(sorted_data_by_pubkey, outer_raw, zero_chunks);
 
