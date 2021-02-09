@@ -4231,7 +4231,7 @@ impl AccountsDB {
             let mut last3 = Pubkey::default();
             (0..sample.len()/(80 * factor)).into_iter().for_each(|i|{
                 for j in 0..factor {
-                    if sample[i*80*factor+j] != 1 {
+                    if sample[i*80*factor+j*80] != 1 {
                         sum2 += 1;
                     }
     
