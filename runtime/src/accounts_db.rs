@@ -4174,7 +4174,7 @@ impl AccountsDB {
             Self::flatten_hash_intermediate(data_sections_by_pubkey, bins);
 
         let (sorted_data_by_pubkey, sort_time) = Self::sort_hash_intermediate(outer);
-
+/*
         let mut m = Measure::start("Jeff");
         let mut sum = 0;
         let mut sum2 = 0;
@@ -4244,7 +4244,7 @@ impl AccountsDB {
             m.stop();
             error!("sum2: {}, time: {}, l: {}, {}, factor: {}, size: {}", sum, m.as_us(), sorted_data_by_pubkey.len(), sum2, factor, size);
         }
-
+*/
         let zero_chunks = 1;
         let (hashes, zeros, total_lamports) =
             Self::de_dup_and_eliminate_zeros(sorted_data_by_pubkey, zero_chunks);
