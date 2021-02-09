@@ -6,7 +6,7 @@ fn foo() -> u64 {
     let mut sum2 = 0;
     let factor = 1;
     for i in 0..(sample.len()/size) {
-        if sample[i*size] != 1 {
+        if sample[i*size] != 100 {
             sum2 += 1;
         }
     }
