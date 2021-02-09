@@ -4159,6 +4159,9 @@ impl AccountsDB {
                         let div = 55_000_000;
                         let first_index = last_raw_idx / div;
                         let second_index = last_raw_idx - (first_index * div);
+                        error!("indexing: {}, {}", first_index, second_index);
+                        error!("indexing lens: {}", raw.len());
+                        error!("indexing lens:   {}", raw[first_index].len());
                         last_raw = raw[first_index][second_index];
                         
                         if last_raw.2 != ZERO_RAW_LAMPORTS_SENTINEL {
