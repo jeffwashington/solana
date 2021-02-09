@@ -4056,7 +4056,7 @@ impl AccountsDB {
                     chunk_index == 0,
                     &pubkey_division[start_index..len],
                     raw,
-                    end_index,
+                    end_index-start_index,
                 );
                 //let mut overall = overall_sum.lock().unwrap();
                 //*overall = Self::checked_cast_for_capitalization(sum + *overall as u128);
@@ -4159,6 +4159,7 @@ impl AccountsDB {
                         let div = 55_000_000;
                         let first_index = last_raw_idx / div;
                         let second_index = last_raw_idx - (first_index * div);
+                        /*
                         if first_index >= raw.len() {
                             error!("indexing: {}, {}", first_index, second_index);
                             error!("indexing lens: {}", raw.len());
@@ -4170,6 +4171,7 @@ impl AccountsDB {
                             }
 
                         }
+                        */
                         last_raw = raw[first_index][second_index];
                         
                         if last_raw.2 != ZERO_RAW_LAMPORTS_SENTINEL {
@@ -4187,15 +4189,17 @@ impl AccountsDB {
                         continue 'outer;
                     }
                     else {
-                        // same pk >= 1 times
-                        let last_raw_idx = slice[k].1 as usize;
-                        let div = 55_000_000;
-                        let first_index = last_raw_idx / div;
-                        let second_index = last_raw_idx - (first_index * div);
-                        let this_raw = &raw[first_index][second_index];
-                        if this_raw.0 >= last_raw.0 || (this_raw.0 == last_raw.0 && this_raw.1 > last_raw.0) {
-                            last_raw = *this_raw;
-                            i = k;
+                        if !look_for_first_key {
+                            // same pk >= 1 times
+                            let last_raw_idx = slice[k].1 as usize;
+                            let div = 55_000_000;
+                            let first_index = last_raw_idx / div;
+                            let second_index = last_raw_idx - (first_index * div);
+                            let this_raw = &raw[first_index][second_index];
+                            if this_raw.0 >= last_raw.0 || (this_raw.0 == last_raw.0 && this_raw.1 > last_raw.0) {
+                                last_raw = *this_raw;
+                                i = k;
+                            }
                         }
                     }
                 }
