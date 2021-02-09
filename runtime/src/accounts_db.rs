@@ -4216,22 +4216,25 @@ impl AccountsDB {
             }
         });
         let mut factor = 1;
+        let mut size = 0;
         loop {
             factor = factor * 10;
             if factor > 5_000_000 {
                 break;
             }
+            size += 10;
 
-            let sample = vec![0u8; 80 * 15_000_000];
+            let sample = vec![0u8; size * 15_000_000];
             let mut m = Measure::start("Jeff");
             let mut sum = 0;
             let mut sum2 = 0;
             let mut last = Pubkey::default();
             let mut last2 = Pubkey::default();
             let mut last3 = Pubkey::default();
-            (0..sample.len()/(80 * factor)).into_iter().for_each(|i|{
+            let factor = 1;
+            (0..sample.len()/(size * factor)).into_iter().for_each(|i|{
                 for j in 0..factor {
-                    if sample[i*80*factor+j*80] != 1 {
+                    if sample[i*size*factor+j*size] != 1 {
                         sum2 += 1;
                     }
     
