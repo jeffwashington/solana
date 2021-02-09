@@ -3872,9 +3872,9 @@ impl AccountsDB {
     }
 
     fn flatten_hash_intermediate2(
-        data_sections_by_pubkey: Vec<Vec<(Vec<(Pubkey, u32)>, Vec<(Slot, u64, u64, Hash)>)>>,
+        data_sections_by_pubkey: Vec<Vec<(Vec<(Pubkey, u32)>, Vec<(Slot, u64)>, Vec<(u64, Hash)>)>>,
         bins: usize,
-    ) -> (Vec<Vec<(Pubkey, u32)>>, Vec<Vec<Vec<(Slot, u64, u64, Hash)>>>, Measure, usize) {
+    ) -> (Vec<Vec<(Pubkey, u32)>>, Vec<Vec<(Vec<(Slot, u64)>, Vec<(u64, Hash)>)>>, Measure, usize) {
         // flatten this:
         // vec: just a level of hierarchy
         //   vec: 1 vec per PUBKEY_BINS_FOR_CALCULATING_HASHES
@@ -3884,13 +3884,13 @@ impl AccountsDB {
         //   vec: Intermediate data whose pubkey belongs in this division
         let mut flatten_time = Measure::start("flatten");
         let mut data_by_pubkey: Vec<Vec<(Pubkey, u32)>> = vec![Vec::new(); bins];
-        let mut data2: Vec<Vec<Vec<(Slot, u64, u64, Hash)>>> = vec![Vec::new(); bins];
+        let mut data2: Vec<Vec<(Vec<(Slot, u64)>, Vec<(u64, Hash)>)>> = vec![Vec::new(); bins];
         let mut raw_len = 0;
         for outer in &data_sections_by_pubkey {
             for pubkey_index in 0..outer.len() {
                 raw_len += outer[pubkey_index].0.len();
                 data_by_pubkey[pubkey_index].extend(outer[pubkey_index].0.clone());
-                data2[pubkey_index].push(outer[pubkey_index].1.clone());
+                data2[pubkey_index].push((outer[pubkey_index].1.clone(), outer[pubkey_index].2.clone()));
             }
         }
         flatten_time.stop();
@@ -3977,7 +3977,7 @@ impl AccountsDB {
 
     fn de_dup_and_eliminate_zeros2(
         sorted_data_by_pubkey: Vec<Vec<(Pubkey, u32)>>,
-        raw: Vec<Vec<Vec<(Slot, u64, u64, Hash)>>>,
+        raw: Vec<Vec<(Vec<(Slot, u64)>, Vec<(u64, Hash)>)>>,
         chunks: usize,
     ) -> (Vec<Vec<Vec<Hash>>>, Measure, u64) {
         // 1. eliminate zero lamport accounts
@@ -4030,7 +4030,7 @@ impl AccountsDB {
     }
     fn de_dup_accounts_in_parallel2(
         pubkey_division: &[(Pubkey, u32)],
-        raw: &Vec<Vec<(Slot, u64, u64, Hash)>>,
+        raw: &Vec<(Vec<(Slot, u64)>, Vec<(u64, Hash)>)>,
         chunk_count: usize,
     ) -> (Vec<Vec<Hash>>, u64) {
         let len = pubkey_division.len();
@@ -4115,7 +4115,7 @@ impl AccountsDB {
     fn de_dup_accounts_from_stores2(
         is_first_slice: bool,
         slice: &[(Pubkey, u32)],
-        raw: &Vec<Vec<(Slot, u64, u64, Hash)>>,
+        raw: &Vec<(Vec<(Slot, u64)>, Vec<(u64, Hash)>)>,
         logical_end: usize,
     ) -> (Vec<Hash>, u128) {
         let len = slice.len();
@@ -4132,7 +4132,7 @@ impl AccountsDB {
             //  the first key we encounter in our slice. Note that if this is true,
             //  our slice begins one index prior to the 'actual' start of our logical range.
             let mut look_for_first_key = !is_first_slice;
-            let mut last_raw = (Slot::default(), u64::default(), u64::default(), Hash::default());
+            let mut last_raw = (Slot::default(), u64::default());//, u64::default(), Hash::default());
             'outer: loop {
                 // at start of loop, item at 'i' is the first entry for a given pubkey - unless look_for_first
                 let last = i;
@@ -4172,12 +4172,12 @@ impl AccountsDB {
 
                         }
                         */
-                        last_raw = raw[first_index][second_index];
+                        let good = raw[first_index].1[second_index];
                         
-                        if last_raw.2 != ZERO_RAW_LAMPORTS_SENTINEL {
+                        if good.0 != ZERO_RAW_LAMPORTS_SENTINEL {
                             // first entry for this key that starts in our slice
-                            result.push(last_raw.3);
-                            // sum += now.lamports as u128;
+                            result.push(good.1);
+                            sum += good.0 as u128;
                         }
         
                         i = k;
@@ -4195,7 +4195,7 @@ impl AccountsDB {
                             let div = 55_000_000;
                             let first_index = last_raw_idx / div;
                             let second_index = last_raw_idx - (first_index * div);
-                            let this_raw = &raw[first_index][second_index];
+                            let this_raw = &raw[first_index].0[second_index];
                             if this_raw.0 >= last_raw.0 || (this_raw.0 == last_raw.0 && this_raw.1 > last_raw.0) {
                                 last_raw = *this_raw;
                                 i = k;
@@ -4205,10 +4205,29 @@ impl AccountsDB {
                 }
 
                 if !wrote_last {
-                    if last_raw.2 != ZERO_RAW_LAMPORTS_SENTINEL {
+                    let last_raw_idx = slice[i].1 as usize;
+                    let div = 55_000_000;
+                    let first_index = last_raw_idx / div;
+                    let second_index = last_raw_idx - (first_index * div);
+                    /*
+                    if first_index >= raw.len() {
+                        error!("indexing: {}, {}", first_index, second_index);
+                        error!("indexing lens: {}", raw.len());
+                    }
+                    else {
+                        let l2 = raw[first_index].len();
+                        if second_index >= l2 {
+                            error!("indexing lens: {}, {} in {},{}", first_index, second_index, raw.len(), l2);
+                        }
+
+                    }
+                    */
+                    let good = raw[first_index].1[second_index];
+                    
+                    if good.0 != ZERO_RAW_LAMPORTS_SENTINEL {
                         // first entry for this key that starts in our slice
-                        result.push(last_raw.3);
-                        // sum += now.lamports as u128;
+                        result.push(good.1);
+                        sum += good.0 as u128;
                     }
                 }
 
@@ -4356,11 +4375,13 @@ impl AccountsDB {
                 let o2:Vec<_> = v.iter().map(|v2| {
                     let mut pk = Vec::new();
                     let mut reset= Vec::new();
+                    let mut reset2= Vec::new();
                     let o3:Vec<_> = v2.iter().enumerate().map(|(i, item)| {
                         pk.push((item.pubkey, (offset + i) as u32));
-                        reset.push((item.slot, item.version, item.lamports, item.hash));
+                        reset.push((item.slot, item.version));
+                        reset2.push((item.lamports, item.hash));
                     }).collect();
-                    (pk, reset)
+                    (pk, reset, reset2)
                 }).collect();
                 offset += div;
                 o2
@@ -4386,7 +4407,7 @@ impl AccountsDB {
     // so, assumption is middle vec is bins sorted by pubkey
     fn rest_of_hash_calculation2(
         accounts: (
-            Vec<Vec<(Vec<(Pubkey, u32)>, Vec<(Slot, u64, u64, Hash)>)>>,
+            Vec<Vec<(Vec<(Pubkey, u32)>, Vec<(Slot, u64)>, Vec<(u64, Hash)>)>>,
             Measure,
             usize,
             Measure,
