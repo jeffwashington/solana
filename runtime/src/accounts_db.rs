@@ -3871,6 +3871,32 @@ impl AccountsDB {
         )
     }
 
+    fn flatten_hash_intermediate2(
+        data_sections_by_pubkey: Vec<Vec<(Vec<(Pubkey, u32)>, Vec<(Slot, u64, u64, Hash)>)>>,
+        bins: usize,
+    ) -> (Vec<Vec<(Pubkey, u32)>>, Vec<Vec<Vec<(Slot, u64, u64, Hash)>>>, Measure, usize) {
+        // flatten this:
+        // vec: just a level of hierarchy
+        //   vec: 1 vec per PUBKEY_BINS_FOR_CALCULATING_HASHES
+        //     vec: Intermediate data whose pubkey belongs in this division
+        // into this:
+        // vec: 1 vec per PUBKEY_BINS_FOR_CALCULATING_HASHES
+        //   vec: Intermediate data whose pubkey belongs in this division
+        let mut flatten_time = Measure::start("flatten");
+        let mut data_by_pubkey: Vec<Vec<(Pubkey, u32)>> = vec![Vec::new(); bins];
+        let mut data2: Vec<Vec<Vec<(Slot, u64, u64, Hash)>>> = vec![Vec::new(); bins];
+        let mut raw_len = 0;
+        for outer in &data_sections_by_pubkey {
+            for pubkey_index in 0..outer.len() {
+                raw_len += outer[pubkey_index].0.len();
+                data_by_pubkey[pubkey_index].extend(outer[pubkey_index].0.clone());
+                data2[pubkey_index].push(outer[pubkey_index].1.clone());
+            }
+        }
+        flatten_time.stop();
+        (data_by_pubkey, data2, flatten_time, raw_len)
+    }
+
     fn flatten_hash_intermediate(
         data_sections_by_pubkey: Vec<Vec<Vec<CalculateHashIntermediate>>>,
         bins: usize,
@@ -3895,6 +3921,14 @@ impl AccountsDB {
         (data_by_pubkey, flatten_time, raw_len)
     }
 
+    fn compare_two_hash_entries2(
+        a: &(Pubkey, u32),
+        b: &(Pubkey, u32),
+    ) -> std::cmp::Ordering {
+        // note partial_cmp only returns None with floating point comparisons
+        a.0.partial_cmp(&b.0).unwrap()
+    }
+
     fn compare_two_hash_entries(
         a: &CalculateHashIntermediate,
         b: &CalculateHashIntermediate,
@@ -3907,6 +3941,22 @@ impl AccountsDB {
             },
             other => other,
         }
+    }
+
+    fn sort_hash_intermediate2(
+        data_by_pubkey: Vec<Vec<(Pubkey, u32)>>,
+    ) -> (Vec<Vec<(Pubkey, u32)>>, Measure) {
+        // sort each PUBKEY_DIVISION vec
+        let mut sort_time = Measure::start("sort");
+        let sorted_data_by_pubkey: Vec<Vec<_>> = data_by_pubkey
+            .into_par_iter()
+            .map(|mut pk_range| {
+                pk_range.par_sort_unstable_by(Self::compare_two_hash_entries2);
+                pk_range
+            })
+            .collect();
+        sort_time.stop();
+        (sorted_data_by_pubkey, sort_time)
     }
 
     fn sort_hash_intermediate(
@@ -3923,6 +3973,34 @@ impl AccountsDB {
             .collect();
         sort_time.stop();
         (sorted_data_by_pubkey, sort_time)
+    }
+
+    fn de_dup_and_eliminate_zeros2(
+        sorted_data_by_pubkey: Vec<Vec<(Pubkey, u32)>>,
+        raw: Vec<Vec<Vec<(Slot, u64, u64, Hash)>>>,
+        chunks: usize,
+    ) -> (Vec<Vec<Vec<Hash>>>, Measure, u64) {
+        // 1. eliminate zero lamport accounts
+        // 2. pick the highest slot or (slot = and highest version) of each pubkey
+        // 3. produce this output:
+        // vec: PUBKEY_BINS_FOR_CALCULATING_HASHES in pubkey order
+        //   vec: sorted sections from parallelism, in pubkey order
+        //     vec: individual hashes in pubkey order
+        let mut zeros = Measure::start("eliminate zeros");
+        let overall_sum = Mutex::new(0u64);
+        let hashes: Vec<Vec<Vec<Hash>>> = sorted_data_by_pubkey
+            .into_par_iter()
+            .enumerate()
+            .map(|(d, pubkey_division)| {
+                let (hashes, sum) = Self::de_dup_accounts_in_parallel2(&pubkey_division, &raw[d], chunks);
+                let mut overall = overall_sum.lock().unwrap();
+                *overall = Self::checked_cast_for_capitalization(sum as u128 + *overall as u128);
+                hashes
+            })
+            .collect();
+        zeros.stop();
+        let sum = *overall_sum.lock().unwrap();
+        (hashes, zeros, sum)
     }
 
     fn de_dup_and_eliminate_zeros(
@@ -3950,6 +4028,46 @@ impl AccountsDB {
         let sum = *overall_sum.lock().unwrap();
         (hashes, zeros, sum)
     }
+    fn de_dup_accounts_in_parallel2(
+        pubkey_division: &[(Pubkey, u32)],
+        raw: &Vec<Vec<(Slot, u64, u64, Hash)>>,
+        chunk_count: usize,
+    ) -> (Vec<Vec<Hash>>, u64) {
+        let len = pubkey_division.len();
+        let max = if len > chunk_count { chunk_count } else { 1 };
+        let chunk_size = len / max;
+        let overall_sum = Mutex::new(0u64);
+        let hashes: Vec<Vec<Hash>> = (0..max)
+            .into_par_iter()
+            .map(|chunk_index| {
+                let mut start_index = chunk_index * chunk_size;
+                let mut end_index = start_index + chunk_size;
+                if chunk_index == max - 1 {
+                    end_index = len;
+                }
+
+                let is_first_slice = chunk_index == 0;
+                if !is_first_slice {
+                    // note that this causes all regions after region 0 to have 1 item that overlaps with the previous region
+                    start_index -= 1;
+                }
+
+                let (result, sum) = Self::de_dup_accounts_from_stores2(
+                    chunk_index == 0,
+                    &pubkey_division[start_index..len],
+                    raw,
+                    end_index,
+                );
+                //let mut overall = overall_sum.lock().unwrap();
+                //*overall = Self::checked_cast_for_capitalization(sum + *overall as u128);
+
+                result
+            })
+            .collect();
+
+        let sum = 0u64;//*overall_sum.lock().unwrap();
+        (hashes, sum)
+    }    
 
     // 1. eliminate zero lamport accounts
     // 2. pick the highest slot or (slot = and highest version) of each pubkey
@@ -3994,6 +4112,96 @@ impl AccountsDB {
         (hashes, sum)
     }
 
+    fn de_dup_accounts_from_stores2(
+        is_first_slice: bool,
+        slice: &[(Pubkey, u32)],
+        raw: &Vec<Vec<(Slot, u64, u64, Hash)>>,
+        logical_end: usize,
+    ) -> (Vec<Hash>, u128) {
+        let len = slice.len();
+        let mut result: Vec<Hash> = Vec::with_capacity(len);
+
+        //error!("slice: {}", len);
+        let mut sum: u128 = 0;
+        let mut wrote_last = true;
+        if len > 0 {
+            let mut i = 0;
+            // look_for_first_key means the first key we find in our slice may be a
+            //  continuation of accounts belonging to a key that started in the last slice.
+            // so, look_for_first_key=true means we have to find the first key different than
+            //  the first key we encounter in our slice. Note that if this is true,
+            //  our slice begins one index prior to the 'actual' start of our logical range.
+            let mut look_for_first_key = !is_first_slice;
+            let mut last_raw = (Slot::default(), u64::default(), u64::default(), Hash::default());
+            'outer: loop {
+                // at start of loop, item at 'i' is the first entry for a given pubkey - unless look_for_first
+                let last = i;
+                /*
+                if !look_for_first_key && now.lamports != ZERO_RAW_LAMPORTS_SENTINEL {
+                    // first entry for this key that starts in our slice
+                    //result.push(now.hash);
+                    // sum += now.lamports as u128;
+                }
+                */
+                for k in (i+1)..len {
+                    let now = slice[k];
+                    if now.0 != slice[i].0 {
+                        if look_for_first_key {
+                            look_for_first_key = false;
+                            i = k;
+                            if k >= logical_end {
+                                break 'outer; // don't identify another new one
+                            }
+                            continue 'outer;
+                        }
+
+                        let last_raw_idx = slice[i].1 as usize;
+                        let div = 55_000_000;
+                        let first_index = last_raw_idx / div;
+                        let second_index = last_raw_idx - (first_index * div);
+                        last_raw = raw[first_index][second_index];
+                        
+                        if last_raw.2 != ZERO_RAW_LAMPORTS_SENTINEL {
+                            // first entry for this key that starts in our slice
+                            result.push(last_raw.3);
+                            // sum += now.lamports as u128;
+                        }
+        
+                        i = k;
+                        wrote_last = true;
+                        if k >= logical_end {
+                            break 'outer; // don't identify another new one
+                        }
+                        wrote_last = true; // identified another one
+                        continue 'outer;
+                    }
+                    else {
+                        // same pk >= 1 times
+                        let last_raw_idx = slice[k].1 as usize;
+                        let div = 55_000_000;
+                        let first_index = last_raw_idx / div;
+                        let second_index = last_raw_idx - (first_index * div);
+                        let this_raw = &raw[first_index][second_index];
+                        if this_raw.0 >= last_raw.0 || (this_raw.0 == last_raw.0 && this_raw.1 > last_raw.0) {
+                            last_raw = *this_raw;
+                            i = k;
+                        }
+                    }
+                }
+
+                if !wrote_last {
+                    if last_raw.2 != ZERO_RAW_LAMPORTS_SENTINEL {
+                        // first entry for this key that starts in our slice
+                        result.push(last_raw.3);
+                        // sum += now.lamports as u128;
+                    }
+                }
+
+                break; // ran out of items in our slice, so our slice is done
+            }
+        }
+        (result, sum)
+    }
     fn de_dup_accounts_from_stores(
         is_first_slice: bool,
         slice: &[CalculateHashIntermediate],
@@ -4017,8 +4225,8 @@ impl AccountsDB {
                 let last = now.pubkey;
                 if !look_for_first_key && now.lamports != ZERO_RAW_LAMPORTS_SENTINEL {
                     // first entry for this key that starts in our slice
-                    //result.push(now.hash);
-                    // sum += now.lamports as u128;
+                    result.push(now.hash);
+                    sum += now.lamports as u128;
                 }
                 for k in (i+1)..len {
                     now = &slice[k];
@@ -4126,17 +4334,161 @@ impl AccountsDB {
             error!("starting");
 
             let thread_pool = make_min_priority_thread_pool()            ;
+
+            let div = 55_000_000;
+            let mut offset = 0;
+            let arr:Vec<_> = arr.into_iter().map(|v| {
+                let o2:Vec<_> = v.iter().map(|v2| {
+                    let mut pk = Vec::new();
+                    let mut reset= Vec::new();
+                    let o3:Vec<_> = v2.iter().enumerate().map(|(i, item)| {
+                        pk.push((item.pubkey, i as u32));
+                        reset.push((item.slot, item.version, item.lamports, item.hash));
+                    }).collect();
+                    (pk, reset)
+                }).collect();
+                offset += div;
+                o2
+            }).collect();
+
             thread_pool.install(|| {
             for _ in 0..10 {
                 let arr = arr.clone();
                 const PUBKEY_BINS_FOR_CALCULATING_HASHES: usize = 64;
-                Self::rest_of_hash_calculation((arr, Measure::start(""), 0, Measure::start("")), PUBKEY_BINS_FOR_CALCULATING_HASHES);
+                Self::rest_of_hash_calculation2((arr, Measure::start(""), 0, Measure::start("")), PUBKEY_BINS_FOR_CALCULATING_HASHES);
             };
             });
 
             panic!("got it: {}", arr.len());
         }
         panic!("got it2");
+    }
+
+    // input:
+    // vec: unordered, created by parallelism
+    //   vec: [0..bins] - where bins are pubkey ranges
+    //     vec: [..] - items which fin in the containing bin, unordered within this vec
+    // so, assumption is middle vec is bins sorted by pubkey
+    fn rest_of_hash_calculation2(
+        accounts: (
+            Vec<Vec<(Vec<(Pubkey, u32)>, Vec<(Slot, u64, u64, Hash)>)>>,
+            Measure,
+            usize,
+            Measure,
+        ),
+        bins: usize,
+    ) -> (Hash, u64) {
+        let (data_sections_by_pubkey, time_scan, num_snapshot_storage, time_pre_scan_flatten) =
+            accounts;
+
+        let (outer, outer_raw, flatten_time, raw_len) =
+            Self::flatten_hash_intermediate2(data_sections_by_pubkey, bins);
+
+        let (sorted_data_by_pubkey, sort_time) = Self::sort_hash_intermediate2(outer);
+/*
+        let mut m = Measure::start("Jeff");
+        let mut sum = 0;
+        let mut sum2 = 0;
+        let mut last = Pubkey::default();
+        let mut last2 = Pubkey::default();
+        let mut last3 = Pubkey::default();
+        sorted_data_by_pubkey.iter().for_each(|v| {
+            for v in &v[0..v.len()] {
+                if v.lamports == 1 {
+                    sum2 += 1;
+                }
+                if false {
+                    let now = v;
+                    //let a1 = now.pubkey;//.as_ref();
+                    //let a2 = last;//.as_ref();
+                    match now.pubkey.partial_cmp(&last) {
+                        Some(order) => {
+                            match order {
+                                std::cmp::Ordering::Equal => (),
+                                _ => {
+                                    sum2 += 1;
+                                    //last2 = last;
+                                    last = now.pubkey;
+                                }
+                            };
+                        },
+                        _ => (),
+                    };
+                }
+                /*
+                if now.pubkey != last2 {
+                    sum2 += 1;
+                }
+                if now.pubkey != last3 {
+                    sum2 += 2;
+                }
+                */
+                sum += 1;
+            }
+        });
+        let mut factor = 1;
+        let mut size = 0;
+        loop {
+            factor = factor * 10;
+            if factor > 5_000_000 {
+                break;
+            }
+            size += 10;
+
+            let sample = vec![0u8; size * 15_000_000];
+            let mut m = Measure::start("Jeff");
+            let mut sum = 0;
+            let mut sum2 = 0;
+            let mut last = Pubkey::default();
+            let mut last2 = Pubkey::default();
+            let mut last3 = Pubkey::default();
+            let factor = 1;
+            (0..sample.len()/(size * factor)).into_iter().for_each(|i|{
+                for j in 0..factor {
+                    if sample[i*size*factor+j*size] != 1 {
+                        sum2 += 1;
+                    }
+    
+                }
+            }
+            );
+            m.stop();
+            error!("sum2: {}, time: {}, l: {}, {}, factor: {}, size: {}", sum, m.as_us(), sorted_data_by_pubkey.len(), sum2, factor, size);
+        }
+*/
+        let zero_chunks = 1;
+        let (hashes, zeros, total_lamports) =
+            Self::de_dup_and_eliminate_zeros2(sorted_data_by_pubkey, outer_raw, zero_chunks);
+
+        let (hashes, flat2_time, hash_total) = Self::flatten_hashes(hashes);
+
+        let mut hash_time = Measure::start("hashes");
+        let (hash, _) =
+            Self::compute_merkle_root_and_capitalization_loop2(hashes, MERKLE_FANOUT);
+        hash_time.stop();
+        let total_time = time_scan.as_us() + zeros.as_us() + hash_time.as_us() + sort_time.as_us() + flatten_time.as_us() + flat2_time.as_us() + time_pre_scan_flatten.as_us();
+        datapoint_info!(
+            "calculate_accounts_hash_without_index",
+            ("accounts_scan", time_scan.as_us(), i64),
+            ("eliminate_zeros", zeros.as_us(), i64),
+            ("hash", hash_time.as_us(), i64),
+            ("sort", sort_time.as_us(), i64),
+            ("hash_total", hash_total, i64),
+            ("flatten", flatten_time.as_us(), i64),
+            ("flatten_after_zeros", flat2_time.as_us(), i64),
+            ("unreduced_entries", raw_len as i64, i64),
+            ("num_snapshot_storage", num_snapshot_storage as i64, i64),
+            (
+                "pre_scan_flatten",
+                time_pre_scan_flatten.as_us() as i64,
+                i64
+            ),
+            ("total_time", total_time, i64),
+            ("bins", bins as i64, i64),
+            ("zero_chunks", zero_chunks as i64, i64),
+        );
+
+        (hash, total_lamports)
     }
 
     // input:
