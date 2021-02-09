@@ -3989,7 +3989,7 @@ impl AccountsDB {
         let mut zeros = Measure::start("eliminate zeros");
         let overall_sum = Mutex::new(0u64);
         let hashes: Vec<Vec<Vec<Hash>>> = sorted_data_by_pubkey
-            .into_iter()
+            .into_par_iter()
             .enumerate()
             .map(|(d, pubkey_division)| {
                 let (hashes, sum) = Self::de_dup_accounts_in_parallel2(&pubkey_division, &raw[d], chunks);
@@ -4038,7 +4038,7 @@ impl AccountsDB {
         let chunk_size = len / max;
         let overall_sum = Mutex::new(0u64);
         let hashes: Vec<Vec<Hash>> = (0..max)
-            .into_iter()
+            .into_par_iter()
             .map(|chunk_index| {
                 let mut start_index = chunk_index * chunk_size;
                 let mut end_index = start_index + chunk_size;
