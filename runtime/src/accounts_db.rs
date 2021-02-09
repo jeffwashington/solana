@@ -3989,7 +3989,7 @@ impl AccountsDB {
         let mut zeros = Measure::start("eliminate zeros");
         let overall_sum = Mutex::new(0u64);
         let hashes: Vec<Vec<Vec<Hash>>> = sorted_data_by_pubkey
-            .into_par_iter()
+            .into_iter()
             .enumerate()
             .map(|(d, pubkey_division)| {
                 let (hashes, sum) = Self::de_dup_accounts_in_parallel2(&pubkey_division, &raw[d], chunks);
@@ -4038,7 +4038,7 @@ impl AccountsDB {
         let chunk_size = len / max;
         let overall_sum = Mutex::new(0u64);
         let hashes: Vec<Vec<Hash>> = (0..max)
-            .into_par_iter()
+            .into_iter()
             .map(|chunk_index| {
                 let mut start_index = chunk_index * chunk_size;
                 let mut end_index = start_index + chunk_size;
@@ -4159,9 +4159,17 @@ impl AccountsDB {
                         let div = 55_000_000;
                         let first_index = last_raw_idx / div;
                         let second_index = last_raw_idx - (first_index * div);
-                        error!("indexing: {}, {}", first_index, second_index);
-                        error!("indexing lens: {}", raw.len());
-                        error!("indexing lens:   {}", raw[first_index].len());
+                        if first_index >= raw.len() {
+                            error!("indexing: {}, {}", first_index, second_index);
+                            error!("indexing lens: {}", raw.len());
+                        }
+                        else {
+                            let l2 = raw[first_index].len();
+                            if second_index >= l2 {
+                                error!("indexing lens: {}, {} in {},{}", first_index, second_index, raw.len(), l2);
+                            }
+
+                        }
                         last_raw = raw[first_index][second_index];
                         
                         if last_raw.2 != ZERO_RAW_LAMPORTS_SENTINEL {
