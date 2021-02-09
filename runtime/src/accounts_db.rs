@@ -4353,7 +4353,7 @@ impl AccountsDB {
                     let mut pk = Vec::new();
                     let mut reset= Vec::new();
                     let o3:Vec<_> = v2.iter().enumerate().map(|(i, item)| {
-                        pk.push((item.pubkey, i as u32));
+                        pk.push((item.pubkey, (offset + i) as u32));
                         reset.push((item.slot, item.version, item.lamports, item.hash));
                     }).collect();
                     (pk, reset)
