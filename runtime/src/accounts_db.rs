@@ -4675,6 +4675,7 @@ impl AccountsDB {
     }
 
     pub fn get_snapshot_storages(&self, snapshot_slot: Slot) -> SnapshotStorages {
+        let mut time = Measure::start("get_snapshot_storages");
         self.storage
             .0
             .iter()
@@ -4694,6 +4695,7 @@ impl AccountsDB {
             })
             .filter(|snapshot_storage: &SnapshotStorage| !snapshot_storage.is_empty())
             .collect()
+        info!("{}", time);
     }
 
     pub fn generate_index(&self) {
