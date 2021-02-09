@@ -14,8 +14,8 @@ loop {
     let now = Instant::now();
     let mut sum2 = 0;
     let factor = 1;
-    for i in 0..sample.len() {
-        if sample[i] != 1 {
+    for i in 0..(sample.len()/size) {
+        if sample[i*size] != 1 {
             sum2 += 1;
         }
     }
