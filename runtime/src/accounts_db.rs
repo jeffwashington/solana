@@ -4242,7 +4242,7 @@ impl AccountsDB {
             }
             );
             m.stop();
-            error!("sum2: {}, time: {}, l: {}, {}, factor: {}", sum, m.as_us(), sorted_data_by_pubkey.len(), sum2, factor);
+            error!("sum2: {}, time: {}, l: {}, {}, factor: {}, size: {}", sum, m.as_us(), sorted_data_by_pubkey.len(), sum2, factor, size);
         }
 
         let zero_chunks = 1;
