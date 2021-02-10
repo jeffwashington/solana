@@ -4066,16 +4066,19 @@ impl AccountsDB {
         let storages = self.get_snapshot_storages(slot);
         let scan_and_hash =
             || {
+                const PUBKEY_BINS_FOR_CALCULATING_HASHES: usize = 64;
+
                 let mut at_least_one_mismatch = false;
                 // clipped and modified from calculate_accounts_hash_without_index
-                let (data_sections_by_pubkey, _) =
-                    Self::scan_snapshot_stores(&storages, simple_capitalization_enabled);
+                let (data_sections_by_pubkey, _, _, _) =
+                    Self::scan_snapshot_stores(&storages, simple_capitalization_enabled, PUBKEY_BINS_FOR_CALCULATING_HASHES, &Range {start:0, end:PUBKEY_BINS_FOR_CALCULATING_HASHES});
 
                 // clipped and modified from rest_of_hash_calculation
                 let (outer, _flatten_time, _raw_len) =
-                    Self::flatten_hash_intermediate(data_sections_by_pubkey);
+                    Self::flatten_hash_intermediate(data_sections_by_pubkey, PUBKEY_BINS_FOR_CALCULATING_HASHES);
 
                 let (sorted_data_by_pubkey, _sort_time) = Self::sort_hash_intermediate(outer);
+                let sorted_data_by_pubkey:Vec<_> = sorted_data_by_pubkey.into_iter().flatten().collect();
                 // note that sorted_data_by_pubkey can contain multiple entries per pubkey, sorted by -slot, -version
 
                 // clipped and modified from calculate_accounts_hash
