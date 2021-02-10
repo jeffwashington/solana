@@ -53,7 +53,7 @@ use std::{
     collections::{hash_map::Entry, BTreeMap, BTreeSet, HashMap, HashSet},
     convert::{TryFrom, TryInto},
     io::{Error as IOError, Result as IOResult},
-    ops::RangeBounds,
+    ops::{Range, RangeBounds},
     path::{Path, PathBuf},
     sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
     sync::{Arc, Mutex, MutexGuard, RwLock},
@@ -188,6 +188,13 @@ impl CalculateHashIntermediate {
             pubkey,
         }
     }
+}
+
+#[derive(Default, Debug)]
+struct PreviousPass {
+    pub reduced_hashes: Vec<(Hash, u64)>,
+    pub remaining_unhashed: Vec<Hash>,
+    pub lamports: u64,
 }
 
 trait Versioned {
@@ -3391,21 +3398,16 @@ impl AccountsDB {
         })
     }
 
-    // For the first iteration, there could be more items in the tuple than just hash and lamports.
-    // Using extractor allows us to avoid an unnecessary array copy on the first iteration.
-    fn compute_merkle_root_and_capitalization_loop<T, F>(
+    fn compute_merkle_root_and_capitalization_one_iteration<T, F>(
         hashes: Vec<T>,
         fanout: usize,
         extractor: F,
-    ) -> (Hash, u64)
+    ) -> Vec<(Hash, u64)>
     where
         F: Fn(&T) -> (Hash, u64) + std::marker::Sync,
         T: std::marker::Sync,
     {
-        if hashes.is_empty() {
-            return (Hasher::default().result(), 0);
-        }
-
+        assert!(!hashes.is_empty());
         let mut time = Measure::start("time");
 
         let total_hashes = hashes.len();
@@ -3437,6 +3439,26 @@ impl AccountsDB {
             .collect();
         time.stop();
         debug!("hashing {} {}", total_hashes, time);
+        result
+    }
+
+    // For the first iteration, there could be more items in the tuple than just hash and lamports.
+    // Using extractor allows us to avoid an unnecessary array copy on the first iteration.
+    fn compute_merkle_root_and_capitalization_loop<T, F>(
+        hashes: Vec<T>,
+        fanout: usize,
+        extractor: F,
+    ) -> (Hash, u64)
+    where
+        F: Fn(&T) -> (Hash, u64) + std::marker::Sync,
+        T: std::marker::Sync,
+    {
+        if hashes.is_empty() {
+            return (Hasher::default().result(), 0);
+        }
+
+        let result =
+            Self::compute_merkle_root_and_capitalization_one_iteration(hashes, fanout, extractor);
 
         if result.len() == 1 {
             result[0]
@@ -3874,7 +3896,9 @@ impl AccountsDB {
             Measure,
         ),
         bins: usize,
-    ) -> (Hash, u64) {
+        last_pass: bool,
+        previous_state: PreviousPass,
+    ) -> (Hash, u64, PreviousPass) {
         let (data_sections_by_pubkey, time_scan, num_snapshot_storage, time_pre_scan_flatten) =
             accounts;
 
@@ -3883,17 +3907,56 @@ impl AccountsDB {
 
         let (sorted_data_by_pubkey, sort_time) = Self::sort_hash_intermediate(outer);
 
-        let (hashes, zeros, total_lamports) =
+        let (hashes, zeros, mut total_lamports) =
             Self::de_dup_and_eliminate_zeros(sorted_data_by_pubkey);
 
-        let (hashes, flat2_time, hash_total) = Self::flatten_hashes(hashes);
+        total_lamports += previous_state.lamports;
+
+        let (mut hashes, flat2_time, hash_total) = Self::flatten_hashes(hashes);
+
+        let extractor = |t: &Hash| (*t, 0);
+
+        let mut next_pass = PreviousPass::default();
+        if !last_pass {
+            // Save hashes that don't evenly hash. They will be combined with hashes from the next pass.
+            let left_over_hashes = hash_total % MERKLE_FANOUT;
+            next_pass.remaining_unhashed = hashes[left_over_hashes..hash_total].to_vec();
+            hashes.truncate(hash_total - left_over_hashes);
+            next_pass.lamports = total_lamports;
+            total_lamports = 0;
+        }
+
+        if !hashes.is_empty() {
+            let partial_hashes = Self::compute_merkle_root_and_capitalization_one_iteration(
+                hashes,
+                MERKLE_FANOUT,
+                extractor,
+            );
+            next_pass.reduced_hashes.extend(partial_hashes);
+        }
+
+        let hash = if last_pass {
+            let hash = if next_pass.reduced_hashes.len() == 1 {
+                next_pass.reduced_hashes[0].0
+            } else {
+                // hash all the rest and combine and hash until we have only 1 hash left
+                let (hash, _) = Self::compute_merkle_root_and_capitalization_recurse(
+                    next_pass.reduced_hashes,
+                    MERKLE_FANOUT,
+                );
+                hash
+            };
+            next_pass.reduced_hashes = Vec::new();
+            hash
+        } else {
+            Hash::default()
+        };
 
         let mut hash_time = Measure::start("hashes");
-        let (hash, _) =
-            Self::compute_merkle_root_and_capitalization_loop(hashes, MERKLE_FANOUT, |t: &Hash| {
-                (*t, 0)
-            });
+
         hash_time.stop();
+
+        // TODO: accumulate metrics
         datapoint_info!(
             "calculate_accounts_hash_without_index",
             ("accounts_scan", time_scan.as_us(), i64),
@@ -3912,7 +3975,7 @@ impl AccountsDB {
             ),
         );
 
-        (hash, total_lamports)
+        (hash, total_lamports, next_pass)
     }
 
     fn calculate_accounts_hash_helper(
@@ -3972,6 +4035,7 @@ impl AccountsDB {
         storage: &[SnapshotStorage],
         simple_capitalization_enabled: bool,
         bins: usize,
+        bin_range: &Range<usize>,
     ) -> (
         Vec<Vec<Vec<CalculateHashIntermediate>>>,
         Measure,
@@ -3987,6 +4051,13 @@ impl AccountsDB {
                 |loaded_account: LoadedAccount,
                  accum: &mut Vec<Vec<CalculateHashIntermediate>>,
                  slot: Slot| {
+                    let pubkey = *loaded_account.pubkey();
+                    let rng_index =
+                        pubkey.as_ref()[0] as usize * bins / ((std::u8::MAX) as usize + 1);
+                    if !bin_range.contains(&rng_index) {
+                        return;
+                    }
+
                     let version = loaded_account.write_version();
                     let raw_lamports = loaded_account.lamports();
                     let zero_raw_lamports = raw_lamports == 0;
@@ -4001,9 +4072,6 @@ impl AccountsDB {
                         )
                     };
 
-                    let pubkey = *loaded_account.pubkey();
-                    let rng_index =
-                        pubkey.as_ref()[0] as usize * bins / ((std::u8::MAX) as usize + 1);
                     let source_item = CalculateHashIntermediate::new(
                         version,
                         *loaded_account.loaded_hash(),
@@ -4034,13 +4102,34 @@ impl AccountsDB {
             // When calculating hashes, it is helpful to break the pubkeys found into bins based on the pubkey value.
             const PUBKEY_BINS_FOR_CALCULATING_HASHES: usize = 64;
 
-            let result = Self::scan_snapshot_stores(
-                storages,
-                simple_capitalization_enabled,
-                PUBKEY_BINS_FOR_CALCULATING_HASHES,
-            );
+            const PASSES: usize = 16;
+            let bins_per_pass = PUBKEY_BINS_FOR_CALCULATING_HASHES / PASSES;
+            assert_eq!(bins_per_pass * PASSES, PUBKEY_BINS_FOR_CALCULATING_HASHES); // evenly divisible
+            let mut previous_pass = PreviousPass::default();
+            let mut final_result = (Hash::default(), 0);
 
-            Self::rest_of_hash_calculation(result, PUBKEY_BINS_FOR_CALCULATING_HASHES)
+            for pass in 0..PASSES {
+                let bounds = Range {
+                    start: pass * bins_per_pass,
+                    end: (pass + 1) * bins_per_pass,
+                };
+                let result = Self::scan_snapshot_stores(
+                    storages,
+                    simple_capitalization_enabled,
+                    PUBKEY_BINS_FOR_CALCULATING_HASHES,
+                    &bounds,
+                );
+
+                let (hash, lamports, for_next_pass) = Self::rest_of_hash_calculation(
+                    result,
+                    PUBKEY_BINS_FOR_CALCULATING_HASHES,
+                    pass == PASSES - 1,
+                    previous_pass,
+                );
+                previous_pass = for_next_pass;
+                final_result = (hash, lamports);
+            }
+            final_result
         };
         if let Some(thread_pool) = thread_pool {
             thread_pool.install(scan_and_hash)
@@ -5312,9 +5401,11 @@ pub mod tests {
                 Measure::start(""),
             ),
             BINS,
+            true,
+            PreviousPass::default(),
         );
         let expected_hash = Hash::from_str("8j9ARGFv4W2GfML7d3sVJK2MePwrikqYnu6yqer28cCa").unwrap();
-        assert_eq!(result, (expected_hash, 88));
+        assert_eq!((result.0, result.1), (expected_hash, 88));
 
         // 3rd key - with pubkey value before 1st key so it will be sorted first
         let key = Pubkey::new(&[10u8; 32]);
@@ -5330,9 +5421,11 @@ pub mod tests {
                 Measure::start(""),
             ),
             BINS,
+            true,
+            PreviousPass::default(),
         );
         let expected_hash = Hash::from_str("EHv9C5vX7xQjjMpsJMzudnDTzoTSRwYkqLzY8tVMihGj").unwrap();
-        assert_eq!(result, (expected_hash, 108));
+        assert_eq!((result.0, result.1), (expected_hash, 108));
 
         // 3rd key - with later slot
         let key = Pubkey::new(&[10u8; 32]);
@@ -5348,9 +5441,11 @@ pub mod tests {
                 Measure::start(""),
             ),
             BINS,
+            true,
+            PreviousPass::default(),
         );
         let expected_hash = Hash::from_str("7NNPg5A8Xsg1uv4UFm6KZNwsipyyUnmgCrznP6MBWoBZ").unwrap();
-        assert_eq!(result, (expected_hash, 118));
+        assert_eq!((result.0, result.1), (expected_hash, 118));
     }
 
     #[test]
@@ -5446,7 +5541,12 @@ pub mod tests {
                     );
                     assert_eq!(
                         hashes2.iter().flatten().collect::<Vec<_>>(),
-                        hashes4.iter().flatten().into_iter().flatten().collect::<Vec<_>>()
+                        hashes4
+                            .iter()
+                            .flatten()
+                            .into_iter()
+                            .flatten()
+                            .collect::<Vec<_>>()
                     );
                     assert_eq!(lamports2, lamports3);
                     assert_eq!(lamports2, lamports4);
@@ -5517,7 +5617,10 @@ pub mod tests {
             .collect();
         let expected = hashes.clone();
 
-        assert_eq!(AccountsDB::flatten_hashes(vec![vec![hashes.clone()]]).0, expected);
+        assert_eq!(
+            AccountsDB::flatten_hashes(vec![vec![hashes.clone()]]).0,
+            expected
+        );
         for in_first in 1..COUNT - 1 {
             assert_eq!(
                 AccountsDB::flatten_hashes(vec![vec![
@@ -5682,14 +5785,15 @@ pub mod tests {
             3,
             Pubkey::new_unique(),
         )]]];
-        const BINS:usize = 1;
+        const BINS: usize = 1;
         let (result, _, len) = AccountsDB::flatten_hash_intermediate(test.clone(), BINS);
         assert_eq!(result, test[0]);
         assert_eq!(len, 1);
 
-        let (result, _, len) = AccountsDB::flatten_hash_intermediate(vec![
-            vec![vec![CalculateHashIntermediate::default(); 0]]
-        ], BINS);
+        let (result, _, len) = AccountsDB::flatten_hash_intermediate(
+            vec![vec![vec![CalculateHashIntermediate::default(); 0]]],
+            BINS,
+        );
         assert_eq!(result.len(), 0);
         assert_eq!(len, 0);
 
@@ -5704,8 +5808,8 @@ pub mod tests {
                 5,
                 6,
                 Pubkey::new_unique(),
-            )]]
-        ];
+            )],
+        ]];
         let (result, _, len) = AccountsDB::flatten_hash_intermediate(test.clone(), BINS);
         let expected = test.into_iter().flatten().collect::<Vec<_>>();
         assert_eq!(result, expected);
