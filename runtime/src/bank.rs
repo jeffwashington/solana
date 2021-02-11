@@ -4242,9 +4242,25 @@ impl Bank {
     }
 
     pub fn calculate_capitalization(&self) -> u64 {
-        self.rc
+        let cap = self
+            .rc
             .accounts
-            .calculate_capitalization(&self.ancestors, self.simple_capitalization_enabled())
+            .calculate_capitalization(&self.ancestors, self.simple_capitalization_enabled());
+
+        let (_hash, total_lamports) = self
+            .rc
+            .accounts
+            .accounts_db
+            .update_accounts_hash_with_index_option(
+                false,
+                true,
+                self.slot(),
+                &self.ancestors,
+                self.simple_capitalization_enabled(),
+                Some(self.capitalization()),
+            );
+        assert_eq!(total_lamports, cap);
+        cap
     }
 
     pub fn calculate_and_verify_capitalization(&self) -> bool {
