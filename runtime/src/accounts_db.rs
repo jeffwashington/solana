@@ -213,7 +213,7 @@ impl HashStats {
     }
 }
 
-#[derive(Default, Debug, PartialEq, Clone)]
+#[derive(Default, Debug, PartialEq, Clone, Serialize, Deserialize)]
 struct CalculateHashIntermediate {
     pub version: u64,
     pub hash: Hash,
@@ -1090,6 +1090,7 @@ impl ShrinkStats {
 pub fn make_min_priority_thread_pool() -> ThreadPool {
     // Use lower thread count to reduce priority.
     let num_threads = std::cmp::max(2, num_cpus::get() / 4);
+    error!("num threads: {}, num cpus: {}", num_threads, num_cpus::get());
     rayon::ThreadPoolBuilder::new()
         .thread_name(|i| format!("solana-accounts-cleanup-{}", i))
         .num_threads(num_threads)
@@ -3996,6 +3997,106 @@ impl AccountsDB {
         (result, sum)
     }
 
+    pub fn test() {
+        if false {
+            let d = std::fs::read("accounts_by_bin.bytes").unwrap();
+            //let serialized = serde_json::to_string(&data_sections_by_pubkey);
+            error!("len: {}", d.len());
+            let arr = bincode::deserialize::<Vec<Vec<Vec<CalculateHashIntermediate>>>>(&d).unwrap();
+            /*
+            for _ in 0..10 {
+                let arr = arr.clone();
+                Self::rest_of_hash_calculation((arr, Measure::start(""), 0, Measure::start("")), 1);
+            };
+            */
+            if true {
+                let data_sections_by_pubkey = arr;
+                let mut idx: Vec<(usize, usize)> = Vec::new();
+                for i in 0..data_sections_by_pubkey.len() {
+                    let arr2 = &data_sections_by_pubkey[i];
+                    for j in 0..arr2.len() {
+                        idx.push((i, j));
+                        let file = format!("accounts_by_bin_{}_{}.bytes", i, j);
+                        let serialized = bincode::serialize(&arr2[j]);
+                        std::fs::write(file, serialized.unwrap()).unwrap();
+                    }
+                }
+                let file = format!("accounts_by_bin_idex.bytes");
+                let serialized = bincode::serialize(&idx);
+                std::fs::write(file, serialized.unwrap()).unwrap();
+            }
+        } else {
+            let idx_file = std::fs::read("accounts_by_bin_idex.bytes").unwrap();
+            //let serialized = serde_json::to_string(&data_sections_by_pubkey);
+            let idx = bincode::deserialize::<Vec<(usize, usize)>>(&idx_file).unwrap();
+
+            let mut arr: Vec<Vec<Vec<CalculateHashIntermediate>>> = Vec::new();
+
+            let out: Vec<(usize, usize, Vec<CalculateHashIntermediate>)> = idx
+                .into_par_iter()
+                .map(|(i, j)| {
+                    let file = format!("accounts_by_bin_{}_{}.bytes", i, j);
+                    let d = std::fs::read(file).unwrap();
+                    let des = bincode::deserialize::<Vec<CalculateHashIntermediate>>(&d).unwrap();
+                    (i, j, des)
+                })
+                .collect();
+
+            out.into_iter().for_each(|(i, j, des)| {
+                if j == 0 {
+                    let n: Vec<Vec<CalculateHashIntermediate>> = Vec::new();
+                    arr.push(n);
+                }
+                arr[i].push(des);
+            });
+            error!("starting");
+
+            let thread_pool = make_min_priority_thread_pool()            ;
+
+            let _div = 55_000_000;
+            let mut offset = 0;
+            let arr:Vec<_> = arr.into_iter().map(|v| {
+                let mut o2: Vec<_> = Vec::new();
+                v.into_iter().for_each(|v2| {
+                    offset += v2.len();
+                    o2.extend(v2);
+                });
+                /*
+                let o2:Vec<_> = v.iter().map(|v2| {
+                    let mut pk = Vec::new();
+                    let mut reset= Vec::new();
+                    let o3:Vec<_> = v2.iter().enumerate().map(|(i, item)| {
+                        if false {
+                            //pk.push((item.pubkey, (offset + i) as u32));
+                            //reset.push((item.slot, item.version, item.lamports, item.hash));
+                        }
+                        else {
+                            pk.push(*item);
+                        }
+                    }).collect();
+                    pk//(pk, reset)
+                }).collect();
+                offset += div;
+                */
+                o2
+            }).collect();
+            //panic!("total items: {}, arrlen: {}", offset, arr.len());
+
+            thread_pool.install(||
+                {
+            for _ in 0..10 {
+                let arr = arr.clone();
+                let mut stats = HashStats::default();
+                Self::rest_of_hash_calculation(arr, &mut stats);
+            };
+            }
+        );
+
+            panic!("got it: {}", arr.len());
+        }
+        panic!("got it2");
+    }
+
     fn flatten_hashes_and_hash(
         hashes: Vec<Vec<Hash>>,
         fanout: usize,
@@ -5498,6 +5599,12 @@ pub mod tests {
             AccountsDB::rest_of_hash_calculation(vec![account_maps], &mut HashStats::default());
         let expected_hash = Hash::from_str("7NNPg5A8Xsg1uv4UFm6KZNwsipyyUnmgCrznP6MBWoBZ").unwrap();
         assert_eq!(result, (expected_hash, 118));
+    }
+
+    #[test]
+    fn test_accounts_db_test_profiling() {
+        solana_logger::setup();
+        AccountsDB::test();
     }
 
     #[test]
