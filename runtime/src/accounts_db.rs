@@ -3575,62 +3575,12 @@ impl AccountsDB {
         );
     }
 
-    pub fn compute_merkle_root(hashes: Vec<(Pubkey, Hash)>, fanout: usize) -> Hash {
-        Self::compute_merkle_root_loop(hashes, fanout, |t| t.1)
-    }
-
-    // this function avoids an infinite recursion compiler error
-    fn compute_merkle_root_recurse(hashes: Vec<Hash>, fanout: usize) -> Hash {
-        Self::compute_merkle_root_loop(hashes, fanout, |t: &Hash| *t)
-    }
-
     fn div_ceil(x: usize, y: usize) -> usize {
         let mut result = x / y;
         if x % y != 0 {
             result += 1;
         }
         result
-    }
-
-    // For the first iteration, there could be more items in the tuple than just hash and lamports.
-    // Using extractor allows us to avoid an unnecessary array copy on the first iteration.
-    fn compute_merkle_root_loop<T, F>(hashes: Vec<T>, fanout: usize, extractor: F) -> Hash
-    where
-        F: Fn(&T) -> Hash + std::marker::Sync,
-        T: std::marker::Sync,
-    {
-        if hashes.is_empty() {
-            return Hasher::default().result();
-        }
-
-        let mut time = Measure::start("time");
-
-        let total_hashes = hashes.len();
-        let chunks = Self::div_ceil(total_hashes, fanout);
-
-        let result: Vec<_> = (0..chunks)
-            .into_par_iter()
-            .map(|i| {
-                let start_index = i * fanout;
-                let end_index = std::cmp::min(start_index + fanout, total_hashes);
-
-                let mut hasher = Hasher::default();
-                for item in hashes.iter().take(end_index).skip(start_index) {
-                    let h = extractor(&item);
-                    hasher.hash(h.as_ref());
-                }
-
-                hasher.result()
-            })
-            .collect();
-        time.stop();
-        debug!("hashing {} {}", total_hashes, time);
-
-        if result.len() == 1 {
-            result[0]
-        } else {
-            Self::compute_merkle_root_recurse(result, fanout)
-        }
     }
 
     // This function is designed to allow hashes to be located in multiple, perhaps multiply deep vecs.
@@ -3757,7 +3707,12 @@ impl AccountsDB {
                 if result.len() == 1 {
                     result[0]
                 } else {
-                    Self::compute_merkle_root_recurse(result, fanout)
+                    Self::compute_merkle_root_from_slices_recurse(
+                        result,
+                        fanout,
+                        max_levels_per_pass,
+                        None,
+                    ).0
                 },
                 vec![], // no intermediate results needed by caller
             )
@@ -3783,7 +3738,7 @@ impl AccountsDB {
     fn accumulate_account_hashes(mut hashes: Vec<(Pubkey, Hash)>) -> Hash {
         Self::sort_hashes_by_pubkey(&mut hashes);
 
-        Self::compute_merkle_root_loop(hashes, MERKLE_FANOUT, |i| i.1)
+        Self::compute_merkle_root_from_slices(hashes.len(), MERKLE_FANOUT, None, |start| &hashes[start..], None, |item| item.1.as_ref()).0
     }
 
     fn sort_hashes_by_pubkey(hashes: &mut Vec<(Pubkey, Hash)>) {
