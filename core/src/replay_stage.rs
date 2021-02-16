@@ -1311,12 +1311,17 @@ impl ReplayStage {
         let active_banks = bank_forks.read().unwrap().active_banks();
         trace!("active banks {:?}", active_banks);
 
+        let mut times = vec![Measure::start("")];
+        let mut lines = vec![];
+
         for bank_slot in &active_banks {
             // If the fork was marked as dead, don't replay it
             if progress.get(bank_slot).map(|p| p.is_dead).unwrap_or(false) {
                 debug!("bank_slot {:?} is marked dead", *bank_slot);
                 continue;
             }
+
+            let l = times.len(); times[l - 1].stop();lines.push(line!());times.push(Measure::start("")); // timer
 
             let bank = bank_forks.read().unwrap().get(*bank_slot).unwrap().clone();
             let parent_slot = bank.parent_slot();
@@ -1331,6 +1336,7 @@ impl ReplayStage {
                     stats.num_dropped_blocks_on_fork + new_dropped_blocks;
                 (num_blocks_on_fork, num_dropped_blocks_on_fork)
             };
+            let l = times.len(); times[l - 1].stop();lines.push(line!());times.push(Measure::start("")); // timer
             // Insert a progress entry even for slots this node is the leader for, so that
             // 1) confirm_forks can report confirmation, 2) we can cache computations about
             // this bank in `select_forks()`
@@ -1344,6 +1350,7 @@ impl ReplayStage {
                     num_dropped_blocks_on_fork,
                 )
             });
+            let l = times.len(); times[l - 1].stop();lines.push(line!());times.push(Measure::start("")); // timer
             if bank.collector_id() != my_pubkey {
                 let replay_result = Self::replay_blockstore_into_bank(
                     &bank,
@@ -1363,8 +1370,10 @@ impl ReplayStage {
                     }
                 }
             }
+            let l = times.len(); times[l - 1].stop();lines.push(line!());times.push(Measure::start("")); // timer
             assert_eq!(*bank_slot, bank.slot());
             if bank.is_complete() {
+                let l = times.len(); times[l - 1].stop();lines.push(line!());times.push(Measure::start("")); // timer
                 if !blockstore.has_duplicate_shreds_in_slot(bank.slot()) {
                     bank_progress.replay_stats.report_stats(
                         bank.slot(),
@@ -1376,7 +1385,8 @@ impl ReplayStage {
                     bank.freeze();
                     heaviest_subtree_fork_choice
                         .add_new_leaf_slot(bank.slot(), Some(bank.parent_slot()));
-                    if let Some(sender) = bank_notification_sender {
+                        let l = times.len(); times[l - 1].stop();lines.push(line!());times.push(Measure::start("")); // timer
+                        if let Some(sender) = bank_notification_sender {
                         sender
                             .send(BankNotification::Frozen(bank.clone()))
                             .unwrap_or_else(|err| {
@@ -1384,8 +1394,11 @@ impl ReplayStage {
                             });
                     }
 
+                    let l = times.len(); times[l - 1].stop();lines.push(line!());times.push(Measure::start("")); // timer
                     Self::record_rewards(&bank, &rewards_recorder_sender);
+                    let l = times.len(); times[l - 1].stop();lines.push(line!());times.push(Measure::start("")); // timer
                 } else {
+                    let l = times.len(); times[l - 1].stop();lines.push(line!());times.push(Measure::start("")); // timer
                     Self::mark_dead_slot(
                         blockstore,
                         bank_progress,
@@ -1393,6 +1406,7 @@ impl ReplayStage {
                         &BlockstoreProcessorError::InvalidBlock(BlockError::DuplicateBlock),
                         true,
                     );
+                    let l = times.len(); times[l - 1].stop();lines.push(line!());times.push(Measure::start("")); // timer
                     warn!(
                         "{} duplicate shreds detected, not freezing bank {}",
                         my_pubkey,
@@ -1409,6 +1423,14 @@ impl ReplayStage {
             }
         }
         inc_new_counter_info!("replay_stage-replay_transactions", tx_count);
+        let l = times.len(); times[l - 1].stop();lines.push(line!());times.push(Measure::start("")); // timer
+
+        let mut result: String = String::default();
+        times.into_iter().zip(lines.into_iter()).into_iter().for_each(|(t, l)| {
+            result += &format!("{} {} ", l, t.as_us()).to_string();
+        });
+        info!("replayj-loop-timing-stats active_banks {} {}", active_banks.len(), result);
+
         did_complete_bank
     }
 
@@ -2507,9 +2529,9 @@ pub(crate) mod tests {
 
         assert_matches!(
             res,
-            Err(
-                BlockstoreProcessorError::FailedToLoadEntries(BlockstoreError::InvalidShredData(_)),
-            )
+            Err(BlockstoreProcessorError::FailedToLoadEntries(
+                BlockstoreError::InvalidShredData(_)
+            ),)
         );
     }
 
