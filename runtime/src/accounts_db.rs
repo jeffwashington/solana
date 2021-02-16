@@ -4356,6 +4356,7 @@ impl AccountsDB {
         //   we have previously surpassed target_fanout and hashed some already to the target_fanout level. In that case, we know
         //     we need to hash whatever is left here to the target_fanout level.
         if hash_total != 0 && (!last_pass || !next_pass.reduced_hashes.is_empty()) {
+            let mut hash_time = Measure::start("hash");
             let partial_hashes = Self::compute_merkle_root_from_slices(
                 hash_total, // note this does not include the ones that didn't divide evenly, unless we're in the last iteration
                 MERKLE_FANOUT,
@@ -4365,6 +4366,8 @@ impl AccountsDB {
             )
             .1;
             next_pass.reduced_hashes.push(partial_hashes);
+            hash_time.stop();
+            stats.hash_time_total_us += hash_time.as_us();
         }
 
         let no_progress = last_pass && next_pass.reduced_hashes.is_empty() && !hashes.is_empty();
@@ -4386,6 +4389,7 @@ impl AccountsDB {
                 // all the passes resulted in a single hash, that means we're done, so we had <= MERKLE_ROOT total hashes
                 cumulative.get_slice(&next_pass.reduced_hashes, 0)[0]
             } else {
+                let mut hash_time = Measure::start("hash");
                 // hash all the rest and combine and hash until we have only 1 hash left
                 let (hash, _) = Self::compute_merkle_root_from_slices(
                     cumulative.total_count,
@@ -4394,6 +4398,9 @@ impl AccountsDB {
                     |start| cumulative.get_slice(&next_pass.reduced_hashes, start),
                     None,
                 );
+                hash_time.stop();
+                stats.hash_time_total_us += hash_time.as_us();
+    
                 hash
             };
             next_pass.reduced_hashes = Vec::new();
