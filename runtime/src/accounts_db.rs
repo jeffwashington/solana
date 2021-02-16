@@ -3635,15 +3635,18 @@ impl AccountsDB {
 
     // This function is designed to allow hashes to be located in multiple, perhaps multiply deep vecs.
     // The caller provides a function to return a slice from the source data.
-    fn compute_merkle_root_from_slices<'a, F>(
+    fn compute_merkle_root_from_slices<'a, F, F2, T>(
         total_hashes: usize,
         fanout: usize,
         max_levels_per_pass: Option<usize>,
         get_hashes: F,
         specific_level_count: Option<usize>,
+        extractor: F2
     ) -> (Hash, Vec<Hash>)
     where
-        F: Fn(usize) -> &'a [Hash] + std::marker::Sync,
+        F: Fn(usize) -> &'a [T] + std::marker::Sync,
+        F2: Fn(&T) -> &[u8] + std::marker::Sync,
+        T: std::marker::Sync + 'a,
     {
         if total_hashes == 0 {
             return (Hasher::default().result(), vec![]);
@@ -3673,7 +3676,7 @@ impl AccountsDB {
         let chunks = Self::div_ceil(total_hashes, num_hashes_per_chunk);
 
         // initial fetch - could return entire slice
-        let data: &[Hash] = get_hashes(0);
+        let data: &[T] = get_hashes(0);
         let data_len = data.len();
 
         let result: Vec<_> = (0..chunks)
@@ -3697,7 +3700,7 @@ impl AccountsDB {
                             data_len = data.len();
                             data_index = 0;
                         }
-                        hasher.hash(data[data_index].as_ref());
+                        hasher.hash(extractor(&data[data_index]));
                         data_index += 1;
                     }
                 } else {
@@ -3716,7 +3719,7 @@ impl AccountsDB {
                                     data_len = data.len();
                                     data_index = 0;
                                 }
-                                hasher_k.hash(data[data_index].as_ref());
+                                hasher_k.hash(extractor(&data[data_index]));
                                 data_index += 1;
                                 i += 1;
                             }
@@ -3773,6 +3776,7 @@ impl AccountsDB {
             max_levels_per_pass,
             |start| &hashes[start..],
             specific_level_count,
+            |item| item.as_ref(),
         )
     }
 
@@ -3928,6 +3932,7 @@ impl AccountsDB {
             None,
             |start: usize| cumulative_offsets.get_slice(&hashes, start),
             None,
+            |item| item.as_ref(),
         );
         hash_time.stop();
         datapoint_info!(
@@ -4363,6 +4368,7 @@ impl AccountsDB {
                 Some(TARGET_FANOUT_LEVEL),
                 |start| cumulative.get_slice_2d(&hashes, start),
                 Some(TARGET_FANOUT_LEVEL),
+                |item| item.as_ref(),
             )
             .1;
             next_pass.reduced_hashes.push(partial_hashes);
@@ -4397,6 +4403,7 @@ impl AccountsDB {
                     None,
                     |start| cumulative.get_slice(&next_pass.reduced_hashes, start),
                     None,
+                    |item| item.as_ref(),
                 );
                 hash_time.stop();
                 stats.hash_time_total_us += hash_time.as_us();
@@ -6472,6 +6479,7 @@ pub mod tests {
             None,
             get_slice,
             None,
+            |item| item.as_ref(),
         );
         hash_time.stop();
         stats.hash_time_total_us += hash_time.as_us();
@@ -6850,6 +6858,7 @@ pub mod tests {
             None,
             |start| &reduced[start..],
             None,
+            |item| item.as_ref(),
         );
         assert_eq!(result, result2.0, "len: {}", hashes.len());
 
@@ -6859,6 +6868,7 @@ pub mod tests {
             Some(1),
             |start| &reduced[start..],
             None,
+            |item| item.as_ref(),
         );
         assert_eq!(result, result2.0, "len: {}", hashes.len());
 
