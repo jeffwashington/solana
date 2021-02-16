@@ -3658,7 +3658,7 @@ impl AccountsDB {
         // Otherwise, we'll be serializing a parallel operation.
         let threshold = target * fanout;
         let mut three_level =
-            max_levels_per_pass >= THREE_LEVEL_OPTIMIZATION && total_hashes >= threshold;
+            max_levels_per_pass.unwrap_or(usize::MAX) >= THREE_LEVEL_OPTIMIZATION && total_hashes >= threshold;
         if three_level {
             if let Some(specific_level_count_value) = specific_level_count {
                 three_level = specific_level_count_value >= THREE_LEVEL_OPTIMIZATION;
@@ -3764,7 +3764,7 @@ impl AccountsDB {
     fn compute_merkle_root_from_slices_recurse(
         hashes: Vec<Hash>,
         fanout: usize,
-        max_levels_per_pass: usize,
+        max_levels_per_pass: Option<usize>,
         specific_level_count: Option<usize>,
     ) -> (Hash, Vec<Hash>) {
         Self::compute_merkle_root_from_slices(
@@ -4284,7 +4284,8 @@ impl AccountsDB {
             for _ in 0..10 {
                 let arr = arr.clone();
                 let mut stats = HashStats::default();
-                Self::rest_of_hash_calculation(arr, &mut stats);
+                let previous_pass = PreviousPass::default();
+                Self::rest_of_hash_calculation(arr, &mut stats, true, previous_pass);
             };
             }
         );
@@ -4358,7 +4359,7 @@ impl AccountsDB {
             let partial_hashes = Self::compute_merkle_root_from_slices(
                 hash_total, // note this does not include the ones that didn't divide evenly, unless we're in the last iteration
                 MERKLE_FANOUT,
-                TARGET_FANOUT_LEVEL,
+                Some(TARGET_FANOUT_LEVEL),
                 |start| cumulative.get_slice_2d(&hashes, start),
                 Some(TARGET_FANOUT_LEVEL),
             )
@@ -4389,7 +4390,7 @@ impl AccountsDB {
                 let (hash, _) = Self::compute_merkle_root_from_slices(
                     cumulative.total_count,
                     MERKLE_FANOUT,
-                    usize::MAX,
+                    None,
                     |start| cumulative.get_slice(&next_pass.reduced_hashes, start),
                     None,
                 );
@@ -6461,7 +6462,7 @@ pub mod tests {
         let hash = AccountsDB::compute_merkle_root_from_slices(
             offsets.total_count,
             fanout,
-            usize::MAX,
+            None,
             get_slice,
             None,
         );
@@ -6839,7 +6840,7 @@ pub mod tests {
         let result2 = AccountsDB::compute_merkle_root_from_slices(
             hashes.len(),
             fanout,
-            usize::MAX,
+            None,
             |start| &reduced[start..],
             None,
         );
@@ -6848,7 +6849,7 @@ pub mod tests {
         let result2 = AccountsDB::compute_merkle_root_from_slices(
             hashes.len(),
             fanout,
-            1,
+            Some(1),
             |start| &reduced[start..],
             None,
         );
@@ -6866,7 +6867,7 @@ pub mod tests {
                     vec![reduced[right..].to_vec()],
                 ];
                 let result2 =
-                    AccountsDB::flatten_hashes_and_hash(src, fanout, &mut HashStats::default());
+                    flatten_hashes_and_hash(src, fanout, &mut HashStats::default());
                 assert_eq!(result, result2);
             }
         }
