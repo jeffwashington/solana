@@ -6451,7 +6451,7 @@ pub mod tests {
             .into_iter()
             .map(|i| Hash::new(&[(i) as u8; 32]))
             .collect();
-        let expected = AccountsDB::compute_merkle_root_loop(hashes.clone(), MERKLE_FANOUT, |i| *i);
+        let expected = AccountsDB::compute_merkle_root_from_slices(hashes.len(), MERKLE_FANOUT, None, |start| &hashes[start..], None, |item| item.as_ref()).0;
 
         assert_eq!(
             flatten_hashes_and_hash(
@@ -6605,10 +6605,9 @@ pub mod tests {
         solana_logger::setup();
 
         let (storages, raw_expected) = sample_storages_and_accounts();
-        let expected_hash =
-            AccountsDB::compute_merkle_root_loop(raw_expected.clone(), MERKLE_FANOUT, |item| {
-                item.hash
-            });
+
+        let expected_hash = AccountsDB::compute_merkle_root_from_slices(raw_expected.len(), MERKLE_FANOUT, None, |start| &raw_expected[start..], None, |item| item.hash.as_ref()).0;
+
         let sum = raw_expected.iter().map(|item| item.lamports).sum();
         let result = AccountsDB::calculate_accounts_hash_without_index(&storages, true, None);
 
@@ -6796,7 +6795,7 @@ pub mod tests {
     }
 
     fn test_hashing_larger(hashes: Vec<(Pubkey, Hash)>, fanout: usize) -> Hash {
-        let result = AccountsDB::compute_merkle_root(hashes.clone(), fanout);
+        let result = AccountsDB::compute_merkle_root_from_slices(hashes.len(), fanout, None, |start| &hashes[start..], None, |item| item.1.as_ref()).0;
         let reduced: Vec<_> = hashes.iter().map(|x| x.1).collect();
         let result2 = test_hashing(reduced, fanout);
         assert_eq!(result, result2, "len: {}", hashes.len());
@@ -6805,7 +6804,7 @@ pub mod tests {
 
     fn test_hashing(hashes: Vec<Hash>, fanout: usize) -> Hash {
         let temp: Vec<_> = hashes.iter().map(|h| (Pubkey::default(), *h)).collect();
-        let result = AccountsDB::compute_merkle_root(temp, fanout);
+        let result = AccountsDB::compute_merkle_root_from_slices(temp.len(), fanout, None, |start| &temp[start..], None, |item| item.1.as_ref()).0;
         let reduced: Vec<_> = hashes.clone();
         let result2 = AccountsDB::compute_merkle_root_from_slices(
             hashes.len(),
@@ -6917,7 +6916,7 @@ pub mod tests {
                         input.iter().map(|i| (i.0, i.1)).collect::<Vec<_>>(),
                     );
                     AccountsDB::sort_hashes_by_pubkey(&mut input);
-                    let result = AccountsDB::compute_merkle_root(input.clone(), fanout);
+                    let result = AccountsDB::compute_merkle_root_from_slices(input.len(), fanout, None, |start| &input[start..], None, |item| item.1.as_ref()).0;
                     assert_eq!(early_result, result);
                     result
                 };
