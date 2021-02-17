@@ -833,6 +833,7 @@ impl MessageProcessor {
             };
             let mut timej = Measure::start("");
             let _ = instruction.visit_each_account(&mut work);
+            assert!(pre_accounts.len() <= instruction.accounts.len());
             timej.stop(); timings.visit_each += timej.as_us();
             if timings.acct_len_max < instruction.accounts.len() {
                 timings.acct_len_max_time = timej.as_us();
@@ -841,7 +842,7 @@ impl MessageProcessor {
             if accounts.len() > pre_accounts.len() {
                 timings.acct_len_over += accounts.len() - pre_accounts.len();
             }
-            timings.add_acct_visit((timej.as_us(), accounts.len()));
+            timings.add_acct_visit((timej.as_us(), instruction.accounts..len()));
         }
         pre_accounts
     }
