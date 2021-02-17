@@ -130,6 +130,7 @@ pub struct ExecuteTimings {
         pub     acct_len_max_time: u64,
         pub     visit_each: u64,
         pub acct_visit_max: Vec<(u64, usize)>,
+        pub acct_len_over: usize,
 
 
 
@@ -167,6 +168,7 @@ impl ExecuteTimings {
         self.    check_id += other.    check_id;
         self.    process_instruction1 += other.    process_instruction1;
         self.    process_instruction2 += other.    process_instruction2;
+        self.    acct_len_over += other.    acct_len_over;
         self.acct_len_max_time = if self.acct_len_max > other.acct_len_max {
             self.acct_len_max_time
         }
