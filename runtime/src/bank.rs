@@ -127,6 +127,7 @@ pub struct ExecuteTimings {
         pub process_instruction1: u64,
         pub process_instruction2: u64,
         pub     acct_len_max: usize,
+        pub     acct_len_max_time: u64,
         pub     visit_each: u64,
         pub acct_visit_max: Vec<(u64, usize)>,
 
@@ -166,6 +167,10 @@ impl ExecuteTimings {
         self.    check_id += other.    check_id;
         self.    process_instruction1 += other.    process_instruction1;
         self.    process_instruction2 += other.    process_instruction2;
+        self.acct_len_max_time = if self.acct_len_max > other.acct_len_max {
+            self.acct_len_max_time
+        }
+        else { other.acct_len_max_time};
         self.    acct_len_max = std::cmp::max(other.    acct_len_max, self.acct_len_max);
         self.    visit_each += other.    visit_each;
         other.acct_visit_max.iter().for_each(|av| self.add_acct_visit(*av));

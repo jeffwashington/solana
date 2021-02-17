@@ -833,6 +833,9 @@ impl MessageProcessor {
             };
             let mut timej = Measure::start("");
             let _ = instruction.visit_each_account(&mut work);
+            if timings.acct_len_max < accounts.len() {
+                timings.acct_len_max_time = timej.as_us();
+            }
             timings.acct_len_max = std::cmp::max(timings.acct_len_max, accounts.len());
             timej.stop(); timings.visit_each += timej.as_us();
             timings.add_acct_visit((timej.as_us(), accounts.len()));
