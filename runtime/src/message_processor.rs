@@ -978,6 +978,7 @@ impl MessageProcessor {
         bpf_compute_budget: BpfComputeBudget,
         mut timings: &mut ExecuteTimings,
     ) -> Result<(), InstructionError> {
+        let mut timej = Measure::start("");
         // Fixup the special instructions key if present
         // before the account pre-values are taken care of
         if feature_set.is_active(&instructions_sysvar_enabled::id()) {
@@ -993,8 +994,8 @@ impl MessageProcessor {
             }
         }
 
-        let mut timej = Measure::start("");
 
+        timej.stop(); timings.fixup += timej.as_us(); let mut timej = Measure::start("");
         let pre_accounts = Self::create_pre_accounts(message, instruction, accounts, &mut timings);
         timej.stop(); timings.create_pre += timej.as_us(); let mut timej = Measure::start("");
         let program_id = instruction.program_id(&message.account_keys);
