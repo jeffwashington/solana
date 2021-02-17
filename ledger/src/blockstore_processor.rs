@@ -235,8 +235,10 @@ fn process_entries_with_callback(
     timings: &mut ExecuteTimings,
 ) -> Result<()> {
     // accumulator for entries that can be processed in parallel
+    let mut times = vec![Measure::start("")];let mut lines = vec![];
     let mut batches = vec![];
     let mut tick_hashes = vec![];
+    let llen = entries.len();
     for entry in entries {
         if entry.is_tick() {
             // If it's a tick, save it for later
@@ -313,6 +315,7 @@ fn process_entries_with_callback(
             }
         }
     }
+    let l = times.len(); times[l - 1].stop();lines.push(line!());times.push(Measure::start("")); // timer
     execute_batches(
         bank,
         &batches,
@@ -321,9 +324,20 @@ fn process_entries_with_callback(
         replay_vote_sender,
         timings,
     )?;
+    let l = times.len(); times[l - 1].stop();lines.push(line!());times.push(Measure::start("")); // timer
     for hash in tick_hashes {
         bank.register_tick(&hash);
     }
+    let l = times.len(); times[l - 1].stop();lines.push(line!());times.push(Measure::start("")); // timer
+
+    let mut result: String = String::default();
+    times.into_iter().zip(lines.into_iter()).into_iter().for_each(|(t, l)| {
+        if t.as_us() > 10 {
+            result += &format!("{} {} ", l, t.as_us()).to_string();
+        }
+    });
+    info!("replayl-loop-timing-stats active_banks entries len {} {}", llen, result);
+
     Ok(())
 }
 
