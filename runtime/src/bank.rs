@@ -171,7 +171,7 @@ impl ExecuteTimings {
         other.acct_visit_max.iter().for_each(|av| self.add_acct_visit(*av));
     }
     pub fn add_acct_visit(&mut self, data: (u64, usize)) {
-        if self.acct_visit_max.len() < 5 {
+        if self.acct_visit_max.len() < 20 {
             self.acct_visit_max.push(data);
             self.acct_visit_max.sort();
             return;
