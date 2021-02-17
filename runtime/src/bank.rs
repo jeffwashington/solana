@@ -99,6 +99,10 @@ pub struct ExecuteTimings {
     pub execute_us: u64,
     pub store_us: u64,
     pub count: u64,
+    pub collect_us: u64,
+    pub collect2_us: u64,
+    pub find_us: u64,
+    pub send_us: u64,
 }
 
 impl ExecuteTimings {
@@ -107,6 +111,9 @@ impl ExecuteTimings {
         self.execute_us += other.execute_us;
         self.store_us += other.store_us;
         self.count += other.count;
+        self.collect_us += other.collect_us;
+        self.collect2_us += other.collect2_us;
+        self.send_us += other.send_us;
     }
 }
 

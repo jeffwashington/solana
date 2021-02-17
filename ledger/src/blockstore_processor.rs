@@ -112,11 +112,14 @@ fn execute_batch(
 
     let mut mint_decimals: HashMap<Pubkey, u8> = HashMap::new();
 
+    let mut timej = Measure::start("");
     let pre_token_balances = if record_token_balances {
         collect_token_balances(&bank, &batch, &mut mint_decimals)
     } else {
         vec![]
     };
+    timej.stop();
+    timings.collect_us += timej.as_us();
     timings.count += 1;
     let (tx_results, balances, inner_instructions, transaction_logs) =
         batch.bank().load_execute_and_commit_transactions(
@@ -128,7 +131,10 @@ fn execute_batch(
             timings,
         );
 
+    let mut timej = Measure::start("");
     bank_utils::find_and_send_votes(batch.transactions(), &tx_results, replay_vote_sender);
+    timej.stop();
+    timings.find_us += timej.as_us();
 
     let TransactionResults {
         fee_collection_results,
@@ -137,12 +143,16 @@ fn execute_batch(
     } = tx_results;
 
     if let Some(transaction_status_sender) = transaction_status_sender {
+        let mut timej = Measure::start("");
         let post_token_balances = if record_token_balances {
             collect_token_balances(&bank, &batch, &mut mint_decimals)
         } else {
             vec![]
         };
-
+        timej.stop();
+        timings.collect2_us += timej.as_us();
+    
+        let mut timej = Measure::start("");
         let token_balances =
             TransactionTokenBalancesSet::new(pre_token_balances, post_token_balances);
 
@@ -157,6 +167,8 @@ fn execute_batch(
             transaction_logs,
             transaction_status_sender,
         );
+        timej.stop();
+        timings.send_us += timej.as_us();
     }
 
     let first_err = get_first_error(batch, fee_collection_results);
