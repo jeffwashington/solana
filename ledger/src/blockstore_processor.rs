@@ -252,10 +252,10 @@ fn process_entries_with_callback(
     let mut tick_hashes = vec![];
     let llen = entries.len();
     let mut lines2 = HashMap::new();
+    let mut time = Measure::start("");
     add_time(&mut lines2, line!(), &mut time); time = Measure::start("");
     for entry in entries {
         add_time(&mut lines2, line!(), &mut time); time = Measure::start("");
-        let mut time = Measure::start("");
         if entry.is_tick() {
             // If it's a tick, save it for later
             tick_hashes.push(entry.hash);
