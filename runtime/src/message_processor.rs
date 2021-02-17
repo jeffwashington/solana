@@ -823,7 +823,6 @@ impl MessageProcessor {
         timings: &mut ExecuteTimings,
     ) -> Vec<PreAccount> {
         let mut pre_accounts = Vec::with_capacity(accounts.len());
-        timings.acct_len_max = std::cmp::max(timings.acct_len_max, accounts.len());
         {
             let mut work = |_unique_index: usize, account_index: usize| {
                 let key = &message.account_keys[account_index];
@@ -834,8 +833,9 @@ impl MessageProcessor {
             };
             let mut timej = Measure::start("");
             let _ = instruction.visit_each_account(&mut work);
-            timej.stop(); timings.visit_each += timej.as_us(); let mut timej = Measure::start("");
-            
+            timings.acct_len_max = std::cmp::max(timings.acct_len_max, accounts.len());
+            timej.stop(); timings.visit_each += timej.as_us();
+            timings.add_acct_visit((timej.as_us(), accounts.len()));
         }
         pre_accounts
     }

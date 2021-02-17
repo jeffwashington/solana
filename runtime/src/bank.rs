@@ -128,6 +128,8 @@ pub struct ExecuteTimings {
         pub process_instruction2: u64,
         pub     acct_len_max: usize,
         pub     visit_each: u64,
+        pub acct_visit_max: Vec<(u64, usize)>,
+
 
 
 
@@ -166,7 +168,20 @@ impl ExecuteTimings {
         self.    process_instruction2 += other.    process_instruction2;
         self.    acct_len_max += other.    acct_len_max;
         self.    visit_each += other.    visit_each;
-            
+        other.acct_visit_max.iter().for_each(|av| self.add_acct_visit(*av));
+    }
+    pub fn add_acct_visit(&mut self, data: (u64, usize)) {
+        if self.acct_visit_max.len() < 5 {
+            self.acct_visit_max.push(data);
+            self.acct_visit_max.sort();
+            return;
+        }
+        if self.acct_visit_max[0].0 >= data.0 {
+            return;
+        }
+        self.acct_visit_max.remove(0);
+        self.acct_visit_max.push(data);
+        self.acct_visit_max.sort();
     }
 }
 
