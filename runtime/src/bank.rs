@@ -105,6 +105,17 @@ pub struct ExecuteTimings {
     pub send_us: u64,
     pub record: u64,
     pub lex: u64,
+    pub txs_len: usize,
+    pub rest: u64,
+
+    pub getx: u64,
+    pub refcells: u64,
+    pub refcell2: u64,
+    pub process_message: u64,
+    pub compile: u64,
+    pub refcells_to_accounts: u64,
+    pub update_executors: u64,
+
 }
 
 impl ExecuteTimings {
@@ -119,6 +130,15 @@ impl ExecuteTimings {
         self.find_us += other.find_us;
         self.record += other.record;
         self.lex += other.lex;
+        self.txs_len += other.txs_len;
+        self.rest += other.rest;
+        self.refcells += other.refcells;
+        self.refcell2 += other.refcell2;
+        self.process_message += other.process_message;
+        self.compile += other.compile;
+        self.refcells_to_accounts += other.refcells_to_accounts;
+        self.update_executors += other.update_executors;
+    
     }
 }
 
@@ -2903,7 +2923,9 @@ impl Bank {
                 (Ok(loaded_transaction), nonce_rollback) => {
                     signature_count += u64::from(tx.message().header.num_required_signatures);
 
+                    let mut timej = Measure::start("");
                     let executors = self.get_executors(&tx.message, &loaded_transaction.loaders);
+                    timej.stop(); timings.getx += timej.as_us(); let mut timej = Measure::start("");
 
                     let (account_refcells, account_dep_refcells, loader_refcells) =
                         Self::accounts_to_refcells(
@@ -2912,6 +2934,7 @@ impl Bank {
                             &mut loaded_transaction.loaders,
                         );
 
+                    timej.stop(); timings.refcells += timej.as_us(); let mut timej = Measure::start("");
                     let instruction_recorders = if enable_cpi_recording {
                         let ix_count = tx.message.instructions.len();
                         let mut recorders = Vec::with_capacity(ix_count);
@@ -2927,6 +2950,7 @@ impl Bank {
                         None
                     };
 
+                    timej.stop(); timings.refcell2 += timej.as_us(); let mut timej = Measure::start("");
                     let process_result = self.message_processor.process_message(
                         tx.message(),
                         &loader_refcells,
@@ -2939,6 +2963,7 @@ impl Bank {
                         self.feature_set.clone(),
                         bpf_compute_budget,
                     );
+                    timej.stop(); timings.process_message += timej.as_us(); let mut timej = Measure::start("");
 
                     if enable_log_recording {
                         let log_messages: TransactionLogMessages =
@@ -2954,6 +2979,7 @@ impl Bank {
                         instruction_recorders,
                         &tx.message,
                     );
+                    timej.stop(); timings.compile += timej.as_us(); let mut timej = Measure::start("");
 
                     Self::refcells_to_accounts(
                         &mut loaded_transaction.accounts,
@@ -2962,10 +2988,12 @@ impl Bank {
                         loader_refcells,
                     );
 
+                    timej.stop(); timings.refcells_to_accounts += timej.as_us(); let mut timej = Measure::start("");
                     if process_result.is_ok() {
                         self.update_executors(executors);
                     }
 
+                    timej.stop(); timings.update_executors += timej.as_us(); let mut timej = Measure::start("");
                     let nonce_rollback =
                         if let Err(TransactionError::InstructionError(_, _)) = &process_result {
                             error_counters.instruction_error += 1;
@@ -2990,12 +3018,14 @@ impl Bank {
         );
         timings.load_us += load_time.as_us();
         timings.execute_us += execution_time.as_us();
+        timings.txs_len += txs.len();
 
         let mut tx_count: u64 = 0;
         let err_count = &mut error_counters.total;
         let transaction_log_collector_config =
             self.transaction_log_collector_config.read().unwrap();
 
+        let mut timej = Measure::start("");
         for (i, ((r, _nonce_rollback), tx)) in executed.iter().zip(txs.iter()).enumerate() {
             if let Some(debug_keys) = &self.transaction_debug_keys {
                 for key in &tx.message.account_keys {
@@ -3066,7 +3096,7 @@ impl Bank {
             );
         }
         Self::update_error_counters(&error_counters);
-        (
+        let res = (
             loaded_accounts,
             executed,
             inner_instructions,
@@ -3074,7 +3104,11 @@ impl Bank {
             retryable_txs,
             tx_count,
             signature_count,
-        )
+        );
+        timej.stop();
+        timings.rest += timej.as_us();
+
+        res
     }
 
     fn filter_program_errors_and_collect_fee(
