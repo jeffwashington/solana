@@ -225,6 +225,18 @@ pub fn process_entries(
     )
 }
 
+fn add_time(times: &mut HashMap<u32, u64>, line: u32, time: &mut Measure) {
+    time.stop();
+    let mut sum = if let Some(item) = times.get(&line) {
+        item.clone()
+    }
+    else {
+        0
+    };
+    sum += time.as_us();
+    times.insert(line, sum);
+}
+
 fn process_entries_with_callback(
     bank: &Arc<Bank>,
     entries: &[Entry],
@@ -239,13 +251,16 @@ fn process_entries_with_callback(
     let mut batches = vec![];
     let mut tick_hashes = vec![];
     let llen = entries.len();
+    let mut lines2 = HashMap::new();
     for entry in entries {
+        let mut time = Measure::start("");
         if entry.is_tick() {
             // If it's a tick, save it for later
             tick_hashes.push(entry.hash);
             if bank.is_block_boundary(bank.tick_height() + tick_hashes.len() as u64) {
                 // If it's a tick that will cause a new blockhash to be created,
                 // execute the group and register the tick
+                add_time(&mut lines2, line!(), &mut time); time = Measure::start("");
                 execute_batches(
                     bank,
                     &batches,
@@ -336,7 +351,14 @@ fn process_entries_with_callback(
             result += &format!("{} {} ", l, t.as_us()).to_string();
         }
     });
-    info!("replayl-loop-timing-stats active_banks entries len {} {}", llen, result);
+
+    let mut result: String = String::default();
+    lines2.into_iter().for_each(|(k, v) | {
+        if v > 10 {
+            result += &format!("{} {} ", k, v).to_string();
+        }
+    });
+    info!("replaym-loop-timing-stats active_banks entries {}", result);
 
     Ok(())
 }
