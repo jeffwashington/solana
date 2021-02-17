@@ -252,7 +252,9 @@ fn process_entries_with_callback(
     let mut tick_hashes = vec![];
     let llen = entries.len();
     let mut lines2 = HashMap::new();
+    add_time(&mut lines2, line!(), &mut time); time = Measure::start("");
     for entry in entries {
+        add_time(&mut lines2, line!(), &mut time); time = Measure::start("");
         let mut time = Measure::start("");
         if entry.is_tick() {
             // If it's a tick, save it for later
@@ -274,11 +276,14 @@ fn process_entries_with_callback(
                     bank.register_tick(hash);
                 }
                 tick_hashes.clear();
+                add_time(&mut lines2, line!(), &mut time); time = Measure::start("");
             }
             continue;
         }
         // else loop on processing the entry
+        add_time(&mut lines2, line!(), &mut time); time = Measure::start("");
         loop {
+            add_time(&mut lines2, line!(), &mut time); time = Measure::start("");
             let iteration_order = if randomize {
                 let mut iteration_order: Vec<usize> = (0..entry.transactions.len()).collect();
                 iteration_order.shuffle(&mut thread_rng());
@@ -287,9 +292,11 @@ fn process_entries_with_callback(
                 None
             };
 
+            add_time(&mut lines2, line!(), &mut time); time = Measure::start("");
             // try to lock the accounts
             let batch = bank.prepare_batch(&entry.transactions, iteration_order);
 
+            add_time(&mut lines2, line!(), &mut time); time = Measure::start("");
             let first_lock_err = first_err(batch.lock_results());
 
             // if locking worked
@@ -298,6 +305,7 @@ fn process_entries_with_callback(
                 // done with this entry
                 break;
             }
+            add_time(&mut lines2, line!(), &mut time); time = Measure::start("");
             // else we failed to lock, 2 possible reasons
             if batches.is_empty() {
                 // An entry has account lock conflicts with *itself*, which should not happen
@@ -318,6 +326,7 @@ fn process_entries_with_callback(
             } else {
                 // else we have an entry that conflicts with a prior entry
                 // execute the current queue and try to process this entry again
+                add_time(&mut lines2, line!(), &mut time); time = Measure::start("");
                 execute_batches(
                     bank,
                     &batches,
@@ -326,6 +335,7 @@ fn process_entries_with_callback(
                     replay_vote_sender,
                     timings,
                 )?;
+                add_time(&mut lines2, line!(), &mut time); time = Measure::start("");
                 batches.clear();
             }
         }
@@ -353,12 +363,13 @@ fn process_entries_with_callback(
     });
 
     let mut result: String = String::default();
+    let l3len = lines2.len();
     lines2.into_iter().for_each(|(k, v) | {
         if v > 10 {
             result += &format!("{} {} ", k, v).to_string();
         }
     });
-    info!("replaym-loop-timing-stats active_banks entries {}", result);
+    info!("replaym-loop-timing-stats active_banks entries {} {}", l3len, result);
 
     Ok(())
 }
