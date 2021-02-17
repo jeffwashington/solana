@@ -1311,8 +1311,7 @@ impl ReplayStage {
         let active_banks = bank_forks.read().unwrap().active_banks();
         trace!("active banks {:?}", active_banks);
 
-        let mut times = vec![Measure::start("")];
-        let mut lines = vec![];
+        let mut times = vec![Measure::start("")];let mut lines = vec![];
 
         for bank_slot in &active_banks {
             // If the fork was marked as dead, don't replay it
@@ -1427,7 +1426,9 @@ impl ReplayStage {
 
         let mut result: String = String::default();
         times.into_iter().zip(lines.into_iter()).into_iter().for_each(|(t, l)| {
-            result += &format!("{} {} ", l, t.as_us()).to_string();
+            if t.as_us() > 10 {
+                result += &format!("{} {} ", l, t.as_us()).to_string();
+            }
         });
         info!("replayj-loop-timing-stats active_banks {} {}", active_banks.len(), result);
 

@@ -664,6 +664,7 @@ pub fn confirm_slot(
     recyclers: &VerifyRecyclers,
     allow_dead_slots: bool,
 ) -> result::Result<(), BlockstoreProcessorError> {
+    let mut times = vec![Measure::start("")];let mut lines = vec![];
     let slot = bank.slot();
 
     let (entries, num_shreds, slot_full) = {
@@ -680,6 +681,7 @@ pub fn confirm_slot(
         load_result
     }?;
 
+    let l = times.len(); times[l - 1].stop();lines.push(line!());times.push(Measure::start("")); // timer
     let num_entries = entries.len();
     let num_txs = entries.iter().map(|e| e.transactions.len()).sum::<usize>();
     trace!(
@@ -690,6 +692,7 @@ pub fn confirm_slot(
         num_txs,
         slot_full,
     );
+    let l = times.len(); times[l - 1].stop();lines.push(line!());times.push(Measure::start("")); // timer
 
     if !skip_verification {
         let tick_hash_count = &mut progress.tick_hash_count;
@@ -708,6 +711,7 @@ pub fn confirm_slot(
             err
         })?;
     }
+    let l = times.len(); times[l - 1].stop();lines.push(line!());times.push(Measure::start("")); // timer
 
     let verifier = if !skip_verification {
         datapoint_debug!("verify-batch-size", ("size", num_entries as i64, i64));
@@ -724,6 +728,7 @@ pub fn confirm_slot(
     } else {
         None
     };
+    let l = times.len(); times[l - 1].stop();lines.push(line!());times.push(Measure::start("")); // timer
 
     let mut replay_elapsed = Measure::start("replay_elapsed");
     let mut execute_timings = ExecuteTimings::default();
@@ -741,6 +746,7 @@ pub fn confirm_slot(
     timing.replay_elapsed += replay_elapsed.as_us();
 
     timing.execute_timings.accumulate(&execute_timings);
+    let l = times.len(); times[l - 1].stop();lines.push(line!());times.push(Measure::start("")); // timer
 
     if let Some(mut verifier) = verifier {
         let verified = verifier.finish_verify(&entries);
@@ -751,6 +757,15 @@ pub fn confirm_slot(
             return Err(BlockError::InvalidEntryHash.into());
         }
     }
+    let l = times.len(); times[l - 1].stop();lines.push(line!());times.push(Measure::start("")); // timer
+
+    let mut result: String = String::default();
+    times.into_iter().zip(lines.into_iter()).into_iter().for_each(|(t, l)| {
+        if t.as_us() > 10 {
+            result += &format!("{} {} ", l, t.as_us()).to_string();
+        }
+    });
+    info!("replayk-loop-timing-stats active_banks {}", result);
 
     process_result?;
 
