@@ -116,11 +116,15 @@ pub struct ExecuteTimings {
     pub refcells_to_accounts: u64,
     pub update_executors: u64,
     pub ic: usize,
-        pub create_pre: u64,
-        pub this_invoke: u64,
-        pub create_keyed: u64,
-        pub process: u64,
-        pub verify: u64,
+    pub create_pre: u64,
+    pub this_invoke: u64,
+    pub create_keyed: u64,
+    pub process: u64,
+    pub verify: u64,
+        pub instructions: u64,
+        pub native_process: u64,
+        pub check_id: u64,
+
 
 }
 
@@ -150,7 +154,10 @@ impl ExecuteTimings {
         self.    create_keyed += other.    create_keyed;
         self.    process += other.    process;
         self.    verify += other.    verify;
-        
+        self.    instructions += other.    instructions;
+        self.    native_process += other.    native_process;
+        self.    check_id += other.    check_id;
+            
     }
 }
 

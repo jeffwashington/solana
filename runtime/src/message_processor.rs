@@ -490,10 +490,16 @@ impl MessageProcessor {
         keyed_accounts: &[KeyedAccount],
         instruction_data: &[u8],
         invoke_context: &mut dyn InvokeContext,
+        mut timings: &mut ExecuteTimings,
     ) -> Result<(), InstructionError> {
+        timings.instructions += 1;
         if let Some(root_account) = keyed_accounts.iter().next() {
+            let mut timej = Measure::start("");
             let root_id = root_account.unsigned_key();
-            if native_loader::check_id(&root_account.owner()?) {
+            let cid = native_loader::check_id(&root_account.owner()?);
+            timej.stop(); timings.check_id += timej.as_us(); let mut timej = Measure::start("");
+
+            if cid {
                 for (id, process_instruction) in &self.programs {
                     if id == root_id {
                         // Call the builtin program
@@ -505,13 +511,17 @@ impl MessageProcessor {
                         );
                     }
                 }
+                let mut timej = Measure::start("");
                 // Call the program via the native loader
-                return self.native_loader.process_instruction(
+                let r = self.native_loader.process_instruction(
                     &native_loader::id(),
                     keyed_accounts,
                     instruction_data,
                     invoke_context,
                 );
+                timej.stop(); timings.native_process += timej.as_us(); let mut timej = Measure::start("");
+
+                return r;
             } else {
                 let owner_id = &root_account.owner()?;
                 for (id, process_instruction) in &self.programs {
@@ -784,6 +794,7 @@ impl MessageProcessor {
                 &keyed_accounts,
                 &instruction.data,
                 invoke_context,
+                &mut ExecuteTimings::default(),
             );
             if result.is_ok() {
                 // Verify the called program has not misbehaved
@@ -947,7 +958,7 @@ impl MessageProcessor {
         instruction_index: usize,
         feature_set: Arc<FeatureSet>,
         bpf_compute_budget: BpfComputeBudget,
-        timings: &mut ExecuteTimings,
+        mut timings: &mut ExecuteTimings,
     ) -> Result<(), InstructionError> {
         // Fixup the special instructions key if present
         // before the account pre-values are taken care of
@@ -990,6 +1001,7 @@ impl MessageProcessor {
             &keyed_accounts,
             &instruction.data,
             &mut invoke_context,
+            &mut timings,
         )?;
         timej.stop(); timings.process += timej.as_us(); let mut timej = Measure::start("");
         Self::verify(
