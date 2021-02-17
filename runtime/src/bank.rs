@@ -115,6 +115,12 @@ pub struct ExecuteTimings {
     pub compile: u64,
     pub refcells_to_accounts: u64,
     pub update_executors: u64,
+    pub ic: usize,
+        pub create_pre: u64,
+        pub this_invoke: u64,
+        pub create_keyed: u64,
+        pub process: u64,
+        pub verify: u64,
 
 }
 
@@ -138,7 +144,13 @@ impl ExecuteTimings {
         self.compile += other.compile;
         self.refcells_to_accounts += other.refcells_to_accounts;
         self.update_executors += other.update_executors;
-    
+        self.ic += other.ic;
+        self.    create_pre += other.    create_pre;
+        self.    this_invoke += other.    this_invoke;
+        self.    create_keyed += other.    create_keyed;
+        self.    process += other.    process;
+        self.    verify += other.    verify;
+        
     }
 }
 
@@ -2858,7 +2870,7 @@ impl Bank {
         max_age: usize,
         enable_cpi_recording: bool,
         enable_log_recording: bool,
-        timings: &mut ExecuteTimings,
+        mut timings: &mut ExecuteTimings,
     ) -> (
         Vec<TransactionLoadResult>,
         Vec<TransactionExecutionResult>,
@@ -2962,6 +2974,7 @@ impl Bank {
                         instruction_recorders.as_deref(),
                         self.feature_set.clone(),
                         bpf_compute_budget,
+                        &mut timings,
                     );
                     timej.stop(); timings.process_message += timej.as_us(); let mut timej = Measure::start("");
 

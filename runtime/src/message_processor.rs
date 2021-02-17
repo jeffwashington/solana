@@ -1,4 +1,6 @@
 use crate::{
+    bank::{
+        Bank, ExecuteTimings},
     instruction_recorder::InstructionRecorder, log_collector::LogCollector,
     native_loader::NativeLoader, rent_collector::RentCollector,
 };
@@ -944,6 +946,7 @@ impl MessageProcessor {
         instruction_index: usize,
         feature_set: Arc<FeatureSet>,
         bpf_compute_budget: BpfComputeBudget,
+        timings: &mut ExecuteTimings,
     ) -> Result<(), InstructionError> {
         // Fixup the special instructions key if present
         // before the account pre-values are taken care of
@@ -960,7 +963,10 @@ impl MessageProcessor {
             }
         }
 
+        let mut timej = Measure::start("");
+
         let pre_accounts = Self::create_pre_accounts(message, instruction, accounts);
+        timej.stop(); timings.create_pre += timej.as_us(); let mut timej = Measure::start("");
         let program_id = instruction.program_id(&message.account_keys);
         let mut invoke_context = ThisInvokeContext::new(
             program_id,
@@ -974,14 +980,17 @@ impl MessageProcessor {
             instruction_recorder,
             feature_set,
         );
+        timej.stop(); timings.this_invoke += timej.as_us(); let mut timej = Measure::start("");
         let keyed_accounts =
             Self::create_keyed_accounts(message, instruction, executable_accounts, accounts);
+        timej.stop(); timings.create_keyed += timej.as_us(); let mut timej = Measure::start("");
         self.process_instruction(
             program_id,
             &keyed_accounts,
             &instruction.data,
             &mut invoke_context,
         )?;
+        timej.stop(); timings.process += timej.as_us(); let mut timej = Measure::start("");
         Self::verify(
             message,
             instruction,
@@ -990,6 +999,7 @@ impl MessageProcessor {
             accounts,
             &rent_collector.rent,
         )?;
+        timej.stop(); timings.verify += timej.as_us(); let mut timej = Measure::start("");
         Ok(())
     }
 
@@ -1009,7 +1019,9 @@ impl MessageProcessor {
         instruction_recorders: Option<&[InstructionRecorder]>,
         feature_set: Arc<FeatureSet>,
         bpf_compute_budget: BpfComputeBudget,
+        mut timings: &mut ExecuteTimings,
     ) -> Result<(), TransactionError> {
+        timings.ic += message.instructions.len();
         for (instruction_index, instruction) in message.instructions.iter().enumerate() {
             let instruction_recorder = instruction_recorders
                 .as_ref()
@@ -1027,6 +1039,7 @@ impl MessageProcessor {
                 instruction_index,
                 feature_set.clone(),
                 bpf_compute_budget,
+                &mut timings,
             )
             .map_err(|err| TransactionError::InstructionError(instruction_index as u8, err))?;
         }
