@@ -268,7 +268,6 @@ fn process_entries_with_callback(
     let mut times = vec![Measure::start("")];let mut lines = vec![];
     let mut batches = vec![];
     let mut tick_hashes = vec![];
-    let llen = entries.len();
     let mut lines2 = HashMap::new();
     let mut time = Measure::start("");
     add_time(&mut lines2, line!(), &mut time); time = Measure::start("");

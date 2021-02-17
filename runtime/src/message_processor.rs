@@ -1,6 +1,6 @@
 use crate::{
     bank::{
-        Bank, ExecuteTimings},
+        ExecuteTimings},
     instruction_recorder::InstructionRecorder, log_collector::LogCollector,
     native_loader::NativeLoader, rent_collector::RentCollector,
 };
@@ -510,7 +510,7 @@ impl MessageProcessor {
                             instruction_data,
                             invoke_context,
                         );
-                        timej.stop(); timings.process_instruction1 += timej.as_us(); let mut timej = Measure::start("");
+                        timej.stop(); timings.process_instruction1 += timej.as_us();
                         return r;
                     }
                 }
@@ -521,7 +521,7 @@ impl MessageProcessor {
                     instruction_data,
                     invoke_context,
                 );
-                timej.stop(); timings.native_process += timej.as_us(); let mut timej = Measure::start("");
+                timej.stop(); timings.native_process += timej.as_us();
 
                 return r;
             } else {
@@ -536,7 +536,7 @@ impl MessageProcessor {
                             instruction_data,
                             invoke_context,
                         );
-                        timej.stop(); timings.process_instruction2 += timej.as_us(); let mut timej = Measure::start("");
+                        timej.stop(); timings.process_instruction2 += timej.as_us();
                         return r;
                     }
                 }
@@ -829,7 +829,13 @@ impl MessageProcessor {
                 let key = &message.account_keys[account_index];
                 let is_writable = message.is_writable(account_index);
                 let account = accounts[account_index].borrow();
-                pre_accounts.push(PreAccount::new(key, &account, is_writable));
+                //let owner = instruction.program_id(&message.account_keys) == &account.owner;
+                timings.data_size += account.data.len();
+                let n = PreAccount::new(key, &account, is_writable);
+                //if !n.data_not_copied {
+                //    timings.data_size_copied += account.data.len();
+                //}
+                pre_accounts.push(n);
                 Ok(())
             };
             let mut timej = Measure::start("");
@@ -1031,7 +1037,7 @@ impl MessageProcessor {
             accounts,
             &rent_collector.rent,
         )?;
-        timej.stop(); timings.verify += timej.as_us(); let mut timej = Measure::start("");
+        timej.stop(); timings.verify += timej.as_us();
         Ok(())
     }
 

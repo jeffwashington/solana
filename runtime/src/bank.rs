@@ -133,6 +133,8 @@ pub struct ExecuteTimings {
         pub acct_len_over: usize,
         pub acct_visit_count: u64,
         pub fixup: u64,
+        pub data_size: usize,
+        pub data_size_copied: usize,
 
 
 
@@ -180,6 +182,8 @@ impl ExecuteTimings {
         other.acct_visit_max.iter().for_each(|av| self.add_acct_visit(*av));
         self.acct_visit_count += other.acct_visit_count;
         self.fixup += other.fixup;
+        self.data_size += other.data_size;
+        self.data_size_copied += other.data_size_copied;
     }
     pub fn add_acct_visit(&mut self, data: (u64, usize)) {
         if self.acct_visit_max.len() < 5 {
@@ -3048,7 +3052,7 @@ impl Bank {
                         self.update_executors(executors);
                     }
 
-                    timej.stop(); timings.update_executors += timej.as_us(); let mut timej = Measure::start("");
+                    timej.stop(); timings.update_executors += timej.as_us();
                     let nonce_rollback =
                         if let Err(TransactionError::InstructionError(_, _)) = &process_result {
                             error_counters.instruction_error += 1;
