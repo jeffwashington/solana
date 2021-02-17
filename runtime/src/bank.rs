@@ -166,12 +166,12 @@ impl ExecuteTimings {
         self.    check_id += other.    check_id;
         self.    process_instruction1 += other.    process_instruction1;
         self.    process_instruction2 += other.    process_instruction2;
-        self.    acct_len_max += other.    acct_len_max;
+        self.    acct_len_max = std::cmp::max(other.    acct_len_max, self.acct_len_max);
         self.    visit_each += other.    visit_each;
         other.acct_visit_max.iter().for_each(|av| self.add_acct_visit(*av));
     }
     pub fn add_acct_visit(&mut self, data: (u64, usize)) {
-        if self.acct_visit_max.len() < 20 {
+        if self.acct_visit_max.len() < 5 {
             self.acct_visit_max.push(data);
             self.acct_visit_max.sort();
             return;
