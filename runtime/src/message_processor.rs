@@ -502,16 +502,18 @@ impl MessageProcessor {
             if cid {
                 for (id, process_instruction) in &self.programs {
                     if id == root_id {
+                        let mut timej = Measure::start("");
                         // Call the builtin program
-                        return process_instruction(
+                        let r = process_instruction(
                             &program_id,
                             &keyed_accounts[1..],
                             instruction_data,
                             invoke_context,
                         );
+                        timej.stop(); timings.process_instruction1 += timej.as_us(); let mut timej = Measure::start("");
+                        return r;
                     }
                 }
-                let mut timej = Measure::start("");
                 // Call the program via the native loader
                 let r = self.native_loader.process_instruction(
                     &native_loader::id(),
@@ -526,13 +528,16 @@ impl MessageProcessor {
                 let owner_id = &root_account.owner()?;
                 for (id, process_instruction) in &self.programs {
                     if id == owner_id {
+                        let mut timej = Measure::start("");
                         // Call the program via a builtin loader
-                        return process_instruction(
+                        let r = process_instruction(
                             &program_id,
                             keyed_accounts,
                             instruction_data,
                             invoke_context,
                         );
+                        timej.stop(); timings.process_instruction2 += timej.as_us(); let mut timej = Measure::start("");
+                        return r;
                     }
                 }
             }
@@ -815,8 +820,10 @@ impl MessageProcessor {
         message: &Message,
         instruction: &CompiledInstruction,
         accounts: &[Rc<RefCell<Account>>],
+        timings: &mut ExecuteTimings,
     ) -> Vec<PreAccount> {
         let mut pre_accounts = Vec::with_capacity(accounts.len());
+        timings.acct_len_max = std::cmp::max(timings.acct_len_max, accounts.len());
         {
             let mut work = |_unique_index: usize, account_index: usize| {
                 let key = &message.account_keys[account_index];
@@ -825,7 +832,10 @@ impl MessageProcessor {
                 pre_accounts.push(PreAccount::new(key, &account, is_writable));
                 Ok(())
             };
+            let mut timej = Measure::start("");
             let _ = instruction.visit_each_account(&mut work);
+            timej.stop(); timings.visit_each += timej.as_us(); let mut timej = Measure::start("");
+            
         }
         pre_accounts
     }
@@ -977,7 +987,7 @@ impl MessageProcessor {
 
         let mut timej = Measure::start("");
 
-        let pre_accounts = Self::create_pre_accounts(message, instruction, accounts);
+        let pre_accounts = Self::create_pre_accounts(message, instruction, accounts, &mut timings);
         timej.stop(); timings.create_pre += timej.as_us(); let mut timej = Measure::start("");
         let program_id = instruction.program_id(&message.account_keys);
         let mut invoke_context = ThisInvokeContext::new(

@@ -124,6 +124,11 @@ pub struct ExecuteTimings {
         pub instructions: u64,
         pub native_process: u64,
         pub check_id: u64,
+        pub process_instruction1: u64,
+        pub process_instruction2: u64,
+        pub     acct_len_max: usize,
+        pub     visit_each: u64,
+
 
 
 }
@@ -157,6 +162,10 @@ impl ExecuteTimings {
         self.    instructions += other.    instructions;
         self.    native_process += other.    native_process;
         self.    check_id += other.    check_id;
+        self.    process_instruction1 += other.    process_instruction1;
+        self.    process_instruction2 += other.    process_instruction2;
+        self.    acct_len_max += other.    acct_len_max;
+        self.    visit_each += other.    visit_each;
             
     }
 }
