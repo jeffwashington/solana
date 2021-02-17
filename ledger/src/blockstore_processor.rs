@@ -272,6 +272,7 @@ fn process_entries_with_callback(
                     timings,
                 )?;
                 batches.clear();
+                add_time(&mut lines2, line!(), &mut time); time = Measure::start("");
                 for hash in &tick_hashes {
                     bank.register_tick(hash);
                 }
