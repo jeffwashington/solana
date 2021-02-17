@@ -112,6 +112,9 @@ fn execute_batch(
 
     let mut mint_decimals: HashMap<Pubkey, u8> = HashMap::new();
 
+    if record_token_balances {
+        timings.record += 1;
+    }
     let mut timej = Measure::start("");
     let pre_token_balances = if record_token_balances {
         collect_token_balances(&bank, &batch, &mut mint_decimals)
@@ -121,6 +124,7 @@ fn execute_batch(
     timej.stop();
     timings.collect_us += timej.as_us();
     timings.count += 1;
+    let mut timej = Measure::start("");
     let (tx_results, balances, inner_instructions, transaction_logs) =
         batch.bank().load_execute_and_commit_transactions(
             batch,
@@ -130,7 +134,9 @@ fn execute_batch(
             transaction_status_sender.is_some(),
             timings,
         );
-
+    timej.stop();
+    timings.lex += timej.as_us();
+    
     let mut timej = Measure::start("");
     bank_utils::find_and_send_votes(batch.transactions(), &tx_results, replay_vote_sender);
     timej.stop();
