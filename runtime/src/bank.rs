@@ -131,6 +131,7 @@ pub struct ExecuteTimings {
         pub     visit_each: u64,
         pub acct_visit_max: Vec<(u64, usize)>,
         pub acct_len_over: usize,
+        pub acct_visit_count: u64,
 
 
 
@@ -176,6 +177,7 @@ impl ExecuteTimings {
         self.    acct_len_max = std::cmp::max(other.    acct_len_max, self.acct_len_max);
         self.    visit_each += other.    visit_each;
         other.acct_visit_max.iter().for_each(|av| self.add_acct_visit(*av));
+        self.acct_visit_count += other.acct_visit_count;
     }
     pub fn add_acct_visit(&mut self, data: (u64, usize)) {
         if self.acct_visit_max.len() < 5 {

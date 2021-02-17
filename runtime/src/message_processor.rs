@@ -822,7 +822,8 @@ impl MessageProcessor {
         accounts: &[Rc<RefCell<Account>>],
         timings: &mut ExecuteTimings,
     ) -> Vec<PreAccount> {
-        let mut pre_accounts = Vec::with_capacity(accounts.len());
+        timings.acct_visit_count += 1;
+        let mut pre_accounts = Vec::with_capacity(instruction.accounts.len());
         {
             let mut work = |_unique_index: usize, account_index: usize| {
                 let key = &message.account_keys[account_index];
