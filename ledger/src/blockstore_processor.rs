@@ -117,7 +117,7 @@ fn execute_batch(
     } else {
         vec![]
     };
-
+    timings.count += 1;
     let (tx_results, balances, inner_instructions, transaction_logs) =
         batch.bank().load_execute_and_commit_transactions(
             batch,
@@ -373,6 +373,7 @@ fn process_entries_with_callback(
         }
     });
     info!("replaym-loop-timing-stats active_banks entries {} {}", l3len, result);
+    info!("replayn-loop-timing-stats {:?}", timings);
 
     Ok(())
 }

@@ -93,11 +93,12 @@ pub const SECONDS_PER_YEAR: f64 = 365.25 * 24.0 * 60.0 * 60.0;
 
 pub const MAX_LEADER_SCHEDULE_STAKES: Epoch = 5;
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct ExecuteTimings {
     pub load_us: u64,
     pub execute_us: u64,
     pub store_us: u64,
+    pub count: u64,
 }
 
 impl ExecuteTimings {
@@ -105,6 +106,7 @@ impl ExecuteTimings {
         self.load_us += other.load_us;
         self.execute_us += other.execute_us;
         self.store_us += other.store_us;
+        self.count += other.count;
     }
 }
 
