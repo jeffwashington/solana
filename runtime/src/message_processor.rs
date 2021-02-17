@@ -842,7 +842,7 @@ impl MessageProcessor {
             if accounts.len() > pre_accounts.len() {
                 timings.acct_len_over += accounts.len() - pre_accounts.len();
             }
-            timings.add_acct_visit((timej.as_us(), instruction.accounts..len()));
+            timings.add_acct_visit((timej.as_us(), instruction.accounts.len()));
         }
         pre_accounts
     }
