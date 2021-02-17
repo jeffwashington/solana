@@ -365,6 +365,8 @@ fn process_entries_with_callback(
 
     let mut result: String = String::default();
     let l3len = lines2.len();
+    let mut lines2:Vec<_> = lines2.into_iter().collect();
+    lines2.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
     lines2.into_iter().for_each(|(k, v) | {
         if v > 10 {
             result += &format!("{} {} ", k, v).to_string();
