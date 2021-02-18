@@ -209,12 +209,14 @@ fn execute_batches(
     timej.stop(); timings.just_load += timej.as_us();
 
     let (results, new_timings): (Vec<Result<()>>, Vec<ExecuteTimings>) =
+    /*
         PAR_THREAD_POOL.with(|thread_pool| {
-            thread_pool.borrow().install(|| {
+            thread_pool.borrow().install(|| {*/
                 batches
-                    .into_par_iter()
-                    .map_with(transaction_status_sender, |sender, batch| {
-                        let mut timings = ExecuteTimings::default();
+                    .into_iter()
+                    //.map_with(transaction_status_sender, |sender, batch| {
+                    .map(|batch| { let sender = &transaction_status_sender;
+                            let mut timings = ExecuteTimings::default();
                         let result = execute_batch(
                             batch,
                             bank,
@@ -227,9 +229,11 @@ fn execute_batches(
                         }
                         (result, timings)
                     })
-                    .unzip()
+                    .unzip();
+                    /*
             })
         });
+        */
 
     for timing in new_timings {
         timings.accumulate(&timing);
