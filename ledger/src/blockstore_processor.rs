@@ -341,6 +341,7 @@ fn process_entries_with_callback(
     add_time(&mut lines2, line!(), &mut time);
     time = Measure::start("");
     timings.entries += entries.len();
+    let mut all_keys = vec![];
     for entry in entries {
         add_time(&mut lines2, line!(), &mut time);
         time = Measure::start("");
@@ -426,6 +427,13 @@ fn process_entries_with_callback(
                 add_time(&mut lines2, line!(), &mut time);
                 time = Measure::start("");
                 //timings.batch_size.push(batches.len());
+                let keys = batches.iter().map(|b| {
+                    b.transactions().iter().map(|t| {
+                        t.message.account_keys.iter().map(|k| *k).collect::<Vec<Pubkey>>()
+                    }).flatten().collect::<Vec<_>>()
+                }).flatten().collect::<Vec<Pubkey>>();
+                all_keys.extend(keys);
+            
                 execute_batches(
                     bank,
                     &batches,
@@ -440,6 +448,12 @@ fn process_entries_with_callback(
             }
         }
     }
+    let mut timej = Measure::start("");
+    let reff = all_keys.iter().map(|x| x).collect::<Vec<_>>();
+    let res = bank.test_load_accounts(&reff);
+    timej.stop();
+    timings.load_3 += timej.as_us();
+
     let l = times.len();
     times[l - 1].stop();
     lines.push(line!());
