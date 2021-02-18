@@ -143,6 +143,7 @@ pub struct ExecuteTimings {
         pub key_lens: Vec<usize>,
         pub instruction_lens: Vec<usize>,
         pub entries: usize,
+        pub batch_size: Vec<usize>,
 
 
 
