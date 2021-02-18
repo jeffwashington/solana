@@ -349,6 +349,9 @@ impl<'a> InvokeContext for ThisInvokeContext<'a> {
             }
         })
     }
+    fn account_data_modified(&self, pubkey: &Pubkey) {
+        // TODO: add to hashset indicating modification of data
+    }
 }
 pub struct ThisLogger {
     log_collector: Option<Rc<LogCollector>>,

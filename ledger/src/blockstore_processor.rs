@@ -136,7 +136,6 @@ fn execute_batch(
         );
     timej.stop();
     timings.lex += timej.as_us();
-    
     let mut timej = Measure::start("");
     bank_utils::find_and_send_votes(batch.transactions(), &tx_results, replay_vote_sender);
     timej.stop();
@@ -157,7 +156,6 @@ fn execute_batch(
         };
         timej.stop();
         timings.collect2_us += timej.as_us();
-    
         let mut timej = Measure::start("");
         let token_balances =
             TransactionTokenBalancesSet::new(pre_token_balances, post_token_balances);
@@ -191,8 +189,24 @@ fn execute_batches(
 ) -> Result<()> {
     inc_new_counter_debug!("bank-par_execute_entries-count", batches.len());
     timings.batch_count += batches.len();
-    let mut keys = batches.iter().map(|item| {item.transactions().iter().map(|t| t.message.account_keys.len()).sum::<usize>()}).collect::<Vec<_>>();
-    let mut ins = batches.iter().map(|item| {item.transactions().iter().map(|t| t.message.instructions.len()).sum::<usize>()}).collect::<Vec<_>>();
+    let mut keys = batches
+        .iter()
+        .map(|item| {
+            item.transactions()
+                .iter()
+                .map(|t| t.message.account_keys.len())
+                .sum::<usize>()
+        })
+        .collect::<Vec<_>>();
+    let mut ins = batches
+        .iter()
+        .map(|item| {
+            item.transactions()
+                .iter()
+                .map(|t| t.message.instructions.len())
+                .sum::<usize>()
+        })
+        .collect::<Vec<_>>();
     //timings.key_lens.extend(keys);
     //timings.instruction_lens.extend(ins);
     timings.key_lens.sort();
@@ -206,32 +220,45 @@ fn execute_batches(
             });
         });
     });
-    timej.stop(); timings.just_load += timej.as_us();
+    timej.stop();
+    timings.just_load += timej.as_us();
 
     let (results, new_timings): (Vec<Result<()>>, Vec<ExecuteTimings>) =
-/*        PAR_THREAD_POOL.with(|thread_pool| {
-            thread_pool.borrow().install(|| {*/
-                batches
+        PAR_THREAD_POOL.with(|thread_pool| {
+            thread_pool.borrow().install(|| {
+                let chunks = 2;
+                let chunk_size = batches.len() / chunks;
+                (0..chunks)
                     .into_par_iter()
-                    .map_with(transaction_status_sender, |sender, batch| {
-                        let mut timings = ExecuteTimings::default();
-                        let result = execute_batch(
-                            batch,
-                            bank,
-                            sender.clone(),
-                            replay_vote_sender,
-                            &mut timings,
-                        );
-                        if let Some(entry_callback) = entry_callback {
-                            entry_callback(bank);
+                    .map_with(transaction_status_sender.clone(), |sender, chunk_index| {
+                        let start = chunk_index * chunk_size;
+                        let mut end = start + chunk_size;
+                        if chunk_index == chunks - 1 {
+                            end = batches.len();
                         }
-                        (result, timings)
+                        let batches = &batches[start..end];
+                        batches
+                            .into_iter()
+                            .map(|batch| {
+                                let mut timings = ExecuteTimings::default();
+                                let result = execute_batch(
+                                    batch,
+                                    bank,
+                                    sender.clone(),
+                                    replay_vote_sender,
+                                    &mut timings,
+                                );
+                                if let Some(entry_callback) = entry_callback {
+                                    entry_callback(bank);
+                                }
+                                (result, timings)
+                            })
+                            .collect::<Vec<_>>()
                     })
-                    .unzip();
-                    /*
+                    .flatten()
+                    .unzip()
             })
         });
-        */
 
     for timing in new_timings {
         timings.accumulate(&timing);
@@ -267,8 +294,7 @@ fn add_time(times: &mut HashMap<u32, u64>, line: u32, time: &mut Measure) {
     time.stop();
     let mut sum = if let Some(item) = times.get(&line) {
         item.clone()
-    }
-    else {
+    } else {
         0
     };
     sum += time.as_us();
@@ -285,22 +311,26 @@ fn process_entries_with_callback(
     timings: &mut ExecuteTimings,
 ) -> Result<()> {
     // accumulator for entries that can be processed in parallel
-    let mut times = vec![Measure::start("")];let mut lines = vec![];
+    let mut times = vec![Measure::start("")];
+    let mut lines = vec![];
     let mut batches = vec![];
     let mut tick_hashes = vec![];
     let mut lines2 = HashMap::new();
     let mut time = Measure::start("");
-    add_time(&mut lines2, line!(), &mut time); time = Measure::start("");
+    add_time(&mut lines2, line!(), &mut time);
+    time = Measure::start("");
     timings.entries += entries.len();
     for entry in entries {
-        add_time(&mut lines2, line!(), &mut time); time = Measure::start("");
+        add_time(&mut lines2, line!(), &mut time);
+        time = Measure::start("");
         if entry.is_tick() {
             // If it's a tick, save it for later
             tick_hashes.push(entry.hash);
             if bank.is_block_boundary(bank.tick_height() + tick_hashes.len() as u64) {
                 // If it's a tick that will cause a new blockhash to be created,
                 // execute the group and register the tick
-                add_time(&mut lines2, line!(), &mut time); time = Measure::start("");
+                add_time(&mut lines2, line!(), &mut time);
+                time = Measure::start("");
                 execute_batches(
                     bank,
                     &batches,
@@ -310,19 +340,23 @@ fn process_entries_with_callback(
                     timings,
                 )?;
                 batches.clear();
-                add_time(&mut lines2, line!(), &mut time); time = Measure::start("");
+                add_time(&mut lines2, line!(), &mut time);
+                time = Measure::start("");
                 for hash in &tick_hashes {
                     bank.register_tick(hash);
                 }
                 tick_hashes.clear();
-                add_time(&mut lines2, line!(), &mut time); time = Measure::start("");
+                add_time(&mut lines2, line!(), &mut time);
+                time = Measure::start("");
             }
             continue;
         }
         // else loop on processing the entry
-        add_time(&mut lines2, line!(), &mut time); time = Measure::start("");
+        add_time(&mut lines2, line!(), &mut time);
+        time = Measure::start("");
         loop {
-            add_time(&mut lines2, line!(), &mut time); time = Measure::start("");
+            add_time(&mut lines2, line!(), &mut time);
+            time = Measure::start("");
             let iteration_order = if randomize {
                 let mut iteration_order: Vec<usize> = (0..entry.transactions.len()).collect();
                 iteration_order.shuffle(&mut thread_rng());
@@ -331,11 +365,13 @@ fn process_entries_with_callback(
                 None
             };
 
-            add_time(&mut lines2, line!(), &mut time); time = Measure::start("");
+            add_time(&mut lines2, line!(), &mut time);
+            time = Measure::start("");
             // try to lock the accounts
             let batch = bank.prepare_batch(&entry.transactions, iteration_order);
 
-            add_time(&mut lines2, line!(), &mut time); time = Measure::start("");
+            add_time(&mut lines2, line!(), &mut time);
+            time = Measure::start("");
             let first_lock_err = first_err(batch.lock_results());
 
             // if locking worked
@@ -344,7 +380,8 @@ fn process_entries_with_callback(
                 // done with this entry
                 break;
             }
-            add_time(&mut lines2, line!(), &mut time); time = Measure::start("");
+            add_time(&mut lines2, line!(), &mut time);
+            time = Measure::start("");
             // else we failed to lock, 2 possible reasons
             if batches.is_empty() {
                 // An entry has account lock conflicts with *itself*, which should not happen
@@ -365,7 +402,8 @@ fn process_entries_with_callback(
             } else {
                 // else we have an entry that conflicts with a prior entry
                 // execute the current queue and try to process this entry again
-                add_time(&mut lines2, line!(), &mut time); time = Measure::start("");
+                add_time(&mut lines2, line!(), &mut time);
+                time = Measure::start("");
                 //timings.batch_size.push(batches.len());
                 execute_batches(
                     bank,
@@ -375,12 +413,16 @@ fn process_entries_with_callback(
                     replay_vote_sender,
                     timings,
                 )?;
-                add_time(&mut lines2, line!(), &mut time); time = Measure::start("");
+                add_time(&mut lines2, line!(), &mut time);
+                time = Measure::start("");
                 batches.clear();
             }
         }
     }
-    let l = times.len(); times[l - 1].stop();lines.push(line!());times.push(Measure::start("")); // timer
+    let l = times.len();
+    times[l - 1].stop();
+    lines.push(line!());
+    times.push(Measure::start("")); // timer
     execute_batches(
         bank,
         &batches,
@@ -389,29 +431,42 @@ fn process_entries_with_callback(
         replay_vote_sender,
         timings,
     )?;
-    let l = times.len(); times[l - 1].stop();lines.push(line!());times.push(Measure::start("")); // timer
+    let l = times.len();
+    times[l - 1].stop();
+    lines.push(line!());
+    times.push(Measure::start("")); // timer
     for hash in tick_hashes {
         bank.register_tick(&hash);
     }
-    let l = times.len(); times[l - 1].stop();lines.push(line!());times.push(Measure::start("")); // timer
+    let l = times.len();
+    times[l - 1].stop();
+    lines.push(line!());
+    times.push(Measure::start("")); // timer
 
     let mut result: String = String::default();
-    times.into_iter().zip(lines.into_iter()).into_iter().for_each(|(t, l)| {
-        if t.as_us() > 10 {
-            result += &format!("{} {} ", l, t.as_us()).to_string();
-        }
-    });
+    times
+        .into_iter()
+        .zip(lines.into_iter())
+        .into_iter()
+        .for_each(|(t, l)| {
+            if t.as_us() > 10 {
+                result += &format!("{} {} ", l, t.as_us()).to_string();
+            }
+        });
 
     let mut result: String = String::default();
     let l3len = lines2.len();
-    let mut lines2:Vec<_> = lines2.into_iter().collect();
+    let mut lines2: Vec<_> = lines2.into_iter().collect();
     lines2.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
-    lines2.into_iter().for_each(|(k, v) | {
+    lines2.into_iter().for_each(|(k, v)| {
         if v > 10 {
             result += &format!("{} {} ", k, v).to_string();
         }
     });
-    info!("replaym-loop-timing-stats active_banks entries {} {}", l3len, result);
+    info!(
+        "replaym-loop-timing-stats active_banks entries {} {}",
+        l3len, result
+    );
     info!("replayn-loop-timing-stats {:?}", timings);
 
     Ok(())
@@ -754,7 +809,8 @@ pub fn confirm_slot(
     recyclers: &VerifyRecyclers,
     allow_dead_slots: bool,
 ) -> result::Result<(), BlockstoreProcessorError> {
-    let mut times = vec![Measure::start("")];let mut lines = vec![];
+    let mut times = vec![Measure::start("")];
+    let mut lines = vec![];
     let slot = bank.slot();
 
     let (entries, num_shreds, slot_full) = {
@@ -771,7 +827,10 @@ pub fn confirm_slot(
         load_result
     }?;
 
-    let l = times.len(); times[l - 1].stop();lines.push(line!());times.push(Measure::start("")); // timer
+    let l = times.len();
+    times[l - 1].stop();
+    lines.push(line!());
+    times.push(Measure::start("")); // timer
     let num_entries = entries.len();
     let num_txs = entries.iter().map(|e| e.transactions.len()).sum::<usize>();
     trace!(
@@ -782,7 +841,10 @@ pub fn confirm_slot(
         num_txs,
         slot_full,
     );
-    let l = times.len(); times[l - 1].stop();lines.push(line!());times.push(Measure::start("")); // timer
+    let l = times.len();
+    times[l - 1].stop();
+    lines.push(line!());
+    times.push(Measure::start("")); // timer
 
     if !skip_verification {
         let tick_hash_count = &mut progress.tick_hash_count;
@@ -801,7 +863,10 @@ pub fn confirm_slot(
             err
         })?;
     }
-    let l = times.len(); times[l - 1].stop();lines.push(line!());times.push(Measure::start("")); // timer
+    let l = times.len();
+    times[l - 1].stop();
+    lines.push(line!());
+    times.push(Measure::start("")); // timer
 
     let verifier = if !skip_verification {
         datapoint_debug!("verify-batch-size", ("size", num_entries as i64, i64));
@@ -818,7 +883,10 @@ pub fn confirm_slot(
     } else {
         None
     };
-    let l = times.len(); times[l - 1].stop();lines.push(line!());times.push(Measure::start("")); // timer
+    let l = times.len();
+    times[l - 1].stop();
+    lines.push(line!());
+    times.push(Measure::start("")); // timer
 
     let mut replay_elapsed = Measure::start("replay_elapsed");
     let mut execute_timings = ExecuteTimings::default();
@@ -836,7 +904,10 @@ pub fn confirm_slot(
     timing.replay_elapsed += replay_elapsed.as_us();
 
     timing.execute_timings.accumulate(&execute_timings);
-    let l = times.len(); times[l - 1].stop();lines.push(line!());times.push(Measure::start("")); // timer
+    let l = times.len();
+    times[l - 1].stop();
+    lines.push(line!());
+    times.push(Measure::start("")); // timer
 
     if let Some(mut verifier) = verifier {
         let verified = verifier.finish_verify(&entries);
@@ -847,14 +918,21 @@ pub fn confirm_slot(
             return Err(BlockError::InvalidEntryHash.into());
         }
     }
-    let l = times.len(); times[l - 1].stop();lines.push(line!());times.push(Measure::start("")); // timer
+    let l = times.len();
+    times[l - 1].stop();
+    lines.push(line!());
+    times.push(Measure::start("")); // timer
 
     let mut result: String = String::default();
-    times.into_iter().zip(lines.into_iter()).into_iter().for_each(|(t, l)| {
-        if t.as_us() > 10 {
-            result += &format!("{} {} ", l, t.as_us()).to_string();
-        }
-    });
+    times
+        .into_iter()
+        .zip(lines.into_iter())
+        .into_iter()
+        .for_each(|(t, l)| {
+            if t.as_us() > 10 {
+                result += &format!("{} {} ", l, t.as_us()).to_string();
+            }
+        });
     info!("replayk-loop-timing-stats active_banks {}", result);
 
     process_result?;
