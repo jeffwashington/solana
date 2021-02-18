@@ -193,7 +193,7 @@ impl Accounts {
                 };
             }
 
-            let mut accounts: Vec<_> = message.account_keys.par_iter().enumerate().map(|(i, key)| {
+            let mut accounts: Vec<_> = message.account_keys.iter().enumerate().map(|(i, key)| {
                 let account = if message.is_non_loader_key(key, i) {
                     if solana_sdk::sysvar::instructions::check_id(key)
                         && feature_set.is_active(&feature_set::instructions_sysvar_enabled::id())
