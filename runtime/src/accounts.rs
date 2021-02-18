@@ -152,6 +152,12 @@ impl Accounts {
         account
     }
 
+    pub fn load_account_temp(&self, key: &Pubkey, ancestors: &Ancestors) -> Option<(Account, Slot)>{
+        self
+        .accounts_db
+        .load(ancestors, key)
+    }
+
     fn load_transaction(
         &self,
         ancestors: &Ancestors,

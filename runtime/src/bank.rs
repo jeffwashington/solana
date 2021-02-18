@@ -95,6 +95,7 @@ pub const MAX_LEADER_SCHEDULE_STAKES: Epoch = 5;
 
 #[derive(Default, Debug)]
 pub struct ExecuteTimings {
+    pub just_load:u64,
     pub load_us: u64,
     pub execute_us: u64,
     pub store_us: u64,
@@ -202,9 +203,11 @@ impl ExecuteTimings {
         self.key_lens.sort();
         self.instruction_lens.sort();
         self.entries += other.entries;
+        self.just_load += other.just_load;
 
     }
     pub fn add_acct_visit(&mut self, data: (u64, usize)) {
+        return;
         if self.acct_visit_max.len() < 5 {
             self.acct_visit_max.push(data);
             self.acct_visit_max.sort();
@@ -2926,6 +2929,10 @@ impl Bank {
         let mut cow_cache = self.cached_executors.write().unwrap();
         let mut cache = cow_cache.write().unwrap();
         cache.remove(pubkey);
+    }
+
+    pub fn test_load_account(&self, key: &Pubkey) -> Option<(Account, Slot)> {
+        self.rc.accounts.load_account_temp(key, &self.ancestors)
     }
 
     #[allow(clippy::type_complexity)]

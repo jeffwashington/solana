@@ -55,7 +55,7 @@ pub type BlockstoreProcessorResult =
     result::Result<(BankForks, LeaderScheduleCache), BlockstoreProcessorError>;
 
 thread_local!(static PAR_THREAD_POOL: RefCell<ThreadPool> = RefCell::new(rayon::ThreadPoolBuilder::new()
-                    .num_threads(2)//get_thread_count())
+                    .num_threads(get_thread_count())
                     .thread_name(|ix| format!("blockstore_processor_{}", ix))
                     .build()
                     .unwrap())
@@ -194,9 +194,20 @@ fn execute_batches(
     let mut keys = batches.iter().map(|item| {item.transactions().iter().map(|t| t.message.account_keys.len()).sum::<usize>()}).collect::<Vec<_>>();
     let mut ins = batches.iter().map(|item| {item.transactions().iter().map(|t| t.message.instructions.len()).sum::<usize>()}).collect::<Vec<_>>();
     timings.key_lens.extend(keys);
-    timings.instruction_lens.extend(ins);
+    //timings.instruction_lens.extend(ins);
     timings.key_lens.sort();
-    timings.instruction_lens.sort();
+    //timings.instruction_lens.sort();
+
+    let mut timej = Measure::start("");
+    batches.iter().for_each(|b| {
+        b.transactions().iter().for_each(|t| {
+            t.message.account_keys.iter().for_each(|key| {
+                bank.test_load_account(key);
+            });
+        });
+    });
+    timej.stop(); timings.just_load += timej.as_us();
+
     let (results, new_timings): (Vec<Result<()>>, Vec<ExecuteTimings>) =
         PAR_THREAD_POOL.with(|thread_pool| {
             thread_pool.borrow().install(|| {
