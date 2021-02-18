@@ -136,6 +136,7 @@ pub struct ExecuteTimings {
         pub data_size: usize,
         pub data_size_copied: usize,
         pub accts_count: u64,
+        pub dup_accts: usize,
 
 
 
@@ -186,6 +187,7 @@ impl ExecuteTimings {
         self.data_size += other.data_size;
         self.data_size_copied += other.data_size_copied;
         self.accts_count += other.accts_count;
+        self.dup_accts += other.dup_accts;
     }
     pub fn add_acct_visit(&mut self, data: (u64, usize)) {
         if self.acct_visit_max.len() < 5 {

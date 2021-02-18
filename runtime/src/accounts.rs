@@ -15,6 +15,7 @@ use dashmap::{
 };
 use log::*;
 use rand::{thread_rng, Rng};
+use rayon::prelude::*;
 use solana_sdk::{
     account::Account,
     account_utils::StateMut,
@@ -31,6 +32,7 @@ use solana_sdk::{
     transaction::{Transaction, TransactionError},
 };
 use std::{
+    sync::atomic::{AtomicBool, Ordering},
     collections::{HashMap, HashSet},
     ops::RangeBounds,
     path::PathBuf,
@@ -167,13 +169,16 @@ impl Accounts {
             // There is no way to predict what program will execute without an error
             // If a fee can pay for execution then the program will be scheduled
             let mut payer_index = None;
-            let mut tx_rent: TransactionRent = 0;
-            let mut accounts = Vec::with_capacity(message.account_keys.len());
-            let mut account_deps = Vec::with_capacity(message.account_keys.len());
+            let mut tx_rent = Mutex::new(0 as TransactionRent);
+            let mut account_deps = Mutex::new(Vec::with_capacity(message.account_keys.len()));
             let rent_fix_enabled = feature_set.cumulative_rent_related_fixes_enabled();
 
+            let mut invalid_account_index = AtomicBool::new(false);
+            let mut pgm_not_found = AtomicBool::new(false);
+            let mut pgm_for_exec = AtomicBool::new(false);
+
             for (i, key) in message.account_keys.iter().enumerate() {
-                let account = if message.is_non_loader_key(key, i) {
+                if message.is_non_loader_key(key, i) {
                     if payer_index.is_none() {
                         payer_index = Some(i);
                     }
@@ -184,6 +189,15 @@ impl Accounts {
                         if message.is_writable(i) {
                             return Err(TransactionError::InvalidAccountIndex);
                         }
+                    }
+                };
+            }
+
+            let mut accounts: Vec<_> = message.account_keys.par_iter().enumerate().map(|(i, key)| {
+                let account = if message.is_non_loader_key(key, i) {
+                    if solana_sdk::sysvar::instructions::check_id(key)
+                        && feature_set.is_active(&feature_set::instructions_sysvar_enabled::id())
+                    {
                         Self::construct_instructions_account(message)
                     } else {
                         let (account, rent) = self
@@ -214,26 +228,39 @@ impl Accounts {
                                     .load(ancestors, &programdata_address)
                                     .map(|(account, _)| account)
                                 {
-                                    account_deps.push((programdata_address, account));
+                                    account_deps.lock().unwrap().push((programdata_address, account));
                                 } else {
-                                    error_counters.account_not_found += 1;
-                                    return Err(TransactionError::ProgramAccountNotFound);
+                                    // TODO error_counters.account_not_found += 1;
+                                    pgm_not_found.store(true, Ordering::Relaxed);
+                                    return Account::default();//
                                 }
                             } else {
-                                error_counters.invalid_program_for_execution += 1;
-                                return Err(TransactionError::InvalidProgramForExecution);
+                                // TODO error_counters.invalid_program_for_execution += 1;
+                                pgm_for_exec.store(true, Ordering::Relaxed);
+                                return Account::default();//
                             }
                         }
 
-                        tx_rent += rent;
+                        *tx_rent.lock().unwrap() += rent;
                         account
                     }
                 } else {
                     // Fill in an empty account for the program slots.
                     Account::default()
                 };
-                accounts.push(account);
+                account
+            }).collect();
+
+            if invalid_account_index.load(Ordering::Relaxed) {
+                return Err(TransactionError::InvalidAccountIndex);
             }
+            if pgm_not_found.load(Ordering::Relaxed) {
+                return Err(TransactionError::ProgramAccountNotFound);
+            }
+            if pgm_for_exec.load(Ordering::Relaxed) {
+                return Err(TransactionError::InvalidProgramForExecution);
+            }
+
             debug_assert_eq!(accounts.len(), message.account_keys.len());
 
             if let Some(payer_index) = payer_index {
@@ -280,11 +307,13 @@ impl Accounts {
                                 )
                             })
                             .collect::<Result<TransactionLoaders>>()?;
+                        let mut vec = vec![];
+                        std::mem::swap(&mut *account_deps.lock().unwrap(), &mut vec);
                         Ok(LoadedTransaction {
                             accounts,
-                            account_deps,
+                            account_deps: vec,
                             loaders,
-                            rent: tx_rent,
+                            rent: *tx_rent.lock().unwrap(),
                         })
                     }
                 }
