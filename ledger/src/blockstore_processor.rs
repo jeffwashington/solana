@@ -193,13 +193,10 @@ fn execute_batches(
     timings.batch_count += batches.len();
     let mut keys = batches.iter().map(|item| {item.transactions().iter().map(|t| t.message.account_keys.len()).sum::<usize>()}).collect::<Vec<_>>();
     let mut ins = batches.iter().map(|item| {item.transactions().iter().map(|t| t.message.instructions.len()).sum::<usize>()}).collect::<Vec<_>>();
-    error!("replayn-loop-timing-stats: {:?}", keys);
-    error!("replayn-loop-timing-stats: {:?}", ins);
-    keys.sort();
-    ins.sort();
-
-    timings.key_lens = keys;
-    timings.instruction_lens = ins;
+    timings.key_lens.extend(keys);
+    timings.instruction_lens.extend(ins);
+    timings.key_lens.sort();
+    timings.instruction_lens.sort();
     let (results, new_timings): (Vec<Result<()>>, Vec<ExecuteTimings>) =
         PAR_THREAD_POOL.with(|thread_pool| {
             thread_pool.borrow().install(|| {
@@ -281,6 +278,7 @@ fn process_entries_with_callback(
     let mut lines2 = HashMap::new();
     let mut time = Measure::start("");
     add_time(&mut lines2, line!(), &mut time); time = Measure::start("");
+    timings.entries += entries.len();
     for entry in entries {
         add_time(&mut lines2, line!(), &mut time); time = Measure::start("");
         if entry.is_tick() {

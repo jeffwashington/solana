@@ -142,6 +142,7 @@ pub struct ExecuteTimings {
         pub batch_count: usize,
         pub key_lens: Vec<usize>,
         pub instruction_lens: Vec<usize>,
+        pub entries: usize,
 
 
 
@@ -199,6 +200,7 @@ impl ExecuteTimings {
         self.instruction_lens.extend(other.instruction_lens.to_vec());
         self.key_lens.sort();
         self.instruction_lens.sort();
+        self.entries += other.entries;
 
     }
     pub fn add_acct_visit(&mut self, data: (u64, usize)) {
