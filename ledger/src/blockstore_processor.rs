@@ -199,9 +199,9 @@ fn execute_batches(
     timings.instruction_lens.sort();
 
     let mut timej = Measure::start("");
-    batches.iter().for_each(|b| {
-        b.transactions().iter().for_each(|t| {
-            t.message.account_keys.iter().for_each(|key| {
+    batches.par_iter().for_each(|b| {
+        b.transactions().par_iter().for_each(|t| {
+            t.message.account_keys.par_iter().for_each(|key| {
                 bank.test_load_account(key);
             });
         });
