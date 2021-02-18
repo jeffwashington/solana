@@ -364,7 +364,7 @@ fn process_entries_with_callback(
                 // else we have an entry that conflicts with a prior entry
                 // execute the current queue and try to process this entry again
                 add_time(&mut lines2, line!(), &mut time); time = Measure::start("");
-                timings.batch_size.push(batches.len());
+                //timings.batch_size.push(batches.len());
                 execute_batches(
                     bank,
                     &batches,
