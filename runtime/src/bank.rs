@@ -27,6 +27,7 @@ use crate::{
 use byteorder::{ByteOrder, LittleEndian};
 use itertools::Itertools;
 use log::*;
+use rayon::prelude::*;
 use rayon::ThreadPool;
 use solana_measure::measure::Measure;
 use solana_metrics::{datapoint_debug, inc_new_counter_debug, inc_new_counter_info};
@@ -2937,8 +2938,10 @@ impl Bank {
         cache.remove(pubkey);
     }
 
-    pub fn test_load_account(&self, key: &Pubkey) -> Option<(Account, Slot)> {
-        self.rc.accounts.load_account_temp(key, &self.ancestors)
+    pub fn test_load_accounts(&self, key: &Vec<&Pubkey>) -> Vec<Option<(Account, Slot)>> {
+        key.par_iter().map(|key| {
+            self.rc.accounts.load_account_temp(&key, &self.ancestors)
+        }).collect::<Vec<_>>()
     }
 
     #[allow(clippy::type_complexity)]

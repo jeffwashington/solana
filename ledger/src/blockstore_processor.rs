@@ -217,26 +217,24 @@ fn execute_batches(
     batches.par_iter().for_each(|b| {
         b.transactions().par_iter().for_each(|t| {
             t.message.account_keys.par_iter().for_each(|key| {
-                bank.test_load_account(key);
+                bank.test_load_accounts(&vec![&key]);
             });
         });
     });
     timej.stop();
     timings.just_load += timej.as_us();
 
-    let mut ct = AtomicU64::new(0);
+    timings.load_acct_count += keys.len() as u64;
+    let keys = batches.iter().map(|b| {
+        b.transactions().iter().map(|t| {
+            t.message.account_keys.iter().map(|k| k).collect::<Vec<&Pubkey>>()
+        }).flatten().collect::<Vec<_>>()
+    }).flatten().collect::<Vec<&Pubkey>>();
+
     let mut timej = Measure::start("");
-    batches.par_iter().for_each(|b| {
-        b.transactions().par_iter().for_each(|t| {
-            t.message.account_keys.par_iter().for_each(|key| {
-                bank.test_load_account(key);
-                ct.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            });
-        });
-    });
+    bank.test_load_accounts(&keys);
     timej.stop();
     timings.load_2 += timej.as_us();
-    timings.load_acct_count += ct.load(std::sync::atomic::Ordering::Relaxed);
 
     let mut timej = Measure::start("");
 
