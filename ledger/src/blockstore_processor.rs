@@ -244,7 +244,7 @@ fn execute_batches(
         PAR_THREAD_POOL.with(|thread_pool| {
             thread_pool.borrow().install(|| {
                 let chunks = std::cmp::max(1, batches.len());
-                let chunk_size = 2;
+                let chunk_size = batches.len() / chunks;
                 (0..chunks)
                     .into_par_iter()
                     .map_with(transaction_status_sender.clone(), |sender, chunk_index| {
