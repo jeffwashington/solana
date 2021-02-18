@@ -47,6 +47,7 @@ use std::{
     path::PathBuf,
     result,
     sync::Arc,
+    sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
     time::{Duration, Instant},
 };
 use thiserror::Error;
@@ -222,6 +223,20 @@ fn execute_batches(
     });
     timej.stop();
     timings.just_load += timej.as_us();
+
+    let mut ct = AtomicU64::new(0);
+    let mut timej = Measure::start("");
+    batches.par_iter().for_each(|b| {
+        b.transactions().par_iter().for_each(|t| {
+            t.message.account_keys.par_iter().for_each(|key| {
+                bank.test_load_account(key);
+                ct.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            });
+        });
+    });
+    timej.stop();
+    timings.load_2 += timej.as_us();
+    timings.load_acct_count += ct.load(std::sync::atomic::Ordering::Relaxed);
 
     let mut timej = Measure::start("");
 

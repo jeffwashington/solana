@@ -95,6 +95,8 @@ pub const MAX_LEADER_SCHEDULE_STAKES: Epoch = 5;
 
 #[derive(Default, Debug)]
 pub struct ExecuteTimings {
+    pub load_acct_count    :u64,
+    pub load_2: u64,
     pub just_load:u64,
     pub batch_execution:u64,
     pub load_us: u64,
@@ -154,6 +156,8 @@ pub struct ExecuteTimings {
 impl ExecuteTimings {
     pub fn accumulate(&mut self, other: &ExecuteTimings) {
         self.load_us += other.load_us;
+        self.load_2 += other.load_2;
+        self.load_acct_count += other.load_acct_count;
         self.execute_us += other.execute_us;
         self.store_us += other.store_us;
         self.count += other.count;
