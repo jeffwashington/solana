@@ -190,6 +190,14 @@ fn execute_batches(
     timings: &mut ExecuteTimings,
 ) -> Result<()> {
     inc_new_counter_debug!("bank-par_execute_entries-count", batches.len());
+    timings.batch_count += batches.len();
+    let mut keys = batches.iter().map(|item| {item.transactions().iter().map(|t| t.message.account_keys.len()).sum::<usize>()}).collect::<Vec<_>>();
+    let mut ins = batches.iter().map(|item| {item.transactions().iter().map(|t| t.message.instructions.len()).sum::<usize>()}).collect::<Vec<_>>();
+    keys.sort();
+    ins.sort();
+
+    timings.key_lens = keys;
+    timings.instruction_lens = ins;
     let (results, new_timings): (Vec<Result<()>>, Vec<ExecuteTimings>) =
         PAR_THREAD_POOL.with(|thread_pool| {
             thread_pool.borrow().install(|| {

@@ -139,7 +139,9 @@ pub struct ExecuteTimings {
         pub dup_accts: usize,
         pub num_txs: usize,
         pub accts_load: usize,
-
+        pub batch_count: usize,
+        pub key_lens: Vec<usize>,
+        pub instruction_lens: Vec<usize>,
 
 
 
@@ -192,6 +194,7 @@ impl ExecuteTimings {
         self.dup_accts += other.dup_accts;
         self.num_txs += other.num_txs;
         self.accts_load += other.accts_load;
+        self.batch_count += other.batch_count;
     }
     pub fn add_acct_visit(&mut self, data: (u64, usize)) {
         if self.acct_visit_max.len() < 5 {
