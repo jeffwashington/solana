@@ -223,6 +223,8 @@ fn execute_batches(
     timej.stop();
     timings.just_load += timej.as_us();
 
+    let mut timej = Measure::start("");
+
     let (results, new_timings): (Vec<Result<()>>, Vec<ExecuteTimings>) =
         PAR_THREAD_POOL.with(|thread_pool| {
             thread_pool.borrow().install(|| {
@@ -259,6 +261,7 @@ fn execute_batches(
                     .unzip()
             })
         });
+    timej.stop(); timings.batch_execution += timej.as_us();
 
     for timing in new_timings {
         timings.accumulate(&timing);
