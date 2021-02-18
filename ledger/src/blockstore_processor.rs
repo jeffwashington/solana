@@ -193,6 +193,8 @@ fn execute_batches(
     timings.batch_count += batches.len();
     let mut keys = batches.iter().map(|item| {item.transactions().iter().map(|t| t.message.account_keys.len()).sum::<usize>()}).collect::<Vec<_>>();
     let mut ins = batches.iter().map(|item| {item.transactions().iter().map(|t| t.message.instructions.len()).sum::<usize>()}).collect::<Vec<_>>();
+    error!("replayn-loop-timing-stats: {:?}", keys);
+    error!("replayn-loop-timing-stats: {:?}", ins);
     keys.sort();
     ins.sort();
 
