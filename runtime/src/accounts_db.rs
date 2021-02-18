@@ -2335,9 +2335,42 @@ impl AccountsDB {
         bank_hashes.insert(slot, new_hash_info);
     }
 
+    pub fn loads(&self, ancestors: &Ancestors, pubkey: &Vec<&Pubkey>) -> Vec<Option<(Account, Slot)>> {
+        self.do_load2(ancestors, pubkey, None)
+    }
+ 
     pub fn load(&self, ancestors: &Ancestors, pubkey: &Pubkey) -> Option<(Account, Slot)> {
         self.do_load(ancestors, pubkey, None)
     }
+
+    fn do_load2(
+        &self,
+        ancestors: &Ancestors,
+        pubkey: &Vec<&Pubkey>,
+        max_root: Option<Slot>,
+    ) -> Vec<Option<(Account, Slot)>> {
+
+        pubkey.par_iter().map(|pubkey| {
+            let (slot, store_id, offset) = {
+                let (lock, index) = self.accounts_index.get(pubkey, Some(ancestors), max_root)?;
+                let slot_list = lock.slot_list();
+                let (
+                    slot,
+                    AccountInfo {
+                        store_id, offset, ..
+                    },
+                ) = slot_list[index];
+                (slot, store_id, offset)
+                // `lock` released here
+            };
+
+            //TODO: thread this as a ref
+            self.get_account_accessor_from_cache_or_storage(slot, pubkey, store_id, offset)
+                .get_loaded_account()
+                .map(|loaded_account| (loaded_account.account(), slot))
+        }).collect::<Vec<_>>()
+    }
+
 
     fn do_load(
         &self,

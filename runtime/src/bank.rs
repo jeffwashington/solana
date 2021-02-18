@@ -2939,9 +2939,7 @@ impl Bank {
     }
 
     pub fn test_load_accounts(&self, key: &Vec<&Pubkey>) -> Vec<Option<(Account, Slot)>> {
-        key.par_iter().map(|key| {
-            self.rc.accounts.load_account_temp(&key, &self.ancestors)
-        }).collect::<Vec<_>>()
+        self.rc.accounts.load_account_temp(&key, &self.ancestors)
     }
 
     #[allow(clippy::type_complexity)]

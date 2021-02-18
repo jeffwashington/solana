@@ -224,12 +224,12 @@ fn execute_batches(
     timej.stop();
     timings.just_load += timej.as_us();
 
-    timings.load_acct_count += keys.len() as u64;
     let keys = batches.iter().map(|b| {
         b.transactions().iter().map(|t| {
             t.message.account_keys.iter().map(|k| k).collect::<Vec<&Pubkey>>()
         }).flatten().collect::<Vec<_>>()
     }).flatten().collect::<Vec<&Pubkey>>();
+    timings.load_acct_count += keys.len() as u64;
 
     let mut timej = Measure::start("");
     bank.test_load_accounts(&keys);
