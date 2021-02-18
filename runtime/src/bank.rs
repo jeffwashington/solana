@@ -137,6 +137,8 @@ pub struct ExecuteTimings {
         pub data_size_copied: usize,
         pub accts_count: u64,
         pub dup_accts: usize,
+        pub num_txs: usize,
+        pub accts_load: usize,
 
 
 
@@ -188,6 +190,8 @@ impl ExecuteTimings {
         self.data_size_copied += other.data_size_copied;
         self.accts_count += other.accts_count;
         self.dup_accts += other.dup_accts;
+        self.num_txs += other.num_txs;
+        self.accts_load += other.accts_load;
     }
     pub fn add_acct_visit(&mut self, data: (u64, usize)) {
         if self.acct_visit_max.len() < 5 {
@@ -2956,6 +2960,8 @@ impl Bank {
             max_age,
             &mut error_counters,
         );
+        timings.num_txs += txs.len();
+        timings.accts_load += txs.iter().map(|t|t.message.account_keys.len()).sum::<usize>();
         let mut loaded_accounts = self.rc.accounts.load_accounts(
             &self.ancestors,
             txs,
