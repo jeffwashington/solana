@@ -454,6 +454,12 @@ fn process_entries_with_callback(
     timej.stop();
     timings.load_3 += timej.as_us();
 
+    let mut timej = Measure::start("");
+    let reff = all_keys.iter().map(|x| x).collect::<Vec<_>>();
+    let res = bank.test_load_accounts(&reff);
+    timej.stop();
+    timings.load_4 += timej.as_us();
+
     let l = times.len();
     times[l - 1].stop();
     lines.push(line!());

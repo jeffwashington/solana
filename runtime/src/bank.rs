@@ -99,6 +99,7 @@ pub struct ExecuteTimings {
     pub load_acct_count    :u64,
     pub load_2: u64,
     pub load_3: u64,
+    pub load_4: u64,
     pub load_2_calls: u64,
     pub load_2_first_part: Vec<u64>,
     pub load_2_second_part: Vec<u64>,
@@ -219,6 +220,7 @@ impl ExecuteTimings {
         self.load_2_first_part.extend(other.load_2_first_part.clone());
         self.load_2_second_part.extend(other.load_2_second_part.clone());
         self.load_3 += other.load_3;
+        self.load_4 += other.load_4;
     
 
     }
