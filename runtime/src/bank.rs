@@ -135,6 +135,7 @@ pub struct ExecuteTimings {
         pub fixup: u64,
         pub data_size: usize,
         pub data_size_copied: usize,
+        pub accts_count: u64,
 
 
 
@@ -184,6 +185,7 @@ impl ExecuteTimings {
         self.fixup += other.fixup;
         self.data_size += other.data_size;
         self.data_size_copied += other.data_size_copied;
+        self.accts_count += other.accts_count;
     }
     pub fn add_acct_visit(&mut self, data: (u64, usize)) {
         if self.acct_visit_max.len() < 5 {

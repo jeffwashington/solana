@@ -836,6 +836,7 @@ impl MessageProcessor {
                 //    timings.data_size_copied += account.data.len();
                 //}
                 pre_accounts.push(n);
+                timings.accts_count += 1;
                 Ok(())
             };
             let mut timej = Measure::start("");
