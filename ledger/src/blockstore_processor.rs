@@ -228,7 +228,7 @@ fn execute_batches(
     let (results, new_timings): (Vec<Result<()>>, Vec<ExecuteTimings>) =
         PAR_THREAD_POOL.with(|thread_pool| {
             thread_pool.borrow().install(|| {
-                let chunks = 2;
+                let chunks = 1;
                 let chunk_size = batches.len() / chunks;
                 (0..chunks)
                     .into_par_iter()
