@@ -96,6 +96,7 @@ pub const MAX_LEADER_SCHEDULE_STAKES: Epoch = 5;
 #[derive(Default, Debug)]
 pub struct ExecuteTimings {
     pub just_load:u64,
+    pub batch_execution:u64,
     pub load_us: u64,
     pub execute_us: u64,
     pub store_us: u64,
@@ -204,6 +205,7 @@ impl ExecuteTimings {
         self.instruction_lens.sort();
         self.entries += other.entries;
         self.just_load += other.just_load;
+        self.batch_execution += other.batch_execution;
 
     }
     pub fn add_acct_visit(&mut self, data: (u64, usize)) {
