@@ -2350,7 +2350,7 @@ impl AccountsDB {
         max_root: Option<Slot>,
     ) -> Vec<Option<(Account, Slot, u64, u64)>> {
 
-        pubkey.par_iter().map(|pubkey| {
+        pubkey.iter().map(|pubkey| {
             let mut timej = Measure::start("");
             let (slot, store_id, offset) = {
                 let (lock, index) = self.accounts_index.get(pubkey, Some(ancestors), max_root)?;

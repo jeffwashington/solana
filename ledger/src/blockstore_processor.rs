@@ -236,8 +236,10 @@ fn execute_batches(
     let res = bank.test_load_accounts(&keys);
     timej.stop();
     timings.load_2 += timej.as_us();
+    /*
     timings.load_2_first_part.extend(res.iter().map(|i| i.clone().unwrap_or_default().2));
     timings.load_2_second_part.extend(res.iter().map(|i| i.clone().unwrap_or_default().3));
+    */
 
     let mut timej = Measure::start("");
 
