@@ -195,6 +195,11 @@ impl ExecuteTimings {
         self.num_txs += other.num_txs;
         self.accts_load += other.accts_load;
         self.batch_count += other.batch_count;
+        self.key_lens.extend(other.key_lens);
+        self.instruction_lens.extend(other.instruction_lens);
+        self.key_lens.sort();
+        self.instruction_lens.sort();
+
     }
     pub fn add_acct_visit(&mut self, data: (u64, usize)) {
         if self.acct_visit_max.len() < 5 {
