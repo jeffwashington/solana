@@ -2335,7 +2335,7 @@ impl AccountsDB {
         bank_hashes.insert(slot, new_hash_info);
     }
 
-    pub fn loads(&self, ancestors: &Ancestors, pubkey: &Vec<&Pubkey>) -> Vec<Option<(Account, Slot)>> {
+    pub fn loads(&self, ancestors: &Ancestors, pubkey: &Vec<&Pubkey>) -> Vec<Option<(Account, Slot, u64, u64)>> {
         self.do_load2(ancestors, pubkey, None)
     }
  
@@ -2348,9 +2348,10 @@ impl AccountsDB {
         ancestors: &Ancestors,
         pubkey: &Vec<&Pubkey>,
         max_root: Option<Slot>,
-    ) -> Vec<Option<(Account, Slot)>> {
+    ) -> Vec<Option<(Account, Slot, u64, u64)>> {
 
         pubkey.par_iter().map(|pubkey| {
+            let mut timej = Measure::start("");
             let (slot, store_id, offset) = {
                 let (lock, index) = self.accounts_index.get(pubkey, Some(ancestors), max_root)?;
                 let slot_list = lock.slot_list();
@@ -2363,11 +2364,16 @@ impl AccountsDB {
                 (slot, store_id, offset)
                 // `lock` released here
             };
+            timej.stop();
 
+            let mut timej2 = Measure::start("");
             //TODO: thread this as a ref
-            self.get_account_accessor_from_cache_or_storage(slot, pubkey, store_id, offset)
+            let res = self.get_account_accessor_from_cache_or_storage(slot, pubkey, store_id, offset)
                 .get_loaded_account()
-                .map(|loaded_account| (loaded_account.account(), slot))
+                .map(|loaded_account| (loaded_account.account(), slot));
+            timej2.stop();
+            Some((res.clone().unwrap().0, res.unwrap().1, timej.as_us(), timej2.as_us()))
+
         }).collect::<Vec<_>>()
     }
 

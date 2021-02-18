@@ -98,6 +98,9 @@ pub const MAX_LEADER_SCHEDULE_STAKES: Epoch = 5;
 pub struct ExecuteTimings {
     pub load_acct_count    :u64,
     pub load_2: u64,
+    pub load_2_calls: u64,
+    pub load_2_first_part: Vec<u64>,
+    pub load_2_second_part: Vec<u64>,
     pub just_load:u64,
     pub batch_execution:u64,
     pub load_us: u64,
@@ -211,6 +214,10 @@ impl ExecuteTimings {
         self.entries += other.entries;
         self.just_load += other.just_load;
         self.batch_execution += other.batch_execution;
+        self.load_2_calls += other.load_2_calls;
+        self.load_2_first_part.extend(other.load_2_first_part.clone());
+        self.load_2_second_part.extend(other.load_2_second_part.clone());
+    
 
     }
     pub fn add_acct_visit(&mut self, data: (u64, usize)) {
@@ -2938,7 +2945,7 @@ impl Bank {
         cache.remove(pubkey);
     }
 
-    pub fn test_load_accounts(&self, key: &Vec<&Pubkey>) -> Vec<Option<(Account, Slot)>> {
+    pub fn test_load_accounts(&self, key: &Vec<&Pubkey>) -> Vec<Option<(Account, Slot, u64, u64)>> {
         self.rc.accounts.load_account_temp(&key, &self.ancestors)
     }
 

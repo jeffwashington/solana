@@ -9,6 +9,7 @@ use crate::{
     system_instruction_processor::{get_system_account_kind, SystemAccountKind},
     transaction_utils::OrderedIterator,
 };
+use solana_measure::measure::Measure;
 use dashmap::{
     mapref::entry::Entry::{Occupied, Vacant},
     DashMap,
@@ -152,7 +153,7 @@ impl Accounts {
         account
     }
 
-    pub fn load_account_temp(&self, key: &Vec<&Pubkey>, ancestors: &Ancestors) -> Vec<Option<(Account, Slot)>>{
+    pub fn load_account_temp(&self, key: &Vec<&Pubkey>, ancestors: &Ancestors) -> Vec<Option<(Account, Slot, u64, u64)>>{
         self
         .accounts_db
         .loads(ancestors, key)

@@ -223,6 +223,7 @@ fn execute_batches(
     });
     timej.stop();
     timings.just_load += timej.as_us();
+    timings.load_2_calls += 1;
 
     let keys = batches.iter().map(|b| {
         b.transactions().iter().map(|t| {
@@ -232,9 +233,11 @@ fn execute_batches(
     timings.load_acct_count += keys.len() as u64;
 
     let mut timej = Measure::start("");
-    bank.test_load_accounts(&keys);
+    let res = bank.test_load_accounts(&keys);
     timej.stop();
     timings.load_2 += timej.as_us();
+    timings.load_2_first_part.extend(res.iter().map(|i| i.clone().unwrap().2));
+    timings.load_2_second_part.extend(res.iter().map(|i| i.clone().unwrap().3));
 
     let mut timej = Measure::start("");
 
