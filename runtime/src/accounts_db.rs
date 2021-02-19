@@ -41,6 +41,7 @@ use solana_measure::measure::Measure;
 use solana_rayon_threadlimit::get_thread_count;
 use solana_sdk::{
     account::Account,
+    //    account::AccountCow,
     clock::{Epoch, Slot},
     genesis_config::ClusterType,
     hash::{Hash, Hasher},
@@ -382,10 +383,25 @@ impl<'a> LoadedAccountAccessor<'a> {
     }
 }
 
+#[derive(Debug, Clone)]
 pub enum LoadedAccount<'a> {
     Stored(StoredAccountMeta<'a>),
     Cached((Pubkey, Cow<'a, CachedAccount>)),
 }
+/*
+impl<T> Clone for LoadedAccount<'a> {
+    fn clone(&self) -> Self {
+        match self {
+            LoadedAccount::Stored(stored_account_meta) => {
+                Self {
+                    Stored()
+                }
+            }
+            LoadedAccount::Cached((_, cached_account)) => &cached_account.account.owner,
+        }
+    }
+}
+*/
 
 impl<'a> LoadedAccount<'a> {
     pub fn owner(&self) -> &Pubkey {
@@ -459,6 +475,17 @@ impl<'a> LoadedAccount<'a> {
             },
         }
     }
+    /*
+    pub fn account_cow(&'a self) -> &'a LoadedAccount<'a> {
+        match self {
+            LoadedAccount::Stored(stored_account_meta) => &AccountCow::new(&stored_account_meta.clone_account()),
+            LoadedAccount::Cached((_, cached_account)) => match cached_account {
+                Cow::Owned(cached_account) => &AccountCow::new(&cached_account.account),
+                Cow::Borrowed(cached_account) => &AccountCow::new(&cached_account.account),
+            },
+        }
+    }
+    */
 }
 
 #[derive(Clone, Default, Debug)]
@@ -2377,6 +2404,13 @@ impl AccountsDB {
         }).collect::<Vec<_>>()
     }
 
+    pub fn load_cow<'a>(
+        &'a self,
+        ancestors: &Ancestors,
+        pubkey: &'a Pubkey,
+    ) -> Option<(Cow<'a, CachedAccount>, Slot)> {
+        self.do_load_cow(ancestors, pubkey, None)
+    }
 
     fn do_load(
         &self,
@@ -2401,6 +2435,35 @@ impl AccountsDB {
         self.get_account_accessor_from_cache_or_storage(slot, pubkey, store_id, offset)
             .get_loaded_account()
             .map(|loaded_account| (loaded_account.account(), slot))
+    }
+
+    fn do_load_cow<'a>(
+        &'a self,
+        ancestors: &Ancestors,
+        pubkey: &'a Pubkey,
+        max_root: Option<Slot>,
+    ) -> Option<(Cow<'a, CachedAccount>, Slot)> {
+        let (slot, store_id, offset) = {
+            let (lock, index) = self.accounts_index.get(pubkey, Some(ancestors), max_root)?;
+            let slot_list = lock.slot_list();
+            let (
+                slot,
+                AccountInfo {
+                    store_id, offset, ..
+                },
+            ) = slot_list[index];
+            (slot, store_id, offset)
+            // `lock` released here
+        };
+
+        self.accounts_cache
+            .load(slot, pubkey)
+            .map(|cached_account| {
+                (
+                    Cow::Owned(cached_account.clone()),
+                    slot,
+                )
+            })
     }
 
     pub fn load_account_hash(&self, ancestors: &Ancestors, pubkey: &Pubkey) -> Hash {

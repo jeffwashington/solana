@@ -67,7 +67,7 @@ impl<'a> From<&'a Account> for AccountMeta {
 
 /// References to Memory Mapped memory
 /// The Account is stored separately from its data, so getting the actual account requires a clone
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct StoredAccountMeta<'a> {
     pub meta: &'a StoredMeta,
     /// account data

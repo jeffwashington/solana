@@ -1,6 +1,6 @@
 use crate::{clock::Epoch, pubkey::Pubkey};
 use solana_program::{account_info::AccountInfo, sysvar::Sysvar};
-use std::{cell::RefCell, cmp, fmt, rc::Rc};
+use std::{borrow::Cow, cell::RefCell, cmp, fmt, rc::Rc};
 
 /// An Account with data that is stored on chain
 #[repr(C)]
@@ -19,6 +19,34 @@ pub struct Account {
     pub executable: bool,
     /// the epoch at which this account will next owe rent
     pub rent_epoch: Epoch,
+}
+
+// same as account, but with data as Cow
+#[derive(PartialEq, Eq, Clone, Default)]
+pub struct AccountWithCowData<'a> {
+    /// lamports in the account
+    pub lamports: u64,
+    /// data held in this account
+    pub data: Cow<'a, Vec<u8>>,
+    /// the program that owns this account. If executable, the program that loads this account.
+    pub owner: Pubkey,
+    /// this account's data contains a loaded program (and is now read-only)
+    pub executable: bool,
+    /// the epoch at which this account will next owe rent
+    pub rent_epoch: Epoch,
+}
+
+pub struct AccountCow<'a> {
+    pub account: Cow<'a, Account>,
+}
+
+impl AccountCow<'_> {
+    pub fn new(account: &Account) -> Self {
+        Self {
+            account: Cow::Owned(account.clone())
+            //account: Cow::new(^account.clone())
+        }
+    }
 }
 
 impl fmt::Debug for Account {

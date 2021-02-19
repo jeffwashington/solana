@@ -64,6 +64,25 @@ pub struct Accounts {
     pub(crate) readonly_locks: Arc<RwLock<Option<HashMap<Pubkey, ReadonlyLock>>>>,
 }
 
+/// This structure handles synchronization for db
+#[derive(Default, Debug, AbiExample)]
+pub struct AccountsCow {
+    /// my slot
+    pub slot: Slot,
+
+    /// my epoch
+    pub epoch: Epoch,
+
+    /// Single global AccountsDB
+    pub accounts_db: Arc<AccountsDB>,
+
+    /// set of writable accounts which are currently in the pipeline
+    pub(crate) account_locks: Mutex<HashSet<Pubkey>>,
+
+    /// Set of read-only accounts which are currently in the pipeline, caching number of locks.
+    pub(crate) readonly_locks: Arc<RwLock<Option<HashMap<Pubkey, ReadonlyLock>>>>,
+}
+
 // for the load instructions
 pub type TransactionAccounts = Vec<Account>;
 pub type TransactionAccountDeps = Vec<(Pubkey, Account)>;
