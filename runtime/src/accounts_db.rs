@@ -2366,6 +2366,10 @@ impl AccountsDB {
         self.do_load2(ancestors, pubkey, None)
     }
  
+    pub fn loads_cow<'a>(&'a self, ancestors: &Ancestors, pubkey: &'a Pubkey) -> Option<(Cow<'a, CachedAccount>, Slot)> {
+        self.do_load_cow(ancestors, &pubkey, None)
+    }
+ 
     pub fn load(&self, ancestors: &Ancestors, pubkey: &Pubkey) -> Option<(Account, Slot)> {
         self.do_load(ancestors, pubkey, None)
     }

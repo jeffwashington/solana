@@ -7,6 +7,7 @@ use crate::{
         AccountAddressFilter, Accounts, TransactionAccountDeps, TransactionAccounts,
         TransactionLoadResult, TransactionLoaders,
     },
+    accounts_cache::{AccountsCache, CachedAccount, SlotCache},
     accounts_db::{ErrorCounters, SnapshotStorages},
     accounts_index::{AccountIndex, Ancestors, IndexKey},
     blockhash_queue::BlockhashQueue,
@@ -75,6 +76,7 @@ use solana_stake_program::stake_state::{
 };
 use solana_vote_program::vote_instruction::VoteInstruction;
 use std::{
+    borrow::Cow,
     cell::RefCell,
     collections::{HashMap, HashSet},
     convert::{TryFrom, TryInto},
@@ -2951,6 +2953,10 @@ impl Bank {
 
     pub fn test_load_accounts(&self, key: &Vec<&Pubkey>) -> Vec<Option<(Account, Slot, u64, u64)>> {
         self.rc.accounts.load_account_temp(&key, &self.ancestors)
+    }
+
+    pub fn test_load_accounts_cow<'a>(&'a self, key: &'a Pubkey) -> Option<(Cow<'a, CachedAccount>, Slot)> {
+        self.rc.accounts.load_account_temp_cow(&key, &self.ancestors)
     }
 
     #[allow(clippy::type_complexity)]

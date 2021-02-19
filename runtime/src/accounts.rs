@@ -1,4 +1,5 @@
 use crate::{
+    accounts_cache::{AccountsCache, CachedAccount, SlotCache},
     accounts_db::{AccountsDB, BankHashInfo, ErrorCounters, LoadedAccount, ScanStorageResult},
     accounts_index::{AccountIndex, Ancestors, IndexKey},
     bank::{
@@ -33,6 +34,7 @@ use solana_sdk::{
     transaction::{Transaction, TransactionError},
 };
 use std::{
+    borrow::Cow,
     sync::atomic::{AtomicBool, Ordering},
     collections::{HashMap, HashSet},
     ops::RangeBounds,
@@ -176,6 +178,12 @@ impl Accounts {
         self
         .accounts_db
         .loads(ancestors, key)
+    }
+
+    pub fn load_account_temp_cow<'a>(&'a self, key: &'a Pubkey, ancestors: &'a Ancestors) -> Option<(Cow<'a, CachedAccount>, Slot)>{
+        self
+        .accounts_db
+        .loads_cow(ancestors, key)
     }
 
     fn load_transaction(
