@@ -2,7 +2,7 @@ use log::*;
 use memmap2::MmapMut;
 use serde::{Deserialize, Serialize};
 use solana_sdk::{
-    account::Account,
+    account::{Account, AnAccount},
     clock::{Epoch, Slot},
     hash::Hash,
     pubkey::Pubkey,
@@ -64,6 +64,29 @@ impl<'a> From<&'a Account> for AccountMeta {
         }
     }
 }
+
+impl AccountMeta {
+    fn from_an_account<T:AnAccount>(account: &T) -> AccountMeta {
+        AccountMeta {
+            lamports: account.lamports(),
+            owner: *account.owner(),
+            executable: account.executable(),
+            rent_epoch: account.rent_epoch(),
+        }
+    }
+}
+/*
+default impl<'a, T: AnAccount> From<&'a T> for AccountMeta {
+    fn from(account: &'a T) -> Self {
+        Self {
+            lamports: account.lamports(),
+            owner: *account.owner(),
+            executable: account.executable(),
+            rent_epoch: account.rent_epoch(),
+        }
+    }
+}
+*/
 
 /// References to Memory Mapped memory
 /// The Account is stored separately from its data, so getting the actual account requires a clone
@@ -420,19 +443,19 @@ impl AppendVec {
     }
 
     #[allow(clippy::mutex_atomic)]
-    pub fn append_accounts(
+    pub fn append_accounts<T:AnAccount>(
         &self,
-        accounts: &[(StoredMeta, &Account)],
+        accounts: &[(StoredMeta, &T)],
         hashes: &[Hash],
     ) -> Vec<usize> {
         let mut offset = self.append_offset.lock().unwrap();
         let mut rv = Vec::with_capacity(accounts.len());
         for ((stored_meta, account), hash) in accounts.iter().zip(hashes) {
             let meta_ptr = stored_meta as *const StoredMeta;
-            let account_meta = AccountMeta::from(*account);
+            let account_meta = AccountMeta::from_an_account(*account);
             let account_meta_ptr = &account_meta as *const AccountMeta;
             let data_len = stored_meta.data_len as usize;
-            let data_ptr = account.data.as_ptr();
+            let data_ptr = account.data().as_ptr();
             let hash_ptr = hash.as_ref().as_ptr();
             let ptrs = [
                 (meta_ptr as *const u8, mem::size_of::<StoredMeta>()),

@@ -21,6 +21,7 @@ pub struct Account {
     pub rent_epoch: Epoch,
 }
 
+#[derive(Clone, Default, Debug)]
 pub struct AccountNoData {
     /// lamports in the account
     pub lamports: u64,
@@ -32,6 +33,63 @@ pub struct AccountNoData {
     pub executable: bool,
     /// the epoch at which this account will next owe rent
     pub rent_epoch: Epoch,
+}
+
+impl AccountNoData {
+    pub fn to_account(&self) -> Account {
+        let mut result = Account {
+            lamports: self.lamports,
+            data: vec![],
+            owner: self.owner,
+            executable: self.executable,
+            rent_epoch: self.rent_epoch,
+        };
+        result.data.extend(self.data.iter());
+        result
+    }
+}
+
+impl Account {
+    pub fn to_account_no_data(&self) -> AccountNoData {
+        let result = AccountNoData {
+            lamports: self.lamports,
+            data: Arc::new(self.data.clone()),
+            owner: self.owner,
+            executable: self.executable,
+            rent_epoch: self.rent_epoch,
+        };
+        result
+    }
+}
+
+pub trait AnAccount : Default + Clone + Sized {
+    fn lamports(&self) -> u64;
+    fn data(&self) -> &Vec<u8>;
+    fn owner(&self) -> &Pubkey;
+    fn executable(&self) -> bool;
+    fn rent_epoch(&self) -> Epoch;
+    //fn clone(&self) -> AnAccount;
+    fn clone_as_account_no_data(&self) -> AccountNoData;
+}
+
+impl AnAccount for Account {
+    fn lamports(&self) -> u64 {self.lamports}
+    fn data(&self) -> &Vec<u8> {&self.data}
+    fn owner(&self) -> &Pubkey {&self.owner}
+    fn executable(&self) -> bool {self.executable}
+    fn rent_epoch(&self) -> Epoch {self.rent_epoch}
+    //fn clone(&self) -> AnAccount {self.clone()}
+    fn clone_as_account_no_data(&self) -> AccountNoData {self.to_account_no_data()}
+}
+
+impl AnAccount for AccountNoData {
+    fn lamports(&self) -> u64 {self.lamports}
+    fn data(&self) -> &Vec<u8> {&self.data}
+    fn owner(&self) -> &Pubkey {&self.owner}
+    fn executable(&self) -> bool {self.executable}
+    fn rent_epoch(&self) -> Epoch {self.rent_epoch}
+    //fn clone(&self) -> AnAccount {self.clone()}
+    fn clone_as_account_no_data(&self) -> AccountNoData {self.clone()}
 }
 
 // same as account, but with data as Cow

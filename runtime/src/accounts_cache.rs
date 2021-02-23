@@ -1,5 +1,5 @@
 use dashmap::DashMap;
-use solana_sdk::{account::Account, clock::Slot, hash::Hash, pubkey::Pubkey};
+use solana_sdk::{account::{AccountNoData, AnAccount}, clock::Slot, hash::Hash, pubkey::Pubkey};
 use std::{
     collections::BTreeSet,
     ops::Deref,
@@ -42,7 +42,7 @@ impl SlotCacheInner {
         );
     }
 
-    pub fn insert(&self, pubkey: &Pubkey, account: Account, hash: Hash) {
+    pub fn insert(&self, pubkey: &Pubkey, account: AccountNoData, hash: Hash) {
         if self.cache.contains_key(pubkey) {
             self.same_account_writes.fetch_add(1, Ordering::Relaxed);
             self.same_account_writes_size
@@ -86,7 +86,7 @@ impl Deref for SlotCacheInner {
 
 #[derive(Debug, Clone)]
 pub struct CachedAccount {
-    pub account: Account,
+    pub account: AccountNoData,
     pub hash: Hash,
 }
 
@@ -123,7 +123,7 @@ impl AccountsCache {
         );
     }
 
-    pub fn store(&self, slot: Slot, pubkey: &Pubkey, account: Account, hash: Hash) {
+    pub fn store<T: AnAccount>(&self, slot: Slot, pubkey: &Pubkey, account: &T, hash: Hash) {
         let slot_cache = self.slot_cache(slot).unwrap_or_else(||
             // DashMap entry.or_insert() returns a RefMut, essentially a write lock,
             // which is dropped after this block ends, minimizing time held by the lock.
@@ -135,7 +135,7 @@ impl AccountsCache {
                 .or_insert(Arc::new(SlotCacheInner::default()))
                 .clone());
 
-        slot_cache.insert(pubkey, account, hash);
+        slot_cache.insert(pubkey, account.clone_as_account_no_data(), hash);
     }
 
     pub fn load(&self, slot: Slot, pubkey: &Pubkey) -> Option<CachedAccount> {

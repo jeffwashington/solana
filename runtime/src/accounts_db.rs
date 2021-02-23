@@ -40,7 +40,7 @@ use serde::{Deserialize, Serialize};
 use solana_measure::measure::Measure;
 use solana_rayon_threadlimit::get_thread_count;
 use solana_sdk::{
-    account::Account,
+    account::{Account, AnAccount},
     account::AccountNoData,
     //    account::AccountCow,
     clock::{Epoch, Slot},
@@ -448,7 +448,7 @@ impl<'a> LoadedAccount<'a> {
                 AccountsDB::hash_stored_account(slot, &stored_account_meta, cluster_type)
             }
             LoadedAccount::Cached((_, cached_account)) => {
-                AccountsDB::hash_account(slot, &cached_account.account, pubkey, cluster_type)
+                AccountsDB::hash_account_no_data(slot, &cached_account.account, pubkey, cluster_type)
             }
         }
     }
@@ -471,8 +471,8 @@ impl<'a> LoadedAccount<'a> {
         match self {
             LoadedAccount::Stored(stored_account_meta) => stored_account_meta.clone_account(),
             LoadedAccount::Cached((_, cached_account)) => match cached_account {
-                Cow::Owned(cached_account) => cached_account.account,
-                Cow::Borrowed(cached_account) => cached_account.account.clone(),
+                Cow::Owned(cached_account) => cached_account.account.to_account(),
+                Cow::Borrowed(cached_account) => cached_account.account.to_account(),
             },
         }
     }
@@ -2468,7 +2468,7 @@ impl AccountsDB {
                 (
                     AccountNoData {
                         lamports: cl.lamports,
-                        data: Arc::new(cl.data),
+                        data: cl.data.clone(),
                         owner: cl.owner,
                         executable: cl.executable,
                         rent_epoch: cl.rent_epoch,
@@ -3090,6 +3090,39 @@ impl AccountsDB {
         }
     }
 
+    pub fn hash_account_no_data(
+        slot: Slot,
+        account: &AccountNoData,
+        pubkey: &Pubkey,
+        cluster_type: &ClusterType,
+    ) -> Hash {
+        let include_owner = Self::include_owner(cluster_type, slot);
+
+        if slot > Self::get_blake3_slot(cluster_type) {
+            Self::blake3_hash_account_data(
+                slot,
+                account.lamports,
+                &account.owner,
+                account.executable,
+                account.rent_epoch,
+                &account.data,
+                pubkey,
+                include_owner,
+            )
+        } else {
+            Self::hash_account_data(
+                slot,
+                account.lamports,
+                &account.owner,
+                account.executable,
+                account.rent_epoch,
+                &account.data,
+                pubkey,
+                include_owner,
+            )
+        }
+    }
+
     fn hash_frozen_account_data(account: &Account) -> Hash {
         let mut hasher = Hasher::default();
 
@@ -3198,12 +3231,12 @@ impl AccountsDB {
             .fetch_add(count as u64, Ordering::Relaxed)
     }
 
-    fn write_accounts_to_storage<F: FnMut(Slot, usize) -> Arc<AccountStorageEntry>>(
+    fn write_accounts_to_storage<F: FnMut(Slot, usize) -> Arc<AccountStorageEntry>, T: AnAccount>(
         &self,
         slot: Slot,
         hashes: &[Hash],
         mut storage_finder: F,
-        accounts_and_meta_to_store: &[(StoredMeta, &Account)],
+        accounts_and_meta_to_store: &[(StoredMeta, &T)],
     ) -> Vec<AccountInfo> {
         assert_eq!(hashes.len(), accounts_and_meta_to_store.len());
         let mut infos: Vec<AccountInfo> = Vec::with_capacity(accounts_and_meta_to_store.len());
@@ -3213,7 +3246,7 @@ impl AccountsDB {
             let mut storage_find = Measure::start("storage_finder");
             let storage = storage_finder(
                 slot,
-                accounts_and_meta_to_store[infos.len()].1.data.len() + STORE_META_OVERHEAD,
+                accounts_and_meta_to_store[infos.len()].1.data().len() + STORE_META_OVERHEAD,
             );
             storage_find.stop();
             total_storage_find_us += storage_find.as_us();
@@ -3229,7 +3262,7 @@ impl AccountsDB {
                 storage.set_status(AccountStorageStatus::Full);
 
                 // See if an account overflows the append vecs in the slot.
-                let data_len = (accounts_and_meta_to_store[infos.len()].1.data.len()
+                let data_len = (accounts_and_meta_to_store[infos.len()].1.data().len()
                     + STORE_META_OVERHEAD) as u64;
                 if !self.has_space_available(slot, data_len) {
                     let special_store_size = std::cmp::max(data_len * 2, self.file_size);
@@ -3260,7 +3293,7 @@ impl AccountsDB {
                     store_id: storage.append_vec_id(),
                     offset: offsets[0],
                     stored_size,
-                    lamports: account.lamports,
+                    lamports: account.lamports(),
                 });
             }
             // restore the state to available
@@ -3400,7 +3433,7 @@ impl AccountsDB {
         // If `should_clean` is None, then`should_flush_f` is also None, which will cause
         // `flush_slot_cache` to flush all accounts to storage without cleaning any accounts.
         let mut should_flush_f = should_clean.map(|(account_bytes_saved, num_accounts_saved)| {
-            move |&pubkey: &Pubkey, account: &Account| {
+            move |&pubkey: &Pubkey, account: &AccountNoData| {
                 use std::collections::hash_map::Entry::{Occupied, Vacant};
                 let should_flush = match written_accounts.entry(pubkey) {
                     Vacant(vacant_entry) => {
@@ -3467,7 +3500,7 @@ impl AccountsDB {
     fn flush_slot_cache(
         &self,
         slot: Slot,
-        mut should_flush_f: Option<&mut impl FnMut(&Pubkey, &Account) -> bool>,
+        mut should_flush_f: Option<&mut impl FnMut(&Pubkey, &AccountNoData) -> bool>,
     ) -> bool {
         info!("flush_slot_cache slot: {}", slot);
         let slot_cache = self.accounts_cache.slot_cache(slot);
@@ -3476,7 +3509,7 @@ impl AccountsDB {
             let mut total_size = 0;
             let mut purged_slot_pubkeys: HashSet<(Slot, Pubkey)> = HashSet::new();
             let mut pubkey_to_slot_set: Vec<(Pubkey, Slot)> = vec![];
-            let (accounts, hashes): (Vec<(&Pubkey, &Account)>, Vec<Hash>) = iter_items
+            let (accounts, hashes): (Vec<(&Pubkey, &AccountNoData)>, Vec<Hash>) = iter_items
                 .iter()
                 .filter_map(|iter_item| {
                     let key = iter_item.key();
@@ -3545,11 +3578,11 @@ impl AccountsDB {
         }
     }
 
-    fn write_accounts_to_cache(
+    fn write_accounts_to_cache<T: AnAccount + Clone>(
         &self,
         slot: Slot,
         hashes: &[Hash],
-        accounts_and_meta_to_store: &[(StoredMeta, &Account)],
+        accounts_and_meta_to_store: &[(StoredMeta, &T)],
     ) -> Vec<AccountInfo> {
         assert_eq!(hashes.len(), accounts_and_meta_to_store.len());
         accounts_and_meta_to_store
@@ -3557,12 +3590,12 @@ impl AccountsDB {
             .zip(hashes)
             .map(|((meta, account), hash)| {
                 self.accounts_cache
-                    .store(slot, &meta.pubkey, (**account).clone(), *hash);
+                    .store(slot, &meta.pubkey, *account, *hash);
                 AccountInfo {
                     store_id: CACHE_VIRTUAL_STORAGE_ID,
                     offset: CACHE_VIRTUAL_OFFSET,
                     stored_size: CACHE_VIRTUAL_STORED_SIZE,
-                    lamports: account.lamports,
+                    lamports: account.lamports(),
                 }
             })
             .collect()
@@ -3571,25 +3604,26 @@ impl AccountsDB {
     fn store_accounts_to<
         F: FnMut(Slot, usize) -> Arc<AccountStorageEntry>,
         P: Iterator<Item = u64>,
+        T: AnAccount + Default + Clone
     >(
         &self,
         slot: Slot,
-        accounts: &[(&Pubkey, &Account)],
+        accounts: &[(&Pubkey, &T)],
         hashes: &[Hash],
         storage_finder: F,
         mut write_version_producer: P,
         is_cached_store: bool,
     ) -> Vec<AccountInfo> {
-        let default_account = Account::default();
-        let accounts_and_meta_to_store: Vec<(StoredMeta, &Account)> = accounts
+        let default_account = T::default();
+        let accounts_and_meta_to_store: Vec<(StoredMeta, &T)> = accounts
             .iter()
             .map(|(pubkey, account)| {
-                let account = if account.lamports == 0 {
+                let account = if account.lamports() == 0 {
                     &default_account
                 } else {
                     *account
                 };
-                let data_len = account.data.len() as u64;
+                let data_len = account.data().len() as u64;
                 let meta = StoredMeta {
                     write_version: write_version_producer.next().unwrap(),
                     pubkey: **pubkey,
@@ -4500,11 +4534,11 @@ impl AccountsDB {
         ret
     }
 
-    fn update_index(
+    fn update_index<T: AnAccount>(
         &self,
         slot: Slot,
         infos: Vec<AccountInfo>,
-        accounts: &[(&Pubkey, &Account)],
+        accounts: &[(&Pubkey, &T)],
     ) -> SlotList<AccountInfo> {
         let mut reclaims = SlotList::<AccountInfo>::with_capacity(infos.len() * 2);
         for (info, pubkey_account) in infos.into_iter().zip(accounts.iter()) {
@@ -4512,8 +4546,8 @@ impl AccountsDB {
             self.accounts_index.upsert(
                 slot,
                 pubkey,
-                &pubkey_account.1.owner,
-                &pubkey_account.1.data,
+                &pubkey_account.1.owner(),
+                &pubkey_account.1.data(),
                 &self.account_indexes,
                 info,
                 &mut reclaims,
@@ -4909,10 +4943,10 @@ impl AccountsDB {
         );
     }
 
-    fn store_accounts_frozen<'a>(
+    fn store_accounts_frozen<'a, T: AnAccount + Clone>(
         &'a self,
         slot: Slot,
-        accounts: &[(&Pubkey, &Account)],
+        accounts: &Vec<(&Pubkey, &T)>,
         hashes: &[Hash],
         storage_finder: Option<StorageFinder<'a>>,
         write_version_producer: Option<Box<dyn Iterator<Item = u64>>>,
@@ -4933,10 +4967,10 @@ impl AccountsDB {
         )
     }
 
-    fn store_accounts_custom<'a>(
+    fn store_accounts_custom<'a, T: AnAccount + Clone + Default>(
         &'a self,
         slot: Slot,
-        accounts: &[(&Pubkey, &Account)],
+        accounts: &[(&Pubkey, &T)],
         hashes: &[Hash],
         storage_finder: Option<StorageFinder<'a>>,
         write_version_producer: Option<Box<dyn Iterator<Item = u64>>>,
