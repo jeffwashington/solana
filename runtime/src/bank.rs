@@ -7,7 +7,7 @@ use crate::{
         AccountAddressFilter, Accounts, TransactionAccountDeps, TransactionAccounts,
         TransactionLoadResult, TransactionLoaders,
     },
-    accounts_cache::{AccountsCache, CachedAccount, SlotCache},
+    accounts_cache::{CachedAccount},
     accounts_db::{ErrorCounters, SnapshotStorages},
     accounts_index::{AccountIndex, Ancestors, IndexKey},
     blockhash_queue::BlockhashQueue,
@@ -28,7 +28,6 @@ use crate::{
 use byteorder::{ByteOrder, LittleEndian};
 use itertools::Itertools;
 use log::*;
-use rayon::prelude::*;
 use rayon::ThreadPool;
 use solana_measure::measure::Measure;
 use solana_metrics::{datapoint_debug, inc_new_counter_debug, inc_new_counter_info};
@@ -227,7 +226,6 @@ impl ExecuteTimings {
 
     }
     pub fn add_acct_visit(&mut self, data: (u64, usize)) {
-        return;
         if self.acct_visit_max.len() < 5 {
             self.acct_visit_max.push(data);
             self.acct_visit_max.sort();

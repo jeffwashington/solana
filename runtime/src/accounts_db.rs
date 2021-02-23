@@ -2447,7 +2447,7 @@ impl AccountsDB {
         pubkey: &'a Pubkey,
         max_root: Option<Slot>,
     ) -> Option<(Cow<'a, CachedAccount>, Slot)> {
-        let (slot, store_id, offset) = {
+        let (slot, _store_id, _offset) = {
             let (lock, index) = self.accounts_index.get(pubkey, Some(ancestors), max_root)?;
             let slot_list = lock.slot_list();
             let (

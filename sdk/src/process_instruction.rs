@@ -373,5 +373,5 @@ impl InvokeContext for MockInvokeContext {
     fn get_account(&self, _pubkey: &Pubkey) -> Option<RefCell<Account>> {
         None
     }
-    fn account_data_modified(&self, pubkey: &Pubkey) {}
+    fn account_data_modified(&self, _pubkey: &Pubkey) {}
 }

@@ -1,5 +1,5 @@
 use crate::{
-    accounts_cache::{AccountsCache, CachedAccount, SlotCache},
+    accounts_cache::{CachedAccount},
     accounts_db::{AccountsDB, BankHashInfo, ErrorCounters, LoadedAccount, ScanStorageResult},
     accounts_index::{AccountIndex, Ancestors, IndexKey},
     bank::{
@@ -10,14 +10,12 @@ use crate::{
     system_instruction_processor::{get_system_account_kind, SystemAccountKind},
     transaction_utils::OrderedIterator,
 };
-use solana_measure::measure::Measure;
 use dashmap::{
     mapref::entry::Entry::{Occupied, Vacant},
     DashMap,
 };
 use log::*;
 use rand::{thread_rng, Rng};
-use rayon::prelude::*;
 use solana_sdk::{
     account::Account,
     account_utils::StateMut,
@@ -203,13 +201,13 @@ impl Accounts {
             // There is no way to predict what program will execute without an error
             // If a fee can pay for execution then the program will be scheduled
             let mut payer_index = None;
-            let mut tx_rent = Mutex::new(0 as TransactionRent);
-            let mut account_deps = Mutex::new(Vec::with_capacity(message.account_keys.len()));
+            let tx_rent = Mutex::new(0 as TransactionRent);
+            let account_deps = Mutex::new(Vec::with_capacity(message.account_keys.len()));
             let rent_fix_enabled = feature_set.cumulative_rent_related_fixes_enabled();
 
-            let mut invalid_account_index = AtomicBool::new(false);
-            let mut pgm_not_found = AtomicBool::new(false);
-            let mut pgm_for_exec = AtomicBool::new(false);
+            let invalid_account_index = AtomicBool::new(false);
+            let pgm_not_found = AtomicBool::new(false);
+            let pgm_for_exec = AtomicBool::new(false);
 
             for (i, key) in message.account_keys.iter().enumerate() {
                 if message.is_non_loader_key(key, i) {

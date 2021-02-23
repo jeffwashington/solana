@@ -349,7 +349,7 @@ impl<'a> InvokeContext for ThisInvokeContext<'a> {
             }
         })
     }
-    fn account_data_modified(&self, pubkey: &Pubkey) {
+    fn account_data_modified(&self, _pubkey: &Pubkey) {
         // TODO: add to hashset indicating modification of data
     }
 }
