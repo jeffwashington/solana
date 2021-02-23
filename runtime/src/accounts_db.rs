@@ -41,6 +41,7 @@ use solana_measure::measure::Measure;
 use solana_rayon_threadlimit::get_thread_count;
 use solana_sdk::{
     account::Account,
+    account::AccountNoData,
     //    account::AccountCow,
     clock::{Epoch, Slot},
     genesis_config::ClusterType,
@@ -2366,7 +2367,7 @@ impl AccountsDB {
         self.do_load2(ancestors, pubkey, None)
     }
  
-    pub fn loads_cow<'a>(&'a self, ancestors: &Ancestors, pubkey: &'a Pubkey) -> Option<(Cow<'a, CachedAccount>, Slot)> {
+    pub fn loads_cow<'a>(&'a self, ancestors: &Ancestors, pubkey: &'a Pubkey) -> Option<(AccountNoData, Slot)> {
         self.do_load_cow(ancestors, &pubkey, None)
     }
  
@@ -2412,7 +2413,7 @@ impl AccountsDB {
         &'a self,
         ancestors: &Ancestors,
         pubkey: &'a Pubkey,
-    ) -> Option<(Cow<'a, CachedAccount>, Slot)> {
+    ) -> Option<(AccountNoData, Slot)> {
         self.do_load_cow(ancestors, pubkey, None)
     }
 
@@ -2446,7 +2447,7 @@ impl AccountsDB {
         ancestors: &Ancestors,
         pubkey: &'a Pubkey,
         max_root: Option<Slot>,
-    ) -> Option<(Cow<'a, CachedAccount>, Slot)> {
+    ) -> Option<(AccountNoData, Slot)> {
         let (slot, _store_id, _offset) = {
             let (lock, index) = self.accounts_index.get(pubkey, Some(ancestors), max_root)?;
             let slot_list = lock.slot_list();
@@ -2463,8 +2464,15 @@ impl AccountsDB {
         self.accounts_cache
             .load(slot, pubkey)
             .map(|cached_account| {
+                let cl = cached_account.account;
                 (
-                    Cow::Owned(cached_account.clone()),
+                    AccountNoData {
+                        lamports: cl.lamports,
+                        data: Arc::new(cl.data),
+                        owner: cl.owner,
+                        executable: cl.executable,
+                        rent_epoch: cl.rent_epoch,
+                    },
                     slot,
                 )
             })

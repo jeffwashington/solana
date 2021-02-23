@@ -7,7 +7,6 @@ use crate::{
         AccountAddressFilter, Accounts, TransactionAccountDeps, TransactionAccounts,
         TransactionLoadResult, TransactionLoaders,
     },
-    accounts_cache::{CachedAccount},
     accounts_db::{ErrorCounters, SnapshotStorages},
     accounts_index::{AccountIndex, Ancestors, IndexKey},
     blockhash_queue::BlockhashQueue,
@@ -32,7 +31,7 @@ use rayon::ThreadPool;
 use solana_measure::measure::Measure;
 use solana_metrics::{datapoint_debug, inc_new_counter_debug, inc_new_counter_info};
 use solana_sdk::{
-    account::{create_account, from_account, Account},
+    account::{create_account, from_account, Account, AccountNoData},
     clock::{
         Epoch, Slot, SlotCount, SlotIndex, UnixTimestamp, DEFAULT_TICKS_PER_SECOND,
         MAX_PROCESSING_AGE, MAX_RECENT_BLOCKHASHES, MAX_TRANSACTION_FORWARDING_DELAY,
@@ -75,7 +74,6 @@ use solana_stake_program::stake_state::{
 };
 use solana_vote_program::vote_instruction::VoteInstruction;
 use std::{
-    borrow::Cow,
     cell::RefCell,
     collections::{HashMap, HashSet},
     convert::{TryFrom, TryInto},
@@ -2953,7 +2951,7 @@ impl Bank {
         self.rc.accounts.load_account_temp(&key, &self.ancestors)
     }
 
-    pub fn test_load_accounts_cow<'a>(&'a self, key: &'a Pubkey) -> Option<(Cow<'a, CachedAccount>, Slot)> {
+    pub fn test_load_accounts_cow<'a>(&'a self, key: &'a Pubkey) -> Option<(AccountNoData, Slot)> {
         self.rc.accounts.load_account_temp_cow(&key, &self.ancestors)
     }
 

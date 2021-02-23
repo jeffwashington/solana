@@ -1,5 +1,4 @@
 use crate::{
-    accounts_cache::{CachedAccount},
     accounts_db::{AccountsDB, BankHashInfo, ErrorCounters, LoadedAccount, ScanStorageResult},
     accounts_index::{AccountIndex, Ancestors, IndexKey},
     bank::{
@@ -17,7 +16,7 @@ use dashmap::{
 use log::*;
 use rand::{thread_rng, Rng};
 use solana_sdk::{
-    account::Account,
+    account::{Account, AccountNoData},
     account_utils::StateMut,
     bpf_loader_upgradeable::{self, UpgradeableLoaderState},
     clock::{Epoch, Slot},
@@ -32,7 +31,6 @@ use solana_sdk::{
     transaction::{Transaction, TransactionError},
 };
 use std::{
-    borrow::Cow,
     sync::atomic::{AtomicBool, Ordering},
     collections::{HashMap, HashSet},
     ops::RangeBounds,
@@ -178,7 +176,7 @@ impl Accounts {
         .loads(ancestors, key)
     }
 
-    pub fn load_account_temp_cow<'a>(&'a self, key: &'a Pubkey, ancestors: &'a Ancestors) -> Option<(Cow<'a, CachedAccount>, Slot)>{
+    pub fn load_account_temp_cow<'a>(&'a self, key: &'a Pubkey, ancestors: &'a Ancestors) -> Option<(AccountNoData, Slot)>{
         self
         .accounts_db
         .loads_cow(ancestors, key)
