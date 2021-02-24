@@ -16,7 +16,7 @@ use dashmap::{
 use log::*;
 use rand::{thread_rng, Rng};
 use solana_sdk::{
-    account::{Account, AccountNoData, AnAccount},
+    account::{Account, AccountNoData, AnAccount, AnAccountConcrete},
     account_utils::StateMut,
     bpf_loader_upgradeable::{self, UpgradeableLoaderState},
     clock::{Epoch, Slot},
@@ -594,16 +594,16 @@ impl Accounts {
     ) -> Vec<(Pubkey, u64)> {
         let mut accounts_balances = self.accounts_db.scan_accounts(
             ancestors,
-            |collector: &mut Vec<(Pubkey, u64)>, option| {
+            |collector: &mut Vec<(Pubkey, u64)>, option: Option<(&Pubkey, Account, Slot)>| {
                 if let Some(data) = option
                     .filter(|(pubkey, account, _)| {
                         let should_include_pubkey = match filter {
                             AccountAddressFilter::Exclude => !filter_by_address.contains(&pubkey),
                             AccountAddressFilter::Include => filter_by_address.contains(&pubkey),
                         };
-                        should_include_pubkey && account.lamports != 0
+                        should_include_pubkey && account.lamports() != 0
                     })
-                    .map(|(pubkey, account, _slot)| (*pubkey, account.lamports))
+                    .map(|(pubkey, account, _slot)| (*pubkey, account.lamports()))
                 {
                     collector.push(data)
                 }
@@ -669,13 +669,13 @@ impl Accounts {
         lamports > 0
     }
 
-    fn load_while_filtering<F: Fn(&Account) -> bool>(
-        collector: &mut Vec<(Pubkey, Account)>,
-        some_account_tuple: Option<(&Pubkey, Account, Slot)>,
+    fn load_while_filtering<T: AnAccountConcrete, F: Fn(&T) -> bool>(
+        collector: &mut Vec<(Pubkey, T)>,
+        some_account_tuple: Option<(&Pubkey, T, Slot)>,
         filter: F,
     ) {
         if let Some(mapped_account_tuple) = some_account_tuple
-            .filter(|(_, account, _)| Self::is_loadable(account.lamports) && filter(account))
+            .filter(|(_, account, _)| Self::is_loadable(account.lamports()) && filter(account))
             .map(|(pubkey, account, _slot)| (*pubkey, account))
         {
             collector.push(mapped_account_tuple)
@@ -697,33 +697,33 @@ impl Accounts {
         )
     }
 
-    pub fn load_by_program_with_filter<F: Fn(&Account) -> bool>(
+    pub fn load_by_program_with_filter<T:AnAccountConcrete, F: Fn(&T) -> bool>(
         &self,
         ancestors: &Ancestors,
         program_id: &Pubkey,
         filter: F,
-    ) -> Vec<(Pubkey, Account)> {
+    ) -> Vec<(Pubkey, T)> {
         self.accounts_db.scan_accounts(
             ancestors,
-            |collector: &mut Vec<(Pubkey, Account)>, some_account_tuple| {
+            |collector: &mut Vec<(Pubkey, T)>, some_account_tuple| {
                 Self::load_while_filtering(collector, some_account_tuple, |account| {
-                    account.owner == *program_id && filter(account)
+                    account.owner() == program_id && filter(account)
                 })
             },
         )
     }
 
-    pub fn load_by_index_key_with_filter<F: Fn(&Account) -> bool>(
+    pub fn load_by_index_key_with_filter<T: AnAccountConcrete, F: Fn(&T) -> bool>(
         &self,
         ancestors: &Ancestors,
         index_key: &IndexKey,
         filter: F,
-    ) -> Vec<(Pubkey, Account)> {
+    ) -> Vec<(Pubkey, T)> {
         self.accounts_db.index_scan_accounts(
             ancestors,
             *index_key,
-            |collector: &mut Vec<(Pubkey, Account)>, some_account_tuple| {
-                Self::load_while_filtering(collector, some_account_tuple, |account| filter(account))
+            |collector: &mut Vec<(Pubkey, T)>, some_account_tuple| {
+                Self::load_while_filtering(collector, some_account_tuple, |account: &T| filter(account))
             },
         )
     }
@@ -731,7 +731,7 @@ impl Accounts {
     pub fn load_all(&self, ancestors: &Ancestors) -> Vec<(Pubkey, Account, Slot)> {
         self.accounts_db.scan_accounts(
             ancestors,
-            |collector: &mut Vec<(Pubkey, Account, Slot)>, some_account_tuple| {
+            |collector: &mut Vec<(Pubkey, Account, Slot)>, some_account_tuple: Option<(&Pubkey, Account, Slot)>| {
                 if let Some((pubkey, account, slot)) =
                     some_account_tuple.filter(|(_, account, _)| Self::is_loadable(account.lamports))
                 {
@@ -1061,7 +1061,7 @@ impl Accounts {
     }
 }
 
-pub fn prepare_if_nonce_account<T:AnAccount + StateMut<nonce::state::Versions>>(
+pub fn prepare_if_nonce_account<T:AnAccountConcrete + StateMut<nonce::state::Versions>>(
     account: &mut T,
     account_pubkey: &Pubkey,
     tx_result: &Result<()>,
@@ -1965,9 +1965,9 @@ mod tests {
 
         let loaders = vec![(Ok(()), None), (Ok(()), None)];
 
-        let account0 = Account::new(1, 0, &Pubkey::default());
-        let account1 = Account::new(2, 0, &Pubkey::default());
-        let account2 = Account::new(3, 0, &Pubkey::default());
+        let account0 = AccountNoData::new(1, 0, &Pubkey::default());
+        let account1 = AccountNoData::new(2, 0, &Pubkey::default());
+        let account2 = AccountNoData::new(3, 0, &Pubkey::default());
 
         let transaction_accounts0 = vec![account0, account2.clone()];
         let transaction_loaders0 = vec![];
@@ -2322,8 +2322,8 @@ mod tests {
                 blockhash,
                 fee_calculator: FeeCalculator::default(),
             }));
-        let nonce_account_pre = Account::new_data(42, &nonce_state, &system_program::id()).unwrap();
-        let from_account_pre = Account::new(4242, 0, &Pubkey::default());
+        let nonce_account_pre = AccountNoData::new_data(42, &nonce_state, &system_program::id()).unwrap();
+        let from_account_pre = AccountNoData::new(4242, 0, &Pubkey::default());
 
         let nonce_rollback = Some(NonceRollbackFull::new(
             nonce_address,
@@ -2345,12 +2345,12 @@ mod tests {
                 fee_calculator: FeeCalculator::default(),
             }));
         let nonce_account_post =
-            Account::new_data(43, &nonce_state, &system_program::id()).unwrap();
+            AccountNoData::new_data(43, &nonce_state, &system_program::id()).unwrap();
 
-        let from_account_post = Account::new(4199, 0, &Pubkey::default());
-        let to_account = Account::new(2, 0, &Pubkey::default());
-        let nonce_authority_account = Account::new(3, 0, &Pubkey::default());
-        let recent_blockhashes_sysvar_account = Account::new(4, 0, &Pubkey::default());
+        let from_account_post = AccountNoData::new(4199, 0, &Pubkey::default());
+        let to_account = AccountNoData::new(2, 0, &Pubkey::default());
+        let nonce_authority_account = AccountNoData::new(3, 0, &Pubkey::default());
+        let recent_blockhashes_sysvar_account = AccountNoData::new(4, 0, &Pubkey::default());
 
         let transaction_accounts = vec![
             from_account_post,
@@ -2434,7 +2434,7 @@ mod tests {
                 blockhash,
                 fee_calculator: FeeCalculator::default(),
             }));
-        let nonce_account_pre = Account::new_data(42, &nonce_state, &system_program::id()).unwrap();
+        let nonce_account_pre = AccountNoData::new_data(42, &nonce_state, &system_program::id()).unwrap();
 
         let nonce_rollback = Some(NonceRollbackFull::new(
             nonce_address,
@@ -2456,12 +2456,12 @@ mod tests {
                 fee_calculator: FeeCalculator::default(),
             }));
         let nonce_account_post =
-            Account::new_data(43, &nonce_state, &system_program::id()).unwrap();
+            AccountNoData::new_data(43, &nonce_state, &system_program::id()).unwrap();
 
-        let from_account_post = Account::new(4200, 0, &Pubkey::default());
-        let to_account = Account::new(2, 0, &Pubkey::default());
-        let nonce_authority_account = Account::new(3, 0, &Pubkey::default());
-        let recent_blockhashes_sysvar_account = Account::new(4, 0, &Pubkey::default());
+        let from_account_post = AccountNoData::new(4200, 0, &Pubkey::default());
+        let to_account = AccountNoData::new(2, 0, &Pubkey::default());
+        let nonce_authority_account = AccountNoData::new(3, 0, &Pubkey::default());
+        let recent_blockhashes_sysvar_account = AccountNoData::new(4, 0, &Pubkey::default());
 
         let transaction_accounts = vec![
             from_account_post,

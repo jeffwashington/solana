@@ -476,6 +476,16 @@ impl<'a> LoadedAccount<'a> {
             },
         }
     }
+
+    pub fn account_no_data(self) -> AccountNoData {
+        match self {
+            LoadedAccount::Stored(stored_account_meta) => stored_account_meta.clone_account_no_data(),
+            LoadedAccount::Cached((_, cached_account)) => match cached_account {
+                Cow::Owned(cached_account) => cached_account.account.clone(),
+                Cow::Borrowed(cached_account) => cached_account.account.clone(),
+            },
+        }
+    }
     /*
     pub fn account_cow(&'a self) -> &'a LoadedAccount<'a> {
         match self {
@@ -771,7 +781,7 @@ pub struct BankHashStats {
 }
 
 impl BankHashStats {
-    pub fn update<T:AnAccount>(&mut self, account: &T) {
+    pub fn update<T:AnAccount + Default + Clone>(&mut self, account: &T) {
         if account.lamports() == 0 {
             self.num_removed_accounts += 1;
         } else {
@@ -2170,9 +2180,9 @@ impl AccountsDB {
         }
     }
 
-    pub fn scan_accounts<F, A>(&self, ancestors: &Ancestors, scan_func: F) -> A
+    pub fn scan_accounts<F, A, T: AnAccount + Default + Clone>(&self, ancestors: &Ancestors, scan_func: F) -> A
     where
-        F: Fn(&mut A, Option<(&Pubkey, Account, Slot)>),
+        F: Fn(&mut A, Option<(&Pubkey, T, Slot)>),
         A: Default,
     {
         let mut collector = A::default();
@@ -2186,7 +2196,7 @@ impl AccountsDB {
                         account_info.offset,
                     )
                     .get_loaded_account()
-                    .map(|loaded_account| (pubkey, loaded_account.account(), slot));
+                    .map(|loaded_account| (pubkey, AnAccount::from_account_no_data(loaded_account.account_no_data()), slot));
                 scan_func(&mut collector, account_slot)
             });
         collector
@@ -2256,14 +2266,14 @@ impl AccountsDB {
         collector
     }
 
-    pub fn index_scan_accounts<F, A>(
+    pub fn index_scan_accounts<T: AnAccount + Default + Clone, F, A>(
         &self,
         ancestors: &Ancestors,
         index_key: IndexKey,
         scan_func: F,
     ) -> A
     where
-        F: Fn(&mut A, Option<(&Pubkey, Account, Slot)>),
+        F: Fn(&mut A, Option<(&Pubkey, T, Slot)>),
         A: Default,
     {
         let mut collector = A::default();
@@ -2279,7 +2289,10 @@ impl AccountsDB {
                         account_info.offset,
                     )
                     .get_loaded_account()
-                    .map(|loaded_account| (pubkey, loaded_account.account(), slot));
+                    .map(|loaded_account| {
+                        let x = T::from_account_no_data(loaded_account.account_no_data());
+                        (pubkey, x, slot)
+                    });
                 scan_func(&mut collector, account_slot)
             },
         );
@@ -3061,7 +3074,7 @@ impl AccountsDB {
         }
     }
 
-    pub fn hash_account<T:AnAccount>(
+    pub fn hash_account<T:AnAccount + Default + Clone>(
         slot: Slot,
         account: &T,
         pubkey: &Pubkey,
@@ -3127,7 +3140,7 @@ impl AccountsDB {
         }
     }
 
-    fn hash_frozen_account_data<T:AnAccount>(account: &T) -> Hash {
+    fn hash_frozen_account_data<T:AnAccount + Default + Clone>(account: &T) -> Hash {
         let mut hasher = Hasher::default();
 
         hasher.hash(&account.data());
@@ -3235,7 +3248,7 @@ impl AccountsDB {
             .fetch_add(count as u64, Ordering::Relaxed)
     }
 
-    fn write_accounts_to_storage<F: FnMut(Slot, usize) -> Arc<AccountStorageEntry>, T: AnAccount>(
+    fn write_accounts_to_storage<F: FnMut(Slot, usize) -> Arc<AccountStorageEntry>, T: AnAccount + Default + Clone>(
         &self,
         slot: Slot,
         hashes: &[Hash],
@@ -3582,7 +3595,7 @@ impl AccountsDB {
         }
     }
 
-    fn write_accounts_to_cache<T: AnAccount + Clone>(
+    fn write_accounts_to_cache<T: AnAccount + Default + Clone>(
         &self,
         slot: Slot,
         hashes: &[Hash],
@@ -4538,7 +4551,7 @@ impl AccountsDB {
         ret
     }
 
-    fn update_index<T: AnAccount>(
+    fn update_index<T: AnAccount + Default + Clone>(
         &self,
         slot: Slot,
         infos: Vec<AccountInfo>,
@@ -4712,7 +4725,7 @@ impl AccountsDB {
         inc_new_counter_info!("clean_stored_dead_slots-ms", measure.as_ms() as usize);
     }
 
-    fn hash_accounts<T:AnAccount>(
+    fn hash_accounts<T:AnAccount + Default + Clone>(
         &self,
         slot: Slot,
         accounts: &[(&Pubkey, &T)],
@@ -4765,7 +4778,7 @@ impl AccountsDB {
     }
 
     /// Cause a panic if frozen accounts would be affected by data in `accounts`
-    fn assert_frozen_accounts<T:AnAccount>(&self, accounts: &[(&Pubkey, &T)]) {
+    fn assert_frozen_accounts<T:AnAccount + Default + Clone>(&self, accounts: &[(&Pubkey, &T)]) {
         if self.frozen_accounts.is_empty() {
             return;
         }
@@ -4791,16 +4804,16 @@ impl AccountsDB {
         }
     }
 
-    pub fn store_cached<T:AnAccount>(&self, slot: Slot, accounts: &[(&Pubkey, &T)]) {
+    pub fn store_cached<T:AnAccount + Default + Clone>(&self, slot: Slot, accounts: &[(&Pubkey, &T)]) {
         self.store(slot, accounts, self.caching_enabled);
     }
 
     /// Store the account update.
-    pub fn store_uncached<T:AnAccount>(&self, slot: Slot, accounts: &[(&Pubkey, &T)]) {
+    pub fn store_uncached<T:AnAccount + Default + Clone>(&self, slot: Slot, accounts: &[(&Pubkey, &T)]) {
         self.store(slot, accounts, false);
     }
 
-    fn store<T:AnAccount>(&self, slot: Slot, accounts: &[(&Pubkey, &T)], is_cached_store: bool) {
+    fn store<T:AnAccount + Default + Clone>(&self, slot: Slot, accounts: &[(&Pubkey, &T)], is_cached_store: bool) {
         // If all transactions in a batch are errored,
         // it's possible to get a store with no accounts.
         if accounts.is_empty() {
@@ -4921,7 +4934,7 @@ impl AccountsDB {
         }
     }
 
-    fn store_accounts_unfrozen<T:AnAccount>(
+    fn store_accounts_unfrozen<T:AnAccount + Default + Clone>(
         &self,
         slot: Slot,
         accounts: &[(&Pubkey, &T)],
@@ -4947,7 +4960,7 @@ impl AccountsDB {
         );
     }
 
-    fn store_accounts_frozen<'a, T: AnAccount + Clone>(
+    fn store_accounts_frozen<'a, T: AnAccount + Default + Clone + Clone>(
         &'a self,
         slot: Slot,
         accounts: &Vec<(&Pubkey, &T)>,
@@ -9866,7 +9879,7 @@ pub mod tests {
             .spawn(move || {
                 db.scan_accounts(
                     &scan_ancestors,
-                    |_collector: &mut Vec<(Pubkey, Account)>, maybe_account| {
+                    |_collector: &mut Vec<(Pubkey, Account)>, maybe_account: Option<(&Pubkey, Account, Slot)>| {
                         ready_.store(true, Ordering::Relaxed);
                         if let Some((pubkey, _, _)) = maybe_account {
                             if *pubkey == stall_key {

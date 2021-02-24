@@ -235,7 +235,7 @@ pub mod tests {
         cache.store(
             inserted_slot,
             &Pubkey::new_unique(),
-            Account::new(1, 0, &Pubkey::default()),
+            &AccountNoData::new(1, 0, &Pubkey::default()),
             Hash::default(),
         );
         // If the cache is told the size limit is 0, it should return the one slot
@@ -253,7 +253,7 @@ pub mod tests {
         cache.store(
             inserted_slot,
             &Pubkey::new_unique(),
-            Account::new(1, 0, &Pubkey::default()),
+            &AccountNoData::new(1, 0, &Pubkey::default()),
             Hash::default(),
         );
 

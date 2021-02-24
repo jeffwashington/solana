@@ -225,6 +225,7 @@ impl Stakes {
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use solana_sdk::account::Account;
     use solana_sdk::{pubkey::Pubkey, rent::Rent};
     use solana_stake_program::stake_state;
     use solana_vote_program::vote_state::{self, VoteState};

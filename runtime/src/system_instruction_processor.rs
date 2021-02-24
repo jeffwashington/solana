@@ -1034,7 +1034,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            get_system_account_kind(&from_account.borrow()),
+            get_system_account_kind(&from_account.borrow().clone_as_account()),
             Some(SystemAccountKind::Nonce)
         );
 
@@ -1638,7 +1638,7 @@ mod tests {
     #[test]
     fn test_get_system_account_kind_uninitialized_nonce_account_fail() {
         assert_eq!(
-            get_system_account_kind(&nonce_account::create_account(42).borrow()),
+            get_system_account_kind(&nonce_account::create_account(42).borrow().clone_as_account()),
             None
         );
     }

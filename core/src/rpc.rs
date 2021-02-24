@@ -49,6 +49,8 @@ use solana_runtime::{
 };
 use solana_sdk::{
     account::Account,
+    account::AccountNoData,
+    account::AnAccount,
     account_utils::StateMut,
     clock::{Slot, UnixTimestamp, MAX_RECENT_BLOCKHASHES},
     commitment_config::{CommitmentConfig, CommitmentLevel},
@@ -1383,16 +1385,16 @@ impl JsonRpcRequestProcessor {
     }
 
     /// Use a set of filters to get an iterator of keyed program accounts from a bank
-    fn get_filtered_program_accounts(
+    fn get_filtered_program_accounts<T:AnAccount>(
         &self,
         bank: &Arc<Bank>,
         program_id: &Pubkey,
         filters: Vec<RpcFilterType>,
-    ) -> Vec<(Pubkey, Account)> {
-        let filter_closure = |account: &Account| {
+    ) -> Vec<(Pubkey, T)> {
+        let filter_closure = |account: &T| {
             filters.iter().all(|filter_type| match filter_type {
-                RpcFilterType::DataSize(size) => account.data.len() as u64 == *size,
-                RpcFilterType::Memcmp(compare) => compare.bytes_match(&account.data),
+                RpcFilterType::DataSize(size) => account.data().len() as u64 == *size,
+                RpcFilterType::Memcmp(compare) => compare.bytes_match(&account.data()),
             })
         };
         if self
@@ -1400,13 +1402,13 @@ impl JsonRpcRequestProcessor {
             .account_indexes
             .contains(&AccountIndex::ProgramId)
         {
-            bank.get_filtered_indexed_accounts(&IndexKey::ProgramId(*program_id), |account| {
+            bank.get_filtered_indexed_accounts(&IndexKey::ProgramId(*program_id), |account: &T| {
                 // The program-id account index checks for Account owner on inclusion. However, due
                 // to the current AccountsDB implementation, an account may remain in storage as a
                 // zero-lamport Account::Default() after being wiped and reinitialized in later
                 // updates. We include the redundant filters here to avoid returning these
                 // accounts.
-                account.owner == *program_id && filter_closure(account)
+                account.owner() == program_id && filter_closure(account)
             })
         } else {
             bank.get_filtered_program_accounts(program_id, filter_closure)
@@ -1414,12 +1416,12 @@ impl JsonRpcRequestProcessor {
     }
 
     /// Get an iterator of spl-token accounts by owner address
-    fn get_filtered_spl_token_accounts_by_owner(
+    fn get_filtered_spl_token_accounts_by_owner<T:AnAccount>(
         &self,
         bank: &Arc<Bank>,
         owner_key: &Pubkey,
         mut filters: Vec<RpcFilterType>,
-    ) -> Vec<(Pubkey, Account)> {
+    ) -> Vec<(Pubkey, T)> {
         // The by-owner accounts index checks for Token Account state and Owner address on
         // inclusion. However, due to the current AccountsDB implementation, an account may remain
         // in storage as a zero-lamport Account::Default() after being wiped and reinitialized in
@@ -1441,11 +1443,11 @@ impl JsonRpcRequestProcessor {
             .account_indexes
             .contains(&AccountIndex::SplTokenOwner)
         {
-            bank.get_filtered_indexed_accounts(&IndexKey::SplTokenOwner(*owner_key), |account| {
-                account.owner == spl_token_id_v2_0()
+            bank.get_filtered_indexed_accounts(&IndexKey::SplTokenOwner(*owner_key), |account: &T| {
+                account.owner() == &spl_token_id_v2_0()
                     && filters.iter().all(|filter_type| match filter_type {
-                        RpcFilterType::DataSize(size) => account.data.len() as u64 == *size,
-                        RpcFilterType::Memcmp(compare) => compare.bytes_match(&account.data),
+                        RpcFilterType::DataSize(size) => account.data().len() as u64 == *size,
+                        RpcFilterType::Memcmp(compare) => compare.bytes_match(&account.data()),
                     })
             })
         } else {
@@ -1480,8 +1482,8 @@ impl JsonRpcRequestProcessor {
             .account_indexes
             .contains(&AccountIndex::SplTokenMint)
         {
-            bank.get_filtered_indexed_accounts(&IndexKey::SplTokenMint(*mint_key), |account| {
-                account.owner == spl_token_id_v2_0()
+            bank.get_filtered_indexed_accounts(&IndexKey::SplTokenMint(*mint_key), |account: &Account| {
+                account.owner() == &spl_token_id_v2_0()
                     && filters.iter().all(|filter_type| match filter_type {
                         RpcFilterType::DataSize(size) => account.data.len() as u64 == *size,
                         RpcFilterType::Memcmp(compare) => compare.bytes_match(&account.data),

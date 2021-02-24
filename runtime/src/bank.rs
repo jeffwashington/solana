@@ -31,7 +31,7 @@ use rayon::ThreadPool;
 use solana_measure::measure::Measure;
 use solana_metrics::{datapoint_debug, inc_new_counter_debug, inc_new_counter_info};
 use solana_sdk::{
-    account::{create_account, from_account, Account, AccountNoData, AnAccount},
+    account::{create_account, from_account, Account, AccountNoData, AnAccountConcrete},
     clock::{
         Epoch, Slot, SlotCount, SlotIndex, UnixTimestamp, DEFAULT_TICKS_PER_SECOND,
         MAX_PROCESSING_AGE, MAX_RECENT_BLOCKHASHES, MAX_TRANSACTION_FORWARDING_DELAY,
@@ -627,7 +627,7 @@ impl NonceRollbackFull {
             fee_account,
         }
     }
-    pub fn from_partial<T: AnAccount>(
+    pub fn from_partial<T: AnAccountConcrete>(
         partial: NonceRollbackPartial,
         message: &Message,
         accounts: &[T],
@@ -4194,21 +4194,21 @@ impl Bank {
             .load_by_program(&self.ancestors, program_id)
     }
 
-    pub fn get_filtered_program_accounts<F: Fn(&Account) -> bool>(
+    pub fn get_filtered_program_accounts<T: AnAccountConcrete, F: Fn(&T) -> bool>(
         &self,
         program_id: &Pubkey,
         filter: F,
-    ) -> Vec<(Pubkey, Account)> {
+    ) -> Vec<(Pubkey, T)> {
         self.rc
             .accounts
             .load_by_program_with_filter(&self.ancestors, program_id, filter)
     }
 
-    pub fn get_filtered_indexed_accounts<F: Fn(&Account) -> bool>(
+    pub fn get_filtered_indexed_accounts<T: AnAccountConcrete, F: Fn(&T) -> bool>(
         &self,
         index_key: &IndexKey,
         filter: F,
-    ) -> Vec<(Pubkey, Account)> {
+    ) -> Vec<(Pubkey, T)> {
         self.rc
             .accounts
             .load_by_index_key_with_filter(&self.ancestors, index_key, filter)
@@ -5144,6 +5144,7 @@ pub(crate) mod tests {
     };
     use crossbeam_channel::bounded;
     use solana_sdk::{
+        account::AnAccount,
         account_utils::StateMut,
         clock::{DEFAULT_SLOTS_PER_EPOCH, DEFAULT_TICKS_PER_SLOT},
         epoch_schedule::MINIMUM_SLOTS_PER_EPOCH,
@@ -5184,7 +5185,7 @@ pub(crate) mod tests {
                 blockhash: Hash::new_unique(),
                 fee_calculator: fee_calculator.clone(),
             }));
-        let nonce_account = Account::new_data(43, &state, &system_program::id()).unwrap();
+        let nonce_account = AccountNoData::new_data(43, &state, &system_program::id()).unwrap();
 
         // NonceRollbackPartial create + NonceRollbackInfo impl
         let partial = NonceRollbackPartial::new(nonce_address, nonce_account.clone());
@@ -5202,9 +5203,9 @@ pub(crate) mod tests {
         ];
         let message = Message::new(&instructions, Some(&from_address));
 
-        let from_account = Account::new(44, 0, &Pubkey::default());
-        let to_account = Account::new(45, 0, &Pubkey::default());
-        let recent_blockhashes_sysvar_account = Account::new(4, 0, &Pubkey::default());
+        let from_account = AccountNoData::new(44, 0, &Pubkey::default());
+        let to_account = AccountNoData::new(45, 0, &Pubkey::default());
+        let recent_blockhashes_sysvar_account = AccountNoData::new(4, 0, &Pubkey::default());
         let accounts = [
             from_account.clone(),
             nonce_account.clone(),
@@ -5233,7 +5234,7 @@ pub(crate) mod tests {
 
         // NonceRollbackFull create, fee-payer not in account_keys fails
         assert_eq!(
-            NonceRollbackFull::from_partial(partial, &message, &[]).unwrap_err(),
+            NonceRollbackFull::from_partial::<Account>(partial, &message, &[]).unwrap_err(),
             TransactionError::AccountNotFound,
         );
     }
@@ -9016,13 +9017,13 @@ pub(crate) mod tests {
 
         // Post-processing filter
         let indexed_accounts = bank
-            .get_filtered_indexed_accounts(&IndexKey::ProgramId(program_id), |account| {
-                account.owner == program_id
+            .get_filtered_indexed_accounts(&IndexKey::ProgramId(program_id), |account: &Account| {
+                *account.owner() == program_id
             });
         assert!(indexed_accounts.is_empty());
         let indexed_accounts = bank
-            .get_filtered_indexed_accounts(&IndexKey::ProgramId(another_program_id), |account| {
-                account.owner == another_program_id
+            .get_filtered_indexed_accounts(&IndexKey::ProgramId(another_program_id), |account:&Account| {
+                *account.owner() == another_program_id
             });
         assert_eq!(indexed_accounts.len(), 1);
         assert_eq!(indexed_accounts[0], (address, new_account));
@@ -9450,7 +9451,7 @@ pub(crate) mod tests {
         let nonce_account = bank.get_account(&nonce_pubkey).unwrap();
         assert_eq!(
             bank.check_tx_durable_nonce(&tx),
-            Some((nonce_pubkey, nonce_account))
+            Some((nonce_pubkey, Account::to_account_no_data(nonce_account)))
         );
     }
 

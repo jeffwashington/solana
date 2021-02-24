@@ -36,6 +36,28 @@ pub struct AccountNoData {
     pub rent_epoch: Epoch,
 }
 
+impl std::cmp::PartialEq<Account> for AccountNoData {
+    fn eq(&self, other: &Account) -> bool
+    {
+        self.lamports == other.lamports &&
+        other.data == *self.data() &&
+        self.owner == other.owner &&
+        self.executable == other.executable &&
+        self.rent_epoch == other.rent_epoch
+    }
+  }
+
+  impl std::cmp::PartialEq<AccountNoData> for Account {
+    fn eq(&self, other: &AccountNoData) -> bool
+    {
+        self.lamports == other.lamports &&
+        self.data == *other.data() && 
+        self.owner == other.owner &&
+        self.executable == other.executable &&
+        self.rent_epoch == other.rent_epoch
+    }
+  }
+
 impl serde::Serialize for AccountNoData {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -70,6 +92,20 @@ impl AccountNoData {
         result
     }
 
+    pub fn new_data<T: serde::Serialize>(
+        lamports: u64,
+        state: &T,
+        owner: &Pubkey,
+    ) -> Result<Self, bincode::Error> {
+        let data = bincode::serialize(state)?;
+        Ok(Self {
+            lamports,
+            data: Arc::new(data),
+            owner: *owner,
+            ..Self::default()
+        })
+    }
+
     pub fn to_accounts(accounts: Vec<AccountNoData>) -> Vec<Account> {
         accounts.into_iter().map(|account| {
             AccountNoData::to_account(account)
@@ -100,9 +136,23 @@ impl Account {
         };
         result
     }
+    pub fn to_account_no_data2(account: &mut Account) -> AccountNoData {
+        let mut data = vec![];
+        std::mem::swap(&mut data, &mut account.data);
+        let result = AccountNoData {
+            lamports: account.lamports,
+            data: Arc::new(data),
+            owner: account.owner,
+            executable: account.executable,
+            rent_epoch: account.rent_epoch,
+        };
+        result
+    }
 }
 
-pub trait AnAccount : Default + Clone + Sized {
+pub trait AnAccountConcrete : Default + Clone + AnAccount {}
+
+pub trait AnAccount: /*Default + Clone +*/ Sized {
     fn lamports(&self) -> u64;
     fn set_lamports(&mut self, lamports: u64);
     fn data(&self) -> &Vec<u8>;
@@ -113,7 +163,11 @@ pub trait AnAccount : Default + Clone + Sized {
     //fn clone(&self) -> AnAccount;
     fn clone_as_account_no_data(&self) -> AccountNoData;
     fn clone_as_account(&self) -> Account;
+    fn from_account_no_data(item: AccountNoData) -> Self;
 }
+
+impl AnAccountConcrete for Account {}
+impl AnAccountConcrete for AccountNoData {}
 
 impl AnAccount for Account {
     fn lamports(&self) -> u64 {self.lamports}
@@ -124,8 +178,55 @@ impl AnAccount for Account {
     fn rent_epoch(&self) -> Epoch {self.rent_epoch}
     fn set_rent_epoch(&mut self, epoch: Epoch) {self.rent_epoch = epoch;}
     //fn clone(&self) -> AnAccount {self.clone()}
-    fn clone_as_account_no_data(&self) -> AccountNoData {Account::to_account_no_data(self.clone())}
+    fn clone_as_account_no_data(&self) -> AccountNoData {Account::to_account_no_data2(&mut self.clone())}
     fn clone_as_account(&self) -> Account {self.clone()}
+    fn from_account_no_data(item: AccountNoData) -> Self {AccountNoData::to_account(item)}
+}
+
+impl<'a> AnAccount for &'a mut Account {
+    fn lamports(&self) -> u64 {self.lamports}
+    fn set_lamports(&mut self, lamports: u64) {self.lamports = lamports;}
+    fn data(&self) -> &Vec<u8> {&self.data}
+    fn owner(&self) -> &Pubkey {&self.owner}
+    fn executable(&self) -> bool {self.executable}
+    fn rent_epoch(&self) -> Epoch {self.rent_epoch}
+    fn set_rent_epoch(&mut self, epoch: Epoch) {self.rent_epoch = epoch;}
+    //fn clone(&self) -> AnAccount {self.clone()}
+    fn clone_as_account_no_data(&self) -> AccountNoData {
+        let result = AccountNoData {
+            lamports: self.lamports,
+            data: Arc::new(self.data().clone()),
+            owner: self.owner,
+            executable: self.executable,
+            rent_epoch: self.rent_epoch,
+        };
+        result
+    }
+    fn clone_as_account(&self) -> Account {
+        let account = self;
+        let result = Account {
+            lamports: account.lamports,
+            data: self.data().clone(),
+            owner: account.owner,
+            executable: account.executable,
+            rent_epoch: account.rent_epoch,
+        };
+        result
+    }
+    fn from_account_no_data(_item: AccountNoData) -> Self {
+        panic!("");
+        /*
+        let account = item;
+        let mut result = Account {
+            lamports: account.lamports,
+            data: *account.data(),
+            owner: account.owner,
+            executable: account.executable,
+            rent_epoch: account.rent_epoch,
+        };
+        &mut result
+        */
+    }
 }
 
 impl AnAccount for AccountNoData {
@@ -139,6 +240,7 @@ impl AnAccount for AccountNoData {
     //fn clone(&self) -> AnAccount {self.clone()}
     fn clone_as_account_no_data(&self) -> AccountNoData {self.clone()}
     fn clone_as_account(&self) -> Account {AccountNoData::to_account(self.clone())}
+    fn from_account_no_data(item: AccountNoData) -> Self {item}
 }
 
 // same as account, but with data as Cow
@@ -187,6 +289,17 @@ impl fmt::Debug for Account {
             self.rent_epoch,
             data_str,
         )
+    }
+}
+
+impl AccountNoData {
+    pub fn new(lamports: u64, space: usize, owner: &Pubkey) -> Self {
+        Self {
+            lamports,
+            data: Arc::new(vec![0u8; space]),
+            owner: *owner,
+            ..Self::default()
+        }
     }
 }
 

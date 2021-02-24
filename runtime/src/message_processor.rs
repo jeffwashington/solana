@@ -1702,6 +1702,7 @@ mod tests {
             None,
             Arc::new(FeatureSet::all_enabled()),
             BpfComputeBudget::new(&FeatureSet::all_enabled()),
+            &mut ExecuteTimings::default(),
         );
         assert_eq!(result, Ok(()));
         assert_eq!(accounts[0].borrow().lamports, 100);
@@ -1727,6 +1728,7 @@ mod tests {
             None,
             Arc::new(FeatureSet::all_enabled()),
             BpfComputeBudget::new(&FeatureSet::all_enabled()),
+            &mut ExecuteTimings::default(),
         );
         assert_eq!(
             result,
@@ -1756,6 +1758,7 @@ mod tests {
             None,
             Arc::new(FeatureSet::all_enabled()),
             BpfComputeBudget::new(&FeatureSet::all_enabled()),
+            &mut ExecuteTimings::default(),
         );
         assert_eq!(
             result,
@@ -1869,6 +1872,7 @@ mod tests {
             None,
             Arc::new(FeatureSet::all_enabled()),
             BpfComputeBudget::new(&FeatureSet::all_enabled()),
+            &mut ExecuteTimings::default(),
         );
         assert_eq!(
             result,
@@ -1898,6 +1902,7 @@ mod tests {
             None,
             Arc::new(FeatureSet::all_enabled()),
             BpfComputeBudget::new(&FeatureSet::all_enabled()),
+            &mut ExecuteTimings::default(),
         );
         assert_eq!(result, Ok(()));
 
@@ -1924,6 +1929,7 @@ mod tests {
             None,
             Arc::new(FeatureSet::all_enabled()),
             BpfComputeBudget::new(&FeatureSet::all_enabled()),
+            &mut ExecuteTimings::default(),
         );
         assert_eq!(result, Ok(()));
         assert_eq!(accounts[0].borrow().lamports, 80);

@@ -2,7 +2,7 @@ use log::*;
 use memmap2::MmapMut;
 use serde::{Deserialize, Serialize};
 use solana_sdk::{
-    account::{Account, AnAccount},
+    account::{Account, AccountNoData, AnAccount},
     clock::{Epoch, Slot},
     hash::Hash,
     pubkey::Pubkey,
@@ -110,6 +110,11 @@ impl<'a> StoredAccountMeta<'a> {
             rent_epoch: self.account_meta.rent_epoch,
             data: self.data.to_vec(),
         }
+    }
+
+    pub fn clone_account_no_data(&self) -> AccountNoData {
+        let acct = self.clone_account();
+        Account::to_account_no_data(acct)
     }
 
     fn sanitize(&self) -> bool {

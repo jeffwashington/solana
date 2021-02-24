@@ -45,7 +45,7 @@ fn test_shrink_and_clean() {
 
             for (pubkey, account) in alive_accounts.iter_mut() {
                 account.lamports -= 1;
-                accounts.store_uncached(current_slot, &[(&pubkey, &account)]);
+                accounts.store_uncached(current_slot, &[(&pubkey, account)]);
             }
             accounts.add_root(current_slot);
         }
@@ -113,7 +113,7 @@ fn test_bad_bank_hash() {
         for (key, account) in &account_refs {
             assert_eq!(
                 db.load_account_hash(&ancestors, &key),
-                AccountsDB::hash_account(some_slot, &account, &key, &ClusterType::Development)
+                AccountsDB::hash_account(some_slot, *account, &key, &ClusterType::Development)
             );
         }
         existing.clear();

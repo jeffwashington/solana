@@ -1,6 +1,6 @@
 //! calculate and collect rent from Accounts
 use solana_sdk::{
-    account::AnAccount, clock::Epoch, epoch_schedule::EpochSchedule, genesis_config::GenesisConfig,
+    account::AnAccountConcrete, clock::Epoch, epoch_schedule::EpochSchedule, genesis_config::GenesisConfig,
     incinerator, pubkey::Pubkey, rent::Rent, sysvar,
 };
 
@@ -50,7 +50,7 @@ impl RentCollector {
     //  the account rent collected, if any
     //
     #[must_use = "add to Bank::collected_rent"]
-    pub fn collect_from_existing_account<T: AnAccount>(
+    pub fn collect_from_existing_account<T: AnAccountConcrete>(
         &self,
         address: &Pubkey,
         account: &mut T,
@@ -104,7 +104,7 @@ impl RentCollector {
     }
 
     #[must_use = "add to Bank::collected_rent"]
-    pub fn collect_from_created_account<T:AnAccount>(
+    pub fn collect_from_created_account<T:AnAccountConcrete>(
         &self,
         address: &Pubkey,
         account: &mut T,
@@ -119,6 +119,7 @@ impl RentCollector {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use solana_sdk::account::Account;
 
     #[test]
     fn test_collect_from_account_created_and_existing() {
