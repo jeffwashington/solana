@@ -2,7 +2,8 @@
 //! node stakes
 use crate::vote_account::{ArcVoteAccount, VoteAccounts};
 use solana_sdk::{
-    account::Account, clock::Epoch, pubkey::Pubkey, sysvar::stake_history::StakeHistory,
+    account::AnAccount, clock::Epoch, pubkey::Pubkey, sysvar::stake_history::StakeHistory,
+    account_utils::{StateMut},
 };
 use solana_stake_program::stake_state::{new_stake_history_entry, Delegation, StakeState};
 use std::{borrow::Borrow, collections::HashMap};
@@ -105,19 +106,19 @@ impl Stakes {
                 .sum::<u64>()
     }
 
-    pub fn is_stake(account: &Account) -> bool {
-        solana_vote_program::check_id(&account.owner)
-            || solana_stake_program::check_id(&account.owner)
-                && account.data.len() >= std::mem::size_of::<StakeState>()
+    pub fn is_stake<T:AnAccount>(account: &T) -> bool {
+        solana_vote_program::check_id(&account.owner())
+            || solana_stake_program::check_id(&account.owner())
+                && account.data().len() >= std::mem::size_of::<StakeState>()
     }
 
-    pub fn store(
+    pub fn store<T:AnAccount + StateMut<StakeState>>(
         &mut self,
         pubkey: &Pubkey,
-        account: &Account,
+        account: &T,
         fix_stake_deactivate: bool,
     ) -> Option<ArcVoteAccount> {
-        if solana_vote_program::check_id(&account.owner) {
+        if solana_vote_program::check_id(&account.owner()) {
             // unconditionally remove existing at first; there is no dependent calculated state for
             // votes, not like stakes (stake codepath maintains calculated stake value grouped by
             // delegated vote pubkey)
@@ -125,7 +126,7 @@ impl Stakes {
             // when account is removed (lamports == 0), don't readd so that given
             // `pubkey` can be used for any owner in the future, while not
             // affecting Stakes.
-            if account.lamports != 0 {
+            if account.lamports() != 0 {
                 let stake = old.as_ref().map_or_else(
                     || {
                         self.calculate_stake(
@@ -139,10 +140,10 @@ impl Stakes {
                 );
 
                 self.vote_accounts
-                    .insert(*pubkey, (stake, ArcVoteAccount::from(account.clone())));
+                    .insert(*pubkey, (stake, ArcVoteAccount::convert(account)));
             }
             old.map(|(_, account)| account)
-        } else if solana_stake_program::check_id(&account.owner) {
+        } else if solana_stake_program::check_id(&account.owner()) {
             //  old_stake is stake lamports and voter_pubkey from the pre-store() version
             let old_stake = self.stake_delegations.get(pubkey).map(|delegation| {
                 (
@@ -156,7 +157,7 @@ impl Stakes {
             let stake = delegation.map(|delegation| {
                 (
                     delegation.voter_pubkey,
-                    if account.lamports != 0 {
+                    if account.lamports() != 0 {
                         delegation.stake(
                             self.epoch,
                             Some(&self.stake_history),
@@ -181,7 +182,7 @@ impl Stakes {
                 }
             }
 
-            if account.lamports == 0 {
+            if account.lamports() == 0 {
                 // when account is removed (lamports == 0), remove it from Stakes as well
                 // so that given `pubkey` can be used for any owner in the future, while not
                 // affecting Stakes.

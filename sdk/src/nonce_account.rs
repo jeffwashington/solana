@@ -1,5 +1,7 @@
 use crate::{
     account::Account,
+    account::AnAccount,
+    account::AccountNoData,
     account_utils::StateMut,
     fee_calculator::FeeCalculator,
     hash::Hash,
@@ -19,7 +21,7 @@ pub fn create_account(lamports: u64) -> RefCell<Account> {
     )
 }
 
-pub fn verify_nonce_account(acc: &Account, hash: &Hash) -> bool {
+pub fn verify_nonce_account(acc: &AccountNoData, hash: &Hash) -> bool {
     if acc.owner != crate::system_program::id() {
         return false;
     }
@@ -29,7 +31,7 @@ pub fn verify_nonce_account(acc: &Account, hash: &Hash) -> bool {
     }
 }
 
-pub fn fee_calculator_of(account: &Account) -> Option<FeeCalculator> {
+pub fn fee_calculator_off<T:AnAccount + StateMut<Versions>>(account: &T) -> Option<FeeCalculator> {
     let state = StateMut::<Versions>::state(account)
         .ok()?
         .convert_to_current();

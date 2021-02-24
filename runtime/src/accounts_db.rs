@@ -471,8 +471,8 @@ impl<'a> LoadedAccount<'a> {
         match self {
             LoadedAccount::Stored(stored_account_meta) => stored_account_meta.clone_account(),
             LoadedAccount::Cached((_, cached_account)) => match cached_account {
-                Cow::Owned(cached_account) => cached_account.account.to_account(),
-                Cow::Borrowed(cached_account) => cached_account.account.to_account(),
+                Cow::Owned(cached_account) => AccountNoData::to_account(cached_account.account.clone()),
+                Cow::Borrowed(cached_account) => AccountNoData::to_account(cached_account.account.clone()),
             },
         }
     }
@@ -771,17 +771,17 @@ pub struct BankHashStats {
 }
 
 impl BankHashStats {
-    pub fn update(&mut self, account: &Account) {
-        if account.lamports == 0 {
+    pub fn update<T:AnAccount>(&mut self, account: &T) {
+        if account.lamports() == 0 {
             self.num_removed_accounts += 1;
         } else {
             self.num_updated_accounts += 1;
         }
-        self.total_data_len = self.total_data_len.wrapping_add(account.data.len() as u64);
-        if account.executable {
+        self.total_data_len = self.total_data_len.wrapping_add(account.data().len() as u64);
+        if account.executable() {
             self.num_executable_accounts += 1;
         }
-        self.num_lamports_stored = self.num_lamports_stored.wrapping_add(account.lamports);
+        self.num_lamports_stored = self.num_lamports_stored.wrapping_add(account.lamports());
     }
 
     pub fn merge(&mut self, other: &BankHashStats) {
@@ -2505,6 +2505,10 @@ impl AccountsDB {
         self.load(ancestors, pubkey)
     }
 
+    pub fn load_slow_no_data(&self, ancestors: &Ancestors, pubkey: &Pubkey) -> Option<(AccountNoData, Slot)> {
+        self.load_cow(ancestors, pubkey)
+    }
+
     // Only safe to use the `get_account_accessor_from_cache_or_storage() -> get_loaded_account()`
     // pattern if you're holding the AccountIndex lock for the `pubkey`, otherwise, a cache
     // flush could happen between `get_account_accessor_from_cache_or_storage()` and
@@ -3057,9 +3061,9 @@ impl AccountsDB {
         }
     }
 
-    pub fn hash_account(
+    pub fn hash_account<T:AnAccount>(
         slot: Slot,
-        account: &Account,
+        account: &T,
         pubkey: &Pubkey,
         cluster_type: &ClusterType,
     ) -> Hash {
@@ -3068,22 +3072,22 @@ impl AccountsDB {
         if slot > Self::get_blake3_slot(cluster_type) {
             Self::blake3_hash_account_data(
                 slot,
-                account.lamports,
-                &account.owner,
-                account.executable,
-                account.rent_epoch,
-                &account.data,
+                account.lamports(),
+                &account.owner(),
+                account.executable(),
+                account.rent_epoch(),
+                &account.data(),
                 pubkey,
                 include_owner,
             )
         } else {
             Self::hash_account_data(
                 slot,
-                account.lamports,
-                &account.owner,
-                account.executable,
-                account.rent_epoch,
-                &account.data,
+                account.lamports(),
+                &account.owner(),
+                account.executable(),
+                account.rent_epoch(),
+                &account.data(),
                 pubkey,
                 include_owner,
             )
@@ -3123,13 +3127,13 @@ impl AccountsDB {
         }
     }
 
-    fn hash_frozen_account_data(account: &Account) -> Hash {
+    fn hash_frozen_account_data<T:AnAccount>(account: &T) -> Hash {
         let mut hasher = Hasher::default();
 
-        hasher.hash(&account.data);
-        hasher.hash(&account.owner.as_ref());
+        hasher.hash(&account.data());
+        hasher.hash(&account.owner().as_ref());
 
-        if account.executable {
+        if account.executable() {
             hasher.hash(&[1u8; 1]);
         } else {
             hasher.hash(&[0u8; 1]);
@@ -4708,10 +4712,10 @@ impl AccountsDB {
         inc_new_counter_info!("clean_stored_dead_slots-ms", measure.as_ms() as usize);
     }
 
-    fn hash_accounts(
+    fn hash_accounts<T:AnAccount>(
         &self,
         slot: Slot,
-        accounts: &[(&Pubkey, &Account)],
+        accounts: &[(&Pubkey, &T)],
         cluster_type: &ClusterType,
     ) -> Vec<Hash> {
         let mut stats = BankHashStats::default();
@@ -4719,9 +4723,9 @@ impl AccountsDB {
         let hashes: Vec<_> = accounts
             .iter()
             .map(|(pubkey, account)| {
-                total_data += account.data.len();
-                stats.update(account);
-                Self::hash_account(slot, account, pubkey, cluster_type)
+                total_data += account.data().len();
+                stats.update(*account);
+                Self::hash_account(slot, *account, pubkey, cluster_type)
             })
             .collect();
 
@@ -4761,21 +4765,21 @@ impl AccountsDB {
     }
 
     /// Cause a panic if frozen accounts would be affected by data in `accounts`
-    fn assert_frozen_accounts(&self, accounts: &[(&Pubkey, &Account)]) {
+    fn assert_frozen_accounts<T:AnAccount>(&self, accounts: &[(&Pubkey, &T)]) {
         if self.frozen_accounts.is_empty() {
             return;
         }
         for (account_pubkey, account) in accounts.iter() {
             if let Some(frozen_account_info) = self.frozen_accounts.get(*account_pubkey) {
-                if account.lamports < frozen_account_info.lamports {
+                if account.lamports() < frozen_account_info.lamports {
                     FROZEN_ACCOUNT_PANIC.store(true, Ordering::Relaxed);
                     panic!(
                         "Frozen account {} modified.  Lamports decreased from {} to {}",
-                        account_pubkey, frozen_account_info.lamports, account.lamports,
+                        account_pubkey, frozen_account_info.lamports, account.lamports(),
                     )
                 }
 
-                let hash = Self::hash_frozen_account_data(&account);
+                let hash = Self::hash_frozen_account_data(*account);
                 if hash != frozen_account_info.hash {
                     FROZEN_ACCOUNT_PANIC.store(true, Ordering::Relaxed);
                     panic!(
@@ -4787,16 +4791,16 @@ impl AccountsDB {
         }
     }
 
-    pub fn store_cached(&self, slot: Slot, accounts: &[(&Pubkey, &Account)]) {
+    pub fn store_cached<T:AnAccount>(&self, slot: Slot, accounts: &[(&Pubkey, &T)]) {
         self.store(slot, accounts, self.caching_enabled);
     }
 
     /// Store the account update.
-    pub fn store_uncached(&self, slot: Slot, accounts: &[(&Pubkey, &Account)]) {
+    pub fn store_uncached<T:AnAccount>(&self, slot: Slot, accounts: &[(&Pubkey, &T)]) {
         self.store(slot, accounts, false);
     }
 
-    fn store(&self, slot: Slot, accounts: &[(&Pubkey, &Account)], is_cached_store: bool) {
+    fn store<T:AnAccount>(&self, slot: Slot, accounts: &[(&Pubkey, &T)], is_cached_store: bool) {
         // If all transactions in a batch are errored,
         // it's possible to get a store with no accounts.
         if accounts.is_empty() {
@@ -4917,10 +4921,10 @@ impl AccountsDB {
         }
     }
 
-    fn store_accounts_unfrozen(
+    fn store_accounts_unfrozen<T:AnAccount>(
         &self,
         slot: Slot,
-        accounts: &[(&Pubkey, &Account)],
+        accounts: &[(&Pubkey, &T)],
         hashes: &[Hash],
         is_cached_store: bool,
     ) {

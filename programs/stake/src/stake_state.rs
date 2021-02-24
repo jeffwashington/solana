@@ -11,6 +11,7 @@ use crate::{
 use serde_derive::{Deserialize, Serialize};
 use solana_sdk::{
     account::Account,
+    account::AnAccount,
     account_utils::{State, StateMut},
     clock::{Clock, Epoch, UnixTimestamp},
     ic_msg,
@@ -83,11 +84,11 @@ impl StakeState {
     }
 
     // utility function, used by Stakes, tests
-    pub fn from(account: &Account) -> Option<StakeState> {
+    pub fn from<T:AnAccount + StateMut<StakeState>>(account: &T) -> Option<StakeState> {
         account.state().ok()
     }
 
-    pub fn stake_from(account: &Account) -> Option<Stake> {
+    pub fn stake_from<T:AnAccount + StateMut<StakeState>>(account: &T) -> Option<Stake> {
         Self::from(account).and_then(|state: Self| state.stake())
     }
     pub fn stake(&self) -> Option<Stake> {
@@ -97,7 +98,7 @@ impl StakeState {
         }
     }
 
-    pub fn delegation_from(account: &Account) -> Option<Delegation> {
+    pub fn delegation_from<T:AnAccount + StateMut<StakeState>>(account: &T) -> Option<Delegation> {
         Self::from(account).and_then(|state: Self| state.delegation())
     }
     pub fn delegation(&self) -> Option<Delegation> {

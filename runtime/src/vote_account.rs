@@ -1,6 +1,6 @@
 use serde::de::{Deserialize, Deserializer};
 use serde::ser::{Serialize, Serializer};
-use solana_sdk::{account::Account, instruction::InstructionError, pubkey::Pubkey};
+use solana_sdk::{account::Account, account::AccountNoData, account::AnAccount, instruction::InstructionError, pubkey::Pubkey};
 use solana_vote_program::vote_state::VoteState;
 use std::{
     borrow::Borrow,
@@ -182,6 +182,33 @@ impl From<Account> for VoteAccount {
     fn from(account: Account) -> Self {
         Self {
             account,
+            vote_state: RwLock::new(INVALID_VOTE_STATE),
+            vote_state_once: Once::new(),
+        }
+    }
+}
+
+impl From<AccountNoData> for ArcVoteAccount {
+    fn from(account: AccountNoData) -> Self {
+        Self(Arc::new(VoteAccount::from(account)))
+    }
+}
+
+impl ArcVoteAccount {
+    pub fn convert<T:AnAccount>(account:&T) -> Self {
+        Self(Arc::new(
+        VoteAccount {
+            account: account.clone_as_account(),
+            vote_state: RwLock::new(INVALID_VOTE_STATE),
+            vote_state_once: Once::new(),
+        }))
+    }
+}
+
+impl From<AccountNoData> for VoteAccount {
+    fn from(account: AccountNoData) -> Self {
+        Self {
+            account: AccountNoData::to_account(account),
             vote_state: RwLock::new(INVALID_VOTE_STATE),
             vote_state_once: Once::new(),
         }

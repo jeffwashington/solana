@@ -1,6 +1,7 @@
 use log::*;
 use solana_sdk::{
     account::Account,
+    account::AnAccount,
     account_utils::StateMut,
     instruction::InstructionError,
     keyed_account::{from_keyed_account, get_signers, next_keyed_account, KeyedAccount},
@@ -333,11 +334,11 @@ pub enum SystemAccountKind {
     Nonce,
 }
 
-pub fn get_system_account_kind(account: &Account) -> Option<SystemAccountKind> {
-    if system_program::check_id(&account.owner) {
-        if account.data.is_empty() {
+pub fn get_system_account_kind<T: AnAccount + StateMut<nonce::state::Versions>>(account: &T) -> Option<SystemAccountKind> {
+    if system_program::check_id(&account.owner()) {
+        if account.data().is_empty() {
             Some(SystemAccountKind::System)
-        } else if account.data.len() == nonce::State::size() {
+        } else if account.data().len() == nonce::State::size() {
             match account.state().ok()? {
                 nonce::state::Versions::Current(state) => match *state {
                     nonce::State::Initialized(_) => Some(SystemAccountKind::Nonce),

@@ -1,6 +1,6 @@
 //! calculate and collect rent from Accounts
 use solana_sdk::{
-    account::Account, clock::Epoch, epoch_schedule::EpochSchedule, genesis_config::GenesisConfig,
+    account::AnAccount, clock::Epoch, epoch_schedule::EpochSchedule, genesis_config::GenesisConfig,
     incinerator, pubkey::Pubkey, rent::Rent, sysvar,
 };
 
@@ -50,20 +50,20 @@ impl RentCollector {
     //  the account rent collected, if any
     //
     #[must_use = "add to Bank::collected_rent"]
-    pub fn collect_from_existing_account(
+    pub fn collect_from_existing_account<T: AnAccount>(
         &self,
         address: &Pubkey,
-        account: &mut Account,
+        account: &mut T,
         rent_fix_enabled: bool,
     ) -> u64 {
-        if account.executable
-            || account.rent_epoch > self.epoch
-            || sysvar::check_id(&account.owner)
+        if account.executable()
+            || account.rent_epoch() > self.epoch
+            || sysvar::check_id(&account.owner())
             || *address == incinerator::id()
         {
             0
         } else {
-            let slots_elapsed: u64 = (account.rent_epoch..=self.epoch)
+            let slots_elapsed: u64 = (account.rent_epoch()..=self.epoch)
                 .map(|epoch| self.epoch_schedule.get_slots_in_epoch(epoch + 1))
                 .sum();
 
@@ -76,11 +76,11 @@ impl RentCollector {
 
             let (rent_due, exempt) =
                 self.rent
-                    .due(account.lamports, account.data.len(), years_elapsed);
+                    .due(account.lamports(), account.data().len(), years_elapsed);
 
             if exempt || rent_due != 0 {
-                if account.lamports > rent_due {
-                    account.rent_epoch = self.epoch
+                if account.lamports() > rent_due {
+                    account.set_rent_epoch(self.epoch
                         + if rent_fix_enabled && exempt {
                             // Rent isn't collected for the next epoch
                             // Make sure to check exempt status later in curent epoch again
@@ -88,12 +88,12 @@ impl RentCollector {
                         } else {
                             // Rent is collected for next epoch
                             1
-                        };
-                    account.lamports -= rent_due;
+                        });
+                    account.set_lamports(account.lamports() - rent_due);
                     rent_due
                 } else {
-                    let rent_charged = account.lamports;
-                    *account = Account::default();
+                    let rent_charged = account.lamports();
+                    *account = T::default();
                     rent_charged
                 }
             } else {
@@ -104,14 +104,14 @@ impl RentCollector {
     }
 
     #[must_use = "add to Bank::collected_rent"]
-    pub fn collect_from_created_account(
+    pub fn collect_from_created_account<T:AnAccount>(
         &self,
         address: &Pubkey,
-        account: &mut Account,
+        account: &mut T,
         enable_new_behavior: bool,
     ) -> u64 {
         // initialize rent_epoch as created at this epoch
-        account.rent_epoch = self.epoch;
+        account.set_rent_epoch(self.epoch);
         self.collect_from_existing_account(address, account, enable_new_behavior)
     }
 }

@@ -16,7 +16,7 @@ use dashmap::{
 use log::*;
 use rand::{thread_rng, Rng};
 use solana_sdk::{
-    account::{Account, AccountNoData},
+    account::{Account, AccountNoData, AnAccount},
     account_utils::StateMut,
     bpf_loader_upgradeable::{self, UpgradeableLoaderState},
     clock::{Epoch, Slot},
@@ -82,8 +82,8 @@ pub struct AccountsCow {
 }
 
 // for the load instructions
-pub type TransactionAccounts = Vec<Account>;
-pub type TransactionAccountDeps = Vec<(Pubkey, Account)>;
+pub type TransactionAccounts = Vec<AccountNoData>;
+pub type TransactionAccountDeps = Vec<(Pubkey, AccountNoData)>;
 pub type TransactionRent = u64;
 pub type TransactionLoaders = Vec<Vec<(Pubkey, Account)>>;
 #[derive(PartialEq, Debug, Clone)]
@@ -159,7 +159,7 @@ impl Accounts {
         false
     }
 
-    fn construct_instructions_account(message: &Message) -> Account {
+    fn construct_instructions_account(message: &Message) -> AccountNoData {
         let mut account = Account {
             data: message.serialize_instructions(),
             ..Account::default()
@@ -167,7 +167,7 @@ impl Accounts {
 
         // add room for current instruction index.
         account.data.resize(account.data.len() + 2, 0);
-        account
+        Account::to_account_no_data(account)
     }
 
     pub fn load_account_temp(&self, key: &Vec<&Pubkey>, ancestors: &Ancestors) -> Vec<Option<(Account, Slot, u64, u64)>>{
@@ -232,7 +232,7 @@ impl Accounts {
                     } else {
                         let (account, rent) = self
                             .accounts_db
-                            .load(ancestors, key)
+                            .load_cow(ancestors, key)
                             .map(|(mut account, _)| {
                                 if message.is_writable(i) {
                                     let rent_due = rent_collector.collect_from_existing_account(
@@ -255,19 +255,19 @@ impl Accounts {
                             {
                                 if let Some(account) = self
                                     .accounts_db
-                                    .load(ancestors, &programdata_address)
+                                    .loads_cow(ancestors, &programdata_address)
                                     .map(|(account, _)| account)
                                 {
                                     account_deps.lock().unwrap().push((programdata_address, account));
                                 } else {
                                     // TODO error_counters.account_not_found += 1;
                                     pgm_not_found.store(true, Ordering::Relaxed);
-                                    return Account::default();//
+                                    return AccountNoData::default();//
                                 }
                             } else {
                                 // TODO error_counters.invalid_program_for_execution += 1;
                                 pgm_for_exec.store(true, Ordering::Relaxed);
-                                return Account::default();//
+                                return AccountNoData::default();//
                             }
                         }
 
@@ -276,7 +276,7 @@ impl Accounts {
                     }
                 } else {
                     // Fill in an empty account for the program slots.
-                    Account::default()
+                    AccountNoData::default()
                 };
                 account
             }).collect();
@@ -494,6 +494,20 @@ impl Accounts {
             .accounts_db
             .load_slow(ancestors, pubkey)
             .unwrap_or((Account::default(), self.slot));
+
+        if account.lamports > 0 {
+            Some((account, slot))
+        } else {
+            None
+        }
+    }
+
+    /// Slow because lock is held for 1 operation instead of many
+    pub fn load_slow_no_data(&self, ancestors: &Ancestors, pubkey: &Pubkey) -> Option<(AccountNoData, Slot)> {
+        let (account, slot) = self
+            .accounts_db
+            .load_slow_no_data(ancestors, pubkey)
+            .unwrap_or((AccountNoData::default(), self.slot));
 
         if account.lamports > 0 {
             Some((account, slot))
@@ -965,7 +979,7 @@ impl Accounts {
         last_blockhash_with_fee_calculator: &(Hash, FeeCalculator),
         fix_recent_blockhashes_sysvar_delay: bool,
         rent_fix_enabled: bool,
-    ) -> Vec<(&'a Pubkey, &'a Account)> {
+    ) -> Vec<(&'a Pubkey, &'a AccountNoData)> {
         let mut accounts = Vec::with_capacity(loaded.len());
         for (i, ((raccs, _nonce_rollback), (_, tx))) in loaded
             .iter_mut()
@@ -1047,11 +1061,11 @@ impl Accounts {
     }
 }
 
-pub fn prepare_if_nonce_account(
-    account: &mut Account,
+pub fn prepare_if_nonce_account<T:AnAccount + StateMut<nonce::state::Versions>>(
+    account: &mut T,
     account_pubkey: &Pubkey,
     tx_result: &Result<()>,
-    maybe_nonce_rollback: Option<(&Pubkey, &Account, Option<&Account>)>,
+    maybe_nonce_rollback: Option<(&Pubkey, &T, Option<&T>)>,
     last_blockhash_with_fee_calculator: &(Hash, FeeCalculator),
     fix_recent_blockhashes_sysvar_delay: bool,
 ) -> bool {

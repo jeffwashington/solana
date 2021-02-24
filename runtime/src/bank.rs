@@ -31,7 +31,7 @@ use rayon::ThreadPool;
 use solana_measure::measure::Measure;
 use solana_metrics::{datapoint_debug, inc_new_counter_debug, inc_new_counter_info};
 use solana_sdk::{
-    account::{create_account, from_account, Account, AccountNoData},
+    account::{create_account, from_account, Account, AccountNoData, AnAccount},
     clock::{
         Epoch, Slot, SlotCount, SlotIndex, UnixTimestamp, DEFAULT_TICKS_PER_SECOND,
         MAX_PROCESSING_AGE, MAX_RECENT_BLOCKHASHES, MAX_TRANSACTION_FORWARDING_DELAY,
@@ -572,19 +572,19 @@ pub struct TransactionLogCollector {
 
 pub trait NonceRollbackInfo {
     fn nonce_address(&self) -> &Pubkey;
-    fn nonce_account(&self) -> &Account;
+    fn nonce_account(&self) -> &AccountNoData;
     fn fee_calculator(&self) -> Option<FeeCalculator>;
-    fn fee_account(&self) -> Option<&Account>;
+    fn fee_account(&self) -> Option<&AccountNoData>;
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct NonceRollbackPartial {
     nonce_address: Pubkey,
-    nonce_account: Account,
+    nonce_account: AccountNoData,
 }
 
 impl NonceRollbackPartial {
-    pub fn new(nonce_address: Pubkey, nonce_account: Account) -> Self {
+    pub fn new(nonce_address: Pubkey, nonce_account: AccountNoData) -> Self {
         Self {
             nonce_address,
             nonce_account,
@@ -596,13 +596,13 @@ impl NonceRollbackInfo for NonceRollbackPartial {
     fn nonce_address(&self) -> &Pubkey {
         &self.nonce_address
     }
-    fn nonce_account(&self) -> &Account {
+    fn nonce_account(&self) -> &AccountNoData {
         &self.nonce_account
     }
     fn fee_calculator(&self) -> Option<FeeCalculator> {
-        nonce_account::fee_calculator_of(&self.nonce_account)
+        nonce_account::fee_calculator_off(&self.nonce_account)
     }
-    fn fee_account(&self) -> Option<&Account> {
+    fn fee_account(&self) -> Option<&AccountNoData> {
         None
     }
 }
@@ -610,16 +610,16 @@ impl NonceRollbackInfo for NonceRollbackPartial {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct NonceRollbackFull {
     nonce_address: Pubkey,
-    nonce_account: Account,
-    fee_account: Option<Account>,
+    nonce_account: AccountNoData,
+    fee_account: Option<AccountNoData>,
 }
 
 impl NonceRollbackFull {
     #[cfg(test)]
     pub fn new(
         nonce_address: Pubkey,
-        nonce_account: Account,
-        fee_account: Option<Account>,
+        nonce_account: AccountNoData,
+        fee_account: Option<AccountNoData>,
     ) -> Self {
         Self {
             nonce_address,
@@ -627,10 +627,10 @@ impl NonceRollbackFull {
             fee_account,
         }
     }
-    pub fn from_partial(
+    pub fn from_partial<T: AnAccount>(
         partial: NonceRollbackPartial,
         message: &Message,
-        accounts: &[Account],
+        accounts: &[T],
     ) -> Result<Self> {
         let NonceRollbackPartial {
             nonce_address,
@@ -646,14 +646,14 @@ impl NonceRollbackFull {
             if fee_pubkey == nonce_address {
                 Ok(Self {
                     nonce_address,
-                    nonce_account: fee_account,
+                    nonce_account: fee_account.clone_as_account_no_data(),
                     fee_account: None,
                 })
             } else {
                 Ok(Self {
                     nonce_address,
                     nonce_account,
-                    fee_account: Some(fee_account),
+                    fee_account: Some(fee_account.clone_as_account_no_data()),
                 })
             }
         } else {
@@ -666,13 +666,13 @@ impl NonceRollbackInfo for NonceRollbackFull {
     fn nonce_address(&self) -> &Pubkey {
         &self.nonce_address
     }
-    fn nonce_account(&self) -> &Account {
+    fn nonce_account(&self) -> &AccountNoData {
         &self.nonce_account
     }
     fn fee_calculator(&self) -> Option<FeeCalculator> {
-        nonce_account::fee_calculator_of(&self.nonce_account)
+        nonce_account::fee_calculator_off(&self.nonce_account)
     }
-    fn fee_account(&self) -> Option<&Account> {
+    fn fee_account(&self) -> Option<&AccountNoData> {
         self.fee_account.as_ref()
     }
 }
@@ -2688,11 +2688,11 @@ impl Bank {
             .check_hash_age(hash, max_age)
     }
 
-    pub fn check_tx_durable_nonce(&self, tx: &Transaction) -> Option<(Pubkey, Account)> {
+    pub fn check_tx_durable_nonce(&self, tx: &Transaction) -> Option<(Pubkey, AccountNoData)> {
         transaction::uses_durable_nonce(&tx)
             .and_then(|nonce_ix| transaction::get_nonce_pubkey_from_instruction(&nonce_ix, &tx))
             .and_then(|nonce_pubkey| {
-                self.get_account(&nonce_pubkey)
+                self.get_account_no_data(&nonce_pubkey)
                     .map(|acc| (*nonce_pubkey, acc))
             })
             .filter(|(_pubkey, nonce_account)| {
@@ -2845,11 +2845,11 @@ impl Bank {
     ) {
         let account_refcells: Vec<_> = accounts
             .drain(..)
-            .map(|account| Rc::new(RefCell::new(account)))
+            .map(|account| Rc::new(RefCell::new(AccountNoData::to_account(account))))
             .collect();
         let account_dep_refcells: Vec<_> = account_deps
             .drain(..)
-            .map(|(pubkey, account_dep)| (pubkey, RefCell::new(account_dep)))
+            .map(|(pubkey, account_dep)| (pubkey, RefCell::new(AccountNoData::to_account(account_dep))))
             .collect();
         let loader_refcells: Vec<Vec<_>> = loaders
             .iter_mut()
@@ -2871,7 +2871,7 @@ impl Bank {
         loader_refcells: TransactionLoaderRefCells,
     ) {
         account_refcells.drain(..).for_each(|account_refcell| {
-            accounts.push(Rc::try_unwrap(account_refcell).unwrap().into_inner())
+            accounts.push(Account::to_account_no_data(Rc::try_unwrap(account_refcell).unwrap().into_inner()))
         });
         loaders
             .iter_mut()
@@ -4159,8 +4159,17 @@ impl Bank {
             .map(|(acc, _slot)| acc)
     }
 
+    pub fn get_account_no_data(&self, pubkey: &Pubkey) -> Option<AccountNoData> {
+        self.get_account_modified_slot_no_data(pubkey)
+            .map(|(acc, _slot)| acc)
+    }
+
     pub fn get_account_modified_slot(&self, pubkey: &Pubkey) -> Option<(Account, Slot)> {
         self.rc.accounts.load_slow(&self.ancestors, pubkey)
+    }
+
+    pub fn get_account_modified_slot_no_data(&self, pubkey: &Pubkey) -> Option<(AccountNoData, Slot)> {
+        self.rc.accounts.load_slow_no_data(&self.ancestors, pubkey)
     }
 
     // Exclude self to really fetch the parent Bank's account hash and data.
@@ -4546,7 +4555,7 @@ impl Bank {
                 .account_keys
                 .iter()
                 .zip(loaded_transaction.accounts.iter())
-                .filter(|(_key, account)| (Stakes::is_stake(account)))
+                .filter(|(_key, account)| (Stakes::is_stake(*account)))
             {
                 if Stakes::is_stake(account) {
                     if let Some(old_vote_account) = self.stakes.write().unwrap().store(

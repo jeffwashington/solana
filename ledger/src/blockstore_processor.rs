@@ -213,6 +213,7 @@ fn execute_batches(
     timings.key_lens.sort();
     timings.instruction_lens.sort();
 
+    /*
     let mut timej = Measure::start("");
     batches.par_iter().for_each(|b| {
         b.transactions().par_iter().for_each(|t| {
@@ -223,6 +224,7 @@ fn execute_batches(
     });
     timej.stop();
     timings.just_load += timej.as_us();
+    */
     timings.load_2_calls += 1;
 
     let keys = batches.iter().map(|b| {
@@ -232,10 +234,12 @@ fn execute_batches(
     }).flatten().collect::<Vec<&Pubkey>>();
     timings.load_acct_count += keys.len() as u64;
 
+    /*
     let mut timej = Measure::start("");
     let res = bank.test_load_accounts(&keys);
     timej.stop();
     timings.load_2 += timej.as_us();
+    */
     /*
     timings.load_2_first_part.extend(res.iter().map(|i| i.clone().unwrap_or_default().2));
     timings.load_2_second_part.extend(res.iter().map(|i| i.clone().unwrap_or_default().3));
@@ -448,11 +452,13 @@ fn process_entries_with_callback(
             }
         }
     }
+    /*
     let mut timej = Measure::start("");
     let reff = all_keys.iter().map(|x| x).collect::<Vec<_>>();
     let res = bank.test_load_accounts(&reff);
     timej.stop();
     timings.load_3 += timej.as_us();
+    */
 
     let mut timej = Measure::start("");
     all_keys.iter().for_each(|key| {
