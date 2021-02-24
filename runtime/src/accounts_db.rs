@@ -2461,36 +2461,43 @@ impl AccountsDB {
         pubkey: &'a Pubkey,
         max_root: Option<Slot>,
     ) -> Option<(AccountNoData, Slot)> {
-        let (slot, _store_id, _offset) = {
-            let (lock, index) = self.accounts_index.get(pubkey, Some(ancestors), max_root)?;
-            let slot_list = lock.slot_list();
-            let (
-                slot,
-                AccountInfo {
-                    store_id, offset, ..
-                },
-            ) = slot_list[index];
-            (slot, store_id, offset)
-            // `lock` released here
-        };
-
-        self.accounts_cache
-            .load(slot, pubkey)
-            .map(|cached_account| {
-                let cl = cached_account.account;
-                (
-                    AccountNoData {
-                        lamports: cl.lamports,
-                        data: cl.data.clone(),
-                        owner: cl.owner,
-                        executable: cl.executable,
-                        rent_epoch: cl.rent_epoch,
-                    },
+            let (slot, store_id, offset) = {
+                let (lock, index) = self.accounts_index.get(pubkey, Some(ancestors), max_root)?;
+                let slot_list = lock.slot_list();
+                let (
                     slot,
-                )
-            })
-    }
-
+                    AccountInfo {
+                        store_id, offset, ..
+                    },
+                ) = slot_list[index];
+                (slot, store_id, offset)
+                // `lock` released here
+            };
+    
+            self.get_account_accessor_from_cache_or_storage(slot, pubkey, store_id, offset)
+                .get_loaded_account()
+                .map(|loaded_account| (loaded_account.account_no_data(), slot))
+    /*
+            self.accounts_cache
+                .load(slot, pubkey)
+                .map(|cached_account| {
+                    let cl = cached_account.account;
+                    error!("got one: {:?}", cl);
+    
+                    (
+                        AccountNoData {
+                            lamports: cl.lamports,
+                            data: cl.data.clone(),
+                            owner: cl.owner,
+                            executable: cl.executable,
+                            rent_epoch: cl.rent_epoch,
+                        },
+                        slot,
+                    )
+                })
+                */
+        }
+    
     pub fn load_account_hash(&self, ancestors: &Ancestors, pubkey: &Pubkey) -> Hash {
         let (slot, store_id, offset) = {
             let (lock, index) = self
