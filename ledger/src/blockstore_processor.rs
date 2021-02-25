@@ -860,7 +860,7 @@ pub fn confirm_slot(
     let mut times = vec![Measure::start("")];
     let mut lines = vec![];
     let slot = bank.slot();
-
+    error!("confirm_slot");
     let (entries, num_shreds, slot_full) = {
         let mut load_elapsed = Measure::start("load_elapsed");
         let load_result = blockstore
