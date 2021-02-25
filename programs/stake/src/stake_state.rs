@@ -12,6 +12,7 @@ use serde_derive::{Deserialize, Serialize};
 use solana_sdk::{
     account::Account,
     account::AnAccount,
+    account::AnAccountConcrete,
     account_utils::{State, StateMut},
     clock::{Clock, Epoch, UnixTimestamp},
     ic_msg,
@@ -1974,7 +1975,7 @@ mod tests {
             .is_ok());
 
         // verify that delegate() looks right, compare against hand-rolled
-        let stake = StakeState::stake_from(&stake_keyed_account.account.borrow()).unwrap();
+        let stake = StakeState::stake_from(&stake_keyed_account.account.borrow().clone_as_account()).unwrap();
         assert_eq!(
             stake,
             Stake {
@@ -2036,7 +2037,7 @@ mod tests {
         );
 
         // verify that delegate() looks right, compare against hand-rolled
-        let stake = StakeState::stake_from(&stake_keyed_account.account.borrow()).unwrap();
+        let stake = StakeState::stake_from(&stake_keyed_account.account.borrow().clone_as_account()).unwrap();
         assert_eq!(
             stake,
             Stake {
@@ -2727,7 +2728,7 @@ mod tests {
         );
         // check that we see what we expect
         assert_eq!(
-            StakeState::from(&stake_keyed_account.account.borrow()).unwrap(),
+            StakeState::from(&stake_keyed_account.account.borrow().clone_as_account()).unwrap(),
             StakeState::Initialized(Meta {
                 lockup: Lockup {
                     unix_timestamp: 0,
@@ -3003,7 +3004,7 @@ mod tests {
         );
 
         if let StakeState::Initialized(Meta { lockup, .. }) =
-            StakeState::from(&stake_keyed_account.account.borrow()).unwrap()
+            StakeState::from(&stake_keyed_account.account.borrow().clone_as_account()).unwrap()
         {
             assert_eq!(lockup.unix_timestamp, 2);
             assert_eq!(lockup.epoch, 1);
@@ -3025,7 +3026,7 @@ mod tests {
         );
 
         if let StakeState::Initialized(Meta { lockup, .. }) =
-            StakeState::from(&stake_keyed_account.account.borrow()).unwrap()
+            StakeState::from(&stake_keyed_account.account.borrow().clone_as_account()).unwrap()
         {
             assert_eq!(lockup.unix_timestamp, 2);
             assert_eq!(lockup.epoch, 3);
@@ -3048,7 +3049,7 @@ mod tests {
         );
 
         if let StakeState::Initialized(Meta { lockup, .. }) =
-            StakeState::from(&stake_keyed_account.account.borrow()).unwrap()
+            StakeState::from(&stake_keyed_account.account.borrow().clone_as_account()).unwrap()
         {
             assert_eq!(lockup.unix_timestamp, 2);
             assert_eq!(lockup.epoch, 3);
@@ -3347,7 +3348,7 @@ mod tests {
             None,
             0..future.epoch,
             &[
-                StakeState::stake_from(&stake_keyed_account.account.borrow())
+                StakeState::stake_from(&stake_keyed_account.account.borrow().clone_as_account())
                     .unwrap()
                     .delegation,
             ],
@@ -3897,7 +3898,7 @@ mod tests {
             Ok(())
         );
         if let StakeState::Initialized(Meta { authorized, .. }) =
-            StakeState::from(&stake_keyed_account.account.borrow()).unwrap()
+            StakeState::from(&stake_keyed_account.account.borrow().clone_as_account()).unwrap()
         {
             assert_eq!(authorized.staker, stake_pubkey0);
             assert_eq!(authorized.withdrawer, stake_pubkey0);
@@ -3935,7 +3936,7 @@ mod tests {
             Ok(())
         );
         if let StakeState::Initialized(Meta { authorized, .. }) =
-            StakeState::from(&stake_keyed_account.account.borrow()).unwrap()
+            StakeState::from(&stake_keyed_account.account.borrow().clone_as_account()).unwrap()
         {
             assert_eq!(authorized.staker, stake_pubkey2);
         }
@@ -3952,7 +3953,7 @@ mod tests {
             Ok(())
         );
         if let StakeState::Initialized(Meta { authorized, .. }) =
-            StakeState::from(&stake_keyed_account.account.borrow()).unwrap()
+            StakeState::from(&stake_keyed_account.account.borrow().clone_as_account()).unwrap()
         {
             assert_eq!(authorized.staker, stake_pubkey2);
         }
@@ -5937,7 +5938,7 @@ mod tests {
             Ok(())
         );
         let stake =
-            StakeState::stake_from(&stake_keyed_account.try_account_ref().unwrap()).unwrap();
+            StakeState::stake_from(&stake_keyed_account.try_account_ref().unwrap().clone_as_account()).unwrap();
         assert_eq!(stake.delegation.voter_pubkey, new_voter_pubkey);
 
         // Test another staking action
@@ -6019,7 +6020,7 @@ mod tests {
                 &signers,
             )
             .unwrap();
-        let stake = StakeState::stake_from(&stake_account.borrow()).unwrap();
+        let stake = StakeState::stake_from(&stake_account.borrow().clone_as_account()).unwrap();
         assert_eq!(
             stake.delegation.stake,
             stake_keyed_account.lamports().unwrap() - rent_exempt_reserve,
@@ -6041,7 +6042,7 @@ mod tests {
                 &signers,
             )
             .unwrap();
-        let stake = StakeState::stake_from(&stake_account.borrow()).unwrap();
+        let stake = StakeState::stake_from(&stake_account.borrow().clone_as_account()).unwrap();
         assert_eq!(
             stake.delegation.stake,
             stake_keyed_account.lamports().unwrap() - rent_exempt_reserve,
