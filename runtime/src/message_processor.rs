@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 use solana_measure::measure::Measure;
 use solana_sdk::{
     account::Account,
+    account::AccountNoData,
+    account::AnAccountConcrete,
     account_utils::StateMut,
     bpf_loader_upgradeable::{self, UpgradeableLoaderState},
     feature_set::{instructions_sysvar_enabled, track_writable_deescalation, FeatureSet},
@@ -61,14 +63,14 @@ impl Executors {
 pub struct PreAccount {
     key: Pubkey,
     is_writable: bool,
-    account: RefCell<Account>,
+    account: AccountNoData,
 }
 impl PreAccount {
-    pub fn new(key: &Pubkey, account: &Account, is_writable: bool) -> Self {
+    pub fn new(key: &Pubkey, account: &AccountNoData, is_writable: bool) -> Self {
         Self {
             key: *key,
             is_writable,
-            account: RefCell::new(account.clone()),
+            account: account.clone(),
         }
     }
 
@@ -77,9 +79,9 @@ impl PreAccount {
         program_id: &Pubkey,
         is_writable: Option<bool>,
         rent: &Rent,
-        post: &Account,
+        post: &AccountNoData,
     ) -> Result<(), InstructionError> {
-        let pre = self.account.borrow();
+        let pre = &self.account;
 
         let is_writable = if let Some(is_writable) = is_writable {
             is_writable
@@ -164,19 +166,8 @@ impl PreAccount {
         Ok(())
     }
 
-    pub fn update(&mut self, account: &Account) {
-        let mut pre = self.account.borrow_mut();
-
-        pre.lamports = account.lamports;
-        pre.owner = account.owner;
-        pre.executable = account.executable;
-        if pre.data.len() != account.data.len() {
-            // Only system account can change data size, copy with alloc
-            pre.data = account.data.clone();
-        } else {
-            // Copy without allocate
-            pre.data.clone_from_slice(&account.data);
-        }
+    pub fn update(&mut self, account: &AccountNoData) {
+        self.account = account.clone();
     }
 
     pub fn key(&self) -> Pubkey {
@@ -184,7 +175,7 @@ impl PreAccount {
     }
 
     pub fn lamports(&self) -> u64 {
-        self.account.borrow().lamports
+        self.account.lamports
     }
 
     pub fn is_zeroed(buf: &[u8]) -> bool {
@@ -217,7 +208,7 @@ pub struct ThisInvokeContext<'a> {
     program_ids: Vec<Pubkey>,
     rent: Rent,
     pre_accounts: Vec<PreAccount>,
-    account_deps: &'a [(Pubkey, RefCell<Account>)],
+    account_deps: &'a [(Pubkey, RefCell<AccountNoData>)],
     programs: &'a [(Pubkey, ProcessInstructionWithContext)],
     logger: Rc<RefCell<dyn Logger>>,
     bpf_compute_budget: BpfComputeBudget,
@@ -232,7 +223,7 @@ impl<'a> ThisInvokeContext<'a> {
         program_id: &Pubkey,
         rent: Rent,
         pre_accounts: Vec<PreAccount>,
-        account_deps: &'a [(Pubkey, RefCell<Account>)],
+        account_deps: &'a [(Pubkey, RefCell<AccountNoData>)],
         programs: &'a [(Pubkey, ProcessInstructionWithContext)],
         log_collector: Option<Rc<LogCollector>>,
         bpf_compute_budget: BpfComputeBudget,
@@ -281,7 +272,7 @@ impl<'a> InvokeContext for ThisInvokeContext<'a> {
         &mut self,
         message: &Message,
         instruction: &CompiledInstruction,
-        accounts: &[Rc<RefCell<Account>>],
+        accounts: &[Rc<RefCell<AccountNoData>>],
         caller_privileges: Option<&[bool]>,
     ) -> Result<(), InstructionError> {
         let track_writable_deescalation =
@@ -331,10 +322,10 @@ impl<'a> InvokeContext for ThisInvokeContext<'a> {
     fn is_feature_active(&self, feature_id: &Pubkey) -> bool {
         self.feature_set.is_active(feature_id)
     }
-    fn get_account(&self, pubkey: &Pubkey) -> Option<RefCell<Account>> {
+    fn get_account(&self, pubkey: &Pubkey) -> Option<RefCell<AccountNoData>> {
         if let Some(account) = self.pre_accounts.iter().find_map(|pre| {
             if pre.key == *pubkey {
-                Some(pre.account.clone())
+                Some(RefCell::new(pre.account.clone()))
             } else {
                 None
             }
@@ -462,8 +453,8 @@ impl MessageProcessor {
     fn create_keyed_accounts<'a>(
         message: &'a Message,
         instruction: &'a CompiledInstruction,
-        executable_accounts: &'a [(Pubkey, RefCell<Account>)],
-        accounts: &'a [Rc<RefCell<Account>>],
+        executable_accounts: &'a [(Pubkey, RefCell<AccountNoData>)],
+        accounts: &'a [Rc<RefCell<AccountNoData>>],
     ) -> Vec<KeyedAccount<'a>> {
         let mut keyed_accounts = create_keyed_readonly_accounts(&executable_accounts);
         let mut keyed_accounts2: Vec<_> = instruction
@@ -769,8 +760,8 @@ impl MessageProcessor {
     /// This method calls the instruction's program entrypoint function
     pub fn process_cross_program_instruction(
         message: &Message,
-        executable_accounts: &[(Pubkey, RefCell<Account>)],
-        accounts: &[Rc<RefCell<Account>>],
+        executable_accounts: &[(Pubkey, RefCell<AccountNoData>)],
+        accounts: &[Rc<RefCell<AccountNoData>>],
         caller_privileges: &[bool],
         invoke_context: &mut dyn InvokeContext,
     ) -> Result<(), InstructionError> {
@@ -822,7 +813,7 @@ impl MessageProcessor {
     pub fn create_pre_accounts(
         message: &Message,
         instruction: &CompiledInstruction,
-        accounts: &[Rc<RefCell<Account>>],
+        accounts: &[Rc<RefCell<AccountNoData>>],
         timings: &mut ExecuteTimings,
     ) -> Vec<PreAccount> {
         timings.acct_visit_count += 1;
@@ -860,8 +851,8 @@ impl MessageProcessor {
     }
 
     /// Verify there are no outstanding borrows
-    pub fn verify_account_references(
-        accounts: &[(Pubkey, RefCell<Account>)],
+    pub fn verify_account_references<T:AnAccountConcrete>(
+        accounts: &[(Pubkey, RefCell<T>)],
     ) -> Result<(), InstructionError> {
         for (_, account) in accounts.iter() {
             account
@@ -876,8 +867,8 @@ impl MessageProcessor {
         message: &Message,
         instruction: &CompiledInstruction,
         pre_accounts: &[PreAccount],
-        executable_accounts: &[(Pubkey, RefCell<Account>)],
-        accounts: &[Rc<RefCell<Account>>],
+        executable_accounts: &[(Pubkey, RefCell<AccountNoData>)],
+        accounts: &[Rc<RefCell<AccountNoData>>],
         rent: &Rent,
     ) -> Result<(), InstructionError> {
         // Verify all executable accounts have zero outstanding refs
@@ -917,7 +908,7 @@ impl MessageProcessor {
         message: &Message,
         instruction: &CompiledInstruction,
         pre_accounts: &mut [PreAccount],
-        accounts: &[Rc<RefCell<Account>>],
+        accounts: &[Rc<RefCell<AccountNoData>>],
         program_id: &Pubkey,
         rent: &Rent,
         track_writable_deescalation: bool,
@@ -977,9 +968,9 @@ impl MessageProcessor {
         &self,
         message: &Message,
         instruction: &CompiledInstruction,
-        executable_accounts: &[(Pubkey, RefCell<Account>)],
-        accounts: &[Rc<RefCell<Account>>],
-        account_deps: &[(Pubkey, RefCell<Account>)],
+        executable_accounts: &[(Pubkey, RefCell<AccountNoData>)],
+        accounts: &[Rc<RefCell<AccountNoData>>],
+        account_deps: &[(Pubkey, RefCell<AccountNoData>)],
         rent_collector: &RentCollector,
         log_collector: Option<Rc<LogCollector>>,
         executors: Rc<RefCell<Executors>>,
@@ -997,7 +988,7 @@ impl MessageProcessor {
                 if solana_sdk::sysvar::instructions::check_id(key) {
                     let mut mut_account_ref = accounts[i].borrow_mut();
                     solana_sdk::sysvar::instructions::store_current_index(
-                        &mut mut_account_ref.data,
+                        &mut Arc::make_mut(&mut mut_account_ref.data)[..],
                         instruction_index as u16,
                     );
                     break;
@@ -1053,9 +1044,9 @@ impl MessageProcessor {
     pub fn process_message(
         &self,
         message: &Message,
-        loaders: &[Vec<(Pubkey, RefCell<Account>)>],
-        accounts: &[Rc<RefCell<Account>>],
-        account_deps: &[(Pubkey, RefCell<Account>)],
+        loaders: &[Vec<(Pubkey, RefCell<AccountNoData>)>],
+        accounts: &[Rc<RefCell<AccountNoData>>],
+        account_deps: &[(Pubkey, RefCell<AccountNoData>)],
         rent_collector: &RentCollector,
         log_collector: Option<Rc<LogCollector>>,
         executors: Rc<RefCell<Executors>>,

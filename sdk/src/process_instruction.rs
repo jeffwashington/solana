@@ -1,5 +1,5 @@
 use solana_sdk::{
-    account::Account,
+    account::AccountNoData,
     feature_set::{
         bpf_compute_budget_balancing, max_cpi_instruction_size_ipv6_mtu, max_invoke_depth_4,
         max_program_call_depth_64, pubkey_log_syscall_enabled, FeatureSet,
@@ -40,7 +40,7 @@ pub trait InvokeContext {
         &mut self,
         message: &Message,
         instruction: &CompiledInstruction,
-        accounts: &[Rc<RefCell<Account>>],
+        accounts: &[Rc<RefCell<AccountNoData>>],
         caller_pivileges: Option<&[bool]>,
     ) -> Result<(), InstructionError>;
     /// Get the program ID of the currently executing program
@@ -63,7 +63,7 @@ pub trait InvokeContext {
     /// Get the bank's active feature set
     fn is_feature_active(&self, feature_id: &Pubkey) -> bool;
     /// Get an account from a pre-account
-    fn get_account(&self, pubkey: &Pubkey) -> Option<RefCell<Account>>;
+    fn get_account(&self, pubkey: &Pubkey) -> Option<RefCell<AccountNoData>>;
     /// Notify caller when account data field was modified
     fn account_data_modified(&self, pubkey: &Pubkey);
 }
@@ -342,7 +342,7 @@ impl InvokeContext for MockInvokeContext {
         &mut self,
         _message: &Message,
         _instruction: &CompiledInstruction,
-        _accounts: &[Rc<RefCell<Account>>],
+        _accounts: &[Rc<RefCell<AccountNoData>>],
         _caller_pivileges: Option<&[bool]>,
     ) -> Result<(), InstructionError> {
         Ok(())
@@ -370,7 +370,7 @@ impl InvokeContext for MockInvokeContext {
     fn is_feature_active(&self, _feature_id: &Pubkey) -> bool {
         true
     }
-    fn get_account(&self, _pubkey: &Pubkey) -> Option<RefCell<Account>> {
+    fn get_account(&self, _pubkey: &Pubkey) -> Option<RefCell<AccountNoData>> {
         None
     }
     fn account_data_modified(&self, _pubkey: &Pubkey) {}

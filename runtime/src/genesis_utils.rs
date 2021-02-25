@@ -1,5 +1,6 @@
 use solana_sdk::{
     account::Account,
+    account::AccountNoData,
     feature::{self, Feature},
     feature_set::FeatureSet,
     fee_calculator::FeeRateGovernor,
@@ -108,15 +109,15 @@ pub fn create_genesis_config_with_vote_accounts_and_cluster_type(
         let stake_pubkey = validator_voting_keypairs.borrow().stake_keypair.pubkey();
 
         // Create accounts
-        let node_account = Account::new(VALIDATOR_LAMPORTS, 0, &system_program::id());
-        let vote_account = vote_state::create_account(&vote_pubkey, &node_pubkey, 0, *stake);
-        let stake_account = stake_state::create_account(
+        let node_account = AccountNoData::new(VALIDATOR_LAMPORTS, 0, &system_program::id());
+        let vote_account = Account::to_account_no_data(vote_state::create_account(&vote_pubkey, &node_pubkey, 0, *stake));
+        let stake_account = Account::to_account_no_data(stake_state::create_account(
             &stake_pubkey,
             &vote_pubkey,
-            &vote_account,
+            &AccountNoData::to_account(vote_account.clone()),
             &genesis_config_info.genesis_config.rent,
             *stake,
-        );
+        ));
 
         // Put newly created accounts into genesis
         genesis_config_info.genesis_config.accounts.extend(vec![
@@ -163,12 +164,12 @@ pub fn activate_all_features(genesis_config: &mut GenesisConfig) {
     for feature_id in FeatureSet::default().inactive {
         genesis_config.accounts.insert(
             feature_id,
-            feature::create_account(
+            Account::to_account_no_data(feature::create_account(
                 &Feature {
                     activated_at: Some(0),
                 },
                 std::cmp::max(genesis_config.rent.minimum_balance(Feature::size_of()), 1),
-            ),
+            )),
         );
     }
 }
@@ -185,7 +186,7 @@ pub fn create_genesis_config_with_leader_ex(
     fee_rate_governor: FeeRateGovernor,
     rent: Rent,
     cluster_type: ClusterType,
-    mut initial_accounts: Vec<(Pubkey, Account)>,
+    mut initial_accounts: Vec<(Pubkey, AccountNoData)>,
 ) -> GenesisConfig {
     let validator_vote_account = vote_state::create_account(
         &validator_vote_account_pubkey,
@@ -204,14 +205,14 @@ pub fn create_genesis_config_with_leader_ex(
 
     initial_accounts.push((
         *mint_pubkey,
-        Account::new(mint_lamports, 0, &system_program::id()),
+        AccountNoData::new(mint_lamports, 0, &system_program::id()),
     ));
     initial_accounts.push((
         *validator_pubkey,
-        Account::new(validator_lamports, 0, &system_program::id()),
+        AccountNoData::new(validator_lamports, 0, &system_program::id()),
     ));
-    initial_accounts.push((*validator_vote_account_pubkey, validator_vote_account));
-    initial_accounts.push((*validator_stake_account_pubkey, validator_stake_account));
+    initial_accounts.push((*validator_vote_account_pubkey, Account::to_account_no_data(validator_vote_account)));
+    initial_accounts.push((*validator_stake_account_pubkey, Account::to_account_no_data(validator_stake_account)));
 
     let mut genesis_config = GenesisConfig {
         accounts: initial_accounts.iter().cloned().collect(),

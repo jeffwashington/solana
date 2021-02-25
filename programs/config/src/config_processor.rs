@@ -3,7 +3,9 @@
 use crate::ConfigKeys;
 use bincode::deserialize;
 use log::*;
+use std::sync::Arc;
 use solana_sdk::{
+    account::AnAccount,
     instruction::InstructionError,
     keyed_account::{next_keyed_account, KeyedAccount},
     process_instruction::InvokeContext,
@@ -100,7 +102,11 @@ pub fn process_instruction(
         return Err(InstructionError::InvalidInstructionData);
     }
 
-    config_keyed_account.try_account_ref_mut()?.data[..data.len()].copy_from_slice(&data);
+    let mut account_data = config_keyed_account.try_account_ref_mut()?;
+    if account_data.data() != data {
+        account_data.data = Arc::new(data.to_vec()); // TODO is this right and efficient?
+    }
+
     Ok(())
 }
 

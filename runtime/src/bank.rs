@@ -31,7 +31,7 @@ use rayon::ThreadPool;
 use solana_measure::measure::Measure;
 use solana_metrics::{datapoint_debug, inc_new_counter_debug, inc_new_counter_info};
 use solana_sdk::{
-    account::{create_account, from_account, Account, AccountNoData, AnAccount, AnAccountConcrete},
+    account::{create_account, from_account, from_account_no_data, Account, AccountNoData, AnAccount, AnAccountConcrete},
     clock::{
         Epoch, Slot, SlotCount, SlotIndex, UnixTimestamp, DEFAULT_TICKS_PER_SECOND,
         MAX_PROCESSING_AGE, MAX_RECENT_BLOCKHASHES, MAX_TRANSACTION_FORWARDING_DELAY,
@@ -241,9 +241,9 @@ impl ExecuteTimings {
 type BankStatusCache = StatusCache<Result<()>>;
 #[frozen_abi(digest = "MUmkgPsCRrWL2HEsMEvpkWMis35kbBnaEZtrph5P6bk")]
 pub type BankSlotDelta = SlotDelta<Result<()>>;
-type TransactionAccountRefCells = Vec<Rc<RefCell<Account>>>;
-type TransactionAccountDepRefCells = Vec<(Pubkey, RefCell<Account>)>;
-type TransactionLoaderRefCells = Vec<Vec<(Pubkey, RefCell<Account>)>>;
+type TransactionAccountRefCells = Vec<Rc<RefCell<AccountNoData>>>;
+type TransactionAccountDepRefCells = Vec<(Pubkey, RefCell<AccountNoData>)>;
+type TransactionLoaderRefCells = Vec<Vec<(Pubkey, RefCell<AccountNoData>)>>;
 
 // Eager rent collection repeats in cyclic manner.
 // Each cycle is composed of <partiion_count> number of tiny pubkey subranges
@@ -1457,7 +1457,7 @@ impl Bank {
 
     fn update_sysvar_account<F>(&self, pubkey: &Pubkey, updater: F)
     where
-        F: Fn(&Option<Account>) -> Account,
+        F: Fn(&Option<AccountNoData>) -> AccountNoData,
     {
         let old_account = self.get_sysvar_account(pubkey);
         let new_account = updater(&old_account);
@@ -1469,8 +1469,8 @@ impl Bank {
         }
     }
 
-    fn inherit_specially_retained_account_balance(&self, old_account: &Option<Account>) -> u64 {
-        old_account.as_ref().map(|a| a.lamports).unwrap_or(1)
+    fn inherit_specially_retained_account_balance<T:AnAccountConcrete>(&self, old_account: &Option<T>) -> u64 {
+        old_account.as_ref().map(|a| a.lamports()).unwrap_or(1)
     }
 
     /// Unused conversion
@@ -1560,7 +1560,7 @@ impl Bank {
         self.update_sysvar_account(&sysvar::slot_history::id(), |account| {
             let mut slot_history = account
                 .as_ref()
-                .map(|account| from_account::<SlotHistory>(&account).unwrap())
+                .map(|account| from_account_no_data::<SlotHistory>(&account).unwrap())
                 .unwrap_or_default();
             slot_history.add(self.slot());
             create_account(
@@ -1574,7 +1574,7 @@ impl Bank {
         self.update_sysvar_account(&sysvar::slot_hashes::id(), |account| {
             let mut slot_hashes = account
                 .as_ref()
-                .map(|account| from_account::<SlotHashes>(&account).unwrap())
+                .map(|account| from_account_no_data::<SlotHashes>(&account).unwrap())
                 .unwrap_or_default();
             slot_hashes.add(self.parent_slot, self.parent_hash);
             create_account(
@@ -1674,7 +1674,7 @@ impl Bank {
             .into_iter()
             .for_each(|(stake_pubkey, _delegation)| {
                 examined_count += 1;
-                if let Some(mut stake_account) = self.get_account(&stake_pubkey) {
+                if let Some(mut stake_account) = self.get_account_no_data(&stake_pubkey) {
                     if let Ok(result) =
                         stake_state::rewrite_stakes(&mut stake_account, &self.rent_collector.rent)
                     {
@@ -1849,7 +1849,7 @@ impl Bank {
     fn stake_delegation_accounts(
         &self,
         reward_calc_tracer: &mut Option<impl FnMut(&RewardCalculationEvent)>,
-    ) -> HashMap<Pubkey, (Vec<(Pubkey, Account)>, Account)> {
+    ) -> HashMap<Pubkey, (Vec<(Pubkey, AccountNoData)>, AccountNoData)> {
         let mut accounts = HashMap::new();
 
         self.stakes
@@ -1859,8 +1859,8 @@ impl Bank {
             .iter()
             .for_each(|(stake_pubkey, delegation)| {
                 match (
-                    self.get_account(&stake_pubkey),
-                    self.get_account(&delegation.voter_pubkey),
+                    self.get_account_no_data(&stake_pubkey),
+                    self.get_account_no_data(&delegation.voter_pubkey),
                 ) {
                     (Some(stake_account), Some(vote_account)) => {
                         // call tracer to catch any illegal data if any
@@ -1925,8 +1925,8 @@ impl Bank {
             })
             .map(|(stake_account, vote_account)| {
                 stake_state::calculate_points(
-                    &stake_account,
-                    &vote_account,
+                    stake_account,
+                    vote_account,
                     Some(&stake_history),
                     fix_stake_deactivate,
                 )
@@ -1965,7 +1965,7 @@ impl Bank {
                     fix_stake_deactivate,
                 );
                 if let Ok((stakers_reward, _voters_reward)) = redeemed {
-                    self.store_account(&stake_pubkey, &stake_account);
+                    self.store_account(&stake_pubkey, stake_account);
                     vote_account_changed = true;
 
                     if stakers_reward > 0 {
@@ -1999,7 +1999,7 @@ impl Bank {
                         },
                     ));
                 }
-                self.store_account(&vote_pubkey, &vote_account);
+                self.store_account(&vote_pubkey, vote_account);
             }
         }
         self.rewards.write().unwrap().append(&mut rewards);
@@ -2287,7 +2287,7 @@ impl Bank {
 
     // NOTE: must hold idempotent for the same set of arguments
     pub fn add_native_program(&self, name: &str, program_id: &Pubkey, must_replace: bool) {
-        let existing_genuine_program = if let Some(mut account) = self.get_account(&program_id) {
+        let existing_genuine_program = if let Some(mut account) = self.get_account_no_data(&program_id) {
             // it's very unlikely to be squatted at program_id as non-system account because of burden to
             // find victim's pubkey/hash. So, when account.owner is indeed native_loader's, it's
             // safe to assume it's a genuine program.
@@ -2358,6 +2358,7 @@ impl Bank {
             name,
             self.inherit_specially_retained_account_balance(&existing_genuine_program),
         );
+        let account = Account::to_account_no_data(account);
         if !self.simple_capitalization_enabled() {
             self.store_account(&program_id, &account);
         } else {
@@ -2845,11 +2846,11 @@ impl Bank {
     ) {
         let account_refcells: Vec<_> = accounts
             .drain(..)
-            .map(|account| Rc::new(RefCell::new(AccountNoData::to_account(account))))
+            .map(|account| Rc::new(RefCell::new(account)))
             .collect();
         let account_dep_refcells: Vec<_> = account_deps
             .drain(..)
-            .map(|(pubkey, account_dep)| (pubkey, RefCell::new(AccountNoData::to_account(account_dep))))
+            .map(|(pubkey, account_dep)| (pubkey, RefCell::new(account_dep)))
             .collect();
         let loader_refcells: Vec<Vec<_>> = loaders
             .iter_mut()
@@ -2871,7 +2872,7 @@ impl Bank {
         loader_refcells: TransactionLoaderRefCells,
     ) {
         account_refcells.drain(..).for_each(|account_refcell| {
-            accounts.push(Account::to_account_no_data(Rc::try_unwrap(account_refcell).unwrap().into_inner()))
+            accounts.push(Rc::try_unwrap(account_refcell).unwrap().into_inner())
         });
         loaders
             .iter_mut()
@@ -2899,7 +2900,7 @@ impl Bank {
     fn get_executors(
         &self,
         message: &Message,
-        loaders: &[Vec<(Pubkey, Account)>],
+        loaders: &[Vec<(Pubkey, AccountNoData)>],
     ) -> Rc<RefCell<Executors>> {
         let mut num_executors = message.account_keys.len();
         for instruction_loaders in loaders.iter() {
@@ -3432,7 +3433,7 @@ impl Bank {
                     rent_share
                 };
                 if !enforce_fix || rent_to_be_paid > 0 {
-                    let mut account = self.get_account(&pubkey).unwrap_or_default();
+                    let mut account = self.get_account_no_data(&pubkey).unwrap_or_default();
                     account.lamports += rent_to_be_paid;
                     self.store_account(&pubkey, &account);
                     rewards.push((
@@ -3502,7 +3503,7 @@ impl Bank {
     fn run_incinerator(&self) {
         if let Some((account, _)) = self.get_account_modified_since_parent(&incinerator::id()) {
             self.capitalization.fetch_sub(account.lamports, Relaxed);
-            self.store_account(&incinerator::id(), &Account::default());
+            self.store_account(&incinerator::id(), &AccountNoData::default());
         }
     }
 
@@ -4013,7 +4014,7 @@ impl Bank {
         parents
     }
 
-    pub fn store_account(&self, pubkey: &Pubkey, account: &Account) {
+    pub fn store_account<T:AnAccountConcrete + solana_sdk::account_utils::StateMut<solana_stake_program::stake_state::StakeState>>(&self, pubkey: &Pubkey, account: &T) {
         assert!(!self.freeze_started());
         self.rc
             .accounts
@@ -4041,21 +4042,21 @@ impl Bank {
             .flush_accounts_cache(false, Some(self.slot()))
     }
 
-    fn store_account_and_update_capitalization(&self, pubkey: &Pubkey, new_account: &Account) {
+    fn store_account_and_update_capitalization<T: AnAccountConcrete + solana_sdk::account_utils::StateMut<solana_stake_program::stake_state::StakeState>>(&self, pubkey: &Pubkey, new_account: &T) {
         if let Some(old_account) = self.get_account(&pubkey) {
-            match new_account.lamports.cmp(&old_account.lamports) {
+            match new_account.lamports().cmp(&old_account.lamports()) {
                 std::cmp::Ordering::Greater => {
                     self.capitalization
-                        .fetch_add(new_account.lamports - old_account.lamports, Relaxed);
+                        .fetch_add(new_account.lamports() - old_account.lamports(), Relaxed);
                 }
                 std::cmp::Ordering::Less => {
                     self.capitalization
-                        .fetch_sub(old_account.lamports - new_account.lamports, Relaxed);
+                        .fetch_sub(old_account.lamports() - new_account.lamports(), Relaxed);
                 }
                 std::cmp::Ordering::Equal => {}
             }
         } else {
-            self.capitalization.fetch_add(new_account.lamports, Relaxed);
+            self.capitalization.fetch_add(new_account.lamports(), Relaxed);
         }
 
         self.store_account(pubkey, new_account);
@@ -4179,12 +4180,12 @@ impl Bank {
     // multiple times with the same parent_slot in the case of forking.
     //
     // Generally, all of sysvar update granularity should be slot boundaries.
-    fn get_sysvar_account(&self, pubkey: &Pubkey) -> Option<Account> {
+    fn get_sysvar_account(&self, pubkey: &Pubkey) -> Option<AccountNoData> {
         let mut ancestors = self.ancestors.clone();
         ancestors.remove(&self.slot());
         self.rc
             .accounts
-            .load_slow(&ancestors, pubkey)
+            .load_slow_no_data(&ancestors, pubkey)
             .map(|(acc, _slot)| acc)
     }
 
@@ -5144,7 +5145,7 @@ pub(crate) mod tests {
     };
     use crossbeam_channel::bounded;
     use solana_sdk::{
-        account::AnAccount,
+        account::AnAccount, account::AnAccountConcrete,
         account_utils::StateMut,
         clock::{DEFAULT_SLOTS_PER_EPOCH, DEFAULT_TICKS_PER_SLOT},
         epoch_schedule::MINIMUM_SLOTS_PER_EPOCH,

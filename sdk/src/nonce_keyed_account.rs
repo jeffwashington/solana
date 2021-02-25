@@ -1,5 +1,5 @@
 use crate::{
-    account::Account, account::AnAccount,
+    account::Account,
     account_utils::State as AccountUtilsState, keyed_account::KeyedAccount,
     nonce_account::create_account,
 };

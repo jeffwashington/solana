@@ -1,7 +1,8 @@
 use log::*;
 use solana_sdk::{
-    account::Account,
+    account::AccountNoData,
     account::AnAccount,
+    account::AnAccountConcrete,
     account_utils::StateMut,
     instruction::InstructionError,
     keyed_account::{from_keyed_account, get_signers, next_keyed_account, KeyedAccount},
@@ -14,6 +15,7 @@ use solana_sdk::{
     system_program,
     sysvar::{self, recent_blockhashes::RecentBlockhashes, rent::Rent},
 };
+use std::borrow::BorrowMut;
 use std::collections::HashSet;
 
 // represents an address that may or may not have been generated
@@ -54,7 +56,7 @@ impl Address {
 }
 
 fn allocate(
-    account: &mut Account,
+    account: &mut AccountNoData,
     address: &Address,
     space: u64,
     signers: &HashSet<Pubkey>,
@@ -66,7 +68,7 @@ fn allocate(
 
     // if it looks like the `to` account is already in use, bail
     //   (note that the id check is also enforced by message_processor)
-    if !account.data.is_empty() || !system_program::check_id(&account.owner) {
+    if !account.data().is_empty() || !system_program::check_id(&account.owner()) {
         debug!(
             "Allocate: invalid argument; account {:?} already in use",
             address
@@ -82,19 +84,19 @@ fn allocate(
         return Err(SystemError::InvalidAccountDataLength.into());
     }
 
-    account.data = vec![0; space as usize];
+    account.set_data(vec![0; space as usize]);
 
     Ok(())
 }
 
 fn assign(
-    account: &mut Account,
+    account: &mut AccountNoData,
     address: &Address,
     owner: &Pubkey,
     signers: &HashSet<Pubkey>,
 ) -> Result<(), InstructionError> {
     // no work to do, just return
-    if account.owner == *owner {
+    if account.owner() == owner {
         return Ok(());
     }
 
@@ -109,12 +111,12 @@ fn assign(
         return Err(SystemError::InvalidProgramId.into());
     }
 
-    account.owner = *owner;
+    account.set_owner(*owner);
     Ok(())
 }
 
 fn allocate_and_assign(
-    to: &mut Account,
+    to: &mut AccountNoData,
     to_address: &Address,
     space: u64,
     owner: &Pubkey,

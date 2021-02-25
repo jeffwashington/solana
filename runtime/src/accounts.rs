@@ -85,7 +85,7 @@ pub struct AccountsCow {
 pub type TransactionAccounts = Vec<AccountNoData>;
 pub type TransactionAccountDeps = Vec<(Pubkey, AccountNoData)>;
 pub type TransactionRent = u64;
-pub type TransactionLoaders = Vec<Vec<(Pubkey, Account)>>;
+pub type TransactionLoaders = Vec<Vec<(Pubkey, AccountNoData)>>;
 #[derive(PartialEq, Debug, Clone)]
 pub struct LoadedTransaction {
     pub accounts: TransactionAccounts,
@@ -359,7 +359,7 @@ impl Accounts {
         ancestors: &Ancestors,
         program_id: &Pubkey,
         error_counters: &mut ErrorCounters,
-    ) -> Result<Vec<(Pubkey, Account)>> {
+    ) -> Result<Vec<(Pubkey, AccountNoData)>> {
         let mut accounts = Vec::new();
         let mut depth = 0;
         let mut program_id = *program_id;
@@ -377,7 +377,7 @@ impl Accounts {
 
             let program = match self
                 .accounts_db
-                .load(ancestors, &program_id)
+                .load_cow(ancestors, &program_id)
                 .map(|(account, _)| account)
             {
                 Some(program) => program,
@@ -402,7 +402,7 @@ impl Accounts {
                 {
                     if let Some(program) = self
                         .accounts_db
-                        .load(ancestors, &programdata_address)
+                        .load_cow(ancestors, &programdata_address)
                         .map(|(account, _)| account)
                     {
                         accounts.insert(0, (programdata_address, program));
@@ -745,12 +745,12 @@ impl Accounts {
         &self,
         ancestors: &Ancestors,
         range: R,
-    ) -> Vec<(Pubkey, Account)> {
-        self.accounts_db.range_scan_accounts(
+    ) -> Vec<(Pubkey, AccountNoData)> {
+        self.accounts_db.range_scan_accounts_no_data(
             "load_to_collect_rent_eagerly_scan_elapsed",
             ancestors,
             range,
-            |collector: &mut Vec<(Pubkey, Account)>, option| {
+            |collector: &mut Vec<(Pubkey, AccountNoData)>, option| {
                 Self::load_while_filtering(collector, option, |_| true)
             },
         )
@@ -759,11 +759,11 @@ impl Accounts {
     /// Slow because lock is held for 1 operation instead of many.
     /// WARNING: This noncached version is only to be used for tests/benchmarking
     /// as bypassing the cache in general is not supported
-    pub fn store_slow_uncached(&self, slot: Slot, pubkey: &Pubkey, account: &Account) {
+    pub fn store_slow_uncached(&self, slot: Slot, pubkey: &Pubkey, account: &AccountNoData) {
         self.accounts_db.store_uncached(slot, &[(pubkey, account)]);
     }
 
-    pub fn store_slow_cached(&self, slot: Slot, pubkey: &Pubkey, account: &Account) {
+    pub fn store_slow_cached<T:AnAccountConcrete>(&self, slot: Slot, pubkey: &Pubkey, account: &T) {
         self.accounts_db.store_cached(slot, &[(pubkey, account)]);
     }
 
@@ -1111,7 +1111,7 @@ pub fn create_test_accounts(
 ) {
     for t in 0..num {
         let pubkey = solana_sdk::pubkey::new_rand();
-        let account = Account::new((t + 1) as u64, 0, &Account::default().owner);
+        let account = AccountNoData::new((t + 1) as u64, 0, &Account::default().owner);
         accounts.store_slow_uncached(slot, &pubkey, &account);
         pubkeys.push(pubkey);
     }
@@ -1122,7 +1122,7 @@ pub fn create_test_accounts(
 pub fn update_accounts_bench(accounts: &Accounts, pubkeys: &[Pubkey], slot: u64) {
     for pubkey in pubkeys {
         let amount = thread_rng().gen_range(0, 10);
-        let account = Account::new(amount, 0, &Account::default().owner);
+        let account = AccountNoData::new(amount, 0, &Account::default().owner);
         accounts.store_slow_uncached(slot, &pubkey, &account);
     }
 }

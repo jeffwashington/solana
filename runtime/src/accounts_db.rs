@@ -2266,6 +2266,39 @@ impl AccountsDB {
         collector
     }
 
+    pub fn range_scan_accounts_no_data<F, A, R>(
+        &self,
+        metric_name: &'static str,
+        ancestors: &Ancestors,
+        range: R,
+        scan_func: F,
+    ) -> A
+    where
+        F: Fn(&mut A, Option<(&Pubkey, AccountNoData, Slot)>),
+        A: Default,
+        R: RangeBounds<Pubkey>,
+    {
+        let mut collector = A::default();
+        self.accounts_index.range_scan_accounts(
+            metric_name,
+            ancestors,
+            range,
+            |pubkey, (account_info, slot)| {
+                let account_slot = self
+                    .get_account_accessor_from_cache_or_storage(
+                        slot,
+                        pubkey,
+                        account_info.store_id,
+                        account_info.offset,
+                    )
+                    .get_loaded_account()
+                    .map(|loaded_account| (pubkey, loaded_account.account_no_data(), slot));
+                scan_func(&mut collector, account_slot)
+            },
+        );
+        collector
+    }
+
     pub fn index_scan_accounts<T: AnAccount + Default + Clone, F, A>(
         &self,
         ancestors: &Ancestors,

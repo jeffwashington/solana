@@ -11,8 +11,7 @@ use crate::{
 use serde_derive::{Deserialize, Serialize};
 use solana_sdk::{
     account::Account,
-    account::AnAccount,
-    account::AnAccountConcrete,
+    account::AnAccount, account::AnAccountConcrete,
     account_utils::{State, StateMut},
     clock::{Clock, Epoch, UnixTimestamp},
     ic_msg,
@@ -1466,10 +1465,10 @@ impl MergeKind {
 
 // utility function, used by runtime
 // returns a tuple of (stakers_reward,voters_reward)
-pub fn redeem_rewards(
+pub fn redeem_rewards<T:AnAccountConcrete + StateMut<StakeState> + StateMut<VoteStateVersions>>(
     rewarded_epoch: Epoch,
-    stake_account: &mut Account,
-    vote_account: &mut Account,
+    stake_account: &mut T,
+    vote_account: &mut T,
     point_value: &PointValue,
     stake_history: Option<&StakeHistory>,
     inflation_point_calc_tracer: &mut Option<impl FnMut(&InflationPointCalculationEvent)>,
@@ -1501,8 +1500,8 @@ pub fn redeem_rewards(
             inflation_point_calc_tracer,
             fix_stake_deactivate,
         ) {
-            stake_account.lamports += stakers_reward;
-            vote_account.lamports += voters_reward;
+            stake_account.set_lamports(stake_account.lamports() + stakers_reward);
+            vote_account.set_lamports(vote_account.lamports() + voters_reward);
 
             stake_account.set_state(&StakeState::Stake(meta, stake))?;
 
@@ -1516,9 +1515,9 @@ pub fn redeem_rewards(
 }
 
 // utility function, used by runtime
-pub fn calculate_points(
-    stake_account: &Account,
-    vote_account: &Account,
+pub fn calculate_points<T:AnAccountConcrete + StateMut<StakeState> + StateMut<VoteStateVersions>>(
+    stake_account: &T,
+    vote_account: &T,
     stake_history: Option<&StakeHistory>,
     fix_stake_deactivate: bool,
 ) -> Result<u128, InstructionError> {
@@ -1552,13 +1551,13 @@ fn calculate_split_rent_exempt_reserve(
 
 pub type RewriteStakeStatus = (&'static str, (u64, u64), (u64, u64));
 
-pub fn rewrite_stakes(
-    stake_account: &mut Account,
+pub fn rewrite_stakes<T:AnAccountConcrete + StateMut<StakeState>>(
+    stake_account: &mut T,
     rent: &Rent,
 ) -> Result<RewriteStakeStatus, InstructionError> {
     match stake_account.state()? {
         StakeState::Initialized(mut meta) => {
-            let meta_status = meta.rewrite_rent_exempt_reserve(rent, stake_account.data.len());
+            let meta_status = meta.rewrite_rent_exempt_reserve(rent, stake_account.data().len());
 
             if meta_status.is_none() {
                 return Err(InstructionError::InvalidAccountData);
@@ -1568,10 +1567,10 @@ pub fn rewrite_stakes(
             Ok(("initialized", meta_status.unwrap_or_default(), (0, 0)))
         }
         StakeState::Stake(mut meta, mut stake) => {
-            let meta_status = meta.rewrite_rent_exempt_reserve(rent, stake_account.data.len());
+            let meta_status = meta.rewrite_rent_exempt_reserve(rent, stake_account.data().len());
             let stake_status = stake
                 .delegation
-                .rewrite_stake(stake_account.lamports, meta.rent_exempt_reserve);
+                .rewrite_stake(stake_account.lamports(), meta.rent_exempt_reserve);
 
             if meta_status.is_none() && stake_status.is_none() {
                 return Err(InstructionError::InvalidAccountData);

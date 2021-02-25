@@ -1,5 +1,6 @@
 use crate::{
     account::Account,
+    account::AccountNoData,
     account::AnAccount,
     account_utils::StateMut,
     fee_calculator::FeeCalculator,
@@ -8,7 +9,7 @@ use crate::{
 };
 use std::cell::RefCell;
 
-pub fn create_account(lamports: u64) -> RefCell<Account> {
+pub fn create_account(lamports: u64) -> RefCell<AccountNoData> {
     RefCell::new(
         Account::new_data_with_space(
             lamports,
@@ -16,7 +17,8 @@ pub fn create_account(lamports: u64) -> RefCell<Account> {
             State::size(),
             &crate::system_program::id(),
         )
-        .expect("nonce_account"),
+        .and_then(|account| Ok(Account::to_account_no_data(account)))
+        .expect("nonce_account")
     )
 }
 

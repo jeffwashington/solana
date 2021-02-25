@@ -156,7 +156,9 @@ pub trait AnAccount: /*Default + Clone +*/ Sized {
     fn lamports(&self) -> u64;
     fn set_lamports(&mut self, lamports: u64);
     fn data(&self) -> &Vec<u8>;
+    fn set_data(&mut self, data: Vec<u8>);
     fn owner(&self) -> &Pubkey;
+    fn set_owner(&mut self, owner: Pubkey);
     fn executable(&self) -> bool;
     fn rent_epoch(&self) -> Epoch;
     fn set_rent_epoch(&mut self, epoch: Epoch);
@@ -173,7 +175,9 @@ impl AnAccount for Account {
     fn lamports(&self) -> u64 {self.lamports}
     fn set_lamports(&mut self, lamports: u64) {self.lamports = lamports;}
     fn data(&self) -> &Vec<u8> {&self.data}
+    fn set_data(&mut self, data: Vec<u8>) {self.data = data;}
     fn owner(&self) -> &Pubkey {&self.owner}
+    fn set_owner(&mut self, owner: Pubkey) {self.owner = owner;}
     fn executable(&self) -> bool {self.executable}
     fn rent_epoch(&self) -> Epoch {self.rent_epoch}
     fn set_rent_epoch(&mut self, epoch: Epoch) {self.rent_epoch = epoch;}
@@ -187,7 +191,9 @@ impl<'a> AnAccount for &'a mut Account {
     fn lamports(&self) -> u64 {self.lamports}
     fn set_lamports(&mut self, lamports: u64) {self.lamports = lamports;}
     fn data(&self) -> &Vec<u8> {&self.data}
+    fn set_data(&mut self, data: Vec<u8>) {self.data = data;}
     fn owner(&self) -> &Pubkey {&self.owner}
+    fn set_owner(&mut self, owner: Pubkey) {self.owner = owner;}
     fn executable(&self) -> bool {self.executable}
     fn rent_epoch(&self) -> Epoch {self.rent_epoch}
     fn set_rent_epoch(&mut self, epoch: Epoch) {self.rent_epoch = epoch;}
@@ -233,7 +239,9 @@ impl AnAccount for AccountNoData {
     fn lamports(&self) -> u64 {self.lamports}
     fn set_lamports(&mut self, lamports: u64) {self.lamports = lamports;}
     fn data(&self) -> &Vec<u8> {&self.data}
+    fn set_data(&mut self, data: Vec<u8>) {self.data = Arc::new(data);}
     fn owner(&self) -> &Pubkey {&self.owner}
+    fn set_owner(&mut self, owner: Pubkey) {self.owner = owner;}
     fn executable(&self) -> bool {self.executable}
     fn rent_epoch(&self) -> Epoch {self.rent_epoch}
     fn set_rent_epoch(&mut self, epoch: Epoch) {self.rent_epoch = epoch;}
@@ -373,10 +381,10 @@ impl Account {
 }
 
 /// Create an `Account` from a `Sysvar`.
-pub fn create_account<S: Sysvar>(sysvar: &S, lamports: u64) -> Account {
+pub fn create_account<S: Sysvar>(sysvar: &S, lamports: u64) -> AccountNoData {
     let data_len = S::size_of().max(bincode::serialized_size(sysvar).unwrap() as usize);
-    let mut account = Account::new(lamports, data_len, &solana_program::sysvar::id());
-    to_account::<S>(sysvar, &mut account).unwrap();
+    let mut account = AccountNoData::new(lamports, data_len, &solana_program::sysvar::id());
+    to_account_no_data::<S>(sysvar, &mut account).unwrap();
     account
 }
 
@@ -385,9 +393,20 @@ pub fn from_account<S: Sysvar>(account: &Account) -> Option<S> {
     bincode::deserialize(&account.data).ok()
 }
 
+/// Create a `Sysvar` from an `Account`'s data.
+pub fn from_account_no_data<S: Sysvar>(account: &AccountNoData) -> Option<S> {
+    bincode::deserialize(&account.data).ok()
+}
+
 /// Serialize a `Sysvar` into an `Account`'s data.
 pub fn to_account<S: Sysvar>(sysvar: &S, account: &mut Account) -> Option<()> {
     bincode::serialize_into(&mut account.data[..], sysvar).ok()
+}
+
+/// Serialize a `Sysvar` into an `Account`'s data.
+pub fn to_account_no_data<S: Sysvar>(sysvar: &S, account: &mut AccountNoData) -> Option<()> {
+    let mut data: &mut Vec<u8> = Arc::make_mut(&mut account.data);
+    bincode::serialize_into(&mut data[..], sysvar).ok()
 }
 
 /// Return the information required to construct an `AccountInfo`.  Used by the

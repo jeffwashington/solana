@@ -4,7 +4,8 @@ pub mod date_instruction;
 
 use bincode::{deserialize, serialize, serialized_size};
 use serde_derive::{Deserialize, Serialize};
-use solana_sdk::{account::Account, pubkey::Pubkey, short_vec};
+use solana_sdk::{account::AccountNoData, pubkey::Pubkey, short_vec};
+use std::sync::Arc;
 
 solana_sdk::declare_id!("Config1111111111111111111111111111111111111");
 
@@ -39,13 +40,13 @@ pub fn create_config_account<T: ConfigState>(
     keys: Vec<(Pubkey, bool)>,
     config_data: &T,
     lamports: u64,
-) -> Account {
+) -> AccountNoData {
     let mut data = serialize(&ConfigKeys { keys }).unwrap();
     data.extend_from_slice(&serialize(config_data).unwrap());
-    Account {
+    AccountNoData {
         lamports,
-        data,
+        data: Arc::new(data),
         owner: id(),
-        ..Account::default()
+        ..AccountNoData::default()
     }
 }
