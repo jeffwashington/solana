@@ -2614,7 +2614,7 @@ impl Blockstore {
     }
 
     pub fn is_dead(&self, slot: Slot) -> bool {
-        error!("Is_dead: {}", slot);
+        //error!("Is_dead: {}", slot);
         matches!(
             self.db
                 .get::<cf::DeadSlots>(slot)
