@@ -2358,6 +2358,7 @@ impl Blockstore {
         allow_dead_slots: bool,
     ) -> Result<(Vec<Entry>, u64, bool)> {
         if self.is_dead(slot) && !allow_dead_slots {
+            error!("Dead slot");
             return Err(BlockstoreError::DeadSlot);
         }
 
