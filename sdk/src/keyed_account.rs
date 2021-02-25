@@ -1,5 +1,5 @@
 use crate::{
-    account::{from_account, from_account_no_data, AccountNoData},
+    account::{from_account_no_data, AccountNoData},
     account_utils::{State, StateMut},
 };
 use solana_program::{clock::Epoch, instruction::InstructionError, pubkey::Pubkey, sysvar::Sysvar};

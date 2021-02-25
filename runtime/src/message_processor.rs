@@ -8,7 +8,6 @@ use log::*;
 use serde::{Deserialize, Serialize};
 use solana_measure::measure::Measure;
 use solana_sdk::{
-    account::Account,
     account::AccountNoData,
     account::AnAccountConcrete,
     account_utils::StateMut,

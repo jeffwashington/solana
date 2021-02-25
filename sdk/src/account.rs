@@ -405,7 +405,7 @@ pub fn to_account<S: Sysvar>(sysvar: &S, account: &mut Account) -> Option<()> {
 
 /// Serialize a `Sysvar` into an `Account`'s data.
 pub fn to_account_no_data<S: Sysvar>(sysvar: &S, account: &mut AccountNoData) -> Option<()> {
-    let mut data: &mut Vec<u8> = Arc::make_mut(&mut account.data);
+    let data: &mut Vec<u8> = Arc::make_mut(&mut account.data);
     bincode::serialize_into(&mut data[..], sysvar).ok()
 }
 

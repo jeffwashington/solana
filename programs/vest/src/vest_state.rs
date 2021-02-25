@@ -7,7 +7,7 @@ use chrono::{
     serde::ts_seconds,
 };
 use serde_derive::{Deserialize, Serialize};
-use solana_sdk::{account::Account, instruction::InstructionError, pubkey::Pubkey};
+use solana_sdk::{account::AccountNoData, instruction::InstructionError, pubkey::Pubkey};
 use std::cmp::min;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -82,9 +82,9 @@ impl VestState {
     /// Redeem vested tokens.
     pub fn redeem_tokens(
         &mut self,
-        contract_account: &mut Account,
+        contract_account: &mut AccountNoData,
         current_date: Date<Utc>,
-        payee_account: &mut Account,
+        payee_account: &mut AccountNoData,
     ) {
         let vested_lamports = self.calc_vested_lamports(current_date);
         let redeemable_lamports = vested_lamports.saturating_sub(self.redeemed_lamports);
@@ -98,8 +98,8 @@ impl VestState {
     /// Renege on the given number of tokens and send them to the given payee.
     pub fn renege(
         &mut self,
-        contract_account: &mut Account,
-        payee_account: &mut Account,
+        contract_account: &mut AccountNoData,
+        payee_account: &mut AccountNoData,
         lamports: u64,
     ) {
         let reneged_lamports = min(contract_account.lamports, lamports);

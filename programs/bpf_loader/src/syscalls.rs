@@ -10,7 +10,7 @@ use solana_rbpf::{
 };
 use solana_runtime::message_processor::MessageProcessor;
 use solana_sdk::{
-    account::Account,
+    account::AccountNoData,
     account_info::AccountInfo,
     account_utils::StateMut,
     bpf_loader, bpf_loader_deprecated,
@@ -39,6 +39,7 @@ use std::{
     rc::Rc,
     slice::from_raw_parts_mut,
     str::{from_utf8, Utf8Error},
+    sync::Arc,
 };
 use thiserror::Error as ThisError;
 
@@ -874,9 +875,9 @@ struct AccountReferences<'a> {
     ref_to_len_in_vm: &'a mut u64,
     serialized_len_ptr: &'a mut u64,
 }
-type TranslatedAccount<'a> = (Rc<RefCell<Account>>, Option<AccountReferences<'a>>);
+type TranslatedAccount<'a> = (Rc<RefCell<AccountNoData>>, Option<AccountReferences<'a>>);
 type TranslatedAccounts<'a> = (
-    Vec<Rc<RefCell<Account>>>,
+    Vec<Rc<RefCell<AccountNoData>>>,
     Vec<Option<AccountReferences<'a>>>,
 );
 
@@ -1041,9 +1042,9 @@ impl<'a> SyscallInvokeSigned<'a> for SyscallInvokeSignedRust<'a> {
             };
 
             Ok((
-                Rc::new(RefCell::new(Account {
+                Rc::new(RefCell::new(AccountNoData {
                     lamports: *lamports,
-                    data: data.to_vec(),
+                    data: Arc::new(data.to_vec()),
                     executable: account_info.executable,
                     owner: *owner,
                     rent_epoch: account_info.rent_epoch,
@@ -1324,9 +1325,9 @@ impl<'a> SyscallInvokeSigned<'a> for SyscallInvokeSignedC<'a> {
             )?;
 
             Ok((
-                Rc::new(RefCell::new(Account {
+                Rc::new(RefCell::new(AccountNoData {
                     lamports: *lamports,
-                    data: data.to_vec(),
+                    data: Arc::new(data.to_vec()),
                     executable: account_info.executable,
                     owner: *owner,
                     rent_epoch: account_info.rent_epoch,
@@ -1537,9 +1538,9 @@ fn check_authorized_program(
 
 fn get_upgradeable_executable(
     callee_program_id: &Pubkey,
-    program_account: &RefCell<Account>,
+    program_account: &RefCell<AccountNoData>,
     invoke_context: &Ref<&mut dyn InvokeContext>,
-) -> Result<Option<(Pubkey, RefCell<Account>)>, EbpfError<BPFError>> {
+) -> Result<Option<(Pubkey, RefCell<AccountNoData>)>, EbpfError<BPFError>> {
     if program_account.borrow().owner == bpf_loader_upgradeable::id() {
         match program_account.borrow().state() {
             Ok(UpgradeableLoaderState::Program {

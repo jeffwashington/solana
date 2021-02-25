@@ -7,13 +7,14 @@ use chrono::prelude::*;
 use solana_config_program::date_instruction::DateConfig;
 use solana_config_program::get_config_data;
 use solana_sdk::{
-    account::Account,
+    account::AccountNoData,
     instruction::InstructionError,
     keyed_account::{next_keyed_account, KeyedAccount},
     process_instruction::InvokeContext,
     program_utils::limited_deserialize,
     pubkey::Pubkey,
 };
+use std::sync::Arc;
 use std::cell::RefMut;
 
 fn verify_date_account(
@@ -37,7 +38,7 @@ fn verify_date_account(
 fn verify_account<'a>(
     keyed_account: &'a KeyedAccount,
     expected_pubkey: &Pubkey,
-) -> Result<RefMut<'a, Account>, InstructionError> {
+) -> Result<RefMut<'a, AccountNoData>, InstructionError> {
     if keyed_account.unsigned_key() != expected_pubkey {
         return Err(VestError::Unauthorized.into());
     }
@@ -48,7 +49,7 @@ fn verify_account<'a>(
 fn verify_signed_account<'a>(
     keyed_account: &'a KeyedAccount,
     expected_pubkey: &Pubkey,
-) -> Result<RefMut<'a, Account>, InstructionError> {
+) -> Result<RefMut<'a, AccountNoData>, InstructionError> {
     if keyed_account.signer_key().is_none() {
         return Err(InstructionError::MissingRequiredSignature);
     }
@@ -141,7 +142,7 @@ pub fn process_instruction(
         }
     }
 
-    vest_state.serialize(&mut contract_account.data)
+    vest_state.serialize(&mut Arc::make_mut(&mut contract_account.data)[..])
 }
 
 #[cfg(test)]

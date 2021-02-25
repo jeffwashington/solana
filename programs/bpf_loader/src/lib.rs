@@ -342,7 +342,7 @@ fn process_loader_upgradeable_instruction(
                 return Err(InstructionError::InvalidAccountData);
             }
             write_program_data(
-                &mut buffer.try_account_ref_mut()?.data,
+                &mut Arc::make_mut(&mut buffer.try_account_ref_mut()?.data)[..],
                 UpgradeableLoaderState::buffer_data_offset()? + offset as usize,
                 &bytes,
                 invoke_context,
@@ -458,7 +458,7 @@ fn process_loader_upgradeable_instruction(
                 slot: clock.slot,
                 upgrade_authority_address,
             })?;
-            programdata.try_account_ref_mut()?.data
+            Arc::make_mut(&mut programdata.try_account_ref_mut()?.data)
                 [programdata_data_offset..programdata_data_offset + buffer_data_len]
                 .copy_from_slice(&buffer.try_account_ref()?.data[buffer_data_offset..]);
             // Update the Program account
@@ -591,10 +591,10 @@ fn process_loader_upgradeable_instruction(
                 slot: clock.slot,
                 upgrade_authority_address: Some(*authority.unsigned_key()),
             })?;
-            programdata.try_account_ref_mut()?.data
+            Arc::make_mut(&mut programdata.try_account_ref_mut()?.data)
                 [programdata_data_offset..programdata_data_offset + buffer_data_len]
                 .copy_from_slice(&buffer.try_account_ref()?.data[buffer_data_offset..]);
-            for i in &mut programdata.try_account_ref_mut()?.data
+            for i in &mut Arc::make_mut(&mut programdata.try_account_ref_mut()?.data)
                 [programdata_data_offset + buffer_data_len..]
             {
                 *i = 0
@@ -699,7 +699,7 @@ fn process_loader_instruction(
                 return Err(InstructionError::MissingRequiredSignature);
             }
             write_program_data(
-                &mut program.try_account_ref_mut()?.data,
+                &mut Arc::make_mut(&mut program.try_account_ref_mut()?.data)[..],
                 offset as usize,
                 &bytes,
                 invoke_context,

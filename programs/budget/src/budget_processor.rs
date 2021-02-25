@@ -14,6 +14,7 @@ use solana_sdk::{
     program_utils::limited_deserialize,
     pubkey::Pubkey,
 };
+use std::sync::Arc;
 
 /// Process a Witness Signature. Any payment plans waiting on this signature
 /// will progress one step.
@@ -145,7 +146,7 @@ pub fn process_instruction(
                 pending_budget: Some(*expr),
                 initialized: true,
             };
-            budget_state.serialize(&mut contract_keyed_account.try_account_ref_mut()?.data)
+            budget_state.serialize(&mut Arc::make_mut(&mut contract_keyed_account.try_account_ref_mut()?.data)[..])
         }
         BudgetInstruction::ApplyTimestamp(dt) => {
             let witness_keyed_account = next_keyed_account(keyed_accounts_iter)?;
@@ -171,7 +172,7 @@ pub fn process_instruction(
                 dt,
             )?;
             trace!("apply timestamp committed");
-            budget_state.serialize(&mut contract_keyed_account.try_account_ref_mut()?.data)
+            budget_state.serialize(&mut Arc::make_mut(&mut contract_keyed_account.try_account_ref_mut()?.data)[..])
         }
         BudgetInstruction::ApplySignature => {
             let witness_keyed_account = next_keyed_account(keyed_accounts_iter)?;
@@ -196,7 +197,7 @@ pub fn process_instruction(
                 next_keyed_account(keyed_accounts_iter),
             )?;
             trace!("apply signature committed");
-            budget_state.serialize(&mut contract_keyed_account.try_account_ref_mut()?.data)
+            budget_state.serialize(&mut Arc::make_mut(&mut contract_keyed_account.try_account_ref_mut()?.data)[..])
         }
         BudgetInstruction::ApplyAccountData => {
             let witness_keyed_account = next_keyed_account(keyed_accounts_iter)?;
@@ -217,7 +218,7 @@ pub fn process_instruction(
                 next_keyed_account(keyed_accounts_iter),
             )?;
             trace!("apply account data committed");
-            budget_state.serialize(&mut contract_keyed_account.try_account_ref_mut()?.data)
+            budget_state.serialize(&mut Arc::make_mut(&mut contract_keyed_account.try_account_ref_mut()?.data)[..])
         }
     }
 }

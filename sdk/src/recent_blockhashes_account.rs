@@ -1,4 +1,4 @@
-use crate::account::{create_account, to_account, to_account_no_data, Account, AccountNoData};
+use crate::account::{create_account, to_account_no_data, AccountNoData};
 use solana_program::sysvar::recent_blockhashes::{
     IntoIterSorted, IterItem, RecentBlockhashes, MAX_ENTRIES,
 };

@@ -108,7 +108,7 @@ pub fn builtin_process_instruction(
     set_invoke_context(invoke_context);
 
     // Copy all the accounts into a HashMap to ensure there are no duplicates
-    let mut accounts: HashMap<Pubkey, Account> = keyed_accounts
+    let mut accounts: HashMap<Pubkey, AccountNoData> = keyed_accounts
         .iter()
         .map(|ka| (*ka.unsigned_key(), ka.account.borrow().clone()))
         .collect();

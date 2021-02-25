@@ -2,7 +2,6 @@ use log::*;
 use solana_sdk::{
     account::AccountNoData,
     account::AnAccount,
-    account::AnAccountConcrete,
     account_utils::StateMut,
     instruction::InstructionError,
     keyed_account::{from_keyed_account, get_signers, next_keyed_account, KeyedAccount},
@@ -15,7 +14,6 @@ use solana_sdk::{
     system_program,
     sysvar::{self, recent_blockhashes::RecentBlockhashes, rent::Rent},
 };
-use std::borrow::BorrowMut;
 use std::collections::HashSet;
 
 // represents an address that may or may not have been generated
