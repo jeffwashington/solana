@@ -2621,6 +2621,7 @@ impl Blockstore {
     }
 
     pub fn set_dead_slot(&self, slot: Slot) -> Result<()> {
+        error!("Set dead slot");
         self.dead_slots_cf.put(slot, &true)
     }
 

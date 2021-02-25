@@ -1038,6 +1038,7 @@ impl ReplayStage {
         err: &BlockstoreProcessorError,
         is_serious: bool,
     ) {
+        error!("mark_dead_slot");
         if is_serious {
             datapoint_error!(
                 "replay-stage-mark_dead_slot",

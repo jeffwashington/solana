@@ -1307,6 +1307,7 @@ fn process_single_slot(
         let slot = bank.slot();
         warn!("slot {} failed to verify: {}", slot, err);
         if blockstore.is_primary_access() {
+            error!("process_single_slot");
             blockstore
                 .set_dead_slot(slot)
                 .expect("Failed to mark slot as dead in blockstore");
