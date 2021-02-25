@@ -2360,7 +2360,7 @@ impl Blockstore {
         allow_dead_slots: bool,
     ) -> Result<(Vec<Entry>, u64, bool)> {
         if self.is_dead(slot) && !allow_dead_slots {
-            error!("Dead slo1t");
+            error!("Dead slot1");
             return Err(BlockstoreError::DeadSlot);
         }
 
@@ -2614,6 +2614,7 @@ impl Blockstore {
     }
 
     pub fn is_dead(&self, slot: Slot) -> bool {
+        error!("Is_dead: {}", slot);
         matches!(
             self.db
                 .get::<cf::DeadSlots>(slot)
@@ -2623,7 +2624,7 @@ impl Blockstore {
     }
 
     pub fn set_dead_slot(&self, slot: Slot) -> Result<()> {
-        error!("Set dead slot");
+        error!("Set dead slot: {}", slot);
         self.dead_slots_cf.put(slot, &true)
     }
 
