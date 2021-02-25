@@ -31,7 +31,7 @@ use rayon::ThreadPool;
 use solana_measure::measure::Measure;
 use solana_metrics::{datapoint_debug, inc_new_counter_debug, inc_new_counter_info};
 use solana_sdk::{
-    account::{create_account, from_account, Account, AccountNoData, AnAccountConcrete},
+    account::{create_account, from_account, Account, AccountNoData, AnAccount, AnAccountConcrete},
     clock::{
         Epoch, Slot, SlotCount, SlotIndex, UnixTimestamp, DEFAULT_TICKS_PER_SECOND,
         MAX_PROCESSING_AGE, MAX_RECENT_BLOCKHASHES, MAX_TRANSACTION_FORWARDING_DELAY,
@@ -627,7 +627,7 @@ impl NonceRollbackFull {
             fee_account,
         }
     }
-    pub fn from_partial<T: AnAccountConcrete>(
+    pub fn from_partial<T: AnAccount+Default+Clone>(
         partial: NonceRollbackPartial,
         message: &Message,
         accounts: &[T],
@@ -4194,7 +4194,7 @@ impl Bank {
             .load_by_program(&self.ancestors, program_id)
     }
 
-    pub fn get_filtered_program_accounts<T: AnAccountConcrete, F: Fn(&T) -> bool>(
+    pub fn get_filtered_program_accounts<T: AnAccount+Default+Clone, F: Fn(&T) -> bool>(
         &self,
         program_id: &Pubkey,
         filter: F,
@@ -4204,7 +4204,7 @@ impl Bank {
             .load_by_program_with_filter(&self.ancestors, program_id, filter)
     }
 
-    pub fn get_filtered_indexed_accounts<T: AnAccountConcrete, F: Fn(&T) -> bool>(
+    pub fn get_filtered_indexed_accounts<T: AnAccount+Default+Clone, F: Fn(&T) -> bool>(
         &self,
         index_key: &IndexKey,
         filter: F,

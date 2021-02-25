@@ -1,4 +1,5 @@
 use crate::{
+    account::Account, account::AnAccount,
     account_utils::State as AccountUtilsState, keyed_account::KeyedAccount,
     nonce_account::create_account,
 };
@@ -896,7 +897,7 @@ mod test {
                 .initialize_nonce_account(&authorized, &recent_blockhashes, &Rent::free())
                 .unwrap();
             assert!(verify_nonce_account(
-                &nonce_account.account.borrow(),
+                &nonce_account.account.borrow().clone_as_account(),
                 &recent_blockhashes[0].blockhash,
             ));
         });
@@ -906,7 +907,7 @@ mod test {
     fn verify_nonce_bad_acc_state_fail() {
         with_test_keyed_account(42, true, |nonce_account| {
             assert!(!verify_nonce_account(
-                &nonce_account.account.borrow(),
+                &nonce_account.account.borrow().clone_as_account(),
                 &Hash::default()
             ));
         });
@@ -926,7 +927,7 @@ mod test {
                 .initialize_nonce_account(&authorized, &recent_blockhashes, &Rent::free())
                 .unwrap();
             assert!(!verify_nonce_account(
-                &nonce_account.account.borrow(),
+                &nonce_account.account.borrow().clone_as_account(),
                 &recent_blockhashes[1].blockhash,
             ));
         });

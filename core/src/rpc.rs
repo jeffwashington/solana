@@ -1385,7 +1385,7 @@ impl JsonRpcRequestProcessor {
     }
 
     /// Use a set of filters to get an iterator of keyed program accounts from a bank
-    fn get_filtered_program_accounts<T:AnAccount>(
+    fn get_filtered_program_accounts<T:AnAccount+Default+Clone>(
         &self,
         bank: &Arc<Bank>,
         program_id: &Pubkey,
@@ -1416,7 +1416,7 @@ impl JsonRpcRequestProcessor {
     }
 
     /// Get an iterator of spl-token accounts by owner address
-    fn get_filtered_spl_token_accounts_by_owner<T:AnAccount>(
+    fn get_filtered_spl_token_accounts_by_owner<T:AnAccount+Default+Clone>(
         &self,
         bank: &Arc<Bank>,
         owner_key: &Pubkey,

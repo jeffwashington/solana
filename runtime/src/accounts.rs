@@ -669,7 +669,7 @@ impl Accounts {
         lamports > 0
     }
 
-    fn load_while_filtering<T: AnAccountConcrete, F: Fn(&T) -> bool>(
+    fn load_while_filtering<T: AnAccount+Default+Clone, F: Fn(&T) -> bool>(
         collector: &mut Vec<(Pubkey, T)>,
         some_account_tuple: Option<(&Pubkey, T, Slot)>,
         filter: F,
@@ -697,7 +697,7 @@ impl Accounts {
         )
     }
 
-    pub fn load_by_program_with_filter<T:AnAccountConcrete, F: Fn(&T) -> bool>(
+    pub fn load_by_program_with_filter<T:AnAccount+Default+Clone, F: Fn(&T) -> bool>(
         &self,
         ancestors: &Ancestors,
         program_id: &Pubkey,
@@ -713,7 +713,7 @@ impl Accounts {
         )
     }
 
-    pub fn load_by_index_key_with_filter<T: AnAccountConcrete, F: Fn(&T) -> bool>(
+    pub fn load_by_index_key_with_filter<T: AnAccount+Default+Clone, F: Fn(&T) -> bool>(
         &self,
         ancestors: &Ancestors,
         index_key: &IndexKey,
