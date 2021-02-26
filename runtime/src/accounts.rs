@@ -2,7 +2,7 @@ use crate::{
     accounts_db::{AccountsDB, BankHashInfo, ErrorCounters, LoadedAccount, ScanStorageResult},
     accounts_index::{AccountIndex, Ancestors, IndexKey},
     bank::{
-        NonceRollbackFull, NonceRollbackInfo, TransactionCheckResult, TransactionExecutionResult,
+        ExecuteTimings, NonceRollbackFull, NonceRollbackInfo, TransactionCheckResult, TransactionExecutionResult,
     },
     blockhash_queue::BlockhashQueue,
     rent_collector::RentCollector,
@@ -191,12 +191,14 @@ impl Accounts {
         error_counters: &mut ErrorCounters,
         rent_collector: &RentCollector,
         feature_set: &FeatureSet,
+        timings: &mut ExecuteTimings,
     ) -> Result<LoadedTransaction> {
         // Copy all the accounts
         let message = tx.message();
         if tx.signatures.is_empty() && fee != 0 {
             Err(TransactionError::MissingSignatureForFee)
         } else {
+            let mut timej = Measure::start("");
             // There is no way to predict what program will execute without an error
             // If a fee can pay for execution then the program will be scheduled
             let mut payer_index = None;
@@ -224,6 +226,7 @@ impl Accounts {
                 };
             }
 
+            timej.stop(); timings.load_2 += timej.as_us(); let mut timej = Measure::start("");
             let mut accounts: Vec<_> = message.account_keys.iter().enumerate().map(|(i, key)| {
                 let account = if message.is_non_loader_key(key, i) {
                     if solana_sdk::sysvar::instructions::check_id(key)
@@ -281,6 +284,7 @@ impl Accounts {
                 };
                 account
             }).collect();
+            timej.stop(); timings.load_3 += timej.as_us(); let mut timej = Measure::start("");
 
             if invalid_account_index.load(Ordering::Relaxed) {
                 return Err(TransactionError::InvalidAccountIndex);
@@ -340,6 +344,8 @@ impl Accounts {
                             .collect::<Result<TransactionLoaders>>()?;
                         let mut vec = vec![];
                         std::mem::swap(&mut *account_deps.lock().unwrap(), &mut vec);
+                        timej.stop(); timings.load_5 += timej.as_us(); let mut timej = Measure::start("");
+
                         Ok(LoadedTransaction {
                             accounts,
                             account_deps: vec,
@@ -433,6 +439,7 @@ impl Accounts {
         error_counters: &mut ErrorCounters,
         rent_collector: &RentCollector,
         feature_set: &FeatureSet,
+        timings: &mut ExecuteTimings,
     ) -> Vec<TransactionLoadResult> {
         let fee_config = FeeConfig {
             secp256k1_program_enabled: feature_set
@@ -463,6 +470,7 @@ impl Accounts {
                         error_counters,
                         rent_collector,
                         feature_set,
+                        timings,
                     ) {
                         Ok(loaded_transaction) => loaded_transaction,
                         Err(e) => return (Err(e), None),
@@ -946,7 +954,6 @@ impl Accounts {
         fix_recent_blockhashes_sysvar_delay: bool,
         rent_fix_enabled: bool,
     ) {
-        let mut time = Measure::start("");
         let accounts_to_store = self.collect_accounts_to_store(
             txs,
             txs_iteration_order,
@@ -957,11 +964,7 @@ impl Accounts {
             fix_recent_blockhashes_sysvar_delay,
             rent_fix_enabled,
         );
-        time.stop();
-        let mut time2 = Measure::start("");
         self.accounts_db.store_cached(slot, &accounts_to_store);
-        time2.stop();
-        error!("store_cached {} {}", time.as_us(), time2.as_us());
     }
 
     /// Purge a slot if it is not a root

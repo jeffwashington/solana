@@ -99,6 +99,8 @@ pub struct ExecuteTimings {
     pub load_2: u64,
     pub load_3: u64,
     pub load_4: u64,
+    pub load_5: u64,
+    pub load_6: u64,
     pub load_2_calls: u64,
     pub load_2_first_part: Vec<u64>,
     pub load_2_second_part: Vec<u64>,
@@ -220,6 +222,8 @@ impl ExecuteTimings {
         self.load_2_second_part.extend(other.load_2_second_part.clone());
         self.load_3 += other.load_3;
         self.load_4 += other.load_4;
+        self.load_5 += other.load_5;
+        self.load_6 += other.load_6;
     
 
     }
@@ -3013,6 +3017,7 @@ impl Bank {
             &mut error_counters,
             &self.rent_collector,
             &self.feature_set,
+            timings,
         );
         load_time.stop();
 
