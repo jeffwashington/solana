@@ -236,8 +236,12 @@ impl Accounts {
                 timings.is_non_loader += tj2.as_us();
 
                 let account = if check {
-                    if solana_sdk::sysvar::instructions::check_id(key)
-                        && feature_set.is_active(&feature_set::instructions_sysvar_enabled::id())
+                    let mut tj4 = Measure::start("");
+                    let a_check = solana_sdk::sysvar::instructions::check_id(key)
+                    && feature_set.is_active(&feature_set::instructions_sysvar_enabled::id());
+                    tj4.stop();
+                    timings.if1 += tj4.as_us();
+                    if a_check
                     {
                         let mut tj3 = Measure::start("");
                         let msg = Self::construct_instructions_account(message);

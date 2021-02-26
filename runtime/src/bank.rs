@@ -171,6 +171,7 @@ pub struct ExecuteTimings {
         pub construct_instructions: u64,
         pub is_non_loader: u64,
         pub collect2: u64,
+        pub if1: u64,
 
 
 }
@@ -269,6 +270,7 @@ impl ExecuteTimings {
         self.non_cache_data += other.non_cache_data;
         self.non_cache_time += other.non_cache_time;
         self.non_cache_time_after += other.non_cache_time_after;
+        self.if1 += other.if1;
 
     }
     pub fn add_acct_visit(&mut self, data: (u64, usize)) {
