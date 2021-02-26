@@ -424,6 +424,27 @@ impl Accounts {
                 return Err(TransactionError::InvalidProgramForExecution);
             }
 
+            let mut v2 = timings.pgms.get(&program_id);
+            let mut v2 = if let Some(v2) = v2 {
+                *v2
+            }
+            else {
+                (0,0)
+            };
+            v2.0 += 1;
+            v2.1 = std::cmp::max(v2.1, program.data.len());
+            timings.pgms.insert(program_id, v2);
+
+            if program.from_cache {
+                timings.program_load_from_cache += 1;
+            }
+            else {
+                //error!("tx: {:?}", tx);
+                // doesn't work - hits error self.accounts_db.store_cached(slot, &[(&programdata_address, &program)]);
+            }
+            timings.program_load_count += 1;
+            timings.program_data_size += program.data.len();            
+
             // Add loader to chain
             let program_owner = program.owner;
 
@@ -462,6 +483,7 @@ impl Accounts {
 
                     if let Some(program) = program
                     {
+                        /*
                         let mut v2 = timings.pgms.get(&programdata_address);
                         let mut v2 = if let Some(v2) = v2 {
                             *v2
@@ -482,6 +504,7 @@ impl Accounts {
                         }
                         timings.program_load_count += 1;
                         timings.program_data_size += program.data.len();
+                        */
 
                         accounts.insert(0, (programdata_address, program));
                     } else {
