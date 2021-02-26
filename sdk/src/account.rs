@@ -34,6 +34,7 @@ pub struct AccountNoData {
     pub executable: bool,
     /// the epoch at which this account will next owe rent
     pub rent_epoch: Epoch,
+    pub from_cache: bool,
 }
 
 impl std::cmp::PartialEq<Account> for AccountNoData {
@@ -133,6 +134,7 @@ impl Account {
             owner: account.owner,
             executable: account.executable,
             rent_epoch: account.rent_epoch,
+            from_cache: false,
         };
         result
     }
@@ -145,6 +147,7 @@ impl Account {
             owner: account.owner,
             executable: account.executable,
             rent_epoch: account.rent_epoch,
+            from_cache: false,
         };
         result
     }
@@ -166,6 +169,7 @@ pub trait AnAccount: /*Default + Clone +*/ Sized {
     fn clone_as_account_no_data(&self) -> AccountNoData;
     fn clone_as_account(&self) -> Account;
     fn from_account_no_data(item: AccountNoData) -> Self;
+    fn from_cache(&self) -> bool;
 }
 
 impl AnAccountConcrete for Account {}
@@ -185,6 +189,7 @@ impl AnAccount for Account {
     fn clone_as_account_no_data(&self) -> AccountNoData {Account::to_account_no_data2(&mut self.clone())}
     fn clone_as_account(&self) -> Account {self.clone()}
     fn from_account_no_data(item: AccountNoData) -> Self {AccountNoData::to_account(item)}
+    fn from_cache(&self) -> bool {false}
 }
 
 impl<'a> AnAccount for &'a mut Account {
@@ -205,6 +210,7 @@ impl<'a> AnAccount for &'a mut Account {
             owner: self.owner,
             executable: self.executable,
             rent_epoch: self.rent_epoch,
+            from_cache: false,
         };
         result
     }
@@ -233,6 +239,7 @@ impl<'a> AnAccount for &'a mut Account {
         &mut result
         */
     }
+    fn from_cache(&self) -> bool {false}
 }
 
 impl AnAccount for AccountNoData {
@@ -249,6 +256,7 @@ impl AnAccount for AccountNoData {
     fn clone_as_account_no_data(&self) -> AccountNoData {self.clone()}
     fn clone_as_account(&self) -> Account {AccountNoData::to_account(self.clone())}
     fn from_account_no_data(item: AccountNoData) -> Self {item}
+    fn from_cache(&self) -> bool {self.from_cache}
 }
 
 // same as account, but with data as Cow

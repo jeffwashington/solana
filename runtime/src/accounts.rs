@@ -262,6 +262,10 @@ impl Accounts {
                                     .loads_cow(ancestors, &programdata_address)
                                     .map(|(account, _)| account)
                                 {
+                                    if account.from_cache {
+                                        timings.from_cache += 1;
+                                    }
+                                    timings.real_load_count += 1;
                                     account_deps.lock().unwrap().push((programdata_address, account));
                                 } else {
                                     // TODO error_counters.account_not_found += 1;
@@ -339,6 +343,7 @@ impl Accounts {
                                     ancestors,
                                     &program_id,
                                     error_counters,
+                                    timings,
                                 )
                             })
                             .collect::<Result<TransactionLoaders>>()?;
@@ -366,6 +371,7 @@ impl Accounts {
         ancestors: &Ancestors,
         program_id: &Pubkey,
         error_counters: &mut ErrorCounters,
+        timings: &mut ExecuteTimings,
     ) -> Result<Vec<(Pubkey, AccountNoData)>> {
         let mut accounts = Vec::new();
         let mut depth = 0;
@@ -412,6 +418,12 @@ impl Accounts {
                         .load_cow(ancestors, &programdata_address)
                         .map(|(account, _)| account)
                     {
+                        if program.from_cache {
+                            timings.program_load_from_cache += 1;
+                        }
+                        timings.program_load_count += 1;
+                        timings.program_data_size += program.data.len();
+
                         accounts.insert(0, (programdata_address, program));
                     } else {
                         error_counters.account_not_found += 1;

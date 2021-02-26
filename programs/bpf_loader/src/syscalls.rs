@@ -1048,6 +1048,7 @@ impl<'a> SyscallInvokeSigned<'a> for SyscallInvokeSignedRust<'a> {
                     executable: account_info.executable,
                     owner: *owner,
                     rent_epoch: account_info.rent_epoch,
+                    from_cache: false,
                 })),
                 Some(AccountReferences {
                     lamports,
@@ -1331,6 +1332,7 @@ impl<'a> SyscallInvokeSigned<'a> for SyscallInvokeSignedC<'a> {
                     executable: account_info.executable,
                     owner: *owner,
                     rent_epoch: account_info.rent_epoch,
+                    from_cache: false,
                 })),
                 Some(AccountReferences {
                     lamports,

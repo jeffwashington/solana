@@ -480,9 +480,13 @@ impl<'a> LoadedAccount<'a> {
     pub fn account_no_data(self) -> AccountNoData {
         match self {
             LoadedAccount::Stored(stored_account_meta) => stored_account_meta.clone_account_no_data(),
-            LoadedAccount::Cached((_, cached_account)) => match cached_account {
+            LoadedAccount::Cached((_, cached_account)) => {
+                let mut result = match cached_account {
                 Cow::Owned(cached_account) => cached_account.account.clone(),
                 Cow::Borrowed(cached_account) => cached_account.account.clone(),
+                };
+                result.from_cache = true;
+                result
             },
         }
     }

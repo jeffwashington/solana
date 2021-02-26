@@ -150,12 +150,16 @@ pub struct ExecuteTimings {
         pub dup_accts: usize,
         pub num_txs: usize,
         pub accts_load: usize,
+        pub from_cache: usize,
         pub batch_count: usize,
         pub key_lens: Vec<usize>,
         pub instruction_lens: Vec<usize>,
         pub entries: usize,
         pub batch_size: Vec<usize>,
-
+        pub real_load_count: usize,
+        pub program_load_count: usize,
+        pub program_load_from_cache: usize,
+        pub program_data_size: usize,
 
 
 }
@@ -224,6 +228,11 @@ impl ExecuteTimings {
         self.load_4 += other.load_4;
         self.load_5 += other.load_5;
         self.load_6 += other.load_6;
+        self.from_cache += other.from_cache;
+        self.real_load_count += other.real_load_count;
+        self.program_load_count += other.program_load_count;
+        self.program_load_from_cache += other.program_load_from_cache;
+        self.program_data_size += other.program_data_size;
     
 
     }
