@@ -280,8 +280,8 @@ impl Accounts {
                             })
                             .unwrap_or_default();
 
-                        if account.executable && bpf_loader_upgradeable::check_id(&account.owner) {
                             let mut timej2 = Measure::start("");
+                        if account.executable && bpf_loader_upgradeable::check_id(&account.owner) {
                             let state = account.state();
                             timej2.stop();
                             timings.load_6 += timej2.as_us();
@@ -303,14 +303,20 @@ impl Accounts {
                                 } else {
                                     // TODO error_counters.account_not_found += 1;
                                     pgm_not_found.store(true, Ordering::Relaxed);
-                                    return AccountNoData::default();//
+                                    timej2.stop();
+                                    timings.load_6 += timej2.as_us();
+                                                return AccountNoData::default();//
                                 }
                             } else {
                                 // TODO error_counters.invalid_program_for_execution += 1;
                                 pgm_for_exec.store(true, Ordering::Relaxed);
-                                return AccountNoData::default();//
+                                timej2.stop();
+                                timings.load_6 += timej2.as_us();
+                                        return AccountNoData::default();//
                             }
                         }
+                        timej2.stop();
+                        timings.load_6 += timej2.as_us();
 
                         tx_rent += rent;
                         account
