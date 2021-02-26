@@ -438,8 +438,8 @@ impl Accounts {
                             timings.program_load_from_cache += 1;
                         }
                         else {
-                            error!("tx: {:?}", tx);
-                            //self.accounts_db.store_cached(slot, &[(&programdata_address, &program)])
+                            //error!("tx: {:?}", tx);
+                            self.accounts_db.store_cached(slot, &[(&programdata_address, &program)]);
                         }
                         timings.program_load_count += 1;
                         timings.program_data_size += program.data.len();
