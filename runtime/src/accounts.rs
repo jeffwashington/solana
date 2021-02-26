@@ -204,7 +204,7 @@ impl Accounts {
             // There is no way to predict what program will execute without an error
             // If a fee can pay for execution then the program will be scheduled
             let mut payer_index = None;
-            let tx_rent = Mutex::new(0 as TransactionRent);
+            let mut tx_rent = 0 as TransactionRent;
             let account_deps = Mutex::new(Vec::with_capacity(message.account_keys.len()));
             let rent_fix_enabled = feature_set.cumulative_rent_related_fixes_enabled();
 
@@ -299,7 +299,7 @@ impl Accounts {
                             }
                         }
 
-                        *tx_rent.lock().unwrap() += rent;
+                        tx_rent += rent;
                         account
                     }
                 } else {
@@ -375,7 +375,7 @@ impl Accounts {
                             accounts,
                             account_deps: vec,
                             loaders,
-                            rent: *tx_rent.lock().unwrap(),
+                            rent: tx_rent,
                         });
                         timej.stop(); timings.load_5 += timej.as_us(); let mut timej = Measure::start("");
                         res
