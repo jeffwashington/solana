@@ -429,8 +429,10 @@ impl Accounts {
                             .accounts_db
                             .load_cow(ancestors, &programdata_address)
                             {
-                                if program.executable() {
-                                    timings.executable.insert(programdata_address, program.clone());    
+                                /*if program.executable()*/ {
+                                    let mut cl = program.clone();
+                                    cl.from_cache = true;
+                                    timings.executable.insert(programdata_address, cl);
                                 }
                                 Some(program)
                             }
