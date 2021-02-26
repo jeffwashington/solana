@@ -161,14 +161,14 @@ impl Accounts {
     }
 
     fn construct_instructions_account(message: &Message) -> AccountNoData {
-        let mut account = Account {
-            data: message.serialize_instructions(),
+        let mut account = AccountNoData {
+            data: Arc::new(message.serialize_instructions()),
             ..Account::default()
         };
 
         // add room for current instruction index.
-        account.data.resize(account.data.len() + 2, 0);
-        Account::to_account_no_data(account)
+        account.data.make_mut().resize(account.data.len() + 2, 0);
+        account
     }
 
     pub fn load_account_temp(&self, key: &Vec<&Pubkey>, ancestors: &Ancestors) -> Vec<Option<(Account, Slot, u64, u64)>>{
