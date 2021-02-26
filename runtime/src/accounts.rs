@@ -248,6 +248,7 @@ impl Accounts {
                                     timings.non_cache_data += account.data.len();
                                     tj.stop();
                                     timings.non_cache_time += tj.as_us();
+                                    timings.non_cache_count += 1;
                             
                                 }
                                 timings.real_load_count += 1;
