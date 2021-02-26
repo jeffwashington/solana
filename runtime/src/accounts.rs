@@ -163,11 +163,13 @@ impl Accounts {
     fn construct_instructions_account(message: &Message) -> AccountNoData {
         let mut account = AccountNoData {
             data: Arc::new(message.serialize_instructions()),
-            ..Account::default()
+            ..AccountNoData::default()
         };
 
+        let len = account.data.len();
+
         // add room for current instruction index.
-        account.data.make_mut().resize(account.data.len() + 2, 0);
+        Arc::make_mut(&mut account.data).resize(len + 2, 0);
         account
     }
 
