@@ -236,12 +236,19 @@ impl Accounts {
                     {
                         Self::construct_instructions_account(message)
                     } else {
+                        let mut tj = Measure::start("");
                         let (account, rent) = self
                             .accounts_db
                             .load_cow(ancestors, key)
                             .map(|(mut account, _)| {
                                 if account.from_cache {
                                     timings.from_cache += 1;
+                                }
+                                else {
+                                    timings.non_cache_data += account.data.len();
+                                    tj.stop();
+                                    timings.non_cache_time += tj.as_us();
+                            
                                 }
                                 timings.real_load_count += 1;
                                 if message.is_writable(i) {
@@ -360,14 +367,15 @@ impl Accounts {
                             .collect::<Result<TransactionLoaders>>()?;
                         let mut vec = vec![];
                         std::mem::swap(&mut *account_deps.lock().unwrap(), &mut vec);
-                        timej.stop(); timings.load_5 += timej.as_us(); let mut timej = Measure::start("");
 
-                        Ok(LoadedTransaction {
+                        let res = Ok(LoadedTransaction {
                             accounts,
                             account_deps: vec,
                             loaders,
                             rent: *tx_rent.lock().unwrap(),
-                        })
+                        });
+                        timej.stop(); timings.load_5 += timej.as_us(); let mut timej = Measure::start("");
+                        res
                     }
                 }
             } else {

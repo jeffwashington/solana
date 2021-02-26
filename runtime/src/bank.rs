@@ -163,6 +163,8 @@ pub struct ExecuteTimings {
         pub program_data_size: usize,
         pub pgms: HashMap<Pubkey, (usize, usize)>,
         pub executable: HashMap<Pubkey, AccountNoData>,
+        pub non_cache_data: usize,
+        pub non_cache_time: u64,
 
 
 }
@@ -253,6 +255,9 @@ impl ExecuteTimings {
         for (k,v) in other.executable.iter() {
             self.executable.insert(*k, v.clone());
         }
+        self.non_cache_data += other.non_cache_data;
+        self.non_cache_time += other.non_cache_time;
+
     }
     pub fn add_acct_visit(&mut self, data: (u64, usize)) {
         if self.acct_visit_max.len() < 5 {
