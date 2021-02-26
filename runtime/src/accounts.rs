@@ -348,6 +348,7 @@ impl Accounts {
                                     &program_id,
                                     error_counters,
                                     timings,
+                                    &tx,
                                 )
                             })
                             .collect::<Result<TransactionLoaders>>()?;
@@ -376,6 +377,7 @@ impl Accounts {
         program_id: &Pubkey,
         error_counters: &mut ErrorCounters,
         timings: &mut ExecuteTimings,
+        tx: &Transaction,
     ) -> Result<Vec<(Pubkey, AccountNoData)>> {
         let mut accounts = Vec::new();
         let mut depth = 0;
@@ -417,10 +419,9 @@ impl Accounts {
                     programdata_address,
                 }) = program.state()
                 {
-                    if let Some(program) = self
+                    if let Some((program, slot)) = self
                         .accounts_db
                         .load_cow(ancestors, &programdata_address)
-                        .map(|(account, _)| account)
                     {
                         let mut v2 = timings.pgms.get(&programdata_address);
                         let mut v2 = if let Some(v2) = v2 {
@@ -435,6 +436,10 @@ impl Accounts {
             
                         if program.from_cache {
                             timings.program_load_from_cache += 1;
+                        }
+                        else {
+                            error!("tx: {:?}", tx);
+                            //self.accounts_db.store_cached(slot, &[(&programdata_address, &program)])
                         }
                         timings.program_load_count += 1;
                         timings.program_data_size += program.data.len();
