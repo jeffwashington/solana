@@ -256,10 +256,14 @@ impl Accounts {
                             .unwrap_or_default();
 
                         if account.executable && bpf_loader_upgradeable::check_id(&account.owner) {
+                            let mut timej2 = Measure::start("");
+                            let state = account.state();
+                            timej2.stop();
+                            timings.load_6 += timej2.as_us();
                             // The upgradeable loader requires the derived ProgramData account
                             if let Ok(UpgradeableLoaderState::Program {
                                 programdata_address,
-                            }) = account.state()
+                            }) = state
                             {
                                 if let Some(account) = self
                                     .accounts_db
