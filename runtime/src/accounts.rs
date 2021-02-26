@@ -422,6 +422,17 @@ impl Accounts {
                         .load_cow(ancestors, &programdata_address)
                         .map(|(account, _)| account)
                     {
+                        let mut v2 = timings.pgms.get(&programdata_address);
+                        let mut v2 = if let Some(v2) = v2 {
+                            *v2
+                        }
+                        else {
+                            (0,0)
+                        };
+                        v2.0 += 1;
+                        v2.1 = std::cmp::max(v2.1, program.data.len());
+                        timings.pgms.insert(programdata_address, v2);
+            
                         if program.from_cache {
                             timings.program_load_from_cache += 1;
                         }
