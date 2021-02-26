@@ -2463,10 +2463,12 @@ impl AccountsDB {
     }
 
     pub fn load_cached_executable(&self,  ancestors: &Ancestors, pubkey: &Pubkey) -> Option<AccountNoData> {
-        let mut cache = self.exe_cache.read().unwrap();
-        let mut result = (*cache).get(&pubkey);
-        if result.is_some() {
-            return Some(result.unwrap().clone());
+        {
+            let mut cache = self.exe_cache.read().unwrap();
+            let mut result = (*cache).get(&pubkey);
+            if result.is_some() {
+                return Some(result.unwrap().clone());
+            }
         }
 
         let mut result = self.load_cow(ancestors, pubkey);
