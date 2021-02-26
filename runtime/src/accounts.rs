@@ -411,7 +411,7 @@ impl Accounts {
 
             let program = match self
                 .accounts_db
-                .load_cow(ancestors, &program_id)
+                .load_cached_executable(ancestors, &program_id)
                 .map(|(account, _)| account)
             {
                 Some(program) => program,
