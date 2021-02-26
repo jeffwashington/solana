@@ -15,6 +15,7 @@ use dashmap::{
 };
 use log::*;
 use rand::{thread_rng, Rng};
+use solana_measure::measure::Measure;
 use solana_sdk::{
     account::{Account, AccountNoData, AnAccount, AnAccountConcrete},
     account_utils::StateMut,
@@ -945,6 +946,7 @@ impl Accounts {
         fix_recent_blockhashes_sysvar_delay: bool,
         rent_fix_enabled: bool,
     ) {
+        let mut time = Measure::start("");
         let accounts_to_store = self.collect_accounts_to_store(
             txs,
             txs_iteration_order,
@@ -955,7 +957,11 @@ impl Accounts {
             fix_recent_blockhashes_sysvar_delay,
             rent_fix_enabled,
         );
+        time.stop();
+        let mut time2 = Measure::start("");
         self.accounts_db.store_cached(slot, &accounts_to_store);
+        time2.stop();
+        error!("store_cached {} {}", time.as_us(), time2.as_us());
     }
 
     /// Purge a slot if it is not a root

@@ -2979,6 +2979,7 @@ impl Bank {
         let mut error_counters = ErrorCounters::default();
         let mut load_time = Measure::start("accounts_load");
 
+        let mut time33 = Measure::start("");
         let retryable_txs: Vec<_> =
             OrderedIterator::new(batch.lock_results(), batch.iteration_order())
                 .enumerate()
@@ -2999,6 +3000,8 @@ impl Bank {
             max_age,
             &mut error_counters,
         );
+        time33.stop();
+        timings.load_4 += time33.as_us();
         timings.num_txs += txs.len();
         timings.accts_load += txs.iter().map(|t|t.message.account_keys.len()).sum::<usize>();
         let mut loaded_accounts = self.rc.accounts.load_accounts(
