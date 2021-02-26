@@ -165,6 +165,7 @@ pub struct ExecuteTimings {
         pub executable: HashMap<Pubkey, AccountNoData>,
         pub non_cache_data: usize,
         pub non_cache_time: u64,
+        pub non_cache_time_after: u64,
         pub non_cache_count: usize,
         pub cache_time: u64,
         pub construct_instructions: u64,
@@ -267,6 +268,7 @@ impl ExecuteTimings {
         }
         self.non_cache_data += other.non_cache_data;
         self.non_cache_time += other.non_cache_time;
+        self.non_cache_time_after += other.non_cache_time_after;
 
     }
     pub fn add_acct_visit(&mut self, data: (u64, usize)) {

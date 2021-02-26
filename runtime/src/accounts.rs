@@ -275,7 +275,7 @@ impl Accounts {
                                     (account, 0)
                                 };
                                 tj5.stop();
-                                timings.non_cache_time += tj5.as_us();
+                                timings.non_cache_time_after += tj5.as_us();
                                 r
                             })
                             .unwrap_or_default();
