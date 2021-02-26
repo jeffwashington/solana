@@ -243,6 +243,8 @@ impl Accounts {
                             .map(|(mut account, _)| {
                                 if account.from_cache {
                                     timings.from_cache += 1;
+                                    tj.stop();
+                                    timings.cache_time += tj.as_us();
                                 }
                                 else {
                                     timings.non_cache_data += account.data.len();
