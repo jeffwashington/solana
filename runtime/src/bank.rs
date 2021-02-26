@@ -157,9 +157,11 @@ pub struct ExecuteTimings {
         pub entries: usize,
         pub batch_size: Vec<usize>,
         pub real_load_count: usize,
+        pub real_load_count2: usize,
         pub program_load_count: usize,
         pub program_load_from_cache: usize,
         pub program_data_size: usize,
+        pub pgms: HashMap<Pubkey, (usize, usize)>,
 
 
 }
@@ -230,11 +232,22 @@ impl ExecuteTimings {
         self.load_6 += other.load_6;
         self.from_cache += other.from_cache;
         self.real_load_count += other.real_load_count;
+        self.real_load_count2 += other.real_load_count2;
         self.program_load_count += other.program_load_count;
         self.program_load_from_cache += other.program_load_from_cache;
         self.program_data_size += other.program_data_size;
-    
-
+        for (k,v) in other.pgms.iter() {
+            let mut v2 = self.pgms.get(&k);
+            let mut v2 = if let Some(v2) = v2 {
+                *v2
+            }
+            else {
+                (0,0)
+            };
+            v2.0 += v.0;
+            v2.1 = std::cmp::max(v2.1, v.1);
+            self.pgms.insert(*k, v2);
+        }
     }
     pub fn add_acct_visit(&mut self, data: (u64, usize)) {
         if self.acct_visit_max.len() < 5 {

@@ -238,6 +238,10 @@ impl Accounts {
                             .accounts_db
                             .load_cow(ancestors, key)
                             .map(|(mut account, _)| {
+                                if account.from_cache {
+                                    timings.from_cache += 1;
+                                }
+                                timings.real_load_count += 1;
                                 if message.is_writable(i) {
                                     let rent_due = rent_collector.collect_from_existing_account(
                                         &key,
@@ -263,9 +267,9 @@ impl Accounts {
                                     .map(|(account, _)| account)
                                 {
                                     if account.from_cache {
-                                        timings.from_cache += 1;
+                                        //timings.from_cache += 1;
                                     }
-                                    timings.real_load_count += 1;
+                                    timings.real_load_count2 += 1;
                                     account_deps.lock().unwrap().push((programdata_address, account));
                                 } else {
                                     // TODO error_counters.account_not_found += 1;
