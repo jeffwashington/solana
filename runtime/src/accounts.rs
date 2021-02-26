@@ -418,10 +418,14 @@ impl Accounts {
             let program_owner = program.owner;
 
             if bpf_loader_upgradeable::check_id(&program_owner) {
+                let mut timej2 = Measure::start("");
+                let state = program.state();
+                timej2.stop();
+                timings.load_6 += timej2.as_us();
                 // The upgradeable loader requires the derived ProgramData account
                 if let Ok(UpgradeableLoaderState::Program {
                     programdata_address,
-                }) = program.state()
+                }) = state
                 {
                     let cached = self.accounts_db.load_cached_executable(ancestors, &programdata_address);
 
