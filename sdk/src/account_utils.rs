@@ -1,6 +1,7 @@
 //! useful extras for Account state
 use crate::{account::Account, account::AccountNoData, instruction::InstructionError};
 use bincode::ErrorKind;
+use log::*;
 
 /// Convenience trait to covert bincode errors to instruction errors.
 pub trait StateMut<T> {
