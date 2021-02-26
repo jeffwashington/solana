@@ -263,7 +263,8 @@ impl Accounts {
                             
                                 }
                                 timings.real_load_count += 1;
-                                if message.is_writable(i) {
+                                let mut tj5 = Measure::start("");
+                                let r = if message.is_writable(i) {
                                     let rent_due = rent_collector.collect_from_existing_account(
                                         &key,
                                         &mut account,
@@ -272,7 +273,10 @@ impl Accounts {
                                     (account, rent_due)
                                 } else {
                                     (account, 0)
-                                }
+                                };
+                                tj5.stop();
+                                timings.non_cache_time += tj5.as_us();
+                                r
                             })
                             .unwrap_or_default();
 
