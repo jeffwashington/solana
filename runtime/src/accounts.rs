@@ -291,6 +291,7 @@ impl Accounts {
                             let state = account.state();
                             timej2.stop();
                             timings.load_6 += timej2.as_us();
+                            timej2 = Measure::start("");
                             // The upgradeable loader requires the derived ProgramData account
                             if let Ok(UpgradeableLoaderState::Program {
                                 programdata_address,
@@ -328,8 +329,12 @@ impl Accounts {
                         account
                     }
                 } else {
-                    // Fill in an empty account for the program slots.
-                    AccountNoData::default()
+                    let mut timej2 = Measure::start("");
+            // Fill in an empty account for the program slots.
+                    let r = AccountNoData::default();
+                    timej2.stop();
+                    timings.load_6 += timej2.as_us();
+                    r
                 };
                 account
             }).collect();
