@@ -517,6 +517,7 @@ fn process_entries_with_callback(
         "replaym-loop-timing-stats active_banks entries {} {}",
         l3len, result
     );
+    timings.executable.clear();
     info!("replayn-loop-timing-stats {:?}", timings);
 
     Ok(())
