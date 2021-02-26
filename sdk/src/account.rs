@@ -170,6 +170,7 @@ pub trait AnAccount: /*Default + Clone +*/ Sized {
     fn clone_as_account(&self) -> Account;
     fn from_account_no_data(item: AccountNoData) -> Self;
     fn from_cache(&self) -> bool;
+    fn to_account_no_data(&mut self) -> AccountNoData;
 }
 
 impl AnAccountConcrete for Account {}
@@ -190,6 +191,7 @@ impl AnAccount for Account {
     fn clone_as_account(&self) -> Account {self.clone()}
     fn from_account_no_data(item: AccountNoData) -> Self {AccountNoData::to_account(item)}
     fn from_cache(&self) -> bool {false}
+    fn to_account_no_data(&mut self) -> AccountNoData {panic!("unexpectedsdf");}
 }
 
 impl<'a> AnAccount for &'a mut Account {
@@ -240,6 +242,7 @@ impl<'a> AnAccount for &'a mut Account {
         */
     }
     fn from_cache(&self) -> bool {false}
+    fn to_account_no_data(&mut self) -> AccountNoData {panic!("unexpectedsdf");}
 }
 
 impl AnAccount for AccountNoData {
@@ -257,6 +260,9 @@ impl AnAccount for AccountNoData {
     fn clone_as_account(&self) -> Account {AccountNoData::to_account(self.clone())}
     fn from_account_no_data(item: AccountNoData) -> Self {item}
     fn from_cache(&self) -> bool {self.from_cache}
+    fn to_account_no_data(&mut self) -> AccountNoData {
+        self.clone()
+    }
 }
 
 // same as account, but with data as Cow

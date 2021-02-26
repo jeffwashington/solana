@@ -658,10 +658,10 @@ impl NonceRollbackFull {
             fee_account,
         }
     }
-    pub fn from_partial<T: AnAccount+Default+Clone>(
+    pub fn from_partial(
         partial: NonceRollbackPartial,
         message: &Message,
-        accounts: &[T],
+        accounts: &[AccountNoData],
     ) -> Result<Self> {
         let NonceRollbackPartial {
             nonce_address,
@@ -677,14 +677,14 @@ impl NonceRollbackFull {
             if fee_pubkey == nonce_address {
                 Ok(Self {
                     nonce_address,
-                    nonce_account: fee_account.clone_as_account_no_data(),
+                    nonce_account: fee_account,
                     fee_account: None,
                 })
             } else {
                 Ok(Self {
                     nonce_address,
                     nonce_account,
-                    fee_account: Some(fee_account.clone_as_account_no_data()),
+                    fee_account: Some(fee_account),
                 })
             }
         } else {
