@@ -196,11 +196,13 @@ impl Accounts {
         timings: &mut ExecuteTimings,
     ) -> Result<LoadedTransaction> {
         // Copy all the accounts
+        let mut timej = Measure::start("");
         let message = tx.message();
         if tx.signatures.is_empty() && fee != 0 {
-            Err(TransactionError::MissingSignatureForFee)
+            let r = Err(TransactionError::MissingSignatureForFee);
+            timej.stop(); timings.load_2 += timej.as_us(); let mut timej = Measure::start("");
+            r
         } else {
-            let mut timej = Measure::start("");
             // There is no way to predict what program will execute without an error
             // If a fee can pay for execution then the program will be scheduled
             let mut payer_index = None;
