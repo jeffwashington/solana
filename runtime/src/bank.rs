@@ -167,12 +167,16 @@ pub struct ExecuteTimings {
         pub non_cache_time: u64,
         pub non_cache_count: usize,
         pub cache_time: u64,
+        pub construct_instructions: u64,
+        pub is_non_loader: u64,
 
 
 }
 
 impl ExecuteTimings {
     pub fn accumulate(&mut self, other: &ExecuteTimings) {
+        self.is_non_loader += other.is_non_loader;
+        self.construct_instructions += other.construct_instructions;
         self.cache_time += other.cache_time;
         self.non_cache_count += other.non_cache_count;
         self.load_us += other.load_us;

@@ -230,11 +230,20 @@ impl Accounts {
 
             timej.stop(); timings.load_2 += timej.as_us(); let mut timej = Measure::start("");
             let mut accounts: Vec<_> = message.account_keys.iter().enumerate().map(|(i, key)| {
-                let account = if message.is_non_loader_key(key, i) {
+                let mut tj = Measure::start("");
+                let check = message.is_non_loader_key(key, i);
+                tj.stop();
+                timings.is_non_loader += tj.as_us();
+
+                let account = if check {
                     if solana_sdk::sysvar::instructions::check_id(key)
                         && feature_set.is_active(&feature_set::instructions_sysvar_enabled::id())
                     {
-                        Self::construct_instructions_account(message)
+                        let mut tj = Measure::start("");
+                        let msg = Self::construct_instructions_account(message);
+                        tj.stop();
+                        timings.construct_instructions += tj.as_us();
+                        msg
                     } else {
                         let mut tj = Measure::start("");
                         let (account, rent) = self
