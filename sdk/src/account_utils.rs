@@ -33,6 +33,9 @@ where
     T: serde::Serialize + serde::de::DeserializeOwned,
 {
     fn state(&self) -> Result<T, InstructionError> {
+        if self.data.len() > 500000 {
+            error!("state: {}", self.data.len());
+        }
         self.deserialize_data()
             .map_err(|_| InstructionError::InvalidAccountData)
     }
