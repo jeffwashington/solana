@@ -22,7 +22,7 @@ pub struct Account {
     pub rent_epoch: Epoch,
 }
 
-#[derive(Clone, Default, Debug, PartialEq, Eq)]
+#[derive(Clone, Default, Debug, PartialEq, Eq, AbiExample)]
 pub struct AccountNoData {
     /// lamports in the account
     pub lamports: u64,

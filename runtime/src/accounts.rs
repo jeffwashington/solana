@@ -419,7 +419,7 @@ impl Accounts {
                     programdata_address,
                 }) = program.state()
                 {
-                    let cached = timings.executable.get(&programdata_address);
+                    let cached = self.accounts_db.load_cached_executable(ancestors, &programdata_address);
 
                     let program = if let Some(program) = cached {
                         Some(program.clone())
