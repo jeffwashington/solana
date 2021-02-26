@@ -419,9 +419,28 @@ impl Accounts {
                     programdata_address,
                 }) = program.state()
                 {
-                    if let Some((program, slot)) = self
-                        .accounts_db
-                        .load_cow(ancestors, &programdata_address)
+                    let cached = timings.executable.get(&programdata_address);
+
+                    let program = if let Some(program) = cached {
+                        Some(program.clone())
+                    }
+                    else {
+                        if let Some((program, _)) = self
+                            .accounts_db
+                            .load_cow(ancestors, &programdata_address)
+                            {
+                                if program.executable() {
+                                    timings.executable.insert(programdata_address, program.clone());    
+                                }
+                                Some(program)
+                            }
+                            else {
+                                None
+                            }
+                        };
+
+
+                    if let Some(program) = program
                     {
                         let mut v2 = timings.pgms.get(&programdata_address);
                         let mut v2 = if let Some(v2) = v2 {
@@ -439,7 +458,7 @@ impl Accounts {
                         }
                         else {
                             //error!("tx: {:?}", tx);
-                            self.accounts_db.store_cached(slot, &[(&programdata_address, &program)]);
+                            // doesn't work - hits error self.accounts_db.store_cached(slot, &[(&programdata_address, &program)]);
                         }
                         timings.program_load_count += 1;
                         timings.program_data_size += program.data.len();

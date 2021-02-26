@@ -162,6 +162,7 @@ pub struct ExecuteTimings {
         pub program_load_from_cache: usize,
         pub program_data_size: usize,
         pub pgms: HashMap<Pubkey, (usize, usize)>,
+        pub executable: HashMap<Pubkey, AccountNoData>,
 
 
 }
@@ -247,6 +248,10 @@ impl ExecuteTimings {
             v2.0 += v.0;
             v2.1 = std::cmp::max(v2.1, v.1);
             self.pgms.insert(*k, v2);
+        }
+
+        for (k,v) in other.executable.iter() {
+            self.executable.insert(*k, v.clone());
         }
     }
     pub fn add_acct_visit(&mut self, data: (u64, usize)) {
