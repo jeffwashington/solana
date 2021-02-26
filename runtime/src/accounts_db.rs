@@ -2475,7 +2475,9 @@ impl AccountsDB {
         if result.is_some() {
             let mut cache = self.exe_cache.write().unwrap();
             let account = result.unwrap().0;
-            (*cache).insert(*pubkey, account.clone());
+            let mut account_store = account.clone();
+            account_store.from_cache = true;
+            (*cache).insert(*pubkey, account_store);
             return Some(account);
         }
         None
