@@ -232,12 +232,15 @@ impl Accounts {
 
             timej.stop(); timings.load_2 += timej.as_us(); let mut timej = Measure::start("");
             let mut accounts: Vec<_> = message.account_keys.iter().enumerate().map(|(i, key)| {
-                let mut tj2 = Measure::start("");
                 let check = message.is_non_loader_key(key, i);
-                tj2.stop();
-                timings.is_non_loader += tj2.as_us();
-
-                let account = if check {
+                (key, check, i)
+            }).collect();
+            timej.stop();
+            timings.is_non_loader += timej.as_us();
+            timej = Measure::start("");
+            
+            let mut accounts: Vec<_> = accounts.iter().map(|(key, check, i)| {
+                let account = if *check {
                     let mut tj4 = Measure::start("");
                     let a_check = solana_sdk::sysvar::instructions::check_id(key)
                     && feature_set.is_active(&feature_set::instructions_sysvar_enabled::id());
@@ -270,7 +273,7 @@ impl Accounts {
                                 }
                                 timings.real_load_count += 1;
                                 let mut tj5 = Measure::start("");
-                                let r = if message.is_writable(i) {
+                                let r = if message.is_writable(*i) {
                                     let rent_due = rent_collector.collect_from_existing_account(
                                         &key,
                                         &mut account,
@@ -284,7 +287,11 @@ impl Accounts {
                                 timings.non_cache_time_after += tj5.as_us();
                                 r
                             })
-                            .unwrap_or_default();
+                            .unwrap_or_else(|| {
+                                tj.stop();
+                                timings.missing_account += tj.as_us();
+                                (AccountNoData::default(), 0)
+                            });
 
                             let mut timej2 = Measure::start("");
                         if account.executable && bpf_loader_upgradeable::check_id(&account.owner) {
