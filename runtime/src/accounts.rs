@@ -231,15 +231,16 @@ impl Accounts {
             }
 
             timej.stop(); timings.load_2 += timej.as_us(); let mut timej = Measure::start("");
-            let mut accounts: Vec<_> = message.account_keys.iter().enumerate().map(|(i, key)| {
+            let mut accounts2: Vec<_> = message.account_keys.iter().enumerate().map(|(i, key)| {
                 let check = message.is_non_loader_key(key, i);
                 (key, check, i)
             }).collect();
             timej.stop();
+            let mut accounts = Vec::with_capacity(accounts2.len());
             timings.is_non_loader += timej.as_us();
             timej = Measure::start("");
             
-            let mut accounts: Vec<_> = accounts.iter().map(|(key, check, i)| {
+            accounts2.iter().for_each(|(key, check, i)| {
                 let account = if *check {
                     let mut tj4 = Measure::start("");
                     let a_check = solana_sdk::sysvar::instructions::check_id(key)
@@ -321,15 +322,17 @@ impl Accounts {
                                     pgm_not_found.store(true, Ordering::Relaxed);
                                     timej2.stop();
                                     timings.load_6 += timej2.as_us();
-                                                return AccountNoData::default();//
+                                                accounts.push(AccountNoData::default());//
+                                                return;
                                 }
                             } else {
                                 // TODO error_counters.invalid_program_for_execution += 1;
                                 pgm_for_exec.store(true, Ordering::Relaxed);
                                 timej2.stop();
                                 timings.load_6 += timej2.as_us();
-                                        return AccountNoData::default();//
-                            }
+                                accounts.push(AccountNoData::default());//
+                                return;
+            }
                         }
                         timej2.stop();
                         timings.load_6 += timej2.as_us();
@@ -345,8 +348,8 @@ impl Accounts {
                     timings.load_6 += timej2.as_us();
                     r
                 };
-                account
-            }).collect();
+                accounts.push(account);
+            });
             timej.stop(); timings.load_3 += timej.as_us(); let mut timej = Measure::start("");
 
             if invalid_account_index.load(Ordering::Relaxed) {
