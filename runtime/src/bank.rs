@@ -174,12 +174,14 @@ pub struct ExecuteTimings {
         pub if1: u64,
         pub missing_account: u64,
         pub missing_account_count: u64,
+        pub construct_instructions_count: u64,
 
 
 }
 
 impl ExecuteTimings {
     pub fn accumulate(&mut self, other: &ExecuteTimings) {
+        self.construct_instructions_count += other.construct_instructions_count;
         self.collect2 += other.collect2;
         self.is_non_loader += other.is_non_loader;
         self.construct_instructions += other.construct_instructions;

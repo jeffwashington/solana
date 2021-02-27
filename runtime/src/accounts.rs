@@ -252,6 +252,7 @@ impl Accounts {
                         let msg = Self::construct_instructions_account(message);
                         tj3.stop();
                         timings.construct_instructions += tj3.as_us();
+                        timings.construct_instructions_count += 1;
                         msg
                     } else {
                         let mut tj = Measure::start("");
