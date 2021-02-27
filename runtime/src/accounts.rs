@@ -312,11 +312,16 @@ impl Accounts {
                                     .loads_cow(ancestors, &programdata_address)
                                     .map(|(account, _)| account)
                                 {
+                                    timej2.stop();
+                                    timings.load_6 += timej2.as_us();
+                                    timej2 = Measure::start("");
                                     if account.from_cache {
                                         //timings.from_cache += 1;
                                     }
                                     timings.real_load_count2 += 1;
                                     account_deps.lock().unwrap().push((programdata_address, account));
+                                    timej2.stop();
+                                    timings.time7 += timej2.as_us();
                                 } else {
                                     // TODO error_counters.account_not_found += 1;
                                     pgm_not_found.store(true, Ordering::Relaxed);
