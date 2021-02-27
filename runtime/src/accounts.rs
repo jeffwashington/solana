@@ -288,6 +288,7 @@ impl Accounts {
                                 r
                             })
                             .unwrap_or_else(|| {
+                                timings.missing_account_count += 1;
                                 tj.stop();
                                 timings.missing_account += tj.as_us();
                                 (AccountNoData::default(), 0)
