@@ -173,6 +173,7 @@ pub struct ExecuteTimings {
         pub collect2: u64,
         pub if1: u64,
         pub missing_account: u64,
+        pub missing_account_count: u64,
 
 
 }
@@ -273,6 +274,7 @@ impl ExecuteTimings {
         self.non_cache_time_after += other.non_cache_time_after;
         self.if1 += other.if1;
         self.missing_account += other.missing_account;
+        self.missing_account_count += other.missing_account_count;
 
     }
     pub fn add_acct_visit(&mut self, data: (u64, usize)) {
