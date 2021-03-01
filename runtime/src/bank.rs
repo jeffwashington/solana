@@ -177,12 +177,14 @@ pub struct ExecuteTimings {
         pub construct_instructions_count: u64,
         pub time7: u64,
         pub for_each: u64,
+        pub errors: u64,
 
 
 }
 
 impl ExecuteTimings {
     pub fn accumulate(&mut self, other: &ExecuteTimings) {
+        self.errors += other.errors;
         self.for_each += other.for_each;
         self.time7 += other.time7;
         self.construct_instructions_count += other.construct_instructions_count;

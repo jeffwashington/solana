@@ -342,17 +342,17 @@ impl Accounts {
                                 } else {
                                     // TODO error_counters.account_not_found += 1;
                                     pgm_not_found.store(true, Ordering::Relaxed);
+                                    accounts.push(AccountNoData::default()); //
                                     timej2.stop();
                                     timings.load_6 += timej2.as_us();
-                                    accounts.push(AccountNoData::default()); //
                                     return;
                                 }
                             } else {
                                 // TODO error_counters.invalid_program_for_execution += 1;
                                 pgm_for_exec.store(true, Ordering::Relaxed);
+                                accounts.push(AccountNoData::default()); //
                                 timej2.stop();
                                 timings.load_6 += timej2.as_us();
-                                accounts.push(AccountNoData::default()); //
                                 return;
                             }
                         }
@@ -373,6 +373,8 @@ impl Accounts {
                 timej_reset = Measure::start("");
                 accounts.push(account);
             });
+            timej_reset.stop();
+            timings.for_each += timej_reset.as_us();
             timej.stop();
             timings.load_3 += timej.as_us();
             let mut timej = Measure::start("");
