@@ -378,7 +378,7 @@ impl Accounts {
                 //let mut pubkey_index = vec![];
                 let mut not_found = 0;
                 let total=pubkeys.len();
-                let mut m = Measure::start();
+                let mut m = Measure::start("");
                 let cows = self.accounts_db.load_cows(ancestors, &pubkeys[..]);
                 m.stop();
                 error!("Loading: {} keys, time: {}", pubkeys.len(), m.as_us());
