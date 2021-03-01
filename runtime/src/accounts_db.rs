@@ -4870,9 +4870,10 @@ impl AccountsDB {
         let mut t2 = Measure::start("");
         let hashes: Vec<_> = (*accounts).iter().map(|(pubkey, account)| {
             let mut tt = Measure::start("");
-            Self::hash_account(slot, *account, pubkey, cluster_type)
+            let hash  =Self::hash_account(slot, *account, pubkey, cluster_type);
             tt.stop();
             error!("Hashing: {:?} len {} time {}", pubkey, account.data.len(), tt.as_us());
+            hash
         }).collect();
         t2.stop();
         //error!("hashing: {}, size: {}, times: {}, serial: {}", accounts.len(), sz, t.as_us(), t2.as_us());
