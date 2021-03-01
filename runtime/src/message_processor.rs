@@ -1099,14 +1099,14 @@ mod tests {
         for i in 0..MAX_DEPTH {
             program_ids.push(solana_sdk::pubkey::new_rand());
             keys.push(solana_sdk::pubkey::new_rand());
-            accounts.push(Rc::new(RefCell::new(Account::new(
+            accounts.push(Rc::new(RefCell::new(AccountNoData::new(
                 i as u64,
                 1,
                 &program_ids[i],
             ))));
             pre_accounts.push(PreAccount::new(&keys[i], &accounts[i].borrow(), false))
         }
-        let account = Account::new(1, 1, &solana_sdk::pubkey::Pubkey::default());
+        let account = AccountNoData::new(1, 1, &solana_sdk::pubkey::Pubkey::default());
         for program_id in program_ids.iter() {
             pre_accounts.push(PreAccount::new(program_id, &account.clone(), false));
         }
@@ -1148,9 +1148,9 @@ mod tests {
             );
 
             // modify account owned by the program
-            accounts[owned_index].borrow_mut().data[0] = (MAX_DEPTH + owned_index) as u8;
+            Arc::make_mut(&mut accounts[owned_index].borrow_mut().data)[0] = (MAX_DEPTH + owned_index) as u8;
             let mut these_accounts = accounts[not_owned_index..owned_index + 1].to_vec();
-            these_accounts.push(Rc::new(RefCell::new(Account::new(
+            these_accounts.push(Rc::new(RefCell::new(AccountNoData::new(
                 1,
                 1,
                 &solana_sdk::pubkey::Pubkey::default(),
@@ -1161,14 +1161,13 @@ mod tests {
             assert_eq!(
                 invoke_context.pre_accounts[owned_index]
                     .account
-                    .borrow()
                     .data[0],
                 (MAX_DEPTH + owned_index) as u8
             );
 
             // modify account not owned by the program
             let data = accounts[not_owned_index].borrow_mut().data[0];
-            accounts[not_owned_index].borrow_mut().data[0] = (MAX_DEPTH + not_owned_index) as u8;
+            Arc::make_mut(&mut accounts[not_owned_index].borrow_mut().data)[0] = (MAX_DEPTH + not_owned_index) as u8;
             assert_eq!(
                 invoke_context.verify_and_update(
                     &message,
@@ -1181,11 +1180,10 @@ mod tests {
             assert_eq!(
                 invoke_context.pre_accounts[not_owned_index]
                     .account
-                    .borrow()
                     .data[0],
                 data
             );
-            accounts[not_owned_index].borrow_mut().data[0] = data;
+            Arc::make_mut(&mut accounts[not_owned_index].borrow_mut().data)[0] = data;
 
             invoke_context.pop();
         }
@@ -1217,7 +1215,7 @@ mod tests {
     fn test_verify_account_references() {
         let accounts = vec![(
             solana_sdk::pubkey::new_rand(),
-            RefCell::new(Account::default()),
+            RefCell::new(AccountNoData::default()),
         )];
 
         assert!(MessageProcessor::verify_account_references(&accounts).is_ok());
@@ -1234,7 +1232,7 @@ mod tests {
         is_writable: bool,
         rent: Rent,
         pre: PreAccount,
-        post: Account,
+        post: AccountNoData,
     }
     impl Change {
         pub fn new(owner: &Pubkey, program_id: &Pubkey) -> Self {
@@ -1244,18 +1242,17 @@ mod tests {
                 is_writable: true,
                 pre: PreAccount::new(
                     &solana_sdk::pubkey::new_rand(),
-                    &Account {
+                    &AccountNoData {
                         owner: *owner,
                         lamports: std::u64::MAX,
-                        data: vec![],
-                        ..Account::default()
+                        ..AccountNoData::default()
                     },
                     false,
                 ),
-                post: Account {
+                post: AccountNoData {
                     owner: *owner,
                     lamports: std::u64::MAX,
-                    ..Account::default()
+                    ..AccountNoData::default()
                 },
             }
         }
@@ -1264,12 +1261,12 @@ mod tests {
             self
         }
         pub fn executable(mut self, pre: bool, post: bool) -> Self {
-            self.pre.account.borrow_mut().executable = pre;
+            self.pre.account.executable = pre;
             self.post.executable = post;
             self
         }
         pub fn lamports(mut self, pre: u64, post: u64) -> Self {
-            self.pre.account.borrow_mut().lamports = pre;
+            self.pre.account.lamports = pre;
             self.post.lamports = post;
             self
         }
@@ -1278,12 +1275,12 @@ mod tests {
             self
         }
         pub fn data(mut self, pre: Vec<u8>, post: Vec<u8>) -> Self {
-            self.pre.account.borrow_mut().data = pre;
-            self.post.data = post;
+            self.pre.account.data = Arc::new(pre);
+            self.post.data = Arc::new(post);
             self
         }
         pub fn rent_epoch(mut self, pre: u64, post: u64) -> Self {
-            self.pre.account.borrow_mut().rent_epoch = pre;
+            self.pre.account.rent_epoch = pre;
             self.post.rent_epoch = post;
             self
         }
@@ -1640,7 +1637,7 @@ mod tests {
                     }
                     // Change data in a read-only account
                     MockSystemInstruction::AttemptDataChange { data } => {
-                        keyed_accounts[1].account.borrow_mut().data = vec![data];
+                        keyed_accounts[1].account.borrow_mut().data = Arc::new(vec![data]);
                         Ok(())
                     }
                 }
@@ -1654,13 +1651,13 @@ mod tests {
         let mut message_processor = MessageProcessor::default();
         message_processor.add_program(mock_system_program_id, mock_system_process_instruction);
 
-        let mut accounts: Vec<Rc<RefCell<Account>>> = Vec::new();
-        let account = Account::new_ref(100, 1, &mock_system_program_id);
+        let mut accounts: Vec<Rc<RefCell<AccountNoData>>> = Vec::new();
+        let account = AccountNoData::new_ref(100, 1, &mock_system_program_id);
         accounts.push(account);
-        let account = Account::new_ref(0, 1, &mock_system_program_id);
+        let account = AccountNoData::new_ref(0, 1, &mock_system_program_id);
         accounts.push(account);
 
-        let mut loaders: Vec<Vec<(Pubkey, RefCell<Account>)>> = Vec::new();
+        let mut loaders: Vec<Vec<(Pubkey, RefCell<AccountNoData>)>> = Vec::new();
         let account = RefCell::new(create_loadable_account("mock_system_program", 1));
         loaders.push(vec![(mock_system_program_id, account)]);
 
@@ -1804,7 +1801,7 @@ mod tests {
                             let mut dup_account = keyed_accounts[2].try_account_ref_mut()?;
                             dup_account.lamports -= lamports;
                             to_account.lamports += lamports;
-                            dup_account.data = vec![data];
+                            dup_account.data = Arc::new(vec![data]);
                         }
                         keyed_accounts[0].try_account_ref_mut()?.lamports -= lamports;
                         keyed_accounts[1].try_account_ref_mut()?.lamports += lamports;
@@ -1821,13 +1818,13 @@ mod tests {
         let mut message_processor = MessageProcessor::default();
         message_processor.add_program(mock_program_id, mock_system_process_instruction);
 
-        let mut accounts: Vec<Rc<RefCell<Account>>> = Vec::new();
-        let account = Account::new_ref(100, 1, &mock_program_id);
+        let mut accounts: Vec<Rc<RefCell<AccountNoData>>> = Vec::new();
+        let account = AccountNoData::new_ref(100, 1, &mock_program_id);
         accounts.push(account);
-        let account = Account::new_ref(0, 1, &mock_program_id);
+        let account = AccountNoData::new_ref(0, 1, &mock_program_id);
         accounts.push(account);
 
-        let mut loaders: Vec<Vec<(Pubkey, RefCell<Account>)>> = Vec::new();
+        let mut loaders: Vec<Vec<(Pubkey, RefCell<AccountNoData>)>> = Vec::new();
         let account = RefCell::new(create_loadable_account("mock_system_program", 1));
         loaders.push(vec![(mock_program_id, account)]);
 
@@ -1924,7 +1921,7 @@ mod tests {
         assert_eq!(result, Ok(()));
         assert_eq!(accounts[0].borrow().lamports, 80);
         assert_eq!(accounts[1].borrow().lamports, 20);
-        assert_eq!(accounts[0].borrow().data, vec![42]);
+        assert_eq!(accounts[0].borrow().data.to_vec(), vec![42]);
     }
 
     #[test]
@@ -1954,10 +1951,10 @@ mod tests {
                     MockInstruction::NoopSuccess => (),
                     MockInstruction::NoopFail => return Err(InstructionError::GenericError),
                     MockInstruction::ModifyOwned => {
-                        keyed_accounts[0].try_account_ref_mut()?.data[0] = 1
+                        Arc::make_mut(&mut keyed_accounts[0].try_account_ref_mut()?.data)[0] = 1
                     }
                     MockInstruction::ModifyNotOwned => {
-                        keyed_accounts[1].try_account_ref_mut()?.data[0] = 1
+                        Arc::make_mut(&mut keyed_accounts[1].try_account_ref_mut()?.data)[0] = 1
                     }
                 }
             } else {
@@ -1969,17 +1966,17 @@ mod tests {
         let caller_program_id = solana_sdk::pubkey::new_rand();
         let callee_program_id = solana_sdk::pubkey::new_rand();
 
-        let mut program_account = Account::new(1, 0, &native_loader::id());
+        let mut program_account = AccountNoData::new(1, 0, &native_loader::id());
         program_account.executable = true;
         let executable_preaccount = PreAccount::new(&callee_program_id, &program_account, true);
         let executable_accounts = vec![(callee_program_id, RefCell::new(program_account.clone()))];
 
         let owned_key = solana_sdk::pubkey::new_rand();
-        let owned_account = Account::new(42, 1, &callee_program_id);
+        let owned_account = AccountNoData::new(42, 1, &callee_program_id);
         let owned_preaccount = PreAccount::new(&owned_key, &owned_account, true);
 
         let not_owned_key = solana_sdk::pubkey::new_rand();
-        let not_owned_account = Account::new(84, 1, &solana_sdk::pubkey::new_rand());
+        let not_owned_account = AccountNoData::new(84, 1, &solana_sdk::pubkey::new_rand());
         let not_owned_preaccount = PreAccount::new(&not_owned_key, &not_owned_account, true);
 
         #[allow(unused_mut)]
@@ -2012,7 +2009,7 @@ mod tests {
         ];
 
         // not owned account modified by the caller (before the invoke)
-        accounts[0].borrow_mut().data[0] = 1;
+        Arc::make_mut(&mut accounts[0].borrow_mut().data)[0] = 1;
         let instruction = Instruction::new(
             callee_program_id,
             &MockInstruction::NoopSuccess,
@@ -2035,7 +2032,7 @@ mod tests {
             ),
             Err(InstructionError::ExternalAccountDataModified)
         );
-        accounts[0].borrow_mut().data[0] = 0;
+        Arc::make_mut(&mut accounts[0].borrow_mut().data)[0] = 0;
 
         let cases = vec![
             (MockInstruction::NoopSuccess, Ok(())),

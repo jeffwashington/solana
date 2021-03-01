@@ -2420,7 +2420,6 @@ impl Bank {
             name,
             self.inherit_specially_retained_account_balance(&existing_genuine_program),
         );
-        let account = Account::to_account_no_data(account);
         if !self.simple_capitalization_enabled() {
             self.store_account(&program_id, &account);
         } else {
@@ -5212,7 +5211,7 @@ pub(crate) mod tests {
     };
     use crossbeam_channel::bounded;
     use solana_sdk::{
-        account::AnAccount, account::AnAccountConcrete,
+        account::AnAccount,
         account_utils::StateMut,
         clock::{DEFAULT_SLOTS_PER_EPOCH, DEFAULT_TICKS_PER_SLOT},
         epoch_schedule::MINIMUM_SLOTS_PER_EPOCH,
@@ -5302,7 +5301,7 @@ pub(crate) mod tests {
 
         // NonceRollbackFull create, fee-payer not in account_keys fails
         assert_eq!(
-            NonceRollbackFull::from_partial::<Account>(partial, &message, &[]).unwrap_err(),
+            NonceRollbackFull::from_partial(partial, &message, &[]).unwrap_err(),
             TransactionError::AccountNotFound,
         );
     }
@@ -5357,8 +5356,8 @@ pub(crate) mod tests {
             dummy_leader_stake_lamports /* 1 token goes to the vote account associated with dummy_leader_lamports */
         );
 
-        let rent_account = bank.get_account(&sysvar::rent::id()).unwrap();
-        let rent = from_account::<sysvar::rent::Rent>(&rent_account).unwrap();
+        let rent_account = bank.get_account_no_data(&sysvar::rent::id()).unwrap();
+        let rent = from_account_no_data::<sysvar::rent::Rent>(&rent_account).unwrap();
 
         assert_eq!(rent.burn_percent, 5);
         assert_eq!(rent.exemption_threshold, 1.2);
@@ -5443,7 +5442,7 @@ pub(crate) mod tests {
                 .map(|_| {
                     (
                         solana_sdk::pubkey::new_rand(),
-                        Account::new(42, 0, &Pubkey::default()),
+                        AccountNoData::new(42, 0, &Pubkey::default()),
                     )
                 })
                 .collect(),
@@ -5500,12 +5499,12 @@ pub(crate) mod tests {
         assert_eq!(bank.last_blockhash(), genesis_config.hash());
 
         // Initialize credit-debit and credit only accounts
-        let account1 = Account::new(264, 0, &Pubkey::default());
-        let account2 = Account::new(264, 1, &Pubkey::default());
-        let account3 = Account::new(264, 0, &Pubkey::default());
-        let account4 = Account::new(264, 1, &Pubkey::default());
-        let account5 = Account::new(10, 0, &Pubkey::default());
-        let account6 = Account::new(10, 1, &Pubkey::default());
+        let account1 = AccountNoData::new(264, 0, &Pubkey::default());
+        let account2 = AccountNoData::new(264, 1, &Pubkey::default());
+        let account3 = AccountNoData::new(264, 0, &Pubkey::default());
+        let account4 = AccountNoData::new(264, 1, &Pubkey::default());
+        let account5 = AccountNoData::new(10, 0, &Pubkey::default());
+        let account6 = AccountNoData::new(10, 1, &Pubkey::default());
 
         bank.store_account(&keypair1.pubkey(), &account1);
         bank.store_account(&keypair2.pubkey(), &account2);
@@ -5523,7 +5522,7 @@ pub(crate) mod tests {
 
         // Make native instruction loader rent exempt
         let system_program_id = system_program::id();
-        let mut system_program_account = bank.get_account(&system_program_id).unwrap();
+        let mut system_program_account = bank.get_account_no_data(&system_program_id).unwrap();
         system_program_account.lamports =
             bank.get_minimum_balance_for_rent_exemption(system_program_account.data.len());
         bank.store_account(&system_program_id, &system_program_account);
@@ -5616,10 +5615,10 @@ pub(crate) mod tests {
         mock_program_id: Pubkey,
         generic_rent_due_for_system_account: u64,
     ) {
-        let mut account_pairs: Vec<(Pubkey, Account)> = Vec::with_capacity(keypairs.len() - 1);
+        let mut account_pairs: Vec<(Pubkey, AccountNoData)> = Vec::with_capacity(keypairs.len() - 1);
         account_pairs.push((
             keypairs[0].pubkey(),
-            Account::new(
+            AccountNoData::new(
                 generic_rent_due_for_system_account + 2,
                 0,
                 &Pubkey::default(),
@@ -5627,7 +5626,7 @@ pub(crate) mod tests {
         ));
         account_pairs.push((
             keypairs[1].pubkey(),
-            Account::new(
+            AccountNoData::new(
                 generic_rent_due_for_system_account + 2,
                 0,
                 &Pubkey::default(),
@@ -5635,7 +5634,7 @@ pub(crate) mod tests {
         ));
         account_pairs.push((
             keypairs[2].pubkey(),
-            Account::new(
+            AccountNoData::new(
                 generic_rent_due_for_system_account + 2,
                 0,
                 &Pubkey::default(),
@@ -5643,7 +5642,7 @@ pub(crate) mod tests {
         ));
         account_pairs.push((
             keypairs[3].pubkey(),
-            Account::new(
+            AccountNoData::new(
                 generic_rent_due_for_system_account + 2,
                 0,
                 &Pubkey::default(),
@@ -5651,15 +5650,15 @@ pub(crate) mod tests {
         ));
         account_pairs.push((
             keypairs[4].pubkey(),
-            Account::new(10, 0, &Pubkey::default()),
+            AccountNoData::new(10, 0, &Pubkey::default()),
         ));
         account_pairs.push((
             keypairs[5].pubkey(),
-            Account::new(10, 0, &Pubkey::default()),
+            AccountNoData::new(10, 0, &Pubkey::default()),
         ));
         account_pairs.push((
             keypairs[6].pubkey(),
-            Account::new(
+            AccountNoData::new(
                 (2 * generic_rent_due_for_system_account) + 24,
                 0,
                 &Pubkey::default(),
@@ -5668,7 +5667,7 @@ pub(crate) mod tests {
 
         account_pairs.push((
             keypairs[8].pubkey(),
-            Account::new(
+            AccountNoData::new(
                 generic_rent_due_for_system_account + 2 + 929,
                 0,
                 &Pubkey::default(),
@@ -5676,13 +5675,13 @@ pub(crate) mod tests {
         ));
         account_pairs.push((
             keypairs[9].pubkey(),
-            Account::new(10, 0, &Pubkey::default()),
+            AccountNoData::new(10, 0, &Pubkey::default()),
         ));
 
         // Feeding to MockProgram to test read only rent behaviour
         account_pairs.push((
             keypairs[10].pubkey(),
-            Account::new(
+            AccountNoData::new(
                 generic_rent_due_for_system_account + 3,
                 0,
                 &Pubkey::default(),
@@ -5690,15 +5689,15 @@ pub(crate) mod tests {
         ));
         account_pairs.push((
             keypairs[11].pubkey(),
-            Account::new(generic_rent_due_for_system_account + 3, 0, &mock_program_id),
+            AccountNoData::new(generic_rent_due_for_system_account + 3, 0, &mock_program_id),
         ));
         account_pairs.push((
             keypairs[12].pubkey(),
-            Account::new(generic_rent_due_for_system_account + 3, 0, &mock_program_id),
+            AccountNoData::new(generic_rent_due_for_system_account + 3, 0, &mock_program_id),
         ));
         account_pairs.push((
             keypairs[13].pubkey(),
-            Account::new(14, 22, &mock_program_id),
+            AccountNoData::new(14, 22, &mock_program_id),
         ));
 
         for account_pair in account_pairs.iter() {
@@ -5754,14 +5753,14 @@ pub(crate) mod tests {
         let pubkey = solana_sdk::pubkey::new_rand();
 
         let some_lamports = 400;
-        let account = Account::new(some_lamports, 0, &system_program::id());
+        let account = AccountNoData::new(some_lamports, 0, &system_program::id());
 
         assert_capitalization_diff(
             &bank,
             || bank.store_account_and_update_capitalization(&pubkey, &account),
             |old, new| assert_eq!(old + some_lamports, new),
         );
-        assert_eq!(account, bank.get_account(&pubkey).unwrap());
+        assert_eq!(account, bank.get_account_no_data(&pubkey).unwrap());
     }
 
     #[test]
@@ -5772,14 +5771,14 @@ pub(crate) mod tests {
         let pubkey = mint_keypair.pubkey();
 
         let new_lamports = 500;
-        let account = Account::new(new_lamports, 0, &system_program::id());
+        let account = AccountNoData::new(new_lamports, 0, &system_program::id());
 
         assert_capitalization_diff(
             &bank,
             || bank.store_account_and_update_capitalization(&pubkey, &account),
             |old, new| assert_eq!(old + 100, new),
         );
-        assert_eq!(account, bank.get_account(&pubkey).unwrap());
+        assert_eq!(account, bank.get_account_no_data(&pubkey).unwrap());
     }
 
     #[test]
@@ -5790,14 +5789,14 @@ pub(crate) mod tests {
         let pubkey = mint_keypair.pubkey();
 
         let new_lamports = 100;
-        let account = Account::new(new_lamports, 0, &system_program::id());
+        let account = AccountNoData::new(new_lamports, 0, &system_program::id());
 
         assert_capitalization_diff(
             &bank,
             || bank.store_account_and_update_capitalization(&pubkey, &account),
             |old, new| assert_eq!(old - 300, new),
         );
-        assert_eq!(account, bank.get_account(&pubkey).unwrap());
+        assert_eq!(account, bank.get_account_no_data(&pubkey).unwrap());
     }
 
     #[test]
@@ -5807,14 +5806,14 @@ pub(crate) mod tests {
         let bank = Bank::new(&genesis_config);
         let pubkey = mint_keypair.pubkey();
 
-        let account = Account::new(lamports, 1, &system_program::id());
+        let account = AccountNoData::new(lamports, 1, &system_program::id());
 
         assert_capitalization_diff(
             &bank,
             || bank.store_account_and_update_capitalization(&pubkey, &account),
             |old, new| assert_eq!(old, new),
         );
-        assert_eq!(account, bank.get_account(&pubkey).unwrap());
+        assert_eq!(account, bank.get_account_no_data(&pubkey).unwrap());
     }
 
     #[test]
@@ -5866,7 +5865,7 @@ pub(crate) mod tests {
 
         genesis_config.accounts.insert(
             validator_1_pubkey,
-            Account::new(42, 0, &system_program::id()),
+            AccountNoData::new(42, 0, &system_program::id()),
         );
         genesis_config.accounts.insert(
             validator_1_staking_keypair.pubkey(),
@@ -5899,7 +5898,7 @@ pub(crate) mod tests {
 
         genesis_config.accounts.insert(
             validator_2_pubkey,
-            Account::new(42, 0, &system_program::id()),
+            AccountNoData::new(42, 0, &system_program::id()),
         );
         genesis_config.accounts.insert(
             validator_2_staking_keypair.pubkey(),
@@ -5932,7 +5931,7 @@ pub(crate) mod tests {
 
         genesis_config.accounts.insert(
             validator_3_pubkey,
-            Account::new(42, 0, &system_program::id()),
+            AccountNoData::new(42, 0, &system_program::id()),
         );
         genesis_config.accounts.insert(
             validator_3_staking_keypair.pubkey(),
@@ -5956,11 +5955,11 @@ pub(crate) mod tests {
         bank.rent_collector.slots_per_year = 192.0;
 
         let payer = Keypair::new();
-        let payer_account = Account::new(400, 0, &system_program::id());
+        let payer_account = AccountNoData::new(400, 0, &system_program::id());
         bank.store_account_and_update_capitalization(&payer.pubkey(), &payer_account);
 
         let payee = Keypair::new();
-        let payee_account = Account::new(70, 1, &system_program::id());
+        let payee_account = AccountNoData::new(70, 1, &system_program::id());
         bank.store_account_and_update_capitalization(&payee.pubkey(), &payee_account);
 
         let bootstrap_validator_initial_balance = bank.get_balance(&bootstrap_validator_pubkey);
@@ -6123,7 +6122,7 @@ pub(crate) mod tests {
 
         let account_pubkey = solana_sdk::pubkey::new_rand();
         let account_balance = 1;
-        let mut account = Account::new(account_balance, 0, &solana_sdk::pubkey::new_rand());
+        let mut account = AccountNoData::new(account_balance, 0, &solana_sdk::pubkey::new_rand());
         account.executable = true;
         bank.store_account(&account_pubkey, &account);
 
@@ -6280,7 +6279,7 @@ pub(crate) mod tests {
 
         // Epoch should be updated
         // Rent deducted on store side
-        let account8 = bank.get_account(&keypairs[7].pubkey()).unwrap();
+        let account8 = bank.get_account_no_data(&keypairs[7].pubkey()).unwrap();
         // Epoch should be set correctly.
         assert_eq!(account8.rent_epoch, bank.epoch + 1);
         rent_collected += magic_rent_number;
@@ -6289,7 +6288,7 @@ pub(crate) mod tests {
         assert_eq!(bank.get_balance(&keypairs[8].pubkey()), 2);
         rent_collected += generic_rent_due_for_system_account;
 
-        let account10 = bank.get_account(&keypairs[9].pubkey()).unwrap();
+        let account10 = bank.get_account_no_data(&keypairs[9].pubkey()).unwrap();
         // Account was overwritten at load time, since it didn't have sufficient balance to pay rent
         // Then, at store time we deducted `magic_rent_number` rent for the current epoch, once it has balance
         assert_eq!(account10.rent_epoch, bank.epoch + 1);
@@ -6967,15 +6966,15 @@ pub(crate) mod tests {
 
         bank.store_account(
             &zero_lamport_pubkey,
-            &Account::new(zero_lamports, 0, &Pubkey::default()),
+            &AccountNoData::new(zero_lamports, 0, &Pubkey::default()),
         );
         bank.store_account(
             &rent_due_pubkey,
-            &Account::new(little_lamports, 0, &Pubkey::default()),
+            &AccountNoData::new(little_lamports, 0, &Pubkey::default()),
         );
         bank.store_account(
             &rent_exempt_pubkey,
-            &Account::new(large_lamports, 0, &Pubkey::default()),
+            &AccountNoData::new(large_lamports, 0, &Pubkey::default()),
         );
 
         let genesis_slot = 0;
@@ -6986,10 +6985,10 @@ pub(crate) mod tests {
 
         assert_eq!(bank.collected_rent.load(Relaxed), 0);
         assert_eq!(
-            bank.get_account(&rent_due_pubkey).unwrap().lamports,
+            bank.get_account_no_data(&rent_due_pubkey).unwrap().lamports,
             little_lamports
         );
-        assert_eq!(bank.get_account(&rent_due_pubkey).unwrap().rent_epoch, 0);
+        assert_eq!(bank.get_account_no_data(&rent_due_pubkey).unwrap().rent_epoch, 0);
         assert_eq!(
             bank.slots_by_pubkey(&rent_due_pubkey, &ancestors),
             vec![genesis_slot]
@@ -7008,15 +7007,15 @@ pub(crate) mod tests {
         // unrelated 1-lamport account exists
         assert_eq!(bank.collected_rent.load(Relaxed), rent_collected + 1);
         assert_eq!(
-            bank.get_account(&rent_due_pubkey).unwrap().lamports,
+            bank.get_account_no_data(&rent_due_pubkey).unwrap().lamports,
             little_lamports - rent_collected
         );
-        assert_eq!(bank.get_account(&rent_due_pubkey).unwrap().rent_epoch, 6);
+        assert_eq!(bank.get_account_no_data(&rent_due_pubkey).unwrap().rent_epoch, 6);
         assert_eq!(
-            bank.get_account(&rent_exempt_pubkey).unwrap().lamports,
+            bank.get_account_no_data(&rent_exempt_pubkey).unwrap().lamports,
             large_lamports
         );
-        assert_eq!(bank.get_account(&rent_exempt_pubkey).unwrap().rent_epoch, 5);
+        assert_eq!(bank.get_account_no_data(&rent_exempt_pubkey).unwrap().rent_epoch, 5);
         assert_eq!(
             bank.slots_by_pubkey(&rent_due_pubkey, &ancestors),
             vec![genesis_slot, some_slot]
@@ -7045,7 +7044,7 @@ pub(crate) mod tests {
         let bank1_without_zero = Arc::new(new_from_parent(&genesis_bank2));
         let zero_lamports = 0;
 
-        let account = Account::new(zero_lamports, 0, &Pubkey::default());
+        let account = AccountNoData::new(zero_lamports, 0, &Pubkey::default());
         bank1_with_zero.store_account(&zero_lamport_pubkey, &account);
         bank1_without_zero.store_account(&zero_lamport_pubkey, &account);
 
@@ -7100,7 +7099,7 @@ pub(crate) mod tests {
                 .map(|_| {
                     (
                         solana_sdk::pubkey::new_rand(),
-                        Account::new(1_000_000_000, 0, &Pubkey::default()),
+                        AccountNoData::new(1_000_000_000, 0, &Pubkey::default()),
                     )
                 })
                 .collect(),
@@ -7177,8 +7176,8 @@ pub(crate) mod tests {
         let inflation = bank1.capitalization() - bank.capitalization();
 
         let rewards = bank1
-            .get_account(&sysvar::rewards::id())
-            .map(|account| from_account::<Rewards>(&account).unwrap())
+            .get_account_no_data(&sysvar::rewards::id())
+            .map(|account| from_account_no_data::<Rewards>(&account).unwrap())
             .unwrap();
 
         // verify the stake and vote accounts are the right size
@@ -7219,7 +7218,7 @@ pub(crate) mod tests {
                 .map(|_| {
                     (
                         solana_sdk::pubkey::new_rand(),
-                        Account::new(1_000_000_000, 0, &Pubkey::default()),
+                        AccountNoData::new(1_000_000_000, 0, &Pubkey::default()),
                     )
                 })
                 .collect(),
@@ -7349,22 +7348,22 @@ pub(crate) mod tests {
         let tx = system_transaction::transfer(&keypair, &pubkey, 10, blockhash);
         bank1.process_transaction(&tx).unwrap();
 
-        assert_eq!(bank0.get_account(&keypair.pubkey()).unwrap().lamports, 10);
-        assert_eq!(bank1.get_account(&keypair.pubkey()), None);
+        assert_eq!(bank0.get_account_no_data(&keypair.pubkey()).unwrap().lamports, 10);
+        assert_eq!(bank1.get_account_no_data(&keypair.pubkey()), None);
 
         info!("bank0 purge");
         let hash = bank0.update_accounts_hash();
         bank0.clean_accounts(false);
         assert_eq!(bank0.update_accounts_hash(), hash);
 
-        assert_eq!(bank0.get_account(&keypair.pubkey()).unwrap().lamports, 10);
-        assert_eq!(bank1.get_account(&keypair.pubkey()), None);
+        assert_eq!(bank0.get_account_no_data(&keypair.pubkey()).unwrap().lamports, 10);
+        assert_eq!(bank1.get_account_no_data(&keypair.pubkey()), None);
 
         info!("bank1 purge");
         bank1.clean_accounts(false);
 
-        assert_eq!(bank0.get_account(&keypair.pubkey()).unwrap().lamports, 10);
-        assert_eq!(bank1.get_account(&keypair.pubkey()), None);
+        assert_eq!(bank0.get_account_no_data(&keypair.pubkey()).unwrap().lamports, 10);
+        assert_eq!(bank1.get_account_no_data(&keypair.pubkey()), None);
 
         assert!(bank0.verify_bank_hash());
 
@@ -7379,8 +7378,8 @@ pub(crate) mod tests {
         assert!(bank1.verify_bank_hash());
 
         // keypair should have 0 tokens on both forks
-        assert_eq!(bank0.get_account(&keypair.pubkey()), None);
-        assert_eq!(bank1.get_account(&keypair.pubkey()), None);
+        assert_eq!(bank0.get_account_no_data(&keypair.pubkey()), None);
+        assert_eq!(bank1.get_account_no_data(&keypair.pubkey()), None);
         bank1.force_flush_accounts_cache();
         bank1.clean_accounts(false);
 
@@ -7608,7 +7607,7 @@ pub(crate) mod tests {
 
         let min_balance = bank.get_minimum_balance_for_rent_exemption(nonce::State::size());
         let nonce = Keypair::new();
-        let nonce_account = Account::new_data(
+        let nonce_account = AccountNoData::new_data(
             min_balance + 42,
             &nonce::state::Versions::new_current(nonce::State::Initialized(
                 nonce::state::Data::default(),
@@ -8345,7 +8344,7 @@ pub(crate) mod tests {
         for _ in 0..3 {
             // first time these should match what happened above, assert that parents are ok
             assert_eq!(bank.get_balance(&key1.pubkey()), 0);
-            assert_eq!(bank.get_account(&key1.pubkey()), None);
+            assert_eq!(bank.get_account_no_data(&key1.pubkey()), None);
             assert_eq!(bank.get_balance(&key2.pubkey()), 1);
             trace!("start");
             assert_eq!(
@@ -8489,10 +8488,10 @@ pub(crate) mod tests {
                         bank1.inherit_specially_retained_account_balance(optional_account),
                     )
                 });
-                let current_account = bank1.get_account(&dummy_clock_id).unwrap();
+                let current_account = bank1.get_account_no_data(&dummy_clock_id).unwrap();
                 assert_eq!(
                     expected_previous_slot,
-                    from_account::<Clock>(&current_account).unwrap().slot
+                    from_account_no_data::<Clock>(&current_account).unwrap().slot
                 );
             },
             |old, new| {
@@ -8532,7 +8531,7 @@ pub(crate) mod tests {
             &bank2,
             || {
                 bank2.update_sysvar_account(&dummy_clock_id, |optional_account| {
-                    let slot = from_account::<Clock>(optional_account.as_ref().unwrap())
+                    let slot = from_account_no_data::<Clock>(optional_account.as_ref().unwrap())
                         .unwrap()
                         .slot
                         + 1;
@@ -8545,10 +8544,10 @@ pub(crate) mod tests {
                         bank2.inherit_specially_retained_account_balance(optional_account),
                     )
                 });
-                let current_account = bank2.get_account(&dummy_clock_id).unwrap();
+                let current_account = bank2.get_account_no_data(&dummy_clock_id).unwrap();
                 assert_eq!(
                     expected_next_slot,
-                    from_account::<Clock>(&current_account).unwrap().slot
+                    from_account_no_data::<Clock>(&current_account).unwrap().slot
                 );
             },
             |old, new| {
@@ -8563,7 +8562,7 @@ pub(crate) mod tests {
             &bank2,
             || {
                 bank2.update_sysvar_account(&dummy_clock_id, |optional_account| {
-                    let slot = from_account::<Clock>(optional_account.as_ref().unwrap())
+                    let slot = from_account_no_data::<Clock>(optional_account.as_ref().unwrap())
                         .unwrap()
                         .slot
                         + 1;
@@ -8576,10 +8575,10 @@ pub(crate) mod tests {
                         bank2.inherit_specially_retained_account_balance(optional_account),
                     )
                 });
-                let current_account = bank2.get_account(&dummy_clock_id).unwrap();
+                let current_account = bank2.get_account_no_data(&dummy_clock_id).unwrap();
                 assert_eq!(
                     expected_next_slot,
-                    from_account::<Clock>(&current_account).unwrap().slot
+                    from_account_no_data::<Clock>(&current_account).unwrap().slot
                 );
             },
             |old, new| {
@@ -8941,8 +8940,8 @@ pub(crate) mod tests {
         genesis_config.fee_rate_governor = FeeRateGovernor::new(12345, 0);
         let bank = Arc::new(Bank::new(&genesis_config));
 
-        let fees_account = bank.get_account(&sysvar::fees::id()).unwrap();
-        let fees = from_account::<Fees>(&fees_account).unwrap();
+        let fees_account = bank.get_account_no_data(&sysvar::fees::id()).unwrap();
+        let fees = from_account_no_data::<Fees>(&fees_account).unwrap();
         assert_eq!(
             bank.fee_calculator.lamports_per_signature,
             fees.fee_calculator.lamports_per_signature
@@ -9008,7 +9007,7 @@ pub(crate) mod tests {
         let bank0 = Arc::new(new_from_parent(&parent));
         let pubkey0 = solana_sdk::pubkey::new_rand();
         let program_id = Pubkey::new(&[2; 32]);
-        let account0 = Account::new(1, 0, &program_id);
+        let account0 = AccountNoData::new(1, 0, &program_id);
         bank0.store_account(&pubkey0, &account0);
 
         assert_eq!(
@@ -9033,11 +9032,11 @@ pub(crate) mod tests {
 
         let bank2 = Arc::new(new_from_parent(&bank1));
         let pubkey1 = solana_sdk::pubkey::new_rand();
-        let account1 = Account::new(3, 0, &program_id);
+        let account1 = AccountNoData::new(3, 0, &program_id);
         bank2.store_account(&pubkey1, &account1);
         // Accounts with 0 lamports should be filtered out by Accounts::load_by_program()
         let pubkey2 = solana_sdk::pubkey::new_rand();
-        let account2 = Account::new(0, 0, &program_id);
+        let account2 = AccountNoData::new(0, 0, &program_id);
         bank2.store_account(&pubkey2, &account2);
 
         let bank3 = Arc::new(new_from_parent(&bank2));
@@ -9059,7 +9058,7 @@ pub(crate) mod tests {
 
         let address = Pubkey::new_unique();
         let program_id = Pubkey::new_unique();
-        let account = Account::new(1, 0, &program_id);
+        let account = AccountNoData::new(1, 0, &program_id);
         bank.store_account(&address, &account);
 
         let indexed_accounts =
@@ -9071,7 +9070,7 @@ pub(crate) mod tests {
         // it is still present in the index under the original program id as well. This
         // demonstrates the need for a redundant post-processing filter.
         let another_program_id = Pubkey::new_unique();
-        let new_account = Account::new(1, 0, &another_program_id);
+        let new_account = AccountNoData::new(1, 0, &another_program_id);
         let bank = Arc::new(new_from_parent(&bank));
         bank.store_account(&address, &new_account);
         let indexed_accounts =
@@ -9085,12 +9084,12 @@ pub(crate) mod tests {
 
         // Post-processing filter
         let indexed_accounts = bank
-            .get_filtered_indexed_accounts(&IndexKey::ProgramId(program_id), |account: &Account| {
+            .get_filtered_indexed_accounts(&IndexKey::ProgramId(program_id), |account: &AccountNoData| {
                 *account.owner() == program_id
             });
         assert!(indexed_accounts.is_empty());
         let indexed_accounts = bank
-            .get_filtered_indexed_accounts(&IndexKey::ProgramId(another_program_id), |account:&Account| {
+            .get_filtered_indexed_accounts(&IndexKey::ProgramId(another_program_id), |account:&AccountNoData| {
                 *account.owner() == another_program_id
             });
         assert_eq!(indexed_accounts.len(), 1);
@@ -9136,13 +9135,13 @@ pub(crate) mod tests {
             Err(InstructionError::Custom(42))
         }
 
-        assert!(bank.get_account(&mock_vote_program_id()).is_none());
+        assert!(bank.get_account_no_data(&mock_vote_program_id()).is_none());
         bank.add_builtin(
             "mock_vote_program",
             mock_vote_program_id(),
             mock_vote_processor,
         );
-        assert!(bank.get_account(&mock_vote_program_id()).is_some());
+        assert!(bank.get_account_no_data(&mock_vote_program_id()).is_some());
 
         let mock_account = Keypair::new();
         let mock_validator_identity = Keypair::new();
@@ -9210,13 +9209,13 @@ pub(crate) mod tests {
             bank.last_blockhash(),
         );
 
-        let vote_loader_account = bank.get_account(&solana_vote_program::id()).unwrap();
+        let vote_loader_account = bank.get_account_no_data(&solana_vote_program::id()).unwrap();
         bank.add_builtin(
             "solana_vote_program",
             solana_vote_program::id(),
             mock_vote_processor,
         );
-        let new_vote_loader_account = bank.get_account(&solana_vote_program::id()).unwrap();
+        let new_vote_loader_account = bank.get_account_no_data(&solana_vote_program::id()).unwrap();
         // Vote loader account should not be updated since it was included in the genesis config.
         assert_eq!(vote_loader_account.data, new_vote_loader_account.data);
         assert_eq!(
@@ -9264,11 +9263,11 @@ pub(crate) mod tests {
         assert_eq!(bank.calculate_capitalization(), bank.capitalization());
         assert_eq!(
             "mock_program1",
-            String::from_utf8_lossy(&bank.get_account(&vote_id).unwrap_or_default().data)
+            String::from_utf8_lossy(&bank.get_account_no_data(&vote_id).unwrap_or_default().data)
         );
         assert_eq!(
             "mock_program2",
-            String::from_utf8_lossy(&bank.get_account(&stake_id).unwrap_or_default().data)
+            String::from_utf8_lossy(&bank.get_account_no_data(&stake_id).unwrap_or_default().data)
         );
 
         // Re-adding builtin programs should be no-op
@@ -9284,11 +9283,11 @@ pub(crate) mod tests {
         assert_eq!(bank.calculate_capitalization(), bank.capitalization());
         assert_eq!(
             "mock_program1",
-            String::from_utf8_lossy(&bank.get_account(&vote_id).unwrap_or_default().data)
+            String::from_utf8_lossy(&bank.get_account_no_data(&vote_id).unwrap_or_default().data)
         );
         assert_eq!(
             "mock_program2",
-            String::from_utf8_lossy(&bank.get_account(&stake_id).unwrap_or_default().data)
+            String::from_utf8_lossy(&bank.get_account_no_data(&stake_id).unwrap_or_default().data)
         );
     }
 
@@ -9297,9 +9296,9 @@ pub(crate) mod tests {
         let (genesis_config, _mint_keypair) = create_genesis_config(500);
         let mut bank = Arc::new(Bank::new(&genesis_config));
         for i in 1..5 {
-            let bhq_account = bank.get_account(&sysvar::recent_blockhashes::id()).unwrap();
+            let bhq_account = bank.get_account_no_data(&sysvar::recent_blockhashes::id()).unwrap();
             let recent_blockhashes =
-                from_account::<sysvar::recent_blockhashes::RecentBlockhashes>(&bhq_account)
+                from_account_no_data::<sysvar::recent_blockhashes::RecentBlockhashes>(&bhq_account)
                     .unwrap();
             // Check length
             assert_eq!(recent_blockhashes.len(), i);
@@ -9317,9 +9316,9 @@ pub(crate) mod tests {
         let mut bank = Arc::new(Bank::new(&genesis_config));
         goto_end_of_slot(Arc::get_mut(&mut bank).unwrap());
 
-        let bhq_account = bank.get_account(&sysvar::recent_blockhashes::id()).unwrap();
+        let bhq_account = bank.get_account_no_data(&sysvar::recent_blockhashes::id()).unwrap();
         let recent_blockhashes =
-            from_account::<sysvar::recent_blockhashes::RecentBlockhashes>(&bhq_account).unwrap();
+            from_account_no_data::<sysvar::recent_blockhashes::RecentBlockhashes>(&bhq_account).unwrap();
 
         let sysvar_recent_blockhash = recent_blockhashes[0].blockhash;
         let bank_last_blockhash = bank.last_blockhash();
@@ -9425,7 +9424,7 @@ pub(crate) mod tests {
     }
 
     fn get_nonce_account(bank: &Bank, nonce_pubkey: &Pubkey) -> Option<Hash> {
-        bank.get_account(&nonce_pubkey).and_then(|acc| {
+        bank.get_account_no_data(&nonce_pubkey).and_then(|acc| {
             let state =
                 StateMut::<nonce::state::Versions>::state(&acc).map(|v| v.convert_to_current());
             match state {
@@ -9516,10 +9515,10 @@ pub(crate) mod tests {
             &[&custodian_keypair, &nonce_keypair],
             nonce_hash,
         );
-        let nonce_account = bank.get_account(&nonce_pubkey).unwrap();
+        let nonce_account = bank.get_account_no_data(&nonce_pubkey).unwrap();
         assert_eq!(
             bank.check_tx_durable_nonce(&tx),
-            Some((nonce_pubkey, Account::to_account_no_data(nonce_account)))
+            Some((nonce_pubkey, nonce_account))
         );
     }
 
@@ -9610,7 +9609,7 @@ pub(crate) mod tests {
         let (genesis_config, _mint_keypair) = create_genesis_config(100_000_000);
         let bank = Arc::new(Bank::new(&genesis_config));
         let nonce = Keypair::new();
-        let nonce_account = Account::new_data(
+        let nonce_account = AccountNoData::new_data(
             42_424_242,
             &nonce::state::Versions::new_current(nonce::State::Initialized(
                 nonce::state::Data::default(),
@@ -9754,8 +9753,8 @@ pub(crate) mod tests {
         debug!("alice: {}", alice_pubkey);
         debug!("custodian: {}", custodian_pubkey);
         debug!("nonce: {}", nonce_pubkey);
-        debug!("nonce account: {:?}", bank.get_account(&nonce_pubkey));
-        debug!("cust: {:?}", bank.get_account(&custodian_pubkey));
+        debug!("nonce account: {:?}", bank.get_account_no_data(&nonce_pubkey));
+        debug!("cust: {:?}", bank.get_account_no_data(&custodian_pubkey));
         let nonce_hash = get_nonce_account(&bank, &nonce_pubkey).unwrap();
 
         for _ in 0..MAX_RECENT_BLOCKHASHES + 1 {
@@ -9799,7 +9798,7 @@ pub(crate) mod tests {
 
         // Grab the hash and fee_calculator stored in the nonce account
         let (stored_nonce_hash, stored_fee_calculator) = bank
-            .get_account(&nonce_pubkey)
+            .get_account_no_data(&nonce_pubkey)
             .and_then(|acc| {
                 let state =
                     StateMut::<nonce::state::Versions>::state(&acc).map(|v| v.convert_to_current());
@@ -9836,7 +9835,7 @@ pub(crate) mod tests {
 
         // Grab the new hash and fee_calculator; both should be updated
         let (nonce_hash, fee_calculator) = bank
-            .get_account(&nonce_pubkey)
+            .get_account_no_data(&nonce_pubkey)
             .and_then(|acc| {
                 let state =
                     StateMut::<nonce::state::Versions>::state(&acc).map(|v| v.convert_to_current());
@@ -9863,9 +9862,9 @@ pub(crate) mod tests {
         let pubkey0 = solana_sdk::pubkey::new_rand();
         let pubkey1 = solana_sdk::pubkey::new_rand();
         let program_id = Pubkey::new(&[2; 32]);
-        let keypair_account = Account::new(8, 0, &program_id);
-        let account0 = Account::new(11, 0, &program_id);
-        let program_account = Account::new(1, 10, &Pubkey::default());
+        let keypair_account = AccountNoData::new(8, 0, &program_id);
+        let account0 = AccountNoData::new(11, 0, &program_id);
+        let program_account = AccountNoData::new(1, 10, &Pubkey::default());
         bank0.store_account(&keypair.pubkey(), &keypair_account);
         bank0.store_account(&pubkey0, &account0);
         bank0.store_account(&program_id, &program_account);
@@ -9915,9 +9914,9 @@ pub(crate) mod tests {
         let pubkey0 = solana_sdk::pubkey::new_rand();
         let pubkey1 = solana_sdk::pubkey::new_rand();
         let pubkey2 = solana_sdk::pubkey::new_rand();
-        let keypair0_account = Account::new(8, 0, &Pubkey::default());
-        let keypair1_account = Account::new(9, 0, &Pubkey::default());
-        let account0 = Account::new(11, 0, &&Pubkey::default());
+        let keypair0_account = AccountNoData::new(8, 0, &Pubkey::default());
+        let keypair1_account = AccountNoData::new(9, 0, &Pubkey::default());
+        let account0 = AccountNoData::new(11, 0, &&Pubkey::default());
         bank0.store_account(&keypair0.pubkey(), &keypair0_account);
         bank0.store_account(&keypair1.pubkey(), &keypair1_account);
         bank0.store_account(&pubkey0, &account0);
@@ -9992,8 +9991,8 @@ pub(crate) mod tests {
         let from_pubkey = solana_sdk::pubkey::new_rand();
         let to_pubkey = solana_sdk::pubkey::new_rand();
         let dup_pubkey = from_pubkey;
-        let from_account = Account::new(100, 1, &mock_program_id);
-        let to_account = Account::new(0, 1, &mock_program_id);
+        let from_account = AccountNoData::new(100, 1, &mock_program_id);
+        let to_account = AccountNoData::new(0, 1, &mock_program_id);
         bank.store_account(&from_pubkey, &from_account);
         bank.store_account(&to_pubkey, &to_account);
 
@@ -10037,8 +10036,8 @@ pub(crate) mod tests {
         let from_pubkey = solana_sdk::pubkey::new_rand();
         let to_pubkey = solana_sdk::pubkey::new_rand();
         let dup_pubkey = from_pubkey;
-        let from_account = Account::new(100, 1, &mock_program_id);
-        let to_account = Account::new(0, 1, &mock_program_id);
+        let from_account = AccountNoData::new(100, 1, &mock_program_id);
+        let to_account = AccountNoData::new(0, 1, &mock_program_id);
         bank.store_account(&from_pubkey, &from_account);
         bank.store_account(&to_pubkey, &to_account);
 
@@ -10091,7 +10090,7 @@ pub(crate) mod tests {
         );
         let result = bank.process_transaction(&tx);
         assert_eq!(result, Ok(()));
-        let account = bank.get_account(&solana_vote_program::id()).unwrap();
+        let account = bank.get_account_no_data(&solana_vote_program::id()).unwrap();
         info!("account: {:?}", account);
         assert!(account.executable);
     }
@@ -10281,7 +10280,7 @@ pub(crate) mod tests {
                     };
                     let space = thread_rng().gen_range(0, 10);
                     let owner = Pubkey::default();
-                    let account = Account::new(lamports, space, &owner);
+                    let account = AccountNoData::new(lamports, space, &owner);
                     bank.store_account(&key, &account);
                     lamports
                 } else {
@@ -10395,9 +10394,9 @@ pub(crate) mod tests {
                 assert_eq!(bank.get_balance(key), *balance);
             }
             for (key, name) in &program_keys {
-                let account = bank.get_account(key).unwrap();
+                let account = bank.get_account_no_data(key).unwrap();
                 assert!(account.executable);
-                assert_eq!(account.data, *name);
+                assert_eq!(account.data.to_vec(), *name);
             }
             info!("result: {:?}", result);
             let result_key = format!("{:?}", result);
@@ -10413,7 +10412,7 @@ pub(crate) mod tests {
         let mut genesis_config = GenesisConfig::new(
             &[(
                 Pubkey::new(&[42; 32]),
-                Account::new(1_000_000_000_000, 0, &system_program::id()),
+                AccountNoData::new(1_000_000_000_000, 0, &system_program::id()),
             )],
             &[],
         );
@@ -10477,7 +10476,7 @@ pub(crate) mod tests {
 
         // Add a new program owned by the first
         let program2_pubkey = solana_sdk::pubkey::new_rand();
-        let mut program2_account = Account::new(42, 1, &program1_pubkey);
+        let mut program2_account = AccountNoData::new(42, 1, &program1_pubkey);
         program2_account.executable = true;
         bank.store_account(&program2_pubkey, &program2_account);
 
@@ -10536,7 +10535,7 @@ pub(crate) mod tests {
 
         let pubkey0_size = get_shrink_account_size();
 
-        let account0 = Account::new(1000, pubkey0_size as usize, &Pubkey::new_unique());
+        let account0 = AccountNoData::new(1000, pubkey0_size as usize, &Pubkey::new_unique());
         bank0.store_account(&pubkey0, &account0);
 
         goto_end_of_slot(Arc::<Bank>::get_mut(&mut bank0).unwrap());
@@ -11000,7 +10999,7 @@ pub(crate) mod tests {
         );
 
         let native_mint_account = bank
-            .get_account(&inline_spl_token_v2_0::native_mint::id())
+            .get_account_no_data(&inline_spl_token_v2_0::native_mint::id())
             .unwrap();
         assert_eq!(native_mint_account.data.len(), 82);
         assert_eq!(
@@ -11025,7 +11024,7 @@ pub(crate) mod tests {
         );
 
         let native_mint_account = bank
-            .get_account(&inline_spl_token_v2_0::native_mint::id())
+            .get_account_no_data(&inline_spl_token_v2_0::native_mint::id())
             .unwrap();
         assert_eq!(native_mint_account.data.len(), 82);
         assert_eq!(
@@ -11049,7 +11048,7 @@ pub(crate) mod tests {
         let reward_pubkey = solana_sdk::pubkey::new_rand();
         genesis_config.rewards_pools.insert(
             reward_pubkey,
-            Account::new(u64::MAX, 0, &solana_sdk::pubkey::new_rand()),
+            AccountNoData::new(u64::MAX, 0, &solana_sdk::pubkey::new_rand()),
         );
         genesis_config.disable_cap_altering_features_for_preciseness();
         let bank0 = Bank::new(&genesis_config);
@@ -11066,7 +11065,7 @@ pub(crate) mod tests {
         );
 
         // assert that everything gets in order....
-        assert!(bank1.get_account(&reward_pubkey).is_none());
+        assert!(bank1.get_account_no_data(&reward_pubkey).is_none());
         assert_eq!(
             bank0.capitalization() + 1 + 1_000_000_000,
             bank1.capitalization()
@@ -11162,8 +11161,8 @@ pub(crate) mod tests {
         };
 
         let loaders = &[
-            vec![(key3, Account::default()), (key4, Account::default())],
-            vec![(key1, Account::default())],
+            vec![(key3, AccountNoData::default()), (key4, AccountNoData::default())],
+            vec![(key1, AccountNoData::default())],
         ];
 
         // don't do any work if not dirty
@@ -11225,7 +11224,7 @@ pub(crate) mod tests {
         let key2 = solana_sdk::pubkey::new_rand();
         let executor: Arc<dyn Executor> = Arc::new(TestExecutor {});
 
-        let loaders = &[vec![(key1, Account::default()), (key2, Account::default())]];
+        let loaders = &[vec![(key1, AccountNoData::default()), (key2, AccountNoData::default())]];
 
         // add one to root bank
         let mut executors = Executors::default();
@@ -11287,13 +11286,13 @@ pub(crate) mod tests {
         // Request `test_feature` activation
         let feature = Feature::default();
         assert_eq!(feature.activated_at, None);
-        bank.store_account(&test_feature, &feature::create_account(&feature, 42));
+        bank.store_account(&test_feature, &feature::create_account_no_data(&feature, 42));
 
         // Run `compute_active_feature_set` disallowing new activations
         let new_activations = bank.compute_active_feature_set(false);
         assert!(new_activations.is_empty());
         assert!(!bank.feature_set.is_active(&test_feature));
-        let feature = feature::from_account_no_data(&bank.get_account(&test_feature).expect("get_account"))
+        let feature = feature::from_account_no_data(&bank.get_account_no_data(&test_feature).expect("get_account_no_data"))
             .expect("from_account");
         assert_eq!(feature.activated_at, None);
 
@@ -11301,7 +11300,7 @@ pub(crate) mod tests {
         let new_activations = bank.compute_active_feature_set(true);
         assert_eq!(new_activations.len(), 1);
         assert!(bank.feature_set.is_active(&test_feature));
-        let feature = feature::from_account_no_data(&bank.get_account(&test_feature).expect("get_account"))
+        let feature = feature::from_account_no_data(&bank.get_account_no_data(&test_feature).expect("get_account_no_data"))
             .expect("from_account");
         assert_eq!(feature.activated_at, Some(1));
 
@@ -11324,19 +11323,19 @@ pub(crate) mod tests {
         // Setup original token account
         bank.store_account_and_update_capitalization(
             &inline_spl_token_v2_0::id(),
-            &Account {
+            &AccountNoData {
                 lamports: 100,
-                ..Account::default()
+                ..AccountNoData::default()
             },
         );
         assert_eq!(bank.get_balance(&inline_spl_token_v2_0::id()), 100);
 
         // Setup new token account
-        let new_token_account = Account {
+        let new_token_account = AccountNoData {
             lamports: 123,
-            data: vec![1, 2, 3],
+            data: Arc::new(vec![1, 2, 3]),
             executable: true,
-            ..Account::default()
+            ..AccountNoData::default()
         };
         bank.store_account_and_update_capitalization(
             &inline_spl_token_v2_0::new_token_program::id(),
@@ -11359,7 +11358,7 @@ pub(crate) mod tests {
 
         // Old token account holds the new token account
         assert_eq!(
-            bank.get_account(&inline_spl_token_v2_0::id()),
+            bank.get_account_no_data(&inline_spl_token_v2_0::id()),
             Some(new_token_account)
         );
 
@@ -11372,7 +11371,7 @@ pub(crate) mod tests {
         bank: &Bank,
         vote_pubkey: &Pubkey,
     ) {
-        let mut vote_account = bank.get_account(vote_pubkey).unwrap_or_default();
+        let mut vote_account = bank.get_account_no_data(vote_pubkey).unwrap_or_default();
         let mut vote_state = VoteState::from(&vote_account).unwrap_or_default();
         vote_state.last_timestamp = timestamp;
         let versioned = VoteStateVersions::new_current(vote_state);
@@ -11391,7 +11390,7 @@ pub(crate) mod tests {
         // inhibit deprecated rewards sysvar creation altogether
         genesis_config.accounts.insert(
             feature_set::deprecate_rewards_sysvar::id(),
-            feature::create_account(
+            feature::create_account_no_data(
                 &Feature {
                     activated_at: Some(0),
                 },
@@ -11405,7 +11404,7 @@ pub(crate) mod tests {
         // schedule activation of simple capitalization
         bank1.store_account_and_update_capitalization(
             &feature_set::simple_capitalization::id(),
-            &feature::create_account(&Feature { activated_at: None }, feature_balance),
+            &feature::create_account_no_data(&Feature { activated_at: None }, feature_balance),
         );
 
         // 12 is minimum adjusted cap increase in adjust_capitalization_for_existing_specially_retained_accounts
@@ -11479,7 +11478,7 @@ pub(crate) mod tests {
         // schedule activation of simple capitalization
         bank1.store_account_and_update_capitalization(
             &feature_set::simple_capitalization::id(),
-            &feature::create_account(&Feature { activated_at: None }, feature_balance),
+            &feature::create_account_no_data(&Feature { activated_at: None }, feature_balance),
         );
 
         // 16 is maximum adjusted cap increase in adjust_capitalization_for_existing_specially_retained_accounts
@@ -11632,7 +11631,7 @@ pub(crate) mod tests {
         let feature = Feature { activated_at: None };
         bank.store_account(
             &feature_set::warp_timestamp_again::id(),
-            &feature::create_account(&feature, 42),
+            &feature::create_account_no_data(&feature, 42),
         );
         let previous_epoch_timestamp = bank.clock().epoch_start_timestamp;
         let previous_timestamp = bank.clock().unix_timestamp;
@@ -11840,7 +11839,7 @@ pub(crate) mod tests {
             .collect();
         let program_id = system_program::id();
         let starting_lamports = 1;
-        let starting_account = Account::new(starting_lamports, 0, &program_id);
+        let starting_account = AccountNoData::new(starting_lamports, 0, &program_id);
 
         // Write accounts to the store
         for key in &all_pubkeys {
@@ -11945,7 +11944,7 @@ pub(crate) mod tests {
                                 &solana_sdk::pubkey::new_rand(),
                                 current_minor_fork_bank.slot() + 2,
                             ));
-                            let account = Account::new(lamports, 0, &program_id);
+                            let account = AccountNoData::new(lamports, 0, &program_id);
                             // Write partial updates to each of the banks in the minor fork so if any of them
                             // get cleaned up, there will be keys with the wrong account value/missing.
                             for key in pubkeys_to_modify {
@@ -11971,7 +11970,7 @@ pub(crate) mod tests {
                             current_minor_fork_bank.slot() - 1,
                         ));
                         let lamports = current_major_fork_bank.slot() + starting_lamports + 1;
-                        let account = Account::new(lamports, 0, &program_id);
+                        let account = AccountNoData::new(lamports, 0, &program_id);
                         for key in pubkeys_to_modify.iter() {
                             // Store rooted updates to these pubkeys such that the minor
                             // fork updates to the same keys will be deleted by clean
@@ -12017,7 +12016,7 @@ pub(crate) mod tests {
                     let mut prev_bank = bank0;
                     loop {
                         let lamports_this_round = current_bank.slot() + starting_lamports + 1;
-                        let account = Account::new(lamports_this_round, 0, &program_id);
+                        let account = AccountNoData::new(lamports_this_round, 0, &program_id);
                         for key in pubkeys_to_modify.iter() {
                             current_bank.store_account(key, &account);
                         }
@@ -12063,7 +12062,7 @@ pub(crate) mod tests {
             .next()
             .copied()
             .unwrap();
-        let mut bootstrap_stake_account = bank.get_account(&bootstrap_stake_pubkey).unwrap();
+        let mut bootstrap_stake_account = bank.get_account_no_data(&bootstrap_stake_pubkey).unwrap();
         bootstrap_stake_account.lamports = 10000000;
         bank.store_account(&bootstrap_stake_pubkey, &bootstrap_stake_account);
 
@@ -12099,7 +12098,7 @@ pub(crate) mod tests {
         // Request `pico_inflation` activation
         bank.store_account(
             &feature_set::pico_inflation::id(),
-            &feature::create_account(
+            &feature::create_account_no_data(
                 &Feature {
                     activated_at: Some(1),
                 },
@@ -12117,7 +12116,7 @@ pub(crate) mod tests {
         // which takes priority over pico_inflation
         bank.store_account(
             &feature_set::full_inflation::devnet_and_testnet::id(),
-            &feature::create_account(
+            &feature::create_account_no_data(
                 &Feature {
                     activated_at: Some(2),
                 },
@@ -12131,7 +12130,7 @@ pub(crate) mod tests {
         // which should have no effect on `get_inflation_start_slot`
         bank.store_account(
             &feature_set::full_inflation::mainnet::certusone::vote::id(),
-            &feature::create_account(
+            &feature::create_account_no_data(
                 &Feature {
                     activated_at: Some(3),
                 },
@@ -12140,7 +12139,7 @@ pub(crate) mod tests {
         );
         bank.store_account(
             &feature_set::full_inflation::mainnet::certusone::enable::id(),
-            &feature::create_account(
+            &feature::create_account_no_data(
                 &Feature {
                     activated_at: Some(3),
                 },
@@ -12180,7 +12179,7 @@ pub(crate) mod tests {
         // Request `pico_inflation` activation
         bank.store_account(
             &feature_set::pico_inflation::id(),
-            &feature::create_account(
+            &feature::create_account_no_data(
                 &Feature {
                     activated_at: Some(1),
                 },
@@ -12198,7 +12197,7 @@ pub(crate) mod tests {
         // which takes priority over pico_inflation
         bank.store_account(
             &feature_set::full_inflation::mainnet::certusone::vote::id(),
-            &feature::create_account(
+            &feature::create_account_no_data(
                 &Feature {
                     activated_at: Some(2),
                 },
@@ -12207,7 +12206,7 @@ pub(crate) mod tests {
         );
         bank.store_account(
             &feature_set::full_inflation::mainnet::certusone::enable::id(),
-            &feature::create_account(
+            &feature::create_account_no_data(
                 &Feature {
                     activated_at: Some(2),
                 },
@@ -12225,7 +12224,7 @@ pub(crate) mod tests {
         // which should have no effect on `get_inflation_start_slot`
         bank.store_account(
             &feature_set::full_inflation::devnet_and_testnet::id(),
-            &feature::create_account(
+            &feature::create_account_no_data(
                 &Feature {
                     activated_at: Some(bank.slot()),
                 },
@@ -12267,7 +12266,7 @@ pub(crate) mod tests {
         let pico_inflation_activation_slot = bank.slot();
         bank.store_account(
             &feature_set::pico_inflation::id(),
-            &feature::create_account(
+            &feature::create_account_no_data(
                 &Feature {
                     activated_at: Some(pico_inflation_activation_slot),
                 },
@@ -12285,7 +12284,7 @@ pub(crate) mod tests {
         let full_inflation_activation_slot = bank.slot();
         bank.store_account(
             &feature_set::full_inflation::devnet_and_testnet::id(),
-            &feature::create_account(
+            &feature::create_account_no_data(
                 &Feature {
                     activated_at: Some(full_inflation_activation_slot),
                 },
@@ -12338,7 +12337,7 @@ pub(crate) mod tests {
         assert_eq!(stake_delegation_accounts.len(), 2);
 
         let mut vote_account = bank
-            .get_account(&validator_vote_keypairs0.vote_keypair.pubkey())
+            .get_account_no_data(&validator_vote_keypairs0.vote_keypair.pubkey())
             .unwrap_or_default();
         let original_lamports = vote_account.lamports;
         vote_account.lamports = 0;
@@ -12364,7 +12363,7 @@ pub(crate) mod tests {
         // modified with malicious data
         let bogus_stake_program = Pubkey::new_unique();
         let mut stake_account = bank
-            .get_account(&validator_vote_keypairs1.stake_keypair.pubkey())
+            .get_account_no_data(&validator_vote_keypairs1.stake_keypair.pubkey())
             .unwrap_or_default();
         stake_account.owner = bogus_stake_program;
         bank.store_account(

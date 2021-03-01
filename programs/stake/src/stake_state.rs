@@ -1516,9 +1516,9 @@ pub fn redeem_rewards<T:AnAccountConcrete + StateMut<StakeState> + StateMut<Vote
 }
 
 // utility function, used by runtime
-pub fn calculate_points<T:AnAccountConcrete + StateMut<StakeState> + StateMut<VoteStateVersions>>(
-    stake_account: &T,
-    vote_account: &T,
+pub fn calculate_points(
+    stake_account: &AccountNoData,
+    vote_account: &AccountNoData,
     stake_history: Option<&StakeHistory>,
     fix_stake_deactivate: bool,
 ) -> Result<u128, InstructionError> {
@@ -1623,8 +1623,8 @@ pub fn create_lockup_stake_account(
     lockup: &Lockup,
     rent: &Rent,
     lamports: u64,
-) -> Account {
-    let mut stake_account = Account::new(lamports, std::mem::size_of::<StakeState>(), &id());
+) -> AccountNoData {
+    let mut stake_account = AccountNoData::new(lamports, std::mem::size_of::<StakeState>(), &id());
 
     let rent_exempt_reserve = rent.minimum_balance(stake_account.data.len());
     assert!(

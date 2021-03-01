@@ -323,6 +323,17 @@ impl AccountNoData {
             ..Self::default()
         }
     }
+    pub fn new_ref(lamports: u64, space: usize, owner: &Pubkey) -> Rc<RefCell<Self>> {
+        Rc::new(RefCell::new(Self::new(lamports, space, owner)))
+    }
+    pub fn new_ref_data<T: serde::Serialize>(
+        lamports: u64,
+        state: &T,
+        owner: &Pubkey,
+    ) -> Result<RefCell<Self>, bincode::Error> {
+        Ok(RefCell::new(Self::new_data(lamports, state, owner)?))
+    }
+
 }
 
 impl Account {
