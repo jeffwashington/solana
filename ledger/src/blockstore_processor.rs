@@ -190,6 +190,7 @@ fn execute_batches(
 ) -> Result<()> {
     inc_new_counter_debug!("bank-par_execute_entries-count", batches.len());
     timings.batch_count += batches.len();
+    error!("Batches: {:?}", batches.len());
     let mut keys = batches
         .iter()
         .map(|item| {
