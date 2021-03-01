@@ -846,7 +846,7 @@ impl Executor for BPFExecutor {
         m4.stop();
 
         m.stop();
-        invoke_context.report_times(m.as_us(), m2.as_us(), m3.as_us(), m4.as_us());
+        invoke_context.report_times(m.as_us(), m2.as_us(), m3.as_us(), m4.as_us(), 0, 0, 0);
         stable_log::program_success(&logger, program_id);
         Ok(())
     }
