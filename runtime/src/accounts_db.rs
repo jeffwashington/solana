@@ -4864,8 +4864,10 @@ impl AccountsDB {
         let hashes: Vec<_> = (*accounts).par_iter().map(|(pubkey, account)| {
             Self::hash_account(slot, *account, pubkey, cluster_type)
             sz += account.data.len();
+            sz
         }).collect();
         t.stop();
+        let sz = sz.into_iter().sum::<usize>();
         let mut t2 = Measure::start("");
         let hashes: Vec<_> = (*accounts).par_iter().map(|(pubkey, account)| {
             Self::hash_account(slot, *account, pubkey, cluster_type)
