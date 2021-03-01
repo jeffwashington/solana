@@ -10,6 +10,40 @@ use solana_sdk::{
     pubkey::Pubkey,
 };
 use std::{cell::RefCell, fmt::Debug, rc::Rc, sync::Arc};
+use crate::timing::duration_as_ns;
+use std::{fmt, time::Instant};
+
+pub struct Measure {
+    pub name: &'static str,
+    pub start: Instant,
+    pub duration: u64,
+}
+
+impl Measure {
+    pub fn start(name: &'static str) -> Self {
+        Self {
+            name,
+            start: Instant::now(),
+            duration: 0,
+        }
+    }
+
+    pub fn stop(&mut self) {
+        self.duration = duration_as_ns(&self.start.elapsed());
+    }
+
+    pub fn as_us(&self) -> u64 {
+        self.duration / 1000
+    }
+
+    pub fn as_ms(&self) -> u64 {
+        self.duration / (1000 * 1000)
+    }
+
+    pub fn as_s(&self) -> f32 {
+        self.duration as f32 / (1000.0f32 * 1000.0f32 * 1000.0f32)
+    }
+}
 
 // Prototype of a native loader entry point
 ///
@@ -66,7 +100,7 @@ pub trait InvokeContext {
     fn get_account(&self, pubkey: &Pubkey) -> Option<RefCell<AccountNoData>>;
     /// Notify caller when account data field was modified
     fn account_data_modified(&self, pubkey: &Pubkey);
-    fn report_times(&mut self, t1: u64, t2: u64, t3: u64, t4: u64);
+    fn report_times(&mut self, t1: u64, t2: u64, t3: u64, t4: u64, data_copied_time: u64, data_copied_count: u64, data_not_copied: u64);
 }
 
 /// Convenience macro to log a message with an `Rc<RefCell<dyn Logger>>`
@@ -333,7 +367,7 @@ impl InvokeContext for MockInvokeContext {
         self.invoke_depth += 1;
         Ok(())
     }
-    fn report_times(&mut self, t1: u64, t2: u64, t3: u64, t4: u64)
+    fn report_times(&mut self, t1: u64, t2: u64, t3: u64, t4: u64, data_copied_time: u64, data_copied_count: u64, data_not_copied: u64)
     {
         // nothing
     }

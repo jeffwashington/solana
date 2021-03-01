@@ -344,12 +344,15 @@ impl<'a> InvokeContext for ThisInvokeContext<'a> {
     fn account_data_modified(&self, _pubkey: &Pubkey) {
         // TODO: add to hashset indicating modification of data
     }
-    fn report_times(&mut self, t1: u64, t2: u64, t3: u64, t4: u64)
+    fn report_times(&mut self, t1: u64, t2: u64, t3: u64, t4: u64, data_copied_time: u64, data_copied_count: u64, data_not_copied: u64)
     {
         self.timings.t1 += t1;
         self.timings.t2 += t2;
         self.timings.t3 += t3;
         self.timings.t4 += t4;
+        self.timings.data_copied += data_copied_time;
+        self.timings.data_copied_count += data_copied_count;
+        self.timings.data_not_copied += data_not_copied;
     }
 }
 pub struct ThisLogger {
