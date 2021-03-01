@@ -251,7 +251,7 @@ impl Accounts {
                 })
                 .collect();
             timej.stop();
-            let par = false;
+            let par = true;
             //let mut accounts = Vec::with_capacity(accounts2.len());
             timings.is_non_loader += timej.as_us();
             timej = Measure::start("");
