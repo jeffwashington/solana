@@ -9,6 +9,7 @@ use std::{
     mem::{align_of, size_of},
     sync::Arc,
 };
+use solana_measure::measure::Measure;
 
 /// Look for a duplicate account and return its position if found
 pub fn is_dup(accounts: &[KeyedAccount], keyed_account: &KeyedAccount) -> (bool, usize) {
@@ -243,7 +244,7 @@ pub fn deserialize_parameters_aligned(
                 context.account_data_modified(keyed_account.unsigned_key());
                 Arc::make_mut(&mut account.data).clone_from_slice(&buffer[start..data_end]);
             }
-            m1.end();
+            m1.stop();
             context.report_times(0, 0, 0, 0, m1.as_us(), count, 1-count);
             start += pre_len + MAX_PERMITTED_DATA_INCREASE; // data
             start += (start as *const u8).align_offset(align_of::<u128>());
