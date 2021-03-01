@@ -4859,17 +4859,16 @@ impl AccountsDB {
         let mut stats = BankHashStats::default();
         let mut total_data = 0;
 
-        let mut sz = 0;
         let mut t = Measure::start("");
-        let hashes: Vec<_> = (*accounts).par_iter().map(|(pubkey, account)| {
-            Self::hash_account(slot, *account, pubkey, cluster_type)
+        let sz: Vec<_> = (*accounts).par_iter().map(|(pubkey, account)| {
+            Self::hash_account(slot, *account, pubkey, cluster_type);
             let sz = account.data.len();
             sz
         }).collect();
         t.stop();
         let sz = sz.into_iter().sum::<usize>();
         let mut t2 = Measure::start("");
-        let hashes: Vec<_> = (*accounts).par_iter().map(|(pubkey, account)| {
+        let hashes: Vec<_> = (*accounts).iter().map(|(pubkey, account)| {
             Self::hash_account(slot, *account, pubkey, cluster_type)
         }).collect();
         t2.stop();
