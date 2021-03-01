@@ -20,6 +20,7 @@ use {
     },
     solana_sdk::{
         account::Account,
+        account::AccountNoData,
         clock::Slot,
         genesis_config::GenesisConfig,
         keyed_account::KeyedAccount,
@@ -646,7 +647,7 @@ impl ProgramTest {
         }
 
         for (address, account) in self.accounts.iter() {
-            if bank.get_account(&address).is_some() {
+            if bank.get_account_no_data(&address).is_some() {
                 info!("Overriding account at {}", address);
             }
             bank.store_account(&address, &account);
@@ -831,7 +832,7 @@ impl ProgramTestContext {
         let bank = bank_forks.working_bank();
 
         // generate some vote activity for rewards
-        let mut vote_account = bank.get_account(vote_account_address).unwrap();
+        let mut vote_account = bank.get_account_no_data(vote_account_address).unwrap();
         let mut vote_state = VoteState::from(&vote_account).unwrap();
 
         let epoch = bank.epoch();
