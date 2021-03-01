@@ -345,6 +345,7 @@ impl Accounts {
                                     accounts.push(AccountNoData::default()); //
                                     timej2.stop();
                                     timings.load_6 += timej2.as_us();
+                                    timings.errors += 1;
                                     return;
                                 }
                             } else {
@@ -353,13 +354,14 @@ impl Accounts {
                                 accounts.push(AccountNoData::default()); //
                                 timej2.stop();
                                 timings.load_6 += timej2.as_us();
+                                timings.errors += 1;
                                 return;
                             }
                         }
+                        tx_rent += rent;
                         timej2.stop();
                         timings.load_6 += timej2.as_us();
 
-                        tx_rent += rent;
                         account
                     }
                 } else {
