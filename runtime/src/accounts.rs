@@ -253,22 +253,13 @@ impl Accounts {
             let mut accounts = Vec::with_capacity(accounts2.len());
             timings.is_non_loader += timej.as_us();
             timej = Measure::start("");
-            let mut timej_reset = Measure::start("");
             accounts2.iter().for_each(|(key, check, i)| {
-                timej_reset.stop();
-                timings.for_each += timej_reset.as_us();
 
-                let mut tj4 = Measure::start("");
                 let account = if *check {
                     let a_check = solana_sdk::sysvar::instructions::check_id(key)
                         && feature_set.is_active(&feature_set::instructions_sysvar_enabled::id());
-                    tj4.stop();
-                    timings.if1 += tj4.as_us();
                     if a_check {
-                        let mut tj3 = Measure::start("");
                         let msg = Self::construct_instructions_account(message);
-                        tj3.stop();
-                        timings.construct_instructions += tj3.as_us();
                         timings.construct_instructions_count += 1;
                         msg
                     } else {
@@ -288,7 +279,6 @@ impl Accounts {
                                     timings.non_cache_count += 1;
                                 }
                                 timings.real_load_count += 1;
-                                let mut tj5 = Measure::start("");
                                 let r = if message.is_writable(*i) {
                                     let rent_due = rent_collector.collect_from_existing_account(
                                         &key,
@@ -299,8 +289,6 @@ impl Accounts {
                                 } else {
                                     (account, 0)
                                 };
-                                tj5.stop();
-                                timings.non_cache_time_after += tj5.as_us();
                                 r
                             })
                             .unwrap_or_else(|| {
@@ -367,16 +355,11 @@ impl Accounts {
                 } else {
                     // Fill in an empty account for the program slots.
                     let r = AccountNoData::default();
-                    tj4.stop();
-                    timings.load_6 += tj4.as_us();
                     r
                 };
 
-                timej_reset = Measure::start("");
                 accounts.push(account);
             });
-            timej_reset.stop();
-            timings.for_each += timej_reset.as_us();
             timej.stop();
             timings.load_3 += timej.as_us();
             let mut timej = Measure::start("");

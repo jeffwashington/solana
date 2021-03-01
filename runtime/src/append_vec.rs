@@ -14,6 +14,7 @@ use std::{
     mem,
     path::{Path, PathBuf},
     sync::atomic::{AtomicUsize, Ordering},
+    sync::Arc,
     sync::Mutex,
 };
 
@@ -113,8 +114,14 @@ impl<'a> StoredAccountMeta<'a> {
     }
 
     pub fn clone_account_no_data(&self) -> AccountNoData {
-        let acct = self.clone_account();
-        Account::to_account_no_data(acct)
+        AccountNoData {
+            lamports: self.account_meta.lamports,
+            owner: self.account_meta.owner,
+            executable: self.account_meta.executable,
+            rent_epoch: self.account_meta.rent_epoch,
+            data: Arc::new(self.data.to_vec()),
+            from_cache: false,
+        }
     }
 
     fn sanitize(&self) -> bool {
