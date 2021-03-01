@@ -1041,6 +1041,7 @@ impl MessageProcessor {
             accounts,
             &rent_collector.rent,
         )?;
+        timings.accumulate(&invoke_context.timings);
         timej.stop(); timings.verify += timej.as_us();
         Ok(())
     }
