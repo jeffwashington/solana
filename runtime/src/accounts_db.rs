@@ -4964,13 +4964,20 @@ impl AccountsDB {
         }
         self.assert_frozen_accounts(accounts);
         let mut hash_time = Measure::start("hash_accounts");
-        let hashes = self.hash_accounts(
+        let delay = true;
+
+        let hashes = if delay {
+            accounts.iter().map(|i| Hash::default()).collect::<Vec<_>>()
+        }
+        else {
+            self.hash_accounts(
             slot,
             accounts,
             &self
                 .cluster_type
                 .expect("Cluster type must be set at initialization"),
-        );
+        )
+        };
         hash_time.stop();
         self.stats
             .store_hash_accounts

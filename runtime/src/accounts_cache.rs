@@ -51,7 +51,7 @@ impl SlotCacheInner {
             self.unique_account_writes_size
                 .fetch_add(account.data.len() as u64, Ordering::Relaxed);
         }
-        self.cache.insert(*pubkey, CachedAccount { account, hash });
+        self.cache.insert(*pubkey, CachedAccount { account, hash2: hash });
     }
 
     pub fn get_cloned(&self, pubkey: &Pubkey) -> Option<CachedAccount> {
@@ -87,15 +87,15 @@ impl Deref for SlotCacheInner {
 #[derive(Debug, Clone)]
 pub struct CachedAccount {
     pub account: AccountNoData,
-    hash: Hash,
+    hash2: Hash,
 }
 
 impl CachedAccount {
     pub fn hash_delayed(&self) -> &Hash {
-        &self.hash
+        &self.hash2
     }
     pub fn set_hash(&mut self, hash: Hash) {
-        self.hash = hash
+        self.hash2 = hash
     }
 }
 
