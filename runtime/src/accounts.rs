@@ -378,7 +378,6 @@ impl Accounts {
                 //let mut pubkey_index = vec![];
                 let mut not_found = 0;
                 let total=pubkeys.len();
-                error!("loading: {:?}, index: {:?}", pubkeys, pubkey_index);
                 self.accounts_db.load_cows(ancestors, &pubkeys[..]).into_iter().zip(pubkey_index.into_iter()).for_each(|(account_slot, i)| {
                     if let Some((mut account, slot)) = account_slot {
                         let (mut account, rent) = if message.is_writable(*i) {
