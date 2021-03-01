@@ -2,7 +2,8 @@ use crate::{
     accounts_db::{AccountsDB, BankHashInfo, ErrorCounters, LoadedAccount, ScanStorageResult},
     accounts_index::{AccountIndex, Ancestors, IndexKey},
     bank::{
-        ExecuteTimings, NonceRollbackFull, NonceRollbackInfo, TransactionCheckResult, TransactionExecutionResult,
+        ExecuteTimings, NonceRollbackFull, NonceRollbackInfo, TransactionCheckResult,
+        TransactionExecutionResult,
     },
     blockhash_queue::BlockhashQueue,
     rent_collector::RentCollector,
@@ -32,10 +33,10 @@ use solana_sdk::{
     transaction::{Transaction, TransactionError},
 };
 use std::{
-    sync::atomic::{AtomicBool, Ordering},
     collections::{HashMap, HashSet},
     ops::RangeBounds,
     path::PathBuf,
+    sync::atomic::{AtomicBool, Ordering},
     sync::{Arc, Mutex, RwLock},
 };
 
@@ -173,16 +174,20 @@ impl Accounts {
         account
     }
 
-    pub fn load_account_temp(&self, key: &Vec<&Pubkey>, ancestors: &Ancestors) -> Vec<Option<(Account, Slot, u64, u64)>>{
-        self
-        .accounts_db
-        .loads(ancestors, key)
+    pub fn load_account_temp(
+        &self,
+        key: &Vec<&Pubkey>,
+        ancestors: &Ancestors,
+    ) -> Vec<Option<(Account, Slot, u64, u64)>> {
+        self.accounts_db.loads(ancestors, key)
     }
 
-    pub fn load_account_temp_cow<'a>(&'a self, key: &'a Pubkey, ancestors: &'a Ancestors) -> Option<(AccountNoData, Slot)>{
-        self
-        .accounts_db
-        .loads_cow(ancestors, key)
+    pub fn load_account_temp_cow<'a>(
+        &'a self,
+        key: &'a Pubkey,
+        ancestors: &'a Ancestors,
+    ) -> Option<(AccountNoData, Slot)> {
+        self.accounts_db.loads_cow(ancestors, key)
     }
 
     fn load_transaction(
@@ -200,7 +205,9 @@ impl Accounts {
         let message = tx.message();
         if tx.signatures.is_empty() && fee != 0 {
             let r = Err(TransactionError::MissingSignatureForFee);
-            timej.stop(); timings.load_2 += timej.as_us(); let mut timej = Measure::start("");
+            timej.stop();
+            timings.load_2 += timej.as_us();
+            let mut timej = Measure::start("");
             r
         } else {
             // There is no way to predict what program will execute without an error
@@ -230,29 +237,34 @@ impl Accounts {
                 };
             }
 
-            timej.stop(); timings.load_2 += timej.as_us(); let mut timej = Measure::start("");
-            let mut accounts2: Vec<_> = message.account_keys.iter().enumerate().map(|(i, key)| {
-                let check = message.is_non_loader_key(key, i);
-                (key, check, i)
-            }).collect();
+            timej.stop();
+            timings.load_2 += timej.as_us();
+            let mut timej = Measure::start("");
+            let mut accounts2: Vec<_> = message
+                .account_keys
+                .iter()
+                .enumerate()
+                .map(|(i, key)| {
+                    let check = message.is_non_loader_key(key, i);
+                    (key, check, i)
+                })
+                .collect();
             timej.stop();
             let mut accounts = Vec::with_capacity(accounts2.len());
             timings.is_non_loader += timej.as_us();
             timej = Measure::start("");
             let mut timej_reset = Measure::start("");
-            
             accounts2.iter().for_each(|(key, check, i)| {
                 timej_reset.stop();
                 timings.for_each += timej_reset.as_us();
 
+                let mut tj4 = Measure::start("");
                 let account = if *check {
-                    let mut tj4 = Measure::start("");
                     let a_check = solana_sdk::sysvar::instructions::check_id(key)
-                    && feature_set.is_active(&feature_set::instructions_sysvar_enabled::id());
+                        && feature_set.is_active(&feature_set::instructions_sysvar_enabled::id());
                     tj4.stop();
                     timings.if1 += tj4.as_us();
-                    if a_check
-                    {
+                    if a_check {
                         let mut tj3 = Measure::start("");
                         let msg = Self::construct_instructions_account(message);
                         tj3.stop();
@@ -269,13 +281,11 @@ impl Accounts {
                                     timings.from_cache += 1;
                                     tj.stop();
                                     timings.cache_time += tj.as_us();
-                                }
-                                else {
+                                } else {
                                     timings.non_cache_data += account.data.len();
                                     tj.stop();
                                     timings.non_cache_time += tj.as_us();
                                     timings.non_cache_count += 1;
-                            
                                 }
                                 timings.real_load_count += 1;
                                 let mut tj5 = Measure::start("");
@@ -300,7 +310,7 @@ impl Accounts {
                                 (AccountNoData::default(), 0)
                             });
 
-                            let mut timej2 = Measure::start("");
+                        let mut timej2 = Measure::start("");
                         if account.executable && bpf_loader_upgradeable::check_id(&account.owner) {
                             let state = account.state();
                             timej2.stop();
@@ -323,7 +333,10 @@ impl Accounts {
                                         //timings.from_cache += 1;
                                     }
                                     timings.real_load_count2 += 1;
-                                    account_deps.lock().unwrap().push((programdata_address, account));
+                                    account_deps
+                                        .lock()
+                                        .unwrap()
+                                        .push((programdata_address, account));
                                     timej2.stop();
                                     timings.time7 += timej2.as_us();
                                 } else {
@@ -331,17 +344,17 @@ impl Accounts {
                                     pgm_not_found.store(true, Ordering::Relaxed);
                                     timej2.stop();
                                     timings.load_6 += timej2.as_us();
-                                                accounts.push(AccountNoData::default());//
-                                                return;
+                                    accounts.push(AccountNoData::default()); //
+                                    return;
                                 }
                             } else {
                                 // TODO error_counters.invalid_program_for_execution += 1;
                                 pgm_for_exec.store(true, Ordering::Relaxed);
                                 timej2.stop();
                                 timings.load_6 += timej2.as_us();
-                                accounts.push(AccountNoData::default());//
+                                accounts.push(AccountNoData::default()); //
                                 return;
-            }
+                            }
                         }
                         timej2.stop();
                         timings.load_6 += timej2.as_us();
@@ -350,17 +363,19 @@ impl Accounts {
                         account
                     }
                 } else {
-                    let mut timej2 = Measure::start("");
-            // Fill in an empty account for the program slots.
+                    // Fill in an empty account for the program slots.
                     let r = AccountNoData::default();
-                    timej2.stop();
-                    timings.load_6 += timej2.as_us();
+                    tj4.stop();
+                    timings.load_6 += tj4.as_us();
                     r
                 };
-                accounts.push(account);
+
                 timej_reset = Measure::start("");
+                accounts.push(account);
             });
-            timej.stop(); timings.load_3 += timej.as_us(); let mut timej = Measure::start("");
+            timej.stop();
+            timings.load_3 += timej.as_us();
+            let mut timej = Measure::start("");
 
             if invalid_account_index.load(Ordering::Relaxed) {
                 return Err(TransactionError::InvalidAccountIndex);
@@ -429,7 +444,9 @@ impl Accounts {
                             loaders,
                             rent: tx_rent,
                         });
-                        timej.stop(); timings.load_5 += timej.as_us(); let mut timej = Measure::start("");
+                        timej.stop();
+                        timings.load_5 += timej.as_us();
+                        let mut timej = Measure::start("");
                         res
                     }
                 }
@@ -479,25 +496,19 @@ impl Accounts {
             }
 
             let mut v2 = timings.pgms.get(&program_id);
-            let mut v2 = if let Some(v2) = v2 {
-                *v2
-            }
-            else {
-                (0,0)
-            };
+            let mut v2 = if let Some(v2) = v2 { *v2 } else { (0, 0) };
             v2.0 += 1;
             v2.1 = std::cmp::max(v2.1, program.data.len());
             timings.pgms.insert(program_id, v2);
 
             if program.from_cache {
                 timings.program_load_from_cache += 1;
-            }
-            else {
+            } else {
                 //error!("tx: {:?}", tx);
                 // doesn't work - hits error self.accounts_db.store_cached(slot, &[(&programdata_address, &program)]);
             }
             timings.program_load_count += 1;
-            timings.program_data_size += program.data.len();            
+            timings.program_data_size += program.data.len();
 
             // Add loader to chain
             let program_owner = program.owner;
@@ -512,31 +523,29 @@ impl Accounts {
                     programdata_address,
                 }) = state
                 {
-                    let cached = self.accounts_db.load_cached_executable(ancestors, &programdata_address);
+                    let cached = self
+                        .accounts_db
+                        .load_cached_executable(ancestors, &programdata_address);
 
                     let program = if let Some(program) = cached {
                         Some(program.clone())
-                    }
-                    else {
-                        if let Some((program, _)) = self
-                            .accounts_db
-                            .load_cow(ancestors, &programdata_address)
+                    } else {
+                        if let Some((program, _)) =
+                            self.accounts_db.load_cow(ancestors, &programdata_address)
+                        {
+                            /*if program.executable()*/
                             {
-                                /*if program.executable()*/ {
-                                    let mut cl = program.clone();
-                                    cl.from_cache = true;
-                                    timings.executable.insert(programdata_address, cl);
-                                }
-                                Some(program)
+                                let mut cl = program.clone();
+                                cl.from_cache = true;
+                                timings.executable.insert(programdata_address, cl);
                             }
-                            else {
-                                None
-                            }
-                        };
+                            Some(program)
+                        } else {
+                            None
+                        }
+                    };
 
-
-                    if let Some(program) = program
-                    {
+                    if let Some(program) = program {
                         /*
                         let mut v2 = timings.pgms.get(&programdata_address);
                         let mut v2 = if let Some(v2) = v2 {
@@ -548,7 +557,6 @@ impl Accounts {
                         v2.0 += 1;
                         v2.1 = std::cmp::max(v2.1, program.data.len());
                         timings.pgms.insert(programdata_address, v2);
-            
                         if program.from_cache {
                             timings.program_load_from_cache += 1;
                         }
@@ -660,7 +668,11 @@ impl Accounts {
     }
 
     /// Slow because lock is held for 1 operation instead of many
-    pub fn load_slow_no_data(&self, ancestors: &Ancestors, pubkey: &Pubkey) -> Option<(AccountNoData, Slot)> {
+    pub fn load_slow_no_data(
+        &self,
+        ancestors: &Ancestors,
+        pubkey: &Pubkey,
+    ) -> Option<(AccountNoData, Slot)> {
         let (account, slot) = self
             .accounts_db
             .load_slow_no_data(ancestors, pubkey)
@@ -826,7 +838,7 @@ impl Accounts {
         lamports > 0
     }
 
-    fn load_while_filtering<T: AnAccount+Default+Clone, F: Fn(&T) -> bool>(
+    fn load_while_filtering<T: AnAccount + Default + Clone, F: Fn(&T) -> bool>(
         collector: &mut Vec<(Pubkey, T)>,
         some_account_tuple: Option<(&Pubkey, T, Slot)>,
         filter: F,
@@ -854,7 +866,7 @@ impl Accounts {
         )
     }
 
-    pub fn load_by_program_with_filter<T:AnAccount+Default+Clone, F: Fn(&T) -> bool>(
+    pub fn load_by_program_with_filter<T: AnAccount + Default + Clone, F: Fn(&T) -> bool>(
         &self,
         ancestors: &Ancestors,
         program_id: &Pubkey,
@@ -870,7 +882,7 @@ impl Accounts {
         )
     }
 
-    pub fn load_by_index_key_with_filter<T: AnAccount+Default+Clone, F: Fn(&T) -> bool>(
+    pub fn load_by_index_key_with_filter<T: AnAccount + Default + Clone, F: Fn(&T) -> bool>(
         &self,
         ancestors: &Ancestors,
         index_key: &IndexKey,
@@ -880,7 +892,9 @@ impl Accounts {
             ancestors,
             *index_key,
             |collector: &mut Vec<(Pubkey, T)>, some_account_tuple| {
-                Self::load_while_filtering(collector, some_account_tuple, |account: &T| filter(account))
+                Self::load_while_filtering(collector, some_account_tuple, |account: &T| {
+                    filter(account)
+                })
             },
         )
     }
@@ -888,7 +902,8 @@ impl Accounts {
     pub fn load_all(&self, ancestors: &Ancestors) -> Vec<(Pubkey, Account, Slot)> {
         self.accounts_db.scan_accounts(
             ancestors,
-            |collector: &mut Vec<(Pubkey, Account, Slot)>, some_account_tuple: Option<(&Pubkey, Account, Slot)>| {
+            |collector: &mut Vec<(Pubkey, Account, Slot)>,
+             some_account_tuple: Option<(&Pubkey, Account, Slot)>| {
                 if let Some((pubkey, account, slot)) =
                     some_account_tuple.filter(|(_, account, _)| Self::is_loadable(account.lamports))
                 {
@@ -920,7 +935,12 @@ impl Accounts {
         self.accounts_db.store_uncached(slot, &[(pubkey, account)]);
     }
 
-    pub fn store_slow_cached<T:AnAccountConcrete>(&self, slot: Slot, pubkey: &Pubkey, account: &T) {
+    pub fn store_slow_cached<T: AnAccountConcrete>(
+        &self,
+        slot: Slot,
+        pubkey: &Pubkey,
+        account: &T,
+    ) {
         self.accounts_db.store_cached(slot, &[(pubkey, account)]);
     }
 
@@ -1218,7 +1238,7 @@ impl Accounts {
     }
 }
 
-pub fn prepare_if_nonce_account<T:AnAccountConcrete + StateMut<nonce::state::Versions>>(
+pub fn prepare_if_nonce_account<T: AnAccountConcrete + StateMut<nonce::state::Versions>>(
     account: &mut T,
     account_pubkey: &Pubkey,
     tx_result: &Result<()>,
@@ -2479,7 +2499,8 @@ mod tests {
                 blockhash,
                 fee_calculator: FeeCalculator::default(),
             }));
-        let nonce_account_pre = AccountNoData::new_data(42, &nonce_state, &system_program::id()).unwrap();
+        let nonce_account_pre =
+            AccountNoData::new_data(42, &nonce_state, &system_program::id()).unwrap();
         let from_account_pre = AccountNoData::new(4242, 0, &Pubkey::default());
 
         let nonce_rollback = Some(NonceRollbackFull::new(
@@ -2591,7 +2612,8 @@ mod tests {
                 blockhash,
                 fee_calculator: FeeCalculator::default(),
             }));
-        let nonce_account_pre = AccountNoData::new_data(42, &nonce_state, &system_program::id()).unwrap();
+        let nonce_account_pre =
+            AccountNoData::new_data(42, &nonce_state, &system_program::id()).unwrap();
 
         let nonce_rollback = Some(NonceRollbackFull::new(
             nonce_address,
