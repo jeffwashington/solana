@@ -178,12 +178,18 @@ pub struct ExecuteTimings {
         pub time7: u64,
         pub for_each: u64,
         pub errors: u64,
-
-
+        pub t1: u64,
+        pub t2: u64,
+        pub t3: u64,
+        pub t4: u64,
 }
 
 impl ExecuteTimings {
     pub fn accumulate(&mut self, other: &ExecuteTimings) {
+        self.t1 += other.t1;
+        self.t2 += other.t2;
+        self.t3 += other.t3;
+        self.t4 += other.t4;
         self.errors += other.errors;
         self.for_each += other.for_each;
         self.time7 += other.time7;

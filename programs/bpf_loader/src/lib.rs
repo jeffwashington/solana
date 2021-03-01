@@ -13,6 +13,7 @@ use crate::{
     serialization::{deserialize_parameters, serialize_parameters},
     syscalls::SyscallError,
 };
+use solana_measure::measure::Measure;
 use solana_rbpf::{
     ebpf::MM_HEAP_START,
     error::{EbpfError, UserDefinedError},
@@ -771,14 +772,18 @@ impl Executor for BPFExecutor {
         invoke_context: &mut dyn InvokeContext,
         use_jit: bool,
     ) -> Result<(), InstructionError> {
+        let mut m = Measure::start("");
         let logger = invoke_context.get_logger();
         let invoke_depth = invoke_context.invoke_depth();
 
         let mut keyed_accounts_iter = keyed_accounts.iter();
         let _ = next_keyed_account(&mut keyed_accounts_iter)?;
         let parameter_accounts = keyed_accounts_iter.as_slice();
+        let mut m2 = Measure::start("");
+        let mut m3;
         let mut parameter_bytes =
-            serialize_parameters(loader_id, program_id, parameter_accounts, &instruction_data)?;
+        serialize_parameters(loader_id, program_id, parameter_accounts, &instruction_data)?;
+        m2.stop();
         {
             let compute_meter = invoke_context.get_compute_meter();
             let mut vm = match create_vm(
@@ -798,11 +803,13 @@ impl Executor for BPFExecutor {
             stable_log::program_invoke(&logger, program_id, invoke_depth);
             let mut instruction_meter = ThisInstructionMeter::new(compute_meter.clone());
             let before = compute_meter.borrow().get_remaining();
+            m3 = Measure::start("");
             let result = if use_jit {
                 vm.execute_program_jit(&mut instruction_meter)
             } else {
                 vm.execute_program_interpreted(&mut instruction_meter)
             };
+            m3.stop();
             let after = compute_meter.borrow().get_remaining();
             ic_logger_msg!(
                 logger,
@@ -834,7 +841,12 @@ impl Executor for BPFExecutor {
                 }
             }
         }
+        let mut m4 = Measure::start("");
         deserialize_parameters(loader_id, parameter_accounts, &parameter_bytes, invoke_context)?;
+        m4.stop();
+
+        m.stop();
+        invoke_context.report_times(m.as_us(), m2.as_us(), m3.as_us(), m4.as_us());
         stable_log::program_success(&logger, program_id);
         Ok(())
     }

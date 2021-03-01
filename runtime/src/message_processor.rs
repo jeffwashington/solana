@@ -215,6 +215,7 @@ pub struct ThisInvokeContext<'a> {
     executors: Rc<RefCell<Executors>>,
     instruction_recorder: Option<InstructionRecorder>,
     feature_set: Arc<FeatureSet>,
+    pub timings: ExecuteTimings,
 }
 impl<'a> ThisInvokeContext<'a> {
     #[allow(clippy::too_many_arguments)]
@@ -246,6 +247,7 @@ impl<'a> ThisInvokeContext<'a> {
             executors,
             instruction_recorder,
             feature_set,
+            timings: ExecuteTimings::default(),
         }
     }
 }
@@ -341,6 +343,13 @@ impl<'a> InvokeContext for ThisInvokeContext<'a> {
     }
     fn account_data_modified(&self, _pubkey: &Pubkey) {
         // TODO: add to hashset indicating modification of data
+    }
+    fn report_times(&mut self, t1: u64, t2: u64, t3: u64, t4: u64)
+    {
+        self.timings.t1 += t1;
+        self.timings.t2 += t2;
+        self.timings.t3 += t3;
+        self.timings.t4 += t4;
     }
 }
 pub struct ThisLogger {

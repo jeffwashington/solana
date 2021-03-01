@@ -66,6 +66,7 @@ pub trait InvokeContext {
     fn get_account(&self, pubkey: &Pubkey) -> Option<RefCell<AccountNoData>>;
     /// Notify caller when account data field was modified
     fn account_data_modified(&self, pubkey: &Pubkey);
+    fn report_times(&mut self, t1: u64, t2: u64, t3: u64, t4: u64);
 }
 
 /// Convenience macro to log a message with an `Rc<RefCell<dyn Logger>>`
@@ -331,6 +332,10 @@ impl InvokeContext for MockInvokeContext {
     fn push(&mut self, _key: &Pubkey) -> Result<(), InstructionError> {
         self.invoke_depth += 1;
         Ok(())
+    }
+    fn report_times(&mut self, t1: u64, t2: u64, t3: u64, t4: u64)
+    {
+        // nothing
     }
     fn pop(&mut self) {
         self.invoke_depth -= 1;
