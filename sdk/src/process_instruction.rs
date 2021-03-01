@@ -100,7 +100,7 @@ pub trait InvokeContext {
     fn get_account(&self, pubkey: &Pubkey) -> Option<RefCell<AccountNoData>>;
     /// Notify caller when account data field was modified
     fn account_data_modified(&self, pubkey: &Pubkey);
-    fn report_times(&mut self, t1: u64, t2: u64, t3: u64, t4: u64, data_copied_time: u64, data_copied_count: u64, data_not_copied: u64);
+    fn report_times(&mut self, t1: u64, t2: u64, t3: u64, t4: u64, data_copied_time: u64, data_copied_count: u64, data_not_copied: u64, size: u64);
 }
 
 /// Convenience macro to log a message with an `Rc<RefCell<dyn Logger>>`
@@ -367,7 +367,7 @@ impl InvokeContext for MockInvokeContext {
         self.invoke_depth += 1;
         Ok(())
     }
-    fn report_times(&mut self, t1: u64, t2: u64, t3: u64, t4: u64, data_copied_time: u64, data_copied_count: u64, data_not_copied: u64)
+    fn report_times(&mut self, t1: u64, t2: u64, t3: u64, t4: u64, data_copied_time: u64, data_copied_count: u64, data_not_copied: u64, size: u64)
     {
         // nothing
     }

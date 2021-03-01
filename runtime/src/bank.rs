@@ -185,6 +185,7 @@ pub struct ExecuteTimings {
         pub data_copied: u64,
         pub data_copied_count: u64,
         pub data_not_copied: u64,
+        pub data_copied_size: u64,
 }
 
 impl ExecuteTimings {
@@ -193,6 +194,7 @@ impl ExecuteTimings {
         self.t2 += other.t2;
         self.t3 += other.t3;
         self.t4 += other.t4;
+        self.data_copied_size += other.data_copied_size;
         self.data_copied += other.data_copied;
         self.data_copied_count += other.data_copied_count;
         self.data_not_copied += other.data_not_copied;

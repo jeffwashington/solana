@@ -231,21 +231,24 @@ pub fn deserialize_parameters_aligned(
             let mut data_end = start + pre_len;
             let mut m1 = Measure::start("");
             let mut count = 0;
+            let mut size = 0;
             if post_len != pre_len
                 && (post_len.saturating_sub(pre_len)) <= MAX_PERMITTED_DATA_INCREASE
             {
                 count = 1;
                 Arc::make_mut(&mut account.data).resize(post_len, 0);
                 data_end = start + post_len;
+                size = data_end - start;
             }
             let data_changed = account.data.len() != data_end - start || &account.data[..] != &buffer[start..data_end];
             if data_changed {
                 count = 1;
                 context.account_data_modified(keyed_account.unsigned_key());
                 Arc::make_mut(&mut account.data).clone_from_slice(&buffer[start..data_end]);
+                size = data_end - start;
             }
             m1.stop();
-            context.report_times(0, 0, 0, 0, m1.as_us(), count, 1-count);
+            context.report_times(0, 0, 0, 0, m1.as_us(), count, 1-count, size as u64);
             start += pre_len + MAX_PERMITTED_DATA_INCREASE; // data
             start += (start as *const u8).align_offset(align_of::<u128>());
             start += size_of::<u64>(); // rent_epoch
