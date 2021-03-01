@@ -421,10 +421,28 @@ impl<'a> LoadedAccount<'a> {
         }
     }
 
-    pub fn loaded_hash(&self) -> &Hash {
+    pub fn loaded_hash<'b>(&'a self, accountsdb: &'b AccountsDB, slot: Slot) -> Hash {
+        match self {
+            LoadedAccount::Stored(stored_account_meta) => *stored_account_meta.hash,
+            LoadedAccount::Cached((pubkey, cached_account)) => {
+                if cached_account.hash_delayed() != &Hash::default() {
+                    return *cached_account.hash_delayed();
+                }
+
+                // we need to calculate it now
+                let hash = AccountsDB::hash_account(slot, &cached_account.account, pubkey, &accountsdb.cluster_type.expect("Cluster type must be set at initialization"));
+                {
+                    // cached_account.to_mut().set_hash(hash);
+                }
+                hash
+            }
+        }
+    }
+
+    pub fn loaded_hash2(&'a self) -> &'a Hash {
         match self {
             LoadedAccount::Stored(stored_account_meta) => &stored_account_meta.hash,
-            LoadedAccount::Cached((_, cached_account)) => &cached_account.hash,
+            LoadedAccount::Cached((_, cached_account)) => panic!("Should not be cached"),
         }
     }
 
@@ -2624,7 +2642,7 @@ impl AccountsDB {
 
         self.get_account_accessor_from_cache_or_storage(slot, pubkey, store_id, offset)
             .get_loaded_account()
-            .map(|loaded_account| *loaded_account.loaded_hash())
+            .map(|loaded_account| loaded_account.loaded_hash(&self, slot))
             .unwrap()
     }
 
@@ -3650,7 +3668,7 @@ impl AccountsDB {
                         .map(|should_flush_f| should_flush_f(key, account))
                         .unwrap_or(true);
                     if should_flush {
-                        let hash = iter_item.value().hash;
+                        let hash = iter_item.value().hash_delayed();
                         total_size += (account.data.len() + STORE_META_OVERHEAD) as u64;
                         Some(((key, account), hash))
                     } else {
@@ -4041,38 +4059,38 @@ impl AccountsDB {
                                         let (slot, account_info) = &lock.slot_list()[index];
                                         if account_info.lamports != 0 {
                                             self.get_account_accessor_from_cache_or_storage(
-                                    *slot,
-                                    pubkey,
-                                    account_info.store_id,
-                                    account_info.offset,
-                                )
-                                .get_loaded_account()
-                                .and_then(|loaded_account| {
-                                    let loaded_hash = loaded_account.loaded_hash();
-                                    let balance = Self::account_balance_for_capitalization(
-                                        account_info.lamports,
-                                        loaded_account.owner(),
-                                        loaded_account.executable(),
-                                        simple_capitalization_enabled,
-                                    );
+                                                *slot,
+                                                pubkey,
+                                                account_info.store_id,
+                                                account_info.offset,
+                                            )
+                                            .get_loaded_account()
+                                            .and_then(|loaded_account| {
+                                                let loaded_hash = loaded_account.loaded_hash(&self, *slot);
+                                                let balance = Self::account_balance_for_capitalization(
+                                                    account_info.lamports,
+                                                    loaded_account.owner(),
+                                                    loaded_account.executable(),
+                                                    simple_capitalization_enabled,
+                                                );
 
-                                    if check_hash {
-                                        let computed_hash = loaded_account.compute_hash(
-                                            *slot,
-                                            &self.cluster_type.expect(
-                                                "Cluster type must be set at initialization",
-                                            ),
-                                            pubkey,
-                                        );
-                                        if computed_hash != *loaded_hash {
-                                            mismatch_found.fetch_add(1, Ordering::Relaxed);
-                                            return None;
-                                        }
-                                    }
+                                                if check_hash {
+                                                    let computed_hash = loaded_account.compute_hash(
+                                                        *slot,
+                                                        &self.cluster_type.expect(
+                                                            "Cluster type must be set at initialization",
+                                                        ),
+                                                        pubkey,
+                                                    );
+                                                    if computed_hash != loaded_hash {
+                                                        mismatch_found.fetch_add(1, Ordering::Relaxed);
+                                                        return None;
+                                                    }
+                                                }
 
-                                    sum += balance as u128;
-                                    Some(*loaded_hash)
-                                })
+                                                sum += balance as u128;
+                                                Some(loaded_hash)
+                                            })
                                         } else {
                                             None
                                         }
@@ -4517,7 +4535,7 @@ impl AccountsDB {
                 let pubkey = *loaded_account.pubkey();
                 let source_item = CalculateHashIntermediate::new(
                     version,
-                    *loaded_account.loaded_hash(),
+                    *loaded_account.loaded_hash2(),
                     balance,
                     slot,
                     pubkey,
@@ -4606,11 +4624,11 @@ impl AccountsDB {
                 slot,
                 |loaded_account: LoadedAccount| {
                     // Cache only has one version per key, don't need to worry about versioning
-                    Some((*loaded_account.pubkey(), *loaded_account.loaded_hash()))
+                    Some((*loaded_account.pubkey(), loaded_account.loaded_hash(&self, slot)))
                 },
                 |accum: &DashMap<Pubkey, (u64, Hash)>, loaded_account: LoadedAccount| {
                     let loaded_write_version = loaded_account.write_version();
-                    let loaded_hash = *loaded_account.loaded_hash();
+                    let loaded_hash = loaded_account.loaded_hash(&self, slot);
                     let should_insert =
                         if let Some(existing_entry) = accum.get(loaded_account.pubkey()) {
                             loaded_write_version > existing_entry.value().version()
@@ -4858,33 +4876,12 @@ impl AccountsDB {
     ) -> Vec<Hash> {
         let mut stats = BankHashStats::default();
         let mut total_data = 0;
-
-        let mut t = Measure::start("");
-        let sz: Vec<_> = (*accounts).par_iter().map(|(pubkey, account)| {
-            Self::hash_account(slot, *account, pubkey, cluster_type);
-            let sz = account.data.len();
-            sz
-        }).collect();
-        t.stop();
-        let sz = sz.into_iter().sum::<usize>();
-        let mut t2 = Measure::start("");
-        let hashes: Vec<_> = (*accounts).iter().map(|(pubkey, account)| {
-            let mut tt = Measure::start("");
-            let hash  =Self::hash_account(slot, *account, pubkey, cluster_type);
-            tt.stop();
-            error!("Hashing: {:?} len {} time {}", pubkey, account.data.len(), tt.as_us());
-            hash
-        }).collect();
-        t2.stop();
-        //error!("hashing: {}, size: {}, times: {}, serial: {}", accounts.len(), sz, t.as_us(), t2.as_us());
-
         let hashes: Vec<_> = accounts
             .iter()
-            .zip(hashes)
-            .map(|((pubkey, account),hash)| {
-                total_data += account.data().len();
+            .map(|(pubkey, account)| {
+                total_data += account.data.len();
                 stats.update(*account);
-                hash
+                Self::hash_account(slot, *account, pubkey, cluster_type)
             })
             .collect();
 
