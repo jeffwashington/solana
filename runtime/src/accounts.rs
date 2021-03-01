@@ -239,8 +239,12 @@ impl Accounts {
             let mut accounts = Vec::with_capacity(accounts2.len());
             timings.is_non_loader += timej.as_us();
             timej = Measure::start("");
+            let mut timej_reset = Measure::start("");
             
             accounts2.iter().for_each(|(key, check, i)| {
+                timej_reset.stop();
+                timings.for_each += timej_reset.as_us();
+
                 let account = if *check {
                     let mut tj4 = Measure::start("");
                     let a_check = solana_sdk::sysvar::instructions::check_id(key)
@@ -354,6 +358,7 @@ impl Accounts {
                     r
                 };
                 accounts.push(account);
+                timej_reset = Measure::start("");
             });
             timej.stop(); timings.load_3 += timej.as_us(); let mut timej = Measure::start("");
 

@@ -2,9 +2,9 @@ use solana_sdk::timing::duration_as_ns;
 use std::{fmt, time::Instant};
 
 pub struct Measure {
-    name: &'static str,
-    start: Instant,
-    duration: u64,
+    pub name: &'static str,
+    pub start: Instant,
+    pub duration: u64,
 }
 
 impl Measure {
