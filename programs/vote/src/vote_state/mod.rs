@@ -7,6 +7,7 @@ use log::*;
 use serde_derive::{Deserialize, Serialize};
 use solana_sdk::{
     account::Account,
+    account::AccountNoData,
     account_utils::State,
     clock::{Epoch, Slot, UnixTimestamp},
     epoch_schedule::MAX_LEADER_SCHEDULE_EPOCH_OFFSET,
@@ -21,6 +22,7 @@ use solana_sdk::{
 use std::boxed::Box;
 use std::cmp::Ordering;
 use std::collections::{HashSet, VecDeque};
+use std::sync::Arc;
 
 mod vote_state_0_23_5;
 pub mod vote_state_versions;
@@ -220,13 +222,13 @@ impl VoteState {
     }
 
     // utility function, used by Stakes, tests
-    pub fn from(account: &Account) -> Option<VoteState> {
+    pub fn from(account: &AccountNoData) -> Option<VoteState> {
         Self::deserialize(&account.data).ok()
     }
 
     // utility function, used by Stakes, tests
-    pub fn to(versioned: &VoteStateVersions, account: &mut Account) -> Option<()> {
-        Self::serialize(versioned, &mut account.data).ok()
+    pub fn to(versioned: &VoteStateVersions, account: &mut AccountNoData) -> Option<()> {
+        Self::serialize(versioned, &mut Arc::make_mut(&mut account.data)[..]).ok()
     }
 
     pub fn deserialize(input: &[u8]) -> Result<Self, InstructionError> {
@@ -245,7 +247,7 @@ impl VoteState {
         })
     }
 
-    pub fn credits_from(account: &Account) -> Option<u64> {
+    pub fn credits_from(account: &AccountNoData) -> Option<u64> {
         Self::from(account).map(|state| state.credits())
     }
 
@@ -732,8 +734,8 @@ pub fn create_account_with_authorized(
     authorized_withdrawer: &Pubkey,
     commission: u8,
     lamports: u64,
-) -> Account {
-    let mut vote_account = Account::new(lamports, VoteState::size_of(), &id());
+) -> AccountNoData {
+    let mut vote_account = Account::to_account_no_data(Account::new(lamports, VoteState::size_of(), &id()));
 
     let vote_state = VoteState::new(
         &VoteInit {
@@ -757,7 +759,7 @@ pub fn create_account(
     node_pubkey: &Pubkey,
     commission: u8,
     lamports: u64,
-) -> Account {
+) -> AccountNoData {
     create_account_with_authorized(node_pubkey, vote_pubkey, vote_pubkey, commission, lamports)
 }
 

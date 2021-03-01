@@ -1541,7 +1541,7 @@ impl Bank {
     }
 
     pub fn clock(&self) -> sysvar::clock::Clock {
-        from_account(&self.get_account(&sysvar::clock::id()).unwrap_or_default())
+        from_account_no_data(&self.get_account_no_data(&sysvar::clock::id()).unwrap_or_default())
             .unwrap_or_default()
     }
 
@@ -1647,7 +1647,7 @@ impl Bank {
     }
 
     pub fn get_slot_history(&self) -> SlotHistory {
-        from_account(&self.get_account(&sysvar::slot_history::id()).unwrap()).unwrap()
+        from_account_no_data(&self.get_account_no_data(&sysvar::slot_history::id()).unwrap()).unwrap()
     }
 
     fn update_epoch_stakes(&mut self, leader_schedule_epoch: Epoch) {
@@ -2292,7 +2292,7 @@ impl Bank {
         self.fee_calculator = self.fee_rate_governor.create_fee_calculator();
 
         for (pubkey, account) in genesis_config.accounts.iter() {
-            if self.get_account(&pubkey).is_some() {
+            if self.get_account_no_data(&pubkey).is_some() {
                 panic!("{} repeated in genesis config", pubkey);
             }
             self.store_account(pubkey, account);
@@ -2303,7 +2303,7 @@ impl Bank {
         self.update_fees();
 
         for (pubkey, account) in genesis_config.rewards_pools.iter() {
-            if self.get_account(&pubkey).is_some() {
+            if self.get_account_no_data(&pubkey).is_some() {
                 panic!("{} repeated in genesis config", pubkey);
             }
             self.store_account(pubkey, account);
@@ -4051,13 +4051,13 @@ impl Bank {
         self.process_transaction(&tx).map(|_| signature)
     }
 
-    pub fn read_balance(account: &Account) -> u64 {
-        account.lamports
+    pub fn read_balance<T:AnAccount>(account: &T) -> u64 {
+        account.lamports()
     }
     /// Each program would need to be able to introspect its own state
     /// this is hard-coded to the Budget language
     pub fn get_balance(&self, pubkey: &Pubkey) -> u64 {
-        self.get_account(pubkey)
+        self.get_account_no_data(pubkey)
             .map(|x| Self::read_balance(&x))
             .unwrap_or(0)
     }
@@ -4080,11 +4080,12 @@ impl Bank {
         parents
     }
 
-    pub fn store_account<T:AnAccountConcrete + solana_sdk::account_utils::StateMut<solana_stake_program::stake_state::StakeState>>(&self, pubkey: &Pubkey, account: &T) {
+    pub fn store_account(&self, pubkey: &Pubkey, account: &AccountNoData) {
         assert!(!self.freeze_started());
+        //panic!("store_account");
         self.rc
             .accounts
-            .store_slow_cached(self.slot(), pubkey, account);
+            .store_slow_cached(self.slot(), pubkey, &account.clone_as_account_no_data());
 
         if Stakes::is_stake(account) {
             self.stakes
@@ -4108,8 +4109,8 @@ impl Bank {
             .flush_accounts_cache(false, Some(self.slot()))
     }
 
-    fn store_account_and_update_capitalization<T: AnAccountConcrete + solana_sdk::account_utils::StateMut<solana_stake_program::stake_state::StakeState>>(&self, pubkey: &Pubkey, new_account: &T) {
-        if let Some(old_account) = self.get_account(&pubkey) {
+    fn store_account_and_update_capitalization(&self, pubkey: &Pubkey, new_account: &AccountNoData) {
+        if let Some(old_account) = self.get_account_no_data(&pubkey) {
             match new_account.lamports().cmp(&old_account.lamports()) {
                 std::cmp::Ordering::Greater => {
                     self.capitalization
@@ -4129,7 +4130,7 @@ impl Bank {
     }
 
     pub fn withdraw(&self, pubkey: &Pubkey, lamports: u64) -> Result<()> {
-        match self.get_account(pubkey) {
+        match self.get_account_no_data(pubkey) {
             Some(mut account) => {
                 let min_balance = match get_system_account_kind(&account) {
                     Some(SystemAccountKind::Nonce) => self
@@ -4152,7 +4153,7 @@ impl Bank {
     }
 
     pub fn deposit(&self, pubkey: &Pubkey, lamports: u64) -> u64 {
-        let mut account = self.get_account(pubkey).unwrap_or_default();
+        let mut account = self.get_account_no_data(pubkey).unwrap_or_default();
 
         let rent_fix_enabled = self.cumulative_rent_related_fixes_enabled();
 
@@ -4255,7 +4256,7 @@ impl Bank {
             .map(|(acc, _slot)| acc)
     }
 
-    pub fn get_program_accounts(&self, program_id: &Pubkey) -> Vec<(Pubkey, Account)> {
+    pub fn get_program_accounts(&self, program_id: &Pubkey) -> Vec<(Pubkey, AccountNoData)> {
         self.rc
             .accounts
             .load_by_program(&self.ancestors, program_id)
@@ -4288,7 +4289,7 @@ impl Bank {
     pub fn get_program_accounts_modified_since_parent(
         &self,
         program_id: &Pubkey,
-    ) -> Vec<(Pubkey, Account)> {
+    ) -> Vec<(Pubkey, AccountNoData)> {
         self.rc
             .accounts
             .load_by_program_slot(self.slot(), Some(program_id))
@@ -4314,7 +4315,7 @@ impl Bank {
         }
     }
 
-    pub fn get_all_accounts_modified_since_parent(&self) -> Vec<(Pubkey, Account)> {
+    pub fn get_all_accounts_modified_since_parent(&self) -> Vec<(Pubkey, AccountNoData)> {
         self.rc.accounts.load_by_program_slot(self.slot(), None)
     }
 
@@ -4869,8 +4870,8 @@ impl Bank {
         // genesis builtin initialization codepath is called even before the initial
         // feature activation, so we need to peek this flag at very early bank
         // initialization phase for the development genesis case
-        if let Some(account) = self.get_account(&feature_set::simple_capitalization::id()) {
-            if let Some(feature) = feature::from_account(&account) {
+        if let Some(account) = self.get_account_no_data(&feature_set::simple_capitalization::id()) {
+            if let Some(feature) = feature::from_account_no_data(&account) {
                 if feature.activated_at == Some(0) {
                     return true;
                 }
@@ -4944,14 +4945,14 @@ impl Bank {
 
         for feature_id in &self.feature_set.inactive {
             let mut activated = None;
-            if let Some(mut account) = self.get_account(feature_id) {
-                if let Some(mut feature) = feature::from_account(&account) {
+            if let Some(mut account) = self.get_account_no_data(feature_id) {
+                if let Some(mut feature) = feature::from_account_no_data(&account) {
                     match feature.activated_at {
                         None => {
                             if allow_new_activations {
                                 // Feature has been requested, activate it now
                                 feature.activated_at = Some(slot);
-                                if feature::to_account(&feature, &mut account).is_some() {
+                                if feature::to_account_no_data(&feature, &mut account).is_some() {
                                     self.store_account(feature_id, &account);
                                 }
                                 newly_activated.insert(*feature_id);
@@ -5006,9 +5007,9 @@ impl Bank {
     }
 
     fn apply_spl_token_v2_self_transfer_fix(&mut self) {
-        if let Some(old_account) = self.get_account(&inline_spl_token_v2_0::id()) {
+        if let Some(old_account) = self.get_account_no_data(&inline_spl_token_v2_0::id()) {
             if let Some(new_account) =
-                self.get_account(&inline_spl_token_v2_0::new_token_program::id())
+                self.get_account_no_data(&inline_spl_token_v2_0::new_token_program::id())
             {
                 datapoint_info!(
                     "bank-apply_spl_token_v2_self_transfer_fix",
@@ -5024,7 +5025,7 @@ impl Bank {
                 // Clear new token account
                 self.store_account(
                     &inline_spl_token_v2_0::new_token_program::id(),
-                    &Account::default(),
+                    &AccountNoData::default(),
                 );
 
                 self.remove_executor(&inline_spl_token_v2_0::id());
@@ -5037,19 +5038,19 @@ impl Bank {
         let mut existing_sysvar_account_count = 8;
         let mut existing_native_program_account_count = 4;
 
-        if self.get_account(&sysvar::rewards::id()).is_some() {
+        if self.get_account_no_data(&sysvar::rewards::id()).is_some() {
             existing_sysvar_account_count += 1;
         }
 
-        if self.get_account(&bpf_loader::id()).is_some() {
+        if self.get_account_no_data(&bpf_loader::id()).is_some() {
             existing_native_program_account_count += 1;
         }
 
-        if self.get_account(&bpf_loader_deprecated::id()).is_some() {
+        if self.get_account_no_data(&bpf_loader_deprecated::id()).is_some() {
             existing_native_program_account_count += 1;
         }
 
-        if self.get_account(&secp256k1_program::id()).is_some() {
+        if self.get_account_no_data(&secp256k1_program::id()).is_some() {
             existing_native_program_account_count += 1;
         }
 
@@ -5074,19 +5075,19 @@ impl Bank {
         };
 
         if reconfigure_token2_native_mint {
-            let mut native_mint_account = solana_sdk::account::Account {
+            let mut native_mint_account = Account::to_account_no_data(solana_sdk::account::Account {
                 owner: inline_spl_token_v2_0::id(),
                 data: inline_spl_token_v2_0::native_mint::ACCOUNT_DATA.to_vec(),
                 lamports: sol_to_lamports(1.),
                 executable: false,
                 rent_epoch: self.epoch() + 1,
-            };
+            });
 
             // As a workaround for
             // https://github.com/solana-labs/solana-program-library/issues/374, ensure that the
             // spl-token 2 native mint account is owned by the spl-token 2 program.
             let store = if let Some(existing_native_mint_account) =
-                self.get_account(&inline_spl_token_v2_0::native_mint::id())
+                self.get_account_no_data(&inline_spl_token_v2_0::native_mint::id())
             {
                 if existing_native_mint_account.owner == solana_sdk::system_program::id() {
                     native_mint_account.lamports = existing_native_mint_account.lamports;
@@ -5122,7 +5123,7 @@ impl Bank {
 
         if purge_window_epoch {
             for reward_pubkey in self.rewards_pool_pubkeys.iter() {
-                if let Some(mut reward_account) = self.get_account(&reward_pubkey) {
+                if let Some(mut reward_account) = self.get_account_no_data(&reward_pubkey) {
                     if reward_account.lamports == u64::MAX {
                         reward_account.lamports = 0;
                         self.store_account(&reward_pubkey, &reward_account);
@@ -11292,7 +11293,7 @@ pub(crate) mod tests {
         let new_activations = bank.compute_active_feature_set(false);
         assert!(new_activations.is_empty());
         assert!(!bank.feature_set.is_active(&test_feature));
-        let feature = feature::from_account(&bank.get_account(&test_feature).expect("get_account"))
+        let feature = feature::from_account_no_data(&bank.get_account(&test_feature).expect("get_account"))
             .expect("from_account");
         assert_eq!(feature.activated_at, None);
 
@@ -11300,7 +11301,7 @@ pub(crate) mod tests {
         let new_activations = bank.compute_active_feature_set(true);
         assert_eq!(new_activations.len(), 1);
         assert!(bank.feature_set.is_active(&test_feature));
-        let feature = feature::from_account(&bank.get_account(&test_feature).expect("get_account"))
+        let feature = feature::from_account_no_data(&bank.get_account(&test_feature).expect("get_account"))
             .expect("from_account");
         assert_eq!(feature.activated_at, Some(1));
 

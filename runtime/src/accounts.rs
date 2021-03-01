@@ -16,6 +16,7 @@ use dashmap::{
 };
 use log::*;
 use rand::{thread_rng, Rng};
+use rayon::prelude::*;
 use solana_measure::measure::Measure;
 use solana_sdk::{
     account::{Account, AccountNoData, AnAccount, AnAccountConcrete},
@@ -213,7 +214,7 @@ impl Accounts {
             // There is no way to predict what program will execute without an error
             // If a fee can pay for execution then the program will be scheduled
             let mut payer_index = None;
-            let mut tx_rent = 0 as TransactionRent;
+            let mut tx_rent = Mutex::new(0 as TransactionRent);
             let account_deps = Mutex::new(Vec::with_capacity(message.account_keys.len()));
             let rent_fix_enabled = feature_set.cumulative_rent_related_fixes_enabled();
 
@@ -250,60 +251,148 @@ impl Accounts {
                 })
                 .collect();
             timej.stop();
-            let mut accounts = Vec::with_capacity(accounts2.len());
+            let par = false;
+            //let mut accounts = Vec::with_capacity(accounts2.len());
             timings.is_non_loader += timej.as_us();
             timej = Measure::start("");
-            accounts2.iter().for_each(|(key, check, i)| {
-
-                let account = if *check {
+            let mut pubkeys = vec![];
+            let mut pubkey_index = vec![];
+            let mut accounts = accounts2.iter().map(|(key, check, i)| {
+                let mut timings = ExecuteTimings::default(); //???timings
+                let mut account = if *check {
                     let a_check = solana_sdk::sysvar::instructions::check_id(key)
                         && feature_set.is_active(&feature_set::instructions_sysvar_enabled::id());
                     if a_check {
                         let msg = Self::construct_instructions_account(message);
-                        timings.construct_instructions_count += 1;
+                        //???timing timings.construct_instructions_count += 1;
                         msg
                     } else {
                         let mut tj = Measure::start("");
-                        let (account, rent) = self
-                            .accounts_db
-                            .load_cow(ancestors, key)
-                            .map(|(mut account, _)| {
-                                if account.from_cache {
-                                    timings.from_cache += 1;
-                                    tj.stop();
-                                    timings.cache_time += tj.as_us();
-                                } else {
-                                    timings.non_cache_data += account.data.len();
-                                    tj.stop();
-                                    timings.non_cache_time += tj.as_us();
-                                    timings.non_cache_count += 1;
-                                }
-                                timings.real_load_count += 1;
-                                let r = if message.is_writable(*i) {
-                                    let rent_due = rent_collector.collect_from_existing_account(
-                                        &key,
-                                        &mut account,
-                                        rent_fix_enabled,
-                                    );
-                                    (account, rent_due)
-                                } else {
-                                    (account, 0)
-                                };
-                                r
-                            })
-                            .unwrap_or_else(|| {
-                                timings.missing_account_count += 1;
-                                tj.stop();
-                                timings.missing_account += tj.as_us();
-                                (AccountNoData::default(), 0)
-                            });
 
-                        let mut timej2 = Measure::start("");
-                        if account.executable && bpf_loader_upgradeable::check_id(&account.owner) {
-                            let state = account.state();
+                        if par {
+                            pubkeys.push(*key);
+                            pubkey_index.push(i);
+                            AccountNoData::default()
+                        }
+                        else{
+                            let (account, rent) = self
+                                .accounts_db
+                                .load_cow(ancestors, key)
+                                .map(|(mut account, _)| {
+                                    if account.from_cache {
+                                        timings.from_cache += 1;
+                                        tj.stop();
+                                        timings.cache_time += tj.as_us();
+                                    } else {
+                                        timings.non_cache_data += account.data.len();
+                                        tj.stop();
+                                        timings.non_cache_time += tj.as_us();
+                                        timings.non_cache_count += 1;
+                                    }
+                                    timings.real_load_count += 1;
+                                    let r = if message.is_writable(*i) {
+                                        let rent_due = rent_collector.collect_from_existing_account(
+                                            &key,
+                                            &mut account,
+                                            rent_fix_enabled,
+                                        );
+                                        (account, rent_due)
+                                    } else {
+                                        (account, 0)
+                                    };
+                                    r
+                                })
+                                .unwrap_or_default();/*else(|| {
+                                    timings.missing_account_count += 1;
+                                    tj.stop();
+                                    timings.missing_account += tj.as_us();
+                                    (AccountNoData::default(), 0)
+                                });*/
+
+                            let mut timej2 = Measure::start("");
+                            if account.executable && bpf_loader_upgradeable::check_id(&account.owner) {
+                                let state = account.state();
+                                timej2.stop();
+                                timings.load_6 += timej2.as_us();
+                                timej2 = Measure::start("");
+                                // The upgradeable loader requires the derived ProgramData account
+                                if let Ok(UpgradeableLoaderState::Program {
+                                    programdata_address,
+                                }) = state
+                                {
+                                    if let Some(account) = self
+                                        .accounts_db
+                                        .loads_cow(ancestors, &programdata_address)
+                                        .map(|(account, _)| account)
+                                    {
+                                        timej2.stop();
+                                        timings.load_6 += timej2.as_us();
+                                        timej2 = Measure::start("");
+                                        if account.from_cache {
+                                            //timings.from_cache += 1;
+                                        }
+                                        timings.real_load_count2 += 1;
+                                        account_deps
+                                            .lock()
+                                            .unwrap()
+                                            .push((programdata_address, account));
+                                        timej2.stop();
+                                        timings.time7 += timej2.as_us();
+                                    } else {
+                                        // TODO error_counters.account_not_found += 1;
+                                        pgm_not_found.store(true, Ordering::Relaxed);
+                                        //accounts.push(AccountNoData::default()); //
+                                        timej2.stop();
+                                        timings.load_6 += timej2.as_us();
+                                        timings.errors += 1;
+                                        return AccountNoData::default();
+                                    }
+                                } else {
+                                    // TODO error_counters.invalid_program_for_execution += 1;
+                                    pgm_for_exec.store(true, Ordering::Relaxed);
+                                    //accounts.push(AccountNoData::default()); //
+                                    timej2.stop();
+                                    timings.load_6 += timej2.as_us();
+                                    timings.errors += 1;
+                                    return AccountNoData::default();
+                                }
+                            }
+                            *tx_rent.lock().unwrap() += rent;
                             timej2.stop();
                             timings.load_6 += timej2.as_us();
-                            timej2 = Measure::start("");
+                            account
+                        }
+                    }
+                } else {
+                    // Fill in an empty account for the program slots.
+                    let r = AccountNoData::default();
+                    r
+                };
+
+                //accounts.push(account);
+                account
+            }).collect::<Vec<_>>();
+
+            if par {
+                //let mut pubkeys = vec![];
+                //let mut pubkey_index = vec![];
+                let mut not_found = 0;
+                let total=pubkeys.len();
+                self.accounts_db.load_cows(ancestors, &pubkeys[..]).into_iter().zip(pubkey_index.into_iter()).map(|(account_slot, i)| {
+                    if let Some((mut account, slot)) = account_slot {
+                        let (mut account, rent) = if message.is_writable(*i) {
+                            let rent_due = rent_collector.collect_from_existing_account(
+                                &pubkeys[*i],
+                                &mut account,
+                                rent_fix_enabled,
+                            );
+                            (account, rent_due)
+                        } else {
+                            (account, 0)
+                        };
+
+                        if account.executable && bpf_loader_upgradeable::check_id(&account.owner) {
+                            let state = account.state();
                             // The upgradeable loader requires the derived ProgramData account
                             if let Ok(UpgradeableLoaderState::Program {
                                 programdata_address,
@@ -314,52 +403,37 @@ impl Accounts {
                                     .loads_cow(ancestors, &programdata_address)
                                     .map(|(account, _)| account)
                                 {
-                                    timej2.stop();
-                                    timings.load_6 += timej2.as_us();
-                                    timej2 = Measure::start("");
-                                    if account.from_cache {
-                                        //timings.from_cache += 1;
-                                    }
-                                    timings.real_load_count2 += 1;
                                     account_deps
                                         .lock()
                                         .unwrap()
                                         .push((programdata_address, account));
-                                    timej2.stop();
-                                    timings.time7 += timej2.as_us();
                                 } else {
                                     // TODO error_counters.account_not_found += 1;
                                     pgm_not_found.store(true, Ordering::Relaxed);
-                                    accounts.push(AccountNoData::default()); //
-                                    timej2.stop();
-                                    timings.load_6 += timej2.as_us();
-                                    timings.errors += 1;
-                                    return;
+                                    //accounts.push(AccountNoData::default()); //
+                                    account = AccountNoData::default();
                                 }
                             } else {
                                 // TODO error_counters.invalid_program_for_execution += 1;
                                 pgm_for_exec.store(true, Ordering::Relaxed);
-                                accounts.push(AccountNoData::default()); //
-                                timej2.stop();
-                                timings.load_6 += timej2.as_us();
-                                timings.errors += 1;
-                                return;
+                                //accounts.push(AccountNoData::default()); //
+                                account = AccountNoData::default();
                             }
                         }
-                        tx_rent += rent;
-                        timej2.stop();
-                        timings.load_6 += timej2.as_us();
 
-                        account
+                        *tx_rent.lock().unwrap() += rent;
+
+                        accounts[*i] = account;
                     }
-                } else {
-                    // Fill in an empty account for the program slots.
-                    let r = AccountNoData::default();
-                    r
-                };
+                    else{
+                        not_found += 1;
+                    }
+                });
+                if not_found > 0 {
+                    error!("not found: {} out of: {}", not_found, total);
+                }
+            }
 
-                accounts.push(account);
-            });
             timej.stop();
             timings.load_3 += timej.as_us();
             let mut timej = Measure::start("");
@@ -429,7 +503,7 @@ impl Accounts {
                             accounts,
                             account_deps: vec,
                             loaders,
-                            rent: tx_rent,
+                            rent: *tx_rent.lock().unwrap(),
                         });
                         timej.stop();
                         timings.load_5 += timej.as_us();
@@ -726,7 +800,7 @@ impl Accounts {
         &self,
         slot: Slot,
         program_id: Option<&Pubkey>,
-    ) -> Vec<(Pubkey, Account)> {
+    ) -> Vec<(Pubkey, AccountNoData)> {
         self.scan_slot(slot, |stored_account| {
             let hit = match program_id {
                 None => true,
@@ -734,7 +808,7 @@ impl Accounts {
             };
 
             if hit {
-                Some((*stored_account.pubkey(), stored_account.account()))
+                Some((*stored_account.pubkey(), stored_account.account_no_data()))
             } else {
                 None
             }
@@ -842,10 +916,10 @@ impl Accounts {
         &self,
         ancestors: &Ancestors,
         program_id: &Pubkey,
-    ) -> Vec<(Pubkey, Account)> {
+    ) -> Vec<(Pubkey, AccountNoData)> {
         self.accounts_db.scan_accounts(
             ancestors,
-            |collector: &mut Vec<(Pubkey, Account)>, some_account_tuple| {
+            |collector: &mut Vec<(Pubkey, AccountNoData)>, some_account_tuple| {
                 Self::load_while_filtering(collector, some_account_tuple, |account| {
                     account.owner == *program_id
                 })
@@ -922,11 +996,11 @@ impl Accounts {
         self.accounts_db.store_uncached(slot, &[(pubkey, account)]);
     }
 
-    pub fn store_slow_cached<T: AnAccountConcrete>(
+    pub fn store_slow_cached(
         &self,
         slot: Slot,
         pubkey: &Pubkey,
-        account: &T,
+        account: &AccountNoData,
     ) {
         self.accounts_db.store_cached(slot, &[(pubkey, account)]);
     }

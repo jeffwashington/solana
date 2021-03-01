@@ -110,14 +110,14 @@ pub fn create_genesis_config_with_vote_accounts_and_cluster_type(
 
         // Create accounts
         let node_account = AccountNoData::new(VALIDATOR_LAMPORTS, 0, &system_program::id());
-        let vote_account = Account::to_account_no_data(vote_state::create_account(&vote_pubkey, &node_pubkey, 0, *stake));
-        let stake_account = Account::to_account_no_data(stake_state::create_account(
+        let vote_account = vote_state::create_account(&vote_pubkey, &node_pubkey, 0, *stake);
+        let stake_account = stake_state::create_account(
             &stake_pubkey,
             &vote_pubkey,
-            &AccountNoData::to_account(vote_account.clone()),
+            &vote_account.clone(),
             &genesis_config_info.genesis_config.rent,
             *stake,
-        ));
+        );
 
         // Put newly created accounts into genesis
         genesis_config_info.genesis_config.accounts.extend(vec![
@@ -211,8 +211,8 @@ pub fn create_genesis_config_with_leader_ex(
         *validator_pubkey,
         AccountNoData::new(validator_lamports, 0, &system_program::id()),
     ));
-    initial_accounts.push((*validator_vote_account_pubkey, Account::to_account_no_data(validator_vote_account)));
-    initial_accounts.push((*validator_stake_account_pubkey, Account::to_account_no_data(validator_stake_account)));
+    initial_accounts.push((*validator_vote_account_pubkey, validator_vote_account));
+    initial_accounts.push((*validator_stake_account_pubkey, validator_stake_account));
 
     let mut genesis_config = GenesisConfig {
         accounts: initial_accounts.iter().cloned().collect(),

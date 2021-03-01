@@ -559,6 +559,19 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
         }
     }
 
+    pub fn get_account_read_entries(&self, pubkeys: &[&Pubkey]) -> Vec<Option<ReadAccountMapEntry<T>>> {
+        let lock = self.account_maps
+            .read()
+            .unwrap();
+        
+        pubkeys.iter().map(|pubkey| {
+        lock
+            .get(*pubkey)
+            .cloned()
+            .map(ReadAccountMapEntry::from_account_map_entry)
+        }).collect::<Vec<_>>()
+    }
+
     pub fn get_account_read_entry(&self, pubkey: &Pubkey) -> Option<ReadAccountMapEntry<T>> {
         self.account_maps
             .read()
@@ -792,6 +805,41 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
             })
     }
 
+    /// Get an account
+    /// The latest account that appears in `ancestors` or `roots` is returned.
+    pub(crate) fn gets(
+        &self,
+        pubkey: &[&Pubkey],
+        ancestors: Option<&Ancestors>,
+        max_root: Option<Slot>,
+    ) -> Vec<Option<(ReadAccountMapEntry<T>, usize)>> {
+        
+        let entries = self.get_account_read_entries(pubkey);
+        entries.into_iter().map(|entry| {
+            entry.and_then(|locked_entry| {
+                let found_index =
+                    self.latest_slot(ancestors, &locked_entry.slot_list(), max_root)?;
+                Some((locked_entry, found_index))
+            })
+        }).collect::<Vec<_>>()
+    }
+/*
+    /// Get an account
+    /// The latest account that appears in `ancestors` or `roots` is returned.
+    pub(crate) fn gets(
+        &self,
+        pubkey: &[&Pubkey],
+        ancestors: Option<&Ancestors>,
+        max_root: Option<Slot>,
+    ) -> Option<(ReadAccountMapEntry<T>, usize)> {
+        self.get_account_read_entry(pubkey)
+            .and_then(|locked_entry| {
+                let found_index =
+                    self.latest_slot(ancestors, &locked_entry.slot_list(), max_root)?;
+                Some((locked_entry, found_index))
+            })
+    }
+*/
     // Get the maximum root <= `max_allowed_root` from the given `slice`
     fn get_max_root(
         roots: &HashSet<Slot>,

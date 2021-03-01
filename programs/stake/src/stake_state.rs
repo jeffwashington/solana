@@ -11,6 +11,7 @@ use crate::{
 use serde_derive::{Deserialize, Serialize};
 use solana_sdk::{
     account::Account,
+    account::AccountNoData,
     account::AnAccount, account::AnAccountConcrete,
     account_utils::{State, StateMut},
     clock::{Clock, Epoch, UnixTimestamp},
@@ -1648,10 +1649,10 @@ pub fn create_lockup_stake_account(
 pub fn create_account(
     authorized: &Pubkey,
     voter_pubkey: &Pubkey,
-    vote_account: &Account,
+    vote_account: &AccountNoData,
     rent: &Rent,
     lamports: u64,
-) -> Account {
+) -> AccountNoData {
     do_create_account(
         authorized,
         voter_pubkey,
@@ -1666,11 +1667,11 @@ pub fn create_account(
 pub fn create_account_with_activation_epoch(
     authorized: &Pubkey,
     voter_pubkey: &Pubkey,
-    vote_account: &Account,
+    vote_account: &AccountNoData,
     rent: &Rent,
     lamports: u64,
     activation_epoch: Epoch,
-) -> Account {
+) -> AccountNoData {
     do_create_account(
         authorized,
         voter_pubkey,
@@ -1684,12 +1685,12 @@ pub fn create_account_with_activation_epoch(
 fn do_create_account(
     authorized: &Pubkey,
     voter_pubkey: &Pubkey,
-    vote_account: &Account,
+    vote_account: &AccountNoData,
     rent: &Rent,
     lamports: u64,
     activation_epoch: Epoch,
-) -> Account {
-    let mut stake_account = Account::new(lamports, std::mem::size_of::<StakeState>(), &id());
+) -> AccountNoData {
+    let mut stake_account = Account::to_account_no_data(Account::new(lamports, std::mem::size_of::<StakeState>(), &id()));
 
     let vote_state = VoteState::from(vote_account).expect("vote_state");
 

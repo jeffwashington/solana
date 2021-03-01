@@ -31,6 +31,7 @@ use solana_runtime::{
 };
 use solana_sdk::{
     account::Account,
+    account::AccountNoData,
     clock::{Epoch, Slot},
     feature::{self, Feature},
     feature_set,
@@ -1806,7 +1807,7 @@ fn main() {
                     if let Some(faucet_pubkey) = faucet_pubkey {
                         bank.store_account(
                             &faucet_pubkey,
-                            &Account::new(faucet_lamports, 0, &system_program::id()),
+                            &Account::to_account_no_data(Account::new(faucet_lamports, 0, &system_program::id())),
                         );
                     }
 
@@ -1821,7 +1822,7 @@ fn main() {
                     }
 
                     for address in accounts_to_remove {
-                        if let Some(mut account) = bank.get_account(&address) {
+                        if let Some(mut account) = bank.get_account_no_data(&address) {
                             account.lamports = 0;
                             bank.store_account(&address, &account);
                         }
@@ -1866,11 +1867,11 @@ fn main() {
 
                             bank.store_account(
                                 identity_pubkey,
-                                &Account::new(
+                                &Account::to_account_no_data(Account::new(
                                     bootstrap_validator_lamports,
                                     0,
                                     &system_program::id(),
-                                ),
+                                )),
                             );
 
                             let vote_account = vote_state::create_account_with_authorized(
@@ -2117,7 +2118,7 @@ fn main() {
                             {
                                 base_bank.store_account(
                                     &feature_set::simple_capitalization::id(),
-                                    &feature::create_account(
+                                    &feature::create_account_no_data(
                                         &Feature { activated_at: None },
                                         feature_account_balance,
                                     ),
@@ -2130,7 +2131,7 @@ fn main() {
                                     // capitalizaion, which doesn't affect inflation behavior!
                                     base_bank.store_account(
                                         &feature_set::cumulative_rent_related_fixes::id(),
-                                        &Account::default(),
+                                        &AccountNoData::default(),
                                     );
                                 } else {
                                     let old_cap = base_bank.set_capitalization();
@@ -2154,7 +2155,7 @@ fn main() {
                             {
                                 base_bank.store_account(
                                     &feature_set::stake_program_v2::id(),
-                                    &feature::create_account(
+                                    &feature::create_account_no_data(
                                         &Feature { activated_at: None },
                                         feature_account_balance,
                                     ),
@@ -2167,7 +2168,7 @@ fn main() {
                             {
                                 base_bank.store_account(
                                     &feature_set::rewrite_stake::id(),
-                                    &feature::create_account(
+                                    &feature::create_account_no_data(
                                         &Feature { activated_at: None },
                                         feature_account_balance,
                                     ),
@@ -2189,7 +2190,7 @@ fn main() {
                                     // capitalizaion, which doesn't affect inflation behavior!
                                     base_bank.store_account(
                                         &feature_set::secp256k1_program_enabled::id(),
-                                        &Account::default(),
+                                        &AccountNoData::default(),
                                     );
                                     force_enabled_count -= 1;
                                 } else {
@@ -2206,7 +2207,7 @@ fn main() {
                                     // capitalizaion, which doesn't affect inflation behavior!
                                     base_bank.store_account(
                                         &feature_set::instructions_sysvar_enabled::id(),
-                                        &Account::default(),
+                                        &AccountNoData::default(),
                                     );
                                     force_enabled_count -= 1;
                                 } else {
@@ -2386,7 +2387,7 @@ fn main() {
                                     pubkey,
                                     account,
                                     base_bank
-                                        .get_account(&pubkey)
+                                        .get_account_no_data(&pubkey)
                                         .map(|a| a.lamports)
                                         .unwrap_or_default(),
                                 )
@@ -2412,7 +2413,7 @@ fn main() {
                                     .map(|(pubkey, ..)| *pubkey)
                                     .collect(),
                             )
-                            .map(|pubkey| (**pubkey, warped_bank.get_account(pubkey).unwrap()))
+                            .map(|pubkey| (**pubkey, warped_bank.get_account_no_data(pubkey).unwrap()))
                             .collect::<Vec<_>>();
                         unchanged_accounts.sort_unstable_by_key(|(pubkey, account)| {
                             (account.owner, account.lamports, *pubkey)

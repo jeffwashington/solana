@@ -2491,6 +2491,14 @@ impl AccountsDB {
         self.do_load_cow(ancestors, pubkey, None)
     }
 
+    pub fn load_cows<'a>(
+        &'a self,
+        ancestors: &Ancestors,
+        pubkeys: &'a[&'a Pubkey],
+    ) -> Vec<Option<(AccountNoData, Slot)>> {
+        self.do_load_cows(ancestors, pubkeys, None)
+    }
+
     fn do_load(
         &self,
         ancestors: &Ancestors,
@@ -2559,7 +2567,45 @@ impl AccountsDB {
                 */
         }
     
-    pub fn load_account_hash(&self, ancestors: &Ancestors, pubkey: &Pubkey) -> Hash {
+        fn do_load_cows<'a>(
+            &'a self,
+            ancestors: &Ancestors,
+            pubkey: &'a [&'a Pubkey],
+            max_root: Option<Slot>,
+        ) -> Vec<Option<(AccountNoData, Slot)>> {
+            let mut found= Vec::with_capacity(pubkey.len());
+            {
+                let lock_and_index = self.accounts_index.gets(pubkey, Some(ancestors), max_root);
+                lock_and_index.into_iter().for_each(|lock_and_index| {
+                    if let Some((lock, index)) = lock_and_index {
+                        let slot_list = lock.slot_list();
+                        let (
+                            slot,
+                            AccountInfo {
+                                store_id, offset, ..
+                            },
+                        ) = slot_list[index];
+                        found.push(Some((slot, store_id, offset)));
+                    }
+                    else {
+                        found.push(None);
+                    }
+                });
+            }
+
+            found.into_iter().zip(pubkey.iter()).map(|(stuff, pubkey)| {
+                if let Some((slot, store_id, offset)) = stuff {
+                    self.get_account_accessor_from_cache_or_storage(slot, *pubkey, store_id, offset)
+                    .get_loaded_account()
+                    .map(|loaded_account| (loaded_account.account_no_data(), slot))
+                }
+                else {
+                    None
+                }
+            }).collect::<Vec<_>>()
+        }
+        
+        pub fn load_account_hash(&self, ancestors: &Ancestors, pubkey: &Pubkey) -> Hash {
         let (slot, store_id, offset) = {
             let (lock, index) = self
                 .accounts_index
@@ -4793,20 +4839,37 @@ impl AccountsDB {
         inc_new_counter_info!("clean_stored_dead_slots-ms", measure.as_ms() as usize);
     }
 
-    fn hash_accounts<T:AnAccount + Default + Clone>(
+    fn h(        accounts: &[(&Pubkey, &Account)],
+    slot: Slot,
+    cluster_type: &ClusterType,
+
+) {
+    let hashes: Vec<_> = (*accounts).par_iter().map(|(pubkey, account)| {
+        Self::hash_account(slot, *account, pubkey, cluster_type)
+    }).collect();
+
+    }
+
+    fn hash_accounts(
         &self,
         slot: Slot,
-        accounts: &[(&Pubkey, &T)],
+        accounts: &[(&Pubkey, &AccountNoData)],
         cluster_type: &ClusterType,
     ) -> Vec<Hash> {
         let mut stats = BankHashStats::default();
         let mut total_data = 0;
+
+        let hashes: Vec<_> = (*accounts).par_iter().map(|(pubkey, account)| {
+            Self::hash_account(slot, *account, pubkey, cluster_type)
+        }).collect();
+
         let hashes: Vec<_> = accounts
             .iter()
-            .map(|(pubkey, account)| {
+            .zip(hashes)
+            .map(|((pubkey, account),hash)| {
                 total_data += account.data().len();
                 stats.update(*account);
-                Self::hash_account(slot, *account, pubkey, cluster_type)
+                hash
             })
             .collect();
 
@@ -4872,16 +4935,16 @@ impl AccountsDB {
         }
     }
 
-    pub fn store_cached<T:AnAccount + Default + Clone>(&self, slot: Slot, accounts: &[(&Pubkey, &T)]) {
+    pub fn store_cached(&self, slot: Slot, accounts: &[(&Pubkey, &AccountNoData)]) {
         self.store(slot, accounts, self.caching_enabled);
     }
 
     /// Store the account update.
-    pub fn store_uncached<T:AnAccount + Default + Clone>(&self, slot: Slot, accounts: &[(&Pubkey, &T)]) {
+    pub fn store_uncached(&self, slot: Slot, accounts: &[(&Pubkey, &AccountNoData)]) {
         self.store(slot, accounts, false);
     }
 
-    fn store<T:AnAccount + Default + Clone>(&self, slot: Slot, accounts: &[(&Pubkey, &T)], is_cached_store: bool) {
+    fn store(&self, slot: Slot, accounts: &[(&Pubkey, &AccountNoData)], is_cached_store: bool) {
         // If all transactions in a batch are errored,
         // it's possible to get a store with no accounts.
         if accounts.is_empty() {
