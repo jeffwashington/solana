@@ -232,6 +232,7 @@ pub fn deserialize_parameters_aligned(
             }
             let data_changed = account.data.len() != data_end - start
                 || &account.data[..] != &buffer[start..data_end];
+            if data_changed {
                 account.data.copy_from_slice(&buffer[start..data_end]);
             }
             start += pre_len + MAX_PERMITTED_DATA_INCREASE; // data
