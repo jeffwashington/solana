@@ -2224,8 +2224,10 @@ impl AccountsDb {
         ancestors: &Ancestors,
         pubkey: &Pubkey,
         max_root: Option<Slot>,
-        keep_in_cache: bool,
+        mut keep_in_cache: bool,
     ) -> Option<(Account, Slot)> {
+        keep_in_cache = keep_in_cache && self.caching_enabled;
+        
         let (slot, store_id, offset) = {
             let (lock, index) = self.accounts_index.get(pubkey, Some(ancestors), max_root)?;
             let slot_list = lock.slot_list();
