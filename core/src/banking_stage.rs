@@ -622,6 +622,8 @@ impl BankingStage {
             txs.len(),
         );
 
+        debug!("process_and_record_transactions_locked: {:?}", execute_timings);
+
         (Ok(num_to_commit), retryable_txs)
     }
 

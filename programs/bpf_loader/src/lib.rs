@@ -14,6 +14,8 @@ use crate::{
     serialization::{deserialize_parameters, serialize_parameters},
     syscalls::SyscallError,
 };
+use log::{log_enabled, trace, Level::Trace};
+use solana_measure::measure::Measure;
 use solana_rbpf::{
     ebpf::MM_HEAP_START,
     error::{EbpfError, UserDefinedError},
@@ -778,8 +780,12 @@ impl Executor for BpfExecutor {
         let mut keyed_accounts_iter = keyed_accounts.iter();
         let _ = next_keyed_account(&mut keyed_accounts_iter)?;
         let parameter_accounts = keyed_accounts_iter.as_slice();
+        let mut serialize_time = Measure::start("serialize");
         let mut parameter_bytes =
             serialize_parameters(loader_id, program_id, parameter_accounts, &instruction_data)?;
+        serialize_time.stop();
+        let mut create_vm_time = Measure::start("create_vm");
+        let mut execute_time;
         {
             let compute_meter = invoke_context.get_compute_meter();
             let mut vm = match create_vm(
@@ -795,7 +801,9 @@ impl Executor for BpfExecutor {
                     return Err(InstructionError::ProgramEnvironmentSetupFailure);
                 }
             };
+            create_vm_time.stop();
 
+            execute_time = Measure::start("execute");
             stable_log::program_invoke(&logger, program_id, invoke_depth);
             let mut instruction_meter = ThisInstructionMeter::new(compute_meter.clone());
             let before = compute_meter.borrow().get_remaining();
@@ -834,8 +842,12 @@ impl Executor for BpfExecutor {
                     return Err(error);
                 }
             }
+            execute_time.stop();
         }
+        let mut deserialize_time = Measure::start("deserialize");
         deserialize_parameters(loader_id, parameter_accounts, &parameter_bytes)?;
+        deserialize_time.stop();
+        invoke_context.update_timing(serialize_time.as_us(), create_vm_time.as_us(), execute_time.as_us(), deserialize_time.as_us());
         stable_log::program_success(&logger, program_id);
         Ok(())
     }
