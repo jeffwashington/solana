@@ -14,7 +14,6 @@ use crate::{
     serialization::{deserialize_parameters, serialize_parameters},
     syscalls::SyscallError,
 };
-use log::{log_enabled, trace, Level::Trace};
 use solana_measure::measure::Measure;
 use solana_rbpf::{
     ebpf::MM_HEAP_START,
