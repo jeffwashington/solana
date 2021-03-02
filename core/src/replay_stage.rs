@@ -1409,7 +1409,6 @@ impl ReplayStage {
             }
         }
         inc_new_counter_info!("replay_stage-replay_transactions", tx_count);
-        debug!("replay_active_banks: {:?}", bank_progress.replay_progress.execute_timings);
         did_complete_bank
     }
 
