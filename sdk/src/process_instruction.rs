@@ -60,6 +60,8 @@ pub trait InvokeContext {
     fn is_feature_active(&self, feature_id: &Pubkey) -> bool;
     /// Get an account from a pre-account
     fn get_account(&self, pubkey: &Pubkey) -> Option<RefCell<Account>>;
+    /// Update timing
+    fn update_timing(&mut self, serialize_us: u64, create_vm_us: u64, execute_us: u64, deserialize_us: u64);
 }
 
 /// Convenience macro to log a message with an `Rc<RefCell<dyn Logger>>`
@@ -328,4 +330,6 @@ impl InvokeContext for MockInvokeContext {
     fn get_account(&self, _pubkey: &Pubkey) -> Option<RefCell<Account>> {
         None
     }
+    fn update_timing(&mut self, _serialize_us: u64, _create_vm_us: u64, _execute_us: u64, _deserialize_us: u64) {
+    }    
 }
