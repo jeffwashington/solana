@@ -604,7 +604,7 @@ fn confirm_full_slot(
         opts.allow_dead_slots,
     )?;
 
-    debug!("confirm_full_slot: {:?}", timing.execute_timings);
+    info!("confirm_full_slot: {:?}", timing.execute_timings);
 
     if !bank.is_complete() {
         Err(BlockstoreProcessorError::InvalidBlock(
