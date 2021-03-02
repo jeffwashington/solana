@@ -230,7 +230,11 @@ pub fn deserialize_parameters_aligned(
                 account.data.resize(post_len, 0);
                 data_end = start + post_len;
             }
-            account.data.clone_from_slice(&buffer[start..data_end]);
+            let data_changed = account.data.len() != data_end - start
+                || &account.data[..] != &buffer[start..data_end];
+            if data_changed {
+                account.data.clone_from_slice(&buffer[start..data_end]);
+            }
             start += pre_len + MAX_PERMITTED_DATA_INCREASE; // data
             start += (start as *const u8).align_offset(align_of::<u128>());
             start += size_of::<u64>(); // rent_epoch
