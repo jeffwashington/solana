@@ -14,7 +14,7 @@ use solana_program::{
     rent::Rent, sysvar,
 };
 use solana_sdk::{
-    account::{from_account, Account},
+    account::{from_account, AccountNoData},
     commitment_config::CommitmentLevel,
     signature::Signature,
     transaction::{self, Transaction},
@@ -100,7 +100,7 @@ impl BanksClient {
         ctx: Context,
         address: Pubkey,
         commitment: CommitmentLevel,
-    ) -> impl Future<Output = io::Result<Option<Account>>> + '_ {
+    ) -> impl Future<Output = io::Result<Option<AccountNoData>>> + '_ {
         self.inner
             .get_account_with_commitment_and_context(ctx, address, commitment)
     }
@@ -204,7 +204,7 @@ impl BanksClient {
         &mut self,
         address: Pubkey,
         commitment: CommitmentLevel,
-    ) -> impl Future<Output = io::Result<Option<Account>>> + '_ {
+    ) -> impl Future<Output = io::Result<Option<AccountNoData>>> + '_ {
         self.get_account_with_commitment_and_context(context::current(), address, commitment)
     }
 
@@ -213,7 +213,7 @@ impl BanksClient {
     pub fn get_account(
         &mut self,
         address: Pubkey,
-    ) -> impl Future<Output = io::Result<Option<Account>>> + '_ {
+    ) -> impl Future<Output = io::Result<Option<AccountNoData>>> + '_ {
         self.get_account_with_commitment(address, CommitmentLevel::default())
     }
 

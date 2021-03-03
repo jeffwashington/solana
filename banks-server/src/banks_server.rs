@@ -9,7 +9,7 @@ use solana_banks_interface::{
 };
 use solana_runtime::{bank::Bank, bank_forks::BankForks, commitment::BlockCommitmentCache};
 use solana_sdk::{
-    account::Account,
+    account::AccountNoData,
     clock::Slot,
     commitment_config::CommitmentLevel,
     fee_calculator::FeeCalculator,
@@ -240,7 +240,7 @@ impl Banks for BanksServer {
         _: Context,
         address: Pubkey,
         commitment: CommitmentLevel,
-    ) -> Option<Account> {
+    ) -> Option<AccountNoData> {
         let bank = self.bank(commitment);
         bank.get_account(&address)
     }

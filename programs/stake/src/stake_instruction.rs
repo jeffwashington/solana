@@ -622,7 +622,7 @@ mod tests {
     use super::*;
     use bincode::serialize;
     use solana_sdk::{
-        account::{self, Account},
+        account::{self, AccountNoData},
         process_instruction::MockInvokeContext,
         rent::Rent,
         sysvar::stake_history::StakeHistory,
@@ -630,14 +630,14 @@ mod tests {
     use std::cell::RefCell;
     use std::str::FromStr;
 
-    fn create_default_account() -> RefCell<Account> {
-        RefCell::new(Account::default())
+    fn create_default_account() -> RefCell<AccountNoData> {
+        RefCell::new(AccountNoData::default())
     }
 
-    fn create_default_stake_account() -> RefCell<Account> {
-        RefCell::new(Account {
+    fn create_default_stake_account() -> RefCell<AccountNoData> {
+        RefCell::new(AccountNoData {
             owner: id(),
-            ..Account::default()
+            ..AccountNoData::default()
         })
     }
 
@@ -673,24 +673,24 @@ mod tests {
                 } else if sysvar::rent::check_id(&meta.pubkey) {
                     account::create_account(&Rent::default(), 1)
                 } else if meta.pubkey == invalid_stake_state_pubkey() {
-                    Account {
+                    AccountNoData {
                         owner: id(),
-                        ..Account::default()
+                        ..AccountNoData::default()
                     }
                 } else if meta.pubkey == invalid_vote_state_pubkey() {
-                    Account {
+                    AccountNoData {
                         owner: solana_vote_program::id(),
-                        ..Account::default()
+                        ..AccountNoData::default()
                     }
                 } else if meta.pubkey == spoofed_stake_state_pubkey() {
-                    Account {
+                    AccountNoData {
                         owner: spoofed_stake_program_id(),
-                        ..Account::default()
+                        ..AccountNoData::default()
                     }
                 } else {
-                    Account {
+                    AccountNoData {
                         owner: id(),
-                        ..Account::default()
+                        ..AccountNoData::default()
                     }
                 })
             })

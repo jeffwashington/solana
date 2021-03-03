@@ -13,7 +13,7 @@ use {
         hardened_unpack::MAX_GENESIS_ARCHIVE_UNPACKED_SIZE,
     },
     solana_sdk::{
-        account::Account,
+        account::AccountNoData,
         clock::{Slot, DEFAULT_MS_PER_SLOT},
         commitment_config::CommitmentConfig,
         fee_calculator::{FeeCalculator, FeeRateGovernor},
@@ -50,7 +50,7 @@ pub struct TestValidatorGenesis {
     rpc_ports: Option<(u16, u16)>, // (JsonRpc, JsonRpcPubSub), None == random ports
     warp_slot: Option<Slot>,
     no_bpf_jit: bool,
-    accounts: HashMap<Pubkey, Account>,
+    accounts: HashMap<Pubkey, AccountNoData>,
     programs: Vec<ProgramInfo>,
     pub validator_exit: Arc<RwLock<ValidatorExit>>,
     pub start_progress: Arc<RwLock<ValidatorStartProgress>>,
@@ -93,14 +93,14 @@ impl TestValidatorGenesis {
     }
 
     /// Add an account to the test environment
-    pub fn add_account(&mut self, address: Pubkey, account: Account) -> &mut Self {
+    pub fn add_account(&mut self, address: Pubkey, account: AccountNoData) -> &mut Self {
         self.accounts.insert(address, account);
         self
     }
 
     pub fn add_accounts<T>(&mut self, accounts: T) -> &mut Self
     where
-        T: IntoIterator<Item = (Pubkey, Account)>,
+        T: IntoIterator<Item = (Pubkey, AccountNoData)>,
     {
         for (address, account) in accounts {
             self.add_account(address, account);
@@ -133,7 +133,7 @@ impl TestValidatorGenesis {
     ) -> &mut Self {
         self.add_account(
             address,
-            Account {
+            AccountNoData {
                 lamports,
                 data: solana_program_test::read_file(
                     solana_program_test::find_file(filename).unwrap_or_else(|| {
@@ -158,7 +158,7 @@ impl TestValidatorGenesis {
     ) -> &mut Self {
         self.add_account(
             address,
-            Account {
+            AccountNoData {
                 lamports,
                 data: base64::decode(data_base64)
                     .unwrap_or_else(|err| panic!("Failed to base64 decode: {}", err)),
@@ -285,7 +285,7 @@ impl TestValidator {
             let data = solana_program_test::read_file(&program.program_path);
             accounts.insert(
                 program.program_id,
-                Account {
+                AccountNoData {
                     lamports: Rent::default().minimum_balance(data.len()).min(1),
                     data,
                     owner: program.loader,

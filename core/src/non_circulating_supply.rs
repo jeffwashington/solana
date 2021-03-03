@@ -137,7 +137,7 @@ solana_sdk::pubkeys!(
 mod tests {
     use super::*;
     use solana_sdk::{
-        account::Account,
+        account::AccountNoData,
         epoch_schedule::EpochSchedule,
         genesis_config::{ClusterType, GenesisConfig},
     };
@@ -150,19 +150,19 @@ mod tests {
 
     #[test]
     fn test_calculate_non_circulating_supply() {
-        let mut accounts: BTreeMap<Pubkey, Account> = BTreeMap::new();
+        let mut accounts: BTreeMap<Pubkey, AccountNoData> = BTreeMap::new();
         let balance = 10;
         let num_genesis_accounts = 10;
         for _ in 0..num_genesis_accounts {
             accounts.insert(
                 solana_sdk::pubkey::new_rand(),
-                Account::new(balance, 0, &Pubkey::default()),
+                AccountNoData::new(balance, 0, &Pubkey::default()),
             );
         }
         let non_circulating_accounts = non_circulating_accounts();
         let num_non_circulating_accounts = non_circulating_accounts.len() as u64;
         for key in non_circulating_accounts.clone() {
-            accounts.insert(key, Account::new(balance, 0, &Pubkey::default()));
+            accounts.insert(key, AccountNoData::new(balance, 0, &Pubkey::default()));
         }
 
         let num_stake_accounts = 3;
@@ -176,7 +176,7 @@ mod tests {
                 },
                 ..Meta::default()
             };
-            let stake_account = Account::new_data_with_space(
+            let stake_account = AccountNoData::new_data_with_space(
                 balance,
                 &StakeState::Initialized(meta),
                 std::mem::size_of::<StakeState>(),
@@ -212,7 +212,7 @@ mod tests {
         bank = Arc::new(new_from_parent(&bank));
         let new_balance = 11;
         for key in non_circulating_accounts {
-            bank.store_account(&key, &Account::new(new_balance, 0, &Pubkey::default()));
+            bank.store_account(&key, &AccountNoData::new(new_balance, 0, &Pubkey::default()));
         }
         let non_circulating_supply = calculate_non_circulating_supply(&bank);
         assert_eq!(

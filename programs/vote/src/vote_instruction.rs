@@ -342,7 +342,7 @@ pub fn process_instruction(
 mod tests {
     use super::*;
     use solana_sdk::{
-        account::{self, Account},
+        account::{self, AccountNoData},
         process_instruction::MockInvokeContext,
         rent::Rent,
     };
@@ -376,21 +376,21 @@ mod tests {
                 } else if sysvar::rent::check_id(&meta.pubkey) {
                     account::create_account(&Rent::free(), 1)
                 } else if meta.pubkey == invalid_vote_state_pubkey() {
-                    Account {
+                    AccountNoData {
                         owner: invalid_vote_state_pubkey(),
-                        ..Account::default()
+                        ..AccountNoData::default()
                     }
                 } else {
-                    Account {
+                    AccountNoData {
                         owner: id(),
-                        ..Account::default()
+                        ..AccountNoData::default()
                     }
                 })
             })
             .collect();
 
         for _ in 0..instruction.accounts.len() {
-            accounts.push(RefCell::new(Account::default()));
+            accounts.push(RefCell::new(AccountNoData::default()));
         }
         {
             let keyed_accounts: Vec<_> = instruction

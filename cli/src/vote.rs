@@ -16,7 +16,7 @@ use solana_cli_output::{CliEpochVotingHistory, CliLockout, CliVoteAccount};
 use solana_client::rpc_client::RpcClient;
 use solana_remote_wallet::remote_wallet::RemoteWalletManager;
 use solana_sdk::{
-    account::Account, commitment_config::CommitmentConfig, message::Message,
+    account::AccountNoData, commitment_config::CommitmentConfig, message::Message,
     native_token::lamports_to_sol, pubkey::Pubkey, system_instruction::SystemError,
     transaction::Transaction,
 };
@@ -618,7 +618,7 @@ fn get_vote_account(
     rpc_client: &RpcClient,
     vote_account_pubkey: &Pubkey,
     commitment_config: CommitmentConfig,
-) -> Result<(Account, VoteState), Box<dyn std::error::Error>> {
+) -> Result<(AccountNoData, VoteState), Box<dyn std::error::Error>> {
     let vote_account = rpc_client
         .get_account_with_commitment(vote_account_pubkey, commitment_config)?
         .value

@@ -68,7 +68,7 @@ pub(crate) mod tests {
     use rand::Rng;
     use solana_runtime::vote_account::{ArcVoteAccount, VoteAccounts};
     use solana_sdk::{
-        account::{from_account, Account},
+        account::{from_account, AccountNoData},
         clock::Clock,
         instruction::Instruction,
         pubkey::Pubkey,
@@ -309,7 +309,7 @@ pub(crate) mod tests {
         ));
         let mut rng = rand::thread_rng();
         let vote_accounts = stakes.into_iter().map(|(stake, vote_state)| {
-            let account = Account::new_data(
+            let account = AccountNoData::new_data(
                 rng.gen(), // lamports
                 &VoteStateVersions::new_current(vote_state),
                 &Pubkey::new_unique(), // owner

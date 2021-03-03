@@ -23,7 +23,7 @@ use solana_client::{
 use solana_rbpf::vm::{Config, Executable};
 use solana_remote_wallet::remote_wallet::RemoteWalletManager;
 use solana_sdk::{
-    account::Account,
+    account::AccountNoData,
     account_utils::StateMut,
     bpf_loader, bpf_loader_deprecated,
     bpf_loader_upgradeable::{self, UpgradeableLoaderState},
@@ -1418,7 +1418,7 @@ fn complete_partial_program_init(
     loader_id: &Pubkey,
     payer_pubkey: &Pubkey,
     elf_pubkey: &Pubkey,
-    account: &Account,
+    account: &AccountNoData,
     account_data_len: usize,
     minimum_balance: u64,
     allow_excessive_balance: bool,
