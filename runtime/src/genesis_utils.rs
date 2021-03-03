@@ -1,5 +1,5 @@
 use solana_sdk::{
-    account::Account,
+    account::AccountNoData,
     feature::{self, Feature},
     feature_set::FeatureSet,
     fee_calculator::FeeRateGovernor,
@@ -108,7 +108,7 @@ pub fn create_genesis_config_with_vote_accounts_and_cluster_type(
         let stake_pubkey = validator_voting_keypairs.borrow().stake_keypair.pubkey();
 
         // Create accounts
-        let node_account = Account::new(VALIDATOR_LAMPORTS, 0, &system_program::id());
+        let node_account = AccountNoData::new(VALIDATOR_LAMPORTS, 0, &system_program::id());
         let vote_account = vote_state::create_account(&vote_pubkey, &node_pubkey, 0, *stake);
         let stake_account = stake_state::create_account(
             &stake_pubkey,
@@ -185,7 +185,7 @@ pub fn create_genesis_config_with_leader_ex(
     fee_rate_governor: FeeRateGovernor,
     rent: Rent,
     cluster_type: ClusterType,
-    mut initial_accounts: Vec<(Pubkey, Account)>,
+    mut initial_accounts: Vec<(Pubkey, AccountNoData)>,
 ) -> GenesisConfig {
     let validator_vote_account = vote_state::create_account(
         &validator_vote_account_pubkey,
@@ -204,11 +204,11 @@ pub fn create_genesis_config_with_leader_ex(
 
     initial_accounts.push((
         *mint_pubkey,
-        Account::new(mint_lamports, 0, &system_program::id()),
+        AccountNoData::new(mint_lamports, 0, &system_program::id()),
     ));
     initial_accounts.push((
         *validator_pubkey,
-        Account::new(validator_lamports, 0, &system_program::id()),
+        AccountNoData::new(validator_lamports, 0, &system_program::id()),
     ));
     initial_accounts.push((*validator_vote_account_pubkey, validator_vote_account));
     initial_accounts.push((*validator_stake_account_pubkey, validator_stake_account));

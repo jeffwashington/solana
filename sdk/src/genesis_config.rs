@@ -3,7 +3,7 @@
 #![cfg(feature = "full")]
 
 use crate::{
-    account::Account,
+    account::AccountNoData,
     clock::{UnixTimestamp, DEFAULT_TICKS_PER_SLOT},
     epoch_schedule::EpochSchedule,
     fee_calculator::FeeRateGovernor,
@@ -67,11 +67,11 @@ pub struct GenesisConfig {
     /// when the network (bootstrap validator) was started relative to the UNIX Epoch
     pub creation_time: UnixTimestamp,
     /// initial accounts
-    pub accounts: BTreeMap<Pubkey, Account>,
+    pub accounts: BTreeMap<Pubkey, AccountNoData>,
     /// built-in programs
     pub native_instruction_processors: Vec<(String, Pubkey)>,
     /// accounts for network rewards, these do not count towards capitalization
-    pub rewards_pools: BTreeMap<Pubkey, Account>,
+    pub rewards_pools: BTreeMap<Pubkey, AccountNoData>,
     pub ticks_per_slot: u64,
     pub unused: u64,
     /// network speed configuration
@@ -98,7 +98,7 @@ pub fn create_genesis_config(lamports: u64) -> (GenesisConfig, Keypair) {
         GenesisConfig::new(
             &[(
                 faucet_keypair.pubkey(),
-                Account::new(lamports, 0, &system_program::id()),
+                AccountNoData::new(lamports, 0, &system_program::id()),
             )],
             &[],
         ),
@@ -131,14 +131,14 @@ impl Default for GenesisConfig {
 
 impl GenesisConfig {
     pub fn new(
-        accounts: &[(Pubkey, Account)],
+        accounts: &[(Pubkey, AccountNoData)],
         native_instruction_processors: &[(String, Pubkey)],
     ) -> Self {
         Self {
             accounts: accounts
                 .iter()
                 .cloned()
-                .collect::<BTreeMap<Pubkey, Account>>(),
+                .collect::<BTreeMap<Pubkey, AccountNoData>>(),
             native_instruction_processors: native_instruction_processors.to_vec(),
             ..GenesisConfig::default()
         }
@@ -201,7 +201,7 @@ impl GenesisConfig {
         file.write_all(&serialized)
     }
 
-    pub fn add_account(&mut self, pubkey: Pubkey, account: Account) {
+    pub fn add_account(&mut self, pubkey: Pubkey, account: AccountNoData) {
         self.accounts.insert(pubkey, account);
     }
 
@@ -315,11 +315,11 @@ mod tests {
         let mut config = GenesisConfig::default();
         config.add_account(
             faucet_keypair.pubkey(),
-            Account::new(10_000, 0, &Pubkey::default()),
+            AccountNoData::new(10_000, 0, &Pubkey::default()),
         );
         config.add_account(
             solana_sdk::pubkey::new_rand(),
-            Account::new(1, 0, &Pubkey::default()),
+            AccountNoData::new(1, 0, &Pubkey::default()),
         );
         config.add_native_instruction_processor("hi".to_string(), solana_sdk::pubkey::new_rand());
 

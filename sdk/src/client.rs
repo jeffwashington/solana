@@ -10,7 +10,7 @@
 #![cfg(feature = "full")]
 
 use crate::{
-    account::Account,
+    account::AccountNoData,
     clock::Slot,
     commitment_config::CommitmentConfig,
     epoch_info::EpochInfo,
@@ -59,14 +59,14 @@ pub trait SyncClient {
     fn get_account_data(&self, pubkey: &Pubkey) -> Result<Option<Vec<u8>>>;
 
     /// Get an account or None if not found.
-    fn get_account(&self, pubkey: &Pubkey) -> Result<Option<Account>>;
+    fn get_account(&self, pubkey: &Pubkey) -> Result<Option<AccountNoData>>;
 
     /// Get an account or None if not found. Uses explicit commitment configuration.
     fn get_account_with_commitment(
         &self,
         pubkey: &Pubkey,
         commitment_config: CommitmentConfig,
-    ) -> Result<Option<Account>>;
+    ) -> Result<Option<AccountNoData>>;
 
     /// Get account balance or 0 if not found.
     fn get_balance(&self, pubkey: &Pubkey) -> Result<u64>;

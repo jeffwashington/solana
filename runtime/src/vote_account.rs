@@ -1,6 +1,6 @@
 use serde::de::{Deserialize, Deserializer};
 use serde::ser::{Serialize, Serializer};
-use solana_sdk::{account::Account, instruction::InstructionError, pubkey::Pubkey};
+use solana_sdk::{account::AccountNoData, instruction::InstructionError, pubkey::Pubkey};
 use solana_vote_program::vote_state::VoteState;
 use std::{
     borrow::Borrow,
@@ -21,7 +21,7 @@ pub struct ArcVoteAccount(Arc<VoteAccount>);
 
 #[derive(Debug, AbiExample)]
 pub struct VoteAccount {
-    account: Account,
+    account: AccountNoData,
     vote_state: RwLock<Result<VoteState, InstructionError>>,
     vote_state_once: Once,
 }
@@ -167,19 +167,19 @@ impl<'de> Deserialize<'de> for ArcVoteAccount {
     where
         D: Deserializer<'de>,
     {
-        let account = Account::deserialize(deserializer)?;
+        let account = AccountNoData::deserialize(deserializer)?;
         Ok(Self::from(account))
     }
 }
 
-impl From<Account> for ArcVoteAccount {
-    fn from(account: Account) -> Self {
+impl From<AccountNoData> for ArcVoteAccount {
+    fn from(account: AccountNoData) -> Self {
         Self(Arc::new(VoteAccount::from(account)))
     }
 }
 
-impl From<Account> for VoteAccount {
-    fn from(account: Account) -> Self {
+impl From<AccountNoData> for VoteAccount {
+    fn from(account: AccountNoData) -> Self {
         Self {
             account,
             vote_state: RwLock::new(INVALID_VOTE_STATE),
@@ -191,7 +191,7 @@ impl From<Account> for VoteAccount {
 impl Default for VoteAccount {
     fn default() -> Self {
         Self {
-            account: Account::default(),
+            account: AccountNoData::default(),
             vote_state: RwLock::new(INVALID_VOTE_STATE),
             vote_state_once: Once::new(),
         }
@@ -299,7 +299,7 @@ mod tests {
     fn new_rand_vote_account<R: Rng>(
         rng: &mut R,
         node_pubkey: Option<Pubkey>,
-    ) -> (Account, VoteState) {
+    ) -> (AccountNoData, VoteState) {
         let vote_init = VoteInit {
             node_pubkey: node_pubkey.unwrap_or_else(Pubkey::new_unique),
             authorized_voter: Pubkey::new_unique(),
@@ -314,7 +314,7 @@ mod tests {
             unix_timestamp: rng.gen(),
         };
         let vote_state = VoteState::new(&vote_init, &clock);
-        let account = Account::new_data(
+        let account = AccountNoData::new_data(
             rng.gen(), // lamports
             &VoteStateVersions::new_current(vote_state.clone()),
             &Pubkey::new_unique(), // owner

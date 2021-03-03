@@ -41,7 +41,7 @@ use serde::{Deserialize, Serialize};
 use solana_measure::measure::Measure;
 use solana_rayon_threadlimit::get_thread_count;
 use solana_sdk::{
-    account::Account,
+    account::AccountNoData,
     clock::{Epoch, Slot},
     genesis_config::ClusterType,
     hash::{Hash, Hasher},
@@ -276,7 +276,7 @@ impl<'a> LoadedAccount<'a> {
         }
     }
 
-    pub fn account(self) -> Account {
+    pub fn account(self) -> AccountNoData {
         match self {
             LoadedAccount::Stored(stored_account_meta) => stored_account_meta.clone_account(),
             LoadedAccount::Cached((_, cached_account)) => match cached_account {
@@ -569,7 +569,7 @@ pub struct BankHashStats {
 }
 
 impl BankHashStats {
-    pub fn update(&mut self, account: &Account) {
+    pub fn update(&mut self, account: &AccountNoData) {
         if account.lamports == 0 {
             self.num_removed_accounts += 1;
         } else {
@@ -1052,7 +1052,7 @@ impl solana_frozen_abi::abi_example::AbiExample for AccountsDb {
         let key = Pubkey::default();
         let some_data_len = 5;
         let some_slot: Slot = 0;
-        let account = Account::new(1, some_data_len, &key);
+        let account = AccountNoData::new(1, some_data_len, &key);
         accounts_db.store_uncached(some_slot, &[(&key, &account)]);
         accounts_db.add_root(0);
 
@@ -1726,7 +1726,7 @@ impl AccountsDb {
         I: Iterator<Item = &'a Arc<AccountStorageEntry>>,
     {
         struct FoundStoredAccount {
-            account: Account,
+            account: AccountNoData,
             account_hash: Hash,
             account_size: usize,
             store_id: AppendVecId,
@@ -2018,7 +2018,7 @@ impl AccountsDb {
 
     pub fn scan_accounts<F, A>(&self, ancestors: &Ancestors, scan_func: F) -> A
     where
-        F: Fn(&mut A, Option<(&Pubkey, Account, Slot)>),
+        F: Fn(&mut A, Option<(&Pubkey, AccountNoData, Slot)>),
         A: Default,
     {
         let mut collector = A::default();
@@ -2077,7 +2077,7 @@ impl AccountsDb {
         scan_func: F,
     ) -> A
     where
-        F: Fn(&mut A, Option<(&Pubkey, Account, Slot)>),
+        F: Fn(&mut A, Option<(&Pubkey, AccountNoData, Slot)>),
         A: Default,
         R: RangeBounds<Pubkey>,
     {
@@ -2109,7 +2109,7 @@ impl AccountsDb {
         scan_func: F,
     ) -> A
     where
-        F: Fn(&mut A, Option<(&Pubkey, Account, Slot)>),
+        F: Fn(&mut A, Option<(&Pubkey, AccountNoData, Slot)>),
         A: Default,
     {
         let mut collector = A::default();
@@ -2209,7 +2209,7 @@ impl AccountsDb {
         bank_hashes.insert(slot, new_hash_info);
     }
 
-    pub fn load(&self, ancestors: &Ancestors, pubkey: &Pubkey) -> Option<(Account, Slot)> {
+    pub fn load(&self, ancestors: &Ancestors, pubkey: &Pubkey) -> Option<(AccountNoData, Slot)> {
         self.do_load(ancestors, pubkey, None)
     }
 
@@ -2218,7 +2218,7 @@ impl AccountsDb {
         ancestors: &Ancestors,
         pubkey: &Pubkey,
         max_root: Option<Slot>,
-    ) -> Option<(Account, Slot)> {
+    ) -> Option<(AccountNoData, Slot)> {
         let (slot, store_id, offset) = {
             let (lock, index) = self.accounts_index.get(pubkey, Some(ancestors), max_root)?;
             let slot_list = lock.slot_list();
@@ -2261,7 +2261,7 @@ impl AccountsDb {
             .unwrap()
     }
 
-    pub fn load_slow(&self, ancestors: &Ancestors, pubkey: &Pubkey) -> Option<(Account, Slot)> {
+    pub fn load_slow(&self, ancestors: &Ancestors, pubkey: &Pubkey) -> Option<(AccountNoData, Slot)> {
         self.load(ancestors, pubkey)
     }
 
@@ -2819,7 +2819,7 @@ impl AccountsDb {
 
     pub fn hash_account(
         slot: Slot,
-        account: &Account,
+        account: &AccountNoData,
         pubkey: &Pubkey,
         cluster_type: &ClusterType,
     ) -> Hash {
@@ -2850,7 +2850,7 @@ impl AccountsDb {
         }
     }
 
-    fn hash_frozen_account_data(account: &Account) -> Hash {
+    fn hash_frozen_account_data(account: &AccountNoData) -> Hash {
         let mut hasher = Hasher::default();
 
         hasher.hash(&account.data);
@@ -2963,7 +2963,7 @@ impl AccountsDb {
         slot: Slot,
         hashes: &[Hash],
         mut storage_finder: F,
-        accounts_and_meta_to_store: &[(StoredMeta, &Account)],
+        accounts_and_meta_to_store: &[(StoredMeta, &AccountNoData)],
     ) -> Vec<AccountInfo> {
         assert_eq!(hashes.len(), accounts_and_meta_to_store.len());
         let mut infos: Vec<AccountInfo> = Vec::with_capacity(accounts_and_meta_to_store.len());
@@ -3188,7 +3188,7 @@ impl AccountsDb {
         // If `should_clean` is None, then`should_flush_f` is also None, which will cause
         // `flush_slot_cache` to flush all accounts to storage without cleaning any accounts.
         let mut should_flush_f = should_clean.map(|(account_bytes_saved, num_accounts_saved)| {
-            move |&pubkey: &Pubkey, account: &Account| {
+            move |&pubkey: &Pubkey, account: &AccountNoData| {
                 use std::collections::hash_map::Entry::{Occupied, Vacant};
                 let should_flush = match written_accounts.entry(pubkey) {
                     Vacant(vacant_entry) => {
@@ -3255,7 +3255,7 @@ impl AccountsDb {
     fn flush_slot_cache(
         &self,
         slot: Slot,
-        mut should_flush_f: Option<&mut impl FnMut(&Pubkey, &Account) -> bool>,
+        mut should_flush_f: Option<&mut impl FnMut(&Pubkey, &AccountSharedData) -> bool>,
     ) -> FlushStats {
         let mut num_purged = 0;
         let mut total_size = 0;
@@ -3264,7 +3264,7 @@ impl AccountsDb {
             let iter_items: Vec<_> = slot_cache.iter().collect();
             let mut purged_slot_pubkeys: HashSet<(Slot, Pubkey)> = HashSet::new();
             let mut pubkey_to_slot_set: Vec<(Pubkey, Slot)> = vec![];
-            let (accounts, hashes): (Vec<(&Pubkey, &Account)>, Vec<Hash>) = iter_items
+            let (accounts, hashes): (Vec<(&Pubkey, &AccountNoData)>, Vec<Hash>) = iter_items
                 .iter()
                 .filter_map(|iter_item| {
                     let key = iter_item.key();
@@ -3346,7 +3346,7 @@ impl AccountsDb {
         &self,
         slot: Slot,
         hashes: &[Hash],
-        accounts_and_meta_to_store: &[(StoredMeta, &Account)],
+        accounts_and_meta_to_store: &[(StoredMeta, &AccountNoData)],
     ) -> Vec<AccountInfo> {
         assert_eq!(hashes.len(), accounts_and_meta_to_store.len());
         accounts_and_meta_to_store
@@ -3371,14 +3371,14 @@ impl AccountsDb {
     >(
         &self,
         slot: Slot,
-        accounts: &[(&Pubkey, &Account)],
+        accounts: &[(&Pubkey, &AccountNoData)],
         hashes: &[Hash],
         storage_finder: F,
         mut write_version_producer: P,
         is_cached_store: bool,
     ) -> Vec<AccountInfo> {
-        let default_account = Account::default();
-        let accounts_and_meta_to_store: Vec<(StoredMeta, &Account)> = accounts
+        let default_account = AccountNoData::default();
+        let accounts_and_meta_to_store: Vec<(StoredMeta, &AccountNoData)> = accounts
             .iter()
             .map(|(pubkey, account)| {
                 let account = if account.lamports == 0 {
@@ -3931,7 +3931,7 @@ impl AccountsDb {
         &self,
         slot: Slot,
         infos: Vec<AccountInfo>,
-        accounts: &[(&Pubkey, &Account)],
+        accounts: &[(&Pubkey, &AccountNoData)],
     ) -> SlotList<AccountInfo> {
         let mut reclaims = SlotList::<AccountInfo>::with_capacity(infos.len() * 2);
         for (info, pubkey_account) in infos.into_iter().zip(accounts.iter()) {
@@ -4113,7 +4113,7 @@ impl AccountsDb {
     fn hash_accounts(
         &self,
         slot: Slot,
-        accounts: &[(&Pubkey, &Account)],
+        accounts: &[(&Pubkey, &AccountNoData)],
         cluster_type: &ClusterType,
     ) -> Vec<Hash> {
         let mut stats = BankHashStats::default();
@@ -4163,7 +4163,7 @@ impl AccountsDb {
     }
 
     /// Cause a panic if frozen accounts would be affected by data in `accounts`
-    fn assert_frozen_accounts(&self, accounts: &[(&Pubkey, &Account)]) {
+    fn assert_frozen_accounts(&self, accounts: &[(&Pubkey, &AccountNoData)]) {
         if self.frozen_accounts.is_empty() {
             return;
         }
@@ -4189,16 +4189,16 @@ impl AccountsDb {
         }
     }
 
-    pub fn store_cached(&self, slot: Slot, accounts: &[(&Pubkey, &Account)]) {
+    pub fn store_cached(&self, slot: Slot, accounts: &[(&Pubkey, &AccountNoData)]) {
         self.store(slot, accounts, self.caching_enabled);
     }
 
     /// Store the account update.
-    pub fn store_uncached(&self, slot: Slot, accounts: &[(&Pubkey, &Account)]) {
+    pub fn store_uncached(&self, slot: Slot, accounts: &[(&Pubkey, &AccountNoData)]) {
         self.store(slot, accounts, false);
     }
 
-    fn store(&self, slot: Slot, accounts: &[(&Pubkey, &Account)], is_cached_store: bool) {
+    fn store(&self, slot: Slot, accounts: &[(&Pubkey, &AccountNoData)], is_cached_store: bool) {
         // If all transactions in a batch are errored,
         // it's possible to get a store with no accounts.
         if accounts.is_empty() {
@@ -4316,7 +4316,7 @@ impl AccountsDb {
     fn store_accounts_unfrozen(
         &self,
         slot: Slot,
-        accounts: &[(&Pubkey, &Account)],
+        accounts: &[(&Pubkey, &AccountNoData)],
         hashes: &[Hash],
         is_cached_store: bool,
     ) {
@@ -4342,7 +4342,7 @@ impl AccountsDb {
     fn store_accounts_frozen<'a>(
         &'a self,
         slot: Slot,
-        accounts: &[(&Pubkey, &Account)],
+        accounts: &[(&Pubkey, &AccountNoData)],
         hashes: &[Hash],
         storage_finder: Option<StorageFinder<'a>>,
         write_version_producer: Option<Box<dyn Iterator<Item = u64>>>,
@@ -4366,7 +4366,7 @@ impl AccountsDb {
     fn store_accounts_custom<'a>(
         &'a self,
         slot: Slot,
-        accounts: &[(&Pubkey, &Account)],
+        accounts: &[(&Pubkey, &AccountNoData)],
         hashes: &[Hash],
         storage_finder: Option<StorageFinder<'a>>,
         write_version_producer: Option<Box<dyn Iterator<Item = u64>>>,
@@ -4682,7 +4682,7 @@ impl AccountsDb {
     // store ref count could become incorrect.
     fn do_shrink_slot_v1(&self, slot: Slot, forced: bool) -> usize {
         struct FoundStoredAccount {
-            account: Account,
+            account: AccountNoData,
             account_hash: Hash,
             account_size: usize,
             store_id: AppendVecId,
@@ -5041,7 +5041,7 @@ pub mod tests {
     };
     use assert_matches::assert_matches;
     use rand::{thread_rng, Rng};
-    use solana_sdk::{account::Account, hash::HASH_BYTES, pubkey::PUBKEY_BYTES};
+    use solana_sdk::{account::AccountNoData, hash::HASH_BYTES, pubkey::PUBKEY_BYTES};
     use std::{
         iter::FromIterator,
         str::FromStr,
@@ -5114,20 +5114,20 @@ pub mod tests {
             SLOT,
             &[(
                 &pubkey0,
-                &Account::new(raw_expected[0].lamports, 1, &Account::default().owner),
+                &AccountNoData::new(raw_expected[0].lamports, 1, &AccountNoData::default().owner),
             )],
         );
         accounts.store_uncached(
             SLOT,
-            &[(&pubkey127, &Account::new(128, 1, &Account::default().owner))],
+            &[(&pubkey127, &AccountNoData::new(128, 1, &AccountNoData::default().owner))],
         );
         accounts.store_uncached(
             SLOT,
-            &[(&pubkey128, &Account::new(129, 1, &Account::default().owner))],
+            &[(&pubkey128, &AccountNoData::new(129, 1, &AccountNoData::default().owner))],
         );
         accounts.store_uncached(
             SLOT,
-            &[(&pubkey255, &Account::new(256, 1, &Account::default().owner))],
+            &[(&pubkey255, &AccountNoData::new(256, 1, &AccountNoData::default().owner))],
         );
         accounts.add_root(SLOT);
 
@@ -5245,7 +5245,7 @@ pub mod tests {
         let arc = Arc::new(data);
         let storages = vec![vec![arc]];
         let pubkey = solana_sdk::pubkey::new_rand();
-        let acc = Account::new(1, 48, &Account::default().owner);
+        let acc = AccountNoData::new(1, 48, &AccountNoData::default().owner);
         let sm = StoredMeta {
             data_len: 1,
             pubkey,
@@ -5275,7 +5275,7 @@ pub mod tests {
         solana_logger::setup();
         let db = AccountsDb::new(Vec::new(), &ClusterType::Development);
         let key = Pubkey::default();
-        let account0 = Account::new(1, 0, &key);
+        let account0 = AccountNoData::new(1, 0, &key);
 
         db.store_uncached(0, &[(&key, &account0)]);
         db.add_root(0);
@@ -5288,11 +5288,11 @@ pub mod tests {
         solana_logger::setup();
         let db = AccountsDb::new(Vec::new(), &ClusterType::Development);
         let key = Pubkey::default();
-        let account0 = Account::new(1, 0, &key);
+        let account0 = AccountNoData::new(1, 0, &key);
 
         db.store_uncached(0, &[(&key, &account0)]);
 
-        let account1 = Account::new(0, 0, &key);
+        let account1 = AccountNoData::new(0, 0, &key);
         db.store_uncached(1, &[(&key, &account1)]);
 
         let ancestors = vec![(1, 1)].into_iter().collect();
@@ -5301,8 +5301,8 @@ pub mod tests {
         let ancestors = vec![(1, 1), (0, 0)].into_iter().collect();
         assert_eq!(&db.load_slow(&ancestors, &key).unwrap().0, &account1);
 
-        let accounts: Vec<Account> =
-            db.unchecked_scan_accounts("", &ancestors, |accounts: &mut Vec<Account>, option| {
+        let accounts: Vec<AccountNoData> =
+            db.unchecked_scan_accounts("", &ancestors, |accounts: &mut Vec<AccountNoData>, option| {
                 accounts.push(option.1.account());
             });
         assert_eq!(accounts, vec![account1]);
@@ -5313,11 +5313,11 @@ pub mod tests {
         solana_logger::setup();
         let db = AccountsDb::new(Vec::new(), &ClusterType::Development);
         let key = Pubkey::default();
-        let account0 = Account::new(1, 0, &key);
+        let account0 = AccountNoData::new(1, 0, &key);
 
         db.store_uncached(0, &[(&key, &account0)]);
 
-        let account1 = Account::new(0, 0, &key);
+        let account1 = AccountNoData::new(0, 0, &key);
         db.store_uncached(1, &[(&key, &account1)]);
         db.add_root(0);
 
@@ -5334,7 +5334,7 @@ pub mod tests {
         let db = AccountsDb::new(Vec::new(), &ClusterType::Development);
 
         let key = Pubkey::default();
-        let account0 = Account::new(1, 0, &key);
+        let account0 = AccountNoData::new(1, 0, &key);
 
         // store value 1 in the "root", i.e. db zero
         db.store_uncached(0, &[(&key, &account0)]);
@@ -5349,7 +5349,7 @@ pub mod tests {
         //                                       (via root0)
 
         // store value 0 in one child
-        let account1 = Account::new(0, 0, &key);
+        let account1 = AccountNoData::new(0, 0, &key);
         db.store_uncached(1, &[(&key, &account1)]);
 
         // masking accounts is done at the Accounts level, at accountsDB we see
@@ -5380,9 +5380,9 @@ pub mod tests {
             let idx = thread_rng().gen_range(0, 99);
             let ancestors = vec![(0, 0)].into_iter().collect();
             let account = db.load_slow(&ancestors, &pubkeys[idx]).unwrap();
-            let default_account = Account {
+            let default_account = AccountNoData {
                 lamports: (idx + 1) as u64,
-                ..Account::default()
+                ..AccountNoData::default()
             };
             assert_eq!((default_account, 0), account);
         }
@@ -5396,9 +5396,9 @@ pub mod tests {
             let account0 = db.load_slow(&ancestors, &pubkeys[idx]).unwrap();
             let ancestors = vec![(1, 1)].into_iter().collect();
             let account1 = db.load_slow(&ancestors, &pubkeys[idx]).unwrap();
-            let default_account = Account {
+            let default_account = AccountNoData {
                 lamports: (idx + 1) as u64,
-                ..Account::default()
+                ..AccountNoData::default()
             };
             assert_eq!(&default_account, &account0.0);
             assert_eq!(&default_account, &account1.0);
@@ -5415,7 +5415,7 @@ pub mod tests {
         assert!(check_storage(&db, 0, 2));
 
         let pubkey = solana_sdk::pubkey::new_rand();
-        let account = Account::new(1, DEFAULT_FILE_SIZE as usize / 3, &pubkey);
+        let account = AccountNoData::new(1, DEFAULT_FILE_SIZE as usize / 3, &pubkey);
         db.store_uncached(1, &[(&pubkey, &account)]);
         db.store_uncached(1, &[(&pubkeys[0], &account)]);
         {
@@ -5471,11 +5471,11 @@ pub mod tests {
 
         // 1 token in the "root", i.e. db zero
         let db0 = AccountsDb::new(Vec::new(), &ClusterType::Development);
-        let account0 = Account::new(1, 0, &key);
+        let account0 = AccountNoData::new(1, 0, &key);
         db0.store_uncached(0, &[(&key, &account0)]);
 
         // 0 lamports in the child
-        let account1 = Account::new(0, 0, &key);
+        let account1 = AccountNoData::new(0, 0, &key);
         db0.store_uncached(1, &[(&key, &account1)]);
 
         // masking accounts is done at the Accounts level, at accountsDB we see
@@ -5492,7 +5492,7 @@ pub mod tests {
         let mut db = AccountsDb::new(Vec::new(), &ClusterType::Development);
         db.caching_enabled = true;
         let key = Pubkey::default();
-        let account0 = Account::new(1, 0, &key);
+        let account0 = AccountNoData::new(1, 0, &key);
         let ancestors: HashMap<_, _> = vec![(unrooted_slot, 1)].into_iter().collect();
         db.store_cached(unrooted_slot, &[(&key, &account0)]);
         db.bank_hashes
@@ -5521,7 +5521,7 @@ pub mod tests {
             .is_none());
 
         // Test we can store for the same slot again and get the right information
-        let account0 = Account::new(2, 0, &key);
+        let account0 = AccountNoData::new(2, 0, &key);
         db.store_uncached(unrooted_slot, &[(&key, &account0)]);
         assert_load_account(&db, unrooted_slot, key, 2);
     }
@@ -5532,7 +5532,7 @@ pub mod tests {
         let unrooted_slot = 9;
         let db = AccountsDb::new(Vec::new(), &ClusterType::Development);
         let key = solana_sdk::pubkey::new_rand();
-        let account0 = Account::new(1, 0, &key);
+        let account0 = AccountNoData::new(1, 0, &key);
         db.store_uncached(unrooted_slot, &[(&key, &account0)]);
 
         // Purge the slot
@@ -5566,14 +5566,14 @@ pub mod tests {
         let ancestors = vec![(slot, 0)].into_iter().collect();
         for t in 0..num {
             let pubkey = solana_sdk::pubkey::new_rand();
-            let account = Account::new((t + 1) as u64, space, &Account::default().owner);
+            let account = AccountNoData::new((t + 1) as u64, space, &AccountNoData::default().owner);
             pubkeys.push(pubkey);
             assert!(accounts.load_slow(&ancestors, &pubkey).is_none());
             accounts.store_uncached(slot, &[(&pubkey, &account)]);
         }
         for t in 0..num_vote {
             let pubkey = solana_sdk::pubkey::new_rand();
-            let account = Account::new((num + t + 1) as u64, space, &solana_vote_program::id());
+            let account = AccountNoData::new((num + t + 1) as u64, space, &solana_vote_program::id());
             pubkeys.push(pubkey);
             let ancestors = vec![(slot, 0)].into_iter().collect();
             assert!(accounts.load_slow(&ancestors, &pubkey).is_none());
@@ -5592,9 +5592,9 @@ pub mod tests {
                     let ancestors = vec![(slot, 0)].into_iter().collect();
                     assert!(accounts.load_slow(&ancestors, &pubkeys[idx]).is_none());
                 } else {
-                    let default_account = Account {
+                    let default_account = AccountNoData {
                         lamports: account.lamports,
-                        ..Account::default()
+                        ..AccountNoData::default()
                     };
                     assert_eq!(default_account, account);
                 }
@@ -5647,7 +5647,7 @@ pub mod tests {
             let idx = thread_rng().gen_range(0, num);
             let account = accounts.load_slow(&ancestors, &pubkeys[idx]);
             let account1 = Some((
-                Account::new((idx + count) as u64, 0, &Account::default().owner),
+                AccountNoData::new((idx + count) as u64, 0, &AccountNoData::default().owner),
                 slot,
             ));
             assert_eq!(account, account1);
@@ -5663,7 +5663,7 @@ pub mod tests {
         count: usize,
     ) {
         for idx in 0..num {
-            let account = Account::new((idx + count) as u64, 0, &Account::default().owner);
+            let account = AccountNoData::new((idx + count) as u64, 0, &AccountNoData::default().owner);
             accounts.store_uncached(slot, &[(&pubkeys[idx], &account)]);
         }
     }
@@ -5676,9 +5676,9 @@ pub mod tests {
         create_account(&db, &mut pubkeys, 0, 1, 0, 0);
         let ancestors = vec![(0, 0)].into_iter().collect();
         let account = db.load_slow(&ancestors, &pubkeys[0]).unwrap();
-        let default_account = Account {
+        let default_account = AccountNoData {
             lamports: 1,
-            ..Account::default()
+            ..AccountNoData::default()
         };
         assert_eq!((default_account, 0), account);
     }
@@ -5709,7 +5709,7 @@ pub mod tests {
         let mut keys = vec![];
         for i in 0..9 {
             let key = solana_sdk::pubkey::new_rand();
-            let account = Account::new(i + 1, size as usize / 4, &key);
+            let account = AccountNoData::new(i + 1, size as usize / 4, &key);
             accounts.store_uncached(0, &[(&key, &account)]);
             keys.push(key);
         }
@@ -5740,7 +5740,7 @@ pub mod tests {
 
         let status = [AccountStorageStatus::Available, AccountStorageStatus::Full];
         let pubkey1 = solana_sdk::pubkey::new_rand();
-        let account1 = Account::new(1, DEFAULT_FILE_SIZE as usize / 2, &pubkey1);
+        let account1 = AccountNoData::new(1, DEFAULT_FILE_SIZE as usize / 2, &pubkey1);
         accounts.store_uncached(0, &[(&pubkey1, &account1)]);
         {
             let stores = &accounts.storage.get_slot_stores(0).unwrap();
@@ -5751,7 +5751,7 @@ pub mod tests {
         }
 
         let pubkey2 = solana_sdk::pubkey::new_rand();
-        let account2 = Account::new(1, DEFAULT_FILE_SIZE as usize / 2, &pubkey2);
+        let account2 = AccountNoData::new(1, DEFAULT_FILE_SIZE as usize / 2, &pubkey2);
         accounts.store_uncached(0, &[(&pubkey2, &account2)]);
         {
             assert_eq!(accounts.storage.0.len(), 1);
@@ -5803,7 +5803,7 @@ pub mod tests {
         //not root, it means we are retaining dead banks.
         let accounts = AccountsDb::new(Vec::new(), &ClusterType::Development);
         let pubkey = solana_sdk::pubkey::new_rand();
-        let account = Account::new(1, 0, &Account::default().owner);
+        let account = AccountNoData::new(1, 0, &AccountNoData::default().owner);
         //store an account
         accounts.store_uncached(0, &[(&pubkey, &account)]);
         let ancestors = vec![(0, 0)].into_iter().collect();
@@ -5875,8 +5875,8 @@ pub mod tests {
         let accounts = AccountsDb::new(Vec::new(), &ClusterType::Development);
         let pubkey1 = solana_sdk::pubkey::new_rand();
         let pubkey2 = solana_sdk::pubkey::new_rand();
-        let account = Account::new(1, 1, &Account::default().owner);
-        let zero_lamport_account = Account::new(0, 0, &Account::default().owner);
+        let account = AccountNoData::new(1, 1, &AccountNoData::default().owner);
+        let zero_lamport_account = AccountNoData::new(0, 0, &AccountNoData::default().owner);
 
         // Store two accounts
         accounts.store_uncached(0, &[(&pubkey1, &account)]);
@@ -5930,8 +5930,8 @@ pub mod tests {
 
         let accounts = AccountsDb::new(Vec::new(), &ClusterType::Development);
         let pubkey = solana_sdk::pubkey::new_rand();
-        let account = Account::new(1, 0, &Account::default().owner);
-        let zero_lamport_account = Account::new(0, 0, &Account::default().owner);
+        let account = AccountNoData::new(1, 0, &AccountNoData::default().owner);
+        let zero_lamport_account = AccountNoData::new(0, 0, &AccountNoData::default().owner);
 
         // Store a zero-lamport account
         accounts.store_uncached(0, &[(&pubkey, &account)]);
@@ -5969,7 +5969,7 @@ pub mod tests {
 
         let accounts = AccountsDb::new(Vec::new(), &ClusterType::Development);
         let pubkey = solana_sdk::pubkey::new_rand();
-        let account = Account::new(1, 0, &Account::default().owner);
+        let account = AccountNoData::new(1, 0, &AccountNoData::default().owner);
         //store an account
         accounts.store_uncached(0, &[(&pubkey, &account)]);
         accounts.store_uncached(1, &[(&pubkey, &account)]);
@@ -5998,8 +5998,8 @@ pub mod tests {
         let accounts = AccountsDb::new(Vec::new(), &ClusterType::Development);
         let pubkey1 = solana_sdk::pubkey::new_rand();
         let pubkey2 = solana_sdk::pubkey::new_rand();
-        let normal_account = Account::new(1, 0, &Account::default().owner);
-        let zero_account = Account::new(0, 0, &Account::default().owner);
+        let normal_account = AccountNoData::new(1, 0, &AccountNoData::default().owner);
+        let zero_account = AccountNoData::new(0, 0, &AccountNoData::default().owner);
         //store an account
         accounts.store_uncached(0, &[(&pubkey1, &normal_account)]);
         accounts.store_uncached(1, &[(&pubkey1, &zero_account)]);
@@ -6044,10 +6044,10 @@ pub mod tests {
             vec![0; inline_spl_token_v2_0::state::Account::get_packed_len()];
         account_data_with_mint[..PUBKEY_BYTES].clone_from_slice(&(mint_key.clone().to_bytes()));
 
-        let mut normal_account = Account::new(1, 0, &Account::default().owner);
+        let mut normal_account = AccountNoData::new(1, 0, &AccountNoData::default().owner);
         normal_account.owner = inline_spl_token_v2_0::id();
         normal_account.data = account_data_with_mint.clone();
-        let mut zero_account = Account::new(0, 0, &Account::default().owner);
+        let mut zero_account = AccountNoData::new(0, 0, &AccountNoData::default().owner);
         zero_account.owner = inline_spl_token_v2_0::id();
         zero_account.data = account_data_with_mint;
 
@@ -6114,8 +6114,8 @@ pub mod tests {
 
         let accounts = AccountsDb::new(Vec::new(), &ClusterType::Development);
         let pubkey = solana_sdk::pubkey::new_rand();
-        let account = Account::new(1, 0, &Account::default().owner);
-        let zero_account = Account::new(0, 0, &Account::default().owner);
+        let account = AccountNoData::new(1, 0, &AccountNoData::default().owner);
+        let zero_account = AccountNoData::new(0, 0, &AccountNoData::default().owner);
 
         // store an account, make it a zero lamport account
         // in slot 1
@@ -6151,7 +6151,7 @@ pub mod tests {
 
         let accounts = AccountsDb::new(Vec::new(), &ClusterType::Development);
         let pubkey = solana_sdk::pubkey::new_rand();
-        let account = Account::new(1, 0, &Account::default().owner);
+        let account = AccountNoData::new(1, 0, &AccountNoData::default().owner);
         //store an account
         accounts.store_uncached(0, &[(&pubkey, &account)]);
         assert_eq!(accounts.accounts_index.uncleaned_roots_len(), 0);
@@ -6209,7 +6209,7 @@ pub mod tests {
         modify_accounts(&accounts, &pubkeys, latest_slot, 10, 3);
         // Overwrite account 30 from slot 0 with lamports=0 into slot 1.
         // Slot 1 should now have 10 + 1 = 11 accounts
-        let account = Account::new(0, 0, &Account::default().owner);
+        let account = AccountNoData::new(0, 0, &AccountNoData::default().owner);
         accounts.store_uncached(latest_slot, &[(&pubkeys[30], &account)]);
 
         // Create 10 new accounts in slot 1, should now have 11 + 10 = 21
@@ -6229,7 +6229,7 @@ pub mod tests {
         accounts.clean_accounts(None);
         // Overwrite account 31 from slot 0 with lamports=0 into slot 2.
         // Slot 2 should now have 20 + 1 = 21 accounts
-        let account = Account::new(0, 0, &Account::default().owner);
+        let account = AccountNoData::new(0, 0, &AccountNoData::default().owner);
         accounts.store_uncached(latest_slot, &[(&pubkeys[31], &account)]);
 
         // Create 10 new accounts in slot 2. Slot 2 should now have
@@ -6325,15 +6325,15 @@ pub mod tests {
         let some_lamport = 223;
         let zero_lamport = 0;
         let no_data = 0;
-        let owner = Account::default().owner;
+        let owner = AccountNoData::default().owner;
 
-        let account = Account::new(some_lamport, no_data, &owner);
+        let account = AccountNoData::new(some_lamport, no_data, &owner);
         let pubkey = solana_sdk::pubkey::new_rand();
 
-        let account2 = Account::new(some_lamport, no_data, &owner);
+        let account2 = AccountNoData::new(some_lamport, no_data, &owner);
         let pubkey2 = solana_sdk::pubkey::new_rand();
 
-        let zero_lamport_account = Account::new(zero_lamport, no_data, &owner);
+        let zero_lamport_account = AccountNoData::new(zero_lamport, no_data, &owner);
 
         let accounts = AccountsDb::new_single();
         accounts.add_root(0);
@@ -6404,12 +6404,12 @@ pub mod tests {
         let some_lamport = 223;
         let zero_lamport = 0;
         let no_data = 0;
-        let owner = Account::default().owner;
+        let owner = AccountNoData::default().owner;
 
-        let account = Account::new(some_lamport, no_data, &owner);
+        let account = AccountNoData::new(some_lamport, no_data, &owner);
         let pubkey = solana_sdk::pubkey::new_rand();
 
-        let zero_lamport_account = Account::new(zero_lamport, no_data, &owner);
+        let zero_lamport_account = AccountNoData::new(zero_lamport, no_data, &owner);
 
         let accounts = AccountsDb::new_single();
         accounts.add_root(0);
@@ -6464,16 +6464,16 @@ pub mod tests {
         let some_lamport = 223;
         let zero_lamport = 0;
         let no_data = 0;
-        let owner = Account::default().owner;
+        let owner = AccountNoData::default().owner;
 
-        let account = Account::new(some_lamport, no_data, &owner);
+        let account = AccountNoData::new(some_lamport, no_data, &owner);
         let pubkey = solana_sdk::pubkey::new_rand();
-        let zero_lamport_account = Account::new(zero_lamport, no_data, &owner);
+        let zero_lamport_account = AccountNoData::new(zero_lamport, no_data, &owner);
 
-        let account2 = Account::new(some_lamport + 1, no_data, &owner);
+        let account2 = AccountNoData::new(some_lamport + 1, no_data, &owner);
         let pubkey2 = solana_sdk::pubkey::new_rand();
 
-        let filler_account = Account::new(some_lamport, no_data, &owner);
+        let filler_account = AccountNoData::new(some_lamport, no_data, &owner);
         let filler_account_pubkey = solana_sdk::pubkey::new_rand();
 
         let accounts = AccountsDb::new_single();
@@ -6522,18 +6522,18 @@ pub mod tests {
         let zero_lamport = 0;
         let dummy_lamport = 999;
         let no_data = 0;
-        let owner = Account::default().owner;
+        let owner = AccountNoData::default().owner;
 
-        let account = Account::new(some_lamport, no_data, &owner);
-        let account2 = Account::new(some_lamport + 100_001, no_data, &owner);
-        let account3 = Account::new(some_lamport + 100_002, no_data, &owner);
-        let zero_lamport_account = Account::new(zero_lamport, no_data, &owner);
+        let account = AccountNoData::new(some_lamport, no_data, &owner);
+        let account2 = AccountNoData::new(some_lamport + 100_001, no_data, &owner);
+        let account3 = AccountNoData::new(some_lamport + 100_002, no_data, &owner);
+        let zero_lamport_account = AccountNoData::new(zero_lamport, no_data, &owner);
 
         let pubkey = solana_sdk::pubkey::new_rand();
         let purged_pubkey1 = solana_sdk::pubkey::new_rand();
         let purged_pubkey2 = solana_sdk::pubkey::new_rand();
 
-        let dummy_account = Account::new(dummy_lamport, no_data, &owner);
+        let dummy_account = AccountNoData::new(dummy_lamport, no_data, &owner);
         let dummy_pubkey = Pubkey::default();
 
         let accounts = AccountsDb::new_single();
@@ -6612,7 +6612,7 @@ pub mod tests {
                     .name("account-writers".to_string())
                     .spawn(move || {
                         let pubkey = solana_sdk::pubkey::new_rand();
-                        let mut account = Account::new(1, 0, &pubkey);
+                        let mut account = AccountNoData::new(1, 0, &pubkey);
                         let mut i = 0;
                         loop {
                             let account_bal = thread_rng().gen_range(1, 99);
@@ -6643,24 +6643,24 @@ pub mod tests {
         let db = AccountsDb::new(Vec::new(), &ClusterType::Development);
         let key = Pubkey::default();
         let key0 = solana_sdk::pubkey::new_rand();
-        let account0 = Account::new(1, 0, &key);
+        let account0 = AccountNoData::new(1, 0, &key);
 
         db.store_uncached(0, &[(&key0, &account0)]);
 
         let key1 = solana_sdk::pubkey::new_rand();
-        let account1 = Account::new(2, 0, &key);
+        let account1 = AccountNoData::new(2, 0, &key);
         db.store_uncached(1, &[(&key1, &account1)]);
 
         let ancestors = vec![(0, 0)].into_iter().collect();
-        let accounts: Vec<Account> =
-            db.unchecked_scan_accounts("", &ancestors, |accounts: &mut Vec<Account>, option| {
+        let accounts: Vec<AccountNoData> =
+            db.unchecked_scan_accounts("", &ancestors, |accounts: &mut Vec<AccountNoData>, option| {
                 accounts.push(option.1.account());
             });
         assert_eq!(accounts, vec![account0]);
 
         let ancestors = vec![(1, 1), (0, 0)].into_iter().collect();
-        let accounts: Vec<Account> =
-            db.unchecked_scan_accounts("", &ancestors, |accounts: &mut Vec<Account>, option| {
+        let accounts: Vec<AccountNoData> =
+            db.unchecked_scan_accounts("", &ancestors, |accounts: &mut Vec<AccountNoData>, option| {
                 accounts.push(option.1.account());
             });
         assert_eq!(accounts.len(), 2);
@@ -6673,12 +6673,12 @@ pub mod tests {
 
         let key = Pubkey::default();
         let key0 = solana_sdk::pubkey::new_rand();
-        let account0 = Account::new(1, 0, &key);
+        let account0 = AccountNoData::new(1, 0, &key);
 
         db.store_uncached(0, &[(&key0, &account0)]);
 
         let key1 = solana_sdk::pubkey::new_rand();
-        let account1 = Account::new(2, 0, &key);
+        let account1 = AccountNoData::new(2, 0, &key);
         db.store_uncached(1, &[(&key1, &account1)]);
 
         db.print_accounts_stats("pre");
@@ -6687,7 +6687,7 @@ pub mod tests {
         let purge_keys = vec![(key1, slots)];
         db.purge_keys_exact(&purge_keys);
 
-        let account2 = Account::new(3, 0, &key);
+        let account2 = AccountNoData::new(3, 0, &key);
         db.store_uncached(2, &[(&key1, &account2)]);
 
         db.print_accounts_stats("post");
@@ -6702,7 +6702,7 @@ pub mod tests {
 
         let key = Pubkey::default();
         let data_len = DEFAULT_FILE_SIZE as usize + 7;
-        let account = Account::new(1, data_len, &key);
+        let account = AccountNoData::new(1, data_len, &key);
 
         db.store_uncached(0, &[(&key, &account)]);
 
@@ -6713,7 +6713,7 @@ pub mod tests {
 
     #[test]
     fn test_hash_frozen_account_data() {
-        let account = Account::new(1, 42, &Pubkey::default());
+        let account = AccountNoData::new(1, 42, &Pubkey::default());
 
         let hash = AccountsDb::hash_frozen_account_data(&account);
         assert_ne!(hash, Hash::default()); // Better not be the default Hash
@@ -6766,7 +6766,7 @@ pub mod tests {
             Pubkey::from_str("My11111111111111111111111111111111111111111").unwrap();
         let mut db = AccountsDb::new(Vec::new(), &ClusterType::Development);
 
-        let mut account = Account::new(1, 42, &frozen_pubkey);
+        let mut account = AccountNoData::new(1, 42, &frozen_pubkey);
         db.store_uncached(0, &[(&frozen_pubkey, &account)]);
 
         let ancestors = vec![(0, 0)].into_iter().collect();
@@ -6801,7 +6801,7 @@ pub mod tests {
             Pubkey::from_str("My11111111111111111111111111111111111111111").unwrap();
         let mut db = AccountsDb::new(Vec::new(), &ClusterType::Development);
 
-        let mut account = Account::new(1, 42, &frozen_pubkey);
+        let mut account = AccountNoData::new(1, 42, &frozen_pubkey);
         db.store_uncached(0, &[(&frozen_pubkey, &account)]);
 
         let ancestors = vec![(0, 0)].into_iter().collect();
@@ -6834,7 +6834,7 @@ pub mod tests {
             Pubkey::from_str("My11111111111111111111111111111111111111111").unwrap();
         let mut db = AccountsDb::new(Vec::new(), &ClusterType::Development);
 
-        let mut account = Account::new(1, 42, &frozen_pubkey);
+        let mut account = AccountNoData::new(1, 42, &frozen_pubkey);
         db.store_uncached(0, &[(&frozen_pubkey, &account)]);
 
         let ancestors = vec![(0, 0)].into_iter().collect();
@@ -6910,7 +6910,7 @@ pub mod tests {
         let key = Pubkey::default();
         let some_data_len = 5;
         let some_slot: Slot = 0;
-        let account = Account::new(1, some_data_len, &key);
+        let account = AccountNoData::new(1, some_data_len, &key);
         let ancestors = vec![(some_slot, 0)].into_iter().collect();
 
         db.store_uncached(some_slot, &[(&key, &account)]);
@@ -6938,7 +6938,7 @@ pub mod tests {
         let key = solana_sdk::pubkey::new_rand();
         let some_data_len = 0;
         let some_slot: Slot = 0;
-        let account = Account::new(1, some_data_len, &key);
+        let account = AccountNoData::new(1, some_data_len, &key);
         let ancestors = vec![(some_slot, 0)].into_iter().collect();
 
         db.store_uncached(some_slot, &[(&key, &account)]);
@@ -6980,7 +6980,7 @@ pub mod tests {
         let key = solana_sdk::pubkey::new_rand();
         let some_data_len = 0;
         let some_slot: Slot = 0;
-        let account = Account::new(1, some_data_len, &key);
+        let account = AccountNoData::new(1, some_data_len, &key);
         let ancestors = vec![(some_slot, 0)].into_iter().collect();
 
         db.store_uncached(some_slot, &[(&key, &account)]);
@@ -7044,7 +7044,7 @@ pub mod tests {
         let key = Pubkey::default();
         let some_data_len = 0;
         let some_slot: Slot = 0;
-        let account = Account::new(1, some_data_len, &key);
+        let account = AccountNoData::new(1, some_data_len, &key);
         let ancestors = vec![(some_slot, 0)].into_iter().collect();
 
         let accounts = &[(&key, &account)];
@@ -7067,7 +7067,7 @@ pub mod tests {
         let key = solana_sdk::pubkey::new_rand();
         let lamports = 100;
         let data_len = 8190;
-        let account = Account::new(lamports, data_len, &solana_sdk::pubkey::new_rand());
+        let account = AccountNoData::new(lamports, data_len, &solana_sdk::pubkey::new_rand());
         // pre-populate with a smaller empty store
         db.create_and_insert_store(1, 8192, "test_storage_finder");
         db.store_uncached(1, &[(&key, &account)]);
@@ -7084,7 +7084,7 @@ pub mod tests {
         let db = AccountsDb::new(Vec::new(), &ClusterType::Development);
 
         let key = Pubkey::default();
-        let account = Account::new(1, 0, &key);
+        let account = AccountNoData::new(1, 0, &key);
         let before_slot = 0;
         let base_slot = before_slot + 1;
         let after_slot = base_slot + 1;
@@ -7102,7 +7102,7 @@ pub mod tests {
         let db = AccountsDb::new(Vec::new(), &ClusterType::Development);
 
         let key = Pubkey::default();
-        let account = Account::new(1, 0, &key);
+        let account = AccountNoData::new(1, 0, &key);
         let base_slot = 0;
         let after_slot = base_slot + 1;
 
@@ -7125,7 +7125,7 @@ pub mod tests {
         let db = AccountsDb::new(Vec::new(), &ClusterType::Development);
 
         let key = Pubkey::default();
-        let account = Account::new(1, 0, &key);
+        let account = AccountNoData::new(1, 0, &key);
         let base_slot = 0;
         let after_slot = base_slot + 1;
 
@@ -7141,7 +7141,7 @@ pub mod tests {
         let db = AccountsDb::new(Vec::new(), &ClusterType::Development);
 
         let key = Pubkey::default();
-        let account = Account::new(1, 0, &key);
+        let account = AccountNoData::new(1, 0, &key);
         let base_slot = 0;
         let after_slot = base_slot + 1;
 
@@ -7166,7 +7166,7 @@ pub mod tests {
     fn test_storage_remove_account_double_remove() {
         let accounts = AccountsDb::new(Vec::new(), &ClusterType::Development);
         let pubkey = solana_sdk::pubkey::new_rand();
-        let account = Account::new(1, 0, &Account::default().owner);
+        let account = AccountNoData::new(1, 0, &AccountNoData::default().owner);
         accounts.store_uncached(0, &[(&pubkey, &account)]);
         let storage_entry = accounts
             .storage
@@ -7188,13 +7188,13 @@ pub mod tests {
         let old_lamport = 223;
         let zero_lamport = 0;
         let no_data = 0;
-        let owner = Account::default().owner;
+        let owner = AccountNoData::default().owner;
 
-        let account = Account::new(old_lamport, no_data, &owner);
-        let account2 = Account::new(old_lamport + 100_001, no_data, &owner);
-        let account3 = Account::new(old_lamport + 100_002, no_data, &owner);
-        let dummy_account = Account::new(99_999_999, no_data, &owner);
-        let zero_lamport_account = Account::new(zero_lamport, no_data, &owner);
+        let account = AccountNoData::new(old_lamport, no_data, &owner);
+        let account2 = AccountNoData::new(old_lamport + 100_001, no_data, &owner);
+        let account3 = AccountNoData::new(old_lamport + 100_002, no_data, &owner);
+        let dummy_account = AccountNoData::new(99_999_999, no_data, &owner);
+        let zero_lamport_account = AccountNoData::new(zero_lamport, no_data, &owner);
 
         let pubkey = solana_sdk::pubkey::new_rand();
         let dummy_pubkey = solana_sdk::pubkey::new_rand();
@@ -7255,13 +7255,13 @@ pub mod tests {
         // size data so only 1 fits in a 4k store
         let data_size = 2200;
 
-        let owner = Account::default().owner;
+        let owner = AccountNoData::default().owner;
 
-        let account = Account::new(old_lamport, data_size, &owner);
-        let account2 = Account::new(old_lamport + 100_001, data_size, &owner);
-        let account3 = Account::new(old_lamport + 100_002, data_size, &owner);
-        let account4 = Account::new(dummy_lamport, data_size, &owner);
-        let zero_lamport_account = Account::new(zero_lamport, data_size, &owner);
+        let account = AccountNoData::new(old_lamport, data_size, &owner);
+        let account2 = AccountNoData::new(old_lamport + 100_001, data_size, &owner);
+        let account3 = AccountNoData::new(old_lamport + 100_002, data_size, &owner);
+        let account4 = AccountNoData::new(dummy_lamport, data_size, &owner);
+        let zero_lamport_account = AccountNoData::new(zero_lamport, data_size, &owner);
 
         let mut current_slot = 0;
         let accounts = AccountsDb::new_sized_no_extra_stores(Vec::new(), store_size);
@@ -7379,13 +7379,13 @@ pub mod tests {
         let zero_lamport = 0;
         let no_data = 0;
         let dummy_lamport = 999_999;
-        let owner = Account::default().owner;
+        let owner = AccountNoData::default().owner;
 
-        let account = Account::new(old_lamport, no_data, &owner);
-        let account2 = Account::new(old_lamport + 100_001, no_data, &owner);
-        let account3 = Account::new(old_lamport + 100_002, no_data, &owner);
-        let dummy_account = Account::new(dummy_lamport, no_data, &owner);
-        let zero_lamport_account = Account::new(zero_lamport, no_data, &owner);
+        let account = AccountNoData::new(old_lamport, no_data, &owner);
+        let account2 = AccountNoData::new(old_lamport + 100_001, no_data, &owner);
+        let account3 = AccountNoData::new(old_lamport + 100_002, no_data, &owner);
+        let dummy_account = AccountNoData::new(dummy_lamport, no_data, &owner);
+        let zero_lamport_account = AccountNoData::new(zero_lamport, no_data, &owner);
 
         let pubkey1 = solana_sdk::pubkey::new_rand();
         let pubkey2 = solana_sdk::pubkey::new_rand();
@@ -7582,9 +7582,9 @@ pub mod tests {
 
         let some_lamport = 223;
         let no_data = 0;
-        let owner = Account::default().owner;
+        let owner = AccountNoData::default().owner;
 
-        let account = Account::new(some_lamport, no_data, &owner);
+        let account = AccountNoData::new(some_lamport, no_data, &owner);
 
         let mut current_slot = 0;
 
@@ -7650,9 +7650,9 @@ pub mod tests {
 
         let some_lamport = 223;
         let no_data = 0;
-        let owner = Account::default().owner;
+        let owner = AccountNoData::default().owner;
 
-        let account = Account::new(some_lamport, no_data, &owner);
+        let account = AccountNoData::new(some_lamport, no_data, &owner);
 
         let mut current_slot = 0;
 
@@ -7710,9 +7710,9 @@ pub mod tests {
 
         let some_lamport = 223;
         let no_data = 0;
-        let owner = Account::default().owner;
+        let owner = AccountNoData::default().owner;
 
-        let account = Account::new(some_lamport, no_data, &owner);
+        let account = AccountNoData::new(some_lamport, no_data, &owner);
 
         let mut current_slot = 0;
 
@@ -8018,7 +8018,7 @@ pub mod tests {
     fn test_store_overhead() {
         solana_logger::setup();
         let accounts = AccountsDb::new_single();
-        let account = Account::default();
+        let account = AccountNoData::default();
         let pubkey = solana_sdk::pubkey::new_rand();
         accounts.store_uncached(0, &[(&pubkey, &account)]);
         let slot_stores = accounts.storage.get_slot_stores(0).unwrap();
@@ -8039,7 +8039,7 @@ pub mod tests {
         let num_accounts: usize = 100;
         let mut keys = Vec::new();
         for i in 0..num_accounts {
-            let account = Account::new((i + 1) as u64, size, &Pubkey::default());
+            let account = AccountNoData::new((i + 1) as u64, size, &Pubkey::default());
             let pubkey = solana_sdk::pubkey::new_rand();
             accounts.store_uncached(0, &[(&pubkey, &account)]);
             keys.push(pubkey);
@@ -8047,7 +8047,7 @@ pub mod tests {
         accounts.add_root(0);
 
         for (i, key) in keys[1..].iter().enumerate() {
-            let account = Account::new((1 + i + num_accounts) as u64, size, &Pubkey::default());
+            let account = AccountNoData::new((1 + i + num_accounts) as u64, size, &Pubkey::default());
             accounts.store_uncached(1, &[(key, &account)]);
         }
         accounts.add_root(1);
@@ -8060,7 +8060,7 @@ pub mod tests {
         let mut account_refs = Vec::new();
         let num_to_store = 20;
         for (i, key) in keys[..num_to_store].iter().enumerate() {
-            let account = Account::new(
+            let account = AccountNoData::new(
                 (1 + i + 2 * num_accounts) as u64,
                 i + 20,
                 &Pubkey::default(),
@@ -8084,7 +8084,7 @@ pub mod tests {
     fn test_zero_lamport_new_root_not_cleaned() {
         let db = AccountsDb::new(Vec::new(), &ClusterType::Development);
         let account_key = Pubkey::new_unique();
-        let zero_lamport_account = Account::new(0, 0, &Account::default().owner);
+        let zero_lamport_account = AccountNoData::new(0, 0, &AccountNoData::default().owner);
 
         // Store zero lamport account into slots 0 and 1, root both slots
         db.store_uncached(0, &[(&account_key, &zero_lamport_account)]);
@@ -8109,7 +8109,7 @@ pub mod tests {
         let mut db = AccountsDb::new(Vec::new(), &ClusterType::Development);
         db.caching_enabled = true;
         let key = Pubkey::default();
-        let account0 = Account::new(1, 0, &key);
+        let account0 = AccountNoData::new(1, 0, &key);
         let slot = 0;
         db.store_cached(slot, &[(&key, &account0)]);
 
@@ -8137,7 +8137,7 @@ pub mod tests {
         let mut db = AccountsDb::new(Vec::new(), &ClusterType::Development);
         db.caching_enabled = true;
         let key = Pubkey::default();
-        let account0 = Account::new(1, 0, &key);
+        let account0 = AccountNoData::new(1, 0, &key);
         let slot = 0;
         db.store_cached(slot, &[(&key, &account0)]);
         db.mark_slot_frozen(slot);
@@ -8161,7 +8161,7 @@ pub mod tests {
     fn test_flush_accounts_cache() {
         let mut db = AccountsDb::new(Vec::new(), &ClusterType::Development);
         db.caching_enabled = true;
-        let account0 = Account::new(1, 0, &Pubkey::default());
+        let account0 = AccountNoData::new(1, 0, &Pubkey::default());
 
         let unrooted_slot = 4;
         let root5 = 5;
@@ -8220,7 +8220,7 @@ pub mod tests {
     fn run_test_flush_accounts_cache_if_needed(num_roots: usize, num_unrooted: usize) {
         let mut db = AccountsDb::new(Vec::new(), &ClusterType::Development);
         db.caching_enabled = true;
-        let account0 = Account::new(1, 0, &Pubkey::default());
+        let account0 = AccountNoData::new(1, 0, &Pubkey::default());
         let mut keys = vec![];
         let num_slots = 2 * MAX_CACHE_SLOTS;
         for i in 0..num_roots + num_unrooted {
@@ -8284,8 +8284,8 @@ pub mod tests {
         ));
 
         let account_key = Pubkey::new_unique();
-        let zero_lamport_account = Account::new(0, 0, &Account::default().owner);
-        let slot1_account = Account::new(1, 1, &Account::default().owner);
+        let zero_lamport_account = AccountNoData::new(0, 0, &AccountNoData::default().owner);
+        let slot1_account = AccountNoData::new(1, 1, &AccountNoData::default().owner);
         db.store_cached(0, &[(&account_key, &zero_lamport_account)]);
         db.store_cached(1, &[(&account_key, &slot1_account)]);
 
@@ -8322,8 +8322,8 @@ pub mod tests {
         let other_account_key = Pubkey::new_unique();
 
         let original_lamports = 1;
-        let slot0_account = Account::new(original_lamports, 1, &Account::default().owner);
-        let zero_lamport_account = Account::new(0, 0, &Account::default().owner);
+        let slot0_account = AccountNoData::new(original_lamports, 1, &AccountNoData::default().owner);
+        let zero_lamport_account = AccountNoData::new(0, 0, &AccountNoData::default().owner);
 
         // Store into slot 0, and then flush the slot to storage
         db.store_cached(0, &[(&zero_lamport_account_key, &slot0_account)]);
@@ -8403,7 +8403,7 @@ pub mod tests {
             .spawn(move || {
                 db.scan_accounts(
                     &scan_ancestors,
-                    |_collector: &mut Vec<(Pubkey, Account)>, maybe_account| {
+                    |_collector: &mut Vec<(Pubkey, AccountNoData)>, maybe_account| {
                         ready_.store(true, Ordering::Relaxed);
                         if let Some((pubkey, _, _)) = maybe_account {
                             if *pubkey == stall_key {
@@ -8440,9 +8440,9 @@ pub mod tests {
         ));
         let account_key = Pubkey::new_unique();
         let account_key2 = Pubkey::new_unique();
-        let zero_lamport_account = Account::new(0, 0, &Account::default().owner);
-        let slot1_account = Account::new(1, 1, &Account::default().owner);
-        let slot2_account = Account::new(2, 1, &Account::default().owner);
+        let zero_lamport_account = AccountNoData::new(0, 0, &AccountNoData::default().owner);
+        let slot1_account = AccountNoData::new(1, 1, &AccountNoData::default().owner);
+        let slot2_account = AccountNoData::new(2, 1, &AccountNoData::default().owner);
 
         /*
             Store zero lamport account into slots 0, 1, 2 where
@@ -8525,7 +8525,7 @@ pub mod tests {
         let num_keys = 10;
 
         for data_size in 0..num_keys {
-            let account = Account::new(1, data_size, &Pubkey::default());
+            let account = AccountNoData::new(1, data_size, &Pubkey::default());
             accounts_db.store_cached(slot, &[(&Pubkey::new_unique(), &account)]);
         }
 
@@ -8585,7 +8585,7 @@ pub mod tests {
             accounts_db.store_cached(
                 // Store it in a slot that isn't returned in `slots`
                 stall_slot,
-                &[(&scan_stall_key, &Account::new(1, 0, &Pubkey::default()))],
+                &[(&scan_stall_key, &AccountNoData::new(1, 0, &Pubkey::default()))],
             );
         }
 
@@ -8593,7 +8593,7 @@ pub mod tests {
         let mut scan_tracker = None;
         for slot in &slots {
             for key in &keys[*slot as usize..] {
-                accounts_db.store_cached(*slot, &[(key, &Account::new(1, 0, &Pubkey::default()))]);
+                accounts_db.store_cached(*slot, &[(key, &AccountNoData::new(1, 0, &Pubkey::default()))]);
             }
             accounts_db.add_root(*slot as Slot);
             if Some(*slot) == scan_slot {
@@ -8629,7 +8629,7 @@ pub mod tests {
             // Store a slot that overwrites all previous keys, rendering all previous keys dead
             accounts_db.store_cached(
                 alive_slot,
-                &[(key, &Account::new(1, 0, &Pubkey::default()))],
+                &[(key, &AccountNoData::new(1, 0, &Pubkey::default()))],
             );
             accounts_db.add_root(alive_slot);
         }
@@ -8959,7 +8959,7 @@ pub mod tests {
         );
         let account_key1 = Pubkey::new_unique();
         let account_key2 = Pubkey::new_unique();
-        let account1 = Account::new(1, 0, &Account::default().owner);
+        let account1 = AccountNoData::new(1, 0, &AccountNoData::default().owner);
 
         // Store into slot 0
         db.store_cached(0, &[(&account_key1, &account1)]);
@@ -9037,10 +9037,10 @@ pub mod tests {
         let db = AccountsDb::new(Vec::new(), &ClusterType::Development);
         let account_key1 = Pubkey::new_unique();
         let account_key2 = Pubkey::new_unique();
-        let account1 = Account::new(1, 0, &Account::default().owner);
-        let account2 = Account::new(2, 0, &Account::default().owner);
-        let account3 = Account::new(3, 0, &Account::default().owner);
-        let account4 = Account::new(4, 0, &Account::default().owner);
+        let account1 = AccountNoData::new(1, 0, &AccountNoData::default().owner);
+        let account2 = AccountNoData::new(2, 0, &AccountNoData::default().owner);
+        let account3 = AccountNoData::new(3, 0, &AccountNoData::default().owner);
+        let account4 = AccountNoData::new(4, 0, &AccountNoData::default().owner);
 
         // Store accounts into slots 0 and 1
         db.store_uncached(0, &[(&account_key1, &account1)]);
