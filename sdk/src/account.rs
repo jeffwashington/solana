@@ -37,7 +37,7 @@ pub struct AccountNoData {
     /// the epoch at which this account will next owe rent
     pub rent_epoch: Epoch,
 }
-
+/*
 pub trait AnAccount: Default + Clone + Sized {
     fn lamports(&self) -> u64;
     fn set_lamports(&mut self, lamports: u64);
@@ -53,6 +53,7 @@ pub trait AnAccount: Default + Clone + Sized {
     fn from_account_no_data(item: AccountNoData) -> Self;
     fn to_account_no_data(&mut self) -> AccountNoData;
 }
+*/
 
 impl fmt::Debug for Account {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
