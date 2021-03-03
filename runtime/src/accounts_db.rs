@@ -2261,7 +2261,11 @@ impl AccountsDb {
             .unwrap()
     }
 
-    pub fn load_slow(&self, ancestors: &Ancestors, pubkey: &Pubkey) -> Option<(AccountNoData, Slot)> {
+    pub fn load_slow(
+        &self,
+        ancestors: &Ancestors,
+        pubkey: &Pubkey,
+    ) -> Option<(AccountNoData, Slot)> {
         self.load(ancestors, pubkey)
     }
 
@@ -5119,15 +5123,24 @@ pub mod tests {
         );
         accounts.store_uncached(
             SLOT,
-            &[(&pubkey127, &AccountNoData::new(128, 1, &AccountNoData::default().owner))],
+            &[(
+                &pubkey127,
+                &AccountNoData::new(128, 1, &AccountNoData::default().owner),
+            )],
         );
         accounts.store_uncached(
             SLOT,
-            &[(&pubkey128, &AccountNoData::new(129, 1, &AccountNoData::default().owner))],
+            &[(
+                &pubkey128,
+                &AccountNoData::new(129, 1, &AccountNoData::default().owner),
+            )],
         );
         accounts.store_uncached(
             SLOT,
-            &[(&pubkey255, &AccountNoData::new(256, 1, &AccountNoData::default().owner))],
+            &[(
+                &pubkey255,
+                &AccountNoData::new(256, 1, &AccountNoData::default().owner),
+            )],
         );
         accounts.add_root(SLOT);
 
@@ -5301,10 +5314,13 @@ pub mod tests {
         let ancestors = vec![(1, 1), (0, 0)].into_iter().collect();
         assert_eq!(&db.load_slow(&ancestors, &key).unwrap().0, &account1);
 
-        let accounts: Vec<AccountNoData> =
-            db.unchecked_scan_accounts("", &ancestors, |accounts: &mut Vec<AccountNoData>, option| {
+        let accounts: Vec<AccountNoData> = db.unchecked_scan_accounts(
+            "",
+            &ancestors,
+            |accounts: &mut Vec<AccountNoData>, option| {
                 accounts.push(option.1.account());
-            });
+            },
+        );
         assert_eq!(accounts, vec![account1]);
     }
 
@@ -5566,14 +5582,16 @@ pub mod tests {
         let ancestors = vec![(slot, 0)].into_iter().collect();
         for t in 0..num {
             let pubkey = solana_sdk::pubkey::new_rand();
-            let account = AccountNoData::new((t + 1) as u64, space, &AccountNoData::default().owner);
+            let account =
+                AccountNoData::new((t + 1) as u64, space, &AccountNoData::default().owner);
             pubkeys.push(pubkey);
             assert!(accounts.load_slow(&ancestors, &pubkey).is_none());
             accounts.store_uncached(slot, &[(&pubkey, &account)]);
         }
         for t in 0..num_vote {
             let pubkey = solana_sdk::pubkey::new_rand();
-            let account = AccountNoData::new((num + t + 1) as u64, space, &solana_vote_program::id());
+            let account =
+                AccountNoData::new((num + t + 1) as u64, space, &solana_vote_program::id());
             pubkeys.push(pubkey);
             let ancestors = vec![(slot, 0)].into_iter().collect();
             assert!(accounts.load_slow(&ancestors, &pubkey).is_none());
@@ -5663,7 +5681,8 @@ pub mod tests {
         count: usize,
     ) {
         for idx in 0..num {
-            let account = AccountNoData::new((idx + count) as u64, 0, &AccountNoData::default().owner);
+            let account =
+                AccountNoData::new((idx + count) as u64, 0, &AccountNoData::default().owner);
             accounts.store_uncached(slot, &[(&pubkeys[idx], &account)]);
         }
     }
@@ -6652,17 +6671,23 @@ pub mod tests {
         db.store_uncached(1, &[(&key1, &account1)]);
 
         let ancestors = vec![(0, 0)].into_iter().collect();
-        let accounts: Vec<AccountNoData> =
-            db.unchecked_scan_accounts("", &ancestors, |accounts: &mut Vec<AccountNoData>, option| {
+        let accounts: Vec<AccountNoData> = db.unchecked_scan_accounts(
+            "",
+            &ancestors,
+            |accounts: &mut Vec<AccountNoData>, option| {
                 accounts.push(option.1.account());
-            });
+            },
+        );
         assert_eq!(accounts, vec![account0]);
 
         let ancestors = vec![(1, 1), (0, 0)].into_iter().collect();
-        let accounts: Vec<AccountNoData> =
-            db.unchecked_scan_accounts("", &ancestors, |accounts: &mut Vec<AccountNoData>, option| {
+        let accounts: Vec<AccountNoData> = db.unchecked_scan_accounts(
+            "",
+            &ancestors,
+            |accounts: &mut Vec<AccountNoData>, option| {
                 accounts.push(option.1.account());
-            });
+            },
+        );
         assert_eq!(accounts.len(), 2);
     }
 
@@ -8047,7 +8072,8 @@ pub mod tests {
         accounts.add_root(0);
 
         for (i, key) in keys[1..].iter().enumerate() {
-            let account = AccountNoData::new((1 + i + num_accounts) as u64, size, &Pubkey::default());
+            let account =
+                AccountNoData::new((1 + i + num_accounts) as u64, size, &Pubkey::default());
             accounts.store_uncached(1, &[(key, &account)]);
         }
         accounts.add_root(1);
@@ -8322,7 +8348,8 @@ pub mod tests {
         let other_account_key = Pubkey::new_unique();
 
         let original_lamports = 1;
-        let slot0_account = AccountNoData::new(original_lamports, 1, &AccountNoData::default().owner);
+        let slot0_account =
+            AccountNoData::new(original_lamports, 1, &AccountNoData::default().owner);
         let zero_lamport_account = AccountNoData::new(0, 0, &AccountNoData::default().owner);
 
         // Store into slot 0, and then flush the slot to storage
@@ -8585,7 +8612,10 @@ pub mod tests {
             accounts_db.store_cached(
                 // Store it in a slot that isn't returned in `slots`
                 stall_slot,
-                &[(&scan_stall_key, &AccountNoData::new(1, 0, &Pubkey::default()))],
+                &[(
+                    &scan_stall_key,
+                    &AccountNoData::new(1, 0, &Pubkey::default()),
+                )],
             );
         }
 
@@ -8593,7 +8623,10 @@ pub mod tests {
         let mut scan_tracker = None;
         for slot in &slots {
             for key in &keys[*slot as usize..] {
-                accounts_db.store_cached(*slot, &[(key, &AccountNoData::new(1, 0, &Pubkey::default()))]);
+                accounts_db.store_cached(
+                    *slot,
+                    &[(key, &AccountNoData::new(1, 0, &Pubkey::default()))],
+                );
             }
             accounts_db.add_root(*slot as Slot);
             if Some(*slot) == scan_slot {

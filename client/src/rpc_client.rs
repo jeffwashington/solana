@@ -769,7 +769,10 @@ impl RpcClient {
             })?
     }
 
-    pub fn get_multiple_accounts(&self, pubkeys: &[Pubkey]) -> ClientResult<Vec<Option<AccountNoData>>> {
+    pub fn get_multiple_accounts(
+        &self,
+        pubkeys: &[Pubkey],
+    ) -> ClientResult<Vec<Option<AccountNoData>>> {
         Ok(self
             .get_multiple_accounts_with_commitment(pubkeys, self.commitment_config)?
             .value)
@@ -843,7 +846,10 @@ impl RpcClient {
         )
     }
 
-    pub fn get_program_accounts(&self, pubkey: &Pubkey) -> ClientResult<Vec<(Pubkey, AccountNoData)>> {
+    pub fn get_program_accounts(
+        &self,
+        pubkey: &Pubkey,
+    ) -> ClientResult<Vec<(Pubkey, AccountNoData)>> {
         self.get_program_accounts_with_config(
             pubkey,
             RpcProgramAccountsConfig {

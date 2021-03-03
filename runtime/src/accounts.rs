@@ -452,7 +452,11 @@ impl Accounts {
     }
 
     /// Slow because lock is held for 1 operation instead of many
-    pub fn load_slow(&self, ancestors: &Ancestors, pubkey: &Pubkey) -> Option<(AccountNoData, Slot)> {
+    pub fn load_slow(
+        &self,
+        ancestors: &Ancestors,
+        pubkey: &Pubkey,
+    ) -> Option<(AccountNoData, Slot)> {
         let (account, slot) = self.accounts_db.load_slow(ancestors, pubkey)?;
 
         if account.lamports > 0 {
@@ -2203,7 +2207,8 @@ mod tests {
                 blockhash,
                 fee_calculator: FeeCalculator::default(),
             }));
-        let nonce_account_pre = AccountNoData::new_data(42, &nonce_state, &system_program::id()).unwrap();
+        let nonce_account_pre =
+            AccountNoData::new_data(42, &nonce_state, &system_program::id()).unwrap();
         let from_account_pre = AccountNoData::new(4242, 0, &Pubkey::default());
 
         let nonce_rollback = Some(NonceRollbackFull::new(
@@ -2315,7 +2320,8 @@ mod tests {
                 blockhash,
                 fee_calculator: FeeCalculator::default(),
             }));
-        let nonce_account_pre = AccountNoData::new_data(42, &nonce_state, &system_program::id()).unwrap();
+        let nonce_account_pre =
+            AccountNoData::new_data(42, &nonce_state, &system_program::id()).unwrap();
 
         let nonce_rollback = Some(NonceRollbackFull::new(
             nonce_address,

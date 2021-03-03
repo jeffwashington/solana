@@ -1004,7 +1004,8 @@ mod tests {
         let mut elf = Vec::new();
         let rent = Rent::default();
         file.read_to_end(&mut elf).unwrap();
-        let program_account = AccountNoData::new_ref(rent.minimum_balance(elf.len()), 0, &program_id);
+        let program_account =
+            AccountNoData::new_ref(rent.minimum_balance(elf.len()), 0, &program_id);
         program_account.borrow_mut().data = elf;
         let keyed_accounts = vec![KeyedAccount::new(&program_key, false, &program_account)];
         let instruction_data = bincode::serialize(&LoaderInstruction::Finalize).unwrap();

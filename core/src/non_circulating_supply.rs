@@ -212,7 +212,10 @@ mod tests {
         bank = Arc::new(new_from_parent(&bank));
         let new_balance = 11;
         for key in non_circulating_accounts {
-            bank.store_account(&key, &AccountNoData::new(new_balance, 0, &Pubkey::default()));
+            bank.store_account(
+                &key,
+                &AccountNoData::new(new_balance, 0, &Pubkey::default()),
+            );
         }
         let non_circulating_supply = calculate_non_circulating_supply(&bank);
         assert_eq!(

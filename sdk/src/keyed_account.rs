@@ -86,7 +86,11 @@ impl<'a> KeyedAccount<'a> {
         }
     }
 
-    pub fn new_readonly(key: &'a Pubkey, is_signer: bool, account: &'a RefCell<AccountNoData>) -> Self {
+    pub fn new_readonly(
+        key: &'a Pubkey,
+        is_signer: bool,
+        account: &'a RefCell<AccountNoData>,
+    ) -> Self {
         Self {
             is_signer,
             is_writable: false,

@@ -1340,7 +1340,10 @@ impl Bank {
         }
     }
 
-    fn inherit_specially_retained_account_balance(&self, old_account: &Option<AccountNoData>) -> u64 {
+    fn inherit_specially_retained_account_balance(
+        &self,
+        old_account: &Option<AccountNoData>,
+    ) -> u64 {
         old_account.as_ref().map(|a| a.lamports).unwrap_or(1)
     }
 
@@ -3898,7 +3901,11 @@ impl Bank {
         self.rc.accounts.accounts_db.expire_old_recycle_stores()
     }
 
-    fn store_account_and_update_capitalization(&self, pubkey: &Pubkey, new_account: &AccountNoData) {
+    fn store_account_and_update_capitalization(
+        &self,
+        pubkey: &Pubkey,
+        new_account: &AccountNoData,
+    ) {
         if let Some(old_account) = self.get_account(&pubkey) {
             match new_account.lamports.cmp(&old_account.lamports) {
                 std::cmp::Ordering::Greater => {
@@ -4099,7 +4106,10 @@ impl Bank {
         self.rc.accounts.load_by_program_slot(self.slot(), None)
     }
 
-    pub fn get_account_modified_since_parent(&self, pubkey: &Pubkey) -> Option<(AccountNoData, Slot)> {
+    pub fn get_account_modified_since_parent(
+        &self,
+        pubkey: &Pubkey,
+    ) -> Option<(AccountNoData, Slot)> {
         let just_self: Ancestors = vec![(self.slot(), 0)].into_iter().collect();
         if let Some((account, slot)) = self.rc.accounts.load_slow(&just_self, pubkey) {
             if slot == self.slot() {
@@ -5405,7 +5415,8 @@ pub(crate) mod tests {
         mock_program_id: Pubkey,
         generic_rent_due_for_system_account: u64,
     ) {
-        let mut account_pairs: Vec<(Pubkey, AccountNoData)> = Vec::with_capacity(keypairs.len() - 1);
+        let mut account_pairs: Vec<(Pubkey, AccountNoData)> =
+            Vec::with_capacity(keypairs.len() - 1);
         account_pairs.push((
             keypairs[0].pubkey(),
             AccountNoData::new(
@@ -10955,7 +10966,10 @@ pub(crate) mod tests {
         };
 
         let loaders = &[
-            vec![(key3, AccountNoData::default()), (key4, AccountNoData::default())],
+            vec![
+                (key3, AccountNoData::default()),
+                (key4, AccountNoData::default()),
+            ],
             vec![(key1, AccountNoData::default())],
         ];
 
@@ -11018,7 +11032,10 @@ pub(crate) mod tests {
         let key2 = solana_sdk::pubkey::new_rand();
         let executor: Arc<dyn Executor> = Arc::new(TestExecutor {});
 
-        let loaders = &[vec![(key1, AccountNoData::default()), (key2, AccountNoData::default())]];
+        let loaders = &[vec![
+            (key1, AccountNoData::default()),
+            (key2, AccountNoData::default()),
+        ]];
 
         // add one to root bank
         let mut executors = Executors::default();

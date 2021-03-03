@@ -232,7 +232,9 @@ pub mod tests {
     use solana_vote_program::vote_state::{self, VoteState, VoteStateVersions};
 
     //  set up some dummies for a staked node     ((     vote      )  (     stake     ))
-    pub fn create_staked_node_accounts(stake: u64) -> ((Pubkey, AccountNoData), (Pubkey, AccountNoData)) {
+    pub fn create_staked_node_accounts(
+        stake: u64,
+    ) -> ((Pubkey, AccountNoData), (Pubkey, AccountNoData)) {
         let vote_pubkey = solana_sdk::pubkey::new_rand();
         let vote_account =
             vote_state::create_account(&vote_pubkey, &solana_sdk::pubkey::new_rand(), 0, 1);

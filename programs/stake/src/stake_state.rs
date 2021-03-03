@@ -1706,8 +1706,8 @@ mod tests {
     use super::*;
     use crate::id;
     use solana_sdk::{
-        account::AccountNoData, native_token, process_instruction::MockInvokeContext, pubkey::Pubkey,
-        system_program,
+        account::AccountNoData, native_token, process_instruction::MockInvokeContext,
+        pubkey::Pubkey, system_program,
     };
     use solana_vote_program::vote_state;
     use std::{cell::RefCell, iter::FromIterator};
