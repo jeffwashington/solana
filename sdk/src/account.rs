@@ -5,8 +5,8 @@ use std::{cell::RefCell, cmp, fmt, rc::Rc};
 /// An Account with data that is stored on chain
 #[repr(C)]
 #[frozen_abi(digest = "AXJTWWXfp49rHb34ayFzFLSEuaRbMUsVPNzBDyP3UPjc")]
-#[serde(rename_all = "camelCase")]
 #[derive(Serialize, Deserialize, PartialEq, Eq, Clone, Default, AbiExample)]
+#[serde(rename_all = "camelCase")]
 pub struct Account {
     /// lamports in the account
     pub lamports: u64,
