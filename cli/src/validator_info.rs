@@ -372,7 +372,7 @@ pub fn process_get_validator_info(
     let validator_info: Vec<(Pubkey, AccountNoData)> = if let Some(validator_info_pubkey) = pubkey {
         vec![(
             validator_info_pubkey,
-            AccountNoData::from(rpc_client.get_account(&validator_info_pubkey)?),
+            rpc_client.get_account_no_data(&validator_info_pubkey)?,
         )]
     } else {
         let all_config = rpc_client.get_program_accounts_no_data(&solana_config_program::id())?;

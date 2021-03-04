@@ -40,7 +40,7 @@ pub fn calculate_non_circulating_supply(bank: &Arc<Bank>) -> NonCirculatingSuppl
         bank.get_program_accounts(&solana_stake_program::id())
     };
     for (pubkey, account) in stake_accounts.iter() {
-        let stake_account = StakeState::from(&account).unwrap_or_default();
+        let stake_account = StakeState::from(account).unwrap_or_default();
         match stake_account {
             StakeState::Initialized(meta) => {
                 if meta.lockup.is_in_force(&clock, None)

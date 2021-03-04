@@ -11,6 +11,7 @@ use crate::{
 use serde_derive::{Deserialize, Serialize};
 use solana_sdk::{
     account::AccountNoData,
+    account::AnAccount,
     account_utils::{State, StateMut},
     clock::{Clock, Epoch, UnixTimestamp},
     ic_msg,
@@ -76,7 +77,7 @@ impl StakeState {
     }
 
     // utility function, used by Stakes, tests
-    pub fn from(account: &AccountNoData) -> Option<StakeState> {
+    pub fn from<T: AnAccount + StateMut<StakeState>>(account: &T) -> Option<StakeState> {
         account.state().ok()
     }
 
@@ -112,7 +113,7 @@ impl StakeState {
         }
     }
 
-    pub fn lockup_from(account: &AccountNoData) -> Option<Lockup> {
+    pub fn lockup_from<T: AnAccount + StateMut<StakeState>>(account: &T) -> Option<Lockup> {
         Self::from(account).and_then(|state: Self| state.lockup())
     }
 

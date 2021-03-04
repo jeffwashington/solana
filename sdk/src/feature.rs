@@ -1,11 +1,12 @@
 use crate::account::AccountNoData;
+use crate::account::AnAccount;
 pub use solana_program::feature::*;
 
-pub fn from_account(account: &AccountNoData) -> Option<Feature> {
-    if account.owner != id() {
+pub fn from_account<T: AnAccount>(account: &T) -> Option<Feature> {
+    if account.owner() != &id() {
         None
     } else {
-        bincode::deserialize(&account.data).ok()
+        bincode::deserialize(account.data()).ok()
     }
 }
 
