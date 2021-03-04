@@ -1,6 +1,8 @@
 use serde::de::{Deserialize, Deserializer};
 use serde::ser::{Serialize, Serializer};
-use solana_sdk::{account::AccountNoData, instruction::InstructionError, pubkey::Pubkey};
+use solana_sdk::{
+    account::Account, account::AccountNoData, instruction::InstructionError, pubkey::Pubkey,
+};
 use solana_vote_program::vote_state::VoteState;
 use std::{
     borrow::Borrow,
@@ -21,7 +23,7 @@ pub struct ArcVoteAccount(Arc<VoteAccount>);
 
 #[derive(Debug, AbiExample)]
 pub struct VoteAccount {
-    account: AccountNoData,
+    account: Account,
     vote_state: RwLock<Result<VoteState, InstructionError>>,
     vote_state_once: Once,
 }
@@ -177,9 +179,24 @@ impl From<AccountNoData> for ArcVoteAccount {
         Self(Arc::new(VoteAccount::from(account)))
     }
 }
+impl From<Account> for ArcVoteAccount {
+    fn from(account: Account) -> Self {
+        Self(Arc::new(VoteAccount::from(account)))
+    }
+}
 
 impl From<AccountNoData> for VoteAccount {
     fn from(account: AccountNoData) -> Self {
+        Self {
+            account: Account::from(account),
+            vote_state: RwLock::new(INVALID_VOTE_STATE),
+            vote_state_once: Once::new(),
+        }
+    }
+}
+
+impl From<Account> for VoteAccount {
+    fn from(account: Account) -> Self {
         Self {
             account,
             vote_state: RwLock::new(INVALID_VOTE_STATE),
@@ -191,7 +208,7 @@ impl From<AccountNoData> for VoteAccount {
 impl Default for VoteAccount {
     fn default() -> Self {
         Self {
-            account: AccountNoData::default(),
+            account: Account::default(),
             vote_state: RwLock::new(INVALID_VOTE_STATE),
             vote_state_once: Once::new(),
         }

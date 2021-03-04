@@ -37,6 +37,19 @@ pub struct AccountNoData {
     /// the epoch at which this account will next owe rent
     pub rent_epoch: Epoch,
 }
+
+impl From<AccountNoData> for Account {
+    fn from(other: AccountNoData) -> Self {
+        Self {
+            lamports: other.lamports,
+            data: other.data,
+            owner: other.owner,
+            executable: other.executable,
+            rent_epoch: other.rent_epoch,
+        }
+    }
+}
+
 /*
 pub trait AnAccount: Default + Clone + Sized {
     fn lamports(&self) -> u64;
