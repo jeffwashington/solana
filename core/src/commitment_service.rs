@@ -411,16 +411,20 @@ mod tests {
             rooted_stake_amount,
         );
 
-        genesis_config.accounts.extend(vec![
-            (pk1, vote_account1.clone()),
-            (sk1, stake_account1),
-            (pk2, vote_account2.clone()),
-            (sk2, stake_account2),
-            (pk3, vote_account3.clone()),
-            (sk3, stake_account3),
-            (pk4, vote_account4.clone()),
-            (sk4, stake_account4),
-        ].into_iter().map(|(key, account)| (key, Account::from(account))));
+        genesis_config.accounts.extend(
+            vec![
+                (pk1, vote_account1.clone()),
+                (sk1, stake_account1),
+                (pk2, vote_account2.clone()),
+                (sk2, stake_account2),
+                (pk3, vote_account3.clone()),
+                (sk3, stake_account3),
+                (pk4, vote_account4.clone()),
+                (sk4, stake_account4),
+            ]
+            .into_iter()
+            .map(|(key, account)| (key, Account::from(account))),
+        );
 
         // Create bank
         let bank = Arc::new(Bank::new(&genesis_config));

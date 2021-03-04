@@ -217,7 +217,11 @@ pub fn create_genesis_config_with_leader_ex(
     initial_accounts.push((*validator_stake_account_pubkey, validator_stake_account));
 
     let mut genesis_config = GenesisConfig {
-        accounts: initial_accounts.iter().cloned().map(|(key, account)| (key, Account::from(account))).collect(),
+        accounts: initial_accounts
+            .iter()
+            .cloned()
+            .map(|(key, account)| (key, Account::from(account)))
+            .collect(),
         fee_rate_governor,
         rent,
         cluster_type,

@@ -4,8 +4,8 @@ use crate::{
     unlocks::{UnlockInfo, Unlocks},
 };
 use solana_sdk::{
-    account::Account, clock::Slot, genesis_config::GenesisConfig,
-    pubkey::Pubkey, system_program, timing::years_as_slots,
+    account::Account, clock::Slot, genesis_config::GenesisConfig, pubkey::Pubkey, system_program,
+    timing::years_as_slots,
 };
 use solana_stake_program::{
     self,
