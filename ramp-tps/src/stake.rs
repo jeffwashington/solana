@@ -51,7 +51,7 @@ fn calculate_stake_warmup(mut stake_entry: StakeHistoryEntry, stake_config: &Sta
 }
 
 fn stake_history_entry(epoch: Epoch, rpc_client: &RpcClient) -> Option<StakeHistoryEntry> {
-    let stake_history_account = rpc_client.get_account(&stake_history::id()).ok()?;
+    let stake_history_account = rpc_client.get_account_no_data(&stake_history::id()).ok()?;
     let stake_history = from_account::<StakeHistory>(&stake_history_account)?;
     stake_history.get(&epoch).cloned()
 }

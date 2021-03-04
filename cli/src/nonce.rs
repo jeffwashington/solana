@@ -311,7 +311,7 @@ pub fn check_nonce_account(
     nonce_authority: &Pubkey,
     nonce_hash: &Hash,
 ) -> Result<(), CliError> {
-    match state_from_account(nonce_account)? {
+    match state_from_account_no_data(nonce_account)? {
         State::Initialized(ref data) => {
             if &data.blockhash != nonce_hash {
                 Err(Error::InvalidHash.into())
@@ -866,18 +866,18 @@ mod tests {
     #[test]
     fn test_account_identity_ok() {
         let nonce_account = nonce_account::create_account(1).into_inner();
-        assert_eq!(account_identity_ok(&nonce_account), Ok(()));
+        assert_eq!(account_no_data_identity_ok(&nonce_account), Ok(()));
 
         let system_account = AccountNoData::new(1, 0, &system_program::id());
         assert_eq!(
-            account_identity_ok(&system_account),
+            account_no_data_identity_ok(&system_account),
             Err(Error::UnexpectedDataSize),
         );
 
         let other_program = Pubkey::new(&[1u8; 32]);
         let other_account_no_data = AccountNoData::new(1, 0, &other_program);
         assert_eq!(
-            account_identity_ok(&other_account_no_data),
+            account_no_data_identity_ok(&other_account_no_data),
             Err(Error::InvalidAccountOwner),
         );
     }
@@ -885,7 +885,10 @@ mod tests {
     #[test]
     fn test_state_from_account() {
         let mut nonce_account = nonce_account::create_account(1).into_inner();
-        assert_eq!(state_from_account(&nonce_account), Ok(State::Uninitialized));
+        assert_eq!(
+            state_from_account_no_data(&nonce_account),
+            Ok(State::Uninitialized)
+        );
 
         let data = nonce::state::Data {
             authority: Pubkey::new(&[1u8; 32]),
@@ -896,13 +899,13 @@ mod tests {
             .set_state(&Versions::new_current(State::Initialized(data.clone())))
             .unwrap();
         assert_eq!(
-            state_from_account(&nonce_account),
+            state_from_account_no_data(&nonce_account),
             Ok(State::Initialized(data))
         );
 
         let wrong_data_size_account = AccountNoData::new(1, 1, &system_program::id());
         assert_eq!(
-            state_from_account(&wrong_data_size_account),
+            state_from_account_no_data(&wrong_data_size_account),
             Err(Error::InvalidAccountData),
         );
     }
@@ -910,13 +913,13 @@ mod tests {
     #[test]
     fn test_data_from_helpers() {
         let mut nonce_account = nonce_account::create_account(1).into_inner();
-        let state = state_from_account(&nonce_account).unwrap();
+        let state = state_from_account_no_data(&nonce_account).unwrap();
         assert_eq!(
             data_from_state(&state),
             Err(Error::InvalidStateForOperation)
         );
         assert_eq!(
-            data_from_account(&nonce_account),
+            data_from_account_no_data(&nonce_account),
             Err(Error::InvalidStateForOperation)
         );
 
@@ -928,8 +931,8 @@ mod tests {
         nonce_account
             .set_state(&Versions::new_current(State::Initialized(data.clone())))
             .unwrap();
-        let state = state_from_account(&nonce_account).unwrap();
+        let state = state_from_account_no_data(&nonce_account).unwrap();
         assert_eq!(data_from_state(&state), Ok(&data));
-        assert_eq!(data_from_account(&nonce_account), Ok(data));
+        assert_eq!(data_from_account_no_data(&nonce_account), Ok(data));
     }
 }

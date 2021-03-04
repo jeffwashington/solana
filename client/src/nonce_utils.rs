@@ -1,6 +1,7 @@
 use crate::rpc_client::RpcClient;
 use solana_sdk::{
     account::Account,
+    account::AccountNoData,
     account_utils::StateMut,
     commitment_config::CommitmentConfig,
     nonce::{
@@ -33,6 +34,13 @@ pub fn get_account(rpc_client: &RpcClient, nonce_pubkey: &Pubkey) -> Result<Acco
     get_account_with_commitment(rpc_client, nonce_pubkey, CommitmentConfig::default())
 }
 
+pub fn get_account_no_data(
+    rpc_client: &RpcClient,
+    nonce_pubkey: &Pubkey,
+) -> Result<AccountNoData, Error> {
+    get_account_no_data_with_commitment(rpc_client, nonce_pubkey, CommitmentConfig::default())
+}
+
 pub fn get_account_with_commitment(
     rpc_client: &RpcClient,
     nonce_pubkey: &Pubkey,
@@ -52,7 +60,29 @@ pub fn get_account_with_commitment(
         })
 }
 
+pub fn get_account_no_data_with_commitment(
+    rpc_client: &RpcClient,
+    nonce_pubkey: &Pubkey,
+    commitment: CommitmentConfig,
+) -> Result<AccountNoData, Error> {
+    Ok(AccountNoData::from(get_account_with_commitment(
+        rpc_client,
+        nonce_pubkey,
+        commitment,
+    )?))
+}
+
 pub fn account_identity_ok(account: &Account) -> Result<(), Error> {
+    if account.owner != system_program::id() {
+        Err(Error::InvalidAccountOwner)
+    } else if account.data.is_empty() {
+        Err(Error::UnexpectedDataSize)
+    } else {
+        Ok(())
+    }
+}
+
+pub fn account_no_data_identity_ok(account: &AccountNoData) -> Result<(), Error> {
     if account.owner != system_program::id() {
         Err(Error::InvalidAccountOwner)
     } else if account.data.is_empty() {
@@ -69,9 +99,21 @@ pub fn state_from_account(account: &Account) -> Result<State, Error> {
         .map(|v| v.convert_to_current())
 }
 
+pub fn state_from_account_no_data(account: &AccountNoData) -> Result<State, Error> {
+    account_no_data_identity_ok(account)?;
+    StateMut::<Versions>::state(account)
+        .map_err(|_| Error::InvalidAccountData)
+        .map(|v| v.convert_to_current())
+}
+
 pub fn data_from_account(account: &Account) -> Result<Data, Error> {
     account_identity_ok(account)?;
     state_from_account(account).and_then(|ref s| data_from_state(s).map(|d| d.clone()))
+}
+
+pub fn data_from_account_no_data(account: &AccountNoData) -> Result<Data, Error> {
+    account_no_data_identity_ok(account)?;
+    state_from_account_no_data(account).and_then(|ref s| data_from_state(s).map(|d| d.clone()))
 }
 
 pub fn data_from_state(state: &State) -> Result<&Data, Error> {

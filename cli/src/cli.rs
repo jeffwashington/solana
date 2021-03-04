@@ -35,6 +35,7 @@ use solana_faucet::faucet::request_airdrop_transaction;
 use solana_faucet::faucet_mock::request_airdrop_transaction;
 use solana_remote_wallet::remote_wallet::RemoteWalletManager;
 use solana_sdk::{
+    account::AccountNoData,
     clock::{Epoch, Slot},
     commitment_config::CommitmentConfig,
     decode_error::DecodeError,
@@ -1084,7 +1085,7 @@ fn process_show_account(
     output_file: &Option<String>,
     use_lamports_unit: bool,
 ) -> ProcessResult {
-    let account = rpc_client.get_account(account_pubkey)?;
+    let account = AccountNoData::from(rpc_client.get_account(account_pubkey)?);
     let data = account.data.clone();
     let cli_account = CliAccount {
         keyed_account: RpcKeyedAccount {
@@ -1196,11 +1197,11 @@ fn process_transfer(
         return_signers(&tx, &config.output_format)
     } else {
         if let Some(nonce_account) = &nonce_account {
-            let nonce_account = nonce_utils::get_account_with_commitment(
+            let nonce_account = AccountNoData::from(nonce_utils::get_account_with_commitment(
                 rpc_client,
                 nonce_account,
                 config.commitment,
-            )?;
+            )?);
             check_nonce_account(&nonce_account, &nonce_authority.pubkey(), &recent_blockhash)?;
         }
 

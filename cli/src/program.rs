@@ -1140,6 +1140,7 @@ fn do_process_program_write_and_deploy(
                 .get_account_with_commitment(buffer_pubkey, config.commitment)?
                 .value
             {
+                let account = AccountNoData::from(account);
                 complete_partial_program_init(
                     &loader_id,
                     &config.signers[0].pubkey(),
@@ -1306,6 +1307,7 @@ fn do_process_program_upgrade(
                 .get_account_with_commitment(&buffer_signer.pubkey(), config.commitment)?
                 .value
             {
+                let account = AccountNoData::from(account);
                 complete_partial_program_init(
                     &loader_id,
                     &config.signers[0].pubkey(),

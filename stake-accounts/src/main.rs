@@ -11,6 +11,7 @@ use solana_cli_config::Config;
 use solana_client::client_error::ClientError;
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::{
+    account::AccountNoData,
     message::Message,
     native_token::lamports_to_sol,
     pubkey::Pubkey,
@@ -50,9 +51,10 @@ fn get_balances(
 }
 
 fn get_lockup(client: &RpcClient, address: &Pubkey) -> Result<Lockup, ClientError> {
-    client
-        .get_account(address)
-        .map(|account| StakeState::lockup_from(&account).unwrap())
+    client.get_account(address).map(|account| {
+        let account = AccountNoData::from(account);
+        StakeState::lockup_from(&account).unwrap()
+    })
 }
 
 fn get_lockups(

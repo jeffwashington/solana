@@ -308,7 +308,7 @@ mod tests {
 
     fn get_account_at<C: SyncClient>(client: &C, base_pubkey: &Pubkey, i: usize) -> AccountNoData {
         let account_address = derive_stake_account_address(&base_pubkey, i);
-        client.get_account(&account_address).unwrap().unwrap()
+        AccountNoData::from(client.get_account(&account_address).unwrap().unwrap())
     }
 
     fn get_balances<C: SyncClient>(
@@ -332,7 +332,7 @@ mod tests {
         (0..num_accounts)
             .map(|i| {
                 let address = derive_stake_account_address(&base_pubkey, i);
-                let account = client.get_account(&address).unwrap().unwrap();
+                let account = AccountNoData::from(client.get_account(&address).unwrap().unwrap());
                 (address, StakeState::lockup_from(&account).unwrap())
             })
             .collect()

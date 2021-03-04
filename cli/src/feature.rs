@@ -10,6 +10,7 @@ use solana_cli_output::{QuietDisplay, VerboseDisplay};
 use solana_client::{client_error::ClientError, rpc_client::RpcClient};
 use solana_remote_wallet::remote_wallet::RemoteWalletManager;
 use solana_sdk::{
+    account::AccountNoData,
     clock::Slot,
     feature::{self, Feature},
     feature_set::FEATURE_NAMES,
@@ -327,6 +328,7 @@ fn process_status(
         let feature_id = &feature_ids[i];
         let feature_name = FEATURE_NAMES.get(feature_id).unwrap();
         if let Some(account) = account {
+            let account = AccountNoData::from(account);
             if let Some(feature) = feature::from_account(&account) {
                 let feature_status = match feature.activated_at {
                     None => CliFeatureStatus::Pending,
@@ -370,6 +372,7 @@ fn process_activate(
         .unwrap();
 
     if let Some(account) = account {
+        let account = AccountNoData::from(account);
         if feature::from_account(&account).is_some() {
             return Err(format!("{} has already been activated", feature_id).into());
         }
