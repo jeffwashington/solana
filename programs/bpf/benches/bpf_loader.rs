@@ -198,7 +198,7 @@ fn bench_instruction_count_tuner(_bencher: &mut Bencher) {
     let mut invoke_context = MockInvokeContext::default();
     invoke_context.compute_meter.remaining = BUDGET;
 
-    let accounts = [RefCell::new(Account::new(
+    let accounts = [RefCell::new(AccountNoData::new(
         1,
         10000001,
         &solana_sdk::pubkey::new_rand(),

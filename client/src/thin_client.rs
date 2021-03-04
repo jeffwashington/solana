@@ -7,7 +7,7 @@ use crate::{rpc_client::RpcClient, rpc_config::RpcProgramAccountsConfig, rpc_res
 use bincode::{serialize_into, serialized_size};
 use log::*;
 use solana_sdk::{
-    account::AccountNoData,
+    account::Account,
     client::{AsyncClient, Client, SyncClient},
     clock::{Slot, MAX_PROCESSING_AGE},
     commitment_config::CommitmentConfig,
@@ -280,7 +280,7 @@ impl ThinClient {
         &self,
         pubkey: &Pubkey,
         config: RpcProgramAccountsConfig,
-    ) -> TransportResult<Vec<(Pubkey, AccountNoData)>> {
+    ) -> TransportResult<Vec<(Pubkey, Account)>> {
         self.rpc_client()
             .get_program_accounts_with_config(pubkey, config)
             .map_err(|e| e.into())
@@ -361,7 +361,7 @@ impl SyncClient for ThinClient {
         Ok(self.rpc_client().get_account_data(pubkey).ok())
     }
 
-    fn get_account(&self, pubkey: &Pubkey) -> TransportResult<Option<AccountNoData>> {
+    fn get_account(&self, pubkey: &Pubkey) -> TransportResult<Option<Account>> {
         let account = self.rpc_client().get_account(pubkey);
         match account {
             Ok(value) => Ok(Some(value)),
@@ -373,7 +373,7 @@ impl SyncClient for ThinClient {
         &self,
         pubkey: &Pubkey,
         commitment_config: CommitmentConfig,
-    ) -> TransportResult<Option<AccountNoData>> {
+    ) -> TransportResult<Option<Account>> {
         self.rpc_client()
             .get_account_with_commitment(pubkey, commitment_config)
             .map_err(|e| e.into())

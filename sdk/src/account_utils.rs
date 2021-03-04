@@ -1,5 +1,5 @@
 //! useful extras for Account state
-use crate::{account::AccountNoData, instruction::InstructionError};
+use crate::{account::Account, account::AccountNoData, instruction::InstructionError};
 use bincode::ErrorKind;
 
 /// Convenience trait to covert bincode errors to instruction errors.
@@ -10,6 +10,22 @@ pub trait StateMut<T> {
 pub trait State<T> {
     fn state(&self) -> Result<T, InstructionError>;
     fn set_state(&self, state: &T) -> Result<(), InstructionError>;
+}
+
+impl<T> StateMut<T> for Account
+where
+    T: serde::Serialize + serde::de::DeserializeOwned,
+{
+    fn state(&self) -> Result<T, InstructionError> {
+        self.deserialize_data()
+            .map_err(|_| InstructionError::InvalidAccountData)
+    }
+    fn set_state(&mut self, state: &T) -> Result<(), InstructionError> {
+        self.serialize_data(state).map_err(|err| match *err {
+            ErrorKind::SizeLimit => InstructionError::AccountDataTooSmall,
+            _ => InstructionError::GenericError,
+        })
+    }
 }
 
 impl<T> StateMut<T> for AccountNoData

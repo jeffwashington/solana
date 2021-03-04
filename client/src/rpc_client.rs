@@ -21,7 +21,7 @@ use solana_account_decoder::{
     UiAccount, UiAccountData, UiAccountEncoding,
 };
 use solana_sdk::{
-    account::AccountNoData,
+    account::Account,
     clock::{Slot, UnixTimestamp, DEFAULT_MS_PER_SLOT, MAX_HASH_AGE_IN_SECONDS},
     commitment_config::{CommitmentConfig, CommitmentLevel},
     epoch_info::EpochInfo,
@@ -722,7 +722,7 @@ impl RpcClient {
 
     /// Note that `get_account` returns `Err(..)` if the account does not exist whereas
     /// `get_account_with_commitment` returns `Ok(None)` if the account does not exist.
-    pub fn get_account(&self, pubkey: &Pubkey) -> ClientResult<AccountNoData> {
+    pub fn get_account(&self, pubkey: &Pubkey) -> ClientResult<Account> {
         self.get_account_with_commitment(pubkey, self.commitment_config)?
             .value
             .ok_or_else(|| RpcError::ForUser(format!("AccountNotFound: pubkey={}", pubkey)).into())
@@ -732,7 +732,7 @@ impl RpcClient {
         &self,
         pubkey: &Pubkey,
         commitment_config: CommitmentConfig,
-    ) -> RpcResult<Option<AccountNoData>> {
+    ) -> RpcResult<Option<Account>> {
         let config = RpcAccountInfoConfig {
             encoding: Some(UiAccountEncoding::Base64),
             commitment: Some(self.maybe_map_commitment(commitment_config)?),
@@ -755,7 +755,7 @@ impl RpcClient {
                     value: rpc_account,
                 } = serde_json::from_value::<Response<Option<UiAccount>>>(result_json)?;
                 trace!("Response account {:?} {:?}", pubkey, rpc_account);
-                let account = rpc_account.and_then(|rpc_account| rpc_account.decode());
+                let account = rpc_account.and_then(|rpc_account| rpc_account.decode_legacy());
                 Ok(Response {
                     context,
                     value: account,
@@ -772,7 +772,7 @@ impl RpcClient {
     pub fn get_multiple_accounts(
         &self,
         pubkeys: &[Pubkey],
-    ) -> ClientResult<Vec<Option<AccountNoData>>> {
+    ) -> ClientResult<Vec<Option<Account>>> {
         Ok(self
             .get_multiple_accounts_with_commitment(pubkeys, self.commitment_config)?
             .value)
@@ -782,7 +782,7 @@ impl RpcClient {
         &self,
         pubkeys: &[Pubkey],
         commitment_config: CommitmentConfig,
-    ) -> RpcResult<Vec<Option<AccountNoData>>> {
+    ) -> RpcResult<Vec<Option<Account>>> {
         let config = RpcAccountInfoConfig {
             encoding: Some(UiAccountEncoding::Base64),
             commitment: Some(self.maybe_map_commitment(commitment_config)?),
@@ -794,9 +794,9 @@ impl RpcClient {
             context,
             value: accounts,
         } = serde_json::from_value::<Response<Vec<Option<UiAccount>>>>(response)?;
-        let accounts: Vec<Option<AccountNoData>> = accounts
+        let accounts: Vec<Option<Account>> = accounts
             .into_iter()
-            .map(|rpc_account| rpc_account.map(|a| a.decode()).flatten())
+            .map(|rpc_account| rpc_account.map(|a| a.decode_legacy()).flatten())
             .collect();
         Ok(Response {
             context,
@@ -849,7 +849,7 @@ impl RpcClient {
     pub fn get_program_accounts(
         &self,
         pubkey: &Pubkey,
-    ) -> ClientResult<Vec<(Pubkey, AccountNoData)>> {
+    ) -> ClientResult<Vec<(Pubkey, Account)>> {
         self.get_program_accounts_with_config(
             pubkey,
             RpcProgramAccountsConfig {
@@ -867,7 +867,7 @@ impl RpcClient {
         &self,
         pubkey: &Pubkey,
         config: RpcProgramAccountsConfig,
-    ) -> ClientResult<Vec<(Pubkey, AccountNoData)>> {
+    ) -> ClientResult<Vec<(Pubkey, Account)>> {
         let commitment = config.account_config.commitment.unwrap_or_default();
         let commitment = self.maybe_map_commitment(commitment)?;
         let account_config = RpcAccountInfoConfig {
@@ -1551,8 +1551,8 @@ fn get_rpc_request_str(rpc_addr: SocketAddr, tls: bool) -> String {
 fn parse_keyed_accounts(
     accounts: Vec<RpcKeyedAccount>,
     request: RpcRequest,
-) -> ClientResult<Vec<(Pubkey, AccountNoData)>> {
-    let mut pubkey_accounts: Vec<(Pubkey, AccountNoData)> = Vec::new();
+) -> ClientResult<Vec<(Pubkey, Account)>> {
+    let mut pubkey_accounts: Vec<(Pubkey, Account)> = Vec::new();
     for RpcKeyedAccount { pubkey, account } in accounts.into_iter() {
         let pubkey = pubkey.parse().map_err(|_| {
             ClientError::new_with_request(
@@ -1562,7 +1562,7 @@ fn parse_keyed_accounts(
         })?;
         pubkey_accounts.push((
             pubkey,
-            account.decode().ok_or_else(|| {
+            account.decode_legacy().ok_or_else(|| {
                 ClientError::new_with_request(
                     RpcError::ParseError("Account from rpc".to_string()).into(),
                     request,

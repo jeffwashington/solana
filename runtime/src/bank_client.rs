@@ -1,6 +1,6 @@
 use crate::bank::Bank;
 use solana_sdk::{
-    account::AccountNoData,
+    account::Account,
     client::{AsyncClient, Client, SyncClient},
     commitment_config::CommitmentConfig,
     epoch_info::EpochInfo,
@@ -116,16 +116,22 @@ impl SyncClient for BankClient {
         Ok(self.bank.get_account(pubkey).map(|account| account.data))
     }
 
-    fn get_account(&self, pubkey: &Pubkey) -> Result<Option<AccountNoData>> {
-        Ok(self.bank.get_account(pubkey))
+    fn get_account(&self, pubkey: &Pubkey) -> Result<Option<Account>> {
+        Ok(self
+            .bank
+            .get_account(pubkey)
+            .and_then(|account| Some(Account::from(account))))
     }
 
     fn get_account_with_commitment(
         &self,
         pubkey: &Pubkey,
         _commitment_config: CommitmentConfig,
-    ) -> Result<Option<AccountNoData>> {
-        Ok(self.bank.get_account(pubkey))
+    ) -> Result<Option<Account>> {
+        Ok(self
+            .bank
+            .get_account(pubkey)
+            .and_then(|account| Some(Account::from(account))))
     }
 
     fn get_balance(&self, pubkey: &Pubkey) -> Result<u64> {

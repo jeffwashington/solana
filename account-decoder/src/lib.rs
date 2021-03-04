@@ -17,7 +17,8 @@ pub mod validator_info;
 use {
     crate::parse_account_data::{parse_account_data, AccountAdditionalData, ParsedAccount},
     solana_sdk::{
-        account::AccountNoData, clock::Epoch, fee_calculator::FeeCalculator, pubkey::Pubkey,
+        account::Account, account::AccountNoData, clock::Epoch, fee_calculator::FeeCalculator,
+        pubkey::Pubkey,
     },
     std::{
         io::{Read, Write},
@@ -62,6 +63,22 @@ impl UiAccount {
     pub fn encode(
         pubkey: &Pubkey,
         account: AccountNoData,
+        encoding: UiAccountEncoding,
+        additional_data: Option<AccountAdditionalData>,
+        data_slice_config: Option<UiDataSliceConfig>,
+    ) -> Self {
+        Self::encode_legacy(
+            pubkey,
+            Account::from(account),
+            encoding,
+            additional_data,
+            data_slice_config,
+        )
+    }
+
+    pub fn encode_legacy(
+        pubkey: &Pubkey,
+        account: Account,
         encoding: UiAccountEncoding,
         additional_data: Option<AccountAdditionalData>,
         data_slice_config: Option<UiDataSliceConfig>,
@@ -111,6 +128,11 @@ impl UiAccount {
     }
 
     pub fn decode(&self) -> Option<AccountNoData> {
+        let result = self.decode_legacy()?;
+        Some(AccountNoData::from(result))
+    }
+
+    pub fn decode_legacy(&self) -> Option<Account> {
         let data = match &self.data {
             UiAccountData::Json(_) => None,
             UiAccountData::LegacyBinary(blob) => bs58::decode(blob).into_vec().ok(),
@@ -130,7 +152,7 @@ impl UiAccount {
                 UiAccountEncoding::Binary | UiAccountEncoding::JsonParsed => None,
             },
         }?;
-        Some(AccountNoData {
+        Some(Account {
             lamports: self.lamports,
             data,
             owner: Pubkey::from_str(&self.owner).ok()?,
