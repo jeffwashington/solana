@@ -62,23 +62,82 @@ impl From<Account> for AccountNoData {
     }
 }
 
-/*
 pub trait AnAccount: Default + Clone + Sized {
     fn lamports(&self) -> u64;
     fn set_lamports(&mut self, lamports: u64);
     fn data(&self) -> &Vec<u8>;
-    fn set_data(&mut self, data: Vec<u8>);
     fn owner(&self) -> &Pubkey;
     fn set_owner(&mut self, owner: Pubkey);
     fn executable(&self) -> bool;
     fn rent_epoch(&self) -> Epoch;
     fn set_rent_epoch(&mut self, epoch: Epoch);
-    fn clone_as_account_no_data(&self) -> AccountNoData;
-    fn clone_as_account(&self) -> Account;
-    fn from_account_no_data(item: AccountNoData) -> Self;
-    fn to_account_no_data(&mut self) -> AccountNoData;
+}
+
+impl AnAccount for Account {
+    fn lamports(&self) -> u64 {
+        self.lamports
+    }
+    fn set_lamports(&mut self, lamports: u64) {
+        self.lamports = lamports;
+    }
+    fn data(&self) -> &Vec<u8> {
+        &self.data
+    }
+    fn owner(&self) -> &Pubkey {
+        &self.owner
+    }
+    fn set_owner(&mut self, owner: Pubkey) {
+        self.owner = owner;
+    }
+    fn executable(&self) -> bool {
+        self.executable
+    }
+    fn rent_epoch(&self) -> Epoch {
+        self.rent_epoch
+    }
+    fn set_rent_epoch(&mut self, epoch: Epoch) {
+        self.rent_epoch = epoch;
+    }
+}
+/*
+impl<'a> AnAccount for &'a mut Account {
+    fn lamports(&self) -> u64 {self.lamports}
+    fn set_lamports(&mut self, lamports: u64) {self.lamports = lamports;}
+    fn data(&self) -> &Vec<u8> {&self.data}
+    fn owner(&self) -> &Pubkey {&self.owner}
+    fn set_owner(&mut self, owner: Pubkey) {self.owner = owner;}
+    fn executable(&self) -> bool {self.executable}
+    fn rent_epoch(&self) -> Epoch {self.rent_epoch}
+    fn set_rent_epoch(&mut self, epoch: Epoch) {self.rent_epoch = epoch;}
 }
 */
+
+impl AnAccount for AccountNoData {
+    fn lamports(&self) -> u64 {
+        self.lamports
+    }
+    fn set_lamports(&mut self, lamports: u64) {
+        self.lamports = lamports;
+    }
+    fn data(&self) -> &Vec<u8> {
+        &self.data
+    }
+    fn owner(&self) -> &Pubkey {
+        &self.owner
+    }
+    fn set_owner(&mut self, owner: Pubkey) {
+        self.owner = owner;
+    }
+    fn executable(&self) -> bool {
+        self.executable
+    }
+    fn rent_epoch(&self) -> Epoch {
+        self.rent_epoch
+    }
+    fn set_rent_epoch(&mut self, epoch: Epoch) {
+        self.rent_epoch = epoch;
+    }
+}
 
 impl fmt::Debug for Account {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
