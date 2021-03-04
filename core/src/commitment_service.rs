@@ -253,7 +253,7 @@ mod tests {
         bank_forks::BankForks,
         genesis_utils::{create_genesis_config_with_vote_accounts, ValidatorVoteKeypairs},
     };
-    use solana_sdk::{pubkey::Pubkey, signature::Signer};
+    use solana_sdk::{account::Account, pubkey::Pubkey, signature::Signer};
     use solana_stake_program::stake_state;
     use solana_vote_program::{
         vote_state::{self, VoteStateVersions},
@@ -420,7 +420,7 @@ mod tests {
             (sk3, stake_account3),
             (pk4, vote_account4.clone()),
             (sk4, stake_account4),
-        ]);
+        ].into_iter().map(|(key, account)| (key, Account::from(account))));
 
         // Create bank
         let bank = Arc::new(Bank::new(&genesis_config));

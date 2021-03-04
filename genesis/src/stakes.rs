@@ -4,8 +4,8 @@ use crate::{
     unlocks::{UnlockInfo, Unlocks},
 };
 use solana_sdk::{
-    account::AccountNoData, clock::Slot, genesis_config::GenesisConfig, pubkey::Pubkey,
-    system_program, timing::years_as_slots,
+    account::Account, clock::Slot, genesis_config::GenesisConfig,
+    pubkey::Pubkey, system_program, timing::years_as_slots,
 };
 use solana_stake_program::{
     self,
@@ -81,7 +81,7 @@ pub fn create_and_add_stakes(
         .entry(authorized.staker)
         .or_insert_with(|| {
             stakes_lamports -= staker_rent_reserve;
-            AccountNoData::new(staker_rent_reserve, 0, &system_program::id())
+            Account::new(staker_rent_reserve, 0, &system_program::id())
         })
         .lamports += staker_fees;
 

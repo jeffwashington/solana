@@ -18,6 +18,7 @@ use solana_runtime::genesis_utils::{
     ValidatorVoteKeypairs,
 };
 use solana_sdk::{
+    account::Account,
     account::AccountNoData,
     client::SyncClient,
     clock::{DEFAULT_DEV_SLOTS_PER_EPOCH, DEFAULT_TICKS_PER_SLOT},
@@ -171,7 +172,7 @@ impl LocalCluster {
         );
         genesis_config
             .accounts
-            .extend(config.additional_accounts.drain(..));
+            .extend(config.additional_accounts.drain(..).map(|(key, account)| (key, Account::from(account))));
         genesis_config.ticks_per_slot = config.ticks_per_slot;
         genesis_config.epoch_schedule = EpochSchedule::custom(
             config.slots_per_epoch,

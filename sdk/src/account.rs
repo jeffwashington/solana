@@ -50,6 +50,18 @@ impl From<AccountNoData> for Account {
     }
 }
 
+impl From<Account> for AccountNoData {
+    fn from(other: Account) -> Self {
+        Self {
+            lamports: other.lamports,
+            data: other.data,
+            owner: other.owner,
+            executable: other.executable,
+            rent_epoch: other.rent_epoch,
+        }
+    }
+}
+
 /*
 pub trait AnAccount: Default + Clone + Sized {
     fn lamports(&self) -> u64;

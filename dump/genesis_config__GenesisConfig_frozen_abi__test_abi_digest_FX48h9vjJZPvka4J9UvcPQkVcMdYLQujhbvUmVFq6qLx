@@ -1,0 +1,444 @@
+struct GenesisConfig (fields = 13)
+    field creation_time: i64
+        primitive i64
+    field accounts: alloc::collections::btree::map::BTreeMap<solana_program::pubkey::Pubkey, solana_sdk::account::Account>
+        map (entries = 1)
+            key solana_program::pubkey::Pubkey
+                struct Pubkey([u8; 32]) (newtype)
+                    tuple (elements = 32)
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+            value solana_sdk::account::Account
+                struct Account (fields = 5)
+                    field lamports: u64
+                        primitive u64
+                    field data: solana_sdk::account::_::<impl serde::ser::Serialize for solana_sdk::account::Account>::serialize::__SerializeWith
+                        bytes [u8] (len = 1)
+                    field owner: solana_program::pubkey::Pubkey
+                        struct Pubkey([u8; 32]) (newtype)
+                            tuple (elements = 32)
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                    field executable: bool
+                        primitive bool
+                    field rentEpoch: u64
+                        primitive u64
+    field native_instruction_processors: alloc::vec::Vec<(alloc::string::String, solana_program::pubkey::Pubkey)>
+        seq (elements = 1)
+            element (alloc::string::String, solana_program::pubkey::Pubkey)
+                tuple (elements = 2)
+                    element alloc::string::String
+                        primitive str
+                    element solana_program::pubkey::Pubkey
+                        struct Pubkey([u8; 32]) (newtype)
+                            tuple (elements = 32)
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+    field rewards_pools: alloc::collections::btree::map::BTreeMap<solana_program::pubkey::Pubkey, solana_sdk::account::Account>
+        map (entries = 1)
+            key solana_program::pubkey::Pubkey
+                struct Pubkey([u8; 32]) (newtype)
+                    tuple (elements = 32)
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+                        element u8
+                            primitive u8
+            value solana_sdk::account::Account
+                struct Account (fields = 5)
+                    field lamports: u64
+                        primitive u64
+                    field data: solana_sdk::account::_::<impl serde::ser::Serialize for solana_sdk::account::Account>::serialize::__SerializeWith
+                        bytes [u8] (len = 1)
+                    field owner: solana_program::pubkey::Pubkey
+                        struct Pubkey([u8; 32]) (newtype)
+                            tuple (elements = 32)
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                                element u8
+                                    primitive u8
+                    field executable: bool
+                        primitive bool
+                    field rentEpoch: u64
+                        primitive u64
+    field ticks_per_slot: u64
+        primitive u64
+    field unused: u64
+        primitive u64
+    field poh_config: solana_sdk::poh_config::PohConfig
+        struct PohConfig (fields = 3)
+            field target_tick_duration: core::time::Duration
+                struct Duration (fields = 2)
+                    field secs: u64
+                        primitive u64
+                    field nanos: u32
+                        primitive u32
+            field target_tick_count: core::option::Option<u64>
+                enum Option (variants = 2)
+                    variant(0) None (unit)
+                    variant(1) Some(u64) (newtype)
+                        primitive u64
+            field hashes_per_tick: core::option::Option<u64>
+                enum Option (variants = 2)
+                    variant(0) None (unit)
+                    variant(1) Some(u64) (newtype)
+                        primitive u64
+    field __backwards_compat_with_v0_23: u64
+        primitive u64
+    field fee_rate_governor: solana_program::fee_calculator::FeeRateGovernor
+        struct FeeRateGovernor (fields = 5)
+            field targetLamportsPerSignature: u64
+                primitive u64
+            field targetSignaturesPerSlot: u64
+                primitive u64
+            field minLamportsPerSignature: u64
+                primitive u64
+            field maxLamportsPerSignature: u64
+                primitive u64
+            field burnPercent: u8
+                primitive u8
+    field rent: solana_program::rent::Rent
+        struct Rent (fields = 3)
+            field lamports_per_byte_year: u64
+                primitive u64
+            field exemption_threshold: f64
+                primitive f64
+            field burn_percent: u8
+                primitive u8
+    field inflation: solana_sdk::inflation::Inflation
+        struct Inflation (fields = 6)
+            field initial: f64
+                primitive f64
+            field terminal: f64
+                primitive f64
+            field taper: f64
+                primitive f64
+            field foundation: f64
+                primitive f64
+            field foundationTerm: f64
+                primitive f64
+            field unused: f64
+                primitive f64
+    field epoch_schedule: solana_program::epoch_schedule::EpochSchedule
+        struct EpochSchedule (fields = 5)
+            field slotsPerEpoch: u64
+                primitive u64
+            field leaderScheduleSlotOffset: u64
+                primitive u64
+            field warmup: bool
+                primitive bool
+            field firstNormalEpoch: u64
+                primitive u64
+            field firstNormalSlot: u64
+                primitive u64
+    field cluster_type: solana_sdk::genesis_config::ClusterType
+        enum ClusterType (variants = 4)
+            variant(0) Testnet (unit)
+            variant(1) MainnetBeta (unit)
+            variant(2) Devnet (unit)
+            variant(3) Development (unit)

@@ -3,6 +3,7 @@
 #![cfg(feature = "full")]
 
 use crate::{
+    account::Account,
     account::AccountNoData,
     clock::{UnixTimestamp, DEFAULT_TICKS_PER_SLOT},
     epoch_schedule::EpochSchedule,
@@ -67,11 +68,11 @@ pub struct GenesisConfig {
     /// when the network (bootstrap validator) was started relative to the UNIX Epoch
     pub creation_time: UnixTimestamp,
     /// initial accounts
-    pub accounts: BTreeMap<Pubkey, AccountNoData>,
+    pub accounts: BTreeMap<Pubkey, Account>,
     /// built-in programs
     pub native_instruction_processors: Vec<(String, Pubkey)>,
     /// accounts for network rewards, these do not count towards capitalization
-    pub rewards_pools: BTreeMap<Pubkey, AccountNoData>,
+    pub rewards_pools: BTreeMap<Pubkey, Account>,
     pub ticks_per_slot: u64,
     pub unused: u64,
     /// network speed configuration
@@ -138,7 +139,8 @@ impl GenesisConfig {
             accounts: accounts
                 .iter()
                 .cloned()
-                .collect::<BTreeMap<Pubkey, AccountNoData>>(),
+                .map(|(key, account)| (key, Account::from(account)))
+                .collect::<BTreeMap<Pubkey, Account>>(),
             native_instruction_processors: native_instruction_processors.to_vec(),
             ..GenesisConfig::default()
         }
@@ -202,7 +204,7 @@ impl GenesisConfig {
     }
 
     pub fn add_account(&mut self, pubkey: Pubkey, account: AccountNoData) {
-        self.accounts.insert(pubkey, account);
+        self.accounts.insert(pubkey, Account::from(account));
     }
 
     pub fn add_native_instruction_processor(&mut self, name: String, program_id: Pubkey) {

@@ -2104,7 +2104,7 @@ impl Bank {
             if self.get_account(&pubkey).is_some() {
                 panic!("{} repeated in genesis config", pubkey);
             }
-            self.store_account(pubkey, account);
+            self.store_account(pubkey, &AccountNoData::from(account.clone()));
             self.capitalization.fetch_add(account.lamports, Relaxed);
         }
         // updating sysvars (the fees sysvar in this case) now depends on feature activations in
@@ -2115,7 +2115,7 @@ impl Bank {
             if self.get_account(&pubkey).is_some() {
                 panic!("{} repeated in genesis config", pubkey);
             }
-            self.store_account(pubkey, account);
+            self.store_account(pubkey, &AccountNoData::from(account.clone()));
         }
 
         // highest staked node is the first collector
@@ -5008,6 +5008,7 @@ pub(crate) mod tests {
     };
     use crossbeam_channel::bounded;
     use solana_sdk::{
+        account::Account,
         account_utils::StateMut,
         clock::{DEFAULT_SLOTS_PER_EPOCH, DEFAULT_TICKS_PER_SLOT},
         epoch_schedule::MINIMUM_SLOTS_PER_EPOCH,
@@ -5239,7 +5240,7 @@ pub(crate) mod tests {
                 .map(|_| {
                     (
                         solana_sdk::pubkey::new_rand(),
-                        AccountNoData::new(42, 0, &Pubkey::default()),
+                        Account::new(42, 0, &Pubkey::default()),
                     )
                 })
                 .collect(),
@@ -5666,15 +5667,15 @@ pub(crate) mod tests {
 
         genesis_config.accounts.insert(
             validator_1_pubkey,
-            AccountNoData::new(42, 0, &system_program::id()),
+            Account::new(42, 0, &system_program::id()),
         );
         genesis_config.accounts.insert(
             validator_1_staking_keypair.pubkey(),
-            validator_1_stake_account,
+            Account::from(validator_1_stake_account),
         );
         genesis_config.accounts.insert(
             validator_1_voting_keypair.pubkey(),
-            validator_1_vote_account,
+            Account::from(validator_1_vote_account),
         );
 
         let validator_2_pubkey = solana_sdk::pubkey::new_rand();
@@ -5699,15 +5700,15 @@ pub(crate) mod tests {
 
         genesis_config.accounts.insert(
             validator_2_pubkey,
-            AccountNoData::new(42, 0, &system_program::id()),
+            Account::new(42, 0, &system_program::id()),
         );
         genesis_config.accounts.insert(
             validator_2_staking_keypair.pubkey(),
-            validator_2_stake_account,
+            Account::from(validator_2_stake_account),
         );
         genesis_config.accounts.insert(
             validator_2_voting_keypair.pubkey(),
-            validator_2_vote_account,
+            Account::from(validator_2_vote_account),
         );
 
         let validator_3_pubkey = solana_sdk::pubkey::new_rand();
@@ -5732,15 +5733,15 @@ pub(crate) mod tests {
 
         genesis_config.accounts.insert(
             validator_3_pubkey,
-            AccountNoData::new(42, 0, &system_program::id()),
+            Account::new(42, 0, &system_program::id()),
         );
         genesis_config.accounts.insert(
             validator_3_staking_keypair.pubkey(),
-            validator_3_stake_account,
+            Account::from(validator_3_stake_account),
         );
         genesis_config.accounts.insert(
             validator_3_voting_keypair.pubkey(),
-            validator_3_vote_account,
+            Account::from(validator_3_vote_account),
         );
 
         genesis_config.rent = Rent {
@@ -6900,7 +6901,7 @@ pub(crate) mod tests {
                 .map(|_| {
                     (
                         solana_sdk::pubkey::new_rand(),
-                        AccountNoData::new(1_000_000_000, 0, &Pubkey::default()),
+                        Account::new(1_000_000_000, 0, &Pubkey::default()),
                     )
                 })
                 .collect(),
@@ -7019,7 +7020,7 @@ pub(crate) mod tests {
                 .map(|_| {
                     (
                         solana_sdk::pubkey::new_rand(),
-                        AccountNoData::new(1_000_000_000, 0, &Pubkey::default()),
+                        Account::new(1_000_000_000, 0, &Pubkey::default()),
                     )
                 })
                 .collect(),
@@ -10853,7 +10854,7 @@ pub(crate) mod tests {
         let reward_pubkey = solana_sdk::pubkey::new_rand();
         genesis_config.rewards_pools.insert(
             reward_pubkey,
-            AccountNoData::new(u64::MAX, 0, &solana_sdk::pubkey::new_rand()),
+            Account::new(u64::MAX, 0, &solana_sdk::pubkey::new_rand()),
         );
         genesis_config.disable_cap_altering_features_for_preciseness();
         let bank0 = Bank::new(&genesis_config);
@@ -11201,12 +11202,12 @@ pub(crate) mod tests {
         // inhibit deprecated rewards sysvar creation altogether
         genesis_config.accounts.insert(
             feature_set::deprecate_rewards_sysvar::id(),
-            feature::create_account(
+            Account::from(feature::create_account(
                 &Feature {
                     activated_at: Some(0),
                 },
                 feature_balance,
-            ),
+            )),
         );
 
         let bank0 = Bank::new(&genesis_config);
