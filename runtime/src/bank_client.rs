@@ -118,10 +118,7 @@ impl SyncClient for BankClient {
     }
 
     fn get_account(&self, pubkey: &Pubkey) -> Result<Option<Account>> {
-        Ok(self
-            .bank
-            .get_account(pubkey)
-            .and_then(|account| Some(Account::from(account))))
+        Ok(self.bank.get_account(pubkey).map(Account::from))
     }
 
     fn get_account_with_commitment(
@@ -129,10 +126,7 @@ impl SyncClient for BankClient {
         pubkey: &Pubkey,
         _commitment_config: CommitmentConfig,
     ) -> Result<Option<Account>> {
-        Ok(self
-            .bank
-            .get_account(pubkey)
-            .and_then(|account| Some(Account::from(account))))
+        Ok(self.bank.get_account(pubkey).map(Account::from))
     }
 
     fn get_account_no_data_with_commitment(
@@ -140,10 +134,7 @@ impl SyncClient for BankClient {
         pubkey: &Pubkey,
         _commitment_config: CommitmentConfig,
     ) -> Result<Option<AccountNoData>> {
-        Ok(self
-            .bank
-            .get_account(pubkey)
-            .and_then(|account| Some(account)))
+        Ok(self.bank.get_account(pubkey))
     }
 
     fn get_balance(&self, pubkey: &Pubkey) -> Result<u64> {
