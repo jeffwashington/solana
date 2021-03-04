@@ -31,7 +31,7 @@ use rayon::ThreadPool;
 use solana_measure::measure::Measure;
 use solana_metrics::{datapoint_debug, inc_new_counter_debug, inc_new_counter_info};
 use solana_sdk::{
-    account::{create_account, from_account, AccountNoData},
+    account::{create_account_no_data as create_account, from_account, AccountNoData},
     clock::{
         Epoch, Slot, SlotCount, SlotIndex, UnixTimestamp, DEFAULT_TICKS_PER_SECOND,
         MAX_PROCESSING_AGE, MAX_RECENT_BLOCKHASHES, MAX_TRANSACTION_FORWARDING_DELAY,
@@ -1434,7 +1434,7 @@ impl Bank {
         self.update_sysvar_account(&sysvar::slot_history::id(), |account| {
             let mut slot_history = account
                 .as_ref()
-                .map(|account| from_account::<SlotHistory>(&account).unwrap())
+                .map(|account| from_account::<SlotHistory, _>(account).unwrap())
                 .unwrap_or_default();
             slot_history.add(self.slot());
             create_account(
@@ -1448,7 +1448,7 @@ impl Bank {
         self.update_sysvar_account(&sysvar::slot_hashes::id(), |account| {
             let mut slot_hashes = account
                 .as_ref()
-                .map(|account| from_account::<SlotHashes>(&account).unwrap())
+                .map(|account| from_account::<SlotHashes, _>(account).unwrap())
                 .unwrap_or_default();
             slot_hashes.add(self.parent_slot, self.parent_hash);
             create_account(
@@ -5155,7 +5155,7 @@ pub(crate) mod tests {
         );
 
         let rent_account = bank.get_account(&sysvar::rent::id()).unwrap();
-        let rent = from_account::<sysvar::rent::Rent>(&rent_account).unwrap();
+        let rent = from_account::<sysvar::rent::Rent, _>(&rent_account).unwrap();
 
         assert_eq!(rent.burn_percent, 5);
         assert_eq!(rent.exemption_threshold, 1.2);
@@ -6979,7 +6979,7 @@ pub(crate) mod tests {
 
         let rewards = bank1
             .get_account(&sysvar::rewards::id())
-            .map(|account| from_account::<Rewards>(&account).unwrap())
+            .map(|account| from_account::<Rewards, _>(&account).unwrap())
             .unwrap();
 
         // verify the stake and vote accounts are the right size
@@ -8293,7 +8293,7 @@ pub(crate) mod tests {
                 let current_account = bank1.get_account(&dummy_clock_id).unwrap();
                 assert_eq!(
                     expected_previous_slot,
-                    from_account::<Clock>(&current_account).unwrap().slot
+                    from_account::<Clock, _>(&current_account).unwrap().slot
                 );
             },
             |old, new| {
@@ -8333,7 +8333,7 @@ pub(crate) mod tests {
             &bank2,
             || {
                 bank2.update_sysvar_account(&dummy_clock_id, |optional_account| {
-                    let slot = from_account::<Clock>(optional_account.as_ref().unwrap())
+                    let slot = from_account::<Clock, _>(optional_account.as_ref().unwrap())
                         .unwrap()
                         .slot
                         + 1;
@@ -8349,7 +8349,7 @@ pub(crate) mod tests {
                 let current_account = bank2.get_account(&dummy_clock_id).unwrap();
                 assert_eq!(
                     expected_next_slot,
-                    from_account::<Clock>(&current_account).unwrap().slot
+                    from_account::<Clock, _>(&current_account).unwrap().slot
                 );
             },
             |old, new| {
@@ -8364,7 +8364,7 @@ pub(crate) mod tests {
             &bank2,
             || {
                 bank2.update_sysvar_account(&dummy_clock_id, |optional_account| {
-                    let slot = from_account::<Clock>(optional_account.as_ref().unwrap())
+                    let slot = from_account::<Clock, _>(optional_account.as_ref().unwrap())
                         .unwrap()
                         .slot
                         + 1;
@@ -8380,7 +8380,7 @@ pub(crate) mod tests {
                 let current_account = bank2.get_account(&dummy_clock_id).unwrap();
                 assert_eq!(
                     expected_next_slot,
-                    from_account::<Clock>(&current_account).unwrap().slot
+                    from_account::<Clock, _>(&current_account).unwrap().slot
                 );
             },
             |old, new| {
@@ -8743,7 +8743,7 @@ pub(crate) mod tests {
         let bank = Arc::new(Bank::new(&genesis_config));
 
         let fees_account = bank.get_account(&sysvar::fees::id()).unwrap();
-        let fees = from_account::<Fees>(&fees_account).unwrap();
+        let fees = from_account::<Fees, _>(&fees_account).unwrap();
         assert_eq!(
             bank.fee_calculator.lamports_per_signature,
             fees.fee_calculator.lamports_per_signature
@@ -9100,7 +9100,7 @@ pub(crate) mod tests {
         for i in 1..5 {
             let bhq_account = bank.get_account(&sysvar::recent_blockhashes::id()).unwrap();
             let recent_blockhashes =
-                from_account::<sysvar::recent_blockhashes::RecentBlockhashes>(&bhq_account)
+                from_account::<sysvar::recent_blockhashes::RecentBlockhashes, _>(&bhq_account)
                     .unwrap();
             // Check length
             assert_eq!(recent_blockhashes.len(), i);
@@ -9120,7 +9120,7 @@ pub(crate) mod tests {
 
         let bhq_account = bank.get_account(&sysvar::recent_blockhashes::id()).unwrap();
         let recent_blockhashes =
-            from_account::<sysvar::recent_blockhashes::RecentBlockhashes>(&bhq_account).unwrap();
+            from_account::<sysvar::recent_blockhashes::RecentBlockhashes, _>(&bhq_account).unwrap();
 
         let sysvar_recent_blockhash = recent_blockhashes[0].blockhash;
         let bank_last_blockhash = bank.last_blockhash();

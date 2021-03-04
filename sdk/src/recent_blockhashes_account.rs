@@ -1,4 +1,4 @@
-use crate::account::{create_account, to_account, AccountNoData};
+use crate::account::{create_account_no_data, to_account, AccountNoData};
 use solana_program::sysvar::recent_blockhashes::{
     IntoIterSorted, IterItem, RecentBlockhashes, MAX_ENTRIES,
 };
@@ -19,7 +19,8 @@ pub fn create_account_with_data<'a, I>(lamports: u64, recent_blockhash_iter: I) 
 where
     I: IntoIterator<Item = IterItem<'a>>,
 {
-    let mut account = create_account::<RecentBlockhashes>(&RecentBlockhashes::default(), lamports);
+    let mut account =
+        create_account_no_data::<RecentBlockhashes>(&RecentBlockhashes::default(), lamports);
     update_account(&mut account, recent_blockhash_iter).unwrap();
     account
 }
@@ -38,7 +39,7 @@ mod tests {
     #[test]
     fn test_create_account_empty() {
         let account = create_account_with_data(42, vec![].into_iter());
-        let recent_blockhashes = from_account::<RecentBlockhashes>(&account).unwrap();
+        let recent_blockhashes = from_account::<RecentBlockhashes, _>(&account).unwrap();
         assert_eq!(recent_blockhashes, RecentBlockhashes::default());
     }
 
@@ -50,7 +51,7 @@ mod tests {
             42,
             vec![IterItem(0u64, &def_hash, &def_fees); MAX_ENTRIES].into_iter(),
         );
-        let recent_blockhashes = from_account::<RecentBlockhashes>(&account).unwrap();
+        let recent_blockhashes = from_account::<RecentBlockhashes, _>(&account).unwrap();
         assert_eq!(recent_blockhashes.len(), MAX_ENTRIES);
     }
 
@@ -62,7 +63,7 @@ mod tests {
             42,
             vec![IterItem(0u64, &def_hash, &def_fees); MAX_ENTRIES + 1].into_iter(),
         );
-        let recent_blockhashes = from_account::<RecentBlockhashes>(&account).unwrap();
+        let recent_blockhashes = from_account::<RecentBlockhashes, _>(&account).unwrap();
         assert_eq!(recent_blockhashes.len(), MAX_ENTRIES);
     }
 
@@ -87,7 +88,7 @@ mod tests {
                 .iter()
                 .map(|(i, hash)| IterItem(*i, hash, &def_fees)),
         );
-        let recent_blockhashes = from_account::<RecentBlockhashes>(&account).unwrap();
+        let recent_blockhashes = from_account::<RecentBlockhashes, _>(&account).unwrap();
 
         let mut unsorted_recent_blockhashes: Vec<_> = unsorted_blocks
             .iter()

@@ -216,7 +216,8 @@ pub fn from_keyed_account<S: Sysvar>(
     if !S::check_id(keyed_account.unsigned_key()) {
         return Err(InstructionError::InvalidArgument);
     }
-    from_account::<S>(&*keyed_account.try_account_ref()?).ok_or(InstructionError::InvalidArgument)
+    from_account::<S, AccountNoData>(&*keyed_account.try_account_ref()?)
+        .ok_or(InstructionError::InvalidArgument)
 }
 
 #[cfg(test)]
@@ -248,12 +249,12 @@ mod tests {
         let wrong_key = Pubkey::new_unique();
 
         let account = create_account(&test_sysvar, 42);
-        let test_sysvar = from_account::<TestSysvar>(&account).unwrap();
+        let test_sysvar = from_account::<TestSysvar, _>(&account).unwrap();
         assert_eq!(test_sysvar, TestSysvar::default());
 
         let mut account = AccountNoData::new(42, TestSysvar::size_of(), &key);
         to_account(&test_sysvar, &mut account).unwrap();
-        let test_sysvar = from_account::<TestSysvar>(&account).unwrap();
+        let test_sysvar = from_account::<TestSysvar, _>(&account).unwrap();
         assert_eq!(test_sysvar, TestSysvar::default());
 
         let account = RefCell::new(account);
