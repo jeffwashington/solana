@@ -21,8 +21,10 @@ pub struct Account {
     pub rent_epoch: Epoch,
 }
 
-//pub type AccountNoData = Account;
-
+/// An Account with data that is stored on chain
+/// This will become a new in-memory representation of the 'Account' struct data.
+/// The existing 'Account' structure cannot easily change due to downstream projects.
+/// This struct will shortly rely on something like the AnAccount trait for access to the fields.
 #[derive(Serialize, Deserialize, PartialEq, Eq, Clone, Default, AbiExample)]
 pub struct AccountNoData {
     /// lamports in the account
@@ -36,6 +38,14 @@ pub struct AccountNoData {
     pub executable: bool,
     /// the epoch at which this account will next owe rent
     pub rent_epoch: Epoch,
+}
+
+pub fn accounts_equal<T: AnAccount, U: AnAccount>(me: &T, other: &U) -> bool {
+    me.lamports() == other.lamports()
+        && me.data() == other.data()
+        && me.owner() == other.owner()
+        && me.executable() == other.executable()
+        && me.rent_epoch() == other.rent_epoch()
 }
 
 impl From<AccountNoData> for Account {
@@ -125,19 +135,6 @@ impl AnAccountWritable for AccountNoData {
     }
 }
 
-/*
-impl<'a> AnAccount for &'a mut Account {
-    fn lamports(&self) -> u64 {self.lamports}
-    fn set_lamports(&mut self, lamports: u64) {self.lamports = lamports;}
-    fn data(&self) -> &Vec<u8> {&self.data}
-    fn owner(&self) -> &Pubkey {&self.owner}
-    fn set_owner(&mut self, owner: Pubkey) {self.owner = owner;}
-    fn executable(&self) -> bool {self.executable}
-    fn rent_epoch(&self) -> Epoch {self.rent_epoch}
-    fn set_rent_epoch(&mut self, epoch: Epoch) {self.rent_epoch = epoch;}
-}
-*/
-
 impl AnAccount for AccountNoData {
     fn lamports(&self) -> u64 {
         self.lamports
@@ -174,45 +171,34 @@ impl AnAccount for Ref<'_, AccountNoData> {
     }
 }
 
+fn debug_fmt<T: AnAccount>(item: &T, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    let data_len = cmp::min(64, item.data().len());
+    let data_str = if data_len > 0 {
+        format!(" data: {}", hex::encode(item.data()[..data_len].to_vec()))
+    } else {
+        "".to_string()
+    };
+    write!(
+        f,
+        "Account {{ lamports: {} data.len: {} owner: {} executable: {} rent_epoch: {}{} }}",
+        item.lamports(),
+        data_len,
+        item.owner(),
+        item.executable(),
+        item.rent_epoch(),
+        data_str,
+    )
+}
+
 impl fmt::Debug for Account {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let data_len = cmp::min(64, self.data.len());
-        let data_str = if data_len > 0 {
-            format!(" data: {}", hex::encode(self.data[..data_len].to_vec()))
-        } else {
-            "".to_string()
-        };
-        write!(
-            f,
-            "Account {{ lamports: {} data.len: {} owner: {} executable: {} rent_epoch: {}{} }}",
-            self.lamports,
-            self.data.len(),
-            self.owner,
-            self.executable,
-            self.rent_epoch,
-            data_str,
-        )
+        debug_fmt(self, f)
     }
 }
 
 impl fmt::Debug for AccountNoData {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let data_len = cmp::min(64, self.data.len());
-        let data_str = if data_len > 0 {
-            format!(" data: {}", hex::encode(self.data[..data_len].to_vec()))
-        } else {
-            "".to_string()
-        };
-        write!(
-            f,
-            "Account {{ lamports: {} data.len: {} owner: {} executable: {} rent_epoch: {}{} }}",
-            self.lamports,
-            self.data.len(),
-            self.owner,
-            self.executable,
-            self.rent_epoch,
-            data_str,
-        )
+        debug_fmt(self, f)
     }
 }
 
