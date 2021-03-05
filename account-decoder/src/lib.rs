@@ -67,22 +67,6 @@ impl UiAccount {
         additional_data: Option<AccountAdditionalData>,
         data_slice_config: Option<UiDataSliceConfig>,
     ) -> Self {
-        Self::encode_legacy(
-            pubkey,
-            Account::from(account),
-            encoding,
-            additional_data,
-            data_slice_config,
-        )
-    }
-
-    pub fn encode_legacy(
-        pubkey: &Pubkey,
-        account: Account,
-        encoding: UiAccountEncoding,
-        additional_data: Option<AccountAdditionalData>,
-        data_slice_config: Option<UiDataSliceConfig>,
-    ) -> Self {
         let data = match encoding {
             UiAccountEncoding::Binary => UiAccountData::LegacyBinary(
                 bs58::encode(slice_data(&account.data, data_slice_config)).into_string(),
