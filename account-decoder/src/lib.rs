@@ -192,6 +192,7 @@ fn slice_data(data: &[u8], data_slice_config: Option<UiDataSliceConfig>) -> &[u8
 #[cfg(test)]
 mod test {
     use super::*;
+    use solana_sdk::account::AnAccount;
 
     #[test]
     fn test_slice_data() {
@@ -240,5 +241,26 @@ mod test {
 
         let decoded_account = encoded_account.decode().unwrap();
         assert_eq!(decoded_account.data, vec![0; 1024]);
+    }
+
+    #[test]
+    fn test_base64_zstd_no_data() {
+        let encoded_account = UiAccount::encode(
+            &Pubkey::default(),
+            AccountNoData {
+                data: vec![0; 1024],
+                ..AccountNoData::default()
+            },
+            UiAccountEncoding::Base64Zstd,
+            None,
+            None,
+        );
+        assert!(matches!(
+            encoded_account.data,
+            UiAccountData::Binary(_, UiAccountEncoding::Base64Zstd)
+        ));
+
+        let decoded_account = encoded_account.decode_legacy().unwrap();
+        assert_eq!(decoded_account.data(), &vec![0; 1024]);
     }
 }
