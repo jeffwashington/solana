@@ -129,7 +129,7 @@ impl SyncClient for BankClient {
         Ok(self.bank.get_account(pubkey).map(Account::from))
     }
 
-    fn get_account_no_data_with_commitment(
+    fn get_account_shared_data_with_commitment(
         &self,
         pubkey: &Pubkey,
         _commitment_config: CommitmentConfig,

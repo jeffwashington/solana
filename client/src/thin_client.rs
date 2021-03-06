@@ -381,13 +381,13 @@ impl SyncClient for ThinClient {
             .map(|r| r.value)
     }
 
-    fn get_account_no_data_with_commitment(
+    fn get_account_shared_data_with_commitment(
         &self,
         pubkey: &Pubkey,
         commitment_config: CommitmentConfig,
     ) -> TransportResult<Option<AccountSharedData>> {
         self.rpc_client()
-            .get_account_no_data_with_commitment(pubkey, commitment_config)
+            .get_account_shared_data_with_commitment(pubkey, commitment_config)
             .map_err(|e| e.into())
             .map(|r| r.value)
     }

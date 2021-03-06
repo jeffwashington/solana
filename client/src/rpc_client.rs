@@ -729,10 +729,10 @@ impl RpcClient {
             .ok_or_else(|| RpcError::ForUser(format!("AccountNotFound: pubkey={}", pubkey)).into())
     }
 
-    /// Note that `get_account` returns `Err(..)` if the account does not exist whereas
-    /// `get_account_with_commitment` returns `Ok(None)` if the account does not exist.
-    pub fn get_account_no_data(&self, pubkey: &Pubkey) -> ClientResult<AccountSharedData> {
-        self.get_account_no_data_with_commitment(pubkey, self.commitment_config)?
+    /// Note that `get_account_shared_data` returns `Err(..)` if the account does not exist whereas
+    /// `get_account_shared_data_with_commitment` returns `Ok(None)` if the account does not exist.
+    pub fn get_account_shared_data(&self, pubkey: &Pubkey) -> ClientResult<AccountSharedData> {
+        self.get_account_shared_data_with_commitment(pubkey, self.commitment_config)?
             .value
             .ok_or_else(|| RpcError::ForUser(format!("AccountNotFound: pubkey={}", pubkey)).into())
     }
@@ -778,7 +778,7 @@ impl RpcClient {
             })?
     }
 
-    pub fn get_account_no_data_with_commitment(
+    pub fn get_account_shared_data_with_commitment(
         &self,
         pubkey: &Pubkey,
         commitment_config: CommitmentConfig,
@@ -885,11 +885,11 @@ impl RpcClient {
         )
     }
 
-    pub fn get_program_accounts_no_data(
+    pub fn get_program_accounts_shared_data(
         &self,
         pubkey: &Pubkey,
     ) -> ClientResult<Vec<(Pubkey, AccountSharedData)>> {
-        self.get_program_accounts_no_data_with_config(
+        self.get_program_accounts_shared_data_with_config(
             pubkey,
             RpcProgramAccountsConfig {
                 filters: None,
@@ -924,7 +924,7 @@ impl RpcClient {
         parse_keyed_accounts(accounts, RpcRequest::GetProgramAccounts)
     }
 
-    pub fn get_program_accounts_no_data_with_config(
+    pub fn get_program_accounts_shared_data_with_config(
         &self,
         pubkey: &Pubkey,
         config: RpcProgramAccountsConfig,
@@ -943,7 +943,7 @@ impl RpcClient {
             RpcRequest::GetProgramAccounts,
             json!([pubkey.to_string(), config]),
         )?;
-        parse_keyed_accounts_no_data(accounts, RpcRequest::GetProgramAccounts)
+        parse_keyed_accounts_shared_data(accounts, RpcRequest::GetProgramAccounts)
     }
 
     /// Request the transaction count.
@@ -1634,7 +1634,7 @@ fn parse_keyed_accounts(
     Ok(pubkey_accounts)
 }
 
-fn parse_keyed_accounts_no_data(
+fn parse_keyed_accounts_shared_data(
     accounts: Vec<RpcKeyedAccount>,
     request: RpcRequest,
 ) -> ClientResult<Vec<(Pubkey, AccountSharedData)>> {

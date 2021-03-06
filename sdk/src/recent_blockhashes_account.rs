@@ -1,4 +1,4 @@
-use crate::account::{create_account_no_data, to_account, AccountSharedData};
+use crate::account::{create_account_shared_data, to_account, AccountSharedData};
 use solana_program::sysvar::recent_blockhashes::{
     IntoIterSorted, IterItem, RecentBlockhashes, MAX_ENTRIES,
 };
@@ -23,7 +23,7 @@ where
     I: IntoIterator<Item = IterItem<'a>>,
 {
     let mut account =
-        create_account_no_data::<RecentBlockhashes>(&RecentBlockhashes::default(), lamports);
+        create_account_shared_data::<RecentBlockhashes>(&RecentBlockhashes::default(), lamports);
     update_account(&mut account, recent_blockhash_iter).unwrap();
     account
 }

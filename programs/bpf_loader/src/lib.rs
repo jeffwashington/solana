@@ -866,7 +866,7 @@ mod tests {
         message_processor::{Executors, ThisInvokeContext},
     };
     use solana_sdk::{
-        account::{create_account_no_data as create_account, AccountSharedData},
+        account::{create_account_shared_data as create_account, AccountSharedData},
         account_utils::StateMut,
         client::SyncClient,
         clock::Clock,

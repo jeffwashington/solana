@@ -70,7 +70,7 @@ pub trait SyncClient {
     ) -> Result<Option<Account>>;
 
     /// Get an account or None if not found. Uses explicit commitment configuration.
-    fn get_account_no_data_with_commitment(
+    fn get_account_shared_data_with_commitment(
         &self,
         pubkey: &Pubkey,
         commitment_config: CommitmentConfig,

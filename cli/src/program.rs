@@ -1137,7 +1137,7 @@ fn do_process_program_write_and_deploy(
     let (initial_message, write_messages, balance_needed) =
         if let Some(buffer_authority_signer) = buffer_authority_signer {
             let (initial_instructions, balance_needed) = if let Some(account) = rpc_client
-                .get_account_no_data_with_commitment(buffer_pubkey, config.commitment)?
+                .get_account_shared_data_with_commitment(buffer_pubkey, config.commitment)?
                 .value
             {
                 complete_partial_program_init(

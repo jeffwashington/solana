@@ -374,7 +374,7 @@ pub fn create_account<S: Sysvar>(sysvar: &S, lamports: u64) -> Account {
 }
 
 /// Create an `Account` from a `Sysvar`.
-pub fn create_account_no_data<S: Sysvar>(sysvar: &S, lamports: u64) -> AccountSharedData {
+pub fn create_account_shared_data<S: Sysvar>(sysvar: &S, lamports: u64) -> AccountSharedData {
     AccountSharedData::from(create_account(sysvar, lamports))
 }
 

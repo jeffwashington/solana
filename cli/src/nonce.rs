@@ -876,9 +876,9 @@ mod tests {
         );
 
         let other_program = Pubkey::new(&[1u8; 32]);
-        let other_account_no_data = AccountSharedData::new(1, 0, &other_program);
+        let other_account_shared_data = AccountSharedData::new(1, 0, &other_program);
         assert_eq!(
-            account_identity_ok(&other_account_no_data),
+            account_identity_ok(&other_account_shared_data),
             Err(Error::InvalidAccountOwner),
         );
     }

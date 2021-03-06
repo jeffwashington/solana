@@ -31,7 +31,7 @@ use rayon::ThreadPool;
 use solana_measure::measure::Measure;
 use solana_metrics::{datapoint_debug, inc_new_counter_debug, inc_new_counter_info};
 use solana_sdk::{
-    account::{create_account_no_data as create_account, from_account, AccountSharedData},
+    account::{create_account_shared_data as create_account, from_account, AccountSharedData},
     clock::{
         Epoch, Slot, SlotCount, SlotIndex, UnixTimestamp, DEFAULT_TICKS_PER_SECOND,
         MAX_PROCESSING_AGE, MAX_RECENT_BLOCKHASHES, MAX_TRANSACTION_FORWARDING_DELAY,

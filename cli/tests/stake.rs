@@ -565,7 +565,7 @@ fn test_nonced_stake_delegation_and_deactivation_no_data() {
     process_command(&config).unwrap();
 
     // Fetch nonce hash
-    let nonce_hash = nonce_utils::get_account_no_data_with_commitment(
+    let nonce_hash = nonce_utils::get_account_shared_data_with_commitment(
         &rpc_client,
         &nonce_account.pubkey(),
         CommitmentConfig::processed(),
@@ -593,7 +593,7 @@ fn test_nonced_stake_delegation_and_deactivation_no_data() {
     process_command(&config).unwrap();
 
     // Fetch nonce hash
-    let nonce_hash = nonce_utils::get_account_no_data_with_commitment(
+    let nonce_hash = nonce_utils::get_account_shared_data_with_commitment(
         &rpc_client,
         &nonce_account.pubkey(),
         CommitmentConfig::processed(),
@@ -718,7 +718,7 @@ fn test_stake_authorize() {
     {
         // test out variations of new no_data functions
         let stake_account = rpc_client
-            .get_account_no_data(&stake_account_pubkey)
+            .get_account_shared_data(&stake_account_pubkey)
             .unwrap();
         let stake_state: StakeState = stake_account.state().unwrap();
         let current_authority = match stake_state {
@@ -742,7 +742,7 @@ fn test_stake_authorize() {
         assert!(accounts_equal(&stake_account_compare, &stake_account));
 
         let stake_account = rpc_client
-            .get_account_no_data_with_commitment(&stake_account_pubkey, rpc_client.commitment())
+            .get_account_shared_data_with_commitment(&stake_account_pubkey, rpc_client.commitment())
             .unwrap()
             .value
             .unwrap();
@@ -866,7 +866,7 @@ fn test_stake_authorize() {
         .and_then(|ref a| {
             assert!(accounts_equal(
                 a,
-                &nonce_utils::get_account_no_data_with_commitment(
+                &nonce_utils::get_account_shared_data_with_commitment(
                     &rpc_client,
                     &key,
                     CommitmentConfig::processed(),

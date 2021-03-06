@@ -115,7 +115,7 @@ impl TestValidatorGenesis {
         for address in addresses {
             info!("Fetching {} over RPC...", address);
             let account = rpc_client
-                .get_account_no_data(&address)
+                .get_account_shared_data(&address)
                 .unwrap_or_else(|err| {
                     error!("Failed to fetch {}: {}", address, err);
                     crate::validator::abort();

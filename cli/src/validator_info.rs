@@ -262,7 +262,7 @@ pub fn process_set_validator_info(
         info: validator_string,
     };
     // Check for existing validator-info account
-    let all_config = rpc_client.get_program_accounts_no_data(&solana_config_program::id())?;
+    let all_config = rpc_client.get_program_accounts_shared_data(&solana_config_program::id())?;
     let existing_account = all_config
         .iter()
         .filter(
@@ -369,25 +369,25 @@ pub fn process_get_validator_info(
     config: &CliConfig,
     pubkey: Option<Pubkey>,
 ) -> ProcessResult {
-    let validator_info: Vec<(Pubkey, AccountSharedData)> = if let Some(validator_info_pubkey) =
-        pubkey
-    {
-        vec![(
-            validator_info_pubkey,
-            rpc_client.get_account_no_data(&validator_info_pubkey)?,
-        )]
-    } else {
-        let all_config = rpc_client.get_program_accounts_no_data(&solana_config_program::id())?;
-        all_config
-            .into_iter()
-            .filter(|(_, validator_info_account)| {
-                match deserialize::<ConfigKeys>(&validator_info_account.data) {
-                    Ok(key_list) => key_list.keys.contains(&(validator_info::id(), false)),
-                    Err(_) => false,
-                }
-            })
-            .collect()
-    };
+    let validator_info: Vec<(Pubkey, AccountSharedData)> =
+        if let Some(validator_info_pubkey) = pubkey {
+            vec![(
+                validator_info_pubkey,
+                rpc_client.get_account_shared_data(&validator_info_pubkey)?,
+            )]
+        } else {
+            let all_config =
+                rpc_client.get_program_accounts_shared_data(&solana_config_program::id())?;
+            all_config
+                .into_iter()
+                .filter(|(_, validator_info_account)| {
+                    match deserialize::<ConfigKeys>(&validator_info_account.data) {
+                        Ok(key_list) => key_list.keys.contains(&(validator_info::id(), false)),
+                        Err(_) => false,
+                    }
+                })
+                .collect()
+        };
 
     let mut validator_info_list: Vec<CliValidatorInfo> = vec![];
     if validator_info.is_empty() {

@@ -35,11 +35,11 @@ pub fn get_account(rpc_client: &RpcClient, nonce_pubkey: &Pubkey) -> Result<Acco
     get_account_with_commitment(rpc_client, nonce_pubkey, CommitmentConfig::default())
 }
 
-pub fn get_account_no_data(
+pub fn get_account_shared_data(
     rpc_client: &RpcClient,
     nonce_pubkey: &Pubkey,
 ) -> Result<AccountSharedData, Error> {
-    get_account_no_data_with_commitment(rpc_client, nonce_pubkey, CommitmentConfig::default())
+    get_account_shared_data_with_commitment(rpc_client, nonce_pubkey, CommitmentConfig::default())
 }
 
 pub fn get_account_with_commitment(
@@ -61,7 +61,7 @@ pub fn get_account_with_commitment(
         })
 }
 
-pub fn get_account_no_data_with_commitment(
+pub fn get_account_shared_data_with_commitment(
     rpc_client: &RpcClient,
     nonce_pubkey: &Pubkey,
     commitment: CommitmentConfig,

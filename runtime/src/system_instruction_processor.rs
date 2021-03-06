@@ -500,7 +500,7 @@ mod tests {
         ))
     }
     fn create_default_rent_account() -> RefCell<AccountSharedData> {
-        RefCell::new(account::create_account_no_data(&Rent::free(), 1))
+        RefCell::new(account::create_account_shared_data(&Rent::free(), 1))
     }
 
     #[test]
@@ -1377,7 +1377,7 @@ mod tests {
                 RefCell::new(if sysvar::recent_blockhashes::check_id(&meta.pubkey) {
                     create_default_recent_blockhashes_account().into_inner()
                 } else if sysvar::rent::check_id(&meta.pubkey) {
-                    account::create_account_no_data(&Rent::free(), 1)
+                    account::create_account_shared_data(&Rent::free(), 1)
                 } else {
                     AccountSharedData::default()
                 })

@@ -620,7 +620,7 @@ fn get_vote_account(
     commitment_config: CommitmentConfig,
 ) -> Result<(AccountSharedData, VoteState), Box<dyn std::error::Error>> {
     let vote_account = rpc_client
-        .get_account_no_data_with_commitment(vote_account_pubkey, commitment_config)?
+        .get_account_shared_data_with_commitment(vote_account_pubkey, commitment_config)?
         .value
         .ok_or_else(|| {
             CliError::RpcRequestError(format!("{:?} account does not exist", vote_account_pubkey))
