@@ -76,6 +76,7 @@ pub trait AnAccountWritable: AnAccount {
     fn set_lamports(&mut self, lamports: u64);
     fn data_as_mut_slice(&mut self) -> &mut [u8];
     fn set_owner(&mut self, owner: Pubkey);
+    fn set_executable(&mut self, executable: bool);
     fn set_rent_epoch(&mut self, epoch: Epoch);
 }
 
@@ -115,6 +116,9 @@ impl AnAccountWritable for Account {
     fn set_owner(&mut self, owner: Pubkey) {
         self.owner = owner;
     }
+    fn set_executable(&mut self, executable: bool) {
+        self.executable = executable;
+    }
     fn set_rent_epoch(&mut self, epoch: Epoch) {
         self.rent_epoch = epoch;
     }
@@ -129,6 +133,9 @@ impl AnAccountWritable for AccountSharedData {
     }
     fn set_owner(&mut self, owner: Pubkey) {
         self.owner = owner;
+    }
+    fn set_executable(&mut self, executable: bool) {
+        self.executable = executable;
     }
     fn set_rent_epoch(&mut self, epoch: Epoch) {
         self.rent_epoch = epoch;
@@ -415,4 +422,160 @@ pub fn create_is_signer_account_infos<'a>(
             )
         })
         .collect()
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+
+    fn make_two_accounts(key: &Pubkey) -> (Account, AccountSharedData) {
+        let mut account1 = Account::new(1, 2, &key);
+        account1.executable = true;
+        account1.rent_epoch = 4;
+        let mut account2 = AccountSharedData::new(1, 2, key);
+        account2.executable = true;
+        account2.rent_epoch = 4;
+        assert!(accounts_equal(&account1, &account2));
+        (account1, account2)
+    }
+
+    #[test]
+    fn test_accounts_shared_data() {
+        let key = Pubkey::new_unique();
+        let (account1, account2) = make_two_accounts(&key);
+        assert!(accounts_equal(&account1, &account2));
+        let account = account1;
+        assert_eq!(account.lamports, 1);
+        assert_eq!(account.lamports(), 1);
+        assert_eq!(account.data.len(), 2);
+        assert_eq!(account.data().len(), 2);
+        assert_eq!(account.owner, key);
+        assert_eq!(account.owner(), &key);
+        assert_eq!(account.executable, true);
+        assert_eq!(account.executable(), true);
+        assert_eq!(account.rent_epoch, 4);
+        assert_eq!(account.rent_epoch(), 4);
+        let account = account2;
+        assert_eq!(account.lamports, 1);
+        assert_eq!(account.lamports(), 1);
+        assert_eq!(account.data.len(), 2);
+        assert_eq!(account.data().len(), 2);
+        assert_eq!(account.owner, key);
+        assert_eq!(account.owner(), &key);
+        assert_eq!(account.executable, true);
+        assert_eq!(account.executable(), true);
+        assert_eq!(account.rent_epoch, 4);
+        assert_eq!(account.rent_epoch(), 4);
+    }
+
+    // test clone and from for both types against expected
+    fn test_equal(
+        should_be_equal: bool,
+        account1: &Account,
+        account2: &AccountSharedData,
+        account_expected: &Account,
+    ) {
+        assert_eq!(should_be_equal, accounts_equal(account1, account2));
+        if should_be_equal {
+            assert!(accounts_equal(account_expected, account2));
+        }
+        assert_eq!(
+            accounts_equal(account_expected, account1),
+            accounts_equal(account_expected, &account1.clone())
+        );
+        assert_eq!(
+            accounts_equal(account_expected, account2),
+            accounts_equal(account_expected, &account2.clone())
+        );
+        assert_eq!(
+            accounts_equal(account_expected, account1),
+            accounts_equal(account_expected, &AccountSharedData::from(account1.clone()))
+        );
+        assert_eq!(
+            accounts_equal(account_expected, account2),
+            accounts_equal(account_expected, &Account::from(account2.clone()))
+        );
+    }
+
+    #[test]
+    fn test_accounts_shared_data2() {
+        let key = Pubkey::new_unique();
+        let key2 = Pubkey::new_unique();
+        let key3 = Pubkey::new_unique();
+        let (mut account1, mut account2) = make_two_accounts(&key);
+        assert!(accounts_equal(&account1, &account2));
+
+        let mut account_expected = account1.clone();
+        assert!(accounts_equal(&account1, &account_expected));
+        assert!(accounts_equal(&account1, &account2.clone()));
+
+        for field_index in 0..5 {
+            for pass in 0..4 {
+                if field_index == 0 {
+                    if pass == 0 {
+                        account1.lamports += 1;
+                    } else if pass == 1 {
+                        account_expected.lamports += 1;
+                        account2.set_lamports(account2.lamports + 1);
+                    } else if pass == 2 {
+                        account1.set_lamports(account1.lamports + 1);
+                    } else if pass == 3 {
+                        account_expected.lamports += 1;
+                        account2.lamports += 1;
+                    }
+                } else if field_index == 1 {
+                    if pass == 0 {
+                        account1.data[0] += 1;
+                    } else if pass == 1 {
+                        account_expected.data[0] += 1;
+                        account2.data_as_mut_slice()[0] = account2.data[0] + 1;
+                    } else if pass == 2 {
+                        account1.data_as_mut_slice()[0] = account1.data[0] + 1;
+                    } else if pass == 3 {
+                        account_expected.data[0] += 1;
+                        account2.data[0] += 1;
+                    }
+                } else if field_index == 2 {
+                    if pass == 0 {
+                        account1.owner = key2;
+                    } else if pass == 1 {
+                        account_expected.owner = key2;
+                        account2.set_owner(key2);
+                    } else if pass == 2 {
+                        account1.set_owner(key3);
+                    } else if pass == 3 {
+                        account_expected.owner = key3;
+                        account2.owner = key3;
+                    }
+                } else if field_index == 3 {
+                    if pass == 0 {
+                        account1.executable = !account1.executable;
+                    } else if pass == 1 {
+                        account_expected.executable = !account_expected.executable;
+                        account2.set_executable(!account2.executable);
+                    } else if pass == 2 {
+                        account1.set_executable(!account1.executable);
+                    } else if pass == 3 {
+                        account_expected.executable = !account_expected.executable;
+                        account2.executable = !account2.executable;
+                    }
+                } else if field_index == 4 {
+                    if pass == 0 {
+                        account1.rent_epoch += 1;
+                    } else if pass == 1 {
+                        account_expected.rent_epoch += 1;
+                        account2.set_rent_epoch(account2.rent_epoch + 1);
+                    } else if pass == 2 {
+                        account1.set_rent_epoch(account1.rent_epoch + 1);
+                    } else if pass == 3 {
+                        account_expected.rent_epoch += 1;
+                        account2.rent_epoch += 1;
+                    }
+                }
+
+                let should_be_equal = pass == 1 || pass == 3;
+                test_equal(should_be_equal, &account1, &account2, &account_expected);
+            }
+        }
+    }
 }
