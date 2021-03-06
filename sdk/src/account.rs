@@ -178,6 +178,24 @@ impl AnAccount for Ref<'_, AccountSharedData> {
     }
 }
 
+impl AnAccount for Ref<'_, Account> {
+    fn lamports(&self) -> u64 {
+        self.lamports
+    }
+    fn data(&self) -> &Vec<u8> {
+        &self.data
+    }
+    fn owner(&self) -> &Pubkey {
+        &self.owner
+    }
+    fn executable(&self) -> bool {
+        self.executable
+    }
+    fn rent_epoch(&self) -> Epoch {
+        self.rent_epoch
+    }
+}
+
 fn debug_fmt<T: AnAccount>(item: &T, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     let data_len = cmp::min(64, item.data().len());
     let data_str = if data_len > 0 {
@@ -440,7 +458,43 @@ pub mod tests {
     }
 
     #[test]
-    fn test_accounts_shared_data() {
+    #[should_panic(
+        expected = "called `Result::unwrap()` on an `Err` value: Io(Kind(UnexpectedEof))"
+    )]
+    fn test_account_deserialize() {
+        let key = Pubkey::new_unique();
+        let (account1, _account2) = make_two_accounts(&key);
+        account1.deserialize_data::<String>().unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "called `Result::unwrap()` on an `Err` value: SizeLimit")]
+    fn test_account_serialize() {
+        let key = Pubkey::new_unique();
+        let (mut account1, _account2) = make_two_accounts(&key);
+        account1.serialize_data(&"hello world").unwrap();
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "called `Result::unwrap()` on an `Err` value: Io(Kind(UnexpectedEof))"
+    )]
+    fn test_account_shared_data_deserialize() {
+        let key = Pubkey::new_unique();
+        let (_account1, account2) = make_two_accounts(&key);
+        account2.deserialize_data::<String>().unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "called `Result::unwrap()` on an `Err` value: SizeLimit")]
+    fn test_account_shared_data_serialize() {
+        let key = Pubkey::new_unique();
+        let (_account1, mut account2) = make_two_accounts(&key);
+        account2.serialize_data(&"hello world").unwrap();
+    }
+
+    #[test]
+    fn test_account_shared_data() {
         let key = Pubkey::new_unique();
         let (account1, account2) = make_two_accounts(&key);
         assert!(accounts_equal(&account1, &account2));
@@ -498,7 +552,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_accounts_shared_data2() {
+    fn test_account_shared_data_all_fields() {
         let key = Pubkey::new_unique();
         let key2 = Pubkey::new_unique();
         let key3 = Pubkey::new_unique();
@@ -575,6 +629,102 @@ pub mod tests {
 
                 let should_be_equal = pass == 1 || pass == 3;
                 test_equal(should_be_equal, &account1, &account2, &account_expected);
+
+                // test new_ref
+                if should_be_equal {
+                    assert!(accounts_equal(
+                        &Account::new_ref(
+                            account_expected.lamports(),
+                            account_expected.data().len(),
+                            account_expected.owner()
+                        )
+                        .borrow(),
+                        &AccountSharedData::new_ref(
+                            account_expected.lamports(),
+                            account_expected.data().len(),
+                            account_expected.owner()
+                        )
+                        .borrow()
+                    ));
+
+                    {
+                        // test new_data
+                        let account1_with_data = Account::new_data(
+                            account_expected.lamports(),
+                            &account_expected.data()[0],
+                            account_expected.owner(),
+                        )
+                        .unwrap();
+                        let account2_with_data = AccountSharedData::new_data(
+                            account_expected.lamports(),
+                            &account_expected.data()[0],
+                            account_expected.owner(),
+                        )
+                        .unwrap();
+
+                        assert!(accounts_equal(&account1_with_data, &account2_with_data));
+                        assert_eq!(
+                            account1_with_data.deserialize_data::<u8>().unwrap(),
+                            account2_with_data.deserialize_data::<u8>().unwrap()
+                        );
+                    }
+
+                    // test new_data_with_space
+                    assert!(accounts_equal(
+                        &Account::new_data_with_space(
+                            account_expected.lamports(),
+                            &account_expected.data()[0],
+                            1,
+                            account_expected.owner()
+                        )
+                        .unwrap(),
+                        &AccountSharedData::new_data_with_space(
+                            account_expected.lamports(),
+                            &account_expected.data()[0],
+                            1,
+                            account_expected.owner()
+                        )
+                        .unwrap()
+                    ));
+
+                    // test new_ref_data
+                    assert!(accounts_equal(
+                        &Account::new_ref_data(
+                            account_expected.lamports(),
+                            &account_expected.data()[0],
+                            account_expected.owner()
+                        )
+                        .unwrap()
+                        .borrow(),
+                        &AccountSharedData::new_ref_data(
+                            account_expected.lamports(),
+                            &account_expected.data()[0],
+                            account_expected.owner()
+                        )
+                        .unwrap()
+                        .borrow()
+                    ));
+
+                    //new_ref_data_with_space
+                    assert!(accounts_equal(
+                        &Account::new_ref_data_with_space(
+                            account_expected.lamports(),
+                            &account_expected.data()[0],
+                            1,
+                            account_expected.owner()
+                        )
+                        .unwrap()
+                        .borrow(),
+                        &AccountSharedData::new_ref_data_with_space(
+                            account_expected.lamports(),
+                            &account_expected.data()[0],
+                            1,
+                            account_expected.owner()
+                        )
+                        .unwrap()
+                        .borrow()
+                    ));
+                }
             }
         }
     }
