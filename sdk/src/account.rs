@@ -78,6 +78,13 @@ pub trait AnAccountWritable: AnAccount {
     fn set_owner(&mut self, owner: Pubkey);
     fn set_executable(&mut self, executable: bool);
     fn set_rent_epoch(&mut self, epoch: Epoch);
+    fn create(
+        lamports: u64,
+        data: Vec<u8>,
+        owner: Pubkey,
+        executable: bool,
+        rent_epoch: Epoch,
+    ) -> Self;
 }
 
 pub trait AnAccount: Sized {
@@ -122,6 +129,21 @@ impl AnAccountWritable for Account {
     fn set_rent_epoch(&mut self, epoch: Epoch) {
         self.rent_epoch = epoch;
     }
+    fn create(
+        lamports: u64,
+        data: Vec<u8>,
+        owner: Pubkey,
+        executable: bool,
+        rent_epoch: Epoch,
+    ) -> Self {
+        Account {
+            lamports,
+            data,
+            owner,
+            executable,
+            rent_epoch,
+        }
+    }
 }
 
 impl AnAccountWritable for AccountSharedData {
@@ -139,6 +161,21 @@ impl AnAccountWritable for AccountSharedData {
     }
     fn set_rent_epoch(&mut self, epoch: Epoch) {
         self.rent_epoch = epoch;
+    }
+    fn create(
+        lamports: u64,
+        data: Vec<u8>,
+        owner: Pubkey,
+        executable: bool,
+        rent_epoch: Epoch,
+    ) -> Self {
+        AccountSharedData {
+            lamports,
+            data,
+            owner,
+            executable,
+            rent_epoch,
+        }
     }
 }
 
