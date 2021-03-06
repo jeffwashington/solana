@@ -552,6 +552,7 @@ pub mod tests {
     }
 
     #[test]
+    #[allow(clippy::redundant_clone)]
     fn test_account_shared_data_all_fields() {
         let key = Pubkey::new_unique();
         let key2 = Pubkey::new_unique();
@@ -561,7 +562,7 @@ pub mod tests {
 
         let mut account_expected = account1.clone();
         assert!(accounts_equal(&account1, &account_expected));
-        assert!(accounts_equal(&account1, &account2.clone()));
+        assert!(accounts_equal(&account1, &account2.clone())); // test the clone here
 
         for field_index in 0..5 {
             for pass in 0..4 {
