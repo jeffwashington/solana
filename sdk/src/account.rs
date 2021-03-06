@@ -264,51 +264,115 @@ impl fmt::Debug for AccountSharedData {
     }
 }
 
+fn shared_new<T: AnAccountWritable>(lamports: u64, space: usize, owner: &Pubkey) -> T {
+    T::create(
+        lamports,
+        vec![0u8; space],
+        *owner,
+        bool::default(),
+        Epoch::default(),
+    )
+}
+
+fn shared_new_ref<T: AnAccountWritable>(
+    lamports: u64,
+    space: usize,
+    owner: &Pubkey,
+) -> Rc<RefCell<T>> {
+    Rc::new(RefCell::new(shared_new::<T>(lamports, space, owner)))
+}
+
+fn shared_new_data<T: serde::Serialize, U: AnAccountWritable>(
+    lamports: u64,
+    state: &T,
+    owner: &Pubkey,
+) -> Result<U, bincode::Error> {
+    let data = bincode::serialize(state)?;
+    Ok(U::create(
+        lamports,
+        data,
+        *owner,
+        bool::default(),
+        Epoch::default(),
+    ))
+}
+fn shared_new_ref_data<T: serde::Serialize, U: AnAccountWritable>(
+    lamports: u64,
+    state: &T,
+    owner: &Pubkey,
+) -> Result<RefCell<U>, bincode::Error> {
+    Ok(RefCell::new(shared_new_data::<T, U>(
+        lamports, state, owner,
+    )?))
+}
+
+fn shared_new_data_with_space<T: serde::Serialize, U: AnAccountWritable>(
+    lamports: u64,
+    state: &T,
+    space: usize,
+    owner: &Pubkey,
+) -> Result<U, bincode::Error> {
+    let mut account = shared_new::<U>(lamports, space, owner);
+
+    shared_serialize_data(&mut account, state)?;
+
+    Ok(account)
+}
+fn shared_new_ref_data_with_space<T: serde::Serialize, U: AnAccountWritable>(
+    lamports: u64,
+    state: &T,
+    space: usize,
+    owner: &Pubkey,
+) -> Result<RefCell<U>, bincode::Error> {
+    Ok(RefCell::new(shared_new_data_with_space::<T, U>(
+        lamports, state, space, owner,
+    )?))
+}
+
+fn shared_deserialize_data<T: serde::de::DeserializeOwned, U: AnAccount>(
+    account: &U,
+) -> Result<T, bincode::Error> {
+    bincode::deserialize(account.data())
+}
+
+fn shared_serialize_data<T: serde::Serialize, U: AnAccountWritable>(
+    account: &mut U,
+    state: &T,
+) -> Result<(), bincode::Error> {
+    if bincode::serialized_size(state)? > account.data().len() as u64 {
+        return Err(Box::new(bincode::ErrorKind::SizeLimit));
+    }
+    bincode::serialize_into(&mut account.data_as_mut_slice(), state)
+}
+
 impl Account {
     pub fn new(lamports: u64, space: usize, owner: &Pubkey) -> Self {
-        Self {
-            lamports,
-            data: vec![0u8; space],
-            owner: *owner,
-            ..Self::default()
-        }
+        shared_new(lamports, space, owner)
     }
     pub fn new_ref(lamports: u64, space: usize, owner: &Pubkey) -> Rc<RefCell<Self>> {
-        Rc::new(RefCell::new(Self::new(lamports, space, owner)))
+        shared_new_ref(lamports, space, owner)
     }
-
     pub fn new_data<T: serde::Serialize>(
         lamports: u64,
         state: &T,
         owner: &Pubkey,
     ) -> Result<Self, bincode::Error> {
-        let data = bincode::serialize(state)?;
-        Ok(Self {
-            lamports,
-            data,
-            owner: *owner,
-            ..Self::default()
-        })
+        shared_new_data(lamports, state, owner)
     }
     pub fn new_ref_data<T: serde::Serialize>(
         lamports: u64,
         state: &T,
         owner: &Pubkey,
     ) -> Result<RefCell<Self>, bincode::Error> {
-        Ok(RefCell::new(Self::new_data(lamports, state, owner)?))
+        shared_new_ref_data(lamports, state, owner)
     }
-
     pub fn new_data_with_space<T: serde::Serialize>(
         lamports: u64,
         state: &T,
         space: usize,
         owner: &Pubkey,
     ) -> Result<Self, bincode::Error> {
-        let mut account = Self::new(lamports, space, owner);
-
-        account.serialize_data(state)?;
-
-        Ok(account)
+        shared_new_data_with_space(lamports, state, space, owner)
     }
     pub fn new_ref_data_with_space<T: serde::Serialize>(
         lamports: u64,
@@ -316,68 +380,44 @@ impl Account {
         space: usize,
         owner: &Pubkey,
     ) -> Result<RefCell<Self>, bincode::Error> {
-        Ok(RefCell::new(Self::new_data_with_space(
-            lamports, state, space, owner,
-        )?))
+        shared_new_ref_data_with_space(lamports, state, space, owner)
     }
-
     pub fn deserialize_data<T: serde::de::DeserializeOwned>(&self) -> Result<T, bincode::Error> {
-        bincode::deserialize(&self.data)
+        shared_deserialize_data(self)
     }
-
     pub fn serialize_data<T: serde::Serialize>(&mut self, state: &T) -> Result<(), bincode::Error> {
-        if bincode::serialized_size(state)? > self.data.len() as u64 {
-            return Err(Box::new(bincode::ErrorKind::SizeLimit));
-        }
-        bincode::serialize_into(&mut self.data[..], state)
+        shared_serialize_data(self, state)
     }
 }
 
 impl AccountSharedData {
     pub fn new(lamports: u64, space: usize, owner: &Pubkey) -> Self {
-        Self {
-            lamports,
-            data: vec![0u8; space],
-            owner: *owner,
-            ..Self::default()
-        }
+        shared_new(lamports, space, owner)
     }
     pub fn new_ref(lamports: u64, space: usize, owner: &Pubkey) -> Rc<RefCell<Self>> {
-        Rc::new(RefCell::new(Self::new(lamports, space, owner)))
+        shared_new_ref(lamports, space, owner)
     }
-
     pub fn new_data<T: serde::Serialize>(
         lamports: u64,
         state: &T,
         owner: &Pubkey,
     ) -> Result<Self, bincode::Error> {
-        let data = bincode::serialize(state)?;
-        Ok(Self {
-            lamports,
-            data,
-            owner: *owner,
-            ..Self::default()
-        })
+        shared_new_data(lamports, state, owner)
     }
     pub fn new_ref_data<T: serde::Serialize>(
         lamports: u64,
         state: &T,
         owner: &Pubkey,
     ) -> Result<RefCell<Self>, bincode::Error> {
-        Ok(RefCell::new(Self::new_data(lamports, state, owner)?))
+        shared_new_ref_data(lamports, state, owner)
     }
-
     pub fn new_data_with_space<T: serde::Serialize>(
         lamports: u64,
         state: &T,
         space: usize,
         owner: &Pubkey,
     ) -> Result<Self, bincode::Error> {
-        let mut account = Self::new(lamports, space, owner);
-
-        account.serialize_data(state)?;
-
-        Ok(account)
+        shared_new_data_with_space(lamports, state, space, owner)
     }
     pub fn new_ref_data_with_space<T: serde::Serialize>(
         lamports: u64,
@@ -385,20 +425,13 @@ impl AccountSharedData {
         space: usize,
         owner: &Pubkey,
     ) -> Result<RefCell<Self>, bincode::Error> {
-        Ok(RefCell::new(Self::new_data_with_space(
-            lamports, state, space, owner,
-        )?))
+        shared_new_ref_data_with_space(lamports, state, space, owner)
     }
-
     pub fn deserialize_data<T: serde::de::DeserializeOwned>(&self) -> Result<T, bincode::Error> {
-        bincode::deserialize(&self.data)
+        shared_deserialize_data(self)
     }
-
     pub fn serialize_data<T: serde::Serialize>(&mut self, state: &T) -> Result<(), bincode::Error> {
-        if bincode::serialized_size(state)? > self.data.len() as u64 {
-            return Err(Box::new(bincode::ErrorKind::SizeLimit));
-        }
-        bincode::serialize_into(&mut self.data[..], state)
+        shared_serialize_data(self, state)
     }
 }
 
