@@ -17,7 +17,7 @@ pub mod validator_info;
 use {
     crate::parse_account_data::{parse_account_data, AccountAdditionalData, ParsedAccount},
     solana_sdk::{
-        account::Account, account::AccountNoData, clock::Epoch, fee_calculator::FeeCalculator,
+        account::Account, account::AccountSharedData, clock::Epoch, fee_calculator::FeeCalculator,
         pubkey::Pubkey,
     },
     std::{
@@ -62,7 +62,7 @@ pub enum UiAccountEncoding {
 impl UiAccount {
     pub fn encode(
         pubkey: &Pubkey,
-        account: AccountNoData,
+        account: AccountSharedData,
         encoding: UiAccountEncoding,
         additional_data: Option<AccountAdditionalData>,
         data_slice_config: Option<UiDataSliceConfig>,
@@ -111,9 +111,9 @@ impl UiAccount {
         }
     }
 
-    pub fn decode(&self) -> Option<AccountNoData> {
+    pub fn decode(&self) -> Option<AccountSharedData> {
         let result = self.decode_legacy()?;
-        Some(AccountNoData::from(result))
+        Some(AccountSharedData::from(result))
     }
 
     pub fn decode_legacy(&self) -> Option<Account> {
@@ -226,9 +226,9 @@ mod test {
     fn test_base64_zstd() {
         let encoded_account = UiAccount::encode(
             &Pubkey::default(),
-            AccountNoData {
+            AccountSharedData {
                 data: vec![0; 1024],
-                ..AccountNoData::default()
+                ..AccountSharedData::default()
             },
             UiAccountEncoding::Base64Zstd,
             None,
@@ -247,9 +247,9 @@ mod test {
     fn test_base64_zstd_no_data() {
         let encoded_account = UiAccount::encode(
             &Pubkey::default(),
-            AccountNoData {
+            AccountSharedData {
                 data: vec![0; 1024],
-                ..AccountNoData::default()
+                ..AccountSharedData::default()
             },
             UiAccountEncoding::Base64Zstd,
             None,

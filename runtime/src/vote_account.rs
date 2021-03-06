@@ -1,7 +1,7 @@
 use serde::de::{Deserialize, Deserializer};
 use serde::ser::{Serialize, Serializer};
 use solana_sdk::{
-    account::Account, account::AccountNoData, instruction::InstructionError, pubkey::Pubkey,
+    account::Account, account::AccountSharedData, instruction::InstructionError, pubkey::Pubkey,
 };
 use solana_vote_program::vote_state::VoteState;
 use std::{
@@ -169,13 +169,13 @@ impl<'de> Deserialize<'de> for ArcVoteAccount {
     where
         D: Deserializer<'de>,
     {
-        let account = AccountNoData::deserialize(deserializer)?;
+        let account = AccountSharedData::deserialize(deserializer)?;
         Ok(Self::from(account))
     }
 }
 
-impl From<AccountNoData> for ArcVoteAccount {
-    fn from(account: AccountNoData) -> Self {
+impl From<AccountSharedData> for ArcVoteAccount {
+    fn from(account: AccountSharedData) -> Self {
         Self(Arc::new(VoteAccount::from(account)))
     }
 }
@@ -185,8 +185,8 @@ impl From<Account> for ArcVoteAccount {
     }
 }
 
-impl From<AccountNoData> for VoteAccount {
-    fn from(account: AccountNoData) -> Self {
+impl From<AccountSharedData> for VoteAccount {
+    fn from(account: AccountSharedData) -> Self {
         Self {
             account: Account::from(account),
             vote_state: RwLock::new(INVALID_VOTE_STATE),
@@ -316,7 +316,7 @@ mod tests {
     fn new_rand_vote_account<R: Rng>(
         rng: &mut R,
         node_pubkey: Option<Pubkey>,
-    ) -> (AccountNoData, VoteState) {
+    ) -> (AccountSharedData, VoteState) {
         let vote_init = VoteInit {
             node_pubkey: node_pubkey.unwrap_or_else(Pubkey::new_unique),
             authorized_voter: Pubkey::new_unique(),
@@ -331,7 +331,7 @@ mod tests {
             unix_timestamp: rng.gen(),
         };
         let vote_state = VoteState::new(&vote_init, &clock);
-        let account = AccountNoData::new_data(
+        let account = AccountSharedData::new_data(
             rng.gen(), // lamports
             &VoteStateVersions::new_current(vote_state.clone()),
             &Pubkey::new_unique(), // owner

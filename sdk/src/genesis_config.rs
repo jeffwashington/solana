@@ -4,7 +4,7 @@
 
 use crate::{
     account::Account,
-    account::AccountNoData,
+    account::AccountSharedData,
     clock::{UnixTimestamp, DEFAULT_TICKS_PER_SLOT},
     epoch_schedule::EpochSchedule,
     fee_calculator::FeeRateGovernor,
@@ -99,7 +99,7 @@ pub fn create_genesis_config(lamports: u64) -> (GenesisConfig, Keypair) {
         GenesisConfig::new(
             &[(
                 faucet_keypair.pubkey(),
-                AccountNoData::new(lamports, 0, &system_program::id()),
+                AccountSharedData::new(lamports, 0, &system_program::id()),
             )],
             &[],
         ),
@@ -132,7 +132,7 @@ impl Default for GenesisConfig {
 
 impl GenesisConfig {
     pub fn new(
-        accounts: &[(Pubkey, AccountNoData)],
+        accounts: &[(Pubkey, AccountSharedData)],
         native_instruction_processors: &[(String, Pubkey)],
     ) -> Self {
         Self {
@@ -203,7 +203,7 @@ impl GenesisConfig {
         file.write_all(&serialized)
     }
 
-    pub fn add_account(&mut self, pubkey: Pubkey, account: AccountNoData) {
+    pub fn add_account(&mut self, pubkey: Pubkey, account: AccountSharedData) {
         self.accounts.insert(pubkey, Account::from(account));
     }
 
@@ -317,11 +317,11 @@ mod tests {
         let mut config = GenesisConfig::default();
         config.add_account(
             faucet_keypair.pubkey(),
-            AccountNoData::new(10_000, 0, &Pubkey::default()),
+            AccountSharedData::new(10_000, 0, &Pubkey::default()),
         );
         config.add_account(
             solana_sdk::pubkey::new_rand(),
-            AccountNoData::new(1, 0, &Pubkey::default()),
+            AccountSharedData::new(1, 0, &Pubkey::default()),
         );
         config.add_native_instruction_processor("hi".to_string(), solana_sdk::pubkey::new_rand());
 

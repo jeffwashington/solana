@@ -1,7 +1,7 @@
 use crate::bank::Bank;
 use solana_sdk::{
     account::Account,
-    account::AccountNoData,
+    account::AccountSharedData,
     client::{AsyncClient, Client, SyncClient},
     commitment_config::CommitmentConfig,
     epoch_info::EpochInfo,
@@ -133,7 +133,7 @@ impl SyncClient for BankClient {
         &self,
         pubkey: &Pubkey,
         _commitment_config: CommitmentConfig,
-    ) -> Result<Option<AccountNoData>> {
+    ) -> Result<Option<AccountSharedData>> {
         Ok(self.bank.get_account(pubkey))
     }
 

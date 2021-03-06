@@ -1,10 +1,13 @@
-use crate::account::{create_account_no_data, to_account, AccountNoData};
+use crate::account::{create_account_no_data, to_account, AccountSharedData};
 use solana_program::sysvar::recent_blockhashes::{
     IntoIterSorted, IterItem, RecentBlockhashes, MAX_ENTRIES,
 };
 use std::{collections::BinaryHeap, iter::FromIterator};
 
-pub fn update_account<'a, I>(account: &mut AccountNoData, recent_blockhash_iter: I) -> Option<()>
+pub fn update_account<'a, I>(
+    account: &mut AccountSharedData,
+    recent_blockhash_iter: I,
+) -> Option<()>
 where
     I: IntoIterator<Item = IterItem<'a>>,
 {
@@ -15,7 +18,7 @@ where
     to_account(&recent_blockhashes, account)
 }
 
-pub fn create_account_with_data<'a, I>(lamports: u64, recent_blockhash_iter: I) -> AccountNoData
+pub fn create_account_with_data<'a, I>(lamports: u64, recent_blockhash_iter: I) -> AccountSharedData
 where
     I: IntoIterator<Item = IterItem<'a>>,
 {

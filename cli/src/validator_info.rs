@@ -19,7 +19,7 @@ use solana_client::rpc_client::RpcClient;
 use solana_config_program::{config_instruction, get_config_data, ConfigKeys, ConfigState};
 use solana_remote_wallet::remote_wallet::RemoteWalletManager;
 use solana_sdk::{
-    account::AccountNoData,
+    account::AccountSharedData,
     message::Message,
     pubkey::Pubkey,
     signature::{Keypair, Signer},
@@ -111,7 +111,7 @@ fn parse_args(matches: &ArgMatches<'_>) -> Value {
 
 fn parse_validator_info(
     pubkey: &Pubkey,
-    account: &AccountNoData,
+    account: &AccountSharedData,
 ) -> Result<(Pubkey, Map<String, serde_json::value::Value>), Box<dyn error::Error>> {
     if account.owner != solana_config_program::id() {
         return Err(format!("{} is not a validator info account", pubkey).into());
@@ -369,7 +369,9 @@ pub fn process_get_validator_info(
     config: &CliConfig,
     pubkey: Option<Pubkey>,
 ) -> ProcessResult {
-    let validator_info: Vec<(Pubkey, AccountNoData)> = if let Some(validator_info_pubkey) = pubkey {
+    let validator_info: Vec<(Pubkey, AccountSharedData)> = if let Some(validator_info_pubkey) =
+        pubkey
+    {
         vec![(
             validator_info_pubkey,
             rpc_client.get_account_no_data(&validator_info_pubkey)?,
@@ -496,10 +498,10 @@ mod tests {
         assert_eq!(
             parse_validator_info(
                 &Pubkey::default(),
-                &AccountNoData {
+                &AccountSharedData {
                     owner: solana_config_program::id(),
                     data,
-                    ..AccountNoData::default()
+                    ..AccountSharedData::default()
                 }
             )
             .unwrap(),

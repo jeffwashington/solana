@@ -8,7 +8,7 @@ use bincode::{serialize_into, serialized_size};
 use log::*;
 use solana_sdk::{
     account::Account,
-    account::AccountNoData,
+    account::AccountSharedData,
     client::{AsyncClient, Client, SyncClient},
     clock::{Slot, MAX_PROCESSING_AGE},
     commitment_config::CommitmentConfig,
@@ -385,7 +385,7 @@ impl SyncClient for ThinClient {
         &self,
         pubkey: &Pubkey,
         commitment_config: CommitmentConfig,
-    ) -> TransportResult<Option<AccountNoData>> {
+    ) -> TransportResult<Option<AccountSharedData>> {
         self.rpc_client()
             .get_account_no_data_with_commitment(pubkey, commitment_config)
             .map_err(|e| e.into())

@@ -26,7 +26,7 @@ pub struct Account {
 /// The existing 'Account' structure cannot easily change due to downstream projects.
 /// This struct will shortly rely on something like the AnAccount trait for access to the fields.
 #[derive(Serialize, Deserialize, PartialEq, Eq, Clone, Default, AbiExample)]
-pub struct AccountNoData {
+pub struct AccountSharedData {
     /// lamports in the account
     pub lamports: u64,
     /// data held in this account
@@ -48,8 +48,8 @@ pub fn accounts_equal<T: AnAccount, U: AnAccount>(me: &T, other: &U) -> bool {
         && me.rent_epoch() == other.rent_epoch()
 }
 
-impl From<AccountNoData> for Account {
-    fn from(other: AccountNoData) -> Self {
+impl From<AccountSharedData> for Account {
+    fn from(other: AccountSharedData) -> Self {
         Self {
             lamports: other.lamports,
             data: other.data,
@@ -60,7 +60,7 @@ impl From<AccountNoData> for Account {
     }
 }
 
-impl From<Account> for AccountNoData {
+impl From<Account> for AccountSharedData {
     fn from(other: Account) -> Self {
         Self {
             lamports: other.lamports,
@@ -120,7 +120,7 @@ impl AnAccountWritable for Account {
     }
 }
 
-impl AnAccountWritable for AccountNoData {
+impl AnAccountWritable for AccountSharedData {
     fn set_lamports(&mut self, lamports: u64) {
         self.lamports = lamports;
     }
@@ -135,7 +135,7 @@ impl AnAccountWritable for AccountNoData {
     }
 }
 
-impl AnAccount for AccountNoData {
+impl AnAccount for AccountSharedData {
     fn lamports(&self) -> u64 {
         self.lamports
     }
@@ -153,7 +153,7 @@ impl AnAccount for AccountNoData {
     }
 }
 
-impl AnAccount for Ref<'_, AccountNoData> {
+impl AnAccount for Ref<'_, AccountSharedData> {
     fn lamports(&self) -> u64 {
         self.lamports
     }
@@ -196,7 +196,7 @@ impl fmt::Debug for Account {
     }
 }
 
-impl fmt::Debug for AccountNoData {
+impl fmt::Debug for AccountSharedData {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         debug_fmt(self, f)
     }
@@ -271,7 +271,7 @@ impl Account {
     }
 }
 
-impl AccountNoData {
+impl AccountSharedData {
     pub fn new(lamports: u64, space: usize, owner: &Pubkey) -> Self {
         Self {
             lamports,
@@ -349,8 +349,8 @@ pub fn create_account<S: Sysvar>(sysvar: &S, lamports: u64) -> Account {
 }
 
 /// Create an `Account` from a `Sysvar`.
-pub fn create_account_no_data<S: Sysvar>(sysvar: &S, lamports: u64) -> AccountNoData {
-    AccountNoData::from(create_account(sysvar, lamports))
+pub fn create_account_no_data<S: Sysvar>(sysvar: &S, lamports: u64) -> AccountSharedData {
+    AccountSharedData::from(create_account(sysvar, lamports))
 }
 
 /// Create a `Sysvar` from an `Account`'s data.
@@ -365,7 +365,7 @@ pub fn to_account<S: Sysvar, T: AnAccountWritable>(sysvar: &S, account: &mut T) 
 
 /// Return the information required to construct an `AccountInfo`.  Used by the
 /// `AccountInfo` conversion implementations.
-impl solana_program::account_info::Account for AccountNoData {
+impl solana_program::account_info::Account for AccountSharedData {
     fn get(&mut self) -> (&mut u64, &mut [u8], &Pubkey, bool, Epoch) {
         (
             &mut self.lamports,
@@ -392,7 +392,7 @@ impl solana_program::account_info::Account for Account {
 }
 
 /// Create `AccountInfo`s
-pub fn create_account_infos(accounts: &mut [(Pubkey, AccountNoData)]) -> Vec<AccountInfo> {
+pub fn create_account_infos(accounts: &mut [(Pubkey, AccountSharedData)]) -> Vec<AccountInfo> {
     accounts.iter_mut().map(Into::into).collect()
 }
 

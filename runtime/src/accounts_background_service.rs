@@ -424,7 +424,7 @@ mod test {
     use super::*;
     use crate::genesis_utils::create_genesis_config;
     use crossbeam_channel::unbounded;
-    use solana_sdk::{account::AccountNoData, pubkey::Pubkey};
+    use solana_sdk::{account::AccountSharedData, pubkey::Pubkey};
 
     #[test]
     fn test_accounts_background_service_remove_dead_slots() {
@@ -440,7 +440,7 @@ mod test {
         let account_key = Pubkey::new_unique();
         bank0.store_account(
             &account_key,
-            &AccountNoData::new(264, 0, &Pubkey::default()),
+            &AccountSharedData::new(264, 0, &Pubkey::default()),
         );
         assert!(bank0.get_account(&account_key).is_some());
         pruned_banks_sender.send(0).unwrap();

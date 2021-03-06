@@ -321,7 +321,7 @@ mod test {
         create_genesis_config_with_vote_accounts, GenesisConfigInfo, ValidatorVoteKeypairs,
     };
     use solana_sdk::{
-        account::AccountNoData,
+        account::AccountSharedData,
         fee_calculator::FeeCalculator,
         genesis_config::create_genesis_config,
         nonce,
@@ -530,7 +530,7 @@ mod test {
                 fee_calculator: FeeCalculator::new(42),
             }));
         let nonce_account =
-            AccountNoData::new_data(43, &nonce_state, &system_program::id()).unwrap();
+            AccountSharedData::new_data(43, &nonce_state, &system_program::id()).unwrap();
         root_bank.store_account(&nonce_address, &nonce_account);
 
         let working_bank = Arc::new(Bank::new_from_parent(&root_bank, &Pubkey::default(), 2));
@@ -755,7 +755,7 @@ mod test {
                 fee_calculator: FeeCalculator::new(42),
             }));
         let nonce_account =
-            AccountNoData::new_data(43, &new_nonce_state, &system_program::id()).unwrap();
+            AccountSharedData::new_data(43, &new_nonce_state, &system_program::id()).unwrap();
         working_bank.store_account(&nonce_address, &nonce_account);
         let result = SendTransactionService::process_transactions(
             &working_bank,

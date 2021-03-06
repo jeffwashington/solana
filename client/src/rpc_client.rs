@@ -22,7 +22,7 @@ use solana_account_decoder::{
 };
 use solana_sdk::{
     account::Account,
-    account::AccountNoData,
+    account::AccountSharedData,
     clock::{Slot, UnixTimestamp, DEFAULT_MS_PER_SLOT, MAX_HASH_AGE_IN_SECONDS},
     commitment_config::{CommitmentConfig, CommitmentLevel},
     epoch_info::EpochInfo,
@@ -731,7 +731,7 @@ impl RpcClient {
 
     /// Note that `get_account` returns `Err(..)` if the account does not exist whereas
     /// `get_account_with_commitment` returns `Ok(None)` if the account does not exist.
-    pub fn get_account_no_data(&self, pubkey: &Pubkey) -> ClientResult<AccountNoData> {
+    pub fn get_account_no_data(&self, pubkey: &Pubkey) -> ClientResult<AccountSharedData> {
         self.get_account_no_data_with_commitment(pubkey, self.commitment_config)?
             .value
             .ok_or_else(|| RpcError::ForUser(format!("AccountNotFound: pubkey={}", pubkey)).into())
@@ -782,12 +782,12 @@ impl RpcClient {
         &self,
         pubkey: &Pubkey,
         commitment_config: CommitmentConfig,
-    ) -> RpcResult<Option<AccountNoData>> {
+    ) -> RpcResult<Option<AccountSharedData>> {
         let result = self.get_account_with_commitment(pubkey, commitment_config)?;
         if let Some(account) = result.value {
             Ok(Response {
                 context: result.context,
-                value: Some(AccountNoData::from(account)),
+                value: Some(AccountSharedData::from(account)),
             })
         } else {
             Ok(Response {
@@ -888,7 +888,7 @@ impl RpcClient {
     pub fn get_program_accounts_no_data(
         &self,
         pubkey: &Pubkey,
-    ) -> ClientResult<Vec<(Pubkey, AccountNoData)>> {
+    ) -> ClientResult<Vec<(Pubkey, AccountSharedData)>> {
         self.get_program_accounts_no_data_with_config(
             pubkey,
             RpcProgramAccountsConfig {
@@ -928,7 +928,7 @@ impl RpcClient {
         &self,
         pubkey: &Pubkey,
         config: RpcProgramAccountsConfig,
-    ) -> ClientResult<Vec<(Pubkey, AccountNoData)>> {
+    ) -> ClientResult<Vec<(Pubkey, AccountSharedData)>> {
         let commitment = config.account_config.commitment.unwrap_or_default();
         let commitment = self.maybe_map_commitment(commitment)?;
         let account_config = RpcAccountInfoConfig {
@@ -1637,8 +1637,8 @@ fn parse_keyed_accounts(
 fn parse_keyed_accounts_no_data(
     accounts: Vec<RpcKeyedAccount>,
     request: RpcRequest,
-) -> ClientResult<Vec<(Pubkey, AccountNoData)>> {
-    let mut pubkey_accounts: Vec<(Pubkey, AccountNoData)> = Vec::new();
+) -> ClientResult<Vec<(Pubkey, AccountSharedData)>> {
+    let mut pubkey_accounts: Vec<(Pubkey, AccountSharedData)> = Vec::new();
     for RpcKeyedAccount { pubkey, account } in accounts.into_iter() {
         let pubkey = pubkey.parse().map_err(|_| {
             ClientError::new_with_request(

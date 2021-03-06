@@ -138,7 +138,7 @@ mod tests {
     use super::*;
     use solana_sdk::{
         account::Account,
-        account::AccountNoData,
+        account::AccountSharedData,
         epoch_schedule::EpochSchedule,
         genesis_config::{ClusterType, GenesisConfig},
     };
@@ -215,7 +215,7 @@ mod tests {
         for key in non_circulating_accounts {
             bank.store_account(
                 &key,
-                &AccountNoData::new(new_balance, 0, &Pubkey::default()),
+                &AccountSharedData::new(new_balance, 0, &Pubkey::default()),
             );
         }
         let non_circulating_supply = calculate_non_circulating_supply(&bank);

@@ -1,5 +1,5 @@
 //! useful extras for Account state
-use crate::{account::Account, account::AccountNoData, instruction::InstructionError};
+use crate::{account::Account, account::AccountSharedData, instruction::InstructionError};
 use bincode::ErrorKind;
 use std::cell::Ref;
 
@@ -29,7 +29,7 @@ where
     }
 }
 
-impl<T> StateMut<T> for AccountNoData
+impl<T> StateMut<T> for AccountSharedData
 where
     T: serde::Serialize + serde::de::DeserializeOwned,
 {
@@ -45,7 +45,7 @@ where
     }
 }
 
-impl<T> StateMut<T> for Ref<'_, AccountNoData>
+impl<T> StateMut<T> for Ref<'_, AccountSharedData>
 where
     T: serde::Serialize + serde::de::DeserializeOwned,
 {
@@ -61,17 +61,17 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{account::AccountNoData, pubkey::Pubkey};
+    use crate::{account::AccountSharedData, pubkey::Pubkey};
 
     #[test]
     fn test_account_state() {
         let state = 42u64;
 
-        assert!(AccountNoData::default().set_state(&state).is_err());
-        let res = AccountNoData::default().state() as Result<u64, InstructionError>;
+        assert!(AccountSharedData::default().set_state(&state).is_err());
+        let res = AccountSharedData::default().state() as Result<u64, InstructionError>;
         assert!(res.is_err());
 
-        let mut account = AccountNoData::new(0, std::mem::size_of::<u64>(), &Pubkey::default());
+        let mut account = AccountSharedData::new(0, std::mem::size_of::<u64>(), &Pubkey::default());
 
         assert!(account.set_state(&state).is_ok());
         let stored_state: u64 = account.state().unwrap();

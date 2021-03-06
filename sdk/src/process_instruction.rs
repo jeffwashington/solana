@@ -1,5 +1,5 @@
 use solana_sdk::{
-    account::AccountNoData,
+    account::AccountSharedData,
     instruction::{CompiledInstruction, Instruction, InstructionError},
     keyed_account::KeyedAccount,
     message::Message,
@@ -36,7 +36,7 @@ pub trait InvokeContext {
         &mut self,
         message: &Message,
         instruction: &CompiledInstruction,
-        accounts: &[Rc<RefCell<AccountNoData>>],
+        accounts: &[Rc<RefCell<AccountSharedData>>],
         caller_pivileges: Option<&[bool]>,
     ) -> Result<(), InstructionError>;
     /// Get the program ID of the currently executing program
@@ -59,7 +59,7 @@ pub trait InvokeContext {
     /// Get the bank's active feature set
     fn is_feature_active(&self, feature_id: &Pubkey) -> bool;
     /// Get an account from a pre-account
-    fn get_account(&self, pubkey: &Pubkey) -> Option<RefCell<AccountNoData>>;
+    fn get_account(&self, pubkey: &Pubkey) -> Option<RefCell<AccountSharedData>>;
     /// Update timing
     fn update_timing(
         &mut self,
@@ -305,7 +305,7 @@ impl InvokeContext for MockInvokeContext {
         &mut self,
         _message: &Message,
         _instruction: &CompiledInstruction,
-        _accounts: &[Rc<RefCell<AccountNoData>>],
+        _accounts: &[Rc<RefCell<AccountSharedData>>],
         _caller_pivileges: Option<&[bool]>,
     ) -> Result<(), InstructionError> {
         Ok(())
@@ -333,7 +333,7 @@ impl InvokeContext for MockInvokeContext {
     fn is_feature_active(&self, _feature_id: &Pubkey) -> bool {
         true
     }
-    fn get_account(&self, _pubkey: &Pubkey) -> Option<RefCell<AccountNoData>> {
+    fn get_account(&self, _pubkey: &Pubkey) -> Option<RefCell<AccountSharedData>> {
         None
     }
     fn update_timing(

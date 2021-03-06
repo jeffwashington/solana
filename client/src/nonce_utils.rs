@@ -1,7 +1,7 @@
 use crate::rpc_client::RpcClient;
 use solana_sdk::{
     account::Account,
-    account::AccountNoData,
+    account::AccountSharedData,
     account::AnAccount,
     account_utils::StateMut,
     commitment_config::CommitmentConfig,
@@ -38,7 +38,7 @@ pub fn get_account(rpc_client: &RpcClient, nonce_pubkey: &Pubkey) -> Result<Acco
 pub fn get_account_no_data(
     rpc_client: &RpcClient,
     nonce_pubkey: &Pubkey,
-) -> Result<AccountNoData, Error> {
+) -> Result<AccountSharedData, Error> {
     get_account_no_data_with_commitment(rpc_client, nonce_pubkey, CommitmentConfig::default())
 }
 
@@ -65,8 +65,8 @@ pub fn get_account_no_data_with_commitment(
     rpc_client: &RpcClient,
     nonce_pubkey: &Pubkey,
     commitment: CommitmentConfig,
-) -> Result<AccountNoData, Error> {
-    Ok(AccountNoData::from(get_account_with_commitment(
+) -> Result<AccountSharedData, Error> {
+    Ok(AccountSharedData::from(get_account_with_commitment(
         rpc_client,
         nonce_pubkey,
         commitment,

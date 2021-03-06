@@ -19,7 +19,7 @@ use solana_runtime::genesis_utils::{
 };
 use solana_sdk::{
     account::Account,
-    account::AccountNoData,
+    account::AccountSharedData,
     client::SyncClient,
     clock::{DEFAULT_DEV_SLOTS_PER_EPOCH, DEFAULT_TICKS_PER_SLOT},
     commitment_config::CommitmentConfig,
@@ -70,7 +70,7 @@ pub struct ClusterConfig {
     pub native_instruction_processors: Vec<(String, Pubkey)>,
     pub cluster_type: ClusterType,
     pub poh_config: PohConfig,
-    pub additional_accounts: Vec<(Pubkey, AccountNoData)>,
+    pub additional_accounts: Vec<(Pubkey, AccountSharedData)>,
 }
 
 impl Default for ClusterConfig {

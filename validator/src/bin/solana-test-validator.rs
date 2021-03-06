@@ -12,7 +12,7 @@ use {
     solana_core::rpc::JsonRpcConfig,
     solana_faucet::faucet::{run_local_faucet_with_port, FAUCET_PORT},
     solana_sdk::{
-        account::AccountNoData,
+        account::AccountSharedData,
         clock::Slot,
         native_token::sol_to_lamports,
         pubkey::Pubkey,
