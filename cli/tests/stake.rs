@@ -506,7 +506,7 @@ fn test_nonced_stake_delegation_and_deactivation() {
 }
 
 #[test]
-fn test_nonced_stake_delegation_and_deactivation_no_data() {
+fn test_nonced_stake_delegation_and_deactivation_shared_data() {
     solana_logger::setup();
 
     let mint_keypair = Keypair::new();
@@ -716,7 +716,7 @@ fn test_stake_authorize() {
     };
     assert_eq!(current_authority, online_authority_pubkey);
     {
-        // test out variations of new no_data functions
+        // test out variations of new shared_data functions
         let stake_account = rpc_client
             .get_account_shared_data(&stake_account_pubkey)
             .unwrap();
