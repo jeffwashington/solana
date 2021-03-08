@@ -40,6 +40,37 @@ pub struct AccountSharedData {
     pub rent_epoch: Epoch,
 }
 
+// account is stored serialized in a vector which may contain other accounts
+pub struct AccountSerializedData {
+    raw: Arc<Vec<u8>>;
+    start_offset: usize;
+}
+
+// an 'account' that we pass around could be:
+// Arc<AccountDifferentStorages> or a struct containing that and supporting the 'AnAccount' trait
+// The big idea is that we could represent an 'account' with data stored in a larger vec that was used to communicate with the vm
+
+// stores the account in memory as either AccountSharedData or AccountSerializedData
+// similar to accounts_db::LoadedAccountAccessor
+pub enum AccountDifferentStorages {
+    AccountSharedData(AccountSharedData),
+    Serialized(AccountSerializedData),
+}
+
+impl AnAccount for AccountDifferentStorages {
+    fn lamports(&self) -> u64 {
+        match self {
+            AccountSharedData(account) => account.lamports,
+            Serialized(account) => {
+                const OFFSET_TO_LAMPORTS: usize = 8; // or whatever...
+                let start = self.start_offset + OFFSET_TO_LAMPORTS;
+                LittleEndian::read_u64(&self.raw[start..]);
+            }
+        }
+    }
+    ...
+}
+
 pub fn accounts_equal<T: AnAccount, U: AnAccount>(me: &T, other: &U) -> bool {
     me.lamports() == other.lamports()
         && me.data() == other.data()
