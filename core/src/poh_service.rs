@@ -144,7 +144,9 @@ impl PohService {
                 if let Ok(mixin) = mixin {
                     let res = poh_l.record(mixin);
                     let should_tick = res.is_none();
-                    sender_mixin_result.send(res);
+                    if sender_mixin_result.send(res).is_err() {
+                        panic!("Error returning mixin hash")
+                    }
                     should_tick
                 } else {
                     let mut hash_time = Measure::start("hash");
@@ -391,6 +393,8 @@ mod tests {
                 0,
                 DEFAULT_PINNED_CPU_CORE,
                 hashes_per_batch,
+                receiver_mixin,
+                sender_mixin_result,
             );
             poh_recorder.lock().unwrap().set_working_bank(working_bank);
 
