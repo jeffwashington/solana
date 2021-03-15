@@ -490,7 +490,7 @@ impl PohRecorder {
     ) -> Result<()> {
         self.waits += 1;
         let res = self.receiver_mixin_result.try_recv();
-        if self.waits % 100000 == 0 {
+        if self.waits % 1000000 == 0 {
             error!("waiting for result: {}, {:?}", self.waits, res);
         }
         if res.is_err() {
