@@ -477,7 +477,7 @@ mod tests {
 
                     hashes += entry.num_hashes;
 
-                    assert_eq!(hashes, poh_config.hashes_per_tick.unwrap());
+                    assert_eq!(hashes, poh_config.hashes_per_tick.unwrap(), "num hashes: {}, num_ticks: {}, iteration: {}", entry.num_hashes, num_ticks, i);
 
                     hashes = 0;
                 } else {
