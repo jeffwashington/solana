@@ -401,7 +401,7 @@ mod tests {
                                     }
                                 }
                             };
-                            error!("ln: {}", line!());
+                            //error!("ln: {}", line!());
                             if use_rayon {
                                 thread_pool.install(|| {
                                     (0..par_batch_size).into_par_iter().for_each(record_lock);
