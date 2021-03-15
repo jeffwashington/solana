@@ -25,7 +25,7 @@ use solana_sdk::pubkey::Pubkey;
 use solana_sdk::timing;
 use solana_sdk::transaction::Transaction;
 use std::cmp;
-use std::sync::mpsc::{channel, Receiver, SendError, Sender, SyncSender};
+use std::sync::mpsc::{channel, Receiver, SendError, Sender, SyncSender, TryRecvError};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use thiserror::Error;
@@ -494,7 +494,15 @@ impl PohRecorder {
             error!("waiting for result: {}, {:?}", self.waits, res);
         }
         if res.is_err() {
-            return Err(PohRecorderError::MaxHeightReached); // TODO wrong error
+            match res {
+                Err(err) => {
+                    if err == TryRecvError::Disconnected{
+                        return Err(PohRecorderError::InvalidCallingObject);
+                    }
+                    return Err(PohRecorderError::MaxHeightReached); // TODO wrong error
+                },
+                Ok(_) => {},
+            }
         }
         let res = res.unwrap();
 
