@@ -476,8 +476,8 @@ impl PohRecorder {
             poh_config.hashes_per_tick,
         )));
         let (sender_mixin, receiver_mixin) = channel();
-        let (sender_mixin_result, receiver_mixin_result) = channel();
-        let (sender, receiver) = channel();
+        let (sender_mixin_result, receiver_mixin_result) = channel(); // would like this to be spsc instead of mpsc
+        let (sender, receiver) = channel(); // would like this to be spsc instead of mpsc
         let (leader_first_tick_height, leader_last_tick_height, grace_ticks) =
             Self::compute_leader_slot_tick_heights(next_leader_slot, ticks_per_slot);
         (
