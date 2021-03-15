@@ -291,7 +291,7 @@ mod tests {
             .unwrap_or(1);
 
         let use_rayon = std::env::var("USE_RAYON").is_ok();
-        let set_affinity = std::env::var("SET_AFFINITY").is_ok();
+        //let set_affinity = std::env::var("SET_AFFINITY").is_ok();
 
         info!(
             "batch_size: {} rayon: {} rayon_threads: {} set_affinity: {}",
