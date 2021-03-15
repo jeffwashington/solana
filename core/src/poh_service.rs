@@ -1,6 +1,6 @@
 //! The `poh_service` module implements a service that records the passing of
 //! "ticks", a measure of time in the PoH stream
-use crate::poh_recorder::PohRecorder;
+use crate::poh_recorder::{PohRecorder, PohRecorderError};
 use solana_ledger::poh::PohEntry;
 use solana_measure::measure::Measure;
 use solana_sdk::{hash::Hash, poh_config::PohConfig};
@@ -384,7 +384,13 @@ mod tests {
                                         h1,
                                         vec![tx.clone()],
                                     );
-                                    if res.is_ok() {
+                                    if let Err(err) = res {
+                                        if err == PohRecorderError::MaxHeightReached {
+                                            continue;
+                                        }
+                                        break;
+                                    }
+                                    else {
                                         break;
                                     }
                                 }
