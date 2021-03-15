@@ -156,7 +156,7 @@ impl PohService {
                     receiver_mixin.try_recv()
                 }; 
                 if let Ok(mixin) = mixin {
-                    error!("jwash:Received mixin");
+                    //error!("jwash:Received mixin");
                     let res = poh_l.record(mixin);
                     let should_tick = res.is_none();
                     if should_tick {
