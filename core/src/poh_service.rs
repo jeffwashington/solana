@@ -125,7 +125,7 @@ impl PohService {
         receiver_mixin: Receiver<(Hash, Vec<Transaction>, Slot, Sender<std::result::Result<(), PohRecorderError>>)>,
         sender_mixin_result: Sender<Option<PohEntry>>,
     ) {
-        error!("tick_producer");
+        //error!("tick_producer");
         let poh;
         let mut tick_height;
         {
@@ -176,7 +176,7 @@ impl PohService {
             };
             ct += 1;
             if ct % 1000000 == 0 {
-                error!("count: {}", ct);
+                //error!("count: {}", ct);
             }
             if should_tick {
                 //error!("tick count: {}", ct);
@@ -232,7 +232,7 @@ impl PohService {
                     last_metric = Instant::now();
                 }
                 if poh_exit.load(Ordering::Relaxed) {
-                    error!("break, count: {}", ct);
+                    //error!("break, count: {}", ct);
                     break;
                 }
             }
