@@ -371,9 +371,7 @@ mod tests {
                             //error!("ln: {}", line!());
                             // send some data
                             let mut time = Measure::start("record");
-                            let record_lock = |_i: usize| {
-                                let (sender_result, receiver_result) = channel();
-
+                            let record_lock = |sender_result: &Sender<std::result::Result<(), PohRecorderError>>, receiver_result: &Receiver<std::result::Result<(), PohRecorderError>>| {
                                 let _ = poh_recorder.lock().unwrap().record1(
                                     bank.slot(),
                                     h1,
@@ -391,16 +389,29 @@ mod tests {
                                         Ok(_) => {}
                                     }
                                 }
-                                let res = res.unwrap();
                                 ()
                             };
                             //error!("ln: {}", line!());
                             if use_rayon {
                                 thread_pool.install(|| {
+                                    let chunks = rayon_threads;
+                                    let chunk_size = par_batch_size / chunks;
+                                    (0..chunks).into_par_iter().for_each(|chunk| {
+                                        let (sender_result, receiver_result) = channel();
+                                        let mut chunk_size = chunk_size;
+                                        if chunk == chunks-1 {
+                                            chunk_size = par_batch_size - chunk_size * (chunks - 1);
+                                        }
+                                        for _i in 0..chunk_size {
+                                            record_lock(&sender_result, &receiver_result);
+                                        }
+                                    })
+                                    /*
                                     (0..par_batch_size).into_par_iter().for_each(record_lock);
+                                    */
                                 });
                             } else {
-                                (0..par_batch_size).into_iter().for_each(record_lock);
+                                panic!("unsupported");//(0..par_batch_size).into_iter().for_each(record_lock);
                             }
                             time.stop();
                             total_us += time.as_us();
