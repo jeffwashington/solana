@@ -589,13 +589,13 @@ mod tests {
         time2.stop();
 
         for i in 0..count {
-            sender_mixin.send(Hash::default());
+            sender_mixin.send(1u32);
         }
 
         let mut time3 = Measure::start("");
         for i in 0..count {
             if let Ok(mixin) = receiver_mixin.try_recv() {
-                b += 2;
+                b += mixin;
             }
             else {
                 b += 1;
