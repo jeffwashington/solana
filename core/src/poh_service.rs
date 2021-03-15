@@ -304,7 +304,7 @@ mod tests {
                 target_tick_duration,
                 target_tick_count: None,
             });
-            let (poh_recorder, entry_receiver) = PohRecorder::new(
+            let (poh_recorder, entry_receiver, receiver_mixin, sender_mixin_result) = PohRecorder::new(
                 bank.tick_height(),
                 prev_hash,
                 bank.slot(),
