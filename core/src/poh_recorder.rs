@@ -494,6 +494,10 @@ impl PohRecorder {
             error!("waiting for result: {}, {:?}", self.waits, res);
         }
         if res.is_err() {
+            let Err(err) = res;
+            if err == RecvError::Disconnected{
+                return Err(PohRecorderError::InvalidCallingObject);
+            }
             return Err(PohRecorderError::MaxHeightReached); // TODO wrong error
         }
         let res = res.unwrap();
