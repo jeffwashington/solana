@@ -6,7 +6,7 @@ use solana_measure::measure::Measure;
 use solana_sdk::{hash::Hash, poh_config::PohConfig};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{
-    mpsc::{Receiver, Sender},
+    mpsc::{channel, Receiver, Sender, RecvError, TryRecvError},
     Arc, Mutex,
 };
 use std::thread::{self, sleep, Builder, JoinHandle};
@@ -36,7 +36,7 @@ impl PohService {
         ticks_per_slot: u64,
         pinned_cpu_core: usize,
         hashes_per_batch: u64,
-        receiver_mixin: Receiver<Hash>,
+        receiver_mixin: Receiver<(Hash, Sender<Option<(PohEntry, u64)>>)>,
         sender_mixin_result: Sender<Option<PohEntry>>,
     ) -> Self {
         let poh_exit_ = poh_exit.clone();
@@ -122,7 +122,7 @@ impl PohService {
         target_tick_ns: u64,
         ticks_per_slot: u64,
         hashes_per_batch: u64,
-        receiver_mixin: Receiver<Hash>,
+        receiver_mixin: Receiver<(Hash, Sender<Option<(PohEntry, u64)>>)>,
         sender_mixin_result: Sender<Option<PohEntry>>,
     ) {
         error!("tick_producer");
@@ -151,21 +151,20 @@ impl PohService {
                 let mut poh_l = poh.lock().unwrap(); // keep locked?
                 lock_time.stop();
                 total_lock_time_ns += lock_time.as_ns();
-                let (mixin, sender) = if let Some((mixin, sender)) = try_again_mixin {
+                let mixin = if let Some((mixin, sender)) = try_again_mixin {
                     try_again_mixin = None;
                     Ok((mixin, sender))
                 } else {
                     receiver_mixin.try_recv()
-                }; 
-                if let Ok(mixin) = mixin {
+                };
+                if let Ok((mixin, sender)) = mixin {
                     //error!("jwash:Received mixin");
                     let res = poh_l.record(mixin);
                     let should_tick = res.is_none();
                     if should_tick {
-                        try_again_mixin = Some(mixin);
-                    }
-                    else{
-                        if sender.send((res, tick_height)).is_err() {
+                        try_again_mixin = Some((mixin, sender));
+                    } else {
+                        if sender.send(Some((res.unwrap(), tick_height))).is_err() {
                             panic!("Error returning mixin hash")
                         }
                     }
@@ -179,7 +178,7 @@ impl PohService {
                 }
             };
             ct += 1;
-            if ct % 1000000 == 0{
+            if ct % 1000000 == 0 {
                 error!("count: {}", ct);
             }
             if should_tick {
@@ -192,7 +191,7 @@ impl PohService {
                     total_lock_time_ns += lock_time.as_ns();
                     let mut tick_time = Measure::start("tick");
                     poh_recorder_l.tick();
-                    tick_height = recorder.tick_height();
+                    tick_height = poh_recorder_l.tick_height();
                     tick_time.stop();
                     total_tick_time_ns += tick_time.as_ns();
                 }
@@ -390,28 +389,25 @@ mod tests {
                                     vec![tx.clone()],
                                     sender_result,
                                 );
-                                loop {
-                                    let res = receiver_result.recv();
-                                    if res.is_err() {
-                                        match res {
-                                            Err(err) => {
-                                                if err == TryRecvError::Disconnected{
-                                                    return Err(PohRecorderError::InvalidCallingObject);
-                                                }
-                                                continue;
-                                            },
-                                            Ok(_) => {},
+                                let res = receiver_result.recv();
+                                if res.is_err() {
+                                    match res {
+                                        Err(err) => {
+                                            return ();/* Err(
+                                                PohRecorderError::InvalidCallingObject,
+                                            );*/
                                         }
+                                        Ok(_) => {}
                                     }
-                                    let res = res.unwrap();
-                            
-                                    let res = poh_recorder.lock().unwrap().record2(
-                                        bank.slot(),
-                                        h1,
-                                        vec![tx.clone()],
-                                        res
-                                    );
                                 }
+                                let res = res.unwrap();
+                                let res2:Result<_, _> = poh_recorder.lock().unwrap().record2(
+                                    bank.slot(),
+                                    h1,
+                                    vec![tx.clone()],
+                                    res,
+                                );
+                                ()
                             };
                             //error!("ln: {}", line!());
                             if use_rayon {

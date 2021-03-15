@@ -1720,7 +1720,7 @@ mod tests {
                     &Arc::new(PohConfig::default()),
                 );
             let poh_recorder = Arc::new(Mutex::new(poh_recorder));
-            start_mixin(receiver_mixin, sender_mixin_result, &poh_recorder);
+            //start_mixin(receiver_mixin, sender_mixin_result, &poh_recorder);
 
             poh_recorder.lock().unwrap().set_working_bank(working_bank);
             let pubkey = solana_sdk::pubkey::new_rand();
