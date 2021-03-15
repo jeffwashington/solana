@@ -485,7 +485,7 @@ mod tests {
 
                     hashes += entry.num_hashes;
 
-                    error!("hashes: {}, hashes_per_tick expected: {}, num hashes: {}, num_ticks: {}, iteration: {}", hashes, poh_config.hashes_per_tick.unwrap(), entry.num_hashes, num_ticks, i);
+                    //error!("hashes: {}, hashes_per_tick expected: {}, num hashes: {}, num_ticks: {}, iteration: {}", hashes, poh_config.hashes_per_tick.unwrap(), entry.num_hashes, num_ticks, i);
                     assert_eq!(hashes, poh_config.hashes_per_tick.unwrap(), "num hashes: {}, num_ticks: {}, iteration: {}", entry.num_hashes, num_ticks, i);
 
                     hashes = 0;
