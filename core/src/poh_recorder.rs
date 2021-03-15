@@ -603,7 +603,22 @@ mod tests {
         }
         time3.stop();
 
-        error!("{}, {}, {}, {}", time.as_ms(), time2.as_ms(), time3.as_ms(), a + b);
+        for i in 0..100 {
+            sender_mixin.send(1u32);
+        }
+
+        let mut time4 = Measure::start("");
+        for i in 0..count {
+            if let Ok(mixin) = receiver_mixin.try_recv() {
+                b += mixin;
+            }
+            else {
+                b += 1;
+            }
+        }
+        time4.stop();
+
+        error!("{}, {}, {}, {}, {}", time.as_ms(), time2.as_ms(), time3.as_ms(), time4.as_ms(), a + b);
     }
 
     #[test]
