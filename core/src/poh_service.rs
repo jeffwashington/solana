@@ -126,8 +126,11 @@ impl PohService {
         sender_mixin_result: Sender<Option<PohEntry>>,
     ) {
         error!("tick_producer");
-        let recorder = poh_recorder.lock().unwrap();
-        let poh = recorder.poh.clone();
+        let poh;
+        {
+            let recorder = poh_recorder.lock().unwrap();
+            poh = recorder.poh.clone();
+        }
         let mut now = Instant::now();
         let mut last_metric = Instant::now();
         let mut num_ticks = 0;
@@ -304,17 +307,18 @@ mod tests {
                 target_tick_duration,
                 target_tick_count: None,
             });
-            let (poh_recorder, entry_receiver, receiver_mixin, sender_mixin_result) = PohRecorder::new(
-                bank.tick_height(),
-                prev_hash,
-                bank.slot(),
-                Some((4, 4)),
-                bank.ticks_per_slot(),
-                &Pubkey::default(),
-                &blockstore.clone(),
-                &Arc::new(LeaderScheduleCache::new_from_bank(&bank)),
-                &poh_config,
-            );
+            let (poh_recorder, entry_receiver, receiver_mixin, sender_mixin_result) =
+                PohRecorder::new(
+                    bank.tick_height(),
+                    prev_hash,
+                    bank.slot(),
+                    Some((4, 4)),
+                    bank.ticks_per_slot(),
+                    &Pubkey::default(),
+                    &blockstore.clone(),
+                    &Arc::new(LeaderScheduleCache::new_from_bank(&bank)),
+                    &poh_config,
+                );
             let poh_recorder = Arc::new(Mutex::new(poh_recorder));
             let exit = Arc::new(AtomicBool::new(false));
             let working_bank = WorkingBank {
