@@ -603,7 +603,7 @@ mod tests {
         }
         time3.stop();
 
-        for i in 0..100 {
+        for i in 0..1 {
             sender_mixin.send(1u32);
         }
 
