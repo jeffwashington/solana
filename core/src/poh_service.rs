@@ -126,8 +126,11 @@ impl PohService {
         sender_mixin_result: Sender<Option<PohEntry>>,
     ) {
         error!("tick_producer");
-        let recorder = poh_recorder.lock().unwrap();
-        let poh = recorder.poh.clone();
+        let poh;
+        {
+            let recorder = poh_recorder.lock().unwrap();
+            poh = recorder.poh.clone();
+        }
         let mut now = Instant::now();
         let mut last_metric = Instant::now();
         let mut num_ticks = 0;
@@ -137,6 +140,8 @@ impl PohService {
         let mut total_hash_time_ns = 0;
         let mut total_tick_time_ns = 0;
         let mut sleep_deficit_ns = 0;
+        let mut ct = 0;
+        let mut try_again_mixin = None;
         loop {
             num_hashes += hashes_per_batch;
             let should_tick = {
@@ -144,13 +149,23 @@ impl PohService {
                 let mut poh_l = poh.lock().unwrap(); // keep locked?
                 lock_time.stop();
                 total_lock_time_ns += lock_time.as_ns();
-                let mixin = receiver_mixin.try_recv();
+                let mixin = if let Some(mixin) = try_again_mixin {
+                    try_again_mixin = None;
+                    Ok(mixin)
+                } else {
+                    receiver_mixin.try_recv()
+                }; 
                 if let Ok(mixin) = mixin {
                     error!("jwash:Received mixin");
                     let res = poh_l.record(mixin);
                     let should_tick = res.is_none();
-                    if sender_mixin_result.send(res).is_err() {
-                        panic!("Error returning mixin hash")
+                    if should_tick {
+                        try_again_mixin = Some(mixin);
+                    }
+                    else{
+                        if sender_mixin_result.send(res).is_err() {
+                            panic!("Error returning mixin hash")
+                        }
                     }
                     should_tick
                 } else {
@@ -161,7 +176,12 @@ impl PohService {
                     r
                 }
             };
+            ct += 1;
+            if ct % 1000000 == 0{
+                error!("count: {}", ct);
+            }
             if should_tick {
+                error!("tick count: {}", ct);
                 // Lock PohRecorder only for the final hash...
                 {
                     let mut lock_time = Measure::start("lock");
@@ -173,6 +193,7 @@ impl PohService {
                     tick_time.stop();
                     total_tick_time_ns += tick_time.as_ns();
                 }
+                error!("after tick count: {}", ct);
                 num_ticks += 1;
                 let elapsed_ns = now.elapsed().as_nanos() as u64;
 
@@ -183,9 +204,10 @@ impl PohService {
 
                 // sleep is not accurate enough to get a predictable time.
                 // Kernel can not schedule the thread for a while.
+                /*
                 while (now.elapsed().as_nanos() as u64) < target_tick_ns {
                     std::hint::spin_loop();
-                }
+                }*/
                 total_sleep_us += (now.elapsed().as_nanos() as u64 - elapsed_ns) / 1000;
                 now = Instant::now();
 
@@ -211,6 +233,7 @@ impl PohService {
                     last_metric = Instant::now();
                 }
                 if poh_exit.load(Ordering::Relaxed) {
+                    error!("break, count: {}", ct);
                     break;
                 }
             }
@@ -341,18 +364,32 @@ mod tests {
                         let now = Instant::now();
                         let mut total_us = 0;
                         let mut total_times = 0;
+                        error!("ln: {}", line!());
                         let h1 = hash(b"hello world!");
                         let tx = test_tx();
+                        error!("ln: {}", line!());
                         loop {
+                            error!("ln: {}", line!());
                             // send some data
                             let mut time = Measure::start("record");
                             let record_lock = |_i: usize| {
-                                let _ = poh_recorder.lock().unwrap().record(
+                                let _ = poh_recorder.lock().unwrap().record1(
                                     bank.slot(),
                                     h1,
                                     vec![tx.clone()],
                                 );
+                                loop {
+                                    let res = poh_recorder.lock().unwrap().record2(
+                                        bank.slot(),
+                                        h1,
+                                        vec![tx.clone()],
+                                    );
+                                    if res.is_ok() {
+                                        break;
+                                    }
+                                }
                             };
+                            error!("ln: {}", line!());
                             if use_rayon {
                                 thread_pool.install(|| {
                                     (0..par_batch_size).into_par_iter().for_each(record_lock);
