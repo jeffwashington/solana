@@ -573,6 +573,7 @@ mod tests {
             *a.lock().unwrap() += 1;
         }
         time.stop();
+        let a = *a.lock().unwrap();
 
         let (sender_mixin, receiver_mixin) = channel();
         let mut b = 0;
