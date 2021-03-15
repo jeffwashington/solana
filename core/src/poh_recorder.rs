@@ -568,7 +568,7 @@ mod tests {
         solana_logger::setup();
         let a = Mutex::new(5u32);
         let mut time = Measure::start("");
-        let count = 2500000;
+        let count = 2500000*10;
         for i in 0..count {
             *a.lock().unwrap() += 1;
         }
@@ -588,8 +588,22 @@ mod tests {
         }
         time2.stop();
 
-        sender_mixin.send(Hash::default());
-        error!("{}, {}, {}", time.as_ms(), time2.as_ms(), a + b);
+        for i in 0..count {
+            sender_mixin.send(Hash::default());
+        }
+
+        let mut time3 = Measure::start("");
+        for i in 0..count {
+            if let Ok(mixin) = receiver_mixin.try_recv() {
+                b += 2;
+            }
+            else {
+                b += 1;
+            }
+        }
+        time3.stop();
+
+        error!("{}, {}, {}, {}", time.as_ms(), time2.as_ms(), time3.as_ms(), a + b);
     }
 
     #[test]
