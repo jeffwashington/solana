@@ -81,7 +81,7 @@ pub struct PohRecorder {
     tick_overhead_us: u64,
     record_us: u64,
     last_metric: Instant,
-    sender_mixin: Sender<Hash>,
+    sender_mixin: Sender<(Hash, Sender<Option<(PohEntry, u64)>>)>,
     receiver_mixin_result: Receiver<Option<PohEntry>>,
     waits: u64,
 }
@@ -430,7 +430,7 @@ impl PohRecorder {
 
             {
                 let now = Instant::now();
-                error!("Sending mixin");
+                error!("Sending mixin");/* TODO
                 if self.sender_mixin.send(mixin).is_err() {
                     return Err(PohRecorderError::MaxHeightReached); // TODO error code
                 }
@@ -448,6 +448,7 @@ impl PohRecorder {
                         .send((working_bank.bank.clone(), (entry, self.tick_height)))?;
                     return Ok(());
                 }
+                */
             }
             // record() might fail if the next PoH hash needs to be a tick.  But that's ok, tick()
             // and re-record()
@@ -503,14 +504,14 @@ impl PohRecorder {
 
         let bank_send = working_bank.bank.clone();
         //error!("got result");
-        if let Some(poh_entry) = res {
+        if let Some((poh_entry, tick_height)) = res {
             let entry = Entry {
                 num_hashes: poh_entry.num_hashes,
                 hash: poh_entry.hash,
                 transactions,
             };
             self.sender
-                .send((bank_send, (entry, self.tick_height)))?;
+                .send((bank_send, (entry, tick_height)))?;
         } else {
             panic!("record should succeed");
         }
@@ -532,7 +533,7 @@ impl PohRecorder {
     ) -> (
         Self,
         Receiver<WorkingBankEntry>,
-        Receiver<Hash>,
+        Receiver<(Hash, Sender<Option<(PohEntry, u64)>>)>,
         Sender<Option<PohEntry>>,
     ) {
         let poh = Arc::new(Mutex::new(Poh::new(
@@ -593,7 +594,7 @@ impl PohRecorder {
     ) -> (
         Self,
         Receiver<WorkingBankEntry>,
-        Receiver<Hash>,
+        Receiver<(Hash, Sender<Option<(PohEntry, u64)>>)>,
         Sender<Option<PohEntry>>,
     ) {
         Self::new_with_clear_signal(
