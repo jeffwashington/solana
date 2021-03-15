@@ -561,6 +561,35 @@ mod tests {
     use solana_sdk::clock::DEFAULT_TICKS_PER_SLOT;
     use solana_sdk::hash::hash;
     use std::sync::mpsc::sync_channel;
+    use solana_measure::measure::Measure;
+
+    #[test]
+    fn test_performance() {
+        solana_logger::setup();
+        let a = Mutex::new(5u32);
+        let mut time = Measure::start("");
+        let count = 2500000;
+        for i in 0..count {
+            *a.lock().unwrap() += 1;
+        }
+        time.stop();
+
+        let (sender_mixin, receiver_mixin) = channel();
+        let mut b = 0;
+        let mut time2 = Measure::start("");
+        for i in 0..count {
+            if let Ok(mixin) = receiver_mixin.try_recv() {
+                b += 2;
+            }
+            else {
+                b += 1;
+            }
+        }
+        time2.stop();
+
+        sender_mixin.send(Hash::default());
+        error!("{}, {}, {}", time.as_ms(), time2.as_ms(), a + b);
+    }
 
     #[test]
     fn test_poh_recorder_no_zero_tick() {
