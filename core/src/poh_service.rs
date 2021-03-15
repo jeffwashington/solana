@@ -127,9 +127,11 @@ impl PohService {
     ) {
         error!("tick_producer");
         let poh;
+        let mut tick_height;
         {
             let recorder = poh_recorder.lock().unwrap();
             poh = recorder.poh.clone();
+            tick_height = recorder.tick_height();
         }
         let mut now = Instant::now();
         let mut last_metric = Instant::now();
@@ -149,9 +151,9 @@ impl PohService {
                 let mut poh_l = poh.lock().unwrap(); // keep locked?
                 lock_time.stop();
                 total_lock_time_ns += lock_time.as_ns();
-                let mixin = if let Some(mixin) = try_again_mixin {
+                let (mixin, sender) = if let Some((mixin, sender)) = try_again_mixin {
                     try_again_mixin = None;
-                    Ok(mixin)
+                    Ok((mixin, sender))
                 } else {
                     receiver_mixin.try_recv()
                 }; 
@@ -163,7 +165,7 @@ impl PohService {
                         try_again_mixin = Some(mixin);
                     }
                     else{
-                        if sender_mixin_result.send(res).is_err() {
+                        if sender.send((res, tick_height)).is_err() {
                             panic!("Error returning mixin hash")
                         }
                     }
@@ -190,6 +192,7 @@ impl PohService {
                     total_lock_time_ns += lock_time.as_ns();
                     let mut tick_time = Measure::start("tick");
                     poh_recorder_l.tick();
+                    tick_height = recorder.tick_height();
                     tick_time.stop();
                     total_tick_time_ns += tick_time.as_ns();
                 }
@@ -373,26 +376,35 @@ mod tests {
                             // send some data
                             let mut time = Measure::start("record");
                             let record_lock = |_i: usize| {
+                                let (sender_result, receiver_result) = channel();
+
                                 let _ = poh_recorder.lock().unwrap().record1(
                                     bank.slot(),
                                     h1,
                                     vec![tx.clone()],
+                                    sender_result,
                                 );
                                 loop {
+                                    let res = receiver_result.recv();
+                                    if res.is_err() {
+                                        match res {
+                                            Err(err) => {
+                                                if err == TryRecvError::Disconnected{
+                                                    return Err(PohRecorderError::InvalidCallingObject);
+                                                }
+                                                continue;
+                                            },
+                                            Ok(_) => {},
+                                        }
+                                    }
+                                    let res = res.unwrap();
+                            
                                     let res = poh_recorder.lock().unwrap().record2(
                                         bank.slot(),
                                         h1,
                                         vec![tx.clone()],
+                                        res
                                     );
-                                    if let Err(err) = res {
-                                        if err == PohRecorderError::MaxHeightReached {
-                                            continue;
-                                        }
-                                        break;
-                                    }
-                                    else {
-                                        break;
-                                    }
                                 }
                             };
                             //error!("ln: {}", line!());
