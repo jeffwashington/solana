@@ -139,6 +139,8 @@ impl PohService {
         let mut num_hashes = 0;
         let mut total_sleep_us = 0;
         let mut total_lock_time_ns = 0;
+        let mut total_lock_time_record_ns = 0;
+        let mut total_lock_time_poh_ns = 0;
         let mut total_hash_time_ns = 0;
         let mut total_tick_time_ns = 0;
         let mut sleep_deficit_ns = 0;
@@ -158,7 +160,7 @@ impl PohService {
                     let mut lock_time = Measure::start("lock");
                     let mut poh_recorder_l = poh_recorder.lock().unwrap();
                     lock_time.stop();
-                    total_lock_time_ns += lock_time.as_ns();
+                    total_lock_time_record_ns += lock_time.as_ns();
                     let res = poh_recorder_l.record(bank_slot, mixin, transactions);
                     sender.send(res);
                     false // record will tick if it needs to
@@ -166,7 +168,7 @@ impl PohService {
                     let mut lock_time = Measure::start("lock");
                     let mut poh_l = poh.lock().unwrap(); // keep locked?
                     lock_time.stop();
-                    total_lock_time_ns += lock_time.as_ns();
+                    total_lock_time_poh_ns += lock_time.as_ns();
                     let mut hash_time = Measure::start("hash");
                     let r = poh_l.hash(hashes_per_batch);
                     hash_time.stop();
@@ -220,7 +222,9 @@ impl PohService {
                         ("elapsed_us", us_per_slot, i64),
                         ("total_sleep_us", total_sleep_us, i64),
                         ("total_tick_time_us", total_tick_time_ns / 1000, i64),
-                        ("total_lock_time_us", total_lock_time_ns / 1000, i64),
+                        ("total_lock_time_tick_us", total_lock_time_ns / 1000, i64),
+                        ("total_lock_time_record_us", total_lock_time_record_ns / 1000, i64),
+                        ("total_lock_time_poh_us", total_lock_time_poh_ns / 1000, i64),
                         ("total_hash_time_us", total_hash_time_ns / 1000, i64),
                     );
                     total_sleep_us = 0;
