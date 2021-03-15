@@ -150,6 +150,11 @@ impl PohRecorder {
         self.ticks_per_slot
     }
 
+    pub fn sender_mixin(&self) -> Sender<(Hash, Vec<Transaction>, Slot, Sender<Result<()>>)>
+    {
+        self.sender_mixin.clone()
+    }
+
     fn is_same_fork_as_previous_leader(&self, slot: Slot) -> bool {
         (slot.saturating_sub(NUM_CONSECUTIVE_LEADER_SLOTS)..slot).any(|slot| {
             // Check if the last slot Poh reset to was any of the

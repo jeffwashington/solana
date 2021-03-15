@@ -344,6 +344,7 @@ mod tests {
                     &Arc::new(LeaderScheduleCache::new_from_bank(&bank)),
                     &poh_config,
                 );
+            let sender_mixin = poh_recorder.sender_mixin();
             let poh_recorder = Arc::new(Mutex::new(poh_recorder));
             let exit = Arc::new(AtomicBool::new(false));
             let working_bank = WorkingBank {
@@ -377,13 +378,9 @@ mod tests {
                             //error!("ln: {}", line!());
                             // send some data
                             let mut time = Measure::start("record");
-                            let record_lock = |sender_result: &Sender<std::result::Result<(), PohRecorderError>>, receiver_result: &Receiver<std::result::Result<(), PohRecorderError>>| {
-                                let _ = poh_recorder.lock().unwrap().record1(
-                                    bank.slot(),
-                                    h1,
-                                    vec![tx.clone()],
-                                    sender_result,
-                                );
+                            let record_lock = |sender_result: Sender<std::result::Result<(), PohRecorderError>>, receiver_result: &Receiver<std::result::Result<(), PohRecorderError>>, sender_mixin:  &Sender<(Hash, Vec<Transaction>, Slot, Sender<std::result::Result<(), PohRecorderError>>)>,| {
+                                //error!("Sending mixin");
+                                let _ = sender_mixin.send((h1, vec![tx.clone()], bank.slot(), sender_result));
                                 let res = receiver_result.recv();
                                 if res.is_err() {
                                     match res {
@@ -399,17 +396,19 @@ mod tests {
                             };
                             //error!("ln: {}", line!());
                             if use_rayon {
+                                let chunks = rayon_threads;
+                                let chunk_size = par_batch_size / chunks;
+                                let sender_mixins = (0..chunks).into_iter().map(|chunk| (sender_mixin.clone(), chunk)).collect::<Vec<_>>();
                                 thread_pool.install(|| {
-                                    let chunks = rayon_threads;
-                                    let chunk_size = par_batch_size / chunks;
-                                    (0..chunks).into_par_iter().for_each(|chunk| {
+                                    sender_mixins.into_par_iter().for_each(|(sender_mixin, chunk)| {
+                                        //let sender_mixin = sender_mixin.clone();
                                         let (sender_result, receiver_result) = channel();
                                         let mut chunk_size = chunk_size;
                                         if chunk == chunks-1 {
                                             chunk_size = par_batch_size - chunk_size * (chunks - 1);
                                         }
                                         for _i in 0..chunk_size {
-                                            record_lock(&sender_result, &receiver_result);
+                                            record_lock(sender_result.clone(), &receiver_result, &sender_mixin);
                                         }
                                     })
                                     /*
