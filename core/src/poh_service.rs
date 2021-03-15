@@ -146,6 +146,7 @@ impl PohService {
                 total_lock_time_ns += lock_time.as_ns();
                 let mixin = receiver_mixin.try_recv();
                 if let Ok(mixin) = mixin {
+                    error!("jwash:Received mixin");
                     let res = poh_l.record(mixin);
                     let should_tick = res.is_none();
                     if sender_mixin_result.send(res).is_err() {
