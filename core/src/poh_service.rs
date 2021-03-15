@@ -3,7 +3,7 @@
 use crate::poh_recorder::{PohRecorder, PohRecorderError};
 use solana_ledger::poh::PohEntry;
 use solana_measure::measure::Measure;
-use solana_sdk::{hash::Hash, poh_config::PohConfig};
+use solana_sdk::{clock::Slot, hash::Hash, poh_config::PohConfig, transaction::Transaction};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{
     mpsc::{channel, Receiver, Sender, RecvError, TryRecvError},
@@ -36,7 +36,7 @@ impl PohService {
         ticks_per_slot: u64,
         pinned_cpu_core: usize,
         hashes_per_batch: u64,
-        receiver_mixin: Receiver<(Hash, Sender<Option<(PohEntry, u64, Sender<()>)>>)>,
+        receiver_mixin: Receiver<(Hash, Vec<Transaction>, Slot, Sender<std::result::Result<(), PohRecorderError>>)>,
         sender_mixin_result: Sender<Option<PohEntry>>,
     ) -> Self {
         let poh_exit_ = poh_exit.clone();
@@ -122,7 +122,7 @@ impl PohService {
         target_tick_ns: u64,
         ticks_per_slot: u64,
         hashes_per_batch: u64,
-        receiver_mixin: Receiver<(Hash, Sender<Option<(PohEntry, u64, Sender<()>)>>)>,
+        receiver_mixin: Receiver<(Hash, Vec<Transaction>, Slot, Sender<std::result::Result<(), PohRecorderError>>)>,
         sender_mixin_result: Sender<Option<PohEntry>>,
     ) {
         error!("tick_producer");
@@ -144,34 +144,29 @@ impl PohService {
         let mut sleep_deficit_ns = 0;
         let mut ct = 0;
         let mut try_again_mixin = None;
-        let (sender2, receiver2) = channel();
         loop {
             num_hashes += hashes_per_batch;
             let should_tick = {
-                let mut lock_time = Measure::start("lock");
-                let mut poh_l = poh.lock().unwrap(); // keep locked?
-                lock_time.stop();
-                total_lock_time_ns += lock_time.as_ns();
-                let mixin = if let Some((mixin, sender)) = try_again_mixin {
+                let mixin = if let Some((mixin, transactions, bank_slot, sender)) = try_again_mixin {
                     try_again_mixin = None;
-                    Ok((mixin, sender))
+                    Ok((mixin, transactions, bank_slot, sender))
                 } else {
                     receiver_mixin.try_recv()
                 };
-                if let Ok((mixin, sender)) = mixin {
+                if let Ok((mixin, transactions, bank_slot, sender)) = mixin {
                     //error!("jwash:Received mixin");
-                    let res = poh_l.record(mixin);
-                    let should_tick = res.is_none();
-                    if should_tick {
-                        try_again_mixin = Some((mixin, sender));
-                    } else {
-                        if sender.send(Some((res.unwrap(), tick_height, sender2.clone()))).is_err() {
-                            panic!("Error returning mixin hash")
-                        }
-                        let _ = receiver2.recv();
-                    }
-                    should_tick
+                    let mut lock_time = Measure::start("lock");
+                    let mut poh_recorder_l = poh_recorder.lock().unwrap();
+                    lock_time.stop();
+                    total_lock_time_ns += lock_time.as_ns();
+                    let res = poh_recorder_l.record(bank_slot, mixin, transactions);
+                    sender.send(res);
+                    false // record will tick if it needs to
                 } else {
+                    let mut lock_time = Measure::start("lock");
+                    let mut poh_l = poh.lock().unwrap(); // keep locked?
+                    lock_time.stop();
+                    total_lock_time_ns += lock_time.as_ns();
                     let mut hash_time = Measure::start("hash");
                     let r = poh_l.hash(hashes_per_batch);
                     hash_time.stop();
@@ -403,12 +398,6 @@ mod tests {
                                     }
                                 }
                                 let res = res.unwrap();
-                                let res2:Result<_, _> = poh_recorder.lock().unwrap().record2(
-                                    bank.slot(),
-                                    h1,
-                                    vec![tx.clone()],
-                                    res,
-                                );
                                 ()
                             };
                             //error!("ln: {}", line!());
