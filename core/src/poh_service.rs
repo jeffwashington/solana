@@ -181,7 +181,7 @@ impl PohService {
                 error!("count: {}", ct);
             }
             if should_tick {
-                error!("tick count: {}", ct);
+                //error!("tick count: {}", ct);
                 // Lock PohRecorder only for the final hash...
                 {
                     let mut lock_time = Measure::start("lock");
@@ -193,7 +193,7 @@ impl PohService {
                     tick_time.stop();
                     total_tick_time_ns += tick_time.as_ns();
                 }
-                error!("after tick count: {}", ct);
+                //error!("after tick count: {}", ct);
                 num_ticks += 1;
                 let elapsed_ns = now.elapsed().as_nanos() as u64;
 
@@ -364,12 +364,12 @@ mod tests {
                         let now = Instant::now();
                         let mut total_us = 0;
                         let mut total_times = 0;
-                        error!("ln: {}", line!());
+                        //error!("ln: {}", line!());
                         let h1 = hash(b"hello world!");
                         let tx = test_tx();
-                        error!("ln: {}", line!());
+                        //error!("ln: {}", line!());
                         loop {
-                            error!("ln: {}", line!());
+                            //error!("ln: {}", line!());
                             // send some data
                             let mut time = Measure::start("record");
                             let record_lock = |_i: usize| {

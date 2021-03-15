@@ -489,7 +489,7 @@ impl PohRecorder {
         transactions: Vec<Transaction>,
     ) -> Result<()> {
         self.waits += 1;
-        if self.waits % 10000 == 0 {
+        if self.waits % 100000 == 0 {
             error!("waiting for result: {}", self.waits);
         }
         let res = self.receiver_mixin_result.try_recv();
