@@ -33,7 +33,7 @@ use thiserror::Error;
 pub const GRACE_TICKS_FACTOR: u64 = 2;
 pub const MAX_GRACE_SLOTS: u64 = 2;
 
-#[derive(Error, Debug, Clone)]
+#[derive(Error, Debug, Clone, PartialEq)]
 pub enum PohRecorderError {
     #[error("invalid calling object")]
     InvalidCallingObject,
@@ -83,6 +83,7 @@ pub struct PohRecorder {
     last_metric: Instant,
     sender_mixin: Sender<Hash>,
     receiver_mixin_result: Receiver<Option<PohEntry>>,
+    waits: u64,
 }
 
 impl PohRecorder {
@@ -487,7 +488,10 @@ impl PohRecorder {
         mixin: Hash,
         transactions: Vec<Transaction>,
     ) -> Result<()> {
-        error!("waiting for result");
+        self.waits += 1;
+        if self.waits % 10000 == 0 {
+            error!("waiting for result: {}", self.waits);
+        }
         let res = self.receiver_mixin_result.try_recv();
         if res.is_err() {
             return Err(PohRecorderError::MaxHeightReached); // TODO wrong error
@@ -567,6 +571,7 @@ impl PohRecorder {
                 last_metric: Instant::now(),
                 sender_mixin,
                 receiver_mixin_result,
+                waits: 0,
             },
             receiver,
             receiver_mixin,
