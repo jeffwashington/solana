@@ -476,7 +476,7 @@ impl PohRecorder {
             return Err(PohRecorderError::MaxHeightReached);
         }
 
-        error!("Sending mixin");
+        //error!("Sending mixin");
         if self.sender_mixin.send(mixin).is_err() {
             return Err(PohRecorderError::MaxHeightReached); // TODO error code
         }
@@ -504,7 +504,7 @@ impl PohRecorder {
             .ok_or(PohRecorderError::MaxHeightReached)?;
 
         let bank_send = working_bank.bank.clone();
-        error!("got result");
+        //error!("got result");
         if let Some(poh_entry) = res {
             let entry = Entry {
                 num_hashes: poh_entry.num_hashes,
