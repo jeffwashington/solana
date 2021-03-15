@@ -294,8 +294,8 @@ mod tests {
         //let set_affinity = std::env::var("SET_AFFINITY").is_ok();
 
         info!(
-            "batch_size: {} rayon: {} rayon_threads: {} set_affinity: {}",
-            par_batch_size, use_rayon, rayon_threads, set_affinity
+            "batch_size: {} rayon: {} rayon_threads: {}",
+            par_batch_size, use_rayon, rayon_threads
         );
 
         for i in 0..10 {
@@ -335,11 +335,6 @@ mod tests {
                         let thread_pool = ThreadPoolBuilder::new()
                             .num_threads(rayon_threads)
                             .start_handler(move |_i| {
-                                if set_affinity {
-                                    let cores: Vec<_> =
-                                        (2..affinity::get_core_num()).into_iter().collect();
-                                    affinity::set_thread_affinity(&cores).unwrap();
-                                }
                             })
                             .build()
                             .unwrap();
