@@ -36,7 +36,7 @@ impl PohService {
         ticks_per_slot: u64,
         pinned_cpu_core: usize,
         hashes_per_batch: u64,
-        receiver_mixin: Receiver<(Hash, Sender<Option<(PohEntry, u64)>>)>,
+        receiver_mixin: Receiver<(Hash, Sender<Option<(PohEntry, u64, Sender<()>)>>)>,
         sender_mixin_result: Sender<Option<PohEntry>>,
     ) -> Self {
         let poh_exit_ = poh_exit.clone();
@@ -122,7 +122,7 @@ impl PohService {
         target_tick_ns: u64,
         ticks_per_slot: u64,
         hashes_per_batch: u64,
-        receiver_mixin: Receiver<(Hash, Sender<Option<(PohEntry, u64)>>)>,
+        receiver_mixin: Receiver<(Hash, Sender<Option<(PohEntry, u64, Sender<()>)>>)>,
         sender_mixin_result: Sender<Option<PohEntry>>,
     ) {
         error!("tick_producer");
@@ -144,6 +144,7 @@ impl PohService {
         let mut sleep_deficit_ns = 0;
         let mut ct = 0;
         let mut try_again_mixin = None;
+        let (sender2, receiver2) = channel();
         loop {
             num_hashes += hashes_per_batch;
             let should_tick = {
@@ -164,9 +165,10 @@ impl PohService {
                     if should_tick {
                         try_again_mixin = Some((mixin, sender));
                     } else {
-                        if sender.send(Some((res.unwrap(), tick_height))).is_err() {
+                        if sender.send(Some((res.unwrap(), tick_height, sender2.clone()))).is_err() {
                             panic!("Error returning mixin hash")
                         }
+                        let _ = receiver2.recv();
                     }
                     should_tick
                 } else {
