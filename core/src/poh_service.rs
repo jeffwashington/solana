@@ -387,10 +387,11 @@ mod tests {
                             let record_lock = |sender_result: Sender<std::result::Result<(), PohRecorderError>>, receiver_result: &Receiver<std::result::Result<(), PohRecorderError>>, sender_mixin:  &Sender<(Hash, Vec<Transaction>, Slot, Sender<std::result::Result<(), PohRecorderError>>)>,| {
                                 //error!("Sending mixin");
                                 let _ = sender_mixin.send((h1, vec![tx.clone()], bank.slot(), sender_result));
-                                let res = receiver_result.recv();
+                                let res = receiver_result.recv_timeout(Duration::from_millis(4000));
                                 if res.is_err() {
                                     match res {
                                         Err(err) => {
+                                            error!("Error in recv_timeout");
                                             return ();/* Err(
                                                 PohRecorderError::InvalidCallingObject,
                                             );*/
