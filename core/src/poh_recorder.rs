@@ -82,6 +82,7 @@ pub struct PohRecorder {
     ticks: u64,
     recorded_items: u64,
     record_time_us: u64,
+    send_time_us: u64,
     tick_overhead_us: u64,
     record_us: u64,
     last_metric: Instant,
@@ -402,6 +403,7 @@ impl PohRecorder {
                 ("ticks", self.ticks, i64),
                 ("record_us", self.record_us, i64),
                 ("record_time_us", self.record_time_us, i64),
+                ("send_time_us", self.send_time_us, i64),
                 ("tick_overhead", self.tick_overhead_us, i64),
                 ("flush_cache_us", self.flush_cache_us, i64),
                 ("recorded_items", self.recorded_items, i64),
@@ -421,6 +423,7 @@ impl PohRecorder {
             self.flush_cache_us = 0;
             self.recorded_items = 0;
             self.record_time_us = 0;
+            self.send_time_us = 0;
         }
     }
 
@@ -465,9 +468,11 @@ impl PohRecorder {
                         hash: poh_entry.hash,
                         transactions,
                     };
+                    let now = Instant::now();
                     self.sender
                         .send((working_bank.bank.clone(), (entry, self.tick_height)))?;
                     self.record_time_us += timing::duration_as_us(&total_time_now.elapsed());
+                    self.send_time_us +=timing::duration_as_us(&now.elapsed());
                     return Ok(());
                 }
             }
@@ -593,6 +598,7 @@ impl PohRecorder {
                 ticks: 0,
                 recorded_items: 0,
                 record_time_us: 0,
+                send_time_us: 0,
                 record_us: 0,
                 tick_overhead_us: 0,
                 last_metric: Instant::now(),
