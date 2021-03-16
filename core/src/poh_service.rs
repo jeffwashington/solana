@@ -157,7 +157,6 @@ impl PohService {
         let mut ct = 0;
         let mut try_again_mixin = None;
         loop {
-            num_hashes += hashes_per_batch;
             let should_tick = {
                 let mixin = if let Some((mixin, transactions, bank_slot, sender)) = try_again_mixin
                 {
@@ -175,6 +174,8 @@ impl PohService {
                     loop {
                         let res = poh_recorder_l.record(bank_slot, mixin, transactions);
                         sender.send(res);
+                        num_hashes += 1;
+
                         let get_again = receiver_mixin.try_recv();
                         match get_again {
                             Ok((mixin2, transactions2, bank_slot2, sender2)) => {
@@ -197,6 +198,7 @@ impl PohService {
                     let mut r;
                     loop {
                         let mut hash_time = Measure::start("hash");
+                        num_hashes += hashes_per_batch;
                         r = poh_l.hash(hashes_per_batch);
                         hash_time.stop();
                         total_hash_time_ns += hash_time.as_ns();
