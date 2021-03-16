@@ -573,6 +573,7 @@ impl PohRecorder {
         let mut count = 0usize;
         let mut should_tick = false;
         let mut loops = 0;
+        error!("starting loop");
         loop {
             /*
             if poh_exit.load(Ordering::Relaxed) {
@@ -581,6 +582,7 @@ impl PohRecorder {
             */
 
             if hashing {
+
                 let mut lock = poh.lock().unwrap();
                 should_tick = lock.hash(count as u64);
                 loops += 1;
@@ -666,7 +668,7 @@ impl PohRecorder {
         let record_ticker = Builder::new()
             .name("solana-poh-service-record_ticker".to_string())
             .spawn(move || {
-                solana_sys_tuner::request_realtime_poh();
+                //solana_sys_tuner::request_realtime_poh();
 
                 error!("starting");
                 Self::record_ticker(
