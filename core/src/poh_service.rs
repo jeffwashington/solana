@@ -166,14 +166,22 @@ impl PohService {
                 } else {
                     receiver_mixin.try_recv()
                 };
-                if let Ok((mixin, transactions, bank_slot, sender)) = mixin {
+                if let Ok((mut mixin, mut transactions, mut bank_slot, mut sender)) = mixin {
                     //error!("jwash:Received mixin");
                     let mut lock_time = Measure::start("lock");
                     let mut poh_recorder_l = poh_recorder.lock().unwrap();
                     lock_time.stop();
                     total_lock_time_record_ns += lock_time.as_ns();
-                    let res = poh_recorder_l.record(bank_slot, mixin, transactions);
-                    sender.send(res);
+                    loop {
+                        let res = poh_recorder_l.record(bank_slot, mixin, transactions);
+                        sender.send(res);
+                        if let Ok(mut mixin, mut transactions, mut bank_slot, mut sender) =
+                            receiver_mixin.try_recv()
+                        {
+                            continue;
+                        }
+                        break;
+                    }
                     false // record will tick if it needs to
                 } else {
                     let mut lock_time = Measure::start("lock");
@@ -258,7 +266,9 @@ impl PohService {
             }
         }
         let mut dct = 0;
-        while receiver_mixin.try_recv().is_ok() {dct += 1;}
+        while receiver_mixin.try_recv().is_ok() {
+            dct += 1;
+        }
 
         drop(receiver_mixin);
         drop(sender_mixin_result);
@@ -425,7 +435,10 @@ mod tests {
                                     sender_result,
                                 ));
                                 if res.is_err() {
-                                    error!("Failed to send record, current waits: {}", *waiting.lock().unwrap());
+                                    error!(
+                                        "Failed to send record, current waits: {}",
+                                        *waiting.lock().unwrap()
+                                    );
                                     return ();
                                 }
                                 *waiting.lock().unwrap() += 1;
@@ -593,13 +606,16 @@ mod tests {
                 elapsed.as_micros() / num_ticks
             );
 
-            error!("Trying to exit, active waits: {}", *waiting2.lock().unwrap());
+            error!(
+                "Trying to exit, active waits: {}",
+                *waiting2.lock().unwrap()
+            );
             exit.store(true, Ordering::Relaxed);
             error!("poh_service.join");
             poh_service.join().unwrap();
             drop(poh_recorder);
             //drop(poh_service);
-            error!("entry_producer.join: {}",*waiting2.lock().unwrap());
+            error!("entry_producer.join: {}", *waiting2.lock().unwrap());
             entry_producer.join().unwrap();
         }
         drop(blockstore);
