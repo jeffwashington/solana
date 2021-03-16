@@ -405,7 +405,6 @@ impl PohRecorder {
                 ("tick_overhead", self.tick_overhead_us, i64),
                 ("flush_cache_us", self.flush_cache_us, i64),
                 ("recorded_items", self.recorded_items, i64),
-                ("record_time_us", )
                 (
                     "record_lock_contention",
                     self.record_lock_contention_us,
