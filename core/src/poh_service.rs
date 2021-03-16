@@ -537,6 +537,7 @@ mod tests {
             error!("poh_service.join");
             poh_service.join().unwrap();
             drop(poh_recorder);
+            drop(poh_service);
             error!("entry_producer.join");
             entry_producer.join().unwrap();
         }
