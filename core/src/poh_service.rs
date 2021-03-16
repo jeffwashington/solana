@@ -347,7 +347,7 @@ mod tests {
         );
 
         for i in 0..10 {
-            let mut waiting = AtomicI32::new(0);
+            let mut waiting = Mutex::new(0);
             let poh_config = Arc::new(PohConfig {
                 hashes_per_tick: Some((hashes_per_tick / 10) * (i + 1)),
                 target_tick_duration,
@@ -424,9 +424,9 @@ mod tests {
                                     bank.slot(),
                                     sender_result,
                                 ));
-                                waiting.fetch_add(1, Ordering::Relaxed);
+                                *waiting.lock().unwrap() += 1;
                                 let res = receiver_result.recv(); //_timeout(Duration::from_millis(4000));
-                                waiting.fetch_add(-1, Ordering::Relaxed);
+                                *waiting.lock().unwrap() -= 1;
                                 if res.is_err() {
                                     match res {
                                         Err(err) => {
@@ -588,13 +588,13 @@ mod tests {
                 elapsed.as_micros() / num_ticks
             );
 
-            error!("Trying to exit, active waits: {}", waiting.load(Ordering::Relaxed));
+            error!("Trying to exit, active waits: {}", *waiting.lock().unwrap());
             exit.store(true, Ordering::Relaxed);
             error!("poh_service.join");
             poh_service.join().unwrap();
             drop(poh_recorder);
             //drop(poh_service);
-            error!("entry_producer.join: {}", waiting.load(Ordering::Relaxed));
+            error!("entry_producer.join: {}",*waiting.lock().unwrap());
             entry_producer.join().unwrap();
         }
         drop(blockstore);
