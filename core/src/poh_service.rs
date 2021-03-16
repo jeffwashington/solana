@@ -418,12 +418,16 @@ mod tests {
                                 Sender<std::result::Result<(), PohRecorderError>>,
                             )>| {
                                 //error!("Sending mixin");
-                                let _ = sender_mixin.send((
+                                let res = sender_mixin.send((
                                     h1,
                                     vec![tx.clone()],
                                     bank.slot(),
                                     sender_result,
                                 ));
+                                if res.is_err() {
+                                    error!("Failed to send record");
+                                    return ();
+                                }
                                 *waiting.lock().unwrap() += 1;
                                 let res = receiver_result.recv(); //_timeout(Duration::from_millis(4000));
                                 *waiting.lock().unwrap() -= 1;
