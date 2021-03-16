@@ -536,6 +536,7 @@ mod tests {
             exit.store(true, Ordering::Relaxed);
             error!("poh_service.join");
             poh_service.join().unwrap();
+            drop(poh_recorder);
             error!("entry_producer.join");
             entry_producer.join().unwrap();
         }
