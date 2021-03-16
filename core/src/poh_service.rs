@@ -194,7 +194,7 @@ impl PohService {
                     let mut poh_l = poh.lock().unwrap(); // keep locked?
                     lock_time.stop();
                     total_lock_time_poh_ns += lock_time.as_ns();
-                    let r;
+                    let mut r;
                     loop {
                         let mut hash_time = Measure::start("hash");
                         r = poh_l.hash(hashes_per_batch);

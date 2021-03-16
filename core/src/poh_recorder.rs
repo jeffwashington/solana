@@ -81,6 +81,7 @@ pub struct PohRecorder {
     tick_lock_contention_us: u64,
     ticks: u64,
     recorded_items: u64,
+    record_time_us: u64,
     tick_overhead_us: u64,
     record_us: u64,
     last_metric: Instant,
@@ -400,9 +401,11 @@ impl PohRecorder {
                 ("tick_lock_contention", self.tick_lock_contention_us, i64),
                 ("ticks", self.ticks, i64),
                 ("record_us", self.record_us, i64),
+                ("record_time_us", self.record_time_us, i64),
                 ("tick_overhead", self.tick_overhead_us, i64),
                 ("flush_cache_us", self.flush_cache_us, i64),
                 ("recorded_items", self.recorded_items, i64),
+                ("record_time_us", )
                 (
                     "record_lock_contention",
                     self.record_lock_contention_us,
@@ -418,6 +421,7 @@ impl PohRecorder {
             self.last_metric = Instant::now();
             self.flush_cache_us = 0;
             self.recorded_items = 0;
+            self.record_time_us = 0;
         }
     }
 
@@ -432,6 +436,7 @@ impl PohRecorder {
         assert!(!transactions.is_empty(), "No transactions provided");
         self.report_metrics(bank_slot);
         self.recorded_items+=1;
+        let total_time_now = Instant::now();
         loop {
             let now = Instant::now();
             self.flush_cache(false)?;
@@ -469,6 +474,7 @@ impl PohRecorder {
             // and re-record()
             self.tick();
         }
+        self.record_time_us += timing::duration_as_us(&total_time_now.elapsed());
     }
     
     pub fn record1(
@@ -584,6 +590,7 @@ impl PohRecorder {
                 tick_lock_contention_us: 0,
                 ticks: 0,
                 recorded_items: 0,
+                record_time_us: 0,
                 record_us: 0,
                 tick_overhead_us: 0,
                 last_metric: Instant::now(),
