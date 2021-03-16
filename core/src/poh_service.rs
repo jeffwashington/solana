@@ -238,7 +238,7 @@ impl PohService {
                     last_metric = Instant::now();
                 }
                 if poh_exit.load(Ordering::Relaxed) {
-                    //error!("break, count: {}", ct);
+                    error!("tick producer break, count: {}", ct);
                     break;
                 }
             }
