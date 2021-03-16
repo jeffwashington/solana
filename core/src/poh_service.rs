@@ -258,7 +258,7 @@ impl PohService {
                     total_lock_time_record_ns = 0;
                     total_lock_time_ns = 0;
                     total_lock_time_poh_ns = 0;
-                    total_hash_time_us = 0;
+                    total_hash_time_ns = 0;
                     last_metric = Instant::now();
                 }
                 if poh_exit.load(Ordering::Relaxed) {
