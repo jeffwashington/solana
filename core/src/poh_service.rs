@@ -6,7 +6,7 @@ use solana_measure::measure::Measure;
 use solana_sdk::{clock::Slot, hash::Hash, poh_config::PohConfig, transaction::Transaction};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{
-    mpsc::{channel, Receiver, Sender, RecvError, TryRecvError},
+    mpsc::{channel, Receiver, RecvError, Sender, TryRecvError},
     Arc, Mutex,
 };
 use std::thread::{self, sleep, Builder, JoinHandle};
@@ -36,7 +36,12 @@ impl PohService {
         ticks_per_slot: u64,
         pinned_cpu_core: usize,
         hashes_per_batch: u64,
-        receiver_mixin: Receiver<(Hash, Vec<Transaction>, Slot, Sender<std::result::Result<(), PohRecorderError>>)>,
+        receiver_mixin: Receiver<(
+            Hash,
+            Vec<Transaction>,
+            Slot,
+            Sender<std::result::Result<(), PohRecorderError>>,
+        )>,
         sender_mixin_result: Sender<Option<PohEntry>>,
     ) -> Self {
         let poh_exit_ = poh_exit.clone();
@@ -122,7 +127,12 @@ impl PohService {
         target_tick_ns: u64,
         ticks_per_slot: u64,
         hashes_per_batch: u64,
-        receiver_mixin: Receiver<(Hash, Vec<Transaction>, Slot, Sender<std::result::Result<(), PohRecorderError>>)>,
+        receiver_mixin: Receiver<(
+            Hash,
+            Vec<Transaction>,
+            Slot,
+            Sender<std::result::Result<(), PohRecorderError>>,
+        )>,
         sender_mixin_result: Sender<Option<PohEntry>>,
     ) {
         //error!("tick_producer");
@@ -149,7 +159,8 @@ impl PohService {
         loop {
             num_hashes += hashes_per_batch;
             let should_tick = {
-                let mixin = if let Some((mixin, transactions, bank_slot, sender)) = try_again_mixin {
+                let mixin = if let Some((mixin, transactions, bank_slot, sender)) = try_again_mixin
+                {
                     try_again_mixin = None;
                     Ok((mixin, transactions, bank_slot, sender))
                 } else {
@@ -223,7 +234,11 @@ impl PohService {
                         ("total_sleep_us", total_sleep_us, i64),
                         ("total_tick_time_us", total_tick_time_ns / 1000, i64),
                         ("total_lock_time_tick_us", total_lock_time_ns / 1000, i64),
-                        ("total_lock_time_record_us", total_lock_time_record_ns / 1000, i64),
+                        (
+                            "total_lock_time_record_us",
+                            total_lock_time_record_ns / 1000,
+                            i64
+                        ),
                         ("total_lock_time_poh_us", total_lock_time_poh_ns / 1000, i64),
                         ("total_hash_time_us", total_hash_time_ns / 1000, i64),
                     );
@@ -238,7 +253,10 @@ impl PohService {
                     last_metric = Instant::now();
                 }
                 if poh_exit.load(Ordering::Relaxed) {
+                    while receiver_mixin.try_recv().is_ok() {}
+
                     drop(receiver_mixin);
+                    drop(sender_mixin_result);
                     error!("tick producer break, count: {}", ct);
                     break;
                 }
@@ -385,17 +403,33 @@ mod tests {
                             //error!("ln: {}", line!());
                             // send some data
                             let mut time = Measure::start("record");
-                            let record_lock = |sender_result: Sender<std::result::Result<(), PohRecorderError>>, receiver_result: &Receiver<std::result::Result<(), PohRecorderError>>, sender_mixin:  &Sender<(Hash, Vec<Transaction>, Slot, Sender<std::result::Result<(), PohRecorderError>>)>,| {
+                            let record_lock = |sender_result: Sender<
+                                std::result::Result<(), PohRecorderError>,
+                            >,
+                                               receiver_result: &Receiver<
+                                std::result::Result<(), PohRecorderError>,
+                            >,
+                                               sender_mixin: &Sender<(
+                                Hash,
+                                Vec<Transaction>,
+                                Slot,
+                                Sender<std::result::Result<(), PohRecorderError>>,
+                            )>| {
                                 //error!("Sending mixin");
-                                let _ = sender_mixin.send((h1, vec![tx.clone()], bank.slot(), sender_result));
-                                let res = receiver_result.recv();//_timeout(Duration::from_millis(4000));
+                                let _ = sender_mixin.send((
+                                    h1,
+                                    vec![tx.clone()],
+                                    bank.slot(),
+                                    sender_result,
+                                ));
+                                let res = receiver_result.recv(); //_timeout(Duration::from_millis(4000));
                                 if res.is_err() {
                                     match res {
                                         Err(err) => {
                                             error!("Error in recv_timeout");
-                                            return ();/* Err(
-                                                PohRecorderError::InvalidCallingObject,
-                                            );*/
+                                            return (); /* Err(
+                                                           PohRecorderError::InvalidCallingObject,
+                                                       );*/
                                         }
                                         Ok(_) => {}
                                     }
@@ -406,27 +440,37 @@ mod tests {
                             if use_rayon {
                                 let chunks = rayon_threads;
                                 let chunk_size = par_batch_size / chunks;
-                                let sender_mixins = (0..chunks).into_iter().map(|chunk| (sender_mixin.clone(), chunk)).collect::<Vec<_>>();
+                                let sender_mixins = (0..chunks)
+                                    .into_iter()
+                                    .map(|chunk| (sender_mixin.clone(), chunk))
+                                    .collect::<Vec<_>>();
                                 thread_pool.install(|| {
-                                    sender_mixins.into_par_iter().for_each(|(sender_mixin, chunk)| {
-                                        //let sender_mixin = sender_mixin.clone();
-                                        let (sender_result, receiver_result) = channel();
-                                        let mut chunk_size = chunk_size;
-                                        if chunk == chunks-1 {
-                                            let chunk_size_new = par_batch_size - chunk_size * (chunks - 1);
-                                            assert!(chunk_size_new < chunk_size + chunks);
-                                            chunk_size = chunk_size_new;
-                                        }
-                                        for _i in 0..chunk_size {
-                                            record_lock(sender_result.clone(), &receiver_result, &sender_mixin);
-                                        }
-                                    })
+                                    sender_mixins.into_par_iter().for_each(
+                                        |(sender_mixin, chunk)| {
+                                            //let sender_mixin = sender_mixin.clone();
+                                            let (sender_result, receiver_result) = channel();
+                                            let mut chunk_size = chunk_size;
+                                            if chunk == chunks - 1 {
+                                                let chunk_size_new =
+                                                    par_batch_size - chunk_size * (chunks - 1);
+                                                assert!(chunk_size_new < chunk_size + chunks);
+                                                chunk_size = chunk_size_new;
+                                            }
+                                            for _i in 0..chunk_size {
+                                                record_lock(
+                                                    sender_result.clone(),
+                                                    &receiver_result,
+                                                    &sender_mixin,
+                                                );
+                                            }
+                                        },
+                                    )
                                     /*
                                     (0..par_batch_size).into_par_iter().for_each(record_lock);
                                     */
                                 });
                             } else {
-                                panic!("unsupported");//(0..par_batch_size).into_iter().for_each(record_lock);
+                                panic!("unsupported"); //(0..par_batch_size).into_iter().for_each(record_lock);
                             }
                             time.stop();
                             total_us += time.as_us();
@@ -495,7 +539,14 @@ mod tests {
                     hashes += entry.num_hashes;
 
                     //error!("hashes: {}, hashes_per_tick expected: {}, num hashes: {}, num_ticks: {}, iteration: {}", hashes, poh_config.hashes_per_tick.unwrap(), entry.num_hashes, num_ticks, i);
-                    assert_eq!(hashes, poh_config.hashes_per_tick.unwrap(), "num hashes: {}, num_ticks: {}, iteration: {}", entry.num_hashes, num_ticks, i);
+                    assert_eq!(
+                        hashes,
+                        poh_config.hashes_per_tick.unwrap(),
+                        "num hashes: {}, num_ticks: {}, iteration: {}",
+                        entry.num_hashes,
+                        num_ticks,
+                        i
+                    );
 
                     hashes = 0;
                 } else {
