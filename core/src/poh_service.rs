@@ -383,7 +383,7 @@ mod tests {
         for i in 0..10 {
             let mut waiting = Arc::new(Mutex::new(0));
             let poh_config = Arc::new(PohConfig {
-                hashes_per_tick: Some(30_000),//(hashes_per_tick / 10) * (i + 1)),
+                hashes_per_tick: Some(32445),//(hashes_per_tick / 10) * (i + 1)),
                 target_tick_duration,
                 target_tick_count: None,
             });
