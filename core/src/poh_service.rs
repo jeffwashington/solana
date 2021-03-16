@@ -448,6 +448,7 @@ mod tests {
                                     .into_iter()
                                     .map(|chunk| (sender_mixin.clone(), chunk))
                                     .collect::<Vec<_>>();
+                                error!("this many parallel: {}", sender_mixins.len());
                                 thread_pool.install(|| {
                                     sender_mixins.into_par_iter().for_each(
                                         |(sender_mixin, chunk)| {
