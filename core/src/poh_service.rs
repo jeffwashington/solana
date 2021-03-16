@@ -403,7 +403,7 @@ mod tests {
                         let mut total_times = 0;
                         let h1 = hash(b"hello world!");
                         let tx = test_tx();
-                        loop {
+                        'outer: loop {
                             // send some data
                             let mut time = Measure::start("record");
                             let record_lock = |recorder: &Recorder| {
@@ -451,15 +451,34 @@ mod tests {
                             if is_test_run && thread_rng().gen_ratio(1, 4) {
                                 sleep(Duration::from_millis(200));
                             }
-
-                            if exit.load(Ordering::Relaxed) {
-                                info!(
-                                    "spent:{}ms record: {}ms entries recorded: {}",
-                                    now.elapsed().as_millis(),
-                                    total_us / 1000,
-                                    &(total_times * par_batch_size),
-                                );
-                                break;
+                            loop {
+                                let records = total_times * par_batch_size;
+                                let elapsed = now.elapsed().as_millis() as usize;
+                                if exit.load(Ordering::Relaxed) {
+                                    info!(
+                                        "spent:{}ms record: {}ms entries recorded: {}, tps: {}",
+                                        elapsed,
+                                        total_us / 1000,
+                                        &(total_times * par_batch_size),
+                                        records * 1000 / std::cmp::max(1, elapsed),
+                                    );
+                                    break 'outer;
+                                }
+                                let throttle = true;
+                                if throttle && elapsed > 0 {
+                                    let target_records_per_s = 2_000;
+                                    let records_per_s = records / elapsed * 1000;
+                                    if records_per_s > target_records_per_s {
+                                        let excess_records = records_per_s - target_records_per_s;
+                                        let sleep_ms = std::cmp::min(
+                                            100,
+                                            excess_records * 1000 / target_records_per_s,
+                                        );
+                                        sleep(Duration::from_millis(sleep_ms as u64));
+                                    } else {
+                                        break;
+                                    }
+                                }
                             }
                         }
                     })
