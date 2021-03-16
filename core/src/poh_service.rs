@@ -374,7 +374,7 @@ mod tests {
                 max_tick_height: std::u64::MAX,
             };
             let ticks_per_slot = bank.ticks_per_slot();
-
+            let waiting2 = waiting.clone();
             let entry_producer = {
                 let poh_recorder = poh_recorder.clone();
                 let exit = exit.clone();
@@ -588,13 +588,13 @@ mod tests {
                 elapsed.as_micros() / num_ticks
             );
 
-            error!("Trying to exit, active waits: {}", *waiting.lock().unwrap());
+            error!("Trying to exit, active waits: {}", *waiting2.lock().unwrap());
             exit.store(true, Ordering::Relaxed);
             error!("poh_service.join");
             poh_service.join().unwrap();
             drop(poh_recorder);
             //drop(poh_service);
-            error!("entry_producer.join: {}",*waiting.lock().unwrap());
+            error!("entry_producer.join: {}",*waiting2.lock().unwrap());
             entry_producer.join().unwrap();
         }
         drop(blockstore);
