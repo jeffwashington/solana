@@ -194,10 +194,25 @@ impl PohService {
                     let mut poh_l = poh.lock().unwrap(); // keep locked?
                     lock_time.stop();
                     total_lock_time_poh_ns += lock_time.as_ns();
-                    let mut hash_time = Measure::start("hash");
-                    let r = poh_l.hash(hashes_per_batch);
-                    hash_time.stop();
-                    total_hash_time_ns += hash_time.as_ns();
+                    loop {
+                        let mut hash_time = Measure::start("hash");
+                        let r = poh_l.hash(hashes_per_batch);
+                        hash_time.stop();
+                        total_hash_time_ns += hash_time.as_ns();
+                        if r {
+                            break;
+                        }
+                        let get_again = receiver_mixin.try_recv();
+                        match get_again {
+                            Ok(inside) => {
+                                try_again_mixin = Some(inside);
+                                break;
+                            },
+                            Err(_) => {
+                                continue;
+                            }
+                        }
+                    }
                     r
                 }
             };
