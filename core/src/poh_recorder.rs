@@ -435,7 +435,7 @@ impl PohRecorder {
         assert!(!transactions.is_empty(), "No transactions provided");
         self.report_metrics(bank_slot);
         self.recorded_items+=1;
-        let total_time_now = Instant::now();
+        let mut total_time_now = Instant::now();
         loop {
             let now = Instant::now();
             self.flush_cache(false)?;
@@ -446,8 +446,8 @@ impl PohRecorder {
                 .as_ref()
                 .ok_or(PohRecorderError::MaxHeightReached)?;
             if bank_slot != working_bank.bank.slot() {
-                self.report_metrics(bank_slot);
                 self.record_time_us += timing::duration_as_us(&total_time_now.elapsed());
+                self.report_metrics(bank_slot);
                 return Err(PohRecorderError::MaxHeightReached);
             }
 
@@ -471,9 +471,11 @@ impl PohRecorder {
                     return Ok(());
                 }
             }
+            self.record_time_us += timing::duration_as_us(&total_time_now.elapsed());
             // record() might fail if the next PoH hash needs to be a tick.  But that's ok, tick()
             // and re-record()
             self.tick();
+            total_time_now = Instant::now();
         }
     }
     
