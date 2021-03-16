@@ -253,11 +253,12 @@ impl PohService {
                     last_metric = Instant::now();
                 }
                 if poh_exit.load(Ordering::Relaxed) {
-                    while receiver_mixin.try_recv().is_ok() {}
+                    let mut dct = 0;
+                    while receiver_mixin.try_recv().is_ok() {dct += 1;}
 
                     drop(receiver_mixin);
                     drop(sender_mixin_result);
-                    error!("tick producer break, count: {}", ct);
+                    error!("tick producer break, count: {}, dropped: {}", ct, dct);
                     break;
                 }
             }
