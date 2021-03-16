@@ -412,7 +412,9 @@ mod tests {
                                         let (sender_result, receiver_result) = channel();
                                         let mut chunk_size = chunk_size;
                                         if chunk == chunks-1 {
-                                            chunk_size = par_batch_size - chunk_size * (chunks - 1);
+                                            let chunk_size_new = par_batch_size - chunk_size * (chunks - 1);
+                                            assert!(chunk_size_new < chunk_size + chunks);
+                                            chunk_size = chunk_size_new;
                                         }
                                         for _i in 0..chunk_size {
                                             record_lock(sender_result.clone(), &receiver_result, &sender_mixin);
