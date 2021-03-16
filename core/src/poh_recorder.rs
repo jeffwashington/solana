@@ -541,7 +541,6 @@ impl PohRecorder {
                 drop(poh_lock);
                 self.record_us += timing::duration_as_us(&now.elapsed());
                 if let Some(poh_entry) = res {
-                    error!("sending");
                     self.record_ticker_sender.send((Hash::default(), 16));
                     let entry = Entry {
                         num_hashes: poh_entry.num_hashes,
@@ -553,9 +552,7 @@ impl PohRecorder {
                     self.sender.send((cl, (entry, self.tick_height)))?;
                     self.record_time_us += timing::duration_as_us(&total_time_now.elapsed());
                     self.send_time_us += timing::duration_as_us(&now.elapsed());
-                    error!("sending2");
-                    self.record_ticker_sender.send((Hash::default(), 16));
-                    error!("sending3");
+                    self.record_ticker_sender.send((Hash::default(), 0));
                     //let _ = self.record_ticker_response_receiver.recv();
                     return Ok(());
                 }
