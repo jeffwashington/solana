@@ -175,12 +175,15 @@ impl PohService {
                     loop {
                         let res = poh_recorder_l.record(bank_slot, mixin, transactions);
                         sender.send(res);
-                        if Ok((mixin, transactions, bank_slot, sender)) =
-                            receiver_mixin.try_recv()
-                        {
-                            continue;
+                        let get_again = receiver_mixin.try_recv();
+                        match get_again {
+                            Ok(mixin) => {
+                                (mixin, transactions, bank_slot, sender) = mixin;  
+                            },
+                            Err(_) => {
+                                break;
+                            }
                         }
-                        break;
                     }
                     false // record will tick if it needs to
                 } else {
