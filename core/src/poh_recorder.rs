@@ -468,9 +468,10 @@ impl PohRecorder {
                         hash: poh_entry.hash,
                         transactions,
                     };
+                    let cl = working_bank.bank.clone();
                     let now = Instant::now();
                     self.sender
-                        .send((working_bank.bank.clone(), (entry, self.tick_height)))?;
+                        .send((cl, (entry, self.tick_height)))?;
                     self.record_time_us += timing::duration_as_us(&total_time_now.elapsed());
                     self.send_time_us +=timing::duration_as_us(&now.elapsed());
                     return Ok(());
