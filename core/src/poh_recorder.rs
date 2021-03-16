@@ -447,6 +447,7 @@ impl PohRecorder {
                 .ok_or(PohRecorderError::MaxHeightReached)?;
             if bank_slot != working_bank.bank.slot() {
                 self.report_metrics(bank_slot);
+                self.record_time_us += timing::duration_as_us(&total_time_now.elapsed());
                 return Err(PohRecorderError::MaxHeightReached);
             }
 
@@ -466,6 +467,7 @@ impl PohRecorder {
                     };
                     self.sender
                         .send((working_bank.bank.clone(), (entry, self.tick_height)))?;
+                    self.record_time_us += timing::duration_as_us(&total_time_now.elapsed());
                     return Ok(());
                 }
             }
@@ -473,7 +475,6 @@ impl PohRecorder {
             // and re-record()
             self.tick();
         }
-        self.record_time_us += timing::duration_as_us(&total_time_now.elapsed());
     }
     
     pub fn record1(
