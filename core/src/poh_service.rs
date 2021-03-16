@@ -238,6 +238,7 @@ impl PohService {
                     last_metric = Instant::now();
                 }
                 if poh_exit.load(Ordering::Relaxed) {
+                    drop(receiver_mixin);
                     error!("tick producer break, count: {}", ct);
                     break;
                 }
@@ -537,7 +538,7 @@ mod tests {
             error!("poh_service.join");
             poh_service.join().unwrap();
             drop(poh_recorder);
-            drop(poh_service);
+            //drop(poh_service);
             error!("entry_producer.join");
             entry_producer.join().unwrap();
         }
