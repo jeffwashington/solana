@@ -175,7 +175,7 @@ impl PohService {
                     loop {
                         let res = poh_recorder_l.record(bank_slot, mixin, transactions);
                         sender.send(res);
-                        if let Ok((mut mixin, mut transactions, mut bank_slot, mut sender)) =
+                        if Ok((mixin, transactions, bank_slot, sender)) =
                             receiver_mixin.try_recv()
                         {
                             continue;
