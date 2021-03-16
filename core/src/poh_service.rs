@@ -177,8 +177,8 @@ impl PohService {
                         sender.send(res);
                         let get_again = receiver_mixin.try_recv();
                         match get_again {
-                            Ok(mixin) => {
-                                (mixin, transactions, bank_slot, sender) = mixin;  
+                            Ok(get_again) => {
+                                (mixin, transactions, bank_slot, sender) = get_again;  
                             },
                             Err(_) => {
                                 break;
