@@ -347,7 +347,7 @@ mod tests {
         );
 
         for i in 0..10 {
-            let mut waiting = AtomicI32::new();
+            let mut waiting = AtomicI32::new(0);
             let poh_config = Arc::new(PohConfig {
                 hashes_per_tick: Some((hashes_per_tick / 10) * (i + 1)),
                 target_tick_duration,
@@ -424,9 +424,9 @@ mod tests {
                                     bank.slot(),
                                     sender_result,
                                 ));
-                                waiting.fetch_add(1);
+                                waiting.fetch_add(1, Ordering::Relaxed);
                                 let res = receiver_result.recv(); //_timeout(Duration::from_millis(4000));
-                                waiting.fetch_add(-1);
+                                waiting.fetch_add(-1, Ordering::Relaxed);
                                 if res.is_err() {
                                     match res {
                                         Err(err) => {
