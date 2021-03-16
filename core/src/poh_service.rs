@@ -564,19 +564,16 @@ mod tests {
             let mut num_ticks = 0;
 
             let time = Instant::now();
+            let hashes_per_tick = poh_config.hashes_per_tick.unwrap();
             while run_time != 0 || need_tick || need_entry || need_partial {
                 let (_bank, (entry, _tick_height)) = entry_receiver.recv().unwrap();
-
                 if entry.is_tick() {
                     num_ticks += 1;
                     assert!(
-                        entry.num_hashes <= poh_config.hashes_per_tick.unwrap(),
-                        "{} <= {}",
-                        entry.num_hashes,
-                        poh_config.hashes_per_tick.unwrap()
+                        entry.num_hashes <= hashes_per_tick
                     );
 
-                    if entry.num_hashes == poh_config.hashes_per_tick.unwrap() {
+                    if entry.num_hashes == hashes_per_tick {
                         need_tick = false;
                     } else {
                         need_partial = false;
@@ -584,14 +581,10 @@ mod tests {
 
                     hashes += entry.num_hashes;
 
-                    //error!("hashes: {}, hashes_per_tick expected: {}, num hashes: {}, num_ticks: {}, iteration: {}", hashes, poh_config.hashes_per_tick.unwrap(), entry.num_hashes, num_ticks, i);
+                    //error!("hashes: {}, hashes_per_tick expected: {}, num hashes: {}, num_ticks: {}, iteration: {}", hashes, hashes_per_tick, entry.num_hashes, num_ticks, i);
                     assert_eq!(
                         hashes,
-                        poh_config.hashes_per_tick.unwrap(),
-                        "num hashes: {}, num_ticks: {}, iteration: {}",
-                        entry.num_hashes,
-                        num_ticks,
-                        i
+                        hashes_per_tick
                     );
 
                     hashes = 0;
@@ -641,6 +634,15 @@ mod tests {
             //drop(poh_service);
             error!("entry_producer.join: {}", *waiting2.lock().unwrap());
             entry_producer.join().unwrap();
+            let mut extra = 0;
+            loop {
+                if let Ok(res) = entry_receiver.try_recv() {
+                    extra += 1;
+                }
+                break;
+            }
+            error!("Extra recorded entries not processed: {}", extra);
+
         }
         drop(blockstore);
         Blockstore::destroy(&ledger_path).unwrap();
