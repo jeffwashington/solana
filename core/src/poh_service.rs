@@ -425,7 +425,7 @@ mod tests {
                                     sender_result,
                                 ));
                                 if res.is_err() {
-                                    error!("Failed to send record");
+                                    error!("Failed to send record, current waits: {}", *waiting.lock().unwrap());
                                     return ();
                                 }
                                 *waiting.lock().unwrap() += 1;
