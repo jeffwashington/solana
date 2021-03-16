@@ -387,7 +387,7 @@ mod tests {
                             let record_lock = |sender_result: Sender<std::result::Result<(), PohRecorderError>>, receiver_result: &Receiver<std::result::Result<(), PohRecorderError>>, sender_mixin:  &Sender<(Hash, Vec<Transaction>, Slot, Sender<std::result::Result<(), PohRecorderError>>)>,| {
                                 //error!("Sending mixin");
                                 let _ = sender_mixin.send((h1, vec![tx.clone()], bank.slot(), sender_result));
-                                let res = receiver_result.recv_timeout(Duration::from_millis(4000));
+                                let res = receiver_result.recv();//_timeout(Duration::from_millis(4000));
                                 if res.is_err() {
                                     match res {
                                         Err(err) => {
@@ -532,8 +532,11 @@ mod tests {
                 elapsed.as_micros() / num_ticks
             );
 
+            error!("Trying to exit");
             exit.store(true, Ordering::Relaxed);
+            error!("poh_service.join");
             poh_service.join().unwrap();
+            error!("entry_producer.join");
             entry_producer.join().unwrap();
         }
         drop(blockstore);
