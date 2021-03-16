@@ -4,7 +4,7 @@ use crate::poh_recorder::{PohRecorder, PohRecorderError};
 use solana_ledger::poh::PohEntry;
 use solana_measure::measure::Measure;
 use solana_sdk::{clock::Slot, hash::Hash, poh_config::PohConfig, transaction::Transaction};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 use std::sync::{
     mpsc::{channel, Receiver, RecvError, Sender, TryRecvError},
     Arc, Mutex,
@@ -347,6 +347,7 @@ mod tests {
         );
 
         for i in 0..10 {
+            let mut waiting = AtomicI32::new();
             let poh_config = Arc::new(PohConfig {
                 hashes_per_tick: Some((hashes_per_tick / 10) * (i + 1)),
                 target_tick_duration,
@@ -423,7 +424,9 @@ mod tests {
                                     bank.slot(),
                                     sender_result,
                                 ));
+                                waiting.fetch_add(1);
                                 let res = receiver_result.recv(); //_timeout(Duration::from_millis(4000));
+                                waiting.fetch_add(-1);
                                 if res.is_err() {
                                     match res {
                                         Err(err) => {
@@ -585,13 +588,13 @@ mod tests {
                 elapsed.as_micros() / num_ticks
             );
 
-            error!("Trying to exit");
+            error!("Trying to exit, active waits: {}", waiting.load(Ordering::Relaxed));
             exit.store(true, Ordering::Relaxed);
             error!("poh_service.join");
             poh_service.join().unwrap();
             drop(poh_recorder);
             //drop(poh_service);
-            error!("entry_producer.join");
+            error!("entry_producer.join: {}", waiting.load(Ordering::Relaxed));
             entry_producer.join().unwrap();
         }
         drop(blockstore);
