@@ -593,7 +593,7 @@ impl PohRecorder {
                         if msg_count == 0 {
                             assert!(hashing);
                             hashing = false;
-                            error!("record_ticker ran: {} times", loops);
+                            //error!("record_ticker ran: {} times", loops);
                             loops = 0;
                             // nobody cares - lock will be released and we'll stop. let res = sender.send((hash, count));
                             assert!(!res.is_err());
