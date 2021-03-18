@@ -23,8 +23,10 @@ use solana_sdk::pubkey::Pubkey;
 use solana_sdk::timing;
 use solana_sdk::transaction::Transaction;
 use std::cmp;
+use std::sync::mpsc::TryRecvError;
 use std::sync::mpsc::{channel, Receiver, SendError, Sender, SyncSender};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, /*atomic::{AtomicBool, Ordering}, */ Mutex};
+use std::thread::{Builder, JoinHandle};
 use std::time::Instant;
 use thiserror::Error;
 
@@ -156,6 +158,9 @@ pub struct PohRecorder {
     record_us: u64,
     last_metric: Instant,
     record_sender: Sender<Record>,
+    record_ticker_sender: Sender<(Hash, usize)>,
+    _record_ticker_response_receiver: Receiver<(Hash, usize)>,
+    _record_ticker: JoinHandle<()>,
 }
 
 impl PohRecorder {
@@ -453,6 +458,7 @@ impl PohRecorder {
     pub fn tick(&mut self) {
         let now = Instant::now();
         let poh_entry = self.poh.lock().unwrap().tick();
+        let _ = self.record_ticker_sender.send((Hash::default(), 16));
         self.tick_lock_contention_us += timing::duration_as_us(&now.elapsed());
         let now = Instant::now();
         if let Some(poh_entry) = poh_entry {
@@ -461,6 +467,7 @@ impl PohRecorder {
 
             if self.leader_first_tick_height.is_none() {
                 self.tick_overhead_us += timing::duration_as_us(&now.elapsed());
+                let _ = self.record_ticker_sender.send((Hash::default(), 0));
                 return;
             }
 
@@ -473,6 +480,7 @@ impl PohRecorder {
             self.tick_cache.push((entry, self.tick_height));
             let _ = self.flush_cache(true);
         }
+        let _ = self.record_ticker_sender.send((Hash::default(), 0));
         self.tick_overhead_us += timing::duration_as_us(&now.elapsed());
     }
 
@@ -530,6 +538,7 @@ impl PohRecorder {
                 drop(poh_lock);
                 self.record_us += timing::duration_as_us(&now.elapsed());
                 if let Some(poh_entry) = res {
+                    let _ = self.record_ticker_sender.send((Hash::default(), 16));
                     let entry = Entry {
                         num_hashes: poh_entry.num_hashes,
                         hash: poh_entry.hash,
@@ -537,12 +546,79 @@ impl PohRecorder {
                     };
                     self.sender
                         .send((working_bank.bank.clone(), (entry, self.tick_height)))?;
+                    let _ = self.record_ticker_sender.send((Hash::default(), 0));
+                    //let _ = self.record_ticker_response_receiver.recv();
                     return Ok(());
                 }
             }
             // record() might fail if the next PoH hash needs to be a tick.  But that's ok, tick()
             // and re-record()
             self.tick();
+        }
+    }
+
+    fn record_ticker(
+        poh: Arc<Mutex<Poh>>,
+        receiver: Receiver<(Hash, usize)>,
+        _sender: Sender<(Hash, usize)>, /*poh_exit: AtomicBool*/
+    ) {
+        // runs in a separate thread
+        // goal is to hash what we can while record is busy doing other synchronous things
+        let mut hashing = false;
+        let mut count = 0usize;
+        let mut should_tick;
+        let mut loops = 0;
+        loop {
+            /*
+            if poh_exit.load(Ordering::Relaxed) {
+                break;
+            }
+            */
+
+            if hashing {
+                let mut lock = poh.lock().unwrap();
+                should_tick = lock.hash(count as u64);
+                loops += 1;
+
+                let res = if should_tick {
+                    receiver.try_recv()
+                } else {
+                    match receiver.recv() {
+                        Ok(payload) => Ok(payload),
+                        Err(_) => Err(TryRecvError::Disconnected),
+                    }
+                };
+                match res {
+                    Ok((_msg_hash, msg_count)) => {
+                        if msg_count == 0 {
+                            assert!(hashing);
+                            hashing = false;
+                            error!("record_ticker ran: {} times", loops);
+                            loops = 0;
+                            // nobody cares - lock will be released and we'll stop. let res = sender.send((hash, count));
+                            assert!(!res.is_err());
+                        } else {
+                            assert!(false, "illegal call");
+                        }
+                    }
+                    Err(_) => {}
+                }
+            } else {
+                let res = receiver.recv();
+                match res {
+                    Ok((_msg_hash, msg_count)) => {
+                        if msg_count == 0 {
+                            assert!(false, "illegal call");
+                        } else {
+                            count = msg_count;
+                            hashing = true;
+                        }
+                    }
+                    Err(_) => {
+                        break;
+                    }
+                }
+            }
         }
     }
 
@@ -563,8 +639,30 @@ impl PohRecorder {
             last_entry_hash,
             poh_config.hashes_per_tick,
         )));
-        let (sender, receiver) = channel();
         let (record_sender, record_receiver) = channel();
+        let (sender, receiver) = channel(); // would like this to be spsc instead of mpsc
+        let (record_ticker_sender, record_ticker_receiver) = channel();
+        let (record_ticker_response_sender, record_ticker_response_receiver) = channel();
+
+        //let poh_exit = AtomicBool::new(false);
+        //let poh_exit_ = poh_exit.clone();
+        let poh_config = poh_config.clone();
+        let poh_ = poh.clone();
+        let record_ticker = Builder::new()
+            .name("solana-poh-service-record_ticker".to_string())
+            .spawn(move || {
+                solana_sys_tuner::request_realtime_poh();
+
+                Self::record_ticker(
+                    poh_,
+                    record_ticker_receiver,
+                    record_ticker_response_sender,
+                    //poh_exit_,
+                );
+                //poh_exit_.store(true, Ordering::Relaxed);
+            })
+            .unwrap();
+
         let (leader_first_tick_height, leader_last_tick_height, grace_ticks) =
             Self::compute_leader_slot_tick_heights(next_leader_slot, ticks_per_slot);
         (
@@ -591,6 +689,9 @@ impl PohRecorder {
                 tick_overhead_us: 0,
                 last_metric: Instant::now(),
                 record_sender,
+                record_ticker_sender,
+                _record_ticker_response_receiver: record_ticker_response_receiver,
+                _record_ticker: record_ticker,
             },
             receiver,
             record_receiver,
