@@ -162,8 +162,8 @@ pub struct PohRecorder {
     record_us: u64,
     last_metric: Instant,
     record_sender: Sender<Record>,
-    record_ticker_sender: Sender<(Hash, usize)>,
-    _record_ticker_response_receiver: Receiver<(Hash, usize)>,
+    record_ticker_sender: Sender<usize>,
+    _record_ticker_response_receiver: Receiver<usize>,
     _record_ticker: JoinHandle<()>,
 }
 
@@ -462,16 +462,16 @@ impl PohRecorder {
     pub fn tick(&mut self) {
         let now = Instant::now();
         let poh_entry = self.poh.lock().unwrap().tick();
-        let _ = self.record_ticker_sender.send((Hash::default(), 16));
         self.tick_lock_contention_us += timing::duration_as_us(&now.elapsed());
         let now = Instant::now();
         if let Some(poh_entry) = poh_entry {
+            let _ = self.record_ticker_sender.send(32);
             self.tick_height += 1;
             trace!("tick_height {}", self.tick_height);
 
             if self.leader_first_tick_height.is_none() {
                 self.tick_overhead_us += timing::duration_as_us(&now.elapsed());
-                let _ = self.record_ticker_sender.send((Hash::default(), 0));
+                let _ = self.record_ticker_sender.send(0);
                 return;
             }
 
@@ -487,7 +487,7 @@ impl PohRecorder {
             let _ = self.flush_cache(true);
             self.flush_cache_tick_us += timing::duration_as_us(&now.elapsed());
         }
-        let _ = self.record_ticker_sender.send((Hash::default(), 0));
+        let _ = self.record_ticker_sender.send(0);
     }
 
     fn report_metrics(&mut self, bank_slot: Slot) {
@@ -555,7 +555,7 @@ impl PohRecorder {
                 self.record_us += timing::duration_as_us(&now.elapsed());
                 let now = Instant::now();
                 if let Some(poh_entry) = res {
-                    let _ = self.record_ticker_sender.send((Hash::default(), 16));
+                    let _ = self.record_ticker_sender.send(32);
                     let entry = Entry {
                         num_hashes: poh_entry.num_hashes,
                         hash: poh_entry.hash,
@@ -566,7 +566,7 @@ impl PohRecorder {
                     let now = Instant::now();
                     self.sender.send((bank_clone, (entry, self.tick_height)))?;
                     self.send_us += timing::duration_as_us(&now.elapsed());
-                    let _ = self.record_ticker_sender.send((Hash::default(), 0));
+                    let _ = self.record_ticker_sender.send(0);
                     return Ok(());
                 }
             }
@@ -578,8 +578,8 @@ impl PohRecorder {
 
     fn record_ticker(
         poh: Arc<Mutex<Poh>>,
-        receiver: Receiver<(Hash, usize)>,
-        _sender: Sender<(Hash, usize)>, /*poh_exit: AtomicBool*/
+        receiver: Receiver<usize>,
+        _sender: Sender<usize>, /*poh_exit: AtomicBool*/
     ) {
         // runs in a separate thread
         // goal is to hash what we can while record is busy doing other synchronous things
@@ -608,7 +608,7 @@ impl PohRecorder {
                     }
                 };
                 match res {
-                    Ok((_msg_hash, msg_count)) => {
+                    Ok(msg_count) => {
                         if msg_count == 0 {
                             assert!(hashing);
                             hashing = false;
@@ -625,7 +625,7 @@ impl PohRecorder {
             } else {
                 let res = receiver.recv();
                 match res {
-                    Ok((_msg_hash, msg_count)) => {
+                    Ok(msg_count) => {
                         if msg_count == 0 {
                             assert!(false, "illegal call");
                         } else {
