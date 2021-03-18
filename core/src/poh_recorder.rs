@@ -486,8 +486,8 @@ impl PohRecorder {
             self.tick_cache.push((entry, self.tick_height));
             let _ = self.flush_cache(true);
             self.flush_cache_tick_us += timing::duration_as_us(&now.elapsed());
+            let _ = self.record_ticker_sender.send(0);
         }
-        let _ = self.record_ticker_sender.send(0);
     }
 
     fn report_metrics(&mut self, bank_slot: Slot) {
