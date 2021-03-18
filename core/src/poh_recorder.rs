@@ -596,38 +596,39 @@ impl PohRecorder {
 
             if hashing {
                 let mut lock = poh.lock().unwrap();
-                should_tick = lock.hash(count as u64);
-                loops += 1;
+                loop {
+                    should_tick = lock.hash(count as u64);
+                    loops += 1;
 
-                let res = if should_tick {
-                    receiver.try_recv()
-                } else {
-                    match receiver.recv() {
-                        Ok(payload) => Ok(payload),
-                        Err(_) => Err(TryRecvError::Disconnected),
+                    if should_tick {
+                        hashing = false;
+                        break;
                     }
-                };
-                match res {
-                    Ok(msg_count) => {
-                        if msg_count == 0 {
-                            assert!(hashing);
-                            hashing = false;
-                            //error!("record_ticker ran: {} times", loops);
-                            loops = 0;
-                            // nobody cares - lock will be released and we'll stop. let res = sender.send((hash, count));
-                            assert!(!res.is_err());
-                        } else {
-                            assert!(false, "illegal call");
+                    let res = receiver.try_recv();
+                    match res {
+                        Ok(msg_count) => {
+                            if msg_count == 0 {
+                                assert!(hashing);
+                                hashing = false;
+                                //error!("record_ticker ran: {} times", loops);
+                                loops = 0;
+                                // nobody cares - lock will be released and we'll stop. let res = sender.send((hash, count));
+                                assert!(!res.is_err());
+                                break;
+                            } else {
+                                assert!(false, "illegal call");
+                            }
                         }
+                        Err(_) => {}
                     }
-                    Err(_) => {}
                 }
             } else {
                 let res = receiver.recv();
                 match res {
                     Ok(msg_count) => {
                         if msg_count == 0 {
-                            assert!(false, "illegal call");
+                            //assert!(false, "illegal call");
+                            // ignore
                         } else {
                             count = msg_count;
                             hashing = true;
