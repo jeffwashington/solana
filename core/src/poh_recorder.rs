@@ -153,6 +153,10 @@ pub struct PohRecorder {
     poh_config: Arc<PohConfig>,
     ticks_per_slot: u64,
     record_lock_contention_us: u64,
+    flush_cache_no_tick_us: u64,
+    flush_cache_tick_us: u64,
+    prepare_send_us: u64,
+    send_us: u64,
     tick_lock_contention_us: u64,
     tick_overhead_us: u64,
     record_us: u64,
@@ -476,12 +480,14 @@ impl PohRecorder {
                 hash: poh_entry.hash,
                 transactions: vec![],
             };
+            self.tick_overhead_us += timing::duration_as_us(&now.elapsed());
 
+            let now = Instant::now();
             self.tick_cache.push((entry, self.tick_height));
             let _ = self.flush_cache(true);
+            self.flush_cache_tick_us += timing::duration_as_us(&now.elapsed());
         }
         let _ = self.record_ticker_sender.send((Hash::default(), 0));
-        self.tick_overhead_us += timing::duration_as_us(&now.elapsed());
     }
 
     fn report_metrics(&mut self, bank_slot: Slot) {
@@ -491,6 +497,10 @@ impl PohRecorder {
                 ("slot", bank_slot, i64),
                 ("tick_lock_contention", self.tick_lock_contention_us, i64),
                 ("record_us", self.record_us, i64),
+                ("flush_cache_no_tick_us", self.flush_cache_no_tick_us, i64),
+                ("flush_cache_tick_us", self.flush_cache_tick_us, i64),
+                ("prepare_send_us", self.prepare_send_us, i64),
+                ("send_us", self.send_us, i64),
                 ("tick_overhead", self.tick_overhead_us, i64),
                 (
                     "record_lock_contention",
@@ -503,6 +513,10 @@ impl PohRecorder {
             self.record_us = 0;
             self.tick_overhead_us = 0;
             self.record_lock_contention_us = 0;
+            self.flush_cache_no_tick_us = 0;
+            self.flush_cache_tick_us = 0;
+            self.prepare_send_us = 0;
+            self.send_us = 0;
             self.last_metric = Instant::now();
         }
     }
@@ -518,7 +532,9 @@ impl PohRecorder {
         assert!(!transactions.is_empty(), "No transactions provided");
         self.report_metrics(bank_slot);
         loop {
+            let now = Instant::now();
             self.flush_cache(false)?;
+            self.flush_cache_no_tick_us += timing::duration_as_us(&now.elapsed());
 
             let working_bank = self
                 .working_bank
@@ -537,6 +553,7 @@ impl PohRecorder {
                 let res = poh_lock.record(mixin);
                 drop(poh_lock);
                 self.record_us += timing::duration_as_us(&now.elapsed());
+                let now = Instant::now();
                 if let Some(poh_entry) = res {
                     let _ = self.record_ticker_sender.send((Hash::default(), 16));
                     let entry = Entry {
@@ -544,10 +561,12 @@ impl PohRecorder {
                         hash: poh_entry.hash,
                         transactions,
                     };
-                    self.sender
-                        .send((working_bank.bank.clone(), (entry, self.tick_height)))?;
+                    let bank_clone = working_bank.bank.clone();
+                    self.prepare_send_us += timing::duration_as_us(&now.elapsed());
+                    let now = Instant::now();
+                    self.sender.send((bank_clone, (entry, self.tick_height)))?;
+                    self.send_us += timing::duration_as_us(&now.elapsed());
                     let _ = self.record_ticker_sender.send((Hash::default(), 0));
-                    //let _ = self.record_ticker_response_receiver.recv();
                     return Ok(());
                 }
             }
@@ -684,6 +703,10 @@ impl PohRecorder {
                 ticks_per_slot,
                 poh_config: poh_config.clone(),
                 record_lock_contention_us: 0,
+                flush_cache_tick_us: 0,
+                flush_cache_no_tick_us: 0,
+                prepare_send_us: 0,
+                send_us: 0,
                 tick_lock_contention_us: 0,
                 record_us: 0,
                 tick_overhead_us: 0,
