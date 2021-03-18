@@ -237,6 +237,7 @@ impl PohService {
                     total_tick_time_ns += tick_time.as_ns();
                 }
                 num_ticks += 1;
+                /* why are we sleeping?
                 let elapsed_ns = now.elapsed().as_nanos() as u64;
                 // sleep is not accurate enough to get a predictable time.
                 // Kernel can not schedule the thread for a while.
@@ -244,6 +245,7 @@ impl PohService {
                     std::hint::spin_loop();
                 }
                 total_sleep_us += (now.elapsed().as_nanos() as u64 - elapsed_ns) / 1000;
+                */
                 now = Instant::now();
 
                 if last_metric.elapsed().as_millis() > 1000 {
