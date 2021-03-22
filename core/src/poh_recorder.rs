@@ -512,6 +512,7 @@ impl PohRecorder {
             return true;
         }
         else {
+            error!("unnecessary tick: {}", self.tick_height);
             self.unnecessary_ticks += 1;
             return false;
         }

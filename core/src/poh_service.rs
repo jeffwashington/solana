@@ -217,6 +217,7 @@ impl PohService {
                         hash_time.stop();
                         total_hash_time_ns += hash_time.as_ns();
                         if r {
+                            error!("should tick in poh: {}", last_tick_height + 1);
                             break;
                         }
                         let get_again = record_receiver.try_recv();
