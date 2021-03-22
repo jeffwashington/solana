@@ -466,7 +466,7 @@ impl PohRecorder {
         Ok(())
     }
 
-    pub fn tick(&mut self, from_poh: bool) -> bool {
+    pub fn tick(&mut self, from_poh: usize) -> bool {
         let now = Instant::now();
         let tick_duration = timing::duration_as_us(&self.last_tick_time.elapsed()) as i64;
         self.last_tick_time = now;
@@ -484,6 +484,9 @@ impl PohRecorder {
         self.tick_lock_contention_us += timing::duration_as_us(&now.elapsed());
         let now = Instant::now();
         if let Some(poh_entry) = poh_entry {
+            if from_poh == 0 {
+                panic!("ticked not from poh");
+            }
             let _ = self.record_ticker_sender.send(32);
             self.tick_height += 1;
             trace!("tick_height {}", self.tick_height);
@@ -615,7 +618,7 @@ impl PohRecorder {
             // record() might fail if the next PoH hash needs to be a tick.  But that's ok, tick()
             // and re-record()
             self.ticks_from_record += 1;
-            self.tick(false);
+            self.tick(0);
         }
     }
 

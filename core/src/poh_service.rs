@@ -101,7 +101,7 @@ impl PohService {
                 Duration::from_millis(0),
             );
             sleep(poh_config.target_tick_duration);
-            poh_recorder.lock().unwrap().tick(true);
+            poh_recorder.lock().unwrap().tick(1);
         }
     }
 
@@ -143,7 +143,7 @@ impl PohService {
                 Duration::from_millis(0),
             );
             sleep(poh_config.target_tick_duration);
-            poh_recorder.lock().unwrap().tick(true);
+            poh_recorder.lock().unwrap().tick(1);
             if poh_exit.load(Ordering::Relaxed) && !warned {
                 warned = true;
                 warn!("exit signal is ignored because PohService is scheduled to exit soon");
@@ -241,7 +241,8 @@ impl PohService {
                     lock_time.stop();
                     total_lock_time_ns += lock_time.as_ns();
                     let mut tick_time = Measure::start("tick");
-                    assert!(poh_recorder_l.tick(true));
+                    error!("ticking: {}", last_tick_height + 1);
+                    assert!(poh_recorder_l.tick((last_tick_height + 1) as usize));
                     tick_height = poh_recorder_l.tick_height();
                     tick_time.stop();
                     total_tick_time_ns += tick_time.as_ns();
