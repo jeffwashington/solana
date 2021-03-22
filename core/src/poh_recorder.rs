@@ -496,7 +496,7 @@ impl PohRecorder {
     fn report_metrics(&mut self, bank_slot: Slot) {
         if self.last_metric.elapsed().as_millis() > 1000 {
             let ticker_hashes = self.ticker_count.load(Ordering::Relaxed);
-            let ticker_us = std::cmp::max(1,self.ticker_time_us.load(Ordering::Relaxed));
+            let ticker_us = self.ticker_time_us.load(Ordering::Relaxed);
             datapoint_info!(
                 "poh_recorder",
                 ("slot", bank_slot, i64),
@@ -510,7 +510,7 @@ impl PohRecorder {
                 ("tick_overhead", self.tick_overhead_us, i64),
                 ("hashes_from_ticker", ticker_hashes, i64),
                 ("ticker_us", ticker_us, i64),
-                ("ticker_effective kHashs/sec", ticker_hashes/(ticker_us / 1000), i64),
+                ("ticker_effective kHashs/sec", ticker_hashes/std::cmp::max(1,(ticker_us / 1000)), i64),
                 (
                     "record_lock_contention",
                     self.record_lock_contention_us,
