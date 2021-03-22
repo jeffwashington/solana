@@ -477,7 +477,7 @@ impl PohRecorder {
 
         let behind = tick_duration - default_target_tick_duration;
 
-        self.lates.push((from_poh == 0, behind as u64));
+        self.lates.push((from_poh == 0, behind as i64));
         self.tick_behind_us += behind;
         self.tick_behind_max_us = std::cmp::max(behind, self.tick_behind_max_us);
 
