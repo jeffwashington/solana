@@ -548,6 +548,8 @@ impl PohRecorder {
                 ),
             );
 
+            error!("Lates: {:?}", lates);
+
             self.lates = Vec::new();
             self.tick_lock_contention_us = 0;
             self.record_us = 0;
