@@ -217,7 +217,7 @@ impl PohService {
                         hash_time.stop();
                         total_hash_time_ns += hash_time.as_ns();
                         if r {
-                            error!("should tick in poh: {}", last_tick_height + 1);
+                            //error!("should tick in poh: {}", last_tick_height + 1);
                             break;
                         }
                         let get_again = record_receiver.try_recv();
@@ -243,7 +243,7 @@ impl PohService {
                     lock_time.stop();
                     total_lock_time_ns += lock_time.as_ns();
                     let mut tick_time = Measure::start("tick");
-                    error!("ticking: {}", last_tick_height + 1);
+                    //error!("ticking: {}", last_tick_height + 1);
                     let res = poh_recorder_l.tick((last_tick_height + 1) as usize);
                     if !res {
                         if failure_count > 0 {
