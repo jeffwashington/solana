@@ -170,6 +170,7 @@ impl PohService {
         let mut total_hash_time_ns = 0;
         let mut total_tick_time_ns = 0;
         let mut try_again_mixin = None;
+        let mut failure_count = 10;
         let mut last_tick_height = poh_recorder.lock().unwrap().tick_height();
         loop {
             let should_tick = {
@@ -242,7 +243,14 @@ impl PohService {
                     total_lock_time_ns += lock_time.as_ns();
                     let mut tick_time = Measure::start("tick");
                     error!("ticking: {}", last_tick_height + 1);
-                    assert!(poh_recorder_l.tick((last_tick_height + 1) as usize));
+                    let res = poh_recorder_l.tick((last_tick_height + 1) as usize);
+                    if failure_count > 0 {
+                        failure_count -= 1;
+                        panic!("error: failed ticking: {}", last_tick_height + 1);
+                    }
+                    else {
+                        panic!("failed: {}", last_tick_height + 1);
+                    }
                     tick_height = poh_recorder_l.tick_height();
                     tick_time.stop();
                     total_tick_time_ns += tick_time.as_ns();
