@@ -167,6 +167,7 @@ pub struct PohRecorder {
     _record_ticker_response_receiver: Receiver<usize>,
     _record_ticker: JoinHandle<()>,
     ticker_count: Arc<AtomicUsize>,
+    ticker_time_us: Arc<AtomicUsize>,
 }
 
 impl PohRecorder {
@@ -494,6 +495,8 @@ impl PohRecorder {
 
     fn report_metrics(&mut self, bank_slot: Slot) {
         if self.last_metric.elapsed().as_millis() > 1000 {
+            let ticker_hashes = self.ticker_count.load(Ordering::Relaxed);
+            let ticker_us = self.ticker_time_us.load(Ordering::Relaxed);
             datapoint_info!(
                 "poh_recorder",
                 ("slot", bank_slot, i64),
@@ -505,7 +508,9 @@ impl PohRecorder {
                 ("send_us", self.send_us, i64),
                 ("ticks_from_record", self.ticks_from_record, i64),
                 ("tick_overhead", self.tick_overhead_us, i64),
-                ("ticks_from_ticker", self.ticker_count.load(Ordering::Relaxed), i64),
+                ("hashes_from_ticker", ticker_hashes, i64),
+                ("ticker_us", ticker_us, i64),
+                ("ticker_effective kHashs/sec", ticker_hashes/(ticker_us / 1000), i64),
                 (
                     "record_lock_contention",
                     self.record_lock_contention_us,
@@ -523,6 +528,8 @@ impl PohRecorder {
             self.send_us = 0;
             self.ticks_from_record = 0;
             self.ticker_count.store(0, Ordering::Relaxed);
+            self.ticker_time_us.store(0, Ordering::Relaxed);
+
             self.last_metric = Instant::now();
         }
     }
@@ -588,6 +595,7 @@ impl PohRecorder {
         receiver: Receiver<usize>,
         _sender: Sender<usize>, /*poh_exit: AtomicBool*/
         count_report: Arc<AtomicUsize>,
+        ticker_time_us_: Arc<AtomicUsize>,
     ) {
         // runs in a separate thread
         // goal is to hash what we can while record is busy doing other synchronous things
@@ -595,6 +603,7 @@ impl PohRecorder {
         let mut count = 0usize;
         let mut should_tick;
         let mut loops = 0;
+        let mut now = Instant::now();
         loop {
             /*
             if poh_exit.load(Ordering::Relaxed) {
@@ -619,6 +628,7 @@ impl PohRecorder {
                             if msg_count == 0 {
                                 assert!(hashing);
                                 count_report.fetch_add(loops * count, Ordering::Relaxed);
+                                count_report.fetch_add(now.elapsed().as_micros() as usize, Ordering::Relaxed);
                                 hashing = false;
                                 //error!("record_ticker ran: {} times", loops);
                                 loops = 0;
@@ -642,6 +652,7 @@ impl PohRecorder {
                         } else {
                             count = msg_count;
                             hashing = true;
+                            now = Instant::now();
                         }
                     }
                     Err(_) => {
@@ -678,6 +689,8 @@ impl PohRecorder {
         //let poh_exit_ = poh_exit.clone();
         let poh_config = poh_config.clone();
         let poh_ = poh.clone();
+        let ticker_time_us = Arc::new(AtomicUsize::new(0));
+        let ticker_time_us_ = ticker_time_us.clone();
         let ticker_count = Arc::new(AtomicUsize::new(0));
         let ticker_count_ = ticker_count.clone();
         let record_ticker = Builder::new()
@@ -690,6 +703,7 @@ impl PohRecorder {
                     record_ticker_receiver,
                     record_ticker_response_sender,
                     ticker_count_,
+                    ticker_time_us_,
                     //poh_exit_,
                 );
                 //poh_exit_.store(true, Ordering::Relaxed);
@@ -731,6 +745,7 @@ impl PohRecorder {
                 _record_ticker_response_receiver: record_ticker_response_receiver,
                 _record_ticker: record_ticker,
                 ticker_count,
+                ticker_time_us,
             },
             receiver,
             record_receiver,

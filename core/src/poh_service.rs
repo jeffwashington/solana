@@ -266,6 +266,7 @@ impl PohService {
                         ("total_hash_time_us", total_hash_time_ns / 1000, i64),
                         ("total_elapsed_us", elapsed_us, i64),
                         ("missed_ticks", real_tick_elapsed, i64),
+                        ("effective kHashes/sec", num_hashes / (total_hash_time_ns / 1_000_000), i64),
                     );
                     total_sleep_us = 0;
                     num_ticks = 0;
