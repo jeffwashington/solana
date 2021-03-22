@@ -159,7 +159,7 @@ pub struct PohRecorder {
     prepare_send_us: u64,
     send_us: u64,
     tick_lock_contention_us: u64,
-    lates: Vec<(bool, u64)>,
+    lates: Vec<(bool, i64)>,
     tick_overhead_us: u64,
     tick_behind_us: i64,
     tick_behind_max_us: i64,
