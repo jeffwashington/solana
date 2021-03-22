@@ -69,6 +69,7 @@ impl Poh {
         // If the hashes_per_tick is variable (std::u64::MAX) then always generate a tick.
         // Otherwise only tick if there are no remaining hashes
         if self.hashes_per_tick < std::u64::MAX && self.remaining_hashes != 0 {
+            error!("poh.tick not necessary");
             return None;
         }
 
