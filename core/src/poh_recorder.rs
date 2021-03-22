@@ -159,6 +159,7 @@ pub struct PohRecorder {
     prepare_send_us: u64,
     send_us: u64,
     tick_lock_contention_us: u64,
+    lates: Vec<(bool, u64)>,
     tick_overhead_us: u64,
     tick_behind_us: i64,
     tick_behind_max_us: i64,
@@ -476,6 +477,7 @@ impl PohRecorder {
 
         let behind = tick_duration - default_target_tick_duration;
 
+        self.lates.push((from_poh == 0, behind as u64));
         self.tick_behind_us += behind;
         self.tick_behind_max_us = std::cmp::max(behind, self.tick_behind_max_us);
 
@@ -546,6 +548,7 @@ impl PohRecorder {
                 ),
             );
 
+            self.lates = Vec::new();
             self.tick_lock_contention_us = 0;
             self.record_us = 0;
             self.tick_overhead_us = 0;
@@ -770,6 +773,7 @@ impl PohRecorder {
                 prepare_send_us: 0,
                 send_us: 0,
                 tick_lock_contention_us: 0,
+                lates: Vec::new(),
                 record_us: 0,
                 tick_overhead_us: 0,
                 tick_behind_us: 0,
