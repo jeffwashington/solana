@@ -246,7 +246,7 @@ impl PohService {
                     let res = poh_recorder_l.tick((last_tick_height + 1) as usize);
                     if failure_count > 0 {
                         failure_count -= 1;
-                        panic!("error: failed ticking: {}", last_tick_height + 1);
+                        error!("error: failed ticking: {}", last_tick_height + 1);
                     }
                     else {
                         panic!("failed: {}", last_tick_height + 1);
