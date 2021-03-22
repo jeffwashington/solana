@@ -164,6 +164,7 @@ impl PohService {
         let mut total_hash_time_ns = 0;
         let mut total_tick_time_ns = 0;
         let mut try_again_mixin = None;
+        let mut last_tick_height = poh_recorder.lock().unwrap().tick_height();
         loop {
             let should_tick = {
                 let mixin = if let Some(record) = try_again_mixin {
@@ -226,6 +227,7 @@ impl PohService {
             };
             if should_tick {
                 // Lock PohRecorder only for the final hash...
+                let tick_height;
                 {
                     let mut lock_time = Measure::start("lock");
                     let mut poh_recorder_l = poh_recorder.lock().unwrap();
@@ -233,10 +235,12 @@ impl PohService {
                     total_lock_time_ns += lock_time.as_ns();
                     let mut tick_time = Measure::start("tick");
                     poh_recorder_l.tick();
+                    tick_height = poh_recorder_l.tick_height();
                     tick_time.stop();
                     total_tick_time_ns += tick_time.as_ns();
                 }
                 num_ticks += 1;
+                let real_tick_elapsed = tick_height - last_tick_height;
                 /* why are we sleeping?
                 let elapsed_ns = now.elapsed().as_nanos() as u64;
                 // sleep is not accurate enough to get a predictable time.
@@ -248,9 +252,9 @@ impl PohService {
                 */
                 now = Instant::now();
 
-                if last_metric.elapsed().as_millis() > 1000 {
-                    let elapsed_us = last_metric.elapsed().as_micros() as u64;
-                    let us_per_slot = (elapsed_us * ticks_per_slot) / num_ticks;
+                let elapsed_us = last_metric.elapsed().as_micros() as u64;
+                if elapsed_us > 1_000_000 {
+                    let us_per_slot = (elapsed_us * ticks_per_slot) / real_tick_elapsed;
                     datapoint_info!(
                         "poh-service",
                         ("ticks", num_ticks as i64, i64),
@@ -260,6 +264,8 @@ impl PohService {
                         ("total_tick_time_us", total_tick_time_ns / 1000, i64),
                         ("total_lock_time_us", total_lock_time_ns / 1000, i64),
                         ("total_hash_time_us", total_hash_time_ns / 1000, i64),
+                        ("total_elapsed_us", elapsed_us, i64),
+                        ("missed_ticks", real_tick_elapsed, i64),
                     );
                     total_sleep_us = 0;
                     num_ticks = 0;
@@ -268,6 +274,7 @@ impl PohService {
                     total_lock_time_ns = 0;
                     total_hash_time_ns = 0;
                     last_metric = Instant::now();
+                    last_tick_height = tick_height;
                 }
                 if poh_exit.load(Ordering::Relaxed) {
                     break;

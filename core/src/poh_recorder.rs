@@ -25,7 +25,7 @@ use solana_sdk::transaction::Transaction;
 use std::cmp;
 use std::sync::mpsc::TryRecvError;
 use std::sync::mpsc::{channel, Receiver, SendError, Sender, SyncSender};
-use std::sync::{Arc, /*atomic::{AtomicBool, Ordering}, */ Mutex};
+use std::sync::{Arc, atomic::{AtomicUsize, Ordering}, Mutex};
 use std::thread::{Builder, JoinHandle};
 use std::time::Instant;
 use thiserror::Error;
@@ -166,6 +166,7 @@ pub struct PohRecorder {
     record_ticker_sender: Sender<usize>,
     _record_ticker_response_receiver: Receiver<usize>,
     _record_ticker: JoinHandle<()>,
+    ticker_count: Arc<AtomicUsize>,
 }
 
 impl PohRecorder {
@@ -504,6 +505,7 @@ impl PohRecorder {
                 ("send_us", self.send_us, i64),
                 ("ticks_from_record", self.ticks_from_record, i64),
                 ("tick_overhead", self.tick_overhead_us, i64),
+                ("ticks_from_ticker", self.ticker_count.load(Ordering::Relaxed), i64),
                 (
                     "record_lock_contention",
                     self.record_lock_contention_us,
@@ -520,6 +522,7 @@ impl PohRecorder {
             self.prepare_send_us = 0;
             self.send_us = 0;
             self.ticks_from_record = 0;
+            self.ticker_count.store(0, Ordering::Relaxed);
             self.last_metric = Instant::now();
         }
     }
@@ -584,6 +587,7 @@ impl PohRecorder {
         poh: Arc<Mutex<Poh>>,
         receiver: Receiver<usize>,
         _sender: Sender<usize>, /*poh_exit: AtomicBool*/
+        count_report: Arc<AtomicUsize>,
     ) {
         // runs in a separate thread
         // goal is to hash what we can while record is busy doing other synchronous things
@@ -601,6 +605,7 @@ impl PohRecorder {
             if hashing {
                 let mut lock = poh.lock().unwrap();
                 loop {
+
                     should_tick = lock.hash(count as u64);
                     loops += 1;
 
@@ -613,6 +618,7 @@ impl PohRecorder {
                         Ok(msg_count) => {
                             if msg_count == 0 {
                                 assert!(hashing);
+                                count_report.fetch_add(loops * count, Ordering::Relaxed);
                                 hashing = false;
                                 //error!("record_ticker ran: {} times", loops);
                                 loops = 0;
@@ -672,6 +678,8 @@ impl PohRecorder {
         //let poh_exit_ = poh_exit.clone();
         let poh_config = poh_config.clone();
         let poh_ = poh.clone();
+        let ticker_count = Arc::new(AtomicUsize::new(0));
+        let ticker_count_ = ticker_count.clone();
         let record_ticker = Builder::new()
             .name("solana-poh-service-record_ticker".to_string())
             .spawn(move || {
@@ -681,6 +689,7 @@ impl PohRecorder {
                     poh_,
                     record_ticker_receiver,
                     record_ticker_response_sender,
+                    ticker_count_,
                     //poh_exit_,
                 );
                 //poh_exit_.store(true, Ordering::Relaxed);
@@ -721,6 +730,7 @@ impl PohRecorder {
                 record_ticker_sender,
                 _record_ticker_response_receiver: record_ticker_response_receiver,
                 _record_ticker: record_ticker,
+                ticker_count,
             },
             receiver,
             record_receiver,
