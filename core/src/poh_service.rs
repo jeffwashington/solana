@@ -110,6 +110,7 @@ impl PohService {
         record_receiver: &Receiver<Record>,
         timeout: Duration,
     ) {
+        panic!("");
         let record = record_receiver.recv_timeout(timeout);
         if let Ok(record) = record {
             if record
@@ -118,6 +119,7 @@ impl PohService {
                     record.slot,
                     record.mixin,
                     record.transactions,
+                    false,
                 ))
                 .is_err()
             {
@@ -185,7 +187,7 @@ impl PohService {
                     loop {
                         let mut temp = Vec::new();
                         std::mem::swap(&mut temp, &mut record.transactions);
-                        let res = poh_recorder_l.record(record.slot, record.mixin, temp);
+                        let res = poh_recorder_l.record(record.slot, record.mixin, temp, true);
                         let _ = record.sender.send(res); // TODO what do we do on failure here?
                         num_hashes += 1; // may have also ticked inside record
 
