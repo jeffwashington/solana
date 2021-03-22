@@ -485,7 +485,7 @@ impl PohRecorder {
         let now = Instant::now();
         if let Some(poh_entry) = poh_entry {
             if from_poh == 0 {
-                panic!("ticked not from poh");
+                //panic!("ticked not from poh");
             }
             let _ = self.record_ticker_sender.send(32);
             self.tick_height += 1;
