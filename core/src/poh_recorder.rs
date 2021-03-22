@@ -510,7 +510,7 @@ impl PohRecorder {
                 ("tick_overhead", self.tick_overhead_us, i64),
                 ("hashes_from_ticker", ticker_hashes, i64),
                 ("ticker_us", ticker_us, i64),
-                ("ticker_effective kHashs/sec", ticker_hashes/std::cmp::max(1,(ticker_us / 1000)), i64),
+                ("ticker_effective kHashes/sec", ticker_hashes/std::cmp::max(1,(ticker_us / 1000)), i64),
                 (
                     "record_lock_contention",
                     self.record_lock_contention_us,
@@ -595,7 +595,7 @@ impl PohRecorder {
         receiver: Receiver<usize>,
         _sender: Sender<usize>, /*poh_exit: AtomicBool*/
         count_report: Arc<AtomicUsize>,
-        ticker_time_us_: Arc<AtomicUsize>,
+        ticker_time_us: Arc<AtomicUsize>,
     ) {
         // runs in a separate thread
         // goal is to hash what we can while record is busy doing other synchronous things
@@ -628,7 +628,7 @@ impl PohRecorder {
                             if msg_count == 0 {
                                 assert!(hashing);
                                 count_report.fetch_add(loops * count, Ordering::Relaxed);
-                                count_report.fetch_add(now.elapsed().as_micros() as usize, Ordering::Relaxed);
+                                ticker_time_us.fetch_add(now.elapsed().as_micros() as usize, Ordering::Relaxed);
                                 hashing = false;
                                 //error!("record_ticker ran: {} times", loops);
                                 loops = 0;

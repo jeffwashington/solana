@@ -159,6 +159,7 @@ impl PohService {
         let mut last_metric = Instant::now();
         let mut num_ticks = 0;
         let mut num_hashes = 0;
+        let mut num_just_hashes = 0;
         let mut total_sleep_us = 0;
         let mut total_lock_time_ns = 0;
         let mut total_hash_time_ns = 0;
@@ -204,6 +205,7 @@ impl PohService {
                     let mut r;
                     loop {
                         num_hashes += hashes_per_batch;
+                        num_just_hashes += hashes_per_batch;
                         let mut hash_time = Measure::start("hash");
                         r = poh_l.hash(hashes_per_batch);
                         hash_time.stop();
