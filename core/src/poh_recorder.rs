@@ -466,7 +466,7 @@ impl PohRecorder {
         Ok(())
     }
 
-    pub fn tick(&mut self) {
+    pub fn tick(&mut self, from_poh: bool) -> bool {
         let now = Instant::now();
         let tick_duration = timing::duration_as_us(&self.last_tick_time.elapsed()) as i64;
         self.last_tick_time = now;
@@ -491,7 +491,7 @@ impl PohRecorder {
             if self.leader_first_tick_height.is_none() {
                 self.tick_overhead_us += timing::duration_as_us(&now.elapsed());
                 let _ = self.record_ticker_sender.send(0);
-                return;
+                return false;
             }
 
             let entry = Entry {
@@ -506,9 +506,11 @@ impl PohRecorder {
             let _ = self.flush_cache(true);
             self.flush_cache_tick_us += timing::duration_as_us(&now.elapsed());
             let _ = self.record_ticker_sender.send(0);
+            return true;
         }
         else {
             self.unnecessary_ticks += 1;
+            return false;
         }
     }
 
@@ -612,7 +614,7 @@ impl PohRecorder {
             // record() might fail if the next PoH hash needs to be a tick.  But that's ok, tick()
             // and re-record()
             self.ticks_from_record += 1;
-            self.tick();
+            self.tick(false);
         }
     }
 

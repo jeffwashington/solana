@@ -92,6 +92,8 @@ impl PohService {
         poh_exit: &AtomicBool,
         record_receiver: Receiver<Record>,
     ) {
+        panic!("");
+
         while !poh_exit.load(Ordering::Relaxed) {
             Self::read_record_receiver_and_process(
                 &poh_recorder,
@@ -99,7 +101,7 @@ impl PohService {
                 Duration::from_millis(0),
             );
             sleep(poh_config.target_tick_duration);
-            poh_recorder.lock().unwrap().tick();
+            poh_recorder.lock().unwrap().tick(true);
         }
     }
 
@@ -130,6 +132,7 @@ impl PohService {
         poh_exit: &AtomicBool,
         record_receiver: Receiver<Record>,
     ) {
+        panic!("");
         let mut warned = false;
         for _ in 0..poh_config.target_tick_count.unwrap() {
             Self::read_record_receiver_and_process(
@@ -138,7 +141,7 @@ impl PohService {
                 Duration::from_millis(0),
             );
             sleep(poh_config.target_tick_duration);
-            poh_recorder.lock().unwrap().tick();
+            poh_recorder.lock().unwrap().tick(true);
             if poh_exit.load(Ordering::Relaxed) && !warned {
                 warned = true;
                 warn!("exit signal is ignored because PohService is scheduled to exit soon");
@@ -236,7 +239,7 @@ impl PohService {
                     lock_time.stop();
                     total_lock_time_ns += lock_time.as_ns();
                     let mut tick_time = Measure::start("tick");
-                    poh_recorder_l.tick();
+                    assert!(poh_recorder_l.tick(true));
                     tick_height = poh_recorder_l.tick_height();
                     tick_time.stop();
                     total_tick_time_ns += tick_time.as_ns();
