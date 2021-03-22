@@ -251,7 +251,8 @@ impl PohService {
                             error!("error: failed ticking: {}", last_tick_height + 1);
                         }
                         else {
-                            panic!("failed: {}", last_tick_height + 1);
+                            error!("error: failed ticking: {}", last_tick_height + 1);
+                            //panic!("failed: {}", last_tick_height + 1);
                         }
                     }
                     tick_height = poh_recorder_l.tick_height();
