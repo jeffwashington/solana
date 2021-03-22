@@ -245,12 +245,14 @@ impl PohService {
                     let mut tick_time = Measure::start("tick");
                     error!("ticking: {}", last_tick_height + 1);
                     let res = poh_recorder_l.tick((last_tick_height + 1) as usize);
-                    if failure_count > 0 {
-                        failure_count -= 1;
-                        error!("error: failed ticking: {}", last_tick_height + 1);
-                    }
-                    else {
-                        panic!("failed: {}", last_tick_height + 1);
+                    if !res {
+                        if failure_count > 0 {
+                            failure_count -= 1;
+                            error!("error: failed ticking: {}", last_tick_height + 1);
+                        }
+                        else {
+                            panic!("failed: {}", last_tick_height + 1);
+                        }
                     }
                     tick_height = poh_recorder_l.tick_height();
                     tick_time.stop();
