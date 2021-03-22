@@ -155,10 +155,13 @@ pub struct PohRecorder {
     record_lock_contention_us: u64,
     flush_cache_no_tick_us: u64,
     flush_cache_tick_us: u64,
+    unnecessary_ticks: u64,
     prepare_send_us: u64,
     send_us: u64,
     tick_lock_contention_us: u64,
     tick_overhead_us: u64,
+    tick_behind_us: i64,
+    tick_behind_max_us: i64,
     record_us: u64,
     ticks_from_record: u64,
     last_metric: Instant,
@@ -168,6 +171,7 @@ pub struct PohRecorder {
     _record_ticker: JoinHandle<()>,
     ticker_count: Arc<AtomicUsize>,
     ticker_time_us: Arc<AtomicUsize>,
+    last_tick_time: Instant,
 }
 
 impl PohRecorder {
@@ -464,6 +468,18 @@ impl PohRecorder {
 
     pub fn tick(&mut self) {
         let now = Instant::now();
+        let tick_duration = timing::duration_as_us(&self.last_tick_time.elapsed()) as i64;
+        self.last_tick_time = now;
+
+        let default_target_tick_duration =
+        timing::duration_as_us(&PohConfig::default().target_tick_duration) as i64;
+
+        let behind = tick_duration - default_target_tick_duration;
+
+        self.tick_behind_us += behind;
+        self.tick_behind_max_us = std::cmp::max(behind, self.tick_behind_max_us);
+
+
         let poh_entry = self.poh.lock().unwrap().tick();
         self.tick_lock_contention_us += timing::duration_as_us(&now.elapsed());
         let now = Instant::now();
@@ -491,6 +507,9 @@ impl PohRecorder {
             self.flush_cache_tick_us += timing::duration_as_us(&now.elapsed());
             let _ = self.record_ticker_sender.send(0);
         }
+        else {
+            self.unnecessary_ticks += 1;
+        }
     }
 
     fn report_metrics(&mut self, bank_slot: Slot) {
@@ -504,13 +523,16 @@ impl PohRecorder {
                 ("record_us", self.record_us, i64),
                 ("flush_cache_no_tick_us", self.flush_cache_no_tick_us, i64),
                 ("flush_cache_tick_us", self.flush_cache_tick_us, i64),
+                ("unnecessary_ticks", self.unnecessary_ticks, i64),
                 ("prepare_send_us", self.prepare_send_us, i64),
                 ("send_us", self.send_us, i64),
                 ("ticks_from_record", self.ticks_from_record, i64),
                 ("tick_overhead", self.tick_overhead_us, i64),
+                ("tick_behind_us", self.tick_behind_us, i64),
+                ("tick_behind_max_us", self.tick_behind_max_us, i64),
                 ("hashes_from_ticker", ticker_hashes, i64),
                 ("ticker_us", ticker_us, i64),
-                ("ticker_effective kHashes/sec", ticker_hashes/std::cmp::max(1,(ticker_us / 1000)), i64),
+                ("ticker_effective kHashes/sec", ticker_hashes/std::cmp::max(1,ticker_us / 1000), i64),
                 (
                     "record_lock_contention",
                     self.record_lock_contention_us,
@@ -524,9 +546,13 @@ impl PohRecorder {
             self.record_lock_contention_us = 0;
             self.flush_cache_no_tick_us = 0;
             self.flush_cache_tick_us = 0;
+            self.unnecessary_ticks = 0;
             self.prepare_send_us = 0;
             self.send_us = 0;
             self.ticks_from_record = 0;
+            self.tick_behind_us = 0;
+            self.tick_behind_max_us = 0;
+        
             self.ticker_count.store(0, Ordering::Relaxed);
             self.ticker_time_us.store(0, Ordering::Relaxed);
 
@@ -732,12 +758,15 @@ impl PohRecorder {
                 poh_config: poh_config.clone(),
                 record_lock_contention_us: 0,
                 flush_cache_tick_us: 0,
+                unnecessary_ticks: 0,
                 flush_cache_no_tick_us: 0,
                 prepare_send_us: 0,
                 send_us: 0,
                 tick_lock_contention_us: 0,
                 record_us: 0,
                 tick_overhead_us: 0,
+                tick_behind_us: 0,
+                tick_behind_max_us: 0,
                 ticks_from_record: 0,
                 last_metric: Instant::now(),
                 record_sender,
@@ -746,6 +775,7 @@ impl PohRecorder {
                 _record_ticker: record_ticker,
                 ticker_count,
                 ticker_time_us,
+                last_tick_time: Instant::now(),
             },
             receiver,
             record_receiver,
