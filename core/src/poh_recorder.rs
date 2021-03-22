@@ -491,7 +491,7 @@ impl PohRecorder {
             if self.leader_first_tick_height.is_none() {
                 self.tick_overhead_us += timing::duration_as_us(&now.elapsed());
                 let _ = self.record_ticker_sender.send(0);
-                return false;
+                return true;
             }
 
             let entry = Entry {
