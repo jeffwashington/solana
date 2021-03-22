@@ -548,7 +548,7 @@ impl PohRecorder {
                 ),
             );
 
-            error!("Lates: {:?}", lates);
+            error!("Lates: {:?}", self.lates);
 
             self.lates = Vec::new();
             self.tick_lock_contention_us = 0;
