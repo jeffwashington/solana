@@ -25,7 +25,7 @@ use solana_sdk::transaction::Transaction;
 use std::cmp;
 use std::sync::mpsc::TryRecvError;
 use std::sync::mpsc::{channel, Receiver, SendError, Sender, SyncSender};
-use std::sync::{Arc, atomic::{AtomicUsize, Ordering}, Mutex};
+use std::sync::{Arc, atomic::{AtomicI32, AtomicUsize, Ordering}, Mutex};
 use std::thread::{Builder, JoinHandle};
 use std::time::Instant;
 use thiserror::Error;
@@ -173,6 +173,7 @@ pub struct PohRecorder {
     ticker_count: Arc<AtomicUsize>,
     ticker_time_us: Arc<AtomicUsize>,
     last_tick_time: Instant,
+    ticker_active_count: Arc<AtomicI32>,
 }
 
 impl PohRecorder {
@@ -489,12 +490,15 @@ impl PohRecorder {
             if from_poh == 0 {
                 //panic!("ticked not from poh");
             }
+            self.ticker_active_count.fetch_add(1, Ordering::Relaxed);
             let _ = self.record_ticker_sender.send(32);
             self.tick_height += 1;
             trace!("tick_height {}", self.tick_height);
 
             if self.leader_first_tick_height.is_none() {
                 self.tick_overhead_us += timing::duration_as_us(&now.elapsed());
+                assert!(0 >= self.ticker_active_count.fetch_sub(1, Ordering::Relaxed));
+
                 let _ = self.record_ticker_sender.send(0);
                 return true;
             }
@@ -510,6 +514,7 @@ impl PohRecorder {
             self.tick_cache.push((entry, self.tick_height));
             let _ = self.flush_cache(true);
             self.flush_cache_tick_us += timing::duration_as_us(&now.elapsed());
+            assert!(0 >= self.ticker_active_count.fetch_sub(1, Ordering::Relaxed));
             let _ = self.record_ticker_sender.send(0);
             return true;
         }
@@ -606,7 +611,10 @@ impl PohRecorder {
                 self.record_us += timing::duration_as_us(&now.elapsed());
                 let now = Instant::now();
                 if let Some(poh_entry) = res {
+                    self.ticker_active_count.fetch_add(1, Ordering::Relaxed);
                     let _ = self.record_ticker_sender.send(32);
+                    self.ticker_active_count.fetch_add(1, Ordering::Relaxed);
+
                     let entry = Entry {
                         num_hashes: poh_entry.num_hashes,
                         hash: poh_entry.hash,
@@ -618,6 +626,7 @@ impl PohRecorder {
                     self.sender.send((bank_clone, (entry, self.tick_height)))?;
                     self.send_us += timing::duration_as_us(&now.elapsed());
                     let _ = self.record_ticker_sender.send(0);
+                    assert!(0 >= self.ticker_active_count.fetch_sub(1, Ordering::Relaxed));
                     return Ok(());
                 }
             }
@@ -634,6 +643,7 @@ impl PohRecorder {
         _sender: Sender<usize>, /*poh_exit: AtomicBool*/
         count_report: Arc<AtomicUsize>,
         ticker_time_us: Arc<AtomicUsize>,
+        ticker_active_count: Arc<AtomicI32>,
     ) {
         // runs in a separate thread
         // goal is to hash what we can while record is busy doing other synchronous things
@@ -731,6 +741,8 @@ impl PohRecorder {
         let ticker_time_us_ = ticker_time_us.clone();
         let ticker_count = Arc::new(AtomicUsize::new(0));
         let ticker_count_ = ticker_count.clone();
+        let ticker_active_count = Arc::new(AtomicI32::new(0));
+        let ticker_active_count_ = ticker_active_count.clone();
         let record_ticker = Builder::new()
             .name("solana-poh-service-record_ticker".to_string())
             .spawn(move || {
@@ -742,6 +754,7 @@ impl PohRecorder {
                     record_ticker_response_sender,
                     ticker_count_,
                     ticker_time_us_,
+                    ticker_active_count_,
                     //poh_exit_,
                 );
                 //poh_exit_.store(true, Ordering::Relaxed);
@@ -789,6 +802,7 @@ impl PohRecorder {
                 ticker_count,
                 ticker_time_us,
                 last_tick_time: Instant::now(),
+                ticker_active_count,
             },
             receiver,
             record_receiver,
