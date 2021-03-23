@@ -672,6 +672,9 @@ impl PohRecorder {
 
                     if should_tick {
                         hashing = false;
+                        count_report.fetch_add(loops * count, Ordering::Relaxed);
+                        ticker_time_us.fetch_add(now.elapsed().as_micros() as usize, Ordering::Relaxed);
+                        now = Instant::now();
                         break;
                     }
                     let res = receiver.try_recv();
@@ -681,9 +684,9 @@ impl PohRecorder {
                                 assert!(hashing);
                                 count_report.fetch_add(loops * count, Ordering::Relaxed);
                                 ticker_time_us.fetch_add(now.elapsed().as_micros() as usize, Ordering::Relaxed);
+                                now = Instant::now();
                                 hashing = false;
                                 //error!("record_ticker ran: {} times", loops);
-                                loops = 0;
                                 // nobody cares - lock will be released and we'll stop. let res = sender.send((hash, count));
                                 assert!(!res.is_err());
                                 break;
@@ -699,12 +702,13 @@ impl PohRecorder {
                 match res {
                     Ok(msg_count) => {
                         if msg_count == 0 {
-                            assert!(false, "illegal call");
+                            // could happen if we hit should_tick=true // assert!(false, "illegal call");
                             // ignore
                         } else {
                             count = msg_count;
                             hashing = true;
                             now = Instant::now();
+                            loops = 0;
                         }
                     }
                     Err(_) => {
