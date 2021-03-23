@@ -490,14 +490,14 @@ impl PohRecorder {
             if from_poh == 0 {
                 //panic!("ticked not from poh");
             }
-            self.ticker_active_count.fetch_add(1, Ordering::Relaxed);
+            assert!(0 >= self.ticker_active_count.fetch_add(1, Ordering::Relaxed));
             let _ = self.record_ticker_sender.send(32);
             self.tick_height += 1;
             trace!("tick_height {}", self.tick_height);
 
             if self.leader_first_tick_height.is_none() {
                 self.tick_overhead_us += timing::duration_as_us(&now.elapsed());
-                assert!(0 >= self.ticker_active_count.fetch_sub(1, Ordering::Relaxed));
+                assert!(1 >= self.ticker_active_count.fetch_sub(1, Ordering::Relaxed));
 
                 let _ = self.record_ticker_sender.send(0);
                 return true;
@@ -514,12 +514,12 @@ impl PohRecorder {
             self.tick_cache.push((entry, self.tick_height));
             let _ = self.flush_cache(true);
             self.flush_cache_tick_us += timing::duration_as_us(&now.elapsed());
-            assert!(0 >= self.ticker_active_count.fetch_sub(1, Ordering::Relaxed));
+            assert!(1 >= self.ticker_active_count.fetch_sub(1, Ordering::Relaxed));
             let _ = self.record_ticker_sender.send(0);
             return true;
         }
         else {
-            error!("unnecessary tick: {}", self.tick_height);
+            //error!("unnecessary tick: {}", self.tick_height);
             self.unnecessary_ticks += 1;
             return false;
         }
@@ -611,9 +611,8 @@ impl PohRecorder {
                 self.record_us += timing::duration_as_us(&now.elapsed());
                 let now = Instant::now();
                 if let Some(poh_entry) = res {
-                    self.ticker_active_count.fetch_add(1, Ordering::Relaxed);
+                    assert!(0 >= self.ticker_active_count.fetch_add(1, Ordering::Relaxed));
                     let _ = self.record_ticker_sender.send(32);
-                    self.ticker_active_count.fetch_add(1, Ordering::Relaxed);
 
                     let entry = Entry {
                         num_hashes: poh_entry.num_hashes,
@@ -623,10 +622,16 @@ impl PohRecorder {
                     let bank_clone = working_bank.bank.clone();
                     self.prepare_send_us += timing::duration_as_us(&now.elapsed());
                     let now = Instant::now();
-                    self.sender.send((bank_clone, (entry, self.tick_height)))?;
+                    match self.sender.send((bank_clone, (entry, self.tick_height))) {
+                        Err(e) => {
+                            assert!(1 >= self.ticker_active_count.fetch_sub(1, Ordering::Relaxed));
+                            return Err(e);
+                        },
+                        Ok(_) => (),
+                    };
                     self.send_us += timing::duration_as_us(&now.elapsed());
                     let _ = self.record_ticker_sender.send(0);
-                    assert!(0 >= self.ticker_active_count.fetch_sub(1, Ordering::Relaxed));
+                    assert!(1 >= self.ticker_active_count.fetch_sub(1, Ordering::Relaxed));
                     return Ok(());
                 }
             }
