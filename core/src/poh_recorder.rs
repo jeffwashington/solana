@@ -606,13 +606,16 @@ impl PohRecorder {
             }
 
             {
-                let now = Instant::now();
-                let mut poh_lock = self.poh.lock().unwrap();
+                let now_prev = Instant::now();
+                let now;
+                let res;
+                {
+                    let mut poh_lock = self.poh.lock().unwrap();
 
-                self.record_lock_contention_us += timing::duration_as_us(&now.elapsed());
-                let now = Instant::now();
-                let res = poh_lock.record(mixin);
-                drop(poh_lock);
+                    self.record_lock_contention_us += timing::duration_as_us(&now_prev.elapsed());
+                    now = Instant::now();
+                     res = poh_lock.record(mixin);
+                }
                 self.record_us += timing::duration_as_us(&now.elapsed());
                 let now = Instant::now();
                 if let Some(poh_entry) = res {
@@ -753,8 +756,9 @@ impl PohRecorder {
         let ticker_count_ = ticker_count.clone();
         let ticker_active_count = Arc::new(AtomicI32::new(0));
         let ticker_active_count_ = ticker_active_count.clone();
+        error!("creating record_ticker");
         let record_ticker = Builder::new()
-            .name("solana-poh-service-record_ticker".to_string())
+            .name("record_ticker".to_string())
             .spawn(move || {
                 solana_sys_tuner::request_realtime_poh();
 
