@@ -199,7 +199,7 @@ pub fn do_bench_tps<T>(client: Arc<T>, config: Config, gen_keypairs: Vec<Keypair
 where
     T: 'static + Client + Send + Sync,
 {
-    make_min_priority_thread_pool().install(|| {
+    /*make_min_priority_thread_pool().install(||*/ {
         let Config {
             id,
             threads,
