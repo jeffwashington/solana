@@ -315,7 +315,7 @@ where
 
         let r_maxes = maxes.read().unwrap();
         r_maxes.first().unwrap().1.txs
-    })
+    }//)
 }
 
 fn metrics_submit_lamport_balance(lamport_balance: u64) {
