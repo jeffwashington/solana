@@ -199,121 +199,123 @@ pub fn do_bench_tps<T>(client: Arc<T>, config: Config, gen_keypairs: Vec<Keypair
 where
     T: 'static + Client + Send + Sync,
 {
-    let Config {
-        id,
-        threads,
-        thread_batch_sleep_ms,
-        duration,
-        tx_count,
-        sustained,
-        target_slots_per_epoch,
-        ..
-    } = config;
+    make_min_priority_thread_pool().install(|| {
+        let Config {
+            id,
+            threads,
+            thread_batch_sleep_ms,
+            duration,
+            tx_count,
+            sustained,
+            target_slots_per_epoch,
+            ..
+        } = config;
 
-    let mut source_keypair_chunks: Vec<Vec<&Keypair>> = Vec::new();
-    let mut dest_keypair_chunks: Vec<VecDeque<&Keypair>> = Vec::new();
-    assert!(gen_keypairs.len() >= 2 * tx_count);
-    for chunk in gen_keypairs.chunks_exact(2 * tx_count) {
-        source_keypair_chunks.push(chunk[..tx_count].iter().collect());
-        dest_keypair_chunks.push(chunk[tx_count..].iter().collect());
-    }
-
-    let first_tx_count = loop {
-        match client.get_transaction_count() {
-            Ok(count) => break count,
-            Err(err) => {
-                info!("Couldn't get transaction count: {:?}", err);
-                sleep(Duration::from_secs(1));
-            }
+        let mut source_keypair_chunks: Vec<Vec<&Keypair>> = Vec::new();
+        let mut dest_keypair_chunks: Vec<VecDeque<&Keypair>> = Vec::new();
+        assert!(gen_keypairs.len() >= 2 * tx_count);
+        for chunk in gen_keypairs.chunks_exact(2 * tx_count) {
+            source_keypair_chunks.push(chunk[..tx_count].iter().collect());
+            dest_keypair_chunks.push(chunk[tx_count..].iter().collect());
         }
-    };
-    info!("Initial transaction count {}", first_tx_count);
 
-    let exit_signal = Arc::new(AtomicBool::new(false));
+        let first_tx_count = loop {
+            match client.get_transaction_count() {
+                Ok(count) => break count,
+                Err(err) => {
+                    info!("Couldn't get transaction count: {:?}", err);
+                    sleep(Duration::from_secs(1));
+                }
+            }
+        };
+        info!("Initial transaction count {}", first_tx_count);
 
-    // Setup a thread per validator to sample every period
-    // collect the max transaction rate and total tx count seen
-    let maxes = Arc::new(RwLock::new(Vec::new()));
-    let sample_period = 1; // in seconds
-    let sample_thread = create_sampler_thread(&client, &exit_signal, sample_period, &maxes);
+        let exit_signal = Arc::new(AtomicBool::new(false));
 
-    let shared_txs: SharedTransactions = Arc::new(RwLock::new(VecDeque::new()));
+        // Setup a thread per validator to sample every period
+        // collect the max transaction rate and total tx count seen
+        let maxes = Arc::new(RwLock::new(Vec::new()));
+        let sample_period = 1; // in seconds
+        let sample_thread = create_sampler_thread(&client, &exit_signal, sample_period, &maxes);
 
-    let recent_blockhash = Arc::new(RwLock::new(get_recent_blockhash(client.as_ref()).0));
-    let shared_tx_active_thread_count = Arc::new(AtomicIsize::new(0));
-    let total_tx_sent_count = Arc::new(AtomicUsize::new(0));
+        let shared_txs: SharedTransactions = Arc::new(RwLock::new(VecDeque::new()));
 
-    let blockhash_thread = {
-        let exit_signal = exit_signal.clone();
-        let recent_blockhash = recent_blockhash.clone();
-        let client = client.clone();
-        let id = id.pubkey();
-        Builder::new()
-            .name("solana-blockhash-poller".to_string())
-            .spawn(move || {
-                poll_blockhash(&exit_signal, &recent_blockhash, &client, &id);
-            })
-            .unwrap()
-    };
+        let recent_blockhash = Arc::new(RwLock::new(get_recent_blockhash(client.as_ref()).0));
+        let shared_tx_active_thread_count = Arc::new(AtomicIsize::new(0));
+        let total_tx_sent_count = Arc::new(AtomicUsize::new(0));
 
-    let s_threads = create_sender_threads(
-        &client,
-        &shared_txs,
-        thread_batch_sleep_ms,
-        &total_tx_sent_count,
-        threads,
-        &exit_signal,
-        &shared_tx_active_thread_count,
-    );
+        let blockhash_thread = {
+            let exit_signal = exit_signal.clone();
+            let recent_blockhash = recent_blockhash.clone();
+            let client = client.clone();
+            let id = id.pubkey();
+            Builder::new()
+                .name("solana-blockhash-poller".to_string())
+                .spawn(move || {
+                    poll_blockhash(&exit_signal, &recent_blockhash, &client, &id);
+                })
+                .unwrap()
+        };
 
-    wait_for_target_slots_per_epoch(target_slots_per_epoch, &client);
+        let s_threads = create_sender_threads(
+            &client,
+            &shared_txs,
+            thread_batch_sleep_ms,
+            &total_tx_sent_count,
+            threads,
+            &exit_signal,
+            &shared_tx_active_thread_count,
+        );
 
-    let start = Instant::now();
+        wait_for_target_slots_per_epoch(target_slots_per_epoch, &client);
 
-    generate_chunked_transfers(
-        recent_blockhash,
-        &shared_txs,
-        shared_tx_active_thread_count,
-        source_keypair_chunks,
-        &mut dest_keypair_chunks,
-        threads,
-        duration,
-        sustained,
-    );
+        let start = Instant::now();
 
-    // Stop the sampling threads so it will collect the stats
-    exit_signal.store(true, Ordering::Relaxed);
+        generate_chunked_transfers(
+            recent_blockhash,
+            &shared_txs,
+            shared_tx_active_thread_count,
+            source_keypair_chunks,
+            &mut dest_keypair_chunks,
+            threads,
+            duration,
+            sustained,
+        );
 
-    info!("Waiting for sampler threads...");
-    if let Err(err) = sample_thread.join() {
-        info!("  join() failed with: {:?}", err);
-    }
+        // Stop the sampling threads so it will collect the stats
+        exit_signal.store(true, Ordering::Relaxed);
 
-    // join the tx send threads
-    info!("Waiting for transmit threads...");
-    for t in s_threads {
-        if let Err(err) = t.join() {
+        info!("Waiting for sampler threads...");
+        if let Err(err) = sample_thread.join() {
             info!("  join() failed with: {:?}", err);
         }
-    }
 
-    info!("Waiting for blockhash thread...");
-    if let Err(err) = blockhash_thread.join() {
-        info!("  join() failed with: {:?}", err);
-    }
+        // join the tx send threads
+        info!("Waiting for transmit threads...");
+        for t in s_threads {
+            if let Err(err) = t.join() {
+                info!("  join() failed with: {:?}", err);
+            }
+        }
 
-    let balance = client.get_balance(&id.pubkey()).unwrap_or(0);
-    metrics_submit_lamport_balance(balance);
+        info!("Waiting for blockhash thread...");
+        if let Err(err) = blockhash_thread.join() {
+            info!("  join() failed with: {:?}", err);
+        }
 
-    compute_and_report_stats(
-        &maxes,
-        sample_period,
-        &start.elapsed(),
-        total_tx_sent_count.load(Ordering::Relaxed),
-    );
+        let balance = client.get_balance(&id.pubkey()).unwrap_or(0);
+        metrics_submit_lamport_balance(balance);
 
-    let r_maxes = maxes.read().unwrap();
-    r_maxes.first().unwrap().1.txs
+        compute_and_report_stats(
+            &maxes,
+            sample_period,
+            &start.elapsed(),
+            total_tx_sent_count.load(Ordering::Relaxed),
+        );
+
+        let r_maxes = maxes.read().unwrap();
+        r_maxes.first().unwrap().1.txs
+    });
 }
 
 fn metrics_submit_lamport_balance(lamport_balance: u64) {
@@ -322,6 +324,16 @@ fn metrics_submit_lamport_balance(lamport_balance: u64) {
         "bench-tps-lamport_balance",
         ("balance", lamport_balance, i64)
     );
+}
+
+pub fn make_min_priority_thread_pool() -> ThreadPool {
+    // Use lower thread count to reduce priority.
+    let num_threads = std::cmp::max(2, num_cpus::get() / 4);
+    rayon::ThreadPoolBuilder::new()
+        .thread_name(|i| format!("solana-accounts-cleanup-{}", i))
+        .num_threads(num_threads)
+        .build()
+        .unwrap()
 }
 
 fn generate_system_txs(
