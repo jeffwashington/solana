@@ -199,7 +199,7 @@ pub fn do_bench_tps<T>(client: Arc<T>, config: Config, gen_keypairs: Vec<Keypair
 where
     T: 'static + Client + Send + Sync,
 {
-    /*make_min_priority_thread_pool().install(||*/ {
+    make_min_priority_thread_pool().install(|| {
         let Config {
             id,
             threads,
@@ -315,7 +315,7 @@ where
 
         let r_maxes = maxes.read().unwrap();
         r_maxes.first().unwrap().1.txs
-    }//)
+    })
 }
 
 fn metrics_submit_lamport_balance(lamport_balance: u64) {
@@ -328,7 +328,7 @@ fn metrics_submit_lamport_balance(lamport_balance: u64) {
 
 pub fn make_min_priority_thread_pool() -> ThreadPool {
     // Use lower thread count to reduce priority.
-    let num_threads = 16;
+    let num_threads = 2;
     rayon::ThreadPoolBuilder::new()
         .thread_name(|i| format!("solana-accounts-cleanup-{}", i))
         .num_threads(num_threads)
