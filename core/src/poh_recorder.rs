@@ -549,7 +549,7 @@ impl PohRecorder {
                 ("hashes_from_ticker", ticker_hashes, i64),
                 ("ticker_lock_time_us", ticker_lock_time_us, i64),
                 ("ticker_us", ticker_us, i64),
-                ("ticker_effective kHashes/sec", ticker_hashes/std::cmp::max(1,ticker_us / 1000), i64),
+                ("ticker_effective kHashes/sec", ticker_hashes * 1000/std::cmp::max(1,ticker_us), i64),
                 (
                     "record_lock_contention",
                     self.record_lock_contention_us,
