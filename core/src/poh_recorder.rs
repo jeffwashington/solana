@@ -685,7 +685,7 @@ impl PohRecorder {
                 match res {
                     Ok(msg_count) => {
                         if msg_count == 0 {
-                            //assert!(false, "illegal call");
+                            assert!(false, "illegal call");
                             // ignore
                         } else {
                             count = msg_count;
