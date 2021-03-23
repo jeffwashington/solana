@@ -658,7 +658,7 @@ impl PohRecorder {
         ticker_delay_time_us: Arc<AtomicUsize>,
         ticker_active_count: Arc<AtomicI32>,
     ) {
-        // runs in a separate thread
+        // runs in a separate thread 
         // goal is to hash what we can while record is busy doing other synchronous things
         let mut hashing = false;
         let mut count = 0usize;
