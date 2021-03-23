@@ -167,12 +167,13 @@ pub struct PohRecorder {
     ticks_from_record: u64,
     last_metric: Instant,
     record_sender: Sender<Record>,
-    record_ticker_sender: Sender<usize>,
-    _record_ticker_response_receiver: Receiver<usize>,
+    record_ticker_sender: Sender<(usize, Instant)>,
+    _record_ticker_response_receiver: Receiver<(usize, Instant)>,
     _record_ticker: JoinHandle<()>,
     ticker_count: Arc<AtomicUsize>,
     ticker_time_us: Arc<AtomicUsize>,
     ticker_lock_time_us: Arc<AtomicUsize>,
+    ticker_delay_time_us: Arc<AtomicUsize>,
     last_tick_time: Instant,
     ticker_active_count: Arc<AtomicI32>,
 }
@@ -492,7 +493,7 @@ impl PohRecorder {
                 //panic!("ticked not from poh");
             }
             assert!(0 >= self.ticker_active_count.fetch_add(1, Ordering::Relaxed));
-            let _ = self.record_ticker_sender.send(32);
+            let _ = self.record_ticker_sender.send((32, Instant::now()));
             self.tick_height += 1;
             trace!("tick_height {}", self.tick_height);
 
@@ -500,7 +501,7 @@ impl PohRecorder {
                 self.tick_overhead_us += timing::duration_as_us(&now.elapsed());
                 assert!(1 >= self.ticker_active_count.fetch_sub(1, Ordering::Relaxed));
 
-                let _ = self.record_ticker_sender.send(0);
+                let _ = self.record_ticker_sender.send((0, Instant::now()));
                 return true;
             }
 
@@ -516,7 +517,7 @@ impl PohRecorder {
             let _ = self.flush_cache(true);
             self.flush_cache_tick_us += timing::duration_as_us(&now.elapsed());
             assert!(1 >= self.ticker_active_count.fetch_sub(1, Ordering::Relaxed));
-            let _ = self.record_ticker_sender.send(0);
+            let _ = self.record_ticker_sender.send((0, Instant::now()));
             return true;
         }
         else {
@@ -528,9 +529,10 @@ impl PohRecorder {
 
     fn report_metrics(&mut self, bank_slot: Slot) {
         if self.last_metric.elapsed().as_millis() > 1000 {
-            let ticker_hashes = self.ticker_count.load(Ordering::Relaxed);
-            let ticker_us = self.ticker_time_us.load(Ordering::Relaxed);
-            let ticker_lock_time_us = self.ticker_lock_time_us.load(Ordering::Relaxed);
+            let ticker_hashes = self.ticker_count.swap(0, Ordering::Relaxed);
+            let ticker_us = self.ticker_time_us.swap(0, Ordering::Relaxed);
+            let ticker_lock_time_us = self.ticker_lock_time_us.swap(0, Ordering::Relaxed);
+            let ticker_delay_time_us = self.ticker_delay_time_us.swap(0, Ordering::Relaxed);
                         
             datapoint_info!(
                 "poh_recorder",
@@ -548,6 +550,7 @@ impl PohRecorder {
                 ("tick_behind_max_us", self.tick_behind_max_us, i64),
                 ("hashes_from_ticker", ticker_hashes, i64),
                 ("ticker_lock_time_us", ticker_lock_time_us, i64),
+                ("ticker_delay_time_us", ticker_delay_time_us, i64),
                 ("ticker_us", ticker_us, i64),
                 ("ticker_effective kHashes/sec", ticker_hashes * 1000/std::cmp::max(1,ticker_us), i64),
                 (
@@ -573,10 +576,6 @@ impl PohRecorder {
             self.tick_behind_us = 0;
             self.tick_behind_max_us = 0;
         
-            self.ticker_count.store(0, Ordering::Relaxed);
-            self.ticker_time_us.store(0, Ordering::Relaxed);
-            self.ticker_lock_time_us.store(0, Ordering::Relaxed);
-
             self.last_metric = Instant::now();
         }
     }
@@ -620,7 +619,7 @@ impl PohRecorder {
                 let now = Instant::now();
                 if let Some(poh_entry) = res {
                     assert!(0 >= self.ticker_active_count.fetch_add(1, Ordering::Relaxed));
-                    let _ = self.record_ticker_sender.send(32);
+                    let _ = self.record_ticker_sender.send((32, Instant::now()));
 
                     let entry = Entry {
                         num_hashes: poh_entry.num_hashes,
@@ -633,11 +632,11 @@ impl PohRecorder {
                     let res = self.sender.send((bank_clone, (entry, self.tick_height)));
                     if res.is_err(){
                         assert!(1 >= self.ticker_active_count.fetch_sub(1, Ordering::Relaxed));
-                        let _ = self.record_ticker_sender.send(0);
+                        let _ = self.record_ticker_sender.send((0, Instant::now()));
                     }
                     res?;
                     self.send_us += timing::duration_as_us(&now.elapsed());
-                    let _ = self.record_ticker_sender.send(0);
+                    let _ = self.record_ticker_sender.send((0, Instant::now()));
                     assert!(1 >= self.ticker_active_count.fetch_sub(1, Ordering::Relaxed));
                     return Ok(());
                 }
@@ -651,11 +650,12 @@ impl PohRecorder {
 
     fn record_ticker(
         poh: Arc<Mutex<Poh>>,
-        receiver: Receiver<usize>,
-        _sender: Sender<usize>, /*poh_exit: AtomicBool*/
+        receiver: Receiver<(usize, Instant)>,
+        _sender: Sender<(usize, Instant)>, /*poh_exit: AtomicBool*/
         count_report: Arc<AtomicUsize>,
         ticker_time_us: Arc<AtomicUsize>,
         ticker_lock_time_us: Arc<AtomicUsize>,
+        ticker_delay_time_us: Arc<AtomicUsize>,
         ticker_active_count: Arc<AtomicI32>,
     ) {
         // runs in a separate thread
@@ -663,6 +663,7 @@ impl PohRecorder {
         let mut hashing = false;
         let mut count = 0usize;
         let mut should_tick;
+        let mut sent = Instant::now();
         loop {
             /*
             if poh_exit.load(Ordering::Relaxed) {
@@ -671,9 +672,13 @@ impl PohRecorder {
             */
 
             if hashing {
+                let elapsed = sent.elapsed().as_micros();
+                ticker_delay_time_us.fetch_add(elapsed as usize, Ordering::Relaxed);
+
                 let now = Instant::now();
                 let mut lock = poh.lock().unwrap();
-                ticker_lock_time_us.fetch_add(now.elapsed().as_micros() as usize, Ordering::Relaxed);
+                let elapsed = now.elapsed().as_micros();
+                ticker_lock_time_us.fetch_add(elapsed as usize, Ordering::Relaxed);
                 let now = Instant::now();
                 let mut loops = 0;
                 loop {
@@ -686,7 +691,7 @@ impl PohRecorder {
                     }
                     let res = receiver.try_recv();
                     match res {
-                        Ok(msg_count) => {
+                        Ok((msg_count, _)) => {
                             if msg_count == 0 {
                                 break;
                             } else {
@@ -705,11 +710,12 @@ impl PohRecorder {
             } else {
                 let res = receiver.recv();
                 match res {
-                    Ok(msg_count) => {
+                    Ok((msg_count, sent_time)) => {
                         if msg_count == 0 {
                             // could happen if we hit should_tick=true // assert!(false, "illegal call");
                             // ignore
                         } else {
+                            sent = sent_time;
                             count = msg_count;
                             hashing = true;
                         }
@@ -752,6 +758,8 @@ impl PohRecorder {
         let ticker_time_us_ = ticker_time_us.clone();
         let ticker_lock_time_us = Arc::new(AtomicUsize::new(0));
         let ticker_lock_time_us_ = ticker_lock_time_us.clone();
+        let ticker_delay_time_us = Arc::new(AtomicUsize::new(0));
+        let ticker_delay_time_us_ = ticker_delay_time_us.clone();
         let ticker_count = Arc::new(AtomicUsize::new(0));
         let ticker_count_ = ticker_count.clone();
         let ticker_active_count = Arc::new(AtomicI32::new(0));
@@ -769,6 +777,7 @@ impl PohRecorder {
                     ticker_count_,
                     ticker_time_us_,
                     ticker_lock_time_us_,
+                    ticker_delay_time_us_,
                     ticker_active_count_,
                     //poh_exit_,
                 );
@@ -817,6 +826,7 @@ impl PohRecorder {
                 ticker_count,
                 ticker_time_us,
                 ticker_lock_time_us,
+                ticker_delay_time_us,
                 last_tick_time: Instant::now(),
                 ticker_active_count,
             },
