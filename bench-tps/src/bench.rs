@@ -1,6 +1,6 @@
 use crate::cli::Config;
 use log::*;
-use rayon::prelude::*;
+use rayon::{prelude::*, ThreadPool};
 use solana_client::perf_utils::{sample_txs, SampleStats};
 use solana_core::gen_keys::GenKeys;
 use solana_faucet::faucet::request_airdrop_transaction;
@@ -328,7 +328,7 @@ fn metrics_submit_lamport_balance(lamport_balance: u64) {
 
 pub fn make_min_priority_thread_pool() -> ThreadPool {
     // Use lower thread count to reduce priority.
-    let num_threads = std::cmp::max(2, num_cpus::get() / 4);
+    let num_threads = 4;
     rayon::ThreadPoolBuilder::new()
         .thread_name(|i| format!("solana-accounts-cleanup-{}", i))
         .num_threads(num_threads)
