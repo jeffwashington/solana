@@ -81,7 +81,7 @@ pub const OFFSET_OF_SHRED_INDEX: usize = OFFSET_OF_SHRED_SLOT + SIZE_OF_SHRED_SL
 pub const SHRED_PAYLOAD_SIZE: usize = PACKET_DATA_SIZE - SIZE_OF_NONCE;
 
 thread_local!(static PAR_THREAD_POOL: RefCell<ThreadPool> = RefCell::new(rayon::ThreadPoolBuilder::new()
-                    .num_threads(get_thread_count() * 2 / 3)
+                    .num_threads(get_thread_count() * 2 / 4)
                     .thread_name(|ix| format!("shredder_{}", ix))
                     .build()
                     .unwrap()));
