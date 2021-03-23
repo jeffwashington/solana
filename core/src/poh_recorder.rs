@@ -622,13 +622,12 @@ impl PohRecorder {
                     let bank_clone = working_bank.bank.clone();
                     self.prepare_send_us += timing::duration_as_us(&now.elapsed());
                     let now = Instant::now();
-                    match self.sender.send((bank_clone, (entry, self.tick_height))) {
-                        Err(e) => {
-                            assert!(1 >= self.ticker_active_count.fetch_sub(1, Ordering::Relaxed));
-                            return Err(e);
-                        },
-                        Ok(_) => (),
-                    };
+                    let res = self.sender.send((bank_clone, (entry, self.tick_height)));
+                    if res.is_err(){
+                        assert!(1 >= self.ticker_active_count.fetch_sub(1, Ordering::Relaxed));
+                        let _ = self.record_ticker_sender.send(0);
+                    }
+                    res?;
                     self.send_us += timing::duration_as_us(&now.elapsed());
                     let _ = self.record_ticker_sender.send(0);
                     assert!(1 >= self.ticker_active_count.fetch_sub(1, Ordering::Relaxed));
