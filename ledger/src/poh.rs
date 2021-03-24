@@ -43,6 +43,28 @@ impl Poh {
         self.hashes_per_tick
     }
 
+    pub fn tick_start_time(&self) -> Instant {
+        self.tick_start_time
+    }
+
+    // static: does not require lock
+    pub fn delay_ns_to_let_wallclock_catchup(
+        num_hashes: u64,
+        hashes_per_tick: u64,
+        tick_start_time: Instant,
+        target_ns_per_tick: u64,
+        now: Instant,
+    ) -> u64 {
+        let elapsed_ns = (now - tick_start_time).as_nanos();
+        let buffer_ns = 10; // report 10ns less
+        let target_elapsed_ns = (target_ns_per_tick * num_hashes / hashes_per_tick - buffer_ns) as u128;
+        if elapsed_ns >= target_elapsed_ns {
+            0
+        } else {
+            (target_elapsed_ns - elapsed_ns) as u64
+        }
+    }
+
     pub fn hash(&mut self, max_num_hashes: u64) -> bool {
         let num_hashes = std::cmp::min(self.remaining_hashes - 1, max_num_hashes);
         for _ in 0..num_hashes {
@@ -85,6 +107,7 @@ impl Poh {
         let num_hashes = self.num_hashes;
         self.remaining_hashes = self.hashes_per_tick;
         self.num_hashes = 0;
+        self.tick_start_time = Instant::now();
         Some(PohEntry {
             num_hashes,
             hash: self.hash,

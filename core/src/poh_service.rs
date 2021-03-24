@@ -35,6 +35,7 @@ struct PohTiming {
     total_tick_time_ns: u64,
     last_metric: Instant,
     total_record_time_us: u64,
+    total_sleeps: u64,
 }
 
 impl PohTiming {
@@ -48,6 +49,7 @@ impl PohTiming {
             total_tick_time_ns: 0,
             last_metric: Instant::now(),
             total_record_time_us: 0,
+            total_sleeps: 0,
         }
     }
     fn report(&mut self, ticks_per_slot: u64) {
@@ -64,6 +66,7 @@ impl PohTiming {
                 ("total_lock_time_us", self.total_lock_time_ns / 1000, i64),
                 ("total_hash_time_us", self.total_hash_time_ns / 1000, i64),
                 ("total_record_time_us", self.total_record_time_us, i64),
+                ("total_sleeps", self.total_sleeps, i64),
             );
             self.total_sleep_us = 0;
             self.num_ticks = 0;
@@ -73,6 +76,7 @@ impl PohTiming {
             self.total_hash_time_ns = 0;
             self.last_metric = Instant::now();
             self.total_record_time_us = 0;
+            self.total_sleeps = 0;
         }
     }
 }
@@ -396,6 +400,7 @@ fn record_or_hash(
         record_receiver: &Receiver<Record>,
         hashes_per_batch: u64,
         poh: &Arc<Mutex<Poh>>,
+        target_tick_ns: u64,
     ) -> bool {
         match next_record.take() {
             Some(mut record) => {
@@ -436,7 +441,8 @@ fn record_or_hash(
                 let mut poh_l = poh.lock().unwrap();
                 lock_time.stop();
                 timing.total_lock_time_ns += lock_time.as_ns();
-                loop {
+                let mut delay_ns_to_let_wallclock_catchup = 0;
+                'outer: loop {
                     timing.num_hashes += hashes_per_batch;
                     let mut hash_time = Measure::start("hash");
                     let should_tick = poh_l.hash(hashes_per_batch);
@@ -445,17 +451,38 @@ fn record_or_hash(
                     if should_tick {
                         return true; // nothing else can be done. tick required.
                     }
-                    // check to see if a record request has been sent
-                    let get_again = record_receiver.try_recv();
-                    match get_again {
-                        Ok(record) => {
-                            // remember the record we just received as the next record to occur
-                            *next_record = Some(record);
-                            break;
+                    let mut busy_waiting = false;
+                    let mut delay_start = Instant::now(); // default required by inner code - cannot be uninitialized
+                    let mut delay_ns_to_let_wallclock_catchup = 0;
+                    loop {
+                        // check to see if a record request has been sent
+                        let get_again = record_receiver.try_recv();
+                        match get_again {
+                            Ok(record) => {
+                                // remember the record we just received as the next record to occur
+                                *next_record = Some(record);
+                                break 'outer;
+                            }
+                            Err(_) => ()
                         }
-                        Err(_) => {
-                            continue;
+                        if !busy_waiting {
+                            delay_start = Instant::now();
+                            delay_ns_to_let_wallclock_catchup = Poh::delay_ns_to_let_wallclock_catchup(poh_l.num_hashes(), poh_l.hashes_per_tick(), poh_l.tick_start_time(), target_tick_ns, delay_start) as u128;
+                            if delay_ns_to_let_wallclock_catchup == 0 {
+                                break; // don't busy_wait
+                            }
+                            timing.total_sleeps += 1;
+                            busy_waiting = true;
                         }
+                        else {
+                            // already busy waiting, so check if we're done
+                            let waited_ns = delay_start.elapsed().as_nanos();
+                            if waited_ns >= delay_ns_to_let_wallclock_catchup {
+                                timing.total_sleep_us += (waited_ns / 1000) as u64;
+                                break 'outer;
+                            }
+                        }
+                        // otherwise, keep polling record_reciever and waiting
                     }
                 }
             }
@@ -483,6 +510,7 @@ fn record_or_hash(
                 &record_receiver,
                 hashes_per_batch,
                 &poh,
+                target_tick_ns,
             );
             if should_tick {
                 // Lock PohRecorder only for the final hash. record_or_hash will lock PohRecorder for record calls but not for hashing.
@@ -500,7 +528,12 @@ fn record_or_hash(
                 let elapsed_ns = now.elapsed().as_nanos() as u64;
                 // sleep is not accurate enough to get a predictable time.
                 // Kernel can not schedule the thread for a while.
+                let mut first = true;
                 while (now.elapsed().as_nanos() as u64) < target_tick_ns {
+                    if first {
+                        timing.total_sleeps += 1;
+                    }
+                    first = false;
                     std::hint::spin_loop();
                 }
                 timing.total_sleep_us += (now.elapsed().as_nanos() as u64 - elapsed_ns) / 1000;
