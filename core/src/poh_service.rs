@@ -271,13 +271,13 @@ impl PohService {
                     total_tick_time_ns += tick_time.as_ns();
                     last_tick_time = Instant::now();
                 }
-                num_just_hashes_this_tick = 0;
-                num_ticks += 1;
                 let real_tick_elapsed = tick_height - last_tick_height;
                 if elapsed_us > 7000 {
                     info!("should_tick is late: {:?}, rate: {} kH/s, htis lock time: {}ns, our ticks: {}, rael ticks: {}", elapsed_us, num_just_hashes_this_tick * 1_000/elapsed_us, lock_time.as_ns(),
                 num_ticks, real_tick_elapsed );
                 }
+                num_just_hashes_this_tick = 0;
+                num_ticks += 1;
 
                 /* why are we sleeping?
                 let elapsed_ns = now.elapsed().as_nanos() as u64;
