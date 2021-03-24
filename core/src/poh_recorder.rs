@@ -552,7 +552,7 @@ impl PohRecorder {
                 ("ticker_lock_time_us", ticker_lock_time_us, i64),
                 ("ticker_delay_time_us", ticker_delay_time_us, i64),
                 ("ticker_us", ticker_us, i64),
-                ("ticker_effective kHashes/sec", ticker_hashes * 1000/std::cmp::max(1,ticker_us), i64),
+                ("ticker_effective_kHashes/sec", ticker_hashes * 1000/std::cmp::max(1,ticker_us), i64),
                 (
                     "record_lock_contention",
                     self.record_lock_contention_us,
@@ -708,10 +708,19 @@ impl PohRecorder {
                 //error!("record_ticker ran: {} times", loops);
                 // nobody cares - lock will be released and we'll stop. let res = sender.send((hash, count));
             } else {
-                let res = receiver.recv();
+                let mut res = receiver.recv();
+                loop {
+                    // dequeue everything
+                    let res2 =  receiver.try_recv();
+                    if res2.is_err() {
+                        break;
+                    }
+                    res = Ok(res2.unwrap());
+                }
                 match res {
                     Ok((msg_count, sent_time)) => {
                         if msg_count == 0 {
+                            assert!(!hashing);
                             // could happen if we hit should_tick=true // assert!(false, "illegal call");
                             // ignore
                         } else {
