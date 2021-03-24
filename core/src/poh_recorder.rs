@@ -368,8 +368,8 @@ impl PohRecorder {
             poh.hash
         };
         info!(
-            "reset poh from: {},{},{} to: {},{}",
-            poh_hash, self.tick_height, self.start_slot, blockhash, start_slot
+            "reset poh from: {},{},{} to: {},{}, time since last tick (us) {:?}",
+            poh_hash, self.tick_height, self.start_slot, blockhash, start_slot, timing::duration_as_us(&self.last_tick_time.elapsed()),
         );
 
         std::mem::swap(&mut cache, &mut self.tick_cache);
