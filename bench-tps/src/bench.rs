@@ -98,7 +98,7 @@ where
     let maxes = maxes.clone();
     let client = client.clone();
     Builder::new()
-        .name("solana-client-sample".to_string())
+        .name("solana-cl-sample".to_string())
         .spawn(move || {
             sample_txs(&exit_signal, &maxes, sample_period, &client);
         })
@@ -179,7 +179,7 @@ where
             let total_tx_sent_count = total_tx_sent_count.clone();
             let client = client.clone();
             Builder::new()
-                .name("solana-client-sender".to_string())
+                .name("solana-cl-sender".to_string())
                 .spawn(move || {
                     do_tx_transfers(
                         &exit_signal,
@@ -202,7 +202,7 @@ where
     make_min_priority_thread_pool().install(|| {
         let Config {
             id,
-            threads,
+            mut threads,
             thread_batch_sleep_ms,
             duration,
             tx_count,
@@ -210,6 +210,8 @@ where
             target_slots_per_epoch,
             ..
         } = config;
+
+        threads = std::cmp::min(threads, 2);
 
         let mut source_keypair_chunks: Vec<Vec<&Keypair>> = Vec::new();
         let mut dest_keypair_chunks: Vec<VecDeque<&Keypair>> = Vec::new();
