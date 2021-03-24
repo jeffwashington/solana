@@ -29,7 +29,7 @@ impl Poh {
     }
 
     pub fn reset(&mut self, hash: Hash, hashes_per_tick: Option<u64>) {
-        info!("reset: {:?}", hashes_per_tick);
+        //info!("reset: {:?}", hashes_per_tick);
         let mut poh = Poh::new(hash, hashes_per_tick);
         std::mem::swap(&mut poh, self);
     }

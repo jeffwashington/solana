@@ -173,6 +173,7 @@ impl PohService {
         let mut failure_count = 10;
         let mut last_tick_height = poh_recorder.lock().unwrap().tick_height();
         let mut last_tick_time = Instant::now();
+        let mut num_just_hashes_this_tick = 0;
         loop {
             let should_tick = {
                 let mixin = if let Some(record) = try_again_mixin {
@@ -212,6 +213,7 @@ impl PohService {
                     let mut r;
                     loop {
                         num_hashes += hashes_per_batch;
+                        num_just_hashes_this_tick += hashes_per_batch;
                         num_just_hashes += hashes_per_batch;
                         let mut hash_time = Measure::start("hash");
                         r = poh_l.hash(hashes_per_batch);
@@ -220,7 +222,7 @@ impl PohService {
                         if r {
                             let elapsed_us = last_tick_time.elapsed().as_micros() as u64;
                             if elapsed_us > 7000 {
-                                info!("should_tick is late: {:?}", elapsed_us);
+                                info!("should_tick is late: {:?}, rate: {} kH/s", elapsed_us, num_just_hashes * 1_000/elapsed_us );
                             }
 
                             //error!("should tick in poh: {}", last_tick_height + 1);
@@ -248,6 +250,10 @@ impl PohService {
                     let mut poh_recorder_l = poh_recorder.lock().unwrap();
                     lock_time.stop();
                     total_lock_time_ns += lock_time.as_ns();
+                    let elapsed_us = last_tick_time.elapsed().as_micros() as u64;
+                    if elapsed_us > 7000 {
+                        info!("should_tick is late: {:?}, rate: {} kH/s, htis lock time: {}ns", elapsed_us, num_just_hashes * 1_000/elapsed_us, lock_time.as_ns() );
+                    }
                     let mut tick_time = Measure::start("tick");
                     //error!("ticking: {}", last_tick_height + 1);
                     let res = poh_recorder_l.tick((last_tick_height + 1) as usize);
@@ -266,6 +272,7 @@ impl PohService {
                     total_tick_time_ns += tick_time.as_ns();
                     last_tick_time = Instant::now();
                 }
+                num_just_hashes_this_tick = 0;
                 num_ticks += 1;
                 let real_tick_elapsed = tick_height - last_tick_height;
                 /* why are we sleeping?
