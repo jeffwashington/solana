@@ -479,6 +479,9 @@ impl PohRecorder {
         timing::duration_as_us(&PohConfig::default().target_tick_duration) as i64;
 
         let behind = tick_duration - default_target_tick_duration;
+        if behind > default_target_tick_duration * 2 {
+            info!("behind at tick: {}, {}", self.tick_height, behind);
+        }
 
         self.lates.push((from_poh == 0, behind as i64));
         self.tick_behind_us += behind;
