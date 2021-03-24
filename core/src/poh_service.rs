@@ -425,6 +425,9 @@ fn record_or_hash(
                         let new_record_result = record_receiver.try_recv();
                         match new_record_result {
                             Ok(new_record) => {
+                                if new_record.is_empty() {
+                                    break; // we were asked to be interrupted
+                                }
                                 // we already have second request to record, so record again while we still have the mutex
                                 record = new_record;
                             }
