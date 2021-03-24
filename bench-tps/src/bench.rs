@@ -328,7 +328,7 @@ fn metrics_submit_lamport_balance(lamport_balance: u64) {
 
 pub fn make_min_priority_thread_pool() -> ThreadPool {
     // Use lower thread count to reduce priority.
-    let num_threads = 4;
+    let num_threads = 2;
     rayon::ThreadPoolBuilder::new()
         .thread_name(|i| format!("solana-accounts-cleanup-{}", i))
         .num_threads(num_threads)
