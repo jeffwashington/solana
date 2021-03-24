@@ -172,6 +172,7 @@ impl PohService {
         let mut try_again_mixin = None;
         let mut failure_count = 10;
         let mut last_tick_height = poh_recorder.lock().unwrap().tick_height();
+        let mut last_tick_time = Instant::now();
         loop {
             let should_tick = {
                 let mixin = if let Some(record) = try_again_mixin {
@@ -217,6 +218,11 @@ impl PohService {
                         hash_time.stop();
                         total_hash_time_ns += hash_time.as_ns();
                         if r {
+                            let elapsed_us = last_tick_time.elapsed().as_micros() as u64;
+                            if elapsed_us > 7000 {
+                                info!("should_tick is late: {:?}", elapsed_us);
+                            }
+
                             //error!("should tick in poh: {}", last_tick_height + 1);
                             break;
                         }
@@ -258,6 +264,7 @@ impl PohService {
                     tick_height = poh_recorder_l.tick_height();
                     tick_time.stop();
                     total_tick_time_ns += tick_time.as_ns();
+                    last_tick_time = Instant::now();
                 }
                 num_ticks += 1;
                 let real_tick_elapsed = tick_height - last_tick_height;
