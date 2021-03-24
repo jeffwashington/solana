@@ -246,8 +246,9 @@ impl PohService {
                 // Lock PohRecorder only for the final hash...
                 let tick_height;
                 let elapsed_us;
+                let mut lock_time;                
                 {
-                    let mut lock_time = Measure::start("lock");
+                    lock_time = Measure::start("lock");
                     let mut poh_recorder_l = poh_recorder.lock().unwrap();
                     lock_time.stop();
                     total_lock_time_ns += lock_time.as_ns();
