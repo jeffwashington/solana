@@ -442,7 +442,7 @@ fn record_or_hash(
                 lock_time.stop();
                 timing.total_lock_time_ns += lock_time.as_ns();
                 let mut delay_ns_to_let_wallclock_catchup = 0;
-                'outer: loop {
+                loop {
                     timing.num_hashes += hashes_per_batch;
                     let mut hash_time = Measure::start("hash");
                     let should_tick = poh_l.hash(hashes_per_batch);
@@ -451,9 +451,25 @@ fn record_or_hash(
                     if should_tick {
                         return true; // nothing else can be done. tick required.
                     }
-                    let mut busy_waiting = false;
-                    let mut delay_start = Instant::now(); // default required by inner code - cannot be uninitialized
-                    let mut delay_ns_to_let_wallclock_catchup = 0;
+                    // check to see if a record request has been sent
+                    let get_again = record_receiver.try_recv();
+                    match get_again {
+                        Ok(record) => {
+                            // remember the record we just received as the next record to occur
+                            *next_record = Some(record);
+                            break;
+                        }
+                        Err(_) => ()
+                    }
+                    let delay_start = Instant::now();
+                    let delay_ns_to_let_wallclock_catchup = Poh::delay_ns_to_let_wallclock_catchup(poh_l.num_hashes(), poh_l.hashes_per_tick(), poh_l.tick_start_time(), target_tick_ns, delay_start) as u128;
+                    if delay_ns_to_let_wallclock_catchup == 0 {
+                        continue; // don't busy_wait
+                    }
+
+                    // now, we start a busy wait where we poll for record_receiver
+                    timing.total_sleeps += 1;
+                    drop(poh_l);
                     loop {
                         // check to see if a record request has been sent
                         let get_again = record_receiver.try_recv();
@@ -461,29 +477,18 @@ fn record_or_hash(
                             Ok(record) => {
                                 // remember the record we just received as the next record to occur
                                 *next_record = Some(record);
-                                break 'outer;
+                                break;
                             }
                             Err(_) => ()
                         }
-                        if !busy_waiting {
-                            delay_start = Instant::now();
-                            delay_ns_to_let_wallclock_catchup = Poh::delay_ns_to_let_wallclock_catchup(poh_l.num_hashes(), poh_l.hashes_per_tick(), poh_l.tick_start_time(), target_tick_ns, delay_start) as u128;
-                            if delay_ns_to_let_wallclock_catchup == 0 {
-                                break; // don't busy_wait
-                            }
-                            timing.total_sleeps += 1;
-                            busy_waiting = true;
+                        let waited_ns = delay_start.elapsed().as_nanos();
+                        if waited_ns >= delay_ns_to_let_wallclock_catchup {
+                            timing.total_sleep_us += (waited_ns / 1000) as u64;
+                            break;
                         }
-                        else {
-                            // already busy waiting, so check if we're done
-                            let waited_ns = delay_start.elapsed().as_nanos();
-                            if waited_ns >= delay_ns_to_let_wallclock_catchup {
-                                timing.total_sleep_us += (waited_ns / 1000) as u64;
-                                break 'outer;
-                            }
-                        }
-                        // otherwise, keep polling record_reciever and waiting
                     }
+                    break;
+                    // otherwise, keep polling record_reciever and waiting
                 }
             }
         };
