@@ -271,14 +271,16 @@ impl PohService {
                     total_tick_time_ns += tick_time.as_ns();
                     last_tick_time = Instant::now();
                 }
+                num_ticks += 1;
                 let real_tick_elapsed = tick_height - last_tick_height;
                 if elapsed_us > 7000 {
-                    info!("should_tick is late: {:?}, rate: {} kH/s, this lock time: {}ns, our ticks: {}, real ticks: {}, num hashes: {}",
+                    info!("should_tick is late: {:?}, rate: {} kH/s, this lock time: {}ns, our ticks: {}, real ticks: {}, num hashes: {}, lock: {}, sleep: {}",
                     elapsed_us, num_just_hashes_this_tick * 1_000/elapsed_us, lock_time.as_ns(),
-                num_ticks, real_tick_elapsed, num_just_hashes_this_tick );
+                num_ticks, real_tick_elapsed, num_just_hashes_this_tick ,
+                total_lock_time_ns, total_sleep_us
+            );
                 }
                 num_just_hashes_this_tick = 0;
-                //num_ticks += 1;
                 num_ticks = real_tick_elapsed;
 
                 /* why are we sleeping?
@@ -293,7 +295,7 @@ impl PohService {
                 now = Instant::now();
 
                 let elapsed_us = last_metric.elapsed().as_micros() as u64;
-                if elapsed_us > 1_000_000 {
+                if true {/*elapsed_us > 1_000_000 {
                     let us_per_slot = (elapsed_us * ticks_per_slot) / real_tick_elapsed;
                     datapoint_info!(
                         "poh-service",
@@ -308,6 +310,7 @@ impl PohService {
                         ("missed_ticks", real_tick_elapsed, i64),
                         ("effective kHashes/sec", num_hashes * 1_000_000 / (std::cmp::max(1,total_hash_time_ns)), i64),
                     );
+                    */
                     total_sleep_us = 0;
                     num_ticks = 0;
                     num_hashes = 0;
