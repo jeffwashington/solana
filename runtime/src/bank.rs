@@ -1031,7 +1031,7 @@ impl Bank {
             // TODO: clean this up, so much special-case copying...
             hashes_per_tick: parent.hashes_per_tick,
             ticks_per_slot: parent.ticks_per_slot,
-            ns_per_slot: parent.ns_per_slot,
+            ns_per_slot: u128::MAX,// parent.ns_per_slot,
             genesis_creation_time: parent.genesis_creation_time,
             unused: parent.unused,
             slots_per_year: parent.slots_per_year,
