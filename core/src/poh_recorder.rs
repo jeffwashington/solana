@@ -533,6 +533,8 @@ impl PohRecorder {
             let ticker_us = self.ticker_time_us.swap(0, Ordering::Relaxed);
             let ticker_lock_time_us = self.ticker_lock_time_us.swap(0, Ordering::Relaxed);
             let ticker_delay_time_us = self.ticker_delay_time_us.swap(0, Ordering::Relaxed);
+            let default_target_tick_duration =
+            timing::duration_as_us(&PohConfig::default().target_tick_duration) as i64;            
                         
             datapoint_info!(
                 "poh_recorder",
@@ -558,6 +560,7 @@ impl PohRecorder {
                     self.record_lock_contention_us,
                     i64
                 ),
+                ("target_tick_elapsed_time_us", default_target_tick_duration, i64),
             );
 
             error!("Lates: {:?}", self.lates);
