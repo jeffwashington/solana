@@ -401,6 +401,7 @@ fn record_or_hash(
         hashes_per_batch: u64,
         poh: &Arc<Mutex<Poh>>,
         target_tick_ns: u64,
+        current_tick: u64,
     ) -> bool {
         match next_record.take() {
             Some(mut record) => {
@@ -441,7 +442,6 @@ fn record_or_hash(
                 let mut poh_l = poh.lock().unwrap();
                 lock_time.stop();
                 timing.total_lock_time_ns += lock_time.as_ns();
-                let mut delay_ns_to_let_wallclock_catchup = 0;
                 loop {
                     timing.num_hashes += hashes_per_batch;
                     let mut hash_time = Measure::start("hash");
@@ -462,7 +462,12 @@ fn record_or_hash(
                         Err(_) => ()
                     }
                     let delay_start = Instant::now();
-                    let delay_ns_to_let_wallclock_catchup = Poh::delay_ns_to_let_wallclock_catchup(poh_l.num_hashes(), poh_l.hashes_per_tick(), poh_l.tick_start_time(), target_tick_ns, delay_start) as u128;
+                    let mut delay_ns_to_let_wallclock_catchup = Poh::delay_ns_to_let_wallclock_catchup(poh_l.num_hashes(), poh_l.hashes_per_tick(), poh_l.tick_start_time(), target_tick_ns, delay_start) as u128;
+
+                    // wait less earlier in the slot and more later in the slot
+                    let multiplier_1000 = (current_tick as u128 % 64) * 1000 / 64;
+                    delay_ns_to_let_wallclock_catchup *= multiplier_1000 / 1000;
+
                     if delay_ns_to_let_wallclock_catchup == 0 {
                         continue; // don't busy_wait
                     }
@@ -507,6 +512,7 @@ fn record_or_hash(
         let mut now = Instant::now();
         let mut timing = PohTiming::new();
         let mut next_record = None;
+        let mut current_tick = 0;
         loop {
             let should_tick = Self::record_or_hash(
                 &mut next_record,
@@ -516,6 +522,7 @@ fn record_or_hash(
                 hashes_per_batch,
                 &poh,
                 target_tick_ns,
+                current_tick,
             );
             if should_tick {
                 // Lock PohRecorder only for the final hash. record_or_hash will lock PohRecorder for record calls but not for hashing.
@@ -526,6 +533,7 @@ fn record_or_hash(
                     timing.total_lock_time_ns += lock_time.as_ns();
                     let mut tick_time = Measure::start("tick");
                     poh_recorder_l.tick();
+                    current_tick = poh_recorder_l.tick_height();
                     tick_time.stop();
                     timing.total_tick_time_ns += tick_time.as_ns();
                 }
