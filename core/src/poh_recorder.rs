@@ -71,6 +71,21 @@ impl Record {
             sender,
         }
     }
+
+    pub fn new_empty(
+        sender: Sender<Result<()>>,
+    ) -> Self {
+        Self {
+            mixin: Hash::default(),
+            transactions: vec![],
+            slot: 0,
+            sender,
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.transactions.is_empty() && self.slot == 0 && self.mixin == Hash::default()
+    }
 }
 
 pub struct TransactionRecorder {
@@ -161,6 +176,7 @@ pub struct PohRecorder {
     ticks_from_record: u64,
     last_metric: Instant,
     record_sender: Sender<Record>,
+    empty_recorder: TransactionRecorder,
 }
 
 impl PohRecorder {
@@ -338,8 +354,17 @@ impl PohRecorder {
             ))
     }
 
+    pub fn reset_async(
+        &mut self,
+        blockhash: Hash,
+        start_slot: Slot,
+        next_leader_slot: Option<(Slot, Slot)>,
+    ) {
+        self.reset_internal(blockhash, start_slot, next_leader_slot);
+    }
+
     // synchronize PoH with a bank
-    pub fn reset(
+    pub fn reset_internal(
         &mut self,
         blockhash: Hash,
         start_slot: Slot,
@@ -347,6 +372,10 @@ impl PohRecorder {
     ) {
         self.clear_bank();
         let mut cache = vec![];
+        {
+            // kick poh_service to have it let go of poh lock it may be holding
+            let _ = self.record_sender.send(Record::new_empty(self.empty_recorder.result_sender.clone())); // poh will not respond on the result channel
+        }
         let poh_hash = {
             let mut poh = self.poh.lock().unwrap();
             poh.reset(blockhash, self.poh_config.hashes_per_tick);
@@ -455,7 +484,11 @@ impl PohRecorder {
         Ok(())
     }
 
-    pub fn tick(&mut self) {
+    pub fn tick_async(&mut self) {
+        self.tick_internal();
+    }
+
+    pub fn tick_internal(&mut self) {
         let now = Instant::now();
         let poh_entry = self.poh.lock().unwrap().tick();
         self.tick_lock_contention_us += timing::duration_as_us(&now.elapsed());
@@ -566,7 +599,7 @@ impl PohRecorder {
             // record() might fail if the next PoH hash needs to be a tick.  But that's ok, tick()
             // and re-record()
             self.ticks_from_record += 1;
-            self.tick();
+            self.tick_internal();
         }
     }
 
@@ -591,6 +624,7 @@ impl PohRecorder {
         let (record_sender, record_receiver) = channel();
         let (leader_first_tick_height, leader_last_tick_height, grace_ticks) =
             Self::compute_leader_slot_tick_heights(next_leader_slot, ticks_per_slot);
+        let empty_recorder = TransactionRecorder::new(record_sender.clone());
         (
             Self {
                 poh,
@@ -620,6 +654,7 @@ impl PohRecorder {
                 ticks_from_record: 0,
                 last_metric: Instant::now(),
                 record_sender,
+                empty_recorder,
             },
             receiver,
             record_receiver,

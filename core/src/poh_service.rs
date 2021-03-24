@@ -156,7 +156,7 @@ impl PohService {
                 Duration::from_millis(0),
             );
             sleep(poh_config.target_tick_duration);
-            poh_recorder.lock().unwrap().tick();
+            poh_recorder.lock().unwrap().tick_async();
         }
     }
 
@@ -195,7 +195,7 @@ impl PohService {
                 Duration::from_millis(0),
             );
             sleep(poh_config.target_tick_duration);
-            poh_recorder.lock().unwrap().tick();
+            poh_recorder.lock().unwrap().tick_async();
             if poh_exit.load(Ordering::Relaxed) && !warned {
                 warned = true;
                 warn!("exit signal is ignored because PohService is scheduled to exit soon");
@@ -405,35 +405,37 @@ fn record_or_hash(
     ) -> bool {
         match next_record.take() {
             Some(mut record) => {
-                // received message to record
-                // so, record for as long as we have queued up record requests
-                let mut lock_time = Measure::start("lock");
-                let mut poh_recorder_l = poh_recorder.lock().unwrap();
-                lock_time.stop();
-                timing.total_lock_time_ns += lock_time.as_ns();
-                let mut record_time = Measure::start("record");
-                loop {
-                    let res = poh_recorder_l.record(
-                        record.slot,
-                        record.mixin,
-                        std::mem::take(&mut record.transactions),
-                    );
-                    let _ = record.sender.send(res); // what do we do on failure here? Ignore for now.
-                    timing.num_hashes += 1; // note: may have also ticked inside record
+                if !record.is_empty() { // empty requests just serve to cause us to cycle and release and re-acquire any locks
+                    // received message to record
+                    // so, record for as long as we have queued up record requests
+                    let mut lock_time = Measure::start("lock");
+                    let mut poh_recorder_l = poh_recorder.lock().unwrap();
+                    lock_time.stop();
+                    timing.total_lock_time_ns += lock_time.as_ns();
+                    let mut record_time = Measure::start("record");
+                    loop {
+                        let res = poh_recorder_l.record(
+                            record.slot,
+                            record.mixin,
+                            std::mem::take(&mut record.transactions),
+                        );
+                        let _ = record.sender.send(res); // what do we do on failure here? Ignore for now.
+                        timing.num_hashes += 1; // note: may have also ticked inside record
 
-                    let new_record_result = record_receiver.try_recv();
-                    match new_record_result {
-                        Ok(new_record) => {
-                            // we already have second request to record, so record again while we still have the mutex
-                            record = new_record;
-                        }
-                        Err(_) => {
-                            break;
+                        let new_record_result = record_receiver.try_recv();
+                        match new_record_result {
+                            Ok(new_record) => {
+                                // we already have second request to record, so record again while we still have the mutex
+                                record = new_record;
+                            }
+                            Err(_) => {
+                                break;
+                            }
                         }
                     }
+                    record_time.stop();
+                    timing.total_record_time_us += record_time.as_us();
                 }
-                record_time.stop();
-                timing.total_record_time_us += record_time.as_us();
                 // PohRecorder.record would have ticked if it needed to, so should_tick will be false
             }
             None => {
@@ -532,7 +534,7 @@ fn record_or_hash(
                     lock_time.stop();
                     timing.total_lock_time_ns += lock_time.as_ns();
                     let mut tick_time = Measure::start("tick");
-                    poh_recorder_l.tick();
+                    poh_recorder_l.tick_async();
                     current_tick = poh_recorder_l.tick_height();
                     tick_time.stop();
                     timing.total_tick_time_ns += tick_time.as_ns();
