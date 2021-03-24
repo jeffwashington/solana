@@ -487,9 +487,16 @@ impl PohRecorder {
         self.tick_behind_us += behind;
         self.tick_behind_max_us = std::cmp::max(behind, self.tick_behind_max_us);
 
+        let now_prev = Instant::now();
+        let poh_entry;
+        {
+            let mut poh_lock = self.poh.lock().unwrap();
 
-        let poh_entry = self.poh.lock().unwrap().tick();
-        self.tick_lock_contention_us += timing::duration_as_us(&now.elapsed());
+            self.tick_lock_contention_us += timing::duration_as_us(&now_prev.elapsed());
+            poh_entry = poh_lock.tick2();
+             drop(poh_lock);
+        }
+
         let now = Instant::now();
         if let Some(poh_entry) = poh_entry {
             if from_poh == 0 {
@@ -619,7 +626,8 @@ impl PohRecorder {
 
                     self.record_lock_contention_us += timing::duration_as_us(&now_prev.elapsed());
                     now = Instant::now();
-                     res = poh_lock.record(mixin);
+                     res = poh_lock.record2(mixin);
+                     drop(poh_lock);
                 }
                 self.record_us += timing::duration_as_us(&now.elapsed());
                 let now = Instant::now();
@@ -711,6 +719,7 @@ impl PohRecorder {
                 count_report.fetch_add(loops * count, Ordering::Relaxed);
                 ticker_time_us.fetch_add(now.elapsed().as_micros() as usize, Ordering::Relaxed);
                 hashing = false;
+                drop(lock);
                 //error!("record_ticker ran: {} times", loops);
                 // nobody cares - lock will be released and we'll stop. let res = sender.send((hash, count));
             } else {

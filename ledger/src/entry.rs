@@ -201,9 +201,9 @@ pub fn next_hash(start_hash: &Hash, num_hashes: u64, transactions: &[Transaction
     let mut poh = Poh::new(*start_hash, None);
     poh.hash(num_hashes.saturating_sub(1));
     if transactions.is_empty() {
-        poh.tick().unwrap().hash
+        poh.tick2().unwrap().hash
     } else {
-        poh.record(hash_transactions(transactions)).unwrap().hash
+        poh.record2(hash_transactions(transactions)).unwrap().hash
     }
 }
 
@@ -287,9 +287,9 @@ impl EntryVerificationState {
                                 } else {
                                     let mut poh = Poh::new(hash, None);
                                     if let Some(mixin) = tx_hash {
-                                        poh.record(*mixin).unwrap().hash == answer.hash
+                                        poh.record2(*mixin).unwrap().hash == answer.hash
                                     } else {
-                                        poh.tick().unwrap().hash == answer.hash
+                                        poh.tick2().unwrap().hash == answer.hash
                                     }
                                 }
                             })
@@ -319,10 +319,10 @@ fn compare_hashes(computed_hash: Hash, ref_entry: &Entry) -> bool {
     } else {
         let mut poh = Poh::new(computed_hash, None);
         if ref_entry.transactions.is_empty() {
-            poh.tick().unwrap().hash == ref_entry.hash
+            poh.tick2().unwrap().hash == ref_entry.hash
         } else {
             let tx_hash = hash_transactions(&ref_entry.transactions);
-            poh.record(tx_hash).unwrap().hash == ref_entry.hash
+            poh.record2(tx_hash).unwrap().hash == ref_entry.hash
         }
     }
 }

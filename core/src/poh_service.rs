@@ -222,7 +222,7 @@ impl PohService {
                         if r {
                             let elapsed_us = last_tick_time.elapsed().as_micros() as u64;
                             if elapsed_us > 7000 {
-                                info!("should_tick is late: {:?}, rate: {} kH/s", elapsed_us, num_just_hashes * 1_000/elapsed_us );
+                                info!("should_tick is late: {:?}, rate: {} kH/s", elapsed_us, num_just_hashes_this_tick * 1_000/elapsed_us );
                             }
 
                             //error!("should tick in poh: {}", last_tick_height + 1);
@@ -252,7 +252,7 @@ impl PohService {
                     total_lock_time_ns += lock_time.as_ns();
                     let elapsed_us = last_tick_time.elapsed().as_micros() as u64;
                     if elapsed_us > 7000 {
-                        info!("should_tick is late: {:?}, rate: {} kH/s, htis lock time: {}ns", elapsed_us, num_just_hashes * 1_000/elapsed_us, lock_time.as_ns() );
+                        info!("should_tick is late: {:?}, rate: {} kH/s, htis lock time: {}ns", elapsed_us, num_just_hashes_this_tick * 1_000/elapsed_us, lock_time.as_ns() );
                     }
                     let mut tick_time = Measure::start("tick");
                     //error!("ticking: {}", last_tick_height + 1);
