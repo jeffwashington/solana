@@ -245,15 +245,13 @@ impl PohService {
             if should_tick {
                 // Lock PohRecorder only for the final hash...
                 let tick_height;
+                let elapsed_us;
                 {
                     let mut lock_time = Measure::start("lock");
                     let mut poh_recorder_l = poh_recorder.lock().unwrap();
                     lock_time.stop();
                     total_lock_time_ns += lock_time.as_ns();
-                    let elapsed_us = last_tick_time.elapsed().as_micros() as u64;
-                    if elapsed_us > 7000 {
-                        info!("should_tick is late: {:?}, rate: {} kH/s, htis lock time: {}ns", elapsed_us, num_just_hashes_this_tick * 1_000/elapsed_us, lock_time.as_ns() );
-                    }
+                    elapsed_us = last_tick_time.elapsed().as_micros() as u64;
                     let mut tick_time = Measure::start("tick");
                     //error!("ticking: {}", last_tick_height + 1);
                     let res = poh_recorder_l.tick((last_tick_height + 1) as usize);
@@ -275,6 +273,11 @@ impl PohService {
                 num_just_hashes_this_tick = 0;
                 num_ticks += 1;
                 let real_tick_elapsed = tick_height - last_tick_height;
+                if elapsed_us > 7000 {
+                    info!("should_tick is late: {:?}, rate: {} kH/s, htis lock time: {}ns, our ticks: {}, rael ticks: {}", elapsed_us, num_just_hashes_this_tick * 1_000/elapsed_us, lock_time.as_ns(),
+                num_ticks, real_tick_elapsed );
+                }
+
                 /* why are we sleeping?
                 let elapsed_ns = now.elapsed().as_nanos() as u64;
                 // sleep is not accurate enough to get a predictable time.
