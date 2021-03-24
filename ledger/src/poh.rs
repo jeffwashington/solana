@@ -8,6 +8,7 @@ pub struct Poh {
     num_hashes: u64,
     hashes_per_tick: u64,
     remaining_hashes: u64,
+    tick_start_time: Instant,
 }
 
 #[derive(Debug)]
@@ -25,12 +26,21 @@ impl Poh {
             num_hashes: 0,
             hashes_per_tick,
             remaining_hashes: hashes_per_tick,
+            tick_start_time: Instant::now(),
         }
     }
 
     pub fn reset(&mut self, hash: Hash, hashes_per_tick: Option<u64>) {
         let mut poh = Poh::new(hash, hashes_per_tick);
         std::mem::swap(&mut poh, self);
+    }
+
+    pub fn num_hashes(&self) -> u64 {
+        self.num_hashes
+    }
+
+    pub fn hashes_per_tick(&self) -> u64 {
+        self.hashes_per_tick
     }
 
     pub fn hash(&mut self, max_num_hashes: u64) -> bool {
@@ -94,7 +104,9 @@ pub fn compute_hash_time_ns(hashes_sample_size: u64) -> u64 {
 
 pub fn compute_hashes_per_tick(duration: Duration, hashes_sample_size: u64) -> u64 {
     let elapsed = compute_hash_time_ns(hashes_sample_size) / (1000 * 1000);
-    duration.as_millis() as u64 * hashes_sample_size / elapsed
+    let result = duration.as_millis() as u64 * hashes_sample_size / elapsed;
+    info!("hashes per tick: {}", result);
+    result
 }
 
 #[cfg(test)]

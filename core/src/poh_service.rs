@@ -199,7 +199,197 @@ impl PohService {
         }
     }
 
-    fn record_or_hash(
+/*    fn tick_producer(
+        poh_recorder: Arc<Mutex<PohRecorder>>,
+        poh_exit: &AtomicBool,
+        target_tick_ns: u64,
+        ticks_per_slot: u64,
+        hashes_per_batch: u64,
+        record_receiver: Receiver<Record>,
+    ) {
+        let poh = poh_recorder.lock().unwrap().poh.clone();
+        let mut now = Instant::now();
+        let mut last_metric = Instant::now();
+        let mut num_ticks = 0;
+        let mut num_hashes = 0;
+        let mut num_just_hashes = 0;
+        let mut total_sleep_us = 0;
+        let mut total_lock_time_ns = 0;
+        let mut total_hash_time_ns = 0;
+        let mut total_tick_time_ns = 0;
+        let mut total_record_time_us = 0;
+        let mut try_again_mixin = None;
+        let mut failure_count = 10;
+        let mut last_tick_height = poh_recorder.lock().unwrap().tick_height();
+        let mut last_tick_time = Instant::now();
+        let mut num_just_hashes_this_tick = 0;
+        loop {
+            let should_tick = {
+                let mixin = if let Some(record) = try_again_mixin {
+                    try_again_mixin = None;
+                    Ok(record)
+                } else {
+                    record_receiver.try_recv()
+                };
+                if let Ok(mut record) = mixin {
+                    let mut lock_time = Measure::start("lock");
+                    let mut poh_recorder_l = poh_recorder.lock().unwrap();
+                    lock_time.stop();
+                    total_lock_time_ns += lock_time.as_ns();
+                    loop {
+                        let mut temp = Vec::new();
+                        std::mem::swap(&mut temp, &mut record.transactions);
+                        let mut lock_time = Measure::start("lock");
+
+                        let res = poh_recorder_l.record(record.slot, record.mixin, temp, true);
+                        let _ = record.sender.send(res); // TODO what do we do on failure here?
+                        lock_time.stop();
+                        total_record_time_us += lock_time.as_us();
+                            num_hashes += 1; // may have also ticked inside record
+
+                        let get_again = record_receiver.try_recv();
+                        match get_again {
+                            Ok(mut record2) => {
+                                std::mem::swap(&mut record2, &mut record);
+                            }
+                            Err(_) => {
+                                break;
+                            }
+                        }
+                    }
+                    false // record will tick if it needs to
+                } else {
+                    let mut lock_time = Measure::start("lock");
+                    let mut poh_l = poh.lock().unwrap();
+                    lock_time.stop();
+                    total_lock_time_ns += lock_time.as_ns();
+                    let mut r;
+                    loop {
+                        num_hashes += hashes_per_batch;
+                        num_just_hashes_this_tick += hashes_per_batch;
+                        num_just_hashes += hashes_per_batch;
+                        let mut hash_time = Measure::start("hash");
+                        r = poh_l.hash(hashes_per_batch);
+                        hash_time.stop();
+                        total_hash_time_ns += hash_time.as_ns();
+                        if r {
+                            let elapsed_us = last_tick_time.elapsed().as_micros() as u64;
+                            if elapsed_us > 7000 {
+                                info!("should_tick is late: {:?}, rate: {} kH/s", elapsed_us, num_just_hashes_this_tick * 1_000/elapsed_us );
+                            }
+                            let elapsed_ns = now.elapsed().as_nanos() as u64;
+                            // sleep is not accurate enough to get a predictable time.
+                            // Kernel can not schedule the thread for a while.
+                            while (now.elapsed().as_nanos() as u64) < target_tick_ns * poh_l.num_hashes() / poh_l.hashes_per_tick() {
+                                std::hint::spin_loop();
+                            }
+                            total_sleep_us += (now.elapsed().as_nanos() as u64 - elapsed_ns) / 1000;
+                            break;
+                        }
+                        let get_again = record_receiver.try_recv();
+                        match get_again {
+                            Ok(inside) => {
+                                try_again_mixin = Some(inside);
+                                break;
+                            }
+                            Err(_) => {
+                                                                
+                                continue;
+                            }
+                        }
+                    }
+                    r
+                }
+            };
+            if should_tick {
+                // Lock PohRecorder only for the final hash...
+                let tick_height;
+                let elapsed_us;
+                let mut lock_time;                
+                {
+                    lock_time = Measure::start("lock");
+                    let mut poh_recorder_l = poh_recorder.lock().unwrap();
+                    lock_time.stop();
+                    total_lock_time_ns += lock_time.as_ns();
+                    elapsed_us = last_tick_time.elapsed().as_micros() as u64;
+                    let mut tick_time = Measure::start("tick");
+                    //error!("ticking: {}", last_tick_height + 1);
+                    let res = poh_recorder_l.tick((last_tick_height + 1) as usize);
+                    if !res {
+                        if failure_count > 0 {
+                            failure_count -= 1;
+                            error!("error: failed ticking: {}", last_tick_height + 1);
+                        }
+                        else {
+                            error!("error: failed ticking: {}", last_tick_height + 1);
+                            //panic!("failed: {}", last_tick_height + 1);
+                        }
+                    }
+                    tick_height = poh_recorder_l.tick_height();
+                    tick_time.stop();
+                    total_tick_time_ns += tick_time.as_ns();
+                    last_tick_time = Instant::now();
+                }
+                num_ticks += 1;
+                let real_tick_elapsed = tick_height - last_tick_height;
+                if elapsed_us > 7000 {
+                    info!("should_tick is late: {:?}, rate: {} kH/s, this lock time: {}ns, our ticks: {}, real ticks: {}, num hashes: {}, lock: {}, sleep: {}, record_time_us: {}, total_tick_time_us: {}, hashes: {}, total_hash_time_us: {}, time since last tick: {}",
+                    elapsed_us, num_just_hashes_this_tick * 1_000/elapsed_us, lock_time.as_ns(),
+                num_ticks, real_tick_elapsed, num_just_hashes_this_tick ,
+                total_lock_time_ns, total_sleep_us, total_record_time_us,
+                total_tick_time_ns / 1000,
+                num_hashes,
+                total_hash_time_ns/1000,
+                last_metric.elapsed().as_micros() as u64,
+            );
+                }
+                num_just_hashes_this_tick = 0;
+                num_ticks = real_tick_elapsed;
+
+                let elapsed_ns = now.elapsed().as_nanos() as u64;
+                // sleep is not accurate enough to get a predictable time.
+                // Kernel can not schedule the thread for a while.
+                while (now.elapsed().as_nanos() as u64) < target_tick_ns {
+                    std::hint::spin_loop();
+                }
+                total_sleep_us += (now.elapsed().as_nanos() as u64 - elapsed_ns) / 1000;
+                now = Instant::now();
+
+                let elapsed_us = last_metric.elapsed().as_micros() as u64;
+                if true {/*elapsed_us > 1_000_000 {
+                    let us_per_slot = (elapsed_us * ticks_per_slot) / real_tick_elapsed;
+                    datapoint_info!(
+                        "poh-service",
+                        ("ticks", num_ticks as i64, i64),
+                        ("hashes", num_hashes as i64, i64),
+                        ("elapsed_us", us_per_slot, i64),
+                        ("total_sleep_us", total_sleep_us, i64),
+                        ("total_tick_time_us", total_tick_time_ns / 1000, i64),
+                        ("total_lock_time_us", total_lock_time_ns / 1000, i64),
+                        ("total_hash_time_us", total_hash_time_ns / 1000, i64),
+                        ("total_elapsed_us", elapsed_us, i64),
+                        ("missed_ticks", real_tick_elapsed, i64),
+                        ("effective kHashes/sec", num_hashes * 1_000_000 / (std::cmp::max(1,total_hash_time_ns)), i64),
+                    );
+                    */
+                    total_record_time_us = 0;
+                    total_sleep_us = 0;
+                    num_ticks = 0;
+                    num_hashes = 0;
+                    total_tick_time_ns = 0;
+                    total_lock_time_ns = 0;
+                    total_hash_time_ns = 0;
+                    last_metric = Instant::now();
+                    last_tick_height = tick_height;
+                }
+                if poh_exit.load(Ordering::Relaxed) {
+                    break;
+                }
+            }
+        }
+    }
+*/
+fn record_or_hash(
         next_record: &mut Option<Record>,
         poh_recorder: &Arc<Mutex<PohRecorder>>,
         timing: &mut PohTiming,
