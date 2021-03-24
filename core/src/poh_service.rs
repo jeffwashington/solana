@@ -273,8 +273,8 @@ impl PohService {
                 }
                 let real_tick_elapsed = tick_height - last_tick_height;
                 if elapsed_us > 7000 {
-                    info!("should_tick is late: {:?}, rate: {} kH/s, htis lock time: {}ns, our ticks: {}, rael ticks: {}", elapsed_us, num_just_hashes_this_tick * 1_000/elapsed_us, lock_time.as_ns(),
-                num_ticks, real_tick_elapsed );
+                    info!("should_tick is late: {:?}, rate: {} kH/s, htis lock time: {}ns, our ticks: {}, rael ticks: {}, num hashes: {}", elapsed_us, num_just_hashes_this_tick * 1_000/elapsed_us, lock_time.as_ns(),
+                num_ticks, real_tick_elapsed, num_just_hashes_this_tick );
                 }
                 num_just_hashes_this_tick = 0;
                 num_ticks += 1;
