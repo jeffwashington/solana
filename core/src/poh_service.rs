@@ -285,7 +285,7 @@ impl PohService {
                 total_lock_time_ns, total_sleep_us, total_record_time_us,
                 total_tick_time_ns / 1000,
                 num_hashes,
-                total_hash_time_us/1000,
+                total_hash_time_ns/1000,
                 last_metric.elapsed().as_micros() as u64,
             );
                 }
