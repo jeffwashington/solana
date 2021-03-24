@@ -279,10 +279,14 @@ impl PohService {
                 num_ticks += 1;
                 let real_tick_elapsed = tick_height - last_tick_height;
                 if elapsed_us > 7000 {
-                    info!("should_tick is late: {:?}, rate: {} kH/s, this lock time: {}ns, our ticks: {}, real ticks: {}, num hashes: {}, lock: {}, sleep: {}, record_time_us: {}",
+                    info!("should_tick is late: {:?}, rate: {} kH/s, this lock time: {}ns, our ticks: {}, real ticks: {}, num hashes: {}, lock: {}, sleep: {}, record_time_us: {}, total_tick_time_us: {}, hashes: {}, total_hash_time_us: {}, time since last tick: {}",
                     elapsed_us, num_just_hashes_this_tick * 1_000/elapsed_us, lock_time.as_ns(),
                 num_ticks, real_tick_elapsed, num_just_hashes_this_tick ,
                 total_lock_time_ns, total_sleep_us, total_record_time_us,
+                total_tick_time_ns / 1000,
+                num_hashes,
+                total_hash_time_us/1000,
+                last_metric.elapsed().as_micros() as u64,
             );
                 }
                 num_just_hashes_this_tick = 0;
