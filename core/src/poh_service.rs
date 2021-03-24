@@ -229,8 +229,13 @@ impl PohService {
                             if elapsed_us > 7000 {
                                 info!("should_tick is late: {:?}, rate: {} kH/s", elapsed_us, num_just_hashes_this_tick * 1_000/elapsed_us );
                             }
-
-                            //error!("should tick in poh: {}", last_tick_height + 1);
+                            let elapsed_ns = now.elapsed().as_nanos() as u64;
+                            // sleep is not accurate enough to get a predictable time.
+                            // Kernel can not schedule the thread for a while.
+                            while (now.elapsed().as_nanos() as u64) < target_tick_ns * poh_l.num_hashes() / poh_l.hashes_per_tick() {
+                                std::hint::spin_loop();
+                            }
+                            total_sleep_us += (now.elapsed().as_nanos() as u64 - elapsed_ns) / 1000;
                             break;
                         }
                         let get_again = record_receiver.try_recv();
@@ -240,6 +245,7 @@ impl PohService {
                                 break;
                             }
                             Err(_) => {
+                                                                
                                 continue;
                             }
                         }

@@ -34,6 +34,14 @@ impl Poh {
         std::mem::swap(&mut poh, self);
     }
 
+    pub fn num_hashes(&self) -> u64 {
+        self.num_hashes
+    }
+
+    pub fn hashes_per_tick(&self) -> u64 {
+        self.hashes_per_tick
+    }
+
     pub fn hash(&mut self, max_num_hashes: u64) -> bool {
         let num_hashes = std::cmp::min(self.remaining_hashes - 1, max_num_hashes);
         for _ in 0..num_hashes {
