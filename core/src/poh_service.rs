@@ -548,6 +548,22 @@ fn record_or_hash(
                 current_tick,
             );
             if should_tick {
+                let elapsed_ns = now.elapsed().as_nanos() as u64;
+                // sleep is not accurate enough to get a predictable time.
+                // Kernel can not schedule the thread for a while.
+                let mut first = true;
+                if (now.elapsed().as_nanos() as u64) < target_tick_ns {
+                    info!("Sleeping at tick: {}, amt: {}, now: {}, target: {}", current_tick, target_tick_ns - now.elapsed().as_nanos() as u64, now.elapsed().as_nanos() as u64, target_tick_ns, );
+                    while (now.elapsed().as_nanos() as u64) < target_tick_ns {
+                        if first {
+                            timing.total_sleeps += 1;
+                        }
+                        first = false;
+                        std::hint::spin_loop();
+                    }
+                }
+                timing.tick_sleep_us += (now.elapsed().as_nanos() as u64 - elapsed_ns) / 1000;
+
                 let ticked;
                 // Lock PohRecorder only for the final hash. record_or_hash will lock PohRecorder for record calls but not for hashing.
                 {
@@ -562,23 +578,6 @@ fn record_or_hash(
                     timing.total_tick_time_ns += tick_time.as_ns();
                 }
                 timing.num_ticks += 1;
-                let elapsed_ns = now.elapsed().as_nanos() as u64;
-                // sleep is not accurate enough to get a predictable time.
-                // Kernel can not schedule the thread for a while.
-                let mut first = true;
-                if ticked {
-                    if (now.elapsed().as_nanos() as u64) < target_tick_ns {
-                        info!("Sleeping at tick: {}, amt: {}, now: {}, target: {}", current_tick, now.elapsed().as_nanos() as u64 - target_tick_ns, now.elapsed().as_nanos() as u64, target_tick_ns, );
-                        while (now.elapsed().as_nanos() as u64) < target_tick_ns {
-                            if first {
-                                timing.total_sleeps += 1;
-                            }
-                            first = false;
-                            std::hint::spin_loop();
-                        }
-                    }
-                }
-                timing.tick_sleep_us += (now.elapsed().as_nanos() as u64 - elapsed_ns) / 1000;
                 now = Instant::now();
 
                 timing.report(ticks_per_slot, current_tick % 64 == 0, current_tick);
