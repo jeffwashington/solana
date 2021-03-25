@@ -57,12 +57,13 @@ impl Poh {
     ) -> u64 {
         let elapsed_ns = (now - tick_start_time).as_nanos();
         let buffer_ns = 10; // report 10ns less
-        let target_elapsed_ns = (target_ns_per_tick * num_hashes / hashes_per_tick - buffer_ns) as u128;
-        info!("delay_ns_to_let_wallclock_catchup, hashes: {}, hashes_per_tick: {}, elapsed_ns: {}, target_ns_per_tick: {}",
+        let target_elapsed_ns = target_ns_per_tick as u128 * num_hashes as u128 / hashes_per_tick as u128 - buffer_ns as u128;
+        info!("delay_ns_to_let_wallclock_catchup, hashes: {}, hashes_per_tick: {}, elapsed_ns: {}, target_ns_per_tick: {}, target: {}",
             num_hashes,
             hashes_per_tick,
             elapsed_ns,
             target_ns_per_tick,
+            target_elapsed_ns,
     );
         if elapsed_ns >= target_elapsed_ns {
             0
