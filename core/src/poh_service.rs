@@ -116,17 +116,10 @@ impl PohService {
                     if let Some(cores) = core_affinity::get_core_ids() {
                         core_affinity::set_for_current(cores[pinned_cpu_core]);
                     }
-                    // Account for some extra time outside of PoH generation to account
-                    // for processing time outside PoH.
-                    let adjustment_per_tick = if ticks_per_slot > 0 {
-                        TARGET_SLOT_ADJUSTMENT_NS / ticks_per_slot
-                    } else {
-                        0
-                    };
                     Self::tick_producer(
                         poh_recorder,
                         &poh_exit_,
-                        poh_config.target_tick_duration.as_nanos() as u64 - adjustment_per_tick,
+                        Self::target_ns_per_tick(ticks_per_slot, poh_config.target_tick_duration.as_nanos() as u64),
                         ticks_per_slot,
                         hashes_per_batch,
                         record_receiver,
@@ -137,6 +130,17 @@ impl PohService {
             .unwrap();
 
         Self { tick_producer }
+    }
+
+    pub fn target_ns_per_tick(ticks_per_slot: u64, target_tick_duration_ns: u64) -> u64 {
+        // Account for some extra time outside of PoH generation to account
+        // for processing time outside PoH.
+        let adjustment_per_tick = if ticks_per_slot > 0 {
+            TARGET_SLOT_ADJUSTMENT_NS / ticks_per_slot
+        } else {
+            0
+        };
+        target_tick_duration_ns - adjustment_per_tick
     }
 
     fn sleepy_tick_producer(

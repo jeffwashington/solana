@@ -27,6 +27,7 @@ use std::sync::mpsc::{channel, Receiver, SendError, Sender, SyncSender};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use thiserror::Error;
+use crate::poh_service::PohService;
 
 pub const GRACE_TICKS_FACTOR: u64 = 2;
 pub const MAX_GRACE_SLOTS: u64 = 2;
@@ -461,7 +462,21 @@ impl PohRecorder {
 
     pub fn tick(&mut self) {
         let now = Instant::now();
-        let poh_entry = self.poh.lock().unwrap().tick();
+        let (poh_entry, target_time) = {
+            let mut poh_l = self.poh.lock().unwrap();
+            let poh_entry = poh_l.tick();
+            let target_time = 
+            if poh_entry.is_some()
+            {
+                let target_ns_per_tick = PohService::target_ns_per_tick(self.ticks_per_slot(), self.poh_config.target_tick_duration.as_nanos() as u64);
+                Some(poh_l.target_poh_time(target_ns_per_tick))
+            }
+            else {
+                None
+            };
+
+            (poh_entry, target_time)
+        };
         self.tick_lock_contention_us += timing::duration_as_us(&now.elapsed());
         let now = Instant::now();
         if let Some(poh_entry) = poh_entry {
@@ -484,6 +499,11 @@ impl PohRecorder {
             self.tick_cache.push((entry, self.tick_height));
             let _ = self.flush_cache(true);
             self.flush_cache_tick_us += timing::duration_as_us(&now.elapsed());
+            let target_time = target_time.unwrap();
+            while Instant::now() < target_time {
+                // TODO: we could possibly get a reset or record request while we're here
+                std::hint::spin_loop();
+            }
         }
     }
 
