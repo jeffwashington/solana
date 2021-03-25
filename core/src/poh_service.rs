@@ -481,11 +481,15 @@ fn record_or_hash(
                     let delay_start = Instant::now();
                     let mut delay_ns_to_let_wallclock_catchup = Poh::delay_ns_to_let_wallclock_catchup(poh_l.num_hashes(), poh_l.hashes_per_tick(), poh_l.tick_start_time(), target_tick_ns, delay_start) as u64;
 
+                    if delay_ns_to_let_wallclock_catchup == 0 {
+                        continue; // don't busy_wait
+                    }
+
                     let earlier = delay_ns_to_let_wallclock_catchup;
                     // wait less earlier in the slot and more later in the slot
                     let multiplier_1000 = (current_tick as u64 % 64) * 1024 / 64;
                     delay_ns_to_let_wallclock_catchup = (delay_ns_to_let_wallclock_catchup * multiplier_1000) / 1024;
-                    info!("delay: {}, multiplier: {}, final: {}", earlier, multiplier_1000, delay_ns_to_let_wallclock_catchup);
+                    //info!("delay: {}, multiplier: {}, final: {}", earlier, multiplier_1000, delay_ns_to_let_wallclock_catchup);
 
                     if delay_ns_to_let_wallclock_catchup == 0 {
                         continue; // don't busy_wait
@@ -561,7 +565,6 @@ fn record_or_hash(
                 // sleep is not accurate enough to get a predictable time.
                 // Kernel can not schedule the thread for a while.
                 let mut first = true;
-                /*
                 while (now.elapsed().as_nanos() as u64) < target_tick_ns {
                     if first {
                         timing.total_sleeps += 1;
@@ -569,7 +572,6 @@ fn record_or_hash(
                     first = false;
                     std::hint::spin_loop();
                 }
-                */
                 timing.tick_sleep_us += (now.elapsed().as_nanos() as u64 - elapsed_ns) / 1000;
                 now = Instant::now();
 
