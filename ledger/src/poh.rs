@@ -55,7 +55,7 @@ impl Poh {
         target_ns_per_tick: u64,
     ) -> Instant {
         let offset_ns = target_ns_per_tick * num_hashes / hashes_per_tick;
-        info!("poh_recorder: should sleep: {}ns", offset_ns);
+        //info!("poh_recorder: should sleep: {}ns", offset_ns);
         tick_start_time + Duration::from_nanos(offset_ns)
     }
 
@@ -70,6 +70,11 @@ impl Poh {
 
     pub fn hash(&mut self, max_num_hashes: u64) -> bool {
         let num_hashes = std::cmp::min(self.remaining_hashes - 1, max_num_hashes);
+        if self.num_hashes == 0 {
+            // caller may throttle when they start hashing
+            self.tick_start_time = Instant::now();
+        }
+
         for _ in 0..num_hashes {
             self.hash = hash(&self.hash.as_ref());
         }
