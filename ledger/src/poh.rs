@@ -74,7 +74,7 @@ impl Poh {
         ticks_per_slot: u64,
     ) -> Instant {
         let (initial_time, offset_tick_ns) = if ticks_per_slot > 0  {
-            (slot_start_time, target_ns_per_tick * tick_number / ticks_per_slot)
+            (slot_start_time, target_ns_per_tick * tick_number)
         }
         else {
             (tick_start_time, 0)
