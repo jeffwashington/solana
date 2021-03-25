@@ -411,7 +411,7 @@ fn record_or_hash(
         poh: &Arc<Mutex<Poh>>,
         target_tick_ns: u64,
         current_tick: u64,
-    ) -> (bool, Instant, u64) {
+    ) -> (bool, Instant) {
         match next_record.take() {
             Some(mut record) => {
                 if !record.is_empty() { // empty requests just serve to cause us to cycle and release and re-acquire any locks
@@ -465,11 +465,10 @@ fn record_or_hash(
                     let should_tick = poh_l.hash(hashes_per_batch);
                     hash_time.stop();
                     timing.total_hash_time_ns += hash_time.as_ns();
-                    let delay_start = Instant::now();
-                    let mut delay_ns_to_let_wallclock_catchup = Poh::delay_ns_to_let_wallclock_catchup(poh_l.num_hashes(), poh_l.hashes_per_tick(), poh_l.tick_start_time(), target_tick_ns, delay_start) as u64;
+                    let target_poh_time = poh_l.target_poh_time(target_tick_ns);
                     if should_tick {
                         error!("poh_record: num_hashes: {}, hashes_per_tick: {}, tick elapsed: {}ns, target: {}ns", poh_l.num_hashes(), poh_l.hashes_per_tick(), poh_l.tick_start_time().elapsed().as_nanos(), target_tick_ns);
-                        return (true, poh_l.tick_start_time(), delay_ns_to_let_wallclock_catchup); // nothing else can be done. tick required.
+                        return (true, target_poh_time); // nothing else can be done. tick required.
                     }
                     // check to see if a record request has been sent
                     let get_again = record_receiver.try_recv();
@@ -482,17 +481,8 @@ fn record_or_hash(
                         Err(_) => ()
                     }
 
-                    if delay_ns_to_let_wallclock_catchup == 0 {
-                        continue; // don't busy_wait
-                    }
-
-                    let earlier = delay_ns_to_let_wallclock_catchup;
-                    // wait less earlier in the slot and more later in the slot
-                    let multiplier_1000 = 1024;//(current_tick as u64 % 64) * 1024 / 64;
-                    delay_ns_to_let_wallclock_catchup = (delay_ns_to_let_wallclock_catchup * multiplier_1000) / 1024;
-                    //info!("delay: {}, multiplier: {}, final: {}", earlier, multiplier_1000, delay_ns_to_let_wallclock_catchup);
-
-                    if delay_ns_to_let_wallclock_catchup == 0 {
+                    let start_wait = Instant::now();
+                    if target_poh_time < start_wait {
                         continue; // don't busy_wait
                     }
 
@@ -510,9 +500,9 @@ fn record_or_hash(
                             }
                             Err(_) => ()
                         }
-                        let waited_ns = delay_start.elapsed().as_nanos() as u64;
-                        if waited_ns >= delay_ns_to_let_wallclock_catchup {
-                            timing.batch_sleep_us += (waited_ns / 1000) as u64;
+
+                        if Instant::now() >= target_poh_time {
+                            timing.batch_sleep_us += (start_wait.elapsed().as_nanos() / 1000) as u64;
                             break;
                         }
                     }
@@ -521,7 +511,7 @@ fn record_or_hash(
                 }
             }
         };
-        (false, Instant::now(), 0) // should_tick = false for all code that reaches here
+        (false, Instant::now()) // should_tick = false for all code that reaches here
     }
 
     fn tick_producer(
@@ -537,7 +527,7 @@ fn record_or_hash(
         let mut next_record = None;
         let mut current_tick = 0;
         loop {
-            let (should_tick, now, expected_delay_ns) = Self::record_or_hash(
+            let (should_tick, target_time) = Self::record_or_hash(
                 &mut next_record,
                 &poh_recorder,
                 &mut timing,
@@ -563,15 +553,13 @@ fn record_or_hash(
                 }
                 timing.num_ticks += 1;
 
-                let elapsed_ns = now.elapsed().as_nanos() as u64;
                 // sleep is not accurate enough to get a predictable time.
                 // Kernel can not schedule the thread for a while.
                 let mut first = true;
-                if elapsed_ns < target_tick_ns {
-                    if target_tick_ns - elapsed_ns > 10_000 {
-                        info!("Sleeping at tick: {}, amt: {}us, now: {}us, target: {}us, expected delay: {}ns", current_tick, (target_tick_ns - now.elapsed().as_nanos() as u64) / 1000, (now.elapsed().as_nanos() as u64)/ 1000 , target_tick_ns / 1000, expected_delay_ns);
-                    }
-                    while (now.elapsed().as_nanos() as u64) < target_tick_ns {
+                let now = Instant::now();
+                if now > target_time {
+                    info!("Sleeping at tick: {}, amt: {}us, now: {}us, target: {}us, expected delay: {}ns", current_tick, (target_tick_ns - now.elapsed().as_nanos() as u64) / 1000, (now.elapsed().as_nanos() as u64)/ 1000 , target_tick_ns / 1000, (target_time - now).as_nanos());
+                    while Instant::now() < target_time {
                         if first {
                             timing.total_sleeps += 1;
                         }
@@ -579,7 +567,7 @@ fn record_or_hash(
                         std::hint::spin_loop();
                     }
                 }
-                timing.tick_sleep_us += (now.elapsed().as_nanos() as u64 - elapsed_ns) / 1000;
+                timing.tick_sleep_us += (now.elapsed().as_nanos() as u64) / 1000;
 
                 timing.report(ticks_per_slot, current_tick % 64 == 0, current_tick);
                 if poh_exit.load(Ordering::Relaxed) {

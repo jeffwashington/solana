@@ -47,32 +47,27 @@ impl Poh {
         self.tick_start_time
     }
 
-    // static: does not require lock
-    pub fn delay_ns_to_let_wallclock_catchup(
+    // static: does not require lock - maybe we expose this later
+    fn calculate_target_poh_time(
         num_hashes: u64,
         hashes_per_tick: u64,
         tick_start_time: Instant,
         target_ns_per_tick: u64,
-        now: Instant,
-    ) -> u64 {
-        let elapsed_ns = ((now - tick_start_time).as_nanos()) as u64;
-        let buffer_ns = 0; // report 10ns less
-        // consider overflow here and try to avoid u128
-        let target_elapsed_ns = target_ns_per_tick * num_hashes / hashes_per_tick - buffer_ns;
-        /*
-        info!("delay_ns_to_let_wallclock_catchup, hashes: {}, hashes_per_tick: {}, elapsed_ns: {}, target_ns_per_tick: {}, target: {}",
-            num_hashes,
-            hashes_per_tick,
-            elapsed_ns,
+    ) -> Instant {
+        let offset_ns = target_ns_per_tick / hashes_per_tick * num_hashes;
+        tick_start_time + Duration::from_nanos(offset_ns)
+    }
+
+    pub fn target_poh_time(
+        &self,
+        target_ns_per_tick: u64,
+    ) -> Instant {
+        Self::calculate_target_poh_time(
+            self.num_hashes(),
+            self.hashes_per_tick(),
+            self.tick_start_time(),
             target_ns_per_tick,
-            target_elapsed_ns,
-    );
-            */
-            if elapsed_ns >= target_elapsed_ns {
-            0
-        } else {
-            (target_elapsed_ns - elapsed_ns) as u64
-        }
+        )
     }
 
     pub fn hash(&mut self, max_num_hashes: u64) -> bool {
