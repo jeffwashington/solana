@@ -323,8 +323,8 @@ impl PohService {
                         std::hint::spin_loop();
                     }
                 }
-                assert!(now.elapsed().as_nanos() >= target_tick_ns as u128);
-                assert!(Instant::now() >= tick_target_time);
+                assert!(now.elapsed().as_nanos() >= target_tick_ns as u128, "looped: {}", temp_now < tick_target_time);
+                assert!(Instant::now() >= tick_target_time, "looped: {}", temp_now < tick_target_time);
                 now = Instant::now();
                 timing.total_sleep_us += started_waiting.elapsed().as_nanos() as u64 / 1000;
 
