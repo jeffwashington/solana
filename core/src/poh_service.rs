@@ -29,13 +29,15 @@ const TARGET_SLOT_ADJUSTMENT_NS: u64 = 50_000_000;
 struct PohTiming {
     num_ticks: u64,
     num_hashes: u64,
-    total_sleep_us: u64,
+    batch_sleep_us: u64,
+    tick_sleep_us: u64,
     total_lock_time_ns: u64,
     total_hash_time_ns: u64,
     total_tick_time_ns: u64,
     last_metric: Instant,
     total_record_time_us: u64,
     total_sleeps: u64,
+    consecutive_records_max: u64,
 }
 
 impl PohTiming {
@@ -43,17 +45,19 @@ impl PohTiming {
         Self {
             num_ticks: 0,
             num_hashes: 0,
-            total_sleep_us: 0,
+            batch_sleep_us: 0,
+            tick_sleep_us: 0,
             total_lock_time_ns: 0,
             total_hash_time_ns: 0,
             total_tick_time_ns: 0,
             last_metric: Instant::now(),
             total_record_time_us: 0,
             total_sleeps: 0,
+            consecutive_records_max: 0,
         }
     }
-    fn report(&mut self, ticks_per_slot: u64) {
-        if self.last_metric.elapsed().as_millis() > 1000 {
+    fn report(&mut self, ticks_per_slot: u64, print: bool) {
+        if print || self.last_metric.elapsed().as_millis() > 1000 {
             let elapsed_us = self.last_metric.elapsed().as_micros() as u64;
             let us_per_slot = (elapsed_us * ticks_per_slot) / self.num_ticks;
             datapoint_info!(
@@ -61,14 +65,17 @@ impl PohTiming {
                 ("ticks", self.num_ticks as i64, i64),
                 ("hashes", self.num_hashes as i64, i64),
                 ("elapsed_us", us_per_slot, i64),
-                ("total_sleep_us", self.total_sleep_us, i64),
+                ("batch_sleep_us", self.batch_sleep_us, i64),
+                ("tick_sleep_us", self.tick_sleep_us, i64),
                 ("total_tick_time_us", self.total_tick_time_ns / 1000, i64),
                 ("total_lock_time_us", self.total_lock_time_ns / 1000, i64),
                 ("total_hash_time_us", self.total_hash_time_ns / 1000, i64),
                 ("total_record_time_us", self.total_record_time_us, i64),
                 ("total_sleeps", self.total_sleeps, i64),
+                ("consecutive_records", self.consecutive_records_max, i64),
             );
-            self.total_sleep_us = 0;
+            self.batch_sleep_us = 0;
+            self.tick_sleep_us = 0;
             self.num_ticks = 0;
             self.num_hashes = 0;
             self.total_tick_time_ns = 0;
@@ -77,6 +84,7 @@ impl PohTiming {
             self.last_metric = Instant::now();
             self.total_record_time_us = 0;
             self.total_sleeps = 0;
+            self.consecutive_records_max = 0;
         }
     }
 }
@@ -217,7 +225,7 @@ impl PohService {
         let mut num_ticks = 0;
         let mut num_hashes = 0;
         let mut num_just_hashes = 0;
-        let mut total_sleep_us = 0;
+        let mut batch_sleep_us = 0;
         let mut total_lock_time_ns = 0;
         let mut total_hash_time_ns = 0;
         let mut total_tick_time_ns = 0;
@@ -287,7 +295,7 @@ impl PohService {
                             while (now.elapsed().as_nanos() as u64) < target_tick_ns * poh_l.num_hashes() / poh_l.hashes_per_tick() {
                                 std::hint::spin_loop();
                             }
-                            total_sleep_us += (now.elapsed().as_nanos() as u64 - elapsed_ns) / 1000;
+                            batch_sleep_us += (now.elapsed().as_nanos() as u64 - elapsed_ns) / 1000;
                             break;
                         }
                         let get_again = record_receiver.try_recv();
@@ -340,7 +348,7 @@ impl PohService {
                     info!("should_tick is late: {:?}, rate: {} kH/s, this lock time: {}ns, our ticks: {}, real ticks: {}, num hashes: {}, lock: {}, sleep: {}, record_time_us: {}, total_tick_time_us: {}, hashes: {}, total_hash_time_us: {}, time since last tick: {}",
                     elapsed_us, num_just_hashes_this_tick * 1_000/elapsed_us, lock_time.as_ns(),
                 num_ticks, real_tick_elapsed, num_just_hashes_this_tick ,
-                total_lock_time_ns, total_sleep_us, total_record_time_us,
+                total_lock_time_ns, batch_sleep_us, total_record_time_us,
                 total_tick_time_ns / 1000,
                 num_hashes,
                 total_hash_time_ns/1000,
@@ -356,7 +364,7 @@ impl PohService {
                 while (now.elapsed().as_nanos() as u64) < target_tick_ns {
                     std::hint::spin_loop();
                 }
-                total_sleep_us += (now.elapsed().as_nanos() as u64 - elapsed_ns) / 1000;
+                batch_sleep_us += (now.elapsed().as_nanos() as u64 - elapsed_ns) / 1000;
                 now = Instant::now();
 
                 let elapsed_us = last_metric.elapsed().as_micros() as u64;
@@ -367,7 +375,7 @@ impl PohService {
                         ("ticks", num_ticks as i64, i64),
                         ("hashes", num_hashes as i64, i64),
                         ("elapsed_us", us_per_slot, i64),
-                        ("total_sleep_us", total_sleep_us, i64),
+                        ("batch_sleep_us", batch_sleep_us, i64),
                         ("total_tick_time_us", total_tick_time_ns / 1000, i64),
                         ("total_lock_time_us", total_lock_time_ns / 1000, i64),
                         ("total_hash_time_us", total_hash_time_ns / 1000, i64),
@@ -377,7 +385,7 @@ impl PohService {
                     );
                     */
                     total_record_time_us = 0;
-                    total_sleep_us = 0;
+                    batch_sleep_us = 0;
                     num_ticks = 0;
                     num_hashes = 0;
                     total_tick_time_ns = 0;
@@ -413,7 +421,9 @@ fn record_or_hash(
                     lock_time.stop();
                     timing.total_lock_time_ns += lock_time.as_ns();
                     let mut record_time = Measure::start("record");
+                    let mut consecutive_records = 0;
                     loop {
+                        consecutive_records += 1;
                         let res = poh_recorder_l.record(
                             record.slot,
                             record.mixin,
@@ -436,6 +446,7 @@ fn record_or_hash(
                             }
                         }
                     }
+                    timing.consecutive_records_max = std::cmp::max(consecutive_records, timing.consecutive_records_max);
                     record_time.stop();
                     timing.total_record_time_us += record_time.as_us();
                 }
@@ -493,7 +504,7 @@ fn record_or_hash(
                         }
                         let waited_ns = delay_start.elapsed().as_nanos();
                         if waited_ns >= delay_ns_to_let_wallclock_catchup {
-                            timing.total_sleep_us += (waited_ns / 1000) as u64;
+                            timing.batch_sleep_us += (waited_ns / 1000) as u64;
                             break;
                         }
                     }
@@ -554,10 +565,10 @@ fn record_or_hash(
                     first = false;
                     std::hint::spin_loop();
                 }
-                timing.total_sleep_us += (now.elapsed().as_nanos() as u64 - elapsed_ns) / 1000;
+                timing.tick_sleep_us += (now.elapsed().as_nanos() as u64 - elapsed_ns) / 1000;
                 now = Instant::now();
 
-                timing.report(ticks_per_slot);
+                timing.report(ticks_per_slot, current_tick % 64 == 0);
                 if poh_exit.load(Ordering::Relaxed) {
                     break;
                 }
