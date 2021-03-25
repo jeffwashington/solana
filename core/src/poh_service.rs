@@ -318,13 +318,16 @@ impl PohService {
                 let temp_now = started_waiting;
                 if temp_now < tick_target_time {
                     error!("poh-service: should wait: {}ns, offset from our now to target time: {}ns", (tick_target_time - temp_now).as_nanos(), (tick_target_time - now).as_nanos());
-                    while Instant::now() < tick_target_time {
+                    loop {
+                        if Instant::now() >= tick_target_time {
+                            break;
+                        }
                         // TODO: we could possibly get a reset or record request while we're here
                         std::hint::spin_loop();
                     }
                 }
-                assert!(now.elapsed().as_nanos() >= target_tick_ns as u128, "looped: {}", temp_now < tick_target_time);
-                assert!(Instant::now() >= tick_target_time, "looped: {}", temp_now < tick_target_time);
+                assert!(now.elapsed().as_nanos() >= target_tick_ns as u128, "looped: {}, val: {}", temp_now < tick_target_time, Instant::now() >= tick_target_time);
+                assert!(Instant::now() >= tick_target_time, "looped: {}, val: {}", temp_now < tick_target_time, Instant::now() >= tick_target_time);
                 now = Instant::now();
                 timing.total_sleep_us += started_waiting.elapsed().as_nanos() as u64 / 1000;
 
