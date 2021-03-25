@@ -288,6 +288,7 @@ impl PohService {
         let poh = poh_recorder.lock().unwrap().poh.clone();
         let mut timing = PohTiming::new();
         let mut next_record = None;
+        let mut now = Instant::now();
         loop {
             let should_tick = Self::record_or_hash(
                 &mut next_record,
@@ -322,6 +323,9 @@ impl PohService {
                         std::hint::spin_loop();
                     }
                 }
+                assert!(now.elapsed().as_nanos() >= target_tick_ns);
+                assert!(Insant::now() >= tick_target_time);
+                now = Instant::now();
                 timing.total_sleep_us += started_waiting.elapsed().as_nanos() as u64 / 1000;
 
                 timing.report(ticks_per_slot);
