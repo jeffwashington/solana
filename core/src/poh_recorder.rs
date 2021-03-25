@@ -378,7 +378,7 @@ impl PohRecorder {
         }
         let poh_hash = {
             let mut poh = self.poh.lock().unwrap();
-            poh.reset(blockhash, self.poh_config.hashes_per_tick);
+            poh.reset_slot(blockhash, self.poh_config.hashes_per_tick);
             poh.hash
         };
         info!(

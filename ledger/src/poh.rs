@@ -9,6 +9,9 @@ pub struct Poh {
     hashes_per_tick: u64,
     remaining_hashes: u64,
     tick_start_time: Instant,
+    ticks_per_slot: u64,
+    tick_number: u64,
+    slot_start_time: Instant,
 }
 
 #[derive(Debug)]
@@ -19,19 +22,32 @@ pub struct PohEntry {
 
 impl Poh {
     pub fn new(hash: Hash, hashes_per_tick: Option<u64>) -> Self {
+        Self::new_with_slot_info(hash, hashes_per_tick, 0, 0)
+    }
+
+    pub fn new_with_slot_info(hash: Hash, hashes_per_tick: Option<u64>, ticks_per_slot: u64, tick_number: u64) -> Self {
         let hashes_per_tick = hashes_per_tick.unwrap_or(std::u64::MAX);
         assert!(hashes_per_tick > 1);
+        let now = Instant::now();
         Poh {
             hash,
             num_hashes: 0,
             hashes_per_tick,
             remaining_hashes: hashes_per_tick,
-            tick_start_time: Instant::now(),
+            tick_start_time: now,
+            ticks_per_slot: ticks_per_slot,
+            tick_number: tick_number,
+            slot_start_time: now,
         }
     }
 
-    pub fn reset(&mut self, hash: Hash, hashes_per_tick: Option<u64>) {
-        let mut poh = Poh::new(hash, hashes_per_tick);
+    pub fn reset_no_slot(&mut self, hash: Hash, hashes_per_tick: Option<u64>) {
+        let mut poh = Poh::new_with_slot_info(hash, hashes_per_tick, self.ticks_per_slot, self.tick_number);
+        std::mem::swap(&mut poh, self);
+    }
+
+    pub fn reset_slot(&mut self, hash: Hash, hashes_per_tick: Option<u64>) {
+        let mut poh = Poh::new_with_slot_info(hash, hashes_per_tick, self.ticks_per_slot, 0);
         std::mem::swap(&mut poh, self);
     }
 
@@ -51,11 +67,14 @@ impl Poh {
     fn calculate_target_poh_time(
         num_hashes: u64,
         hashes_per_tick: u64,
-        tick_start_time: Instant,
+        slot_start_time: Instant,
         target_ns_per_tick: u64,
+        tick_number: u64,
+        ticks_per_slot: u64,
     ) -> Instant {
-        let offset_ns = target_ns_per_tick / hashes_per_tick * num_hashes;
-        tick_start_time + Duration::from_nanos(offset_ns)
+        let offset_tick_ns = target_ns_per_tick * tick_number / ticks_per_slot;
+        let offset_ns = target_ns_per_tick * num_hashes / hashes_per_tick;
+        slot_start_time + Duration::from_nanos(offset_ns + offset_tick_ns)
     }
 
     pub fn target_poh_time(
@@ -65,8 +84,10 @@ impl Poh {
         Self::calculate_target_poh_time(
             self.num_hashes(),
             self.hashes_per_tick(),
-            self.tick_start_time(),
+            self.slot_start_time,
             target_ns_per_tick,
+            self.tick_number,
+            self.ticks_per_slot,
         )
     }
 
@@ -113,6 +134,7 @@ impl Poh {
         self.remaining_hashes = self.hashes_per_tick;
         self.num_hashes = 0;
         self.tick_start_time = Instant::now();
+        self.tick_number += 1;
         Some(PohEntry {
             num_hashes,
             hash: self.hash,
