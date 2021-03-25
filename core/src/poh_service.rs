@@ -468,7 +468,7 @@ fn record_or_hash(
                     let delay_start = Instant::now();
                     let mut delay_ns_to_let_wallclock_catchup = Poh::delay_ns_to_let_wallclock_catchup(poh_l.num_hashes(), poh_l.hashes_per_tick(), poh_l.tick_start_time(), target_tick_ns, delay_start) as u64;
                     if should_tick {
-                        error!("poh_record: num_hashes: {}, hashes_per_tick: {}", poh_l.num_hashes(), poh_l.hashes_per_tick());
+                        error!("poh_record: num_hashes: {}, hashes_per_tick: {}, tick elapsed: {}ns, target: {}ns", poh_l.num_hashes(), poh_l.hashes_per_tick(), poh_l.tick_start_time().elapsed_ns(), target_tick_ns);
                         return (true, poh_l.tick_start_time(), delay_ns_to_let_wallclock_catchup); // nothing else can be done. tick required.
                     }
                     // check to see if a record request has been sent
