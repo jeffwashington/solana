@@ -467,7 +467,7 @@ fn record_or_hash(
                     timing.total_hash_time_ns += hash_time.as_ns();
                     let target_poh_time = poh_l.target_poh_time(target_tick_ns);
                     if should_tick {
-                        error!("poh_record: num_hashes: {}, hashes_per_tick: {}, tick elapsed: {}ns, target: {}ns", poh_l.num_hashes(), poh_l.hashes_per_tick(), poh_l.tick_start_time().elapsed().as_nanos(), target_tick_ns);
+                        //error!("poh_record: num_hashes: {}, hashes_per_tick: {}, tick elapsed: {}ns, target: {}ns", poh_l.num_hashes(), poh_l.hashes_per_tick(), poh_l.tick_start_time().elapsed().as_nanos(), target_tick_ns);
                         return (true, target_poh_time); // nothing else can be done. tick required.
                     }
                     // check to see if a record request has been sent
