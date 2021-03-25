@@ -525,7 +525,7 @@ impl PohRecorder {
     }
 
     fn report_metrics(&mut self, bank_slot: Slot, print: bool) {
-        if print || self.last_metric.elapsed().as_millis() > 1000 {
+        if print {//} || self.last_metric.elapsed().as_millis() > 1000 {
             datapoint_info!(
                 "poh_recorder",
                 ("slot", bank_slot, i64),
