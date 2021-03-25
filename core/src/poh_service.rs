@@ -484,7 +484,7 @@ fn record_or_hash(
                     let earlier = delay_ns_to_let_wallclock_catchup;
                     // wait less earlier in the slot and more later in the slot
                     let multiplier_1000 = (current_tick as u128 % 64) * 1000 / 63;
-                    delay_ns_to_let_wallclock_catchup *= multiplier_1000 / 1000;
+                    delay_ns_to_let_wallclock_catchup = (delay_ns_to_let_wallclock_catchup * multiplier_1000) / 1000;
                     info!("delay: {}, multiplier: {}, final: {}", earlier, multiplier_1000, delay_ns_to_let_wallclock_catchup);
 
                     if delay_ns_to_let_wallclock_catchup == 0 {
