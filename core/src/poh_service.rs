@@ -565,6 +565,7 @@ fn record_or_hash(
                 // sleep is not accurate enough to get a predictable time.
                 // Kernel can not schedule the thread for a while.
                 let mut first = true;
+                /*
                 while (now.elapsed().as_nanos() as u64) < target_tick_ns {
                     if first {
                         timing.total_sleeps += 1;
@@ -572,6 +573,7 @@ fn record_or_hash(
                     first = false;
                     std::hint::spin_loop();
                 }
+                */
                 timing.tick_sleep_us += (now.elapsed().as_nanos() as u64 - elapsed_ns) / 1000;
                 now = Instant::now();
 
