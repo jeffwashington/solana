@@ -557,7 +557,7 @@ fn record_or_hash(
                 // Kernel can not schedule the thread for a while.
                 let mut first = true;
                 let now = Instant::now();
-                if now > target_time {
+                if now < target_time {
                     info!("Sleeping at tick: {}, amt: {}us, now: {}us, target: {}us, expected delay: {}ns", current_tick, (target_tick_ns - now.elapsed().as_nanos() as u64) / 1000, (now.elapsed().as_nanos() as u64)/ 1000 , target_tick_ns / 1000, (target_time - now).as_nanos());
                     while Instant::now() < target_time {
                         if first {
