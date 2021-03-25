@@ -80,6 +80,7 @@ impl Poh {
             (tick_start_time, 0)
         };
         let offset_ns = target_ns_per_tick * num_hashes / hashes_per_tick;
+        info!("poh_recorder: offset_tick_us: {}, offset_ns: {}, tick != slot: {}, tick: {}, ticks per slot: {}", offset_tick_ns / 1000, offset_ns / 1000, tick_start_time != slot_start_time, tick_number, ticks_per_slot);
         initial_time + Duration::from_nanos(offset_ns + offset_tick_ns)
     }
 
