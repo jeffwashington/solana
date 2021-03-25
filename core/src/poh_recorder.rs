@@ -484,22 +484,24 @@ impl PohRecorder {
         Ok(())
     }
 
-    pub fn tick_async(&mut self) {
-        self.tick_internal();
+    pub fn tick_async(&mut self) -> bool {
+        self.tick_internal()
     }
 
-    pub fn tick_internal(&mut self) {
+    pub fn tick_internal(&mut self) -> bool {
         let now = Instant::now();
         let poh_entry = self.poh.lock().unwrap().tick();
         self.tick_lock_contention_us += timing::duration_as_us(&now.elapsed());
         let now = Instant::now();
+        let mut ticked = false;
         if let Some(poh_entry) = poh_entry {
+            ticked = true;
             self.tick_height += 1;
             trace!("tick_height {}", self.tick_height);
 
             if self.leader_first_tick_height.is_none() {
                 self.tick_overhead_us += timing::duration_as_us(&now.elapsed());
-                return;
+                return true;
             }
 
             let entry = Entry {
@@ -519,6 +521,7 @@ impl PohRecorder {
             slot = bank.bank.slot();
         }
         self.report_metrics(slot, self.tick_height % 64 == 0);
+        ticked
     }
 
     fn report_metrics(&mut self, bank_slot: Slot, print: bool) {

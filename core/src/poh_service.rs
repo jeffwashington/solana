@@ -548,6 +548,7 @@ fn record_or_hash(
                 current_tick,
             );
             if should_tick {
+                let ticked;
                 // Lock PohRecorder only for the final hash. record_or_hash will lock PohRecorder for record calls but not for hashing.
                 {
                     let mut lock_time = Measure::start("lock");
@@ -555,7 +556,7 @@ fn record_or_hash(
                     lock_time.stop();
                     timing.total_lock_time_ns += lock_time.as_ns();
                     let mut tick_time = Measure::start("tick");
-                    poh_recorder_l.tick_async();
+                    ticked = poh_recorder_l.tick_async();
                     current_tick = poh_recorder_l.tick_height();
                     tick_time.stop();
                     timing.total_tick_time_ns += tick_time.as_ns();
@@ -565,15 +566,18 @@ fn record_or_hash(
                 // sleep is not accurate enough to get a predictable time.
                 // Kernel can not schedule the thread for a while.
                 let mut first = true;
-                /*
-                while (now.elapsed().as_nanos() as u64) < target_tick_ns {
-                    if first {
-                        timing.total_sleeps += 1;
+                if ticked {
+                    if (now.elapsed().as_nanos() as u64) < target_tick_ns {
+                        info!("Sleeping at tick: {}, amt: {}, now: {}, target: {}", current_tick, now.elapsed().as_nanos() as u64 - target_tick_ns, now.elapsed().as_nanos() as u64, target_tick_ns, );
+                        while (now.elapsed().as_nanos() as u64) < target_tick_ns {
+                            if first {
+                                timing.total_sleeps += 1;
+                            }
+                            first = false;
+                            std::hint::spin_loop();
+                        }
                     }
-                    first = false;
-                    std::hint::spin_loop();
                 }
-                */
                 timing.tick_sleep_us += (now.elapsed().as_nanos() as u64 - elapsed_ns) / 1000;
                 now = Instant::now();
 
