@@ -55,6 +55,7 @@ impl Poh {
         target_ns_per_tick: u64,
     ) -> Instant {
         let offset_ns = target_ns_per_tick * num_hashes / hashes_per_tick;
+        info!("poh_recorder: should sleep: {}ns", tick_start_time);
         tick_start_time + Duration::from_nanos(offset_ns)
     }
 
