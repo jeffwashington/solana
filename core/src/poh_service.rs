@@ -411,7 +411,7 @@ fn record_or_hash(
         poh: &Arc<Mutex<Poh>>,
         target_tick_ns: u64,
         current_tick: u64,
-    ) -> (bool, Instant) {
+    ) -> (bool, Instant, u64) {
         match next_record.take() {
             Some(mut record) => {
                 if !record.is_empty() { // empty requests just serve to cause us to cycle and release and re-acquire any locks
@@ -465,8 +465,10 @@ fn record_or_hash(
                     let should_tick = poh_l.hash(hashes_per_batch);
                     hash_time.stop();
                     timing.total_hash_time_ns += hash_time.as_ns();
+                    let delay_start = Instant::now();
+                    let mut delay_ns_to_let_wallclock_catchup = Poh::delay_ns_to_let_wallclock_catchup(poh_l.num_hashes(), poh_l.hashes_per_tick(), poh_l.tick_start_time(), target_tick_ns, delay_start) as u64;
                     if should_tick {
-                        return (true, poh_l.tick_start_time()); // nothing else can be done. tick required.
+                        return (true, poh_l.tick_start_time(), delay_ns_to_let_wallclock_catchup); // nothing else can be done. tick required.
                     }
                     // check to see if a record request has been sent
                     let get_again = record_receiver.try_recv();
@@ -478,8 +480,6 @@ fn record_or_hash(
                         }
                         Err(_) => ()
                     }
-                    let delay_start = Instant::now();
-                    let mut delay_ns_to_let_wallclock_catchup = Poh::delay_ns_to_let_wallclock_catchup(poh_l.num_hashes(), poh_l.hashes_per_tick(), poh_l.tick_start_time(), target_tick_ns, delay_start) as u64;
 
                     if delay_ns_to_let_wallclock_catchup == 0 {
                         continue; // don't busy_wait
@@ -520,7 +520,7 @@ fn record_or_hash(
                 }
             }
         };
-        (false, Instant::now()) // should_tick = false for all code that reaches here
+        (false, Instant::now(), 0) // should_tick = false for all code that reaches here
     }
 
     fn tick_producer(
@@ -536,7 +536,7 @@ fn record_or_hash(
         let mut next_record = None;
         let mut current_tick = 0;
         loop {
-            let (should_tick, now) = Self::record_or_hash(
+            let (should_tick, now, expected_delay_ns) = Self::record_or_hash(
                 &mut next_record,
                 &poh_recorder,
                 &mut timing,
@@ -547,24 +547,6 @@ fn record_or_hash(
                 current_tick,
             );
             if should_tick {
-                let elapsed_ns = now.elapsed().as_nanos() as u64;
-                // sleep is not accurate enough to get a predictable time.
-                // Kernel can not schedule the thread for a while.
-                let mut first = true;
-                if elapsed_ns < target_tick_ns {
-                    if target_tick_ns - elapsed_ns > 10_000 {
-                        info!("Sleeping at tick: {}, amt: {}us, now: {}us, target: {}us", current_tick, (target_tick_ns - now.elapsed().as_nanos() as u64) / 1000, (now.elapsed().as_nanos() as u64)/ 1000 , target_tick_ns / 1000, );
-                    }
-                    while (now.elapsed().as_nanos() as u64) < target_tick_ns {
-                        if first {
-                            timing.total_sleeps += 1;
-                        }
-                        first = false;
-                        std::hint::spin_loop();
-                    }
-                }
-                timing.tick_sleep_us += (now.elapsed().as_nanos() as u64 - elapsed_ns) / 1000;
-
                 let ticked;
                 // Lock PohRecorder only for the final hash. record_or_hash will lock PohRecorder for record calls but not for hashing.
                 {
@@ -579,6 +561,24 @@ fn record_or_hash(
                     timing.total_tick_time_ns += tick_time.as_ns();
                 }
                 timing.num_ticks += 1;
+
+                let elapsed_ns = now.elapsed().as_nanos() as u64;
+                // sleep is not accurate enough to get a predictable time.
+                // Kernel can not schedule the thread for a while.
+                let mut first = true;
+                if elapsed_ns < target_tick_ns {
+                    if target_tick_ns - elapsed_ns > 10_000 {
+                        info!("Sleeping at tick: {}, amt: {}us, now: {}us, target: {}us, expected delay: {}us", current_tick, (target_tick_ns - now.elapsed().as_nanos() as u64) / 1000, (now.elapsed().as_nanos() as u64)/ 1000 , target_tick_ns / 1000, expected_delay_ns/1000);
+                    }
+                    while (now.elapsed().as_nanos() as u64) < target_tick_ns {
+                        if first {
+                            timing.total_sleeps += 1;
+                        }
+                        first = false;
+                        std::hint::spin_loop();
+                    }
+                }
+                timing.tick_sleep_us += (now.elapsed().as_nanos() as u64 - elapsed_ns) / 1000;
 
                 timing.report(ticks_per_slot, current_tick % 64 == 0, current_tick);
                 if poh_exit.load(Ordering::Relaxed) {
