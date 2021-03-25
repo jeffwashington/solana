@@ -317,7 +317,7 @@ impl PohService {
                 let started_waiting = Instant::now();
                 let temp_now = started_waiting;
                 if temp_now < tick_target_time {
-                    error!("poh-service: should wait: {}ns", (tick_target_time - temp_now).as_nanos());
+                    error!("poh-service: should wait: {}ns, offset from our now to target time: {}ns", (tick_target_time - temp_now).as_nanos(), (tick_target_time - now).as_nanos());
                     while Instant::now() < tick_target_time {
                         // TODO: we could possibly get a reset or record request while we're here
                         std::hint::spin_loop();
