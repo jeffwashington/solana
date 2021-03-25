@@ -378,7 +378,7 @@ impl PohRecorder {
         }
         let poh_hash = {
             let mut poh = self.poh.lock().unwrap();
-            poh.reset_slot(blockhash, self.poh_config.hashes_per_tick);
+            poh.reset_slot(blockhash, self.poh_config.hashes_per_tick); // ??? TODO: ticks per slot in the bank?
             poh.hash
         };
         info!(
@@ -624,9 +624,11 @@ impl PohRecorder {
         leader_schedule_cache: &Arc<LeaderScheduleCache>,
         poh_config: &Arc<PohConfig>,
     ) -> (Self, Receiver<WorkingBankEntry>, Receiver<Record>) {
-        let poh = Arc::new(Mutex::new(Poh::new(
+        let poh = Arc::new(Mutex::new(Poh::new_with_slot_info(
             last_entry_hash,
             poh_config.hashes_per_tick,
+            ticks_per_slot,
+            0,
         )));
         let (sender, receiver) = channel();
         let (record_sender, record_receiver) = channel();

@@ -67,14 +67,20 @@ impl Poh {
     fn calculate_target_poh_time(
         num_hashes: u64,
         hashes_per_tick: u64,
+        tick_start_time: Instant,
         slot_start_time: Instant,
         target_ns_per_tick: u64,
         tick_number: u64,
         ticks_per_slot: u64,
     ) -> Instant {
-        let offset_tick_ns = target_ns_per_tick * tick_number / ticks_per_slot;
+        let (initial_time, offset_tick_ns) = if ticks_per_slot > 0  {
+            (slot_start_time, target_ns_per_tick * tick_number / ticks_per_slot)
+        }
+        else {
+            (tick_start_time, 0)
+        };
         let offset_ns = target_ns_per_tick * num_hashes / hashes_per_tick;
-        slot_start_time + Duration::from_nanos(offset_ns + offset_tick_ns)
+        initial_time + Duration::from_nanos(offset_ns + offset_tick_ns)
     }
 
     pub fn target_poh_time(
@@ -84,6 +90,7 @@ impl Poh {
         Self::calculate_target_poh_time(
             self.num_hashes(),
             self.hashes_per_tick(),
+            self.tick_start_time,
             self.slot_start_time,
             target_ns_per_tick,
             self.tick_number,
