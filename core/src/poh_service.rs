@@ -552,7 +552,7 @@ fn record_or_hash(
                 // Kernel can not schedule the thread for a while.
                 let mut first = true;
                 if (now.elapsed().as_nanos() as u64) < target_tick_ns {
-                    info!("Sleeping at tick: {}, amt: {}, now: {}, target: {}", current_tick, target_tick_ns - now.elapsed().as_nanos() as u64, now.elapsed().as_nanos() as u64, target_tick_ns, );
+                    info!("Sleeping at tick: {}, amt: {}us, now: {}us, target: {}us", current_tick, (target_tick_ns - now.elapsed().as_nanos())/1000 as u64, now.elapsed().as_nanos() / 1000 as u64, target_tick_ns / 1000, );
                     while (now.elapsed().as_nanos() as u64) < target_tick_ns {
                         if first {
                             timing.total_sleeps += 1;
