@@ -463,7 +463,7 @@ fn record_or_hash(
                     timing.num_hashes += hashes_per_batch;
                     let mut hash_time = Measure::start("hash");
                     let should_tick = poh_l.hash(hashes_per_batch);
-                    hash_time.stop();delay_ns_to_let_wallclock_catchup
+                    hash_time.stop();
                     timing.total_hash_time_ns += hash_time.as_ns();
                     let delay_start = Instant::now();
                     let mut delay_ns_to_let_wallclock_catchup = Poh::delay_ns_to_let_wallclock_catchup(poh_l.num_hashes(), poh_l.hashes_per_tick(), poh_l.tick_start_time(), target_tick_ns, delay_start) as u64;
