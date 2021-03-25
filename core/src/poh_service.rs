@@ -479,12 +479,12 @@ fn record_or_hash(
                         Err(_) => ()
                     }
                     let delay_start = Instant::now();
-                    let mut delay_ns_to_let_wallclock_catchup = Poh::delay_ns_to_let_wallclock_catchup(poh_l.num_hashes(), poh_l.hashes_per_tick(), poh_l.tick_start_time(), target_tick_ns, delay_start) as u128;
+                    let mut delay_ns_to_let_wallclock_catchup = Poh::delay_ns_to_let_wallclock_catchup(poh_l.num_hashes(), poh_l.hashes_per_tick(), poh_l.tick_start_time(), target_tick_ns, delay_start) as u64;
 
                     let earlier = delay_ns_to_let_wallclock_catchup;
                     // wait less earlier in the slot and more later in the slot
-                    let multiplier_1000 = (current_tick as u128 % 64) * 1000 / 63;
-                    delay_ns_to_let_wallclock_catchup = (delay_ns_to_let_wallclock_catchup * multiplier_1000) / 1000;
+                    let multiplier_1000 = (current_tick as u64 % 64) * 1024 / 64;
+                    delay_ns_to_let_wallclock_catchup = (delay_ns_to_let_wallclock_catchup * multiplier_1000) / 1024;
                     info!("delay: {}, multiplier: {}, final: {}", earlier, multiplier_1000, delay_ns_to_let_wallclock_catchup);
 
                     if delay_ns_to_let_wallclock_catchup == 0 {
@@ -505,7 +505,7 @@ fn record_or_hash(
                             }
                             Err(_) => ()
                         }
-                        let waited_ns = delay_start.elapsed().as_nanos();
+                        let waited_ns = delay_start.elapsed().as_nanos() as u64;
                         if waited_ns >= delay_ns_to_let_wallclock_catchup {
                             timing.batch_sleep_us += (waited_ns / 1000) as u64;
                             break;
