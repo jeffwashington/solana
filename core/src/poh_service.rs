@@ -56,8 +56,8 @@ impl PohTiming {
             consecutive_records_max: 0,
         }
     }
-    fn report(&mut self, ticks_per_slot: u64, print: bool) {
-        if print || self.last_metric.elapsed().as_millis() > 1000 {
+    fn report(&mut self, ticks_per_slot: u64, print: bool, current_tick: u64) {
+        if print {//} || self.last_metric.elapsed().as_millis() > 1000 {
             let elapsed_us = self.last_metric.elapsed().as_micros() as u64;
             let us_per_slot = (elapsed_us * ticks_per_slot) / self.num_ticks;
             datapoint_info!(
@@ -73,6 +73,7 @@ impl PohTiming {
                 ("total_record_time_us", self.total_record_time_us, i64),
                 ("total_sleeps", self.total_sleeps, i64),
                 ("consecutive_records", self.consecutive_records_max, i64),
+                ("current_tick", current_tick, i64),
             );
             self.batch_sleep_us = 0;
             self.tick_sleep_us = 0;
@@ -480,9 +481,11 @@ fn record_or_hash(
                     let delay_start = Instant::now();
                     let mut delay_ns_to_let_wallclock_catchup = Poh::delay_ns_to_let_wallclock_catchup(poh_l.num_hashes(), poh_l.hashes_per_tick(), poh_l.tick_start_time(), target_tick_ns, delay_start) as u128;
 
+                    let earlier = delay_ns_to_let_wallclock_catchup;
                     // wait less earlier in the slot and more later in the slot
-                    let multiplier_1000 = (current_tick as u128 % 64) * 1000 / 64;
+                    let multiplier_1000 = (current_tick as u128 % 64) * 1000 / 63;
                     delay_ns_to_let_wallclock_catchup *= multiplier_1000 / 1000;
+                    info!("delay: {}, multiplier: {}, final: {}", earlier, multiplier_1000, delay_ns_to_let_wallclock_catchup);
 
                     if delay_ns_to_let_wallclock_catchup == 0 {
                         continue; // don't busy_wait
@@ -568,7 +571,7 @@ fn record_or_hash(
                 timing.tick_sleep_us += (now.elapsed().as_nanos() as u64 - elapsed_ns) / 1000;
                 now = Instant::now();
 
-                timing.report(ticks_per_slot, current_tick % 64 == 0);
+                timing.report(ticks_per_slot, current_tick % 64 == 0, current_tick);
                 if poh_exit.load(Ordering::Relaxed) {
                     break;
                 }
