@@ -284,6 +284,7 @@ impl PohService {
         hashes_per_batch: u64,
         record_receiver: Receiver<Record>,
     ) {
+        error!("poh_service: target_tick_ns: {}, ticks_per_slot: {}", target_tick_ns, ticks_per_slot);
         let poh = poh_recorder.lock().unwrap().poh.clone();
         let mut timing = PohTiming::new();
         let mut next_record = None;
