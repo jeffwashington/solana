@@ -411,7 +411,7 @@ fn record_or_hash(
         poh: &Arc<Mutex<Poh>>,
         target_tick_ns: u64,
         current_tick: u64,
-    ) -> bool {
+    ) -> (bool, Instant) {
         match next_record.take() {
             Some(mut record) => {
                 if !record.is_empty() { // empty requests just serve to cause us to cycle and release and re-acquire any locks
@@ -466,7 +466,7 @@ fn record_or_hash(
                     hash_time.stop();
                     timing.total_hash_time_ns += hash_time.as_ns();
                     if should_tick {
-                        return true; // nothing else can be done. tick required.
+                        return (true, poh_l.tick_start_time()); // nothing else can be done. tick required.
                     }
                     // check to see if a record request has been sent
                     let get_again = record_receiver.try_recv();
@@ -520,7 +520,7 @@ fn record_or_hash(
                 }
             }
         };
-        false // should_tick = false for all code that reaches here
+        (false, Instant::now()) // should_tick = false for all code that reaches here
     }
 
     fn tick_producer(
@@ -532,12 +532,11 @@ fn record_or_hash(
         record_receiver: Receiver<Record>,
     ) {
         let poh = poh_recorder.lock().unwrap().poh.clone();
-        let mut now = Instant::now();
         let mut timing = PohTiming::new();
         let mut next_record = None;
         let mut current_tick = 0;
         loop {
-            let should_tick = Self::record_or_hash(
+            let (should_tick, now) = Self::record_or_hash(
                 &mut next_record,
                 &poh_recorder,
                 &mut timing,
@@ -578,7 +577,6 @@ fn record_or_hash(
                     timing.total_tick_time_ns += tick_time.as_ns();
                 }
                 timing.num_ticks += 1;
-                now = Instant::now();
 
                 timing.report(ticks_per_slot, current_tick % 64 == 0, current_tick);
                 if poh_exit.load(Ordering::Relaxed) {
