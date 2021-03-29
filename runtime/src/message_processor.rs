@@ -167,7 +167,7 @@ impl PreAccount {
             }
         }
 
-        if &pre.data != &post.data || Arc::strong_count(pre.data) != Arc::strong_count(post.data) || Arc::strong_count(post.data) == 1 {
+        if &pre.data != &post.data || Arc::strong_count(&pre.data) != Arc::strong_count(&post.data) || Arc::strong_count(&post.data) == 1 {
             let len = pre.data.len();
             // arcs are different
             let difft = len != post.data.len() || pre.data() != post.data();
