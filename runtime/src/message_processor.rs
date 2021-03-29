@@ -176,6 +176,9 @@ impl PreAccount {
                 timings.data_size_unneeded_change += len;
                 error!("unneeded {:?} {}", program_id, len);
             }
+            else {
+                timings.data_unneeded_change += 1;
+            }
         }
 
         // executable is one-way (false->true) and only the account owner may set it.
