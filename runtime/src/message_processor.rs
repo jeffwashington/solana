@@ -62,6 +62,8 @@ pub struct ExecuteDetailsTimings {
     pub total_account_count: u64,
     pub total_data_size: usize,
     pub data_size_changed: usize,
+    pub data_unneeded_change: usize,
+    pub data_size_unneeded_change: usize,
 }
 
 impl ExecuteDetailsTimings {
@@ -74,6 +76,8 @@ impl ExecuteDetailsTimings {
         self.total_account_count += other.total_account_count;
         self.total_data_size += other.total_data_size;
         self.data_size_changed += other.data_size_changed;
+        self.data_unneeded_change += other.data_unneeded_change;
+        self.data_size_unneeded_change += other.data_size_unneeded_change;
     }
 }
 
@@ -160,6 +164,17 @@ impl PreAccount {
                 return Err(InstructionError::ExternalAccountDataModified);
             } else {
                 return Err(InstructionError::ReadonlyDataModified);
+            }
+        }
+
+        if &pre.data != &post.data {
+            let len = pre.data.len();
+            // arcs are different
+            let difft = len != post.data.len() || pre.data() != post.data();
+            if !difft {
+                timings.data_unneeded_change += 1;
+                timings.data_size_unneeded_change += len;
+                error!("unneeded {:?} {}", program_id, len);
             }
         }
 
