@@ -174,7 +174,9 @@ impl PreAccount {
             if !difft {
                 timings.data_unneeded_change += 1;
                 timings.data_size_unneeded_change += len;
-                error!("unneeded {:?} {}", program_id, len);
+                if len >=1048588 {
+                    error!("unneeded {:?} {}", self.key, len);
+                }
             }
             else {
                 //timings.data_unneeded_change += 1;
