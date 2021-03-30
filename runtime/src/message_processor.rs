@@ -106,6 +106,7 @@ impl PreAccount {
         post: &AccountSharedData,
         timings: &mut ExecuteDetailsTimings,
         happened: &mut bool,
+        final2: bool,
     ) -> Result<(), InstructionError> {
         let pre = self.account.borrow();
         // TODO: should we verify duplicate accounts!?!?!?
@@ -186,7 +187,7 @@ impl PreAccount {
                             ct += 1;
                         }
                     }
-                    error!("unneeded first: {}, {:?} {}, {}, diff byte: {}", *happened, self.key, len, ct, diff);
+                    error!("unneeded first: {}, {:?} {}, {}, diff byte: {}, final: {}", *happened, self.key, len, ct, diff, final2);
                     *happened = true;
                 }
             }
@@ -957,7 +958,7 @@ impl MessageProcessor {
     }
 
     /// Verify the results of an instruction
-    pub fn verify(
+    pub fn verify2(
         message: &Message,
         instruction: &CompiledInstruction,
         pre_accounts: &[PreAccount],
@@ -989,6 +990,7 @@ impl MessageProcessor {
                     &account,
                     timings,
                     &mut first,
+                    true,
                 )?;
                 pre_sum += u128::from(pre_accounts[unique_index].lamports());
                 post_sum += u128::from(account.lamports);
