@@ -225,7 +225,7 @@ impl PreAccount {
             let len = pre.data.len();
             // arcs are different
             let difft = len != account.data.len() || pre.data() != account.data();
-            if !difft {
+            if !difft && len == 1048588 {
                 error!("unneeded copy {:?}", len);
             }
         }
