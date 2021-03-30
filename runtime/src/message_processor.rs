@@ -229,9 +229,14 @@ impl PreAccount {
             pre.lamports = account.lamports;
             pre.owner = account.owner;
             pre.executable = account.executable;
-            if pre.data() != account.data() { // if data contents are the same, then leave pre as it is so we can track unneeded copies
+            if &pre.data() != &account.data() { // if data contents are the same, then leave pre as it is so we can track unneeded copies
                 // Copy without allocate
                 pre.set_data_from_slice(&account.data());
+            }
+            else {
+                if pre.data().len() == 1048588 {
+                    error!("avoiding copy");
+                }
             }
         }
 
