@@ -958,7 +958,7 @@ impl MessageProcessor {
     }
 
     /// Verify the results of an instruction
-    pub fn verify2(
+    pub fn verify(
         message: &Message,
         instruction: &CompiledInstruction,
         pre_accounts: &[PreAccount],
