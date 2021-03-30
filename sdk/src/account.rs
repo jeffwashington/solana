@@ -187,13 +187,15 @@ impl WritableAccount for AccountSharedData {
         executable: bool,
         rent_epoch: Epoch,
     ) -> Self {
-        AccountSharedData {
+        let result = AccountSharedData {
             lamports,
             data: Arc::new(data),
             owner,
             executable,
             rent_epoch,
-        }
+        };
+        log_it(&result.data);
+        result
     }
 }
 
@@ -415,6 +417,7 @@ impl AccountSharedData {
         let different = len_different || data != &self.data[..];
         if different {
             self.data = Arc::new(data.to_vec());
+            log_it(&self.data);
         }
     }
     pub fn set_data(&mut self, data: Vec<u8>) {
