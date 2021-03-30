@@ -54,6 +54,7 @@ pub fn accounts_equal<T: ReadableAccount, U: ReadableAccount>(me: &T, other: &U)
 
 impl From<AccountSharedData> for Account {
     fn from(mut other: AccountSharedData) -> Self {
+        log_it(&other.data);
         let account_data = Arc::make_mut(&mut other.data);
         Self {
             lamports: other.lamports,
@@ -151,11 +152,19 @@ impl WritableAccount for Account {
     }
 }
 
+fn log_it(data: &Arc<Vec<u8>>) {
+    if data.len() == 1048588     {
+        let bt = std::backtrace::Backtrace::capture();
+        println!("{:?}", bt);
+    }
+}
+
 impl WritableAccount for AccountSharedData {
     fn set_lamports(&mut self, lamports: u64) {
         self.lamports = lamports;
     }
     fn data_as_mut_slice(&mut self) -> &mut [u8] {
+        log_it(&self.data);
         let data = Arc::make_mut(&mut self.data);
         &mut data[..]
     }
