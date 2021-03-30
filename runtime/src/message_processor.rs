@@ -232,6 +232,9 @@ impl PreAccount {
             if &pre.data() != &account.data() { // if data contents are the same, then leave pre as it is so we can track unneeded copies
                 // Copy without allocate
                 pre.set_data_from_slice(&account.data());
+                if pre.data().len() == 1048588 {
+                    error!("copy because different");
+                }
             }
             else {
                 if pre.data().len() == 1048588 {
