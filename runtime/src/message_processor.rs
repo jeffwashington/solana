@@ -224,7 +224,7 @@ impl PreAccount {
 
         if pre.data().len() != account.data().len() {
             // Only system account can change data size, copy with alloc
-            if pre.data().len() == 1048588 || account.data().len() {
+            if pre.data().len() == 1048588 || account.data().len() == 1048588 {
                 error!("cloning because lens are difft: {}, {}", pre.data().len(), account.data().len());
             }
             *pre = account.clone();
