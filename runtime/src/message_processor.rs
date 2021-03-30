@@ -184,7 +184,7 @@ impl PreAccount {
                             ct += 1;
                         }
                     }
-                    error!("unneeded ct: {}, diff byte: {}", ct, diff);
+                    error!("unneeded {:?} {}, {}, diff byte: {}", self.key, len, ct, diff);
                 }
             }
             else {
