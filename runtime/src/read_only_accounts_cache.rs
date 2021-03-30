@@ -70,7 +70,7 @@ impl ReadOnlyAccountsCache {
         );
 
         // maybe purge after we insert. Insert may have replaced.
-        let new_size = self.maybe_purge_lru_items(len);
+        let new_size = self.maybe_purge_lru_items(len, pubkey, slot, account);
         *self.data_size.write().unwrap() = new_size;
     }
 
@@ -80,10 +80,10 @@ impl ReadOnlyAccountsCache {
         self.cache.remove(&(*pubkey, slot));
     }
 
-    fn maybe_purge_lru_items(&self, new_item_len: usize) -> usize {
+    fn maybe_purge_lru_items(&self, new_item_len: usize, latest_item: &Pubkey, latest_slot: Slot, account: &AccountSharedData) -> usize {
         let mut new_size = *self.data_size.read().unwrap() + new_item_len;
         if new_size <= self.max_data_size {
-            return new_size;
+            //return new_size;
         }
 
         let mut hs = std::collections::HashSet::new();
@@ -94,11 +94,17 @@ impl ReadOnlyAccountsCache {
         for item in self.cache.iter() {
             let value = item.value();
             let item_len = value.account.data().len();
+            if item_len > 100_000 {
+                if &item.key().0 == latest_item && item.key().1 != latest_slot {
+                    error!("inserting duplicate: {:?}, len: {}, data same: {}", *item.key(), item_len, &account.data() == &value.account.data());
+
+                }
+            }
             new_size += item_len;
             lru.push((*value.last_used.read().unwrap(), item_len, *item.key()));
             if item_len > 100_000 {
                 if hs.contains(&item.key().0) {
-                    error!("duplicate: {:?}, len: {}", *item.key(), item_len);
+                    //error!("duplicate: {:?}, len: {}", *item.key(), item_len);
                 }
                 hs.insert(item.key().0);
             }
