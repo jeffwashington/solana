@@ -8,6 +8,7 @@ use std::{
     },
     time::Instant,
 };
+use log::*;
 
 use solana_sdk::{
     account::{AccountSharedData, ReadableAccount},
@@ -85,6 +86,8 @@ impl ReadOnlyAccountsCache {
             return new_size;
         }
 
+        let mut hs = std::collections::HashSet::new();
+
         // purge in lru order
         let mut lru = Vec::with_capacity(self.cache.len());
         new_size = 0;
@@ -93,6 +96,12 @@ impl ReadOnlyAccountsCache {
             let item_len = value.account.data().len();
             new_size += item_len;
             lru.push((*value.last_used.read().unwrap(), item_len, *item.key()));
+            if item_len > 100_000 {
+                if hs.contains(&item.key().0) {
+                    error!("duplicate: {:?}, len: {}", *item.key(), item_len);
+                }
+                hs.insert(item.key().0);
+            }
         }
         if new_size > self.max_data_size {
             lru.sort();
