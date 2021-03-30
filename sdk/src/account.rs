@@ -427,6 +427,11 @@ impl AccountSharedData {
                 }
                 assert!(ct != 0);
             }
+            else {
+                if len == 1048588{
+                error!("len diffferent");
+                }
+            }
 
             self.data = Arc::new(data.to_vec());
             log_it(&self.data);
