@@ -96,7 +96,7 @@ impl ReadOnlyAccountsCache {
             let item_len = value.account.data().len();
             if item_len > 100_000 {
                 if &item.key().0 == latest_item && item.key().1 != latest_slot {
-                    error!("inserting duplicate: {:?}, len: {}, data same: {}", *item.key(), item_len, &account.data() == &value.account.data());
+                    error!("inserting duplicate: {:?}, len: {}, data same: {}, slots: {}, {}", *item.key(), item_len, &account.data() == &value.account.data(),item.key().1, latest_slot);
 
                 }
             }
