@@ -91,11 +91,22 @@ pub struct PreAccount {
 }
 impl PreAccount {
     pub fn new(key: &Pubkey, account: &AccountSharedData) -> Self {
+        let r = 
         Self {
             key: *key,
             account: Rc::new(RefCell::new(account.clone())),
             changed: false,
+        };
+        {
+            let pre = r.account.borrow();
+
+            if account.data().len() == 1048588 {
+                let difft_arc = &pre.data != &account.data || Arc::strong_count(&pre.data) != Arc::strong_count(&account.data) || Arc::strong_count(&account.data) == 1;
+                error!("PreAccount::new({:?}), difft arc: {}, {}, {}, {}", key, difft_arc, &pre.data != &account.data, Arc::strong_count(&pre.data) != Arc::strong_count(&account.data), Arc::strong_count(&account.data));
+            }
         }
+
+        r
     }
 
     pub fn verify(
@@ -187,6 +198,10 @@ impl PreAccount {
                             ct += 1;
                         }
                     }
+                    let account = post;
+                    let difft_arc = &pre.data != &account.data || Arc::strong_count(&pre.data) != Arc::strong_count(&account.data) || Arc::strong_count(&account.data) == 1;
+                    error!("unneeded first:({:?}), difft arc: {}, {}, {}, {}", self.key, difft_arc, &pre.data != &account.data, Arc::strong_count(&pre.data) != Arc::strong_count(&account.data), Arc::strong_count(&account.data));
+        
                     error!("unneeded first: {}, {:?} {}, {}, diff byte: {}, final: {}", *happened, self.key, len, ct, diff, final2);
                     *happened = true;
                 }
@@ -947,9 +962,6 @@ impl MessageProcessor {
                 let key = &message.account_keys[account_index];
                 let account = accounts[account_index].borrow();
                 pre_accounts.push(PreAccount::new(key, &account));
-                if account.data().len() == 1048588 {
-                    error!("PreAccount::new({:?})", key);
-                }
                 Ok(())
             };
             let _ = instruction.visit_each_account(&mut work);
