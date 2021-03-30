@@ -266,6 +266,7 @@ impl PreAccount {
             pre.executable = account.executable;
             if &pre.data() != &account.data() { // if data contents are the same, then leave pre as it is so we can track unneeded copies
                 // Copy without allocate
+                    /*
                 if pre.data().len() == 1048588 {
                     let mut diff = -1;
                     let mut ct = 0;
@@ -287,14 +288,17 @@ impl PreAccount {
                     error!("copy because different: ct: {}, diff byte: {}, key: {:?}, ct2: {}, diff2: {}", ct, diff, self.key, ct2, diff2);
                 }
                 else {
+                    */
                     pre.set_data_from_slice(&account.data());
-                }
+                //}
             }
             else {
+                /*
                 if pre.data().len() == 1048588 {
                     let difft_arc = &pre.data != &account.data || Arc::strong_count(&pre.data) != Arc::strong_count(&account.data) || Arc::strong_count(&account.data) == 1;
                     error!("avoiding copy: {:?}, difft_arc: {}", self.key, difft_arc);
                 }
+                */
             }
         }
 
