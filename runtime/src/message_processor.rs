@@ -233,7 +233,15 @@ impl PreAccount {
                 // Copy without allocate
                 pre.set_data_from_slice(&account.data());
                 if pre.data().len() == 1048588 {
-                    error!("copy because different");
+                    let mut diff = -1;
+                    let mut ct = 0;
+                    for i in 0..pre.data().len() {
+                        if pre.data()[i] != account.data()[i] {
+                            diff = i;
+                            ct += 1;
+                        }
+                    }
+                    error!("copy because different: ct: {}, diff byte: {}", ct, diff);
                 }
             }
             else {
