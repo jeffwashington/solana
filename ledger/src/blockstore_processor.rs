@@ -170,13 +170,13 @@ fn execute_batches(
     replay_vote_sender: Option<&ReplayVoteSender>,
     timings: &mut ExecuteTimings,
 ) -> Result<()> {
+    error!("Execute batches");
     inc_new_counter_debug!("bank-par_execute_entries-count", batches.len());
     let (results, new_timings): (Vec<Result<()>>, Vec<ExecuteTimings>) =
-        PAR_THREAD_POOL.with(|thread_pool| {
-            thread_pool.borrow().install(|| {
                 batches
-                    .into_par_iter()
+                    .into_iter()
                     .map_with(transaction_status_sender, |sender, batch| {
+                        error!("Execute batch");
                         let mut timings = ExecuteTimings::default();
                         let result = execute_batch(
                             batch,
@@ -190,9 +190,7 @@ fn execute_batches(
                         }
                         (result, timings)
                     })
-                    .unzip()
-            })
-        });
+                    .unzip();
 
     for timing in new_timings {
         timings.accumulate(&timing);
