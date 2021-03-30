@@ -691,27 +691,6 @@ impl RecycleStores {
     }
 }
 
-#[derive(Debug, Default)]
-pub struct ReadOnlyAccountsCache {
-    cache: DashMap<Pubkey, AccountSharedData>,
-}
-
-impl ReadOnlyAccountsCache {
-    pub fn load(&self, pubkey: &Pubkey) -> Option<AccountSharedData> {
-        self.cache
-            .get(pubkey)
-            .map(|account_ref| account_ref.value().clone())
-    }
-
-    pub fn store(&self, pubkey: &Pubkey, account: &AccountSharedData) {
-        self.cache.insert(pubkey.clone(), account.clone());
-    }
-
-    pub fn remove(&self, pubkey: &Pubkey) {
-        self.cache.remove(pubkey);
-    }
-}
-
 // This structure handles the load/store of the accounts
 #[derive(Debug)]
 pub struct AccountsDb {
@@ -2306,7 +2285,6 @@ impl AccountsDb {
         if self.caching_enabled {
             match result {
                 Some((account, _)) => {
-                    // TODO: when to purge old executable accounts
                     self.read_only_accounts_cache.store(pubkey, &account);
                     Some(account)
                 }
