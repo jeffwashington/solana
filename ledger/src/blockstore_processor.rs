@@ -175,13 +175,13 @@ fn execute_batches(
     let (results, new_timings): (Vec<Result<()>>, Vec<ExecuteTimings>) =
                 batches
                     .into_iter()
-                    .map_with(transaction_status_sender, |sender, batch| {
+                    .map(|batch| {
                         error!("Execute batch");
                         let mut timings = ExecuteTimings::default();
                         let result = execute_batch(
                             batch,
                             bank,
-                            sender.clone(),
+                            transaction_status_sender.clone(),
                             replay_vote_sender,
                             &mut timings,
                         );
