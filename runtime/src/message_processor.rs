@@ -97,6 +97,7 @@ impl PreAccount {
             account: Rc::new(RefCell::new(account.clone())),
             changed: false,
         };
+        /*
         {
             let pre = r.account.borrow();
 
@@ -105,6 +106,7 @@ impl PreAccount {
                 error!("PreAccount::new({:?}), difft arc: {}, {}, {}, {}", key, difft_arc, &pre.data != &account.data, Arc::strong_count(&pre.data) != Arc::strong_count(&account.data), Arc::strong_count(&account.data));
             }
         }
+        */
 
         r
     }

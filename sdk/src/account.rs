@@ -156,10 +156,12 @@ impl WritableAccount for Account {
 use log::*;
 
 fn log_it(data: &Arc<Vec<u8>>) {
+    /*
     if data.len() == 1048588     {
         let bt = backtrace::Backtrace::new();
         error!("backtrace:{:?}", bt);
     }
+    */
 }
 
 impl WritableAccount for AccountSharedData {
