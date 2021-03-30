@@ -255,7 +255,7 @@ impl PreAccount {
                             ct += 1;
                         }
                     }
-                    error!("copy because different: ct: {}, diff byte: {}, key: {:?}", ct, diff, pre.key);
+                    error!("copy because different: ct: {}, diff byte: {}, key: {:?}", ct, diff, self.key);
                 }
                 pre.set_data_from_slice(&account.data());
             }
