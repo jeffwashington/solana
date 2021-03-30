@@ -176,7 +176,7 @@ fn execute_batches(
                 batches
                     .into_iter()
                     .map(|batch| {
-                        error!("Execute batch");
+                        //error!("Execute batch");
                         let mut timings = ExecuteTimings::default();
                         let result = execute_batch(
                             batch,
