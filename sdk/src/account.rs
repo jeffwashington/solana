@@ -433,6 +433,9 @@ impl AccountSharedData {
         }
     }
     pub fn set_data(&mut self, data: Vec<u8>) {
+        if self.data.len() != data.len() && self.data.len() == 1048588 || data.len() == 1048588 {
+            error!("Changing data size: {}, {}", self.data.len(), data.len());
+        }
         self.data = Arc::new(data);
         log_it(&self.data);        
     }

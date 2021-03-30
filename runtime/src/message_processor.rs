@@ -107,6 +107,7 @@ impl PreAccount {
         timings: &mut ExecuteDetailsTimings,
     ) -> Result<(), InstructionError> {
         let pre = self.account.borrow();
+        // TODO: should we verify duplicate accounts!?!?!?
 
         // Only the owner of the account may change owner and
         //   only if the account is writable and
