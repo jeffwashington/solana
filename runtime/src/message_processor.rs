@@ -172,10 +172,19 @@ impl PreAccount {
             // arcs are different
             let difft = len != post.data.len() || pre.data() != post.data();
             if !difft {
+
                 timings.data_unneeded_change += 1;
                 timings.data_size_unneeded_change += len;
                 if len >=1048588 {
-                    error!("unneeded {:?} {}", self.key, len);
+                    let mut diff = -1;
+                    let mut ct = 0;
+                    for i in 0..pre.data().len() {
+                        if pre.data()[i] != post.data()[i] {
+                            diff = i as i64;
+                            ct += 1;
+                        }
+                    }
+                    error!("unneeded ct: {}, diff byte: {}", ct, diff);
                 }
             }
             else {
