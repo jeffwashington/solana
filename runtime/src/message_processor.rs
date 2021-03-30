@@ -101,7 +101,7 @@ impl PreAccount {
             let pre = r.account.borrow();
 
             if account.data().len() == 1048588 {
-                let difft_arc = &pre.data != &account.data || Arc::strong_count(&pre.data) != Arc::strong_count(&account.data) || Arc::strong_count(&account.data) == 1;
+                let difft_arc = Arc::strong_count(&pre.data) != Arc::strong_count(&account.data) || Arc::strong_count(&account.data) == 1;
                 error!("PreAccount::new({:?}), difft arc: {}, {}, {}, {}", key, difft_arc, &pre.data != &account.data, Arc::strong_count(&pre.data) != Arc::strong_count(&account.data), Arc::strong_count(&account.data));
             }
         }
@@ -181,33 +181,35 @@ impl PreAccount {
             }
         }
 
-        if &pre.data != &post.data || Arc::strong_count(&pre.data) != Arc::strong_count(&post.data) || Arc::strong_count(&post.data) == 1 {
-            let len = pre.data.len();
-            // arcs are different
-            let difft = len != post.data.len() || &pre.data() != &post.data();
-            if !difft {
+        if final2 {
+            if &pre.data != &post.data && (Arc::strong_count(&pre.data) != Arc::strong_count(&post.data) || Arc::strong_count(&post.data) == 1) {
+                let len = pre.data.len();
+                // arcs are different
+                let difft = len != post.data.len() || &pre.data() != &post.data();
+                if !difft {
 
-                timings.data_unneeded_change += 1;
-                timings.data_size_unneeded_change += len;
-                if len >=1048588 {
-                    let mut diff = -1;
-                    let mut ct = 0;
-                    for i in 0..pre.data().len() {
-                        if pre.data()[i] != post.data()[i] {
-                            diff = i as i64;
-                            ct += 1;
+                    timings.data_unneeded_change += 1;
+                    timings.data_size_unneeded_change += len;
+                    if len >=1048588 {
+                        let mut diff = -1;
+                        let mut ct = 0;
+                        for i in 0..pre.data().len() {
+                            if pre.data()[i] != post.data()[i] {
+                                diff = i as i64;
+                                ct += 1;
+                            }
                         }
+                        let account = post;
+                        let difft_arc = &pre.data != &account.data || Arc::strong_count(&pre.data) != Arc::strong_count(&account.data) || Arc::strong_count(&account.data) == 1;
+                        error!("unneeded first:({:?}), difft arc: {}, {}, {}, {}", self.key, difft_arc, &pre.data != &account.data, Arc::strong_count(&pre.data) != Arc::strong_count(&account.data), Arc::strong_count(&account.data));
+            
+                        error!("unneeded first: {}, {:?} {}, {}, diff byte: {}, final: {}", *happened, self.key, len, ct, diff, final2);
+                        *happened = true;
                     }
-                    let account = post;
-                    let difft_arc = &pre.data != &account.data || Arc::strong_count(&pre.data) != Arc::strong_count(&account.data) || Arc::strong_count(&account.data) == 1;
-                    error!("unneeded first:({:?}), difft arc: {}, {}, {}, {}", self.key, difft_arc, &pre.data != &account.data, Arc::strong_count(&pre.data) != Arc::strong_count(&account.data), Arc::strong_count(&account.data));
-        
-                    error!("unneeded first: {}, {:?} {}, {}, diff byte: {}, final: {}", *happened, self.key, len, ct, diff, final2);
-                    *happened = true;
                 }
-            }
-            else {
-                //timings.data_unneeded_change += 1;
+                else {
+                    //timings.data_unneeded_change += 1;
+                }
             }
         }
 
