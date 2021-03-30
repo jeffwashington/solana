@@ -416,6 +416,18 @@ impl AccountSharedData {
         let len_different = len != data.len();
         let different = len_different || data != &self.data[..];
         if different {
+            if !len_different {
+                let mut diff = -1;
+                let mut ct = 0;
+                for i in 0..self.data().len() {
+                    if self.data()[i] != data[i] {
+                        diff = i as i64;
+                        ct += 1;
+                    }
+                }
+                assert!(ct != 0);
+            }
+
             self.data = Arc::new(data.to_vec());
             log_it(&self.data);
         }
