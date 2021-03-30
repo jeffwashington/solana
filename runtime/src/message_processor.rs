@@ -221,18 +221,23 @@ impl PreAccount {
 
     pub fn update(&mut self, account: &AccountSharedData) {
         let mut pre = self.account.borrow_mut();
-        if &pre.data != &account.data || Arc::strong_count(&pre.data) != Arc::strong_count(&account.data) || Arc::strong_count(&account.data) == 1 {
-            let len = pre.data.len();
-            // arcs are different
-            let difft = len != account.data.len() || pre.data() != account.data();
-            if !difft && len == 1048588 {
-                error!("unneeded copy {:?}", len);
+
+        if pre.data().len() != account.data().len() {
+            // Only system account can change data size, copy with alloc
+            *pre = account.clone();
+        } else {
+            pre.lamports = account.lamports;
+            pre.owner = account.owner;
+            pre.executable = account.executable;
+            if pre.data() != account.data() { // if data contents are the same, then leave pre as it is so we can track unneeded copies
+                // Copy without allocate
+                pre.set_data_from_slice(&account.data());
             }
         }
-        
-        *pre = account.clone();
+
         self.changed = true;
     }
+
 
     pub fn key(&self) -> Pubkey {
         self.key
