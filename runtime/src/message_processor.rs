@@ -170,7 +170,7 @@ impl PreAccount {
         if &pre.data != &post.data || Arc::strong_count(&pre.data) != Arc::strong_count(&post.data) || Arc::strong_count(&post.data) == 1 {
             let len = pre.data.len();
             // arcs are different
-            let difft = len != post.data.len() || pre.data() != post.data();
+            let difft = len != post.data.len() || &pre.data() != &post.data();
             if !difft {
 
                 timings.data_unneeded_change += 1;
@@ -241,7 +241,7 @@ impl PreAccount {
             pre.lamports = account.lamports;
             pre.owner = account.owner;
             pre.executable = account.executable;
-            if pre.data() != account.data() { // if data contents are the same, then leave pre as it is so we can track unneeded copies
+            if &pre.data() != &account.data() { // if data contents are the same, then leave pre as it is so we can track unneeded copies
                 // Copy without allocate
                 if pre.data().len() == 1048588 {
                     let mut diff = -1;
