@@ -105,6 +105,7 @@ impl PreAccount {
         rent: &Rent,
         post: &AccountSharedData,
         timings: &mut ExecuteDetailsTimings,
+        happened: &mut bool,
     ) -> Result<(), InstructionError> {
         let pre = self.account.borrow();
         // TODO: should we verify duplicate accounts!?!?!?
@@ -185,7 +186,8 @@ impl PreAccount {
                             ct += 1;
                         }
                     }
-                    error!("unneeded {:?} {}, {}, diff byte: {}", self.key, len, ct, diff);
+                    error!("unneeded first: {}, {:?} {}, {}, diff byte: {}", *happened, self.key, len, ct, diff);
+                    *happened = true;
                 }
             }
             else {
@@ -964,6 +966,7 @@ impl MessageProcessor {
         // Verify all executable accounts have zero outstanding refs
         Self::verify_account_references(executable_accounts)?;
 
+        let mut first = false;
         // Verify the per-account instruction results
         let (mut pre_sum, mut post_sum) = (0_u128, 0_u128);
         {
@@ -982,6 +985,7 @@ impl MessageProcessor {
                     rent,
                     &account,
                     timings,
+                    &mut first,
                 )?;
                 pre_sum += u128::from(pre_accounts[unique_index].lamports());
                 post_sum += u128::from(account.lamports);
@@ -1020,6 +1024,7 @@ impl MessageProcessor {
                     message.is_writable(account_index)
                 };
                 // Find the matching PreAccount
+                let mut happened = false;
                 for pre_account in pre_accounts.iter_mut() {
                     if *key == pre_account.key() {
                         {
@@ -1029,7 +1034,7 @@ impl MessageProcessor {
                                 .map_err(|_| InstructionError::AccountBorrowOutstanding)?;
                         }
                         let account = account.borrow();
-                        pre_account.verify(&program_id, is_writable, &rent, &account, timings)?;
+                        pre_account.verify(&program_id, is_writable, &rent, &account, timings, &mut happened)?;
                         pre_sum += u128::from(pre_account.lamports());
                         post_sum += u128::from(account.lamports);
                         if is_writable && !account.executable {
