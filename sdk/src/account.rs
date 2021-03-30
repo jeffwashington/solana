@@ -68,13 +68,15 @@ impl From<AccountSharedData> for Account {
 
 impl From<Account> for AccountSharedData {
     fn from(other: Account) -> Self {
-        Self {
+        let result = Self {
             lamports: other.lamports,
             data: Arc::new(other.data),
             owner: other.owner,
             executable: other.executable,
             rent_epoch: other.rent_epoch,
-        }
+        };
+        log_it(&result.data);        
+        result
     }
 }
 
@@ -417,6 +419,7 @@ impl AccountSharedData {
     }
     pub fn set_data(&mut self, data: Vec<u8>) {
         self.data = Arc::new(data);
+        log_it(&self.data);        
     }
     pub fn new(lamports: u64, space: usize, owner: &Pubkey) -> Self {
         shared_new(lamports, space, owner)

@@ -221,6 +221,15 @@ impl PreAccount {
 
     pub fn update(&mut self, account: &AccountSharedData) {
         let mut pre = self.account.borrow_mut();
+        if &pre.data != &account.data || Arc::strong_count(&pre.data) != Arc::strong_count(&account.data) || Arc::strong_count(&account.data) == 1 {
+            let len = pre.data.len();
+            // arcs are different
+            let difft = len != account.data.len() || pre.data() != account.data();
+            if !difft {
+                error!("unneeded copy {:?}", len);
+            }
+        }
+        
         *pre = account.clone();
         self.changed = true;
     }
