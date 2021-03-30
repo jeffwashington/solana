@@ -75,7 +75,7 @@ impl From<Account> for AccountSharedData {
             executable: other.executable,
             rent_epoch: other.rent_epoch,
         };
-        log_it(&result.data);        
+        // too noisy and all accounts are loaded here:         log_it(&result.data);        
         result
     }
 }
