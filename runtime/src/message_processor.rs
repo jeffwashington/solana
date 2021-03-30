@@ -1039,7 +1039,7 @@ impl MessageProcessor {
                                 .map_err(|_| InstructionError::AccountBorrowOutstanding)?;
                         }
                         let account = account.borrow();
-                        pre_account.verify(&program_id, is_writable, &rent, &account, timings, &mut happened)?;
+                        pre_account.verify(&program_id, is_writable, &rent, &account, timings, &mut happened, false)?;
                         pre_sum += u128::from(pre_account.lamports());
                         post_sum += u128::from(account.lamports);
                         if is_writable && !account.executable {
