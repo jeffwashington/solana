@@ -256,13 +256,25 @@ impl PreAccount {
                             ct += 1;
                         }
                     }
-                    error!("copy because different: ct: {}, diff byte: {}, key: {:?}", ct, diff, self.key);
+                    pre.set_data_from_slice(&account.data());
+                    let mut diff2 = -1;
+                    let mut ct2 = 0;
+                    for i in 0..pre.data().len() {
+                        if pre.data()[i] != account.data()[i] {
+                            diff2 = i as i64;
+                            ct2 += 1;
+                        }
+                    }
+                    error!("copy because different: ct: {}, diff byte: {}, key: {:?}, ct2: {}, diff2: {}", ct, diff, self.key, ct2, diff2);
                 }
-                pre.set_data_from_slice(&account.data());
+                else {
+                    pre.set_data_from_slice(&account.data());
+                }
             }
             else {
                 if pre.data().len() == 1048588 {
-                    error!("avoiding copy: {:?}", self.key);
+                    let difft_arc = &pre.data != &account.data || Arc::strong_count(&pre.data) != Arc::strong_count(&account.data) || Arc::strong_count(&account.data) == 1;
+                    error!("avoiding copy: {:?}, difft_arc: {}", self.key, difft_arc);
                 }
             }
         }
