@@ -54,7 +54,7 @@ pub fn accounts_equal<T: ReadableAccount, U: ReadableAccount>(me: &T, other: &U)
 
 impl From<AccountSharedData> for Account {
     fn from(mut other: AccountSharedData) -> Self {
-        // too noisy and all accounts are loaded here: log_it(&other.data);
+        log_it(&other.data);
         let account_data = Arc::make_mut(&mut other.data);
         Self {
             lamports: other.lamports,
@@ -75,7 +75,7 @@ impl From<Account> for AccountSharedData {
             executable: other.executable,
             rent_epoch: other.rent_epoch,
         };
-        // too noisy and all accounts are loaded here:         log_it(&result.data);        
+        log_it(&result.data);        
         result
     }
 }
