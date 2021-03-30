@@ -5105,6 +5105,7 @@ name = "solana-sdk"
 version = "1.7.0"
 dependencies = [
  "assert_matches",
+ "backtrace",
  "bincode",
  "bs58",
  "bv",

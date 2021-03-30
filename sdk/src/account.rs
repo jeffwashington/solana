@@ -154,7 +154,7 @@ impl WritableAccount for Account {
 
 fn log_it(data: &Arc<Vec<u8>>) {
     if data.len() == 1048588     {
-        let bt = std::backtrace::Backtrace::capture();
+        let bt = backtrace::Backtrace::new();
         println!("{:?}", bt);
     }
 }
