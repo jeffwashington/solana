@@ -240,7 +240,7 @@ impl PreAccount {
                     let mut ct = 0;
                     for i in 0..pre.data().len() {
                         if pre.data()[i] != account.data()[i] {
-                            diff = i;
+                            diff = i as i64;
                             ct += 1;
                         }
                     }
