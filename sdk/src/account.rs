@@ -151,6 +151,7 @@ impl WritableAccount for Account {
         }
     }
 }
+use log::*;
 
 fn log_it(data: &Arc<Vec<u8>>) {
     if data.len() == 1048588     {
