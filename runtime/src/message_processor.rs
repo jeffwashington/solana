@@ -934,6 +934,9 @@ impl MessageProcessor {
                 let key = &message.account_keys[account_index];
                 let account = accounts[account_index].borrow();
                 pre_accounts.push(PreAccount::new(key, &account));
+                if account.data().len() == 1048588 {
+                    error!("PreAccount::new({:?})", key);
+                }
                 Ok(())
             };
             let _ = instruction.visit_each_account(&mut work);
