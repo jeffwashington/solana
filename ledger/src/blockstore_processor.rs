@@ -242,9 +242,9 @@ fn process_entries_with_callback(
     let mut tick_hashes = vec![];
     let mut pubkeys = HashSet::new();
     for entry in entries {
-        for transaction in entry.transactions {
-            for key in transaction.message.account_keys {
-                pubkeys.insert(key);
+        for transaction in &entry.transactions {
+            for key in &transaction.message.account_keys {
+                pubkeys.insert(*key);
             }
         }
     }
