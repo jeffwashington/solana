@@ -298,7 +298,18 @@ impl RootsTracker {
     }
 
     pub fn remove(&mut self, slot: &Slot) {
-        self.not_roots.insert(*slot); // we could update min or max here, but we always march forward, and someone will do it
+        self.not_roots.insert(*slot);
+        self.purge();
+    }
+
+    pub fn purge(&mut self) {
+        let min = self.min_root;
+        for slot in min..(self.max_root + 1) {
+            if self.not_roots.contains(&slot) {
+                self.not_roots.remove(&slot);
+                self.min_root += 1;
+            }
+        }
     }
 
     pub fn insert(&mut self, slot: &Slot) {
