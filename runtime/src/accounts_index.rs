@@ -323,6 +323,9 @@ impl RootsTracker {
                 self.not_roots.remove(&slot);
                 self.min_root += 1;
             }
+            else {
+                break;
+            }
         }
     }
 
