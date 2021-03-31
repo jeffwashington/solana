@@ -71,6 +71,7 @@ pub struct ExecuteDetailsTimings {
     pub collect: u64,
     pub main_load: u64,
     pub ex_load: u64,
+    pub load_ex: u64,
 }
 
 impl ExecuteDetailsTimings {
@@ -89,6 +90,7 @@ impl ExecuteDetailsTimings {
         self.collect += other.collect;
         self.main_load += other.main_load;
         self.ex_load += other.ex_load;
+        self.load_ex += other.load_ex;
     }
 }
 

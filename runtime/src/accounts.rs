@@ -307,7 +307,9 @@ impl Accounts {
                     } else {
                         accounts[payer_index].lamports -= fee;
 
+
                         let message = tx.message();
+                        let mut time = solana_measure::measure::Measure::start("");
                         let loaders = message
                             .instructions
                             .iter()
@@ -324,6 +326,9 @@ impl Accounts {
                                 )
                             })
                             .collect::<Result<TransactionLoaders>>()?;
+                        time.stop();
+                        timings.details.load_ex += time.as_us();
+
                         Ok(LoadedTransaction {
                             accounts,
                             account_deps,
