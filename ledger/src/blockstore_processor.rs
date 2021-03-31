@@ -253,7 +253,7 @@ fn process_entries_with_callback(
         .name("solana-accounts-transaction-account-loader".to_string())
         .spawn(move || {
             for key in pubkeys {
-                bank.load_accounts_into_read_only_cache(&key);
+                bank_.load_accounts_into_read_only_cache(&key);
             }
             error!("Done loading accounts");
         })
