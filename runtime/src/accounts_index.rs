@@ -25,12 +25,98 @@ use std::{
         Arc, RwLock, RwLockReadGuard, RwLockWriteGuard,
     },
 };
+use serde::{
+    de::{self, Deserializer, SeqAccess, Visitor},
+    ser::{self, SerializeTuple, Serializer},
+    {Deserialize, Serialize},
+};
 
 pub const ITER_BATCH_SIZE: usize = 1000;
 
 pub type SlotList<T> = Vec<(Slot, T)>;
 pub type SlotSlice<'s, T> = &'s [(Slot, T)];
-pub type Ancestors = HashMap<Slot, usize>;
+
+#[derive(Debug, Clone)]
+pub struct Ancestors {
+    map: HashMap<Slot, usize>,
+    min: Slot,
+}
+//pub type Ancestors = ;
+
+impl PartialEq for Ancestors {
+    fn eq(&self, other: &Self) -> bool {
+        self.map.eq(&other.map)
+    }
+}
+
+impl Default for Ancestors {
+    fn default() -> Self {
+        Self {
+            map: HashMap::new(),
+            min: Slot::MAX,
+        }
+    }
+}
+
+impl Ancestors {
+    pub fn contains_key(&self, slot: &Slot) -> bool {
+        if *slot < self.min {
+            false
+        }
+        else {
+            self.map.contains_key(slot)
+        }
+    }
+
+    pub fn keys(&self) -> std::collections::hash_map::Keys<'_, Slot, usize> {
+        self.map.keys()
+    }
+
+    pub fn get(&self, slot: &Slot) -> Option<&usize> {
+        self.map.get(slot)
+    }
+
+    pub fn insert(&mut self, slot: Slot, index: usize) {
+        self.map.insert(slot, index);
+        self.min = std::cmp::min(slot, self.min);
+    }
+
+    pub fn remove(&mut self, slot: &Slot) {
+        self.map.remove(slot);
+        // need not affect min, but could. This is rare, however.
+    }
+}
+
+impl<'de> Deserialize<'de> for Ancestors {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let map = HashMap::deserialize(deserializer);
+        match map {
+            Ok(map) => {
+                let mut min = Slot::MAX;
+                for k in map.keys() {
+                    min = std::cmp::min(min, *k);
+                }
+                Ok(Self {
+                    map,
+                    min,
+                })
+            },
+            Err(err) => Err(err),
+        }
+    }
+}
+
+impl Serialize for Ancestors {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.map.serialize(serializer)
+    }
+}
 
 pub type RefCount = u64;
 pub type AccountMap<K, V> = BTreeMap<K, V>;
@@ -354,7 +440,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
         // In both cases we can ignore the given ancestors and instead just rely on the roots
         // present as `max_root` indicates the roots present in the index are more up to date
         // than the ancestors given.
-        let empty = HashMap::new();
+        let empty = Ancestors::default();
         let ancestors = if ancestors.contains_key(&max_root) {
             ancestors
         } else {

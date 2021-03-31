@@ -1055,7 +1055,7 @@ impl Bank {
             parent_slot: parent.slot(),
             collector_id: *collector_id,
             collector_fees: AtomicU64::new(0),
-            ancestors: HashMap::new(),
+            ancestors: Ancestors::default(),//HashMap::new(),
             hash: RwLock::new(Hash::default()),
             is_delta: AtomicBool::new(false),
             tick_height: AtomicU64::new(parent.tick_height.load(Relaxed)),
@@ -4132,7 +4132,9 @@ impl Bank {
         &self,
         pubkey: &Pubkey,
     ) -> Option<(AccountSharedData, Slot)> {
-        let just_self: Ancestors = vec![(self.slot(), 0)].into_iter().collect();
+        let mut just_self = Ancestors::default();
+        just_self.insert(self.slot(), 0);
+
         if let Some((account, slot)) = self.rc.accounts.load_slow(&just_self, pubkey) {
             if slot == self.slot() {
                 return Some((account, slot));
