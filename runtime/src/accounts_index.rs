@@ -410,6 +410,9 @@ pub struct Timings {
     pub last: Instant,
     pub roots_len: u64,
     pub roots_len_ct: u64,
+    pub ancestors: u64,
+    pub ancestors_len: u64,
+    pub ancestors_ct: u64,
 }
 
 impl Default for Timings {
@@ -431,6 +434,9 @@ impl Timings {
         if (now - self.last).as_millis() > 4000 {
             error!("Timings: {:?}", self);
 
+            self.ancestors = 0;
+            self.ancestors_ct = 0;
+            self.ancestors_len = 0;
             self.roots_len_ct = 0;
             self.roots_len = 0;
             self.count = 0;
@@ -962,7 +968,20 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
         ancestors: Option<&Ancestors>,
         max_root: Option<Slot>,
     ) -> bool {
-        ancestors.map_or(false, |ancestors| ancestors.contains_key(&slot)) ||
+
+        let mut time = Measure::start("");
+        let mut len = 0;
+        let a = 
+        ancestors.map_or(false, |ancestors| {len = ancestors.len(); ancestors.contains_key(&slot)});
+        time.stop();
+        {
+            let mut lock = self.timings.lock().unwrap();
+            lock.ancestors += time.as_ns();
+            lock.ancestors_len = std::cmp::max(lock.ancestors_len, len as u64);
+            lock.ancestors_ct += 1;
+        }
+
+        a ||
         // If the slot is a root, it must be less than the maximum root specified. This
         // allows scans on non-rooted slots to specify and read data from
         // ancestors > max_root, while not seeing rooted data update during the scan
