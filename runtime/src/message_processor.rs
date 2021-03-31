@@ -66,6 +66,10 @@ pub struct ExecuteDetailsTimings {
     pub total_data_size: usize,
     pub data_size_changed: usize,
     pub load_tx_us: u64,
+    pub construct_ix_us: u64,
+    pub nlk: u64,
+    pub collect: u64,
+    pub main_load: u64,
 }
 
 impl ExecuteDetailsTimings {
@@ -79,6 +83,10 @@ impl ExecuteDetailsTimings {
         self.total_data_size += other.total_data_size;
         self.data_size_changed += other.data_size_changed;
         self.load_tx_us += other.load_tx_us;
+        self.construct_ix_us += other.construct_ix_us;
+        self.nlk += other.nlk;
+        self.collect += other.collect;
+        self.main_load += other.main_load;
     }
 }
 
