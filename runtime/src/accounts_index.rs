@@ -408,6 +408,8 @@ pub struct Timings {
     pub latest_slot: u64,
     pub count: u64,
     pub last: Instant,
+    pub roots_len: u64,
+    pub roots_len_ct: u64,
 }
 
 impl Default for Timings {
@@ -417,6 +419,8 @@ impl Default for Timings {
             last: Instant::now(),
             count: 0,
             latest_slot: 0,
+            roots_len: 0,
+            roots_len_ct: 0,
         }
     }
 }
@@ -424,9 +428,11 @@ impl Default for Timings {
 impl Timings {
     pub fn report(&mut self) {
         let now = Instant::now();
-        if (now - self.last).as_millis() > 1000 {
+        if (now - self.last).as_millis() > 4000 {
             error!("Timings: {:?}", self);
 
+            self.roots_len_ct = 0;
+            self.roots_len = 0;
             self.count = 0;
             self.latest_slot = 0;
             self.is_root = 0;
@@ -1205,9 +1211,18 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
 
     pub fn is_root(&self, slot: Slot) -> bool {
         let mut time = Measure::start("");
-        let result = self.roots_tracker.read().unwrap().roots.contains(&slot);
+        let len;
+        let result;
+        {
+            let mut roots = self.roots_tracker.read().unwrap();
+            result = roots.roots.contains(&slot);
+            len = roots.roots.len();
+        }
         time.stop();
-        self.timings.lock().unwrap().is_root += time.as_ns();
+        let mut lock = self.timings.lock().unwrap();
+        lock.is_root += time.as_ns();
+        lock.roots_len = std::cmp::max(lock.roots_len, len as u64);
+        lock.roots_len_ct += 1;
         result
     }
 
