@@ -1237,8 +1237,8 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
         let result;
         {
             let mut roots = self.roots_tracker.read().unwrap();
-            result = roots.roots.contains(&slot);
-            len = roots.roots.len();
+            result = roots.contains(&slot);
+            len = roots.roots_len();
         }
         time.stop();
         let mut lock = self.timings.lock().unwrap();

@@ -2271,36 +2271,6 @@ impl AccountsDb {
         self.do_load(ancestors, pubkey, None, true);
     }
 
-    pub fn load_and_keep_in_read_only_cache(
-        &self,
-        ancestors: &Ancestors,
-        pubkey: &Pubkey,
-    ) -> Option<AccountSharedData> {
-        let result = self.read_only_accounts_cache.load(pubkey);
-        if result.is_some() {
-            return result;
-        }
-
-        let result = self.do_load(ancestors, pubkey, None);
-        if self.caching_enabled {
-            match result {
-                Some((account, _)) => {
-                    self.read_only_accounts_cache.store(pubkey, &account);
-                    Some(account)
-                }
-                _ => None,
-            }
-        } else {
-            result.map(|(account, _)| account)
-        }
-    }
-
-    /*
-    fn clear_read_only_cache(&mut self) {
-        self.read_only_accounts_cache = ReadOnlyAccountsCache::default();
-    }
-    */
-
     fn do_load(
         &self,
         ancestors: &Ancestors,
