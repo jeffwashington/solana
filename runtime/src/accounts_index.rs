@@ -424,6 +424,9 @@ impl Default for Timings {
             latest_slot: 0,
             roots_len: 0,
             roots_len_ct: 0,
+            ancestors_len: 0,
+            ancestors_ct:0,
+            ancestors: 0,
         }
     }
 }
