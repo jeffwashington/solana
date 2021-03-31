@@ -83,7 +83,7 @@ impl ReadOnlyAccountsCache {
     fn maybe_purge_lru_items(&self, new_item_len: usize, latest_item: &Pubkey, latest_slot: Slot, account: &AccountSharedData) -> usize {
         let mut new_size = *self.data_size.read().unwrap() + new_item_len;
         if new_size <= self.max_data_size {
-            //return new_size;
+            return new_size;
         }
 
         let mut hs = std::collections::HashSet::new();

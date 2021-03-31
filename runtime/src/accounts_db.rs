@@ -1074,7 +1074,7 @@ impl solana_frozen_abi::abi_example::AbiExample for AccountsDb {
 impl Default for AccountsDb {
     fn default() -> Self {
         let num_threads = get_thread_count();
-        const MAX_READ_ONLY_CACHE_DATA_SIZE: usize = 200_000_000;
+        const MAX_READ_ONLY_CACHE_DATA_SIZE: usize = 300_000_000;
 
         let mut bank_hashes = HashMap::new();
         bank_hashes.insert(0, BankHashInfo::default());
