@@ -297,6 +297,10 @@ impl RootsTracker {
         self.max_root as usize - self.min_root as usize - self.not_roots.len()
     }
 
+    pub fn roots_not_len(&self) -> usize {
+        self.not_roots.len()
+    }
+
     pub fn remove(&mut self, slot: &Slot) {
         self.not_roots.insert(*slot);
         self.purge();
@@ -421,6 +425,7 @@ pub struct Timings {
     pub last: Instant,
     pub roots_len: u64,
     pub roots_len_ct: u64,
+    pub roots_map_len: u64,
     pub ancestors: u64,
     pub ancestors_len: u64,
     pub ancestors_ct: u64,
@@ -438,6 +443,7 @@ impl Default for Timings {
             ancestors_len: 0,
             ancestors_ct:0,
             ancestors: 0,
+            roots_map_len: 0,
         }
     }
 }
@@ -1245,16 +1251,19 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
     pub fn is_root(&self, slot: Slot) -> bool {
         let mut time = Measure::start("");
         let len;
+        let len2;
         let result;
         {
             let mut roots = self.roots_tracker.read().unwrap();
             result = roots.contains(&slot);
             len = roots.roots_len();
+            len2 = roots.roots_not_len();
         }
         time.stop();
         let mut lock = self.timings.lock().unwrap();
         lock.is_root += time.as_ns();
         lock.roots_len = std::cmp::max(lock.roots_len, len as u64);
+        lock.roots_map_len += std::cmp::max(lock.roots_map_len, len2 as u64);
         lock.roots_len_ct += 1;
         result
     }
