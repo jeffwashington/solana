@@ -265,7 +265,9 @@ impl<T: 'static + Clone + IsCached> WriteAccountMapEntry<T> {
 #[derive(Debug, Default)]
 pub struct RootsTracker {
     not_roots: HashSet<Slot>,
+    real_root: HashSet<Slot>,
     min_root: Slot, // inclusive
+    max_root_range: Slot, // inclusive
     max_root: Slot, // inclusive
     uncleaned_roots: HashSet<Slot>,
     previous_uncleaned_roots: HashSet<Slot>,
@@ -285,16 +287,23 @@ impl Default for RootsTracker {
 impl RootsTracker {
     pub fn contains(&self, slot: &Slot) -> bool {
         let slot = *slot;
-        if slot < self.min_root || slot > self.max_root { // ??? <= or >= ?
+        let res = 
+        if slot < self.min_root || slot > self.max_root_range { // ??? <= or >= ?
             false
         }        
         else {
             !self.not_roots.contains(&slot)
-        }
+        };
+        let res2 = self.real_root.contains(&slot);
+        assert_eq!(res, res2, "diff: {:?}", self);
+        res
     }
 
     pub fn roots_len(&self) -> usize {
-        self.max_root as usize - self.min_root as usize - self.not_roots.len()
+        let res=
+        self.max_root_range as usize - self.min_root as usize - self.not_roots.len();
+        assert_eq!(res, self.real_root.len(), "diff: {:?}", self);
+        res
     }
 
     pub fn roots_not_len(&self) -> usize {
@@ -304,11 +313,12 @@ impl RootsTracker {
     pub fn remove(&mut self, slot: &Slot) {
         self.not_roots.insert(*slot);
         self.purge();
+        self.remove(slot);
     }
 
     pub fn purge(&mut self) {
         let min = self.min_root;
-        for slot in min..(self.max_root + 1) {
+        for slot in min..(self.max_root_range + 1) {
             if self.not_roots.contains(&slot) {
                 self.not_roots.remove(&slot);
                 self.min_root += 1;
@@ -317,6 +327,7 @@ impl RootsTracker {
     }
 
     pub fn insert(&mut self, slot: &Slot) {
+        self.real_root.insert(*slot);
         let slot = *slot;
         if slot < 10 {
             error!("hit zero: {}", slot);
@@ -328,16 +339,16 @@ impl RootsTracker {
                 self.not_roots.insert(not);
             }
         }
-        else if slot <= self.max_root {
+        else if slot <= self.max_root_range {
             // in range
             self.not_roots.remove(&slot);
         }
         else {
             // after range
-            for not in (self.max_root + 1)..(slot - 1) {
+            for not in (self.max_root_range + 1)..(slot - 1) {
                 self.not_roots.insert(not);
             }
-            self.max_root = slot;
+            self.max_root_range = slot;
         }
     }
 }
