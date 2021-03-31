@@ -10,6 +10,7 @@ use solana_sdk::{
     clock::Slot,
     pubkey::{Pubkey, PUBKEY_BYTES},
 };
+use log::*;
 use std::{
     collections::{
         btree_map::{self, BTreeMap},
@@ -20,6 +21,7 @@ use std::{
         Bound::{Excluded, Included, Unbounded},
         Range, RangeBounds,
     },
+    time::Instant,
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc, RwLock, RwLockReadGuard, RwLockWriteGuard,
@@ -400,6 +402,37 @@ pub trait ZeroLamport {
     fn is_zero_lamport(&self) -> bool;
 }
 
+#[derive(Debug)]
+pub struct Timings {
+    pub is_root: u64,
+    pub latest_slot: u64,
+    pub count: u64,
+    pub last: Instant,
+}
+
+impl Default for Timings {
+    fn default() -> Self {
+        Self {
+            is_root: 0,
+            last: Instant::now(),
+        }
+    }
+}
+
+impl Timings {
+    pub fn report(&mut self) {
+        let now = Instant::now();
+        if (now - self.last).as_millis() > 1000 {
+            error!("Timings: {:?}", self);
+
+            self.count = 0;
+            self.latest_slot = 0;
+            self.is_root = 0;
+            self.last = now;
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct AccountsIndex<T> {
     pub account_maps: RwLock<AccountMap<Pubkey, AccountMapEntry<T>>>,
@@ -409,6 +442,7 @@ pub struct AccountsIndex<T> {
     roots_tracker: RwLock<RootsTracker>,
     ongoing_scan_roots: RwLock<BTreeMap<Slot, u64>>,
     zero_lamport_pubkeys: DashSet<Pubkey>,
+    timings: std::sync::Mutex<Timings>,
 }
 
 impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
@@ -892,6 +926,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
         slice: SlotSlice<T>,
         max_root: Option<Slot>,
     ) -> Option<usize> {
+        let mut time = Measure::start();
         let mut current_max = 0;
         let mut rv = None;
         for (i, (slot, _t)) in slice.iter().rev().enumerate() {
@@ -900,6 +935,12 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
                 current_max = *slot;
             }
         }
+        time.stop();
+
+        let mut lock = self.timings.lock().unwrap();
+        lock.latest_slot += time.as_ns();
+        lock.count += 1;
+        lock.report();
 
         rv
     }
@@ -1161,7 +1202,11 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
     }
 
     pub fn is_root(&self, slot: Slot) -> bool {
-        self.roots_tracker.read().unwrap().contains(&slot)
+        let mut time = Measure::start("");
+        let result = self.roots_tracker.read().unwrap().roots.contains(&slot);
+        time.stop();
+        self.timings.lock().unwrap().is_root += time.as_ns();
+        result
     }
 
     pub fn add_root(&self, slot: Slot, caching_enabled: bool) {
