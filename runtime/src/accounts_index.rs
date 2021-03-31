@@ -975,7 +975,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
         let mut time = Measure::start("");
         let mut len = 0;
         let a = 
-        ancestors.map_or(false, |ancestors| {len = ancestors.len(); ancestors.contains_key(&slot)});
+        ancestors.map_or(false, |ancestors| {ancestors.contains_key(&slot)});
         time.stop();
         {
             let mut lock = self.timings.lock().unwrap();
