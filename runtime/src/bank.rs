@@ -2911,6 +2911,7 @@ impl Bank {
             &mut error_counters,
             &self.rent_collector,
             &self.feature_set,
+            timings,
         );
         load_time.stop();
 

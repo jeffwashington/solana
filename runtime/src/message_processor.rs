@@ -65,6 +65,7 @@ pub struct ExecuteDetailsTimings {
     pub total_account_count: u64,
     pub total_data_size: usize,
     pub data_size_changed: usize,
+    pub load_tx_us: u64,
 }
 
 impl ExecuteDetailsTimings {
@@ -77,6 +78,7 @@ impl ExecuteDetailsTimings {
         self.total_account_count += other.total_account_count;
         self.total_data_size += other.total_data_size;
         self.data_size_changed += other.data_size_changed;
+        self.load_tx_us += other.load_tx_us;
     }
 }
 
