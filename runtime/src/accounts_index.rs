@@ -415,6 +415,8 @@ impl Default for Timings {
         Self {
             is_root: 0,
             last: Instant::now(),
+            count: 0,
+            latest_slot: 0,
         }
     }
 }
@@ -926,7 +928,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
         slice: SlotSlice<T>,
         max_root: Option<Slot>,
     ) -> Option<usize> {
-        let mut time = Measure::start();
+        let mut time = Measure::start("");
         let mut current_max = 0;
         let mut rv = None;
         for (i, (slot, _t)) in slice.iter().rev().enumerate() {
