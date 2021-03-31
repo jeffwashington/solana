@@ -2880,6 +2880,7 @@ impl Bank {
         debug!("processing transactions: {}", txs.len());
         inc_new_counter_info!("bank-process_transactions", txs.len());
         let mut error_counters = ErrorCounters::default();
+        let mut load_time = Measure::start("accounts_load");
 
         let retryable_txs: Vec<_> =
             OrderedIterator::new(batch.lock_results(), batch.iteration_order())
@@ -2894,16 +2895,13 @@ impl Bank {
                 })
                 .collect();
 
-                let mut execution_time = Measure::start("execution_time");
-                let sig_results = self.check_transactions(
+        let sig_results = self.check_transactions(
             txs,
             batch.iteration_order(),
             batch.lock_results(),
             max_age,
             &mut error_counters,
         );
-        execution_time.stop();
-        let mut load_time = Measure::start("accounts_load");
         let mut loaded_accounts = self.rc.accounts.load_accounts(
             &self.ancestors,
             txs,
@@ -2916,6 +2914,7 @@ impl Bank {
         );
         load_time.stop();
 
+        let mut execution_time = Measure::start("execution_time");
         let mut signature_count: u64 = 0;
         let mut inner_instructions: Vec<Option<InnerInstructionsList>> =
             Vec::with_capacity(txs.len());
@@ -3010,6 +3009,7 @@ impl Bank {
             })
             .collect();
 
+        execution_time.stop();
 
         debug!(
             "load: {}us execute: {}us txs_len={}",
