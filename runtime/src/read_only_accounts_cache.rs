@@ -91,12 +91,15 @@ impl ReadOnlyAccountsCache {
         // purge in lru order
         let mut lru = Vec::with_capacity(self.cache.len());
         new_size = 0;
+        let mut remove = Vec::new();
         for item in self.cache.iter() {
             let value = item.value();
             let item_len = value.account.data().len();
             if item_len > 100_000 {
                 if &item.key().0 == latest_item && item.key().1 != latest_slot {
-                    error!("inserting duplicate: {:?}, len: {}, data same: {}, slots: {}, {}", *item.key(), item_len, &account.data() == &value.account.data(),item.key().1, latest_slot);
+                    remove.push(*item.key());
+                    continue;
+//                    error!("inserting duplicate: {:?}, len: {}, data same: {}, slots: {}, {}", *item.key(), item_len, &account.data() == &value.account.data(),item.key().1, latest_slot);
 
                 }
             }
@@ -109,6 +112,10 @@ impl ReadOnlyAccountsCache {
                 hs.insert(item.key().0);
             }
         }
+        for item in remove.into_iter() {
+            self.cache.remove(&item);
+        }
+
         if new_size > self.max_data_size {
             lru.sort();
             for oldest in lru.into_iter() {
