@@ -200,39 +200,40 @@ impl Accounts {
             let demote_sysvar_write_locks =
                 feature_set.is_active(&feature_set::demote_sysvar_write_locks::id());
 
-            let instructions_sysvar_enabled = feature_set.is_active(&feature_set::instructions_sysvar_enabled::id();
+            let instructions_sysvar_enabled = feature_set.is_active(&feature_set::instructions_sysvar_enabled::id());
 
             for (i, key) in message.account_keys.iter().enumerate() {
-                let mut time = Measure::start("");
+                let mut time = solana_measure::measure::Measure::start("");
                 let nlk = message.is_non_loader_key(key, i);
                 time.stop();
-                timings.nlk += time.as_us();
+                timings.details.nlk += time.as_us();
                 let account = if nlk {
                     if payer_index.is_none() {
                         payer_index = Some(i);
                     }
 
-                    if instructions_sysvar_enabled && solana_sdk::sysvar::instructions::check_id(key))
+                    if instructions_sysvar_enabled && solana_sdk::sysvar::instructions::check_id(key)
                     {
                         if message.is_writable(i, demote_sysvar_write_locks) {
                             return Err(TransactionError::InvalidAccountIndex);
                         }
-                        let mut time = Measure::start("");
-                        Self::construct_instructions_account(message, demote_sysvar_write_locks)
+                        let mut time = solana_measure::measure::Measure::start("");
+                        let res  =Self::construct_instructions_account(message, demote_sysvar_write_locks);
                         time.stop();
-                        timings.construct_ix_us += time.as_us();
+                        timings.details.construct_ix_us += time.as_us();
+                        res
                     } else {
-                        let mut time = Measure::start("");
+                        let mut time = solana_measure::measure::Measure::start("");
                         let (account, rent) = self
                             .accounts_db
                             .load(ancestors, key)
                             .map(|(mut account, _)| {
                                 if message.is_writable(i, demote_sysvar_write_locks) {
-                                    let mut time = Measure::start("");
+                                    let mut time = solana_measure::measure::Measure::start("");
                                                 let rent_due = rent_collector
                                         .collect_from_existing_account(&key, &mut account);
                                         time.stop();
-                                        timings.collect += time.as_us();
+                                        timings.details.collect += time.as_us();
                                         (account, rent_due)
                                 } else {
                                     (account, 0)
@@ -240,7 +241,9 @@ impl Accounts {
                             })
                             .unwrap_or_default();
                             time.stop();
-                            timings.main_load += time.as_us();
+                            timings.details.main_load += time.as_us();
+
+                            let mut time = solana_measure::measure::Measure::start("");
 
                         if account.executable && bpf_loader_upgradeable::check_id(&account.owner) {
                             // The upgradeable loader requires the derived ProgramData account
@@ -262,6 +265,8 @@ impl Accounts {
                                 error_counters.invalid_program_for_execution += 1;
                                 return Err(TransactionError::InvalidProgramForExecution);
                             }
+                            time.stop();
+                            timings.details.ex_load += time.as_us();
                         }
 
                         tx_rent += rent;
