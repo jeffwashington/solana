@@ -30,6 +30,7 @@ use serde::{
     ser::{self, SerializeTuple, Serializer},
     {Deserialize, Serialize},
 };
+use log::*;
 
 pub const ITER_BATCH_SIZE: usize = 1000;
 
@@ -261,10 +262,67 @@ impl<T: 'static + Clone + IsCached> WriteAccountMapEntry<T> {
 
 #[derive(Debug, Default)]
 pub struct RootsTracker {
-    roots: HashSet<Slot>,
-    max_root: Slot,
+    not_roots: HashSet<Slot>,
+    min_root: Slot, // inclusive
+    max_root: Slot, // inclusive
     uncleaned_roots: HashSet<Slot>,
     previous_uncleaned_roots: HashSet<Slot>,
+}
+/*
+impl Default for RootsTracker {
+        fn default() -> Self {
+            Self {
+                not_roots: HashSet::new(),
+                min_root: 0,
+            }
+        }
+    
+}
+*/
+
+impl RootsTracker {
+    pub fn contains(&self, slot: &Slot) -> bool {
+        let slot = *slot;
+        if slot < self.min_root || slot > self.max_root { // ??? <= or >= ?
+            false
+        }        
+        else {
+            !self.not_roots.contains(&slot)
+        }
+    }
+
+    pub fn roots_len(&self) -> usize {
+        self.max_root as usize - self.min_root as usize - self.not_roots.len()
+    }
+
+    pub fn remove(&mut self, slot: &Slot) {
+        self.not_roots.insert(*slot); // we could update min or max here, but we always march forward, and someone will do it
+    }
+
+    pub fn insert(&mut self, slot: &Slot) {
+        let slot = *slot;
+        if slot < 10 {
+            error!("hit zero: {}", slot);
+        }
+        if slot < self.min_root {
+            // before range
+            self.min_root = slot;
+            for not in (slot + 1)..self.min_root {
+                self.not_roots.insert(not);
+            }
+        }
+        else if slot <= self.max_root {
+            // in range
+            self.not_roots.remove(&slot);
+        }
+        else {
+            // after range
+            for not in (self.max_root + 1)..(slot - 1) {
+                self.not_roots.insert(not);
+            }
+            self.max_root = slot;
+        }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -880,7 +938,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
 
     // Get the maximum root <= `max_allowed_root` from the given `slice`
     fn get_max_root(
-        roots: &HashSet<Slot>,
+        roots: &RootsTracker,// &self,//: &HashSet<Slot>,
         slice: SlotSlice<T>,
         max_allowed_root: Option<Slot>,
     ) -> Slot {
@@ -1062,7 +1120,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
         account_indexes: &HashSet<AccountIndex>,
     ) {
         let roots_tracker = &self.roots_tracker.read().unwrap();
-        let max_root = Self::get_max_root(&roots_tracker.roots, &list, max_clean_root);
+        let max_root = Self::get_max_root(&roots_tracker, &list, max_clean_root);
 
         let mut purged_slots: HashSet<Slot> = HashSet::new();
         list.retain(|(slot, value)| {
@@ -1103,12 +1161,12 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
     }
 
     pub fn is_root(&self, slot: Slot) -> bool {
-        self.roots_tracker.read().unwrap().roots.contains(&slot)
+        self.roots_tracker.read().unwrap().contains(&slot)
     }
 
     pub fn add_root(&self, slot: Slot, caching_enabled: bool) {
         let mut w_roots_tracker = self.roots_tracker.write().unwrap();
-        w_roots_tracker.roots.insert(slot);
+        w_roots_tracker.insert(&slot);
         // we delay cleaning until flushing!
         if !caching_enabled {
             w_roots_tracker.uncleaned_roots.insert(slot);
@@ -1136,11 +1194,11 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
         if self.is_root(slot) {
             let (roots_len, uncleaned_roots_len, previous_uncleaned_roots_len) = {
                 let mut w_roots_tracker = self.roots_tracker.write().unwrap();
-                w_roots_tracker.roots.remove(&slot);
+                w_roots_tracker.remove(&slot);
                 w_roots_tracker.uncleaned_roots.remove(&slot);
                 w_roots_tracker.previous_uncleaned_roots.remove(&slot);
                 (
-                    w_roots_tracker.roots.len(),
+                    w_roots_tracker.roots_len(),
                     w_roots_tracker.uncleaned_roots.len(),
                     w_roots_tracker.previous_uncleaned_roots.len(),
                 )
@@ -1197,17 +1255,18 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
     }
 
     pub fn num_roots(&self) -> usize {
-        self.roots_tracker.read().unwrap().roots.len()
+        self.roots_tracker.read().unwrap().roots_len()
     }
 
     pub fn all_roots(&self) -> Vec<Slot> {
-        self.roots_tracker
-            .read()
-            .unwrap()
-            .roots
-            .iter()
-            .cloned()
-            .collect()
+        let mut roots = Vec::new();
+        let tracker = self.roots_tracker.read().unwrap();
+        for root in tracker.min_root..tracker.max_root {
+            if !tracker.not_roots.contains(&root) {
+                roots.push(root);
+            }
+        }
+        roots
     }
 
     #[cfg(test)]
