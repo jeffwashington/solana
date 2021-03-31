@@ -244,12 +244,12 @@ fn process_entries_with_callback(
     for entry in entries {
         for transaction in entry.transactions {
             for key in transaction.message.account_keys {
-                pubkeys.insert(*key);
+                pubkeys.insert(key);
             }
         }
     }
     let bank_ = bank.clone();
-    Builder::new()
+    std::thread::Builder::new()
         .name("solana-accounts-transaction-account-loader".to_string())
         .spawn(move || {
             for key in pubkeys {
