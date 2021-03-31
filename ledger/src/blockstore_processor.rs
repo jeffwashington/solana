@@ -255,7 +255,6 @@ fn process_entries_with_callback(
             for key in pubkeys {
                 bank_.load_accounts_into_read_only_cache(&key);
             }
-            error!("Done loading accounts");
         })
     .unwrap();    
     for entry in entries {
