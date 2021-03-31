@@ -4332,7 +4332,7 @@ impl Bank {
     }
 
     pub fn load_accounts_into_read_only_cache(&self, key: &Pubkey) {
-        self.rc.accounts.accounts_db.load(&self.ancestors, key);
+        self.rc.accounts.accounts_db.load_accounts_into_read_only_cache(&self.ancestors, key);
     }
 
     pub fn update_accounts_hash_with_index_option(

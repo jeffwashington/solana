@@ -2260,7 +2260,15 @@ impl AccountsDb {
         ancestors: &Ancestors,
         pubkey: &Pubkey,
     ) -> Option<(AccountSharedData, Slot)> {
-        self.do_load(ancestors, pubkey, None)
+        self.do_load(ancestors, pubkey, None, false)
+    }
+
+    pub fn load_accounts_into_read_only_cache(
+        &self,
+        ancestors: &Ancestors,
+        pubkey: &Pubkey,
+    ) {
+        self.do_load(ancestors, pubkey, None, true);
     }
 
     fn do_load(
@@ -2268,6 +2276,7 @@ impl AccountsDb {
         ancestors: &Ancestors,
         pubkey: &Pubkey,
         max_root: Option<Slot>,
+        load_into_read_only_cache_only: bool,
     ) -> Option<(AccountSharedData, Slot)> {
         let (slot, store_id, offset) = {
             let (lock, index) = self.accounts_index.get(pubkey, Some(ancestors), max_root)?;
@@ -2282,9 +2291,21 @@ impl AccountsDb {
             // `lock` released here
         };
 
-        let result = self.read_only_accounts_cache.load(pubkey, slot);
-        if let Some(account) = result {
-            return Some((account, slot));
+        if self.caching_enabled {
+            if load_into_read_only_cache_only {
+                if store_id == CACHE_VIRTUAL_STORAGE_ID {
+                    return None;
+                }
+                if self.read_only_accounts_cache.in_cache(pubkey, slot) {
+                    return None;
+                }
+            }
+            else if store_id != CACHE_VIRTUAL_STORAGE_ID {
+                let result = self.read_only_accounts_cache.load(pubkey, slot);
+                if let Some(account) = result {
+                    return Some((account, slot));
+                }
+            }
         }
 
         //TODO: thread this as a ref
