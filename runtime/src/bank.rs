@@ -4331,6 +4331,10 @@ impl Bank {
         &self.rc.accounts.accounts_db.thread_pool_clean
     }
 
+    pub fn load_accounts_into_read_only_cache(&self, key: &Pubkey) {
+        self.rc.accounts.accounts_db.load(&self.ancestors, key);
+    }
+
     pub fn update_accounts_hash_with_index_option(
         &self,
         use_index: bool,

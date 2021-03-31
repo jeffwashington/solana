@@ -240,6 +240,24 @@ fn process_entries_with_callback(
     // accumulator for entries that can be processed in parallel
     let mut batches = vec![];
     let mut tick_hashes = vec![];
+    let mut pubkeys = HashSet::new();
+    for entry in entries {
+        for transaction in entry.transactions {
+            for key in transaction.message.account_keys {
+                pubkeys.insert(*key);
+            }
+        }
+    }
+    let bank_ = bank.clone();
+    Builder::new()
+        .name("solana-accounts-transaction-account-loader".to_string())
+        .spawn(move || {
+            for key in pubkeys {
+                bank.load_accounts_into_read_only_cache(key);
+            }
+            error!("Done loading accounts");
+        })
+    .unwrap();    
     for entry in entries {
         if entry.is_tick() {
             // If it's a tick, save it for later
