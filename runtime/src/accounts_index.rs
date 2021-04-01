@@ -326,7 +326,7 @@ impl RootsTracker {
     pub fn roots_len(&self) -> usize {
         let res=
         self.max_root_range as usize - self.min_root as usize - self.not_roots.len();
-        assert_eq!(res, self.real_root.len(), "diff: {:?}", self.max_root_range);
+        assert_eq!(res, self.real_root.len(), "diff: {:?}", (self.max_root_range, self.min_root, &self.real_root, &self.not_roots));
         res
     }
 
@@ -357,13 +357,22 @@ impl RootsTracker {
     }
 
     pub fn insert(&mut self, slot: &Slot) {
-        //error!("insert: {}", slot);
+        error!("insert: {}", slot);
         self.real_root.insert(*slot);
         let slot = *slot;
         if slot < 10 {
-            error!("hit zero: {}", slot);
+            //error!("hit zero: {}", slot);
         }
-        if slot < self.min_root {
+        if self.min_root == self.max_root_range {
+            self.min_root = slot;
+            self.max_root_range = slot + 1;
+            assert!(self.not_roots.is_empty());
+        }
+        else if slot == self.min_root && slot == self.max_root_range {
+            self.min_root = slot;
+            self.max_root_range = slot + 1;
+        }
+        else if slot < self.min_root {
             // before range
             self.min_root = slot;
             for not in (slot + 1)..self.min_root {
