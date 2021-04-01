@@ -341,7 +341,7 @@ impl RollingBitField {
         self.count += 1;
         let address = self.get_address(index);
         self.bits[address.array_index] |= address.mask;
-        self.max = std::cmp::max(self.max, index);
+        self.max = std::cmp::max(self.max, index + 1);
     }
 
     pub fn remove(&mut self, index: u64) {
