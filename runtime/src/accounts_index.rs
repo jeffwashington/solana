@@ -363,7 +363,7 @@ impl RollingBitField {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]//, Default)]
 pub struct RootsTracker {
     bit_field: RollingBitField,
     //not_roots: HashSet<Slot>,
@@ -374,17 +374,20 @@ pub struct RootsTracker {
     uncleaned_roots: HashSet<Slot>,
     previous_uncleaned_roots: HashSet<Slot>,
 }
-/*
+
 impl Default for RootsTracker {
         fn default() -> Self {
             Self {
-                not_roots: HashSet::new(),
+                bit_field: RollingBitField::new(1048576),
                 min_root: 0,
+                max_root_range: 0,
+                max_root: 0,
+                uncleaned_roots: HashSet::new(),
+                previous_uncleaned_roots: HashSet::new(),
             }
         }
     
 }
-*/
 
 impl RootsTracker {
     pub fn roots_clear(&mut self) {
