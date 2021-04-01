@@ -9018,6 +9018,7 @@ pub mod tests {
 
     #[test]
     fn test_accounts_db_cache_clean_dead_slots() {
+        solana_logger::setup();
         let num_slots = 10;
         let (accounts_db, keys, mut slots, _) = setup_accounts_db_cache_clean(num_slots, None);
         let last_dead_slot = (num_slots - 1) as Slot;

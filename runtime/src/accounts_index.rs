@@ -338,7 +338,7 @@ impl RootsTracker {
         error!("remove: {}", slot);
         self.not_roots.insert(*slot);
         self.purge();
-        self.remove(slot);
+        self.real_root.remove(slot);
     }
 
     pub fn purge(&mut self) {
