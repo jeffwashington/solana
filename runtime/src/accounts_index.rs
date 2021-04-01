@@ -10,6 +10,7 @@ use solana_sdk::{
     clock::Slot,
     pubkey::{Pubkey, PUBKEY_BYTES},
 };
+use log::*;
 use std::{
     collections::{
         btree_map::{self, BTreeMap},
@@ -20,6 +21,7 @@ use std::{
         Bound::{Excluded, Included, Unbounded},
         Range, RangeBounds,
     },
+    time::Instant,
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc, RwLock, RwLockReadGuard, RwLockWriteGuard,
@@ -43,6 +45,21 @@ pub struct Ancestors {
     min: Slot,
 }
 //pub type Ancestors = ;
+
+impl std::iter::FromIterator<(Slot, usize)> for Ancestors {
+    fn from_iter<I>(iter: I) -> Self
+    where
+        I: IntoIterator<Item = (Slot, usize)>,
+    {
+        let map = HashMap::<Slot, usize>::from_iter(iter);
+        let mut min = Slot::MAX;
+        for k in map.keys() {
+            min = std::cmp::min(min, *k);
+        }
+
+        Self { map, min }
+    }
+}
 
 impl PartialEq for Ancestors {
     fn eq(&self, other: &Self) -> bool {
@@ -263,7 +280,9 @@ impl<T: 'static + Clone + IsCached> WriteAccountMapEntry<T> {
 #[derive(Debug, Default)]
 pub struct RootsTracker {
     not_roots: HashSet<Slot>,
+    //real_root: HashSet<Slot>,
     min_root: Slot, // inclusive
+    max_root_range: Slot, // inclusive
     max_root: Slot, // inclusive
     uncleaned_roots: HashSet<Slot>,
     previous_uncleaned_roots: HashSet<Slot>,
@@ -281,46 +300,99 @@ impl Default for RootsTracker {
 */
 
 impl RootsTracker {
+    pub fn roots_clear(&mut self) {
+        self.not_roots.clear();
+        //self.real_root.clear();
+        self.min_root = 0;
+        self.max_root_range = 0;
+        self.max_root = 0;
+        self.uncleaned_roots = HashSet::new();
+        self.previous_uncleaned_roots = HashSet::new();
+    }
     pub fn contains(&self, slot: &Slot) -> bool {
         let slot = *slot;
-        if slot < self.min_root || slot > self.max_root { // ??? <= or >= ?
+        let res = 
+        if slot < self.min_root || slot >= self.max_root_range { // ??? <= or >= ?
             false
         }        
         else {
             !self.not_roots.contains(&slot)
-        }
+        };
+        /*
+        let res2 = self.real_root.contains(&slot);
+        assert_eq!(res, res2, "diff: {:?}", slot);
+        */
+        res
     }
 
     pub fn roots_len(&self) -> usize {
-        self.max_root as usize - self.min_root as usize - self.not_roots.len()
+        let res=
+        self.max_root_range as usize - self.min_root as usize - self.not_roots.len();
+        //assert_eq!(res, self.real_root.len(), "diff: {:?}", (self.max_root_range, self.min_root, &self.real_root, &self.not_roots));
+        res
+    }
+
+    pub fn roots_not_len(&self) -> usize {
+        self.not_roots.len()
     }
 
     pub fn remove(&mut self, slot: &Slot) {
-        self.not_roots.insert(*slot); // we could update min or max here, but we always march forward, and someone will do it
+        //error!("remove: {}", slot);
+        self.not_roots.insert(*slot);
+        self.purge();
+        //self.real_root.remove(slot);
+    }
+
+    pub fn purge(&mut self) {
+        let min = self.min_root;
+        for slot in min..(self.max_root_range) {
+            if self.not_roots.contains(&slot) {
+                self.not_roots.remove(&slot);
+                self.min_root += 1;
+                //error!("purged: {}", slot);
+
+            }
+            else {
+                break;
+            }
+        }
     }
 
     pub fn insert(&mut self, slot: &Slot) {
+        //error!("insert: {}", slot);
+        //self.real_root.insert(*slot);
         let slot = *slot;
         if slot < 10 {
-            error!("hit zero: {}", slot);
+            //error!("hit zero: {}", slot);
         }
-        if slot < self.min_root {
+        if self.min_root == self.max_root_range {
+            self.min_root = slot;
+            self.max_root_range = slot + 1;
+            assert!(self.not_roots.is_empty());
+        }
+        else if slot == self.min_root && slot == self.max_root_range {
+            self.min_root = slot;
+            self.max_root_range = slot + 1;
+        }
+        else if slot < self.min_root {
             // before range
             self.min_root = slot;
             for not in (slot + 1)..self.min_root {
                 self.not_roots.insert(not);
             }
         }
-        else if slot <= self.max_root {
+        else if slot < self.max_root_range {
             // in range
             self.not_roots.remove(&slot);
         }
         else {
             // after range
-            for not in (self.max_root + 1)..(slot - 1) {
-                self.not_roots.insert(not);
+            if slot > 0 {
+                for not in self.max_root_range..slot {
+                    self.not_roots.insert(not);
+                }
             }
-            self.max_root = slot;
+            self.max_root_range = slot + 1;
         }
     }
 }
@@ -1261,7 +1333,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
     pub fn all_roots(&self) -> Vec<Slot> {
         let mut roots = Vec::new();
         let tracker = self.roots_tracker.read().unwrap();
-        for root in tracker.min_root..tracker.max_root {
+        for root in tracker.min_root..tracker.max_root_range {
             if !tracker.not_roots.contains(&root) {
                 roots.push(root);
             }
@@ -1271,7 +1343,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
 
     #[cfg(test)]
     pub fn clear_roots(&self) {
-        self.roots_tracker.write().unwrap().roots.clear()
+        self.roots_tracker.write().unwrap().roots_clear()
     }
 
     #[cfg(test)]
@@ -1343,7 +1415,7 @@ pub mod tests {
     fn test_get_empty() {
         let key = Keypair::new();
         let index = AccountsIndex::<bool>::default();
-        let ancestors = HashMap::new();
+        let ancestors = Ancestors::default();
         assert!(index.get(&key.pubkey(), Some(&ancestors), None).is_none());
         assert!(index.get(&key.pubkey(), None, None).is_none());
 
@@ -1368,7 +1440,7 @@ pub mod tests {
         );
         assert!(gc.is_empty());
 
-        let ancestors = HashMap::new();
+        let ancestors = Ancestors::default();
         assert!(index.get(&key.pubkey(), Some(&ancestors), None).is_none());
         assert!(index.get(&key.pubkey(), None, None).is_none());
 
@@ -1492,7 +1564,7 @@ pub mod tests {
         };
         let pubkey_range = (pubkey_start, pubkey_end);
 
-        let ancestors: Ancestors = HashMap::new();
+        let ancestors = Ancestors::default();
         let mut scanned_keys = HashSet::new();
         index.range_scan_accounts("", &ancestors, pubkey_range, |pubkey, _index| {
             scanned_keys.insert(*pubkey);
@@ -1562,7 +1634,7 @@ pub mod tests {
 
     fn run_test_scan_accounts(num_pubkeys: usize) {
         let (index, _) = setup_accounts_index_keys(num_pubkeys);
-        let ancestors: Ancestors = HashMap::new();
+        let ancestors = Ancestors::default();
 
         let mut scanned_keys = HashSet::new();
         index.unchecked_scan_accounts("", &ancestors, |pubkey, _index| {
@@ -1666,7 +1738,7 @@ pub mod tests {
                 .len()
         );
         index.reset_uncleaned_roots(None);
-        assert_eq!(2, index.roots_tracker.read().unwrap().roots.len());
+        assert_eq!(2, index.roots_tracker.read().unwrap().roots_len());
         assert_eq!(0, index.roots_tracker.read().unwrap().uncleaned_roots.len());
         assert_eq!(
             2,
@@ -1680,7 +1752,7 @@ pub mod tests {
 
         index.add_root(2, false);
         index.add_root(3, false);
-        assert_eq!(4, index.roots_tracker.read().unwrap().roots.len());
+        assert_eq!(4, index.roots_tracker.read().unwrap().roots_len());
         assert_eq!(2, index.roots_tracker.read().unwrap().uncleaned_roots.len());
         assert_eq!(
             2,
@@ -1693,7 +1765,7 @@ pub mod tests {
         );
 
         index.clean_dead_slot(1);
-        assert_eq!(3, index.roots_tracker.read().unwrap().roots.len());
+        assert_eq!(3, index.roots_tracker.read().unwrap().roots_len());
         assert_eq!(2, index.roots_tracker.read().unwrap().uncleaned_roots.len());
         assert_eq!(
             1,
@@ -1706,7 +1778,7 @@ pub mod tests {
         );
 
         index.clean_dead_slot(2);
-        assert_eq!(2, index.roots_tracker.read().unwrap().roots.len());
+        assert_eq!(2, index.roots_tracker.read().unwrap().roots_len());
         assert_eq!(1, index.roots_tracker.read().unwrap().uncleaned_roots.len());
         assert_eq!(
             1,
@@ -1851,7 +1923,7 @@ pub mod tests {
 
         let mut num = 0;
         let mut found_key = false;
-        index.unchecked_scan_accounts("", &Ancestors::new(), |pubkey, _index| {
+        index.unchecked_scan_accounts("", &Ancestors::default(), |pubkey, _index| {
             if pubkey == &key.pubkey() {
                 found_key = true;
                 assert_eq!(_index, (&true, 3));
@@ -1925,7 +1997,7 @@ pub mod tests {
 
         // Given a max_root, should filter out roots < max_root, but specified
         // ancestors should not be affected
-        let ancestors: HashMap<Slot, usize> = vec![(3, 1), (7, 1)].into_iter().collect();
+        let ancestors = vec![(3, 1), (7, 1)].into_iter().collect();
         assert_eq!(
             index
                 .latest_slot(Some(&ancestors), &slot_slice, Some(4))
