@@ -419,7 +419,7 @@ pub struct RootsTracker {
 impl Default for RootsTracker {
         fn default() -> Self {
             Self {
-                bit_field: RollingBitField::new(1048576),//2097152
+                bit_field: RollingBitField::new(2097152),//1048576
                 real_root: HashSet::new(),
                 min_root: 0,
                 max_root_range: 0,
