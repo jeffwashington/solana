@@ -494,6 +494,8 @@ pub struct Timings {
     pub ancestors_ct: u64,
     pub root_check_ns: u64,
     pub root_check_count: u64,
+    pub get_rooted_entries_ns: u64,
+    pub get_rooted_entries_ct: u64,
 }
 
 impl Default for Timings {
@@ -511,6 +513,8 @@ impl Default for Timings {
             roots_map_len: 0,
             root_check_ns: 0,
             root_check_count: 0,
+            get_rooted_entries_ns: 0,
+            get_rooted_entries_ct: 0,
         }
     }
 }
@@ -532,6 +536,9 @@ impl Timings {
             self.root_check_ns = 0;
             self.root_check_count = 0;
             self.last = now;
+            self.get_rooted_entries_ns= 0;
+            self.get_rooted_entries_ct= 0;
+
         }
     }
 }
@@ -966,11 +973,19 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
     }
 
     pub fn get_rooted_entries(&self, slice: SlotSlice<T>, max: Option<Slot>) -> SlotList<T> {
-        slice
+        let mut time = Measure::start("");
+        let res = slice
             .iter()
             .filter(|(slot, _)| self.is_root(*slot) && max.map_or(true, |max| *slot <= max))
             .cloned()
-            .collect()
+            .collect();
+
+        time.stop();
+        let mut lock = self.timings.lock().unwrap();
+        lock.get_rooted_entries_ct += 1;
+        lock.get_rooted_entries_ns += time.as_ns();
+            
+        res
     }
 
     // returns the rooted entries and the storage ref count
