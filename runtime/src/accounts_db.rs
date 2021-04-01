@@ -5738,6 +5738,8 @@ pub mod tests {
 
     #[test]
     fn test_accountsdb_add_root_many() {
+        solana_logger::setup();
+
         let db = AccountsDb::new(Vec::new(), &ClusterType::Development);
 
         let mut pubkeys: Vec<Pubkey> = vec![];
