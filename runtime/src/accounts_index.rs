@@ -482,12 +482,12 @@ pub trait ZeroLamport {
 
 #[derive(Debug)]
 pub struct Timings {
-    pub is_root: u64,
+    pub is_root_ns: u64,
     pub latest_slot_ns: u64,
     pub count: u64,
     pub last: Instant,
     pub roots_len: u64,
-    pub roots_len_ct: u64,
+    pub is_root_ct: u64,
     pub roots_map_len: u64,
     pub ancestors: u64,
     pub ancestors_len: u64,
@@ -501,12 +501,12 @@ pub struct Timings {
 impl Default for Timings {
     fn default() -> Self {
         Self {
-            is_root: 0,
+            is_root_ns: 0,
             last: Instant::now(),
             count: 0,
             latest_slot_ns: 0,
             roots_len: 0,
-            roots_len_ct: 0,
+            is_root_ct: 0,
             ancestors_len: 0,
             ancestors_ct:0,
             ancestors: 0,
@@ -525,10 +525,11 @@ impl Timings {
         if (now - self.last).as_millis() > 4000 {
             error!("Timings: {:?}", self);
 
+            self.is_root_ns = 0;
             self.ancestors = 0;
             self.ancestors_ct = 0;
             self.ancestors_len = 0;
-            self.roots_len_ct = 0;
+            self.is_root_ct = 0;
             self.roots_len = 0;
             self.count = 0;
             self.latest_slot_ns = 0;
@@ -974,11 +975,17 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
 
     pub fn get_rooted_entries(&self, slice: SlotSlice<T>, max: Option<Slot>) -> SlotList<T> {
         let mut time = Measure::start("");
-        let res = slice
-            .iter()
-            .filter(|(slot, _)| self.is_root(*slot) && max.map_or(true, |max| *slot <= max))
-            .cloned()
-            .collect();
+        let res;
+        {
+            let lock = self.roots_tracker.read().unwrap();
+            let max = max.unwrap_or(Slot::MAX);
+
+            res = slice
+                .iter()
+                .filter(|(slot, _)| *slot <= max && lock.contains(slot))
+                .cloned()
+                .collect();
+        }
 
         time.stop();
         let mut lock = self.timings.lock().unwrap();
@@ -1386,10 +1393,10 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
         }
         time.stop();
         let mut lock = self.timings.lock().unwrap();
-        lock.is_root += time.as_ns();
+        lock.is_root_ns += time.as_ns();
         lock.roots_len = std::cmp::max(lock.roots_len, len as u64);
         lock.roots_map_len = std::cmp::max(lock.roots_map_len, len2 as u64);
-        lock.roots_len_ct += 1;
+        lock.is_root_ct += 1;
         result
     }
 
