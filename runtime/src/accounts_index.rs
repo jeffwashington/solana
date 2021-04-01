@@ -339,7 +339,7 @@ impl RollingBitField {
         let mask: u64 = 1u64 << bit_index;
         //error!("calc_address: {}, {}, {}", index, array_index, bit_index);
         if array_index == 5861 {
-            error!("index: {}, {:?}, mask: {}, bit index: {}", index, array_index, mask, bit_index);
+            //error!("index: {}, {:?}, mask: {}, bit index: {}", index, array_index, mask, bit_index);
         }
         RollingBitFieldAddress { array_index, mask}
     }
@@ -355,7 +355,7 @@ impl RollingBitField {
         let address = self.get_address(index);
         self.bits[address.array_index] |= address.mask;
         if address.array_index == 5861 {
-            error!("insert: {:?}, address: {:?}, mask: {}, bits: {}", index, address, address.mask, self.bits[address.array_index]);
+            //error!("insert: {:?}, address: {:?}, mask: {}, bits: {}", index, address, address.mask, self.bits[address.array_index]);
         }
         self.max = std::cmp::max(self.max, index + 1);
     }
@@ -368,7 +368,7 @@ impl RollingBitField {
         let address = self.get_address(index);
         self.bits[address.array_index] &= !address.mask;
         if address.array_index == 5861 {
-            error!("remove: {}, {:?}, {:?}, not mask: {}", index, address, self.bits[address.array_index], !address.mask);
+            //error!("remove: {}, {:?}, {:?}, not mask: {}", index, address, self.bits[address.array_index], !address.mask);
         }
     }
 
@@ -379,7 +379,7 @@ impl RollingBitField {
         let address = self.get_address(index);
         let res = (self.bits[address.array_index] & address.mask) != 0;
         if address.array_index == 5861 {
-            error!("contains: {}, {:?}, {:?}, mask: {}, result: {}", index, address, self.bits[address.array_index], address.mask, res);
+            //error!("contains: {}, {:?}, {:?}, mask: {}, result: {}", index, address, self.bits[address.array_index], address.mask, res);
 
         }
             res
