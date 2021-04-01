@@ -280,7 +280,7 @@ impl<T: 'static + Clone + IsCached> WriteAccountMapEntry<T> {
 #[derive(Debug, Default)]
 pub struct RootsTracker {
     not_roots: HashSet<Slot>,
-    real_root: HashSet<Slot>,
+    //real_root: HashSet<Slot>,
     min_root: Slot, // inclusive
     max_root_range: Slot, // inclusive
     max_root: Slot, // inclusive
@@ -302,7 +302,7 @@ impl Default for RootsTracker {
 impl RootsTracker {
     pub fn roots_clear(&mut self) {
         self.not_roots.clear();
-        self.real_root.clear();
+        //self.real_root.clear();
         self.min_root = 0;
         self.max_root_range = 0;
         self.max_root = 0;
@@ -318,15 +318,17 @@ impl RootsTracker {
         else {
             !self.not_roots.contains(&slot)
         };
+        /*
         let res2 = self.real_root.contains(&slot);
         assert_eq!(res, res2, "diff: {:?}", slot);
+        */
         res
     }
 
     pub fn roots_len(&self) -> usize {
         let res=
         self.max_root_range as usize - self.min_root as usize - self.not_roots.len();
-        assert_eq!(res, self.real_root.len(), "diff: {:?}", (self.max_root_range, self.min_root, &self.real_root, &self.not_roots));
+        //assert_eq!(res, self.real_root.len(), "diff: {:?}", (self.max_root_range, self.min_root, &self.real_root, &self.not_roots));
         res
     }
 
@@ -338,7 +340,7 @@ impl RootsTracker {
         //error!("remove: {}", slot);
         self.not_roots.insert(*slot);
         self.purge();
-        self.real_root.remove(slot);
+        //self.real_root.remove(slot);
     }
 
     pub fn purge(&mut self) {
@@ -358,7 +360,7 @@ impl RootsTracker {
 
     pub fn insert(&mut self, slot: &Slot) {
         //error!("insert: {}", slot);
-        self.real_root.insert(*slot);
+        //self.real_root.insert(*slot);
         let slot = *slot;
         if slot < 10 {
             //error!("hit zero: {}", slot);
