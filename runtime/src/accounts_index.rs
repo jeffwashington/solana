@@ -338,8 +338,8 @@ impl RollingBitField {
         let bit_index = index % bits_in_u64;
         let mask: u64 = 1u64 << bit_index;
         //error!("calc_address: {}, {}, {}", index, array_index, bit_index);
-        if index == 71678277 {
-            error!("index: {:?}, mask: {}, bit index: {}", array_index, mask, bit_index);
+        if array_index == 5861 {
+            error!("index: {}, {:?}, mask: {}, bit index: {}", index, array_index, mask, bit_index);
         }
         RollingBitFieldAddress { array_index, mask}
     }
@@ -348,8 +348,8 @@ impl RollingBitField {
         self.count += 1;
         let address = self.get_address(index);
         self.bits[address.array_index] |= address.mask;
-        if index == 71678277 {
-            error!("insert: {:?}, mask: {}, bits: {}", address, address.mask, self.bits[address.array_index]);
+        if address.array_index == 5861 {
+            error!("insert: {:?}, address: {:?}, mask: {}, bits: {}", index, address, address.mask, self.bits[address.array_index]);
         }
         self.max = std::cmp::max(self.max, index + 1);
     }
@@ -358,14 +358,19 @@ impl RollingBitField {
         self.count -= 1; // TODO saturating? or would we rather panic?
         let address = self.get_address(index);
         self.bits[address.array_index] &= !address.mask;
-        if index == 71678277 {
-            error!("remove: {:?}, {:?}, not mask: {}", address, self.bits[address.array_index], !address.mask);
+        if address.array_index == 5861 {
+            error!("remove: {}, {:?}, {:?}, not mask: {}", index, address, self.bits[address.array_index], !address.mask);
         }
     }
 
     pub fn contains(&self, index: u64) -> bool {
         let address = self.get_address(index);
-        self.bits[address.array_index] & address.mask != 0
+        let res = (self.bits[address.array_index] & address.mask) != 0;
+        if address.array_index == 5861 {
+            error!("contains: {}, {:?}, {:?}, mask: {}, result: {}", index, address, self.bits[address.array_index], address.mask, res);
+
+        }
+            res
     }
 
     pub fn len(&self) ->usize {
