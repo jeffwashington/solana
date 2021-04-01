@@ -382,7 +382,7 @@ impl RollingBitField {
 pub struct RootsTracker {
     bit_field: RollingBitField,
     //not_roots: HashSet<Slot>,
-    //real_root: HashSet<Slot>,
+    real_root: HashSet<Slot>,
     min_root: Slot, // inclusive
     max_root_range: Slot, // inclusive
     max_root: Slot, // inclusive
@@ -394,6 +394,7 @@ impl Default for RootsTracker {
         fn default() -> Self {
             Self {
                 bit_field: RollingBitField::new(1048576),
+                real_root: HashSet::new(),
                 min_root: 0,
                 max_root_range: 0,
                 max_root: 0,
@@ -407,7 +408,7 @@ impl Default for RootsTracker {
 impl RootsTracker {
     pub fn roots_clear(&mut self) {
         self.bit_field.clear();
-        //self.real_root.clear();
+        self.real_root.clear();
         self.min_root = 0;
         self.max_root_range = 0;
         self.max_root = 0;
@@ -415,7 +416,9 @@ impl RootsTracker {
         self.previous_uncleaned_roots = HashSet::new();
     }
     pub fn contains(&self, slot: &Slot) -> bool {
-        self.bit_field.contains(*slot)
+        let res = self.bit_field.contains(*slot);
+        assert_eq!(res, self.real_root.contains(slot));
+        res
     }
 
     pub fn roots_len(&self) -> usize {
@@ -427,10 +430,12 @@ impl RootsTracker {
     }
 
     pub fn remove(&mut self, slot: &Slot) {
+        self.real_root.remove(slot);
         self.bit_field.remove(*slot);
     }
 
     pub fn insert(&mut self, slot: &Slot) {
+        self.real_root.insert(*slot);
         self.bit_field.insert(*slot);
     }
 }
