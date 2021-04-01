@@ -417,7 +417,7 @@ impl RootsTracker {
     }
     pub fn contains(&self, slot: &Slot) -> bool {
         let res = self.bit_field.contains(*slot);
-        assert_eq!(res, self.real_root.contains(slot));
+        assert_eq!(res, self.real_root.contains(slot), "slot: {}, bit len: {}, real len: {}", slot, self.bit_field.len(), self.real_root.len());
         res
     }
 
