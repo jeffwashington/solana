@@ -16,6 +16,7 @@ use std::{
         btree_map::{self, BTreeMap},
         HashMap, HashSet,
     },
+    marker::PhantomData,
     ops::{
         Bound,
         Bound::{Excluded, Included, Unbounded},
@@ -277,9 +278,95 @@ impl<T: 'static + Clone + IsCached> WriteAccountMapEntry<T> {
     }
 }
 
+use std::ops::{Add, Sub};
+use num_traits::FromPrimitive;
+
+#[derive(Debug, Default)]
+pub struct RollingBitField {
+    max_width: usize,
+    //min: usize,
+    //max: usize, // exclusive
+    bits: Vec<u64>,
+    count: usize,
+}
+
+#[derive(Debug, Default)]
+struct RollingBitFieldAddress {
+    array_index: usize,
+    mask: u64,
+}
+
+impl RollingBitFieldAddress {
+    pub fn is_empty(&self) -> bool {
+        self.mask == 0
+    }
+}
+impl RollingBitField {
+    pub fn new(power_of_2_width: usize) -> Self {
+        assert!(power_of_2_width > 0);
+        assert_eq!(2usize.pow(Self::log_2(power_of_2_width)), power_of_2_width as usize);
+        let address = Self::calc_address(power_of_2_width, power_of_2_width as u64 - 1);
+        let bits = vec![0u64; (address.array_index + 1)];
+        Self {
+            max_width: power_of_2_width,
+            bits,
+            count: 0,
+        }
+    }
+
+    const fn num_bits<R>() -> usize { std::mem::size_of::<R>() * 8 }
+
+    fn log_2(x: usize) -> u32 {
+        assert!(x > 0);
+        Self::num_bits::<usize>() as u32 - x.leading_zeros() - 1
+    }
+
+    fn get_address(&self, index: u64) -> RollingBitFieldAddress {
+        Self::calc_address(self.max_width, index)
+    }
+
+    fn calc_address(max_width: usize, index: u64) -> RollingBitFieldAddress {
+        let index = index as usize;
+        let bits_in_byte = 8;
+        let bits_in_u64 = 64;
+        let array_index = (index % max_width) / bits_in_u64;
+        let bit_index = index % bits_in_u64;
+        let mask = 2 << bit_index;
+        RollingBitFieldAddress { array_index, mask}
+    }
+
+    pub fn insert(&mut self, index: u64) {
+        self.count += 1;
+        let address = self.get_address(index);
+        self.bits[address.array_index] |= address.mask;
+    }
+
+    pub fn remove(&mut self, index: u64) {
+        self.count -= 1; // TODO saturating? or would we rather panic?
+        let address = self.get_address(index);
+        self.bits[address.array_index] &= !address.mask;
+    }
+
+    pub fn contains(&self, index: u64) -> bool {
+        let address = self.get_address(index);
+        self.bits[address.array_index] & address.mask != 0
+    }
+
+    pub fn len(&self) ->usize {
+        self.count
+    }
+
+    pub fn clear(&mut self) {
+        let mut n =
+            Self::new(self.max_width);
+        std::mem::swap(&mut n, self);
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct RootsTracker {
-    not_roots: HashSet<Slot>,
+    bit_field: RollingBitField,
+    //not_roots: HashSet<Slot>,
     //real_root: HashSet<Slot>,
     min_root: Slot, // inclusive
     max_root_range: Slot, // inclusive
@@ -301,7 +388,7 @@ impl Default for RootsTracker {
 
 impl RootsTracker {
     pub fn roots_clear(&mut self) {
-        self.not_roots.clear();
+        self.bit_field.clear();
         //self.real_root.clear();
         self.min_root = 0;
         self.max_root_range = 0;
@@ -310,90 +397,23 @@ impl RootsTracker {
         self.previous_uncleaned_roots = HashSet::new();
     }
     pub fn contains(&self, slot: &Slot) -> bool {
-        let slot = *slot;
-        let res = 
-        if slot < self.min_root || slot >= self.max_root_range { // ??? <= or >= ?
-            false
-        }        
-        else {
-            !self.not_roots.contains(&slot)
-        };
-        /*
-        let res2 = self.real_root.contains(&slot);
-        assert_eq!(res, res2, "diff: {:?}", slot);
-        */
-        res
+        self.bit_field.contains(*slot)
     }
 
     pub fn roots_len(&self) -> usize {
-        let res=
-        self.max_root_range as usize - self.min_root as usize - self.not_roots.len();
-        //assert_eq!(res, self.real_root.len(), "diff: {:?}", (self.max_root_range, self.min_root, &self.real_root, &self.not_roots));
-        res
+        self.bit_field.len()
     }
 
     pub fn roots_not_len(&self) -> usize {
-        self.not_roots.len()
+        0
     }
 
     pub fn remove(&mut self, slot: &Slot) {
-        //error!("remove: {}", slot);
-        self.not_roots.insert(*slot);
-        self.purge();
-        //self.real_root.remove(slot);
-    }
-
-    pub fn purge(&mut self) {
-        let min = self.min_root;
-        for slot in min..(self.max_root_range) {
-            if self.not_roots.contains(&slot) {
-                self.not_roots.remove(&slot);
-                self.min_root += 1;
-                //error!("purged: {}", slot);
-
-            }
-            else {
-                break;
-            }
-        }
+        self.bit_field.remove(*slot);
     }
 
     pub fn insert(&mut self, slot: &Slot) {
-        //error!("insert: {}", slot);
-        //self.real_root.insert(*slot);
-        let slot = *slot;
-        if slot < 10 {
-            //error!("hit zero: {}", slot);
-        }
-        if self.min_root == self.max_root_range {
-            self.min_root = slot;
-            self.max_root_range = slot + 1;
-            assert!(self.not_roots.is_empty());
-        }
-        else if slot == self.min_root && slot == self.max_root_range {
-            self.min_root = slot;
-            self.max_root_range = slot + 1;
-        }
-        else if slot < self.min_root {
-            // before range
-            self.min_root = slot;
-            for not in (slot + 1)..self.min_root {
-                self.not_roots.insert(not);
-            }
-        }
-        else if slot < self.max_root_range {
-            // in range
-            self.not_roots.remove(&slot);
-        }
-        else {
-            // after range
-            if slot > 0 {
-                for not in self.max_root_range..slot {
-                    self.not_roots.insert(not);
-                }
-            }
-            self.max_root_range = slot + 1;
-        }
+        self.bit_field.insert(*slot);
     }
 }
 
@@ -1332,12 +1352,14 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
 
     pub fn all_roots(&self) -> Vec<Slot> {
         let mut roots = Vec::new();
+        /* TODO
         let tracker = self.roots_tracker.read().unwrap();
         for root in tracker.min_root..tracker.max_root_range {
             if !tracker.not_roots.contains(&root) {
                 roots.push(root);
             }
         }
+        */
         roots
     }
 
