@@ -347,7 +347,7 @@ impl RootsTracker {
             if self.not_roots.contains(&slot) {
                 self.not_roots.remove(&slot);
                 self.min_root += 1;
-                error!("purged: {}", slot);
+                //error!("purged: {}", slot);
 
             }
             else {
@@ -1316,7 +1316,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
         let mut lock = self.timings.lock().unwrap();
         lock.is_root += time.as_ns();
         lock.roots_len = std::cmp::max(lock.roots_len, len as u64);
-        lock.roots_map_len += std::cmp::max(lock.roots_map_len, len2 as u64);
+        lock.roots_map_len = std::cmp::max(lock.roots_map_len, len2 as u64);
         lock.roots_len_ct += 1;
         result
     }
@@ -1418,7 +1418,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
     pub fn all_roots(&self) -> Vec<Slot> {
         let mut roots = Vec::new();
         let tracker = self.roots_tracker.read().unwrap();
-        for root in tracker.min_root..tracker.max_root {
+        for root in tracker.min_root..tracker.max_root_range {
             if !tracker.not_roots.contains(&root) {
                 roots.push(root);
             }

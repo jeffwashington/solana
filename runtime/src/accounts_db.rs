@@ -7884,6 +7884,7 @@ pub mod tests {
 
     #[test]
     fn test_shrink_next_slots() {
+        solana_logger::setup();
         let mut accounts = AccountsDb::new_single();
         accounts.caching_enabled = false;
 
