@@ -8823,6 +8823,7 @@ pub mod tests {
 
     #[test]
     fn test_scan_flush_accounts_cache_then_clean_drop() {
+        solana_logger::setup();
         let caching_enabled = true;
         let db = Arc::new(AccountsDb::new_with_config(
             Vec::new(),

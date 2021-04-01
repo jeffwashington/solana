@@ -386,7 +386,7 @@ impl RootsTracker {
         else {
             // after range
             if slot > 0 {
-                for not in (self.max_root_range + 1)..(slot - 1) {
+                for not in self.max_root_range..slot {
                     self.not_roots.insert(not);
                 }
             }
