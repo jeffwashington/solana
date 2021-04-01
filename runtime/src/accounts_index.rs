@@ -336,10 +336,10 @@ impl RollingBitField {
         let bits_in_u64 = 64;
         let array_index = (index % max_width) / bits_in_u64;
         let bit_index = index % bits_in_u64;
-        let mask = 1 << bit_index;
+        let mask: u64 = 1u64 << bit_index;
         //error!("calc_address: {}, {}, {}", index, array_index, bit_index);
         if index == 71678277 {
-            error!("index: {:?}, {}", array_index, mask);
+            error!("index: {:?}, mask: {}, bit index: {}", array_index, mask, bit_index);
         }
         RollingBitFieldAddress { array_index, mask}
     }
@@ -347,10 +347,10 @@ impl RollingBitField {
     pub fn insert(&mut self, index: u64) {
         self.count += 1;
         let address = self.get_address(index);
-        if index == 71678277 {
-            error!("insert: {:?}", address);
-        }
         self.bits[address.array_index] |= address.mask;
+        if index == 71678277 {
+            error!("insert: {:?}, mask: {}, bits: {}", address, address.mask, self.bits[address.array_index]);
+        }
         self.max = std::cmp::max(self.max, index + 1);
     }
 
