@@ -46,6 +46,21 @@ pub struct Ancestors {
 }
 //pub type Ancestors = ;
 
+impl std::iter::FromIterator<(Slot, usize)> for Ancestors {
+    fn from_iter<I>(iter: I) -> Self
+    where
+        I: IntoIterator<Item = (Slot, usize)>,
+    {
+        let map = HashMap::<Slot, usize>::from_iter(iter);
+        let mut min = Slot::MAX;
+        for k in map.keys() {
+            min = std::cmp::min(min, *k);
+        }
+
+        Self { map, min }
+    }
+}
+
 impl PartialEq for Ancestors {
     fn eq(&self, other: &Self) -> bool {
         self.map.eq(&other.map)
@@ -285,6 +300,15 @@ impl Default for RootsTracker {
 */
 
 impl RootsTracker {
+    pub fn roots_clear(&mut self) {
+        self.not_roots.clear();
+        self.real_root.clear();
+        self.min_root = 0;
+        self.max_root_range = 0;
+        self.max_root = 0;
+        self.uncleaned_roots = HashSet::new();
+        self.previous_uncleaned_roots = HashSet::new();
+    }
     pub fn contains(&self, slot: &Slot) -> bool {
         let slot = *slot;
         let res = 
@@ -1389,7 +1413,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
 
     #[cfg(test)]
     pub fn clear_roots(&self) {
-        self.roots_tracker.write().unwrap().roots.clear()
+        self.roots_tracker.write().unwrap().roots_clear()
     }
 
     #[cfg(test)]
@@ -1461,7 +1485,7 @@ pub mod tests {
     fn test_get_empty() {
         let key = Keypair::new();
         let index = AccountsIndex::<bool>::default();
-        let ancestors = HashMap::new();
+        let ancestors = Ancestors::default();
         assert!(index.get(&key.pubkey(), Some(&ancestors), None).is_none());
         assert!(index.get(&key.pubkey(), None, None).is_none());
 
@@ -1486,7 +1510,7 @@ pub mod tests {
         );
         assert!(gc.is_empty());
 
-        let ancestors = HashMap::new();
+        let ancestors = Ancestors::default();
         assert!(index.get(&key.pubkey(), Some(&ancestors), None).is_none());
         assert!(index.get(&key.pubkey(), None, None).is_none());
 
@@ -1610,7 +1634,7 @@ pub mod tests {
         };
         let pubkey_range = (pubkey_start, pubkey_end);
 
-        let ancestors: Ancestors = HashMap::new();
+        let ancestors = Ancestors::default();
         let mut scanned_keys = HashSet::new();
         index.range_scan_accounts("", &ancestors, pubkey_range, |pubkey, _index| {
             scanned_keys.insert(*pubkey);
@@ -1680,7 +1704,7 @@ pub mod tests {
 
     fn run_test_scan_accounts(num_pubkeys: usize) {
         let (index, _) = setup_accounts_index_keys(num_pubkeys);
-        let ancestors: Ancestors = HashMap::new();
+        let ancestors = Ancestors::default();
 
         let mut scanned_keys = HashSet::new();
         index.unchecked_scan_accounts("", &ancestors, |pubkey, _index| {
@@ -1784,7 +1808,7 @@ pub mod tests {
                 .len()
         );
         index.reset_uncleaned_roots(None);
-        assert_eq!(2, index.roots_tracker.read().unwrap().roots.len());
+        assert_eq!(2, index.roots_tracker.read().unwrap().roots_len());
         assert_eq!(0, index.roots_tracker.read().unwrap().uncleaned_roots.len());
         assert_eq!(
             2,
@@ -1798,7 +1822,7 @@ pub mod tests {
 
         index.add_root(2, false);
         index.add_root(3, false);
-        assert_eq!(4, index.roots_tracker.read().unwrap().roots.len());
+        assert_eq!(4, index.roots_tracker.read().unwrap().roots_len());
         assert_eq!(2, index.roots_tracker.read().unwrap().uncleaned_roots.len());
         assert_eq!(
             2,
@@ -1811,7 +1835,7 @@ pub mod tests {
         );
 
         index.clean_dead_slot(1);
-        assert_eq!(3, index.roots_tracker.read().unwrap().roots.len());
+        assert_eq!(3, index.roots_tracker.read().unwrap().roots_len());
         assert_eq!(2, index.roots_tracker.read().unwrap().uncleaned_roots.len());
         assert_eq!(
             1,
@@ -1824,7 +1848,7 @@ pub mod tests {
         );
 
         index.clean_dead_slot(2);
-        assert_eq!(2, index.roots_tracker.read().unwrap().roots.len());
+        assert_eq!(2, index.roots_tracker.read().unwrap().roots_len());
         assert_eq!(1, index.roots_tracker.read().unwrap().uncleaned_roots.len());
         assert_eq!(
             1,
@@ -1969,7 +1993,7 @@ pub mod tests {
 
         let mut num = 0;
         let mut found_key = false;
-        index.unchecked_scan_accounts("", &Ancestors::new(), |pubkey, _index| {
+        index.unchecked_scan_accounts("", &Ancestors::default(), |pubkey, _index| {
             if pubkey == &key.pubkey() {
                 found_key = true;
                 assert_eq!(_index, (&true, 3));
@@ -2043,7 +2067,7 @@ pub mod tests {
 
         // Given a max_root, should filter out roots < max_root, but specified
         // ancestors should not be affected
-        let ancestors: HashMap<Slot, usize> = vec![(3, 1), (7, 1)].into_iter().collect();
+        let ancestors = vec![(3, 1), (7, 1)].into_iter().collect();
         assert_eq!(
             index
                 .latest_slot(Some(&ancestors), &slot_slice, Some(4))

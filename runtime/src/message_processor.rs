@@ -1378,6 +1378,7 @@ mod tests {
                 &self.rent,
                 &self.post,
                 &mut ExecuteDetailsTimings::default(),
+                false,
             )
         }
     }

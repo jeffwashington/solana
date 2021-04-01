@@ -1079,7 +1079,7 @@ pub fn update_accounts_bench(accounts: &Accounts, pubkeys: &[Pubkey], slot: u64)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::rent_collector::RentCollector;
+    use crate::{bank::ExecuteTimings, rent_collector::RentCollector};
     use solana_sdk::{
         account::{AccountSharedData, WritableAccount},
         epoch_schedule::EpochSchedule,
@@ -1123,6 +1123,7 @@ mod tests {
             error_counters,
             rent_collector,
             &FeatureSet::all_enabled(),
+            &mut ExecuteTimings::default(),
         )
     }
 
@@ -1159,7 +1160,8 @@ mod tests {
             instructions,
         );
 
-        let loaded_accounts = load_accounts(tx, &accounts, &mut error_counters);
+        let loaded_accounts = load_accounts(tx, &accounts, &mut error_counters
+    );
 
         assert_eq!(error_counters.account_not_found, 1);
         assert_eq!(loaded_accounts.len(), 1);
@@ -1219,7 +1221,7 @@ mod tests {
             instructions,
         );
 
-        let loaded_accounts = load_accounts(tx, &accounts, &mut error_counters);
+        let loaded_accounts = load_accounts(tx, &accounts, &mut error_counters,     );
 
         assert_eq!(error_counters.account_not_found, 1);
         assert_eq!(loaded_accounts.len(), 1);
@@ -1283,7 +1285,7 @@ mod tests {
             instructions,
         );
 
-        let loaded_accounts = load_accounts(tx, &accounts, &mut error_counters);
+        let loaded_accounts = load_accounts(tx, &accounts, &mut error_counters,     );
 
         assert_eq!(error_counters.invalid_account_for_fee, 1);
         assert_eq!(loaded_accounts.len(), 1);
@@ -2054,6 +2056,7 @@ mod tests {
             &mut error_counters,
             &rent_collector,
             &FeatureSet::all_enabled(),
+            &mut ExecuteTimings::default(),
         )
     }
 
