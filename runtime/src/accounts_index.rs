@@ -326,7 +326,7 @@ impl RootsTracker {
     pub fn roots_len(&self) -> usize {
         let res=
         self.max_root_range as usize - self.min_root as usize - self.not_roots.len();
-        assert_eq!(res, self.real_root.len(), "diff: {:?}", self);
+        assert_eq!(res, self.real_root.len(), "diff: {:?}", self.max_root_range);
         res
     }
 
