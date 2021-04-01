@@ -312,7 +312,7 @@ impl RootsTracker {
     pub fn contains(&self, slot: &Slot) -> bool {
         let slot = *slot;
         let res = 
-        if slot < self.min_root || slot > self.max_root_range { // ??? <= or >= ?
+        if slot < self.min_root || slot >= self.max_root_range { // ??? <= or >= ?
             false
         }        
         else {
@@ -343,7 +343,7 @@ impl RootsTracker {
 
     pub fn purge(&mut self) {
         let min = self.min_root;
-        for slot in min..(self.max_root_range + 1) {
+        for slot in min..(self.max_root_range) {
             if self.not_roots.contains(&slot) {
                 self.not_roots.remove(&slot);
                 self.min_root += 1;
@@ -381,7 +381,7 @@ impl RootsTracker {
                     self.not_roots.insert(not);
                 }
             }
-            self.max_root_range = slot;
+            self.max_root_range = slot + 1;
         }
     }
 }
