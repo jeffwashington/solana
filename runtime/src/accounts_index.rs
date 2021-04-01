@@ -1018,10 +1018,33 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
         let mut time = Measure::start("");
         let mut current_max = 0;
         let mut rv = None;
+        if let Some(ancestors) = ancestors {
+            if !ancestors.is_empty() {
+                for (i, (slot, _t)) in slice.iter().rev().enumerate() {
+                    if *slot >= current_max && ancestors.contains_key(slot) {
+                        rv = Some((slice.len() - 1) - i);
+                        current_max = *slot;
+                    }
+                }
+            }
+        }
+
+        let max_root = max_root.unwrap_or(Slot::MAX);
+        let mut tracker = None;
+
         for (i, (slot, _t)) in slice.iter().rev().enumerate() {
-            if *slot >= current_max && self.is_ancestor_or_root(*slot, ancestors, max_root) {
-                rv = Some((slice.len() - 1) - i);
-                current_max = *slot;
+            if *slot >= current_max && *slot <= max_root {
+                let lock = match tracker {
+                    Some(inner) => inner,
+                    None => {
+                        self.roots_tracker.read().unwrap()
+                    }
+                };
+                if lock.roots.contains(&slot) {
+                    rv = Some((slice.len() - 1) - i);
+                    current_max = *slot;
+                }
+                tracker = Some(lock);
             }
         }
         time.stop();
