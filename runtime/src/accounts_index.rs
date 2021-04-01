@@ -338,12 +338,18 @@ impl RollingBitField {
         let bit_index = index % bits_in_u64;
         let mask = 1 << bit_index;
         //error!("calc_address: {}, {}, {}", index, array_index, bit_index);
+        if index == 71678277 {
+            error!("index: {:?}, {}", array_index, mask);
+        }
         RollingBitFieldAddress { array_index, mask}
     }
 
     pub fn insert(&mut self, index: u64) {
         self.count += 1;
         let address = self.get_address(index);
+        if index == 71678277 {
+            error!("insert: {:?}", address);
+        }
         self.bits[address.array_index] |= address.mask;
         self.max = std::cmp::max(self.max, index + 1);
     }
@@ -352,6 +358,9 @@ impl RollingBitField {
         self.count -= 1; // TODO saturating? or would we rather panic?
         let address = self.get_address(index);
         self.bits[address.array_index] &= !address.mask;
+        if index == 71678277 {
+            error!("remove: {:?}, {:?}, not mask: {}", address, self.bits[address.array_index], !address.mask);
+        }
     }
 
     pub fn contains(&self, index: u64) -> bool {
@@ -944,6 +953,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
     }
 
     pub fn get_rooted_entries(&self, slice: SlotSlice<T>, max: Option<Slot>) -> SlotList<T> {
+        let mut time = Measure::start("");
         slice
             .iter()
             .filter(|(slot, _)| self.is_root(*slot) && max.map_or(true, |max| *slot <= max))
