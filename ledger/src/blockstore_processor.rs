@@ -242,6 +242,23 @@ fn process_entries_with_callback(
             entry.transactions.shuffle(&mut rng);
         }
     }
+    let mut pubkeys = HashSet::new();
+    for entry in entries.iter() {
+        for transaction in &entry.transactions {
+            for key in &transaction.message.account_keys {
+                pubkeys.insert(*key);
+            }
+        }
+    }
+    let bank_ = bank.clone();
+    std::thread::Builder::new()
+        .name("solana-accounts-transaction-account-loader".to_string())
+        .spawn(move || {
+            for key in pubkeys {
+                bank_.load_accounts_into_read_only_cache(&key);
+            }
+        })
+        .unwrap();
     for entry in entries {
         if entry.is_tick() {
             // If it's a tick, save it for later
