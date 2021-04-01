@@ -348,7 +348,7 @@ impl RollingBitField {
         if self.max.saturating_sub(index) > self.max_width  as u64{
             panic!("acting on an item at index: {}, that is far behind the recent max: {}", index, self.max);
         }
-        if index.saturating_sub(self.max) > self.max_width  as u64{
+        if self.max > 0 && index.saturating_sub(self.max) > self.max_width  as u64{
             panic!("acting on an item at index: {}, that is far behind the recent max: {}", index, self.max);
         }
         self.count += 1;
