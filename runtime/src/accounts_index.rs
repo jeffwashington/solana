@@ -103,6 +103,14 @@ impl Ancestors {
         self.map.remove(slot);
         // need not affect min, but could. This is rare, however.
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.map.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.map.len()
+    }
 }
 
 impl<'de> Deserialize<'de> for Ancestors {
@@ -1020,11 +1028,20 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
         let mut rv = None;
         if let Some(ancestors) = ancestors {
             if !ancestors.is_empty() {
+                let mut time = Measure::start("");
                 for (i, (slot, _t)) in slice.iter().rev().enumerate() {
                     if *slot >= current_max && ancestors.contains_key(slot) {
                         rv = Some((slice.len() - 1) - i);
                         current_max = *slot;
                     }
+                }
+                time.stop();
+
+                {
+                    let mut lock = self.timings.lock().unwrap();
+                    lock.ancestors += time.as_ns();
+                    lock.ancestors_len = std::cmp::max(lock.ancestors_len, ancestors.len() as u64);
+                    lock.ancestors_ct += 1;
                 }
             }
         }
@@ -1032,6 +1049,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
         let max_root = max_root.unwrap_or(Slot::MAX);
         let mut tracker = None;
 
+        let mut time = Measure::start("");
         for (i, (slot, _t)) in slice.iter().rev().enumerate() {
             if *slot >= current_max && *slot <= max_root {
                 let lock = match tracker {
@@ -1040,7 +1058,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
                         self.roots_tracker.read().unwrap()
                     }
                 };
-                if lock.roots.contains(&slot) {
+                if lock.contains(&slot) {
                     rv = Some((slice.len() - 1) - i);
                     current_max = *slot;
                 }
@@ -1052,6 +1070,11 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
         let mut lock = self.timings.lock().unwrap();
         lock.latest_slot += time.as_ns();
         lock.count += 1;
+        lock.is_root += time.as_ns();
+        //lock.roots_len = std::cmp::max(lock.roots_len, len as u64);
+        //lock.roots_map_len = std::cmp::max(lock.roots_map_len, len2 as u64);
+        //lock.roots_len_ct += 1;
+
         lock.report();
 
         rv
