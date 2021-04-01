@@ -5738,6 +5738,8 @@ pub mod tests {
 
     #[test]
     fn test_accountsdb_add_root_many() {
+        solana_logger::setup();
+
         let db = AccountsDb::new(Vec::new(), &ClusterType::Development);
 
         let mut pubkeys: Vec<Pubkey> = vec![];
@@ -5859,7 +5861,7 @@ pub mod tests {
         db.caching_enabled = true;
         let key = Pubkey::default();
         let account0 = AccountSharedData::new(1, 0, &key);
-        let ancestors: HashMap<_, _> = vec![(unrooted_slot, 1)].into_iter().collect();
+        let ancestors = vec![(unrooted_slot, 1)].into_iter().collect();
         db.store_cached(unrooted_slot, &[(&key, &account0)]);
         db.bank_hashes
             .write()
@@ -5917,7 +5919,7 @@ pub mod tests {
         assert_load_account(&db, new_root, key2, 1);
 
         // Check purged account stays gone
-        let unrooted_slot_ancestors: HashMap<_, _> = vec![(unrooted_slot, 1)].into_iter().collect();
+        let unrooted_slot_ancestors = vec![(unrooted_slot, 1)].into_iter().collect();
         assert!(db.load_slow(&unrooted_slot_ancestors, &key).is_none());
     }
 
@@ -6262,7 +6264,7 @@ pub mod tests {
         // Make sure both accounts are in the same AppendVec in slot 0, which
         // will prevent pubkey1 from being cleaned up later even when it's a
         // zero-lamport account
-        let ancestors: HashMap<Slot, usize> = vec![(0, 1)].into_iter().collect();
+        let ancestors = vec![(0, 1)].into_iter().collect();
         let (slot1, account_info1) = accounts
             .accounts_index
             .get(&pubkey1, Some(&ancestors), None)
@@ -6452,7 +6454,7 @@ pub mod tests {
         // Secondary index should still find both pubkeys
         let mut found_accounts = HashSet::new();
         accounts.accounts_index.index_scan_accounts(
-            &HashMap::new(),
+            &Ancestors::default(),
             IndexKey::SplTokenMint(mint_key),
             |key, _| {
                 found_accounts.insert(*key);
@@ -6479,7 +6481,7 @@ pub mod tests {
         // Secondary index should have purged `pubkey1` as well
         let mut found_accounts = vec![];
         accounts.accounts_index.index_scan_accounts(
-            &HashMap::new(),
+            &Ancestors::default(),
             IndexKey::SplTokenMint(mint_key),
             |key, _| found_accounts.push(*key),
         );
@@ -6935,7 +6937,7 @@ pub mod tests {
         accounts.add_root(current_slot);
 
         accounts.print_accounts_stats("pre_f");
-        accounts.update_accounts_hash(4, &HashMap::default());
+        accounts.update_accounts_hash(4, &Ancestors::default());
 
         let accounts = f(accounts, current_slot);
 
@@ -6947,7 +6949,7 @@ pub mod tests {
         assert_load_account(&accounts, current_slot, dummy_pubkey, dummy_lamport);
 
         accounts
-            .verify_bank_hash_and_lamports(4, &HashMap::default(), 1222)
+            .verify_bank_hash_and_lamports(4, &Ancestors::default(), 1222)
             .unwrap();
     }
 
@@ -6998,7 +7000,7 @@ pub mod tests {
                             db.store_uncached(slot, &[(&pubkey, &account)]);
 
                             let (account, slot) =
-                                db.load_slow(&HashMap::new(), &pubkey).unwrap_or_else(|| {
+                                db.load_slow(&Ancestors::default(), &pubkey).unwrap_or_else(|| {
                                     panic!("Could not fetch stored account {}, iter {}", pubkey, i)
                                 });
                             assert_eq!(slot, slot);
@@ -8003,7 +8005,7 @@ pub mod tests {
             accounts.all_account_count_in_append_vec(shrink_slot)
         );
 
-        let no_ancestors = HashMap::default();
+        let no_ancestors = Ancestors::default();
         accounts.update_accounts_hash(current_slot, &no_ancestors);
         accounts
             .verify_bank_hash_and_lamports(current_slot, &no_ancestors, 22300)
@@ -8404,7 +8406,7 @@ pub mod tests {
 
         accounts.print_accounts_stats("post-store");
 
-        let mut ancestors = HashMap::new();
+        let mut ancestors = Ancestors::default();
         ancestors.insert(1, 0);
         ancestors.insert(2, 1);
         for (key, account_ref) in keys[..num_to_store].iter().zip(account_refs) {
@@ -8432,7 +8434,7 @@ pub mod tests {
 
         // Should still be able to find zero lamport account in slot 1
         assert_eq!(
-            db.load_slow(&HashMap::new(), &account_key),
+            db.load_slow(&Ancestors::default(), &account_key),
             Some((zero_lamport_account, 1))
         );
     }
@@ -8447,7 +8449,7 @@ pub mod tests {
         db.store_cached(slot, &[(&key, &account0)]);
 
         // Load with no ancestors and no root will return nothing
-        assert!(db.load_slow(&HashMap::new(), &key).is_none());
+        assert!(db.load_slow(&Ancestors::default(), &key).is_none());
 
         // Load with ancestors not equal to `slot` will return nothing
         let ancestors = vec![(slot + 1, 1)].into_iter().collect();
@@ -8462,7 +8464,7 @@ pub mod tests {
 
         // Adding root will return the account even without ancestors
         db.add_root(slot);
-        assert_eq!(db.load_slow(&HashMap::new(), &key), Some((account0, slot)));
+        assert_eq!(db.load_slow(&Ancestors::default(), &key), Some((account0, slot)));
     }
 
     #[test]
@@ -8487,7 +8489,7 @@ pub mod tests {
         // Add root then flush
         db.add_root(slot);
         db.flush_accounts_cache(true, None);
-        assert_eq!(db.load_slow(&HashMap::new(), &key), Some((account0, slot)));
+        assert_eq!(db.load_slow(&Ancestors::default(), &key), Some((account0, slot)));
     }
 
     #[test]
@@ -8528,11 +8530,11 @@ pub mod tests {
         assert_eq!(db.accounts_cache.num_slots(), 1);
         assert!(db.accounts_cache.slot_cache(unrooted_slot).is_some());
         assert_eq!(
-            db.load_slow(&HashMap::new(), &key5),
+            db.load_slow(&Ancestors::default(), &key5),
             Some((account0.clone(), root5))
         );
         assert_eq!(
-            db.load_slow(&HashMap::new(), &key6),
+            db.load_slow(&Ancestors::default(), &key6),
             Some((account0, root6))
         );
     }
@@ -8589,7 +8591,7 @@ pub mod tests {
         // Should still be able to fetch all the accounts after flush
         for (slot, key) in (0..num_slots as Slot).zip(keys) {
             let ancestors = if slot < num_roots as Slot {
-                HashMap::new()
+                Ancestors::default()
             } else {
                 vec![(slot, 1)].into_iter().collect()
             };
@@ -8676,7 +8678,7 @@ pub mod tests {
         // Clean should not remove anything yet as nothing has been flushed
         db.clean_accounts(None);
         let account = db
-            .do_load(&Ancestors::default(), &account_key, Some(0))
+            .do_load(&Ancestors::default(), &account_key, Some(0), false)
             .unwrap();
         assert_eq!(account.0.lamports, 0);
         // since this item is in the cache, it should not be in the read only cache
@@ -8687,7 +8689,7 @@ pub mod tests {
         db.flush_accounts_cache(true, None);
         db.clean_accounts(None);
         assert!(db
-            .do_load(&Ancestors::default(), &account_key, Some(0))
+            .do_load(&Ancestors::default(), &account_key, Some(0), false)
             .is_none());
     }
 
@@ -8753,10 +8755,15 @@ pub mod tests {
         // entry in slot 1 is blocking cleanup of the zero-lamport account.
         let max_root = None;
         assert_eq!(
-            db.do_load(&Ancestors::default(), &zero_lamport_account_key, max_root,)
-                .unwrap()
-                .0
-                .lamports,
+            db.do_load(
+                &Ancestors::default(),
+                &zero_lamport_account_key,
+                max_root,
+                false
+            )
+            .unwrap()
+            .0
+            .lamports,
             0
         );
     }
@@ -8816,6 +8823,7 @@ pub mod tests {
 
     #[test]
     fn test_scan_flush_accounts_cache_then_clean_drop() {
+        solana_logger::setup();
         let caching_enabled = true;
         let db = Arc::new(AccountsDb::new_with_config(
             Vec::new(),
@@ -8870,7 +8878,7 @@ pub mod tests {
         // Intra cache cleaning should not clean the entry for `account_key` from slot 0,
         // even though it was updated in slot `2` because of the ongoing scan
         let account = db
-            .do_load(&Ancestors::default(), &account_key, Some(0))
+            .do_load(&Ancestors::default(), &account_key, Some(0), false)
             .unwrap();
         assert_eq!(account.0.lamports, zero_lamport_account.lamports);
 
@@ -8878,7 +8886,7 @@ pub mod tests {
         // because we're still doing a scan on it.
         db.clean_accounts(None);
         let account = db
-            .do_load(&scan_ancestors, &account_key, Some(max_scan_root))
+            .do_load(&scan_ancestors, &account_key, Some(max_scan_root), false)
             .unwrap();
         assert_eq!(account.0.lamports, slot1_account.lamports);
 
@@ -8887,14 +8895,14 @@ pub mod tests {
         scan_tracker.exit().unwrap();
         db.clean_accounts(None);
         let account = db
-            .do_load(&scan_ancestors, &account_key, Some(max_scan_root))
+            .do_load(&scan_ancestors, &account_key, Some(max_scan_root), false)
             .unwrap();
         assert_eq!(account.0.lamports, slot1_account.lamports);
 
         // Simulate dropping the bank, which finally removes the slot from the cache
         db.purge_slot(1);
         assert!(db
-            .do_load(&scan_ancestors, &account_key, Some(max_scan_root))
+            .do_load(&scan_ancestors, &account_key, Some(max_scan_root), false)
             .is_none());
     }
 
@@ -9011,6 +9019,7 @@ pub mod tests {
 
     #[test]
     fn test_accounts_db_cache_clean_dead_slots() {
+        solana_logger::setup();
         let num_slots = 10;
         let (accounts_db, keys, mut slots, _) = setup_accounts_db_cache_clean(num_slots, None);
         let last_dead_slot = (num_slots - 1) as Slot;
@@ -9030,7 +9039,7 @@ pub mod tests {
         // a smaller max root
         for key in &keys {
             assert!(accounts_db
-                .do_load(&Ancestors::default(), key, Some(last_dead_slot))
+                .do_load(&Ancestors::default(), key, Some(last_dead_slot), false)
                 .is_some());
         }
 
@@ -9053,7 +9062,7 @@ pub mod tests {
         // as those have been purged from the accounts index for the dead slots.
         for key in &keys {
             assert!(accounts_db
-                .do_load(&Ancestors::default(), key, Some(last_dead_slot))
+                .do_load(&Ancestors::default(), key, Some(last_dead_slot), false)
                 .is_none());
         }
         // Each slot should only have one entry in the storage, since all other accounts were
