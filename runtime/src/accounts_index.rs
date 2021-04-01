@@ -335,7 +335,7 @@ impl RootsTracker {
     }
 
     pub fn remove(&mut self, slot: &Slot) {
-        error!("remove: {}", slot);
+        //error!("remove: {}", slot);
         self.not_roots.insert(*slot);
         self.purge();
         self.real_root.remove(slot);
@@ -357,7 +357,7 @@ impl RootsTracker {
     }
 
     pub fn insert(&mut self, slot: &Slot) {
-        error!("insert: {}", slot);
+        //error!("insert: {}", slot);
         self.real_root.insert(*slot);
         let slot = *slot;
         if slot < 10 {
