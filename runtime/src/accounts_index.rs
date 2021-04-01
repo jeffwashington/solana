@@ -333,7 +333,8 @@ impl RollingBitField {
         let bits_in_u64 = 64;
         let array_index = (index % max_width) / bits_in_u64;
         let bit_index = index % bits_in_u64;
-        let mask = 2 << bit_index;
+        let mask = 1 << bit_index;
+        //error!("calc_address: {}, {}, {}", index, array_index, bit_index);
         RollingBitFieldAddress { array_index, mask}
     }
 
