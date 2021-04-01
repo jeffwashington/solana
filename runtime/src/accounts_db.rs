@@ -8553,7 +8553,6 @@ pub mod tests {
     }
 
     fn run_test_flush_accounts_cache_if_needed(num_roots: usize, num_unrooted: usize) {
-        solana_logger::setup();
         let mut db = AccountsDb::new(Vec::new(), &ClusterType::Development);
         db.caching_enabled = true;
         let account0 = AccountSharedData::new(1, 0, &Pubkey::default());
@@ -8592,13 +8591,10 @@ pub mod tests {
         // Should still be able to fetch all the accounts after flush
         for (slot, key) in (0..num_slots as Slot).zip(keys) {
             let ancestors = if slot < num_roots as Slot {
-                error!("default ancestors");
                 Ancestors::default()
             } else {
-                error!("ancestors");
                 vec![(slot, 1)].into_iter().collect()
             };
-            error!("slot: {}", slot);
             assert_eq!(
                 db.load_slow(&ancestors, &key),
                 Some((account0.clone(), slot))
