@@ -345,6 +345,12 @@ impl RollingBitField {
     }
 
     pub fn insert(&mut self, index: u64) {
+        if self.max.saturating_sub(index) > self.max_width  as u64{
+            panic!("acting on an item at index: {}, that is far behind the recent max: {}", index, self.max);
+        }
+        if index.saturating_sub(self.max) > self.max_width  as u64{
+            panic!("acting on an item at index: {}, that is far behind the recent max: {}", index, self.max);
+        }
         self.count += 1;
         let address = self.get_address(index);
         self.bits[address.array_index] |= address.mask;
@@ -355,6 +361,9 @@ impl RollingBitField {
     }
 
     pub fn remove(&mut self, index: u64) {
+        if self.max.saturating_sub(index) > self.max_width  as u64{
+            panic!("acting on an item at index: {}, that is far behind the recent max: {}", index, self.max);
+        }
         self.count -= 1; // TODO saturating? or would we rather panic?
         let address = self.get_address(index);
         self.bits[address.array_index] &= !address.mask;
@@ -364,6 +373,9 @@ impl RollingBitField {
     }
 
     pub fn contains(&self, index: u64) -> bool {
+        if self.max.saturating_sub(index) > self.max_width as u64 {
+            panic!("acting on an item at index: {}, that is far behind the recent max: {}", index, self.max);
+        }
         let address = self.get_address(index);
         let res = (self.bits[address.array_index] & address.mask) != 0;
         if address.array_index == 5861 {
@@ -407,7 +419,7 @@ pub struct RootsTracker {
 impl Default for RootsTracker {
         fn default() -> Self {
             Self {
-                bit_field: RollingBitField::new(1048576),
+                bit_field: RollingBitField::new(1048576),//2097152
                 real_root: HashSet::new(),
                 min_root: 0,
                 max_root_range: 0,
