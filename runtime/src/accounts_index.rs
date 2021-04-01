@@ -483,7 +483,7 @@ pub trait ZeroLamport {
 #[derive(Debug)]
 pub struct Timings {
     pub is_root: u64,
-    pub latest_slot: u64,
+    pub latest_slot_ns: u64,
     pub count: u64,
     pub last: Instant,
     pub roots_len: u64,
@@ -492,6 +492,8 @@ pub struct Timings {
     pub ancestors: u64,
     pub ancestors_len: u64,
     pub ancestors_ct: u64,
+    pub root_check_ns: u64,
+    pub root_check_count: u64,
 }
 
 impl Default for Timings {
@@ -500,13 +502,15 @@ impl Default for Timings {
             is_root: 0,
             last: Instant::now(),
             count: 0,
-            latest_slot: 0,
+            latest_slot_ns: 0,
             roots_len: 0,
             roots_len_ct: 0,
             ancestors_len: 0,
             ancestors_ct:0,
             ancestors: 0,
             roots_map_len: 0,
+            root_check_ns: 0,
+            root_check_count: 0,
         }
     }
 }
@@ -523,8 +527,10 @@ impl Timings {
             self.roots_len_ct = 0;
             self.roots_len = 0;
             self.count = 0;
-            self.latest_slot = 0;
-            self.is_root = 0;
+            self.latest_slot_ns = 0;
+            self.count = 0;
+            self.root_check_ns = 0;
+            self.root_check_count = 0;
             self.last = now;
         }
     }
@@ -1049,7 +1055,8 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
         let max_root = max_root.unwrap_or(Slot::MAX);
         let mut tracker = None;
 
-        let mut time = Measure::start("");
+        let mut roots_checked = 0;
+        let mut time2 = Measure::start("");
         for (i, (slot, _t)) in slice.iter().rev().enumerate() {
             if *slot >= current_max && *slot <= max_root {
                 let lock = match tracker {
@@ -1058,6 +1065,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
                         self.roots_tracker.read().unwrap()
                     }
                 };
+                roots_checked += 1;
                 if lock.contains(&slot) {
                     rv = Some((slice.len() - 1) - i);
                     current_max = *slot;
@@ -1065,12 +1073,13 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
                 tracker = Some(lock);
             }
         }
-        time.stop();
+        time2.stop();
 
         let mut lock = self.timings.lock().unwrap();
-        lock.latest_slot += time.as_ns();
+        lock.latest_slot_ns += time.as_ns();
         lock.count += 1;
-        lock.is_root += time.as_ns();
+        lock.root_check_count += roots_checked;
+        lock.root_check_ns += time2.as_ns();
         //lock.roots_len = std::cmp::max(lock.roots_len, len as u64);
         //lock.roots_map_len = std::cmp::max(lock.roots_map_len, len2 as u64);
         //lock.roots_len_ct += 1;
