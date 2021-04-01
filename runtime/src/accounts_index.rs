@@ -284,8 +284,8 @@ use num_traits::FromPrimitive;
 #[derive(Debug, Default)]
 pub struct RollingBitField {
     max_width: usize,
-    //min: usize,
-    //max: usize, // exclusive
+    min: u64,
+    max: u64, // exclusive
     bits: Vec<u64>,
     count: usize,
 }
@@ -311,6 +311,8 @@ impl RollingBitField {
             max_width: power_of_2_width,
             bits,
             count: 0,
+            min:0,
+            max:0,
         }
     }
 
@@ -339,6 +341,7 @@ impl RollingBitField {
         self.count += 1;
         let address = self.get_address(index);
         self.bits[address.array_index] |= address.mask;
+        self.max = std::cmp::max(self.max, index);
     }
 
     pub fn remove(&mut self, index: u64) {
@@ -360,6 +363,14 @@ impl RollingBitField {
         let mut n =
             Self::new(self.max_width);
         std::mem::swap(&mut n, self);
+    }
+
+    pub fn get_all(&self, all: &mut Vec<u64>) {
+        for index in self.min..self.max {
+            if self.contains(index as u64) {
+                all.push(index as u64);
+            }
+        }
     }
 }
 
@@ -1355,14 +1366,8 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
 
     pub fn all_roots(&self) -> Vec<Slot> {
         let mut roots = Vec::new();
-        /* TODO
         let tracker = self.roots_tracker.read().unwrap();
-        for root in tracker.min_root..tracker.max_root_range {
-            if !tracker.not_roots.contains(&root) {
-                roots.push(root);
-            }
-        }
-        */
+        tracker.bit_field.get_all(&mut roots);
         roots
     }
 
