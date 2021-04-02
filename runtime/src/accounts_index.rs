@@ -184,12 +184,6 @@ pub struct RollingBitField {
     count: usize,
 }
 
-#[derive(Debug, Default)]
-struct RollingBitFieldAddress {
-    array_index: usize,
-    mask: u64,
-}
-
 // functionally similar to a hashset
 // Relies on there being a sliding window of key values. The key values continue to increase.
 // Old key values are removed from the lesser values and do not accumulate.
@@ -197,7 +191,6 @@ impl RollingBitField {
     pub fn new(max_width: u64) -> Self {
         assert!(max_width > 0);
         assert!(max_width.is_power_of_two()); // power of 2 to make dividing a shift
-                                              // calculate the array length required using the max width - 1
         let bits = BitVec::new_fill(false, max_width);
         Self {
             max_width,
@@ -248,11 +241,26 @@ impl RollingBitField {
                 key, self.max
             );
         }
+        self.count = 0;
+        self.count -= 1;
         let address = self.get_address(key);
         let value = self.bits.get(address);
         if value {
-            self.count -= 1; // TODO saturating? or would we rather panic?
+            self.count -= 1; // this will underflow if it tries to go below 0. That is like an assert.
             self.bits.set(address, false);
+            self.purge(key);
+        }
+    }
+
+    fn purge(&mut self, key: u64) {
+        if key == self.min {
+            let start = self.min;
+            for key in start..self.max {
+                if self.bits.get(key) {
+                    self.min = key;
+                    break;
+                }
+            }
         }
     }
 
