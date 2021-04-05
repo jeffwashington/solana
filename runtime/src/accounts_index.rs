@@ -1407,7 +1407,7 @@ pub mod tests {
         let mut hash = HashSet::new();
 
         let min = 101_000;
-        let width = 33;
+        let width = 0;
         let dead = 19;
 
         let mut slot = min;
