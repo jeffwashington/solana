@@ -272,12 +272,12 @@ impl RollingBitField {
 
     pub fn contains(&self, key: &u64) -> bool {
         let key = *key;
-        if self.count == 0 || key < self.min || key >= self.max {
+        let address = self.get_address(key);
+        let result = self.bits.get(address);
+        if result && (self.count == 0 || key < self.min || key >= self.max) {
             return false;
         }
-
-        let address = self.get_address(key);
-        self.bits.get(address)
+        result
     }
 
     pub fn len(&self) -> usize {
