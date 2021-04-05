@@ -262,14 +262,7 @@ impl RollingBitField {
     }
 
     pub fn contains(&self, key: &u64) -> bool {
-        let key = *key;
-        if self.max.saturating_sub(key) > self.max_width as u64 {
-            panic!(
-                "acting on an item at key: {}, that is too far behind the recent max: {}",
-                key, self.max
-            );
-        }
-        let address = self.get_address(key);
+        let address = self.get_address(*key);
         (self.bits[address.array_index] & address.mask) != 0
     }
 
