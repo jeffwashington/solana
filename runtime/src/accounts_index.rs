@@ -1392,7 +1392,7 @@ pub mod tests {
             }
         }
         time2.stop();
-        error!("{}, {}, {}", time.as_ms(), time2.as_ms(), time_as_ms() / time2.as_ms());
+        error!("{}, {}, {}", time.as_ms(), time2.as_ms(), time.as_ms() / time2.as_ms());
     }
 
     #[test]
