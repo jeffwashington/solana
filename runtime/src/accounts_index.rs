@@ -211,8 +211,7 @@ impl RollingBitField {
         key % max_width
     }
 
-    pub fn insert(&mut self, key: &u64) {
-        let key = *key;
+    pub fn insert(&mut self, key: u64) {
         if self.count > 0 && self.max.saturating_sub(key) > self.max_width as u64 {
             panic!(
                 "acting on an item at key: {}, that is too far behind the recent max: {}",
@@ -1179,7 +1178,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
 
     pub fn add_root(&self, slot: Slot, caching_enabled: bool) {
         let mut w_roots_tracker = self.roots_tracker.write().unwrap();
-        w_roots_tracker.roots.insert(&slot);
+        w_roots_tracker.roots.insert(slot);
         // we delay cleaning until flushing!
         if !caching_enabled {
             w_roots_tracker.uncleaned_roots.insert(slot);
@@ -1365,8 +1364,9 @@ pub mod tests {
             if slot % dead == 0 {
                 continue;
             }
-            hash.insert(&slot);
-            bitfield.insert(&slot);
+            let s2 = slot.clone();
+            hash.insert(s2);
+            bitfield.insert(s2);
         }
 
         let max = slot + 1;
