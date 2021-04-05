@@ -1422,7 +1422,7 @@ pub mod tests {
         }
 
         let max = slot + 1;
-        let passes = 1000;
+        let passes = 100_000;
 
         let mut time = Measure::start("");
         let mut count = 0;
