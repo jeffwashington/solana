@@ -312,6 +312,9 @@ pub struct RootsTracker {
 
 impl Default for RootsTracker {
     fn default() -> Self {
+        // we expect to keep a rolling set of 400k slots around at a time
+        // 2M gives us plenty of extra room to handle a width 5x what we should need.
+        // cost is 2M bits of memory
         RootsTracker::new(2097152)
     }
 }
@@ -1394,6 +1397,61 @@ pub mod tests {
             time2.as_ms(),
             time.as_ms() / time2.as_ms()
         );
+    }
+
+    #[test]
+    fn test_bitfield_smaller() {
+        solana_logger::setup();
+
+        let mut bitfield = RollingBitField::new(2097152);
+        let mut hash = HashSet::new();
+
+        let min = 101_000;
+        let width = 33;
+        let dead = 19;
+
+        let mut slot = min;
+        while hash.len() < width {
+            slot += 1;
+            if slot % dead == 0 {
+                continue;
+            }
+            let s2 = slot.clone();
+            hash.insert(s2);
+            bitfield.insert(s2);
+        }
+
+        let max = slot + 1;
+        let passes = 1000;
+
+        let mut time = Measure::start("");
+        let mut count = 0;
+        for pass in 0..passes {
+            for slot in (min - 10)..max + 100 {
+                if hash.contains(&slot) {
+                    count += 1;
+                }
+            }
+        }
+        time.stop();
+
+        let mut time2 = Measure::start("");
+        let mut count2 = 0;
+        for pass in 0..passes {
+            for slot in (min - 10)..max + 100 {
+                if bitfield.contains(&slot) {
+                    count2 += 1;
+                }
+            }
+        }
+        time2.stop();
+        error!(
+            "{}, {}, {}",
+            time.as_ms(),
+            time2.as_ms(),
+            time.as_ms() / time2.as_ms()
+        );
+        assert_eq!(count, count2);
     }
 
     #[test]
