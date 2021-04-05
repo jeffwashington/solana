@@ -1407,21 +1407,24 @@ pub mod tests {
         solana_logger::setup();
 
         let mut bitfield = RollingBitField::new(4096);
-        let mut hash = HashSet::new();
+        let bitfield2 = RwLock::new(RollingBitField::new(2097152));
 
         let min = 101_000;
         let width = 0;
         let dead = 19;
 
         let mut slot = min;
-        while hash.len() < width {
+        {
+            let mut lock = bitfield2.write().unwrap();
+        while bitfield.len() < width {
             slot += 1;
             if slot % dead == 0 {
                 continue;
             }
-            hash.insert(slot);
+            lock.insert(slot);
             bitfield.insert(slot);
         }
+    }
 
         let max = slot + 1;
         let passes = 100_000;
@@ -1430,7 +1433,7 @@ pub mod tests {
         let mut count = 0;
         for _ in 0..passes {
             for slot in (min - 10)..max + 100 {
-                if hash.contains(&slot) {
+                if bitfield2.read().unwrap().contains(&slot) {
                     count += 1;
                 }
             }
