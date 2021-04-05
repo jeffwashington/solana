@@ -1351,7 +1351,7 @@ pub mod tests {
         solana_logger::setup();
 
         let mut bitfield = RollingBitField::new(2097152);
-        let bitfield2 = RwLock::new(RollingBitField::new(2097152));
+        let bitfield2 = RwLock::new(HashSet::new());
 
         let min = 101_000;
         let width = 400_000;
