@@ -1403,11 +1403,11 @@ pub mod tests {
     fn test_bitfield_smaller() {
         solana_logger::setup();
 
-        let mut bitfield = RollingBitField::new(2097152);
+        let mut bitfield = RollingBitField::new(4096);
         let mut hash = HashSet::new();
 
         let min = 101_000;
-        let width = 0;
+        let width = 33;
         let dead = 19;
 
         let mut slot = min;
