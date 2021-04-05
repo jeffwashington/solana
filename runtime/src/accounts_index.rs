@@ -1449,7 +1449,7 @@ pub mod tests {
             "{}, {}, {}",
             time.as_ms(),
             time2.as_ms(),
-            time.as_us() / time2.as_us()
+            time.as_ns() / time2.as_ns()
         );
         assert_eq!(count, count2);
     }
