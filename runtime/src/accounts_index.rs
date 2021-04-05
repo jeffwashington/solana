@@ -1393,7 +1393,7 @@ pub mod tests {
             }
         }
         time2.stop();
-        info!(
+        error!(
             "{}, {}, {}",
             time.as_ms(),
             time2.as_ms(),
@@ -1447,7 +1447,7 @@ pub mod tests {
             }
         }
         time2.stop();
-        info!(
+        error!(
             "{}, {}, {}",
             time.as_ms(),
             time2.as_ms(),
