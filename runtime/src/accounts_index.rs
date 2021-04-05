@@ -316,7 +316,7 @@ impl Default for RootsTracker {
 impl RootsTracker {
     pub fn new(max_width: u64) -> Self {
         Self {
-            roots: RollingBitField::new(max_width),
+            roots: RollingBitField::new(max_width as usize),
             max_root: 0,
             uncleaned_roots: HashSet::new(),
             previous_uncleaned_roots: HashSet::new(),
@@ -1359,7 +1359,7 @@ pub mod tests {
             }
             let s2 = slot.clone();
             hash.insert(s2);
-            bitfield.insert(s2);
+            bitfield.insert(&s2);
         }
 
         let max = slot + 1;
