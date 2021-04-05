@@ -4,13 +4,13 @@ use crate::{
     secondary_index::*,
 };
 use dashmap::DashSet;
+use log::*;
 use ouroboros::self_referencing;
 use solana_measure::measure::Measure;
 use solana_sdk::{
     clock::Slot,
     pubkey::{Pubkey, PUBKEY_BYTES},
 };
-use log::*;
 use std::{
     collections::{
         btree_map::{self, BTreeMap},
@@ -202,12 +202,12 @@ impl RollingBitField {
         }
     }
 
-    fn get_address(&self, key: u64) -> u64 {
-        Self::calc_address(self.max_width, key)
+    fn get_address(&self, key: &u64) -> u64 {
+        Self::calc_address(self.max_width, &key)
     }
 
     // find the array index
-    fn calc_address(max_width: u64, key: u64) -> u64 {
+    fn calc_address(max_width: u64, key: &u64) -> u64 {
         key % max_width
     }
 
@@ -224,26 +224,23 @@ impl RollingBitField {
                 key, self.max
             );
         }
-        let address = self.get_address(key);
+        let address = self.get_address(&key);
         let value = self.bits.get(address);
         if !value {
             self.bits.set(address, true);
             if self.count == 0 {
                 self.min = key;
                 self.max = key + 1;
-            }
-            else {
+            } else {
                 self.min = std::cmp::min(self.min, key);
                 self.max = std::cmp::max(self.max, key + 1);
-
             }
             self.count += 1;
         }
     }
 
     pub fn remove(&mut self, key: &u64) {
-        let key = *key;
-        if self.count > 0 && self.max.saturating_sub(key) > self.max_width as u64 {
+        if self.count > 0 && self.max.saturating_sub(*key) > self.max_width as u64 {
             panic!(
                 "acting on an item at key: {}, that is too far behind the recent max: {}",
                 key, self.max
@@ -258,8 +255,8 @@ impl RollingBitField {
         }
     }
 
-    fn purge(&mut self, key: u64) {
-        if key == self.min && self.count > 0 {
+    fn purge(&mut self, key: &u64) {
+        if key == &self.min && self.count > 0 {
             let start = self.min;
             for key in start..self.max {
                 if self.bits.get(key) {
@@ -271,10 +268,9 @@ impl RollingBitField {
     }
 
     pub fn contains(&self, key: &u64) -> bool {
-        let key = *key;
         let address = self.get_address(key);
         let result = self.bits.get(address);
-        if result && (self.count == 0 || key < self.min || key >= self.max) {
+        if result && (self.count == 0 || key < &self.min || key >= &self.max) {
             return false;
         }
         result
@@ -1392,7 +1388,12 @@ pub mod tests {
             }
         }
         time2.stop();
-        error!("{}, {}, {}", time.as_ms(), time2.as_ms(), time.as_ms() / time2.as_ms());
+        error!(
+            "{}, {}, {}",
+            time.as_ms(),
+            time2.as_ms(),
+            time.as_ms() / time2.as_ms()
+        );
     }
 
     #[test]
