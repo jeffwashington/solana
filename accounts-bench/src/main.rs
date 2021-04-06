@@ -83,7 +83,7 @@ fn main() {
         num_slots,
         create_time
     );
-    let mut ancestors: Ancestors = vec![(0, 0)].into_iter().collect();
+    let mut ancestors: Ancestors = Ancestors::from(vec![(0, 0)]);
     for i in 1..num_slots {
         ancestors.insert(i as u64, i - 1);
         accounts.add_root(i as u64);

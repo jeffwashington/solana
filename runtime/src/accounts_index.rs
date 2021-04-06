@@ -30,18 +30,67 @@ pub const ITER_BATCH_SIZE: usize = 1000;
 
 pub type SlotList<T> = Vec<(Slot, T)>;
 pub type SlotSlice<'s, T> = &'s [(Slot, T)];
+
+#[derive(Debug, Default, Clone, PartialEq,Serialize, Deserialize)]
 pub struct Ancestors {
     min: Slot,
     slots: Vec<usize>,
+    count: usize,
+    max: Slot,
 }
 
+impl From<Vec<(Slot, usize)>> for Ancestors {
+    fn from(mut source: Vec<(Slot, usize)>) -> Ancestors {
+        let mut result = Ancestors::default();
+
+        if !source.is_empty() {
+            source.sort();
+            result.min = source[0].0;
+            result.max = source.last().unwrap().0;
+            let range = result.range();
+        }
+
+        result
+    }
+}
+
+/*
+impl From<Iterator<Item=(u64,usize)>> for Ancestors {
+    fn from(source: Iterator<Item=(u64,usize)>) -> Ancestors {
+        Ancestors::default()
+    }
+}
+*/
+
 impl Ancestors {
-    pub fn keys(&self) -> impl Iterator<Item = &Slot> + '_ {
-        self.slots.iter()
+    pub fn new() -> Self {
+        Self::default()
+    }
+    fn range(&self) -> Slot {
+        self.max - self.min
+    }
+    pub fn keys(&self) -> Vec<Slot> {
+        vec![]
+    }
+
+    pub fn insert(&mut self, slot: Slot, size: usize) {
+        // todo
+    }
+
+    pub fn get(&self, slot: &Slot) -> Option<usize> {
+        None
+    }
+
+    pub fn remove(&mut self, slot: &Slot) {
+        // todo
     }
 
     pub fn contains_key(&self, slot: &Slot) -> bool {
         false
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.count == 0
     }
 }
 
@@ -509,7 +558,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
         // In both cases we can ignore the given ancestors and instead just rely on the roots
         // present as `max_root` indicates the roots present in the index are more up to date
         // than the ancestors given.
-        let empty = HashMap::new();
+        let empty = Ancestors::new();
         let ancestors = if ancestors.contains_key(&max_root) {
             ancestors
         } else {

@@ -1054,7 +1054,7 @@ impl Bank {
             parent_slot: parent.slot(),
             collector_id: *collector_id,
             collector_fees: AtomicU64::new(0),
-            ancestors: HashMap::new(),
+            ancestors: Ancestors::new(),
             hash: RwLock::new(Hash::default()),
             is_delta: AtomicBool::new(false),
             tick_height: AtomicU64::new(parent.tick_height.load(Relaxed)),
@@ -1129,7 +1129,7 @@ impl Bank {
     pub(crate) fn proper_ancestors(&self) -> impl Iterator<Item = Slot> + '_ {
         self.ancestors
             .keys()
-            .copied()
+            .into_iter()
             .filter(move |slot| *slot != self.slot)
     }
 
@@ -1343,8 +1343,8 @@ impl Bank {
         let mut roots = self.src.status_cache.read().unwrap().roots().clone();
         let min = roots.iter().min().cloned().unwrap_or(0);
         for ancestor in self.ancestors.keys() {
-            if *ancestor >= min {
-                roots.insert(*ancestor);
+            if ancestor >= min {
+                roots.insert(ancestor);
             }
         }
 
@@ -4092,7 +4092,7 @@ impl Bank {
         &self,
         pubkey: &Pubkey,
     ) -> Option<(AccountSharedData, Slot)> {
-        let just_self: Ancestors = vec![(self.slot(), 0)].into_iter().collect();
+        let just_self: Ancestors = Ancestors::from(vec![(self.slot(), 0)]);
         if let Some((account, slot)) = self.rc.accounts.load_slow(&just_self, pubkey) {
             if slot == self.slot() {
                 return Some((account, slot));
