@@ -30,7 +30,22 @@ pub const ITER_BATCH_SIZE: usize = 1000;
 
 pub type SlotList<T> = Vec<(Slot, T)>;
 pub type SlotSlice<'s, T> = &'s [(Slot, T)];
-pub type Ancestors = HashMap<Slot, usize>;
+pub struct Ancestors {
+    min: Slot,
+    slots: Vec<usize>,
+}
+
+impl Ancestors {
+    pub fn keys(&self) -> impl Iterator<Item = &Slot> + '_ {
+        self.slots.iter()
+    }
+
+    pub fn contains_key(&self, slot: &Slot) -> bool {
+        false
+    }
+}
+
+//} //= HashSet<Slot>;//HashMap<Slot, usize>;
 
 pub type RefCount = u64;
 pub type AccountMap<K, V> = BTreeMap<K, V>;
