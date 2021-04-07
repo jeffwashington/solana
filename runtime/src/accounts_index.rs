@@ -34,7 +34,7 @@ pub type SlotSlice<'s, T> = &'s [(Slot, T)];
 #[derive(Debug, Default, Clone, PartialEq,Serialize, Deserialize)]
 pub struct Ancestors {
     min: Slot,
-    slots: Vec<usize>,
+    slots: Vec<Option<usize>>,
     count: usize,
     max: Slot,
 }
@@ -43,11 +43,17 @@ impl From<Vec<(Slot, usize)>> for Ancestors {
     fn from(mut source: Vec<(Slot, usize)>) -> Ancestors {
         let mut result = Ancestors::default();
 
-        if !source.is_empty() {
+        result.count = source.len();
+        if result.count > 0 {
             source.sort();
             result.min = source[0].0;
-            result.max = source.last().unwrap().0;
+            result.max = source.last().unwrap().0 + 1;
             let range = result.range();
+            result.slots = vec![None; range as usize];
+            source.into_iter().for_each(|(mut slot, size)| {
+                slot -= result.min;
+                result.slots[slot as usize] = Some(size);
+            });
         }
 
         result
@@ -70,23 +76,42 @@ impl Ancestors {
         self.max - self.min
     }
     pub fn keys(&self) -> Vec<Slot> {
-        vec![]
+        self.slots.iter().enumerate().filter_map(|(size, i)| Some(size as u64 + self.min)).collect::<Vec<_>>()
     }
 
-    pub fn insert(&mut self, slot: Slot, size: usize) {
-        // todo
+    pub fn insert(&mut self, mut slot: Slot, size: usize) {
+        if slot < self.min || slot >= self.max {
+            panic!("too big");
+        }
+        slot -= self.min;
+        if self.slots[slot as usize].is_none() {
+            self.count += 1;
+        }
+        self.slots[slot as usize] = Some(size);
     }
 
     pub fn get(&self, slot: &Slot) -> Option<usize> {
-        None
+        if slot < &self.min || slot >= &self.max {
+            panic!("too big");
+        }
+        let slot = slot - self.min;
+        self.slots[slot as usize]
     }
 
     pub fn remove(&mut self, slot: &Slot) {
-        // todo
+        if slot < &self.min || slot >= &self.max {
+            panic!("too big");
+        }
+        let slot = slot - self.min;
+        self.count -= 1;
+        self.slots[slot as usize] = None;
     }
 
     pub fn contains_key(&self, slot: &Slot) -> bool {
-        false
+        if slot < &self.min || slot >= &self.max {
+            return false;
+        }
+        self.slots[(slot - self.min) as usize].is_some()
     }
 
     pub fn is_empty(&self) -> bool {
