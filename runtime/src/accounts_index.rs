@@ -68,6 +68,20 @@ impl From<Iterator<Item=(u64,usize)>> for Ancestors {
 }
 */
 
+impl std::iter::FromIterator<(Slot, usize)> for Ancestors {
+    fn from_iter<I>(iter: I) -> Self
+    where
+        I: IntoIterator<Item = (Slot, usize)>,
+    {
+        let mut data = Vec::new();
+        for i in iter {
+data.push(i);            
+        }
+        Ancestors::from(data)
+    }
+}
+
+
 impl Ancestors {
     pub fn new() -> Self {
         Self::default()
@@ -1733,7 +1747,7 @@ pub mod tests {
     fn test_get_empty() {
         let key = Keypair::new();
         let index = AccountsIndex::<bool>::default();
-        let ancestors = HashMap::new();
+        let ancestors = Ancestors::new();
         assert!(index.get(&key.pubkey(), Some(&ancestors), None).is_none());
         assert!(index.get(&key.pubkey(), None, None).is_none());
 
@@ -1758,7 +1772,7 @@ pub mod tests {
         );
         assert!(gc.is_empty());
 
-        let ancestors = HashMap::new();
+        let ancestors = Ancestors::new();
         assert!(index.get(&key.pubkey(), Some(&ancestors), None).is_none());
         assert!(index.get(&key.pubkey(), None, None).is_none());
 
@@ -1882,7 +1896,7 @@ pub mod tests {
         };
         let pubkey_range = (pubkey_start, pubkey_end);
 
-        let ancestors: Ancestors = HashMap::new();
+        let ancestors = Ancestors::new();
         let mut scanned_keys = HashSet::new();
         index.range_scan_accounts("", &ancestors, pubkey_range, |pubkey, _index| {
             scanned_keys.insert(*pubkey);
@@ -1952,7 +1966,7 @@ pub mod tests {
 
     fn run_test_scan_accounts(num_pubkeys: usize) {
         let (index, _) = setup_accounts_index_keys(num_pubkeys);
-        let ancestors: Ancestors = HashMap::new();
+        let ancestors = Ancestors::new();
 
         let mut scanned_keys = HashSet::new();
         index.unchecked_scan_accounts("", &ancestors, |pubkey, _index| {
@@ -2315,7 +2329,7 @@ pub mod tests {
 
         // Given a max_root, should filter out roots < max_root, but specified
         // ancestors should not be affected
-        let ancestors: HashMap<Slot, usize> = vec![(3, 1), (7, 1)].into_iter().collect();
+        let ancestors = vec![(3, 1), (7, 1)].into_iter().collect();
         assert_eq!(
             index
                 .latest_slot(Some(&ancestors), &slot_slice, Some(4))

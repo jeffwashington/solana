@@ -2158,7 +2158,7 @@ pub mod test {
             .map(|(pubkey, _)| (*pubkey, (MAX_LOCKOUT_HISTORY - 1) as Slot))
             .collect();
         let mut tower = Tower::new_for_tests(0, 0.67);
-        let mut ancestors = HashMap::new();
+        let mut ancestors = Ancestors::new();
         for i in 0..(MAX_LOCKOUT_HISTORY + 1) {
             tower.record_vote(i as u64, Hash::default());
             ancestors.insert(i as u64, (0..i as u64).collect());
