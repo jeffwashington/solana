@@ -95,7 +95,20 @@ impl Ancestors {
 
     pub fn insert(&mut self, mut slot: Slot, size: usize) {
         if slot < self.min || slot >= self.max {
-            panic!("too big");
+            let new_min = std::cmp::min(self.min, slot);
+            let new_max = std::cmp::max(self.max, slot);
+            let new_range = new_max - new_min;
+            if new_min == self.min {
+                self.max = slot + 1;
+                self.slots.resize(new_range as usize, None);
+            }
+            else {
+                // min changed
+                let mut new_slots = vec![None; new_range as usize];
+                self.slots.iter().enumerate().for_each(|(i, size)| new_slots[i as usize + self.min as usize - slot as usize] = *size);
+                self.min = slot;
+                // fall through and set this value in
+            }
         }
         slot -= self.min;
         if self.slots[slot as usize].is_none() {
@@ -121,6 +134,9 @@ impl Ancestors {
         self.slots[slot as usize] = None;
     }
 
+    pub fn contains(&self, slot: &Slot) -> bool {
+        self.contains_key(slot)
+    }
     pub fn contains_key(&self, slot: &Slot) -> bool {
         if slot < &self.min || slot >= &self.max {
             return false;
@@ -1734,6 +1750,63 @@ pub mod tests {
             }
             time2.stop();
             info!(
+                "{}, {}, {}",
+                time.as_ms(),
+                time2.as_ms(),
+                time.as_ns() / time2.as_ns()
+            );
+            assert_eq!(count, count2);
+        }
+    }
+
+    #[test]
+    fn test_ancetors_smaller() {
+        // smaller bitfield, fewer entries, including 0
+        solana_logger::setup();
+
+        for width in 0..34 {
+            let mut hash = HashSet::new();
+
+            let min = 1_010_000;
+            let dead = 19;
+
+            let mut slot = min;
+            let mut slots = Vec::new();
+            while hash.len() < width {
+                slot += 1;
+                if slot % dead == 0 {
+                    continue;
+                }
+                hash.insert(slot);
+                //bitfield.insert(slot);
+                slots.push((slot, 0));
+            }
+            let mut bitfield = Ancestors::from(slots);
+
+            let max = slot + 1;
+let passes = 100_000;
+            let mut time = Measure::start("");
+            let mut count = 0;
+            for pass in 0..passes {
+                for slot in (min - 10)..max + 100 {
+                if hash.contains(&slot) {
+                    count += 1;
+                }
+            }
+        }
+            time.stop();
+
+            let mut time2 = Measure::start("");
+            let mut count2 = 0;
+            for pass in 0..passes {
+                for slot in (min - 10)..max + 100 {
+                    if bitfield.contains(&slot) {
+                        count2 += 1;
+                    }
+                }
+            }
+            time2.stop();
+            error!(
                 "{}, {}, {}",
                 time.as_ms(),
                 time2.as_ms(),

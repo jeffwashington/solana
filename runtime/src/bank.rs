@@ -943,7 +943,7 @@ impl Bank {
         accounts_db_caching_enabled: bool,
     ) -> Self {
         let mut bank = Self::default();
-        bank.ancestors.insert(bank.slot(), 0);
+        bank.ancestors = Ancestors::from(vec![(bank.slot(), 0)]);
         bank.transaction_debug_keys = debug_keys;
         bank.cluster_type = Some(genesis_config.cluster_type);
 
@@ -1093,10 +1093,12 @@ impl Bank {
             ("block_height", new.block_height, i64)
         );
 
-        new.ancestors.insert(new.slot(), 0);
+        let mut ancestors = Vec::with_capacity(1 + new.parents().len());
+        ancestors.push((new.slot(), 0));
         new.parents().iter().enumerate().for_each(|(i, p)| {
-            new.ancestors.insert(p.slot(), i + 1);
+            ancestors.push((p.slot(), i+1));
         });
+        new.ancestors = Ancestors::from(ancestors);
 
         // Following code may touch AccountsDb, requiring proper ancestors
         let parent_epoch = parent.epoch();
