@@ -13,7 +13,7 @@ use solana_sdk::{
 use std::{
     collections::{
         btree_map::{self, BTreeMap},
-        HashMap, HashSet,
+        HashSet,
     },
     ops::{
         Bound,
@@ -31,7 +31,7 @@ pub const ITER_BATCH_SIZE: usize = 1000;
 pub type SlotList<T> = Vec<(Slot, T)>;
 pub type SlotSlice<'s, T> = &'s [(Slot, T)];
 
-#[derive(Debug, Default, Clone, PartialEq,Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Ancestors {
     min: Slot,
     slots: Vec<Option<usize>>,
@@ -75,51 +75,27 @@ impl std::iter::FromIterator<(Slot, usize)> for Ancestors {
     {
         let mut data = Vec::new();
         for i in iter {
-data.push(i);            
+            data.push(i);
         }
         Ancestors::from(data)
     }
 }
 
-
 impl Ancestors {
-    pub fn new() -> Self {
-        Self::default()
-    }
     fn range(&self) -> Slot {
         self.max - self.min
     }
     pub fn keys(&self) -> Vec<Slot> {
-        self.slots.iter().enumerate().filter_map(|(size, i)| Some(size as u64 + self.min)).collect::<Vec<_>>()
-    }
-
-    pub fn insert(&mut self, mut slot: Slot, size: usize) {
-        if slot < self.min || slot >= self.max {
-            let new_min = std::cmp::min(self.min, slot);
-            let new_max = std::cmp::max(self.max, slot);
-            let new_range = new_max - new_min;
-            if new_min == self.min {
-                self.max = slot + 1;
-                self.slots.resize(new_range as usize, None);
-            }
-            else {
-                // min changed
-                let mut new_slots = vec![None; new_range as usize];
-                self.slots.iter().enumerate().for_each(|(i, size)| new_slots[i as usize + self.min as usize - slot as usize] = *size);
-                self.min = slot;
-                // fall through and set this value in
-            }
-        }
-        slot -= self.min;
-        if self.slots[slot as usize].is_none() {
-            self.count += 1;
-        }
-        self.slots[slot as usize] = Some(size);
+        self.slots
+            .iter()
+            .enumerate()
+            .filter_map(|(size, _i)| Some(size as u64 + self.min))
+            .collect::<Vec<_>>()
     }
 
     pub fn get(&self, slot: &Slot) -> Option<usize> {
         if slot < &self.min || slot >= &self.max {
-            panic!("too big");
+            return None;
         }
         let slot = slot - self.min;
         self.slots[slot as usize]
@@ -127,7 +103,7 @@ impl Ancestors {
 
     pub fn remove(&mut self, slot: &Slot) {
         if slot < &self.min || slot >= &self.max {
-            panic!("too big");
+            return;
         }
         let slot = slot - self.min;
         self.count -= 1;
@@ -613,7 +589,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
         // In both cases we can ignore the given ancestors and instead just rely on the roots
         // present as `max_root` indicates the roots present in the index are more up to date
         // than the ancestors given.
-        let empty = Ancestors::new();
+        let empty = Ancestors::default();
         let ancestors = if ancestors.contains_key(&max_root) {
             ancestors
         } else {
@@ -1459,6 +1435,33 @@ pub mod tests {
         )
     }
 
+    impl Ancestors {
+        pub fn insert(&mut self, mut slot: Slot, size: usize) {
+            if slot < self.min || slot >= self.max {
+                let new_min = std::cmp::min(self.min, slot);
+                let new_max = std::cmp::max(self.max, slot);
+                let new_range = new_max - new_min;
+                if new_min == self.min {
+                    self.max = slot + 1;
+                    self.slots.resize(new_range as usize, None);
+                } else {
+                    // min changed
+                    let mut new_slots = vec![None; new_range as usize];
+                    self.slots.iter().enumerate().for_each(|(i, size)| {
+                        new_slots[i as usize + self.min as usize - slot as usize] = *size
+                    });
+                    self.min = slot;
+                    // fall through and set this value in
+                }
+            }
+            slot -= self.min;
+            if self.slots[slot as usize].is_none() {
+                self.count += 1;
+            }
+            self.slots[slot as usize] = Some(size);
+        }
+    }
+
     #[test]
     fn test_bitfield_permutations() {
         solana_logger::setup();
@@ -1781,24 +1784,24 @@ pub mod tests {
                 //bitfield.insert(slot);
                 slots.push((slot, 0));
             }
-            let mut bitfield = Ancestors::from(slots);
+            let bitfield = Ancestors::from(slots);
 
             let max = slot + 1;
-let passes = 100_000;
+            let passes = 100_000;
             let mut time = Measure::start("");
             let mut count = 0;
-            for pass in 0..passes {
+            for _pass in 0..passes {
                 for slot in (min - 10)..max + 100 {
-                if hash.contains(&slot) {
-                    count += 1;
+                    if hash.contains(&slot) {
+                        count += 1;
+                    }
                 }
             }
-        }
             time.stop();
 
             let mut time2 = Measure::start("");
             let mut count2 = 0;
-            for pass in 0..passes {
+            for _pass in 0..passes {
                 for slot in (min - 10)..max + 100 {
                     if bitfield.contains(&slot) {
                         count2 += 1;
@@ -1820,7 +1823,7 @@ let passes = 100_000;
     fn test_get_empty() {
         let key = Keypair::new();
         let index = AccountsIndex::<bool>::default();
-        let ancestors = Ancestors::new();
+        let ancestors = Ancestors::default();
         assert!(index.get(&key.pubkey(), Some(&ancestors), None).is_none());
         assert!(index.get(&key.pubkey(), None, None).is_none());
 
@@ -1845,7 +1848,7 @@ let passes = 100_000;
         );
         assert!(gc.is_empty());
 
-        let ancestors = Ancestors::new();
+        let ancestors = Ancestors::default();
         assert!(index.get(&key.pubkey(), Some(&ancestors), None).is_none());
         assert!(index.get(&key.pubkey(), None, None).is_none());
 
@@ -1969,7 +1972,7 @@ let passes = 100_000;
         };
         let pubkey_range = (pubkey_start, pubkey_end);
 
-        let ancestors = Ancestors::new();
+        let ancestors = Ancestors::default();
         let mut scanned_keys = HashSet::new();
         index.range_scan_accounts("", &ancestors, pubkey_range, |pubkey, _index| {
             scanned_keys.insert(*pubkey);
@@ -2039,7 +2042,7 @@ let passes = 100_000;
 
     fn run_test_scan_accounts(num_pubkeys: usize) {
         let (index, _) = setup_accounts_index_keys(num_pubkeys);
-        let ancestors = Ancestors::new();
+        let ancestors = Ancestors::default();
 
         let mut scanned_keys = HashSet::new();
         index.unchecked_scan_accounts("", &ancestors, |pubkey, _index| {
@@ -2328,7 +2331,7 @@ let passes = 100_000;
 
         let mut num = 0;
         let mut found_key = false;
-        index.unchecked_scan_accounts("", &Ancestors::new(), |pubkey, _index| {
+        index.unchecked_scan_accounts("", &Ancestors::default(), |pubkey, _index| {
             if pubkey == &key.pubkey() {
                 found_key = true;
                 assert_eq!(_index, (&true, 3));

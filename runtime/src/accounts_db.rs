@@ -6414,7 +6414,7 @@ pub mod tests {
         // Secondary index should still find both pubkeys
         let mut found_accounts = HashSet::new();
         accounts.accounts_index.index_scan_accounts(
-            &Ancestors::new(),
+            &Ancestors::default(),
             IndexKey::SplTokenMint(mint_key),
             |key, _| {
                 found_accounts.insert(*key);
@@ -6441,7 +6441,7 @@ pub mod tests {
         // Secondary index should have purged `pubkey1` as well
         let mut found_accounts = vec![];
         accounts.accounts_index.index_scan_accounts(
-            &Ancestors::new(),
+            &Ancestors::default(),
             IndexKey::SplTokenMint(mint_key),
             |key, _| found_accounts.push(*key),
         );
@@ -6897,7 +6897,7 @@ pub mod tests {
         accounts.add_root(current_slot);
 
         accounts.print_accounts_stats("pre_f");
-        accounts.update_accounts_hash(4, &Ancestors::new());
+        accounts.update_accounts_hash(4, &Ancestors::default());
 
         let accounts = f(accounts, current_slot);
 
@@ -6959,8 +6959,9 @@ pub mod tests {
                             account.lamports = account_bal;
                             db.store_uncached(slot, &[(&pubkey, &account)]);
 
-                            let (account, slot) =
-                                db.load_slow(&Ancestors::new(), &pubkey).unwrap_or_else(|| {
+                            let (account, slot) = db
+                                .load_slow(&Ancestors::default(), &pubkey)
+                                .unwrap_or_else(|| {
                                     panic!("Could not fetch stored account {}, iter {}", pubkey, i)
                                 });
                             assert_eq!(slot, slot);
@@ -8318,7 +8319,7 @@ pub mod tests {
 
         accounts.print_accounts_stats("post-store");
 
-        let mut ancestors = Ancestors::new();
+        let mut ancestors = Ancestors::default();
         ancestors.insert(1, 0);
         ancestors.insert(2, 1);
         for (key, account_ref) in keys[..num_to_store].iter().zip(account_refs) {
@@ -8346,7 +8347,7 @@ pub mod tests {
 
         // Should still be able to find zero lamport account in slot 1
         assert_eq!(
-            db.load_slow(&Ancestors::new(), &account_key),
+            db.load_slow(&Ancestors::default(), &account_key),
             Some((zero_lamport_account, 1))
         );
     }
@@ -8361,7 +8362,7 @@ pub mod tests {
         db.store_cached(slot, &[(&key, &account0)]);
 
         // Load with no ancestors and no root will return nothing
-        assert!(db.load_slow(&Ancestors::new(), &key).is_none());
+        assert!(db.load_slow(&Ancestors::default(), &key).is_none());
 
         // Load with ancestors not equal to `slot` will return nothing
         let ancestors = vec![(slot + 1, 1)].into_iter().collect();
@@ -8376,7 +8377,10 @@ pub mod tests {
 
         // Adding root will return the account even without ancestors
         db.add_root(slot);
-        assert_eq!(db.load_slow(&Ancestors::new(), &key), Some((account0, slot)));
+        assert_eq!(
+            db.load_slow(&Ancestors::default(), &key),
+            Some((account0, slot))
+        );
     }
 
     #[test]
@@ -8401,7 +8405,10 @@ pub mod tests {
         // Add root then flush
         db.add_root(slot);
         db.flush_accounts_cache(true, None);
-        assert_eq!(db.load_slow(&Ancestors::new(), &key), Some((account0, slot)));
+        assert_eq!(
+            db.load_slow(&Ancestors::default(), &key),
+            Some((account0, slot))
+        );
     }
 
     #[test]
@@ -8442,11 +8449,11 @@ pub mod tests {
         assert_eq!(db.accounts_cache.num_slots(), 1);
         assert!(db.accounts_cache.slot_cache(unrooted_slot).is_some());
         assert_eq!(
-            db.load_slow(&Ancestors::new(), &key5),
+            db.load_slow(&Ancestors::default(), &key5),
             Some((account0.clone(), root5))
         );
         assert_eq!(
-            db.load_slow(&Ancestors::new(), &key6),
+            db.load_slow(&Ancestors::default(), &key6),
             Some((account0, root6))
         );
     }
@@ -8503,7 +8510,7 @@ pub mod tests {
         // Should still be able to fetch all the accounts after flush
         for (slot, key) in (0..num_slots as Slot).zip(keys) {
             let ancestors = if slot < num_roots as Slot {
-                Ancestors::new()
+                Ancestors::default()
             } else {
                 vec![(slot, 1)].into_iter().collect()
             };

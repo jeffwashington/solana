@@ -1054,7 +1054,7 @@ impl Bank {
             parent_slot: parent.slot(),
             collector_id: *collector_id,
             collector_fees: AtomicU64::new(0),
-            ancestors: Ancestors::new(),
+            ancestors: Ancestors::default(),
             hash: RwLock::new(Hash::default()),
             is_delta: AtomicBool::new(false),
             tick_height: AtomicU64::new(parent.tick_height.load(Relaxed)),
@@ -1096,7 +1096,7 @@ impl Bank {
         let mut ancestors = Vec::with_capacity(1 + new.parents().len());
         ancestors.push((new.slot(), 0));
         new.parents().iter().enumerate().for_each(|(i, p)| {
-            ancestors.push((p.slot(), i+1));
+            ancestors.push((p.slot(), i + 1));
         });
         new.ancestors = Ancestors::from(ancestors);
 
