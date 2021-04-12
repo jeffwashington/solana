@@ -60,14 +60,6 @@ impl From<Vec<(Slot, usize)>> for Ancestors {
     }
 }
 
-/*
-impl From<Iterator<Item=(u64,usize)>> for Ancestors {
-    fn from(source: Iterator<Item=(u64,usize)>) -> Ancestors {
-        Ancestors::default()
-    }
-}
-*/
-
 impl std::iter::FromIterator<(Slot, usize)> for Ancestors {
     fn from_iter<I>(iter: I) -> Self
     where
@@ -82,14 +74,11 @@ impl std::iter::FromIterator<(Slot, usize)> for Ancestors {
 }
 
 impl Ancestors {
-    fn range(&self) -> Slot {
-        self.max - self.min
-    }
     pub fn keys(&self) -> Vec<Slot> {
         self.slots
             .iter()
             .enumerate()
-            .filter_map(|(size, _i)| Some(size as u64 + self.min))
+            .filter_map(|(size, i)| i.map(|_| size as u64 + self.min))
             .collect::<Vec<_>>()
     }
 
@@ -97,35 +86,41 @@ impl Ancestors {
         if slot < &self.min || slot >= &self.max {
             return None;
         }
-        let slot = slot - self.min;
-        self.slots[slot as usize]
+        let slot = self.slot_index(slot);
+        self.slots[slot]
     }
 
     pub fn remove(&mut self, slot: &Slot) {
         if slot < &self.min || slot >= &self.max {
             return;
         }
-        let slot = slot - self.min;
-        self.count -= 1;
-        self.slots[slot as usize] = None;
+        let slot = self.slot_index(slot);
+        if self.slots[slot].is_some() {
+            self.count -= 1;
+            self.slots[slot] = None;
+        }
     }
 
-    pub fn contains(&self, slot: &Slot) -> bool {
-        self.contains_key(slot)
-    }
     pub fn contains_key(&self, slot: &Slot) -> bool {
         if slot < &self.min || slot >= &self.max {
             return false;
         }
-        self.slots[(slot - self.min) as usize].is_some()
+        let slot = self.slot_index(slot);
+        self.slots[slot].is_some()
     }
 
     pub fn is_empty(&self) -> bool {
         self.count == 0
     }
-}
 
-//} //= HashSet<Slot>;//HashMap<Slot, usize>;
+    fn slot_index(&self, slot: &Slot) -> usize {
+        (slot - self.min) as usize
+    }
+
+    fn range(&self) -> Slot {
+        self.max - self.min
+    }
+}
 
 pub type RefCount = u64;
 pub type AccountMap<K, V> = BTreeMap<K, V>;
@@ -1393,6 +1388,7 @@ pub mod tests {
     use super::*;
     use log::*;
     use solana_sdk::signature::{Keypair, Signer};
+    use std::collections::HashMap;
 
     pub enum SecondaryIndexTypes<'a> {
         RwLock(&'a SecondaryIndex<RwLockSecondaryIndexEntry>),
@@ -1436,10 +1432,14 @@ pub mod tests {
     }
 
     impl Ancestors {
+        pub fn len(&self) -> usize {
+            self.keys().len()
+        }
+
         pub fn insert(&mut self, mut slot: Slot, size: usize) {
             if slot < self.min || slot >= self.max {
                 let new_min = std::cmp::min(self.min, slot);
-                let new_max = std::cmp::max(self.max, slot);
+                let new_max = std::cmp::max(self.max, slot + 1);
                 let new_range = new_max - new_min;
                 if new_min == self.min {
                     self.max = slot + 1;
@@ -1498,6 +1498,55 @@ pub mod tests {
         let mut count2 = 0;
         for slot in (min - 10)..max + 100 {
             if bitfield.contains(&slot) {
+                count2 += 1;
+            }
+        }
+        time2.stop();
+        info!(
+            "{}ms, {}ms, {} ratio",
+            time.as_ms(),
+            time2.as_ms(),
+            time.as_ns() / time2.as_ns()
+        );
+        assert_eq!(count, count2);
+    }
+
+    #[test]
+    fn test_ancestors_permutations() {
+        solana_logger::setup();
+        let mut ancestors = Ancestors::default();
+        let mut hash = HashMap::new();
+
+        let min = 101_000;
+        let width = 400_000;
+        let dead = 19;
+
+        let mut slot = min;
+        while hash.len() < width {
+            slot += 1;
+            if slot % dead == 0 {
+                continue;
+            }
+            hash.insert(slot, 0);
+            ancestors.insert(slot, 0);
+        }
+        compare_ancestors(&hash, &ancestors);
+
+        let max = slot + 1;
+
+        let mut time = Measure::start("");
+        let mut count = 0;
+        for slot in (min - 10)..max + 100 {
+            if hash.contains(&slot) {
+                count += 1;
+            }
+        }
+        time.stop();
+
+        let mut time2 = Measure::start("");
+        let mut count2 = 0;
+        for slot in (min - 10)..max + 100 {
+            if ancestors.contains_key(&slot) {
                 count2 += 1;
             }
         }
@@ -1638,6 +1687,22 @@ pub mod tests {
         }
     }
 
+    fn compare_ancestors(hashset: &HashMap<u64, usize>, ancestors: &Ancestors) {
+        assert_eq!(hashset.len(), ancestors.len());
+        assert_eq!(hashset.is_empty(), ancestors.is_empty());
+        let mut min = u64::MAX;
+        let mut max = 0;
+        for item in hashset.iter() {
+            let key = item.0;
+            min = std::cmp::min(min, *key);
+            max = std::cmp::max(max, *key);
+            assert_eq!(ancestors.get(&key).unwrap(), *item.1);
+        }
+        for slot in min - 1..max + 2 {
+            assert_eq!(ancestors.get(&slot).as_ref(), hashset.get(&slot));
+        }
+    }
+
     #[test]
     fn test_bitfield_functionality() {
         solana_logger::setup();
@@ -1763,8 +1828,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_ancetors_smaller() {
-        // smaller bitfield, fewer entries, including 0
+    fn test_ancestors_smaller() {
         solana_logger::setup();
 
         for width in 0..34 {
@@ -1781,13 +1845,12 @@ pub mod tests {
                     continue;
                 }
                 hash.insert(slot);
-                //bitfield.insert(slot);
                 slots.push((slot, 0));
             }
-            let bitfield = Ancestors::from(slots);
+            let ancestors = Ancestors::from(slots);
 
             let max = slot + 1;
-            let passes = 100_000;
+            let passes = 1;
             let mut time = Measure::start("");
             let mut count = 0;
             for _pass in 0..passes {
@@ -1803,13 +1866,13 @@ pub mod tests {
             let mut count2 = 0;
             for _pass in 0..passes {
                 for slot in (min - 10)..max + 100 {
-                    if bitfield.contains(&slot) {
+                    if ancestors.contains_key(&slot) {
                         count2 += 1;
                     }
                 }
             }
             time2.stop();
-            error!(
+            info!(
                 "{}, {}, {}",
                 time.as_ms(),
                 time2.as_ms(),
