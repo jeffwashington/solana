@@ -4521,6 +4521,12 @@ impl AccountsDb {
             is_cached_store,
         );
         store_accounts_time.stop();
+
+        for acct in accounts.iter() {
+            // put accounts we just stored in read only cache - as an experiment
+            self.read_only_accounts_cache.store(acct.0, slot, acct.1);
+        }
+
         self.stats
             .store_accounts
             .fetch_add(store_accounts_time.as_us(), Ordering::Relaxed);
