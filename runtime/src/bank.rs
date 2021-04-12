@@ -2855,7 +2855,7 @@ impl Bank {
         debug!("processing transactions: {}", txs.len());
         inc_new_counter_info!("bank-process_transactions", txs.len());
         let mut error_counters = ErrorCounters::default();
-        let mut load_time = Measure::start("accounts_load");
+        let mut load_time2 = Measure::start("accounts_load");
 
         let retryable_txs: Vec<_> = batch
             .lock_results()
@@ -2873,6 +2873,8 @@ impl Bank {
 
         let sig_results =
             self.check_transactions(txs, batch.lock_results(), max_age, &mut error_counters);
+        load_time2.stop();
+        let mut load_time = Measure::start("accounts_load");
         let mut loaded_accounts = self.rc.accounts.load_accounts(
             &self.ancestors,
             txs,
@@ -2989,6 +2991,7 @@ impl Bank {
         );
         timings.load_us += load_time.as_us();
         timings.execute_us += execution_time.as_us();
+        timings.details.other_load_us += load_time2.as_us();
 
         let mut tx_count: u64 = 0;
         let err_count = &mut error_counters.total;
