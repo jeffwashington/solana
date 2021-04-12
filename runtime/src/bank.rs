@@ -947,7 +947,7 @@ impl Bank {
         accounts_db_caching_enabled: bool,
     ) -> Self {
         let mut bank = Self::default();
-        bank.ancestors.insert(bank.slot(), 0);
+        bank.ancestors = Ancestors::from(vec![(bank.slot(), 0)]);
         bank.transaction_debug_keys = debug_keys;
         bank.cluster_type = Some(genesis_config.cluster_type);
 
@@ -1097,10 +1097,12 @@ impl Bank {
             ("block_height", new.block_height, i64)
         );
 
-        new.ancestors.insert(new.slot(), 0);
+        let mut ancestors = Vec::with_capacity(1 + new.parents().len());
+        ancestors.push((new.slot(), 0));
         new.parents().iter().enumerate().for_each(|(i, p)| {
-            new.ancestors.insert(p.slot(), i + 1);
+            ancestors.push((p.slot(), i + 1));
         });
+        new.ancestors = Ancestors::from(ancestors);
 
         // Following code may touch AccountsDb, requiring proper ancestors
         let parent_epoch = parent.epoch();
@@ -1133,7 +1135,7 @@ impl Bank {
     pub(crate) fn proper_ancestors(&self) -> impl Iterator<Item = Slot> + '_ {
         self.ancestors
             .keys()
-            .copied()
+            .into_iter()
             .filter(move |slot| *slot != self.slot)
     }
 
@@ -1347,8 +1349,8 @@ impl Bank {
         let mut roots = self.src.status_cache.read().unwrap().roots().clone();
         let min = roots.iter().min().cloned().unwrap_or(0);
         for ancestor in self.ancestors.keys() {
-            if *ancestor >= min {
-                roots.insert(*ancestor);
+            if ancestor >= min {
+                roots.insert(ancestor);
             }
         }
 
@@ -4174,7 +4176,7 @@ impl Bank {
         &self,
         pubkey: &Pubkey,
     ) -> Option<(AccountSharedData, Slot)> {
-        let just_self: Ancestors = vec![(self.slot(), 0)].into_iter().collect();
+        let just_self: Ancestors = Ancestors::from(vec![(self.slot(), 0)]);
         if let Some((account, slot)) = self.rc.accounts.load_slow(&just_self, pubkey) {
             if slot == self.slot() {
                 return Some((account, slot));
@@ -10474,6 +10476,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_upgrade_epoch() {
+        solana_logger::setup();
         let GenesisConfigInfo {
             mut genesis_config,
             mint_keypair,
@@ -10481,7 +10484,6 @@ pub(crate) mod tests {
         } = create_genesis_config_with_leader(500, &solana_sdk::pubkey::new_rand(), 0);
         genesis_config.fee_rate_governor = FeeRateGovernor::new(1, 0);
         let bank = Arc::new(Bank::new(&genesis_config));
-
         // Jump to the test-only upgrade epoch -- see `Bank::upgrade_epoch()`
         let bank = Bank::new_from_parent(
             &bank,
