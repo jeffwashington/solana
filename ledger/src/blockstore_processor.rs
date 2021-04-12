@@ -262,10 +262,12 @@ fn process_entries_with_callback(
             .unwrap();
     }
     else {
+        error!("loading accounts: {}", pubkeys.len());
         for key in pubkeys {
             bank.load_accounts_into_read_only_cache(&key);
         }
     }
+    error!("done loading accounts");
     for entry in entries {
         if entry.is_tick() {
             // If it's a tick, save it for later
