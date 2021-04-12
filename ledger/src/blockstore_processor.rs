@@ -250,15 +250,22 @@ fn process_entries_with_callback(
             }
         }
     }
-    let bank_ = bank.clone();
-    std::thread::Builder::new()
-        .name("solana-accounts-transaction-account-loader".to_string())
-        .spawn(move || {
-            for key in pubkeys {
-                bank_.load_accounts_into_read_only_cache(&key);
-            }
-        })
-        .unwrap();
+    if false {
+        let bank_ = bank.clone();
+        std::thread::Builder::new()
+            .name("solana-accounts-transaction-account-loader".to_string())
+            .spawn(move || {
+                for key in pubkeys {
+                    bank_.load_accounts_into_read_only_cache(&key);
+                }
+            })
+            .unwrap();
+    }
+    else {
+        for key in pubkeys {
+            bank.load_accounts_into_read_only_cache(&key);
+        }
+    }
     for entry in entries {
         if entry.is_tick() {
             // If it's a tick, save it for later
