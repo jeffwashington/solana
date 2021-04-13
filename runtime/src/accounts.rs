@@ -273,6 +273,7 @@ impl Accounts {
                 if acct.lamports == 0 && acct.owner == Pubkey::default() {
                     details.not_found += 1;
                 }
+                details.read_only_cache_lookup += acct.readonly_cache_lookup;
             });
 
 
