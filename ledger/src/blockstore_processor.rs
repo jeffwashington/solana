@@ -346,6 +346,8 @@ fn process_entries_with_callback(
     for hash in tick_hashes {
         bank.register_tick(&hash);
     }
+    info!("ExecuteTimings: {:?}", timings);
+    timings = ExecuteTimings::default();
     Ok(())
 }
 
