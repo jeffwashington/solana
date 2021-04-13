@@ -275,14 +275,16 @@ impl Accounts {
             details.non_loader = details.non_loader / 1000;
             debug_assert_eq!(accounts.len(), message.account_keys.len());
             accounts.iter().for_each(|acct| {
+                details.count += 1;
+                /*
                 if acct.read_only_cache {
                 details.read_only_hits += 1;
                 }
                 details.lookup_time += acct.index_time;
                 if acct.stored_in_readonly {
                 details.stored += 1;  
-                }
-                details.count += 1;
+                }*/
+                /*
                 details.readonly_cache_store += acct.readonly_cache_store;
                 details.write_cache += acct.write_cache;
                 if acct.lamports == 0 && acct.owner == Pubkey::default() {
@@ -290,8 +292,11 @@ impl Accounts {
                 }
                 details.read_only_cache_lookup += acct.readonly_cache_lookup;
                 details.get_account_accessor += acct.get_account_accessor;
+                */
             });
             account_deps.iter().for_each(|(add, acct)| {
+                details.count += 1;
+                /*
                 if acct.read_only_cache {
                 details.read_only_hits += 1;
                 }
@@ -299,7 +304,6 @@ impl Accounts {
                 if acct.stored_in_readonly {
                 details.stored += 1;  
                 }
-                details.count += 1;
                 details.readonly_cache_store += acct.readonly_cache_store;
                 details.write_cache += acct.write_cache;
                 if acct.lamports == 0 && acct.owner == Pubkey::default() {
@@ -307,6 +311,7 @@ impl Accounts {
                 }
                 details.read_only_cache_lookup += acct.readonly_cache_lookup;
                 details.get_account_accessor += acct.get_account_accessor;
+                */
             });
 
 

@@ -39,13 +39,13 @@ pub struct AccountSharedData {
     pub executable: bool,
     /// the epoch at which this account will next owe rent
     pub rent_epoch: Epoch,
-    pub read_only_cache: bool,
+/*    pub read_only_cache: bool,
     pub index_time: u64,
     pub stored_in_readonly: bool,
     pub readonly_cache_lookup: u64,
     pub readonly_cache_store: u64,
     pub write_cache: u64,
-    pub get_account_accessor: u64,
+    pub get_account_accessor: u64,*/
 }
 
 /// Compares two ReadableAccounts
@@ -80,6 +80,7 @@ impl From<Account> for AccountSharedData {
             owner: other.owner,
             executable: other.executable,
             rent_epoch: other.rent_epoch,
+            /*
             index_time: 0,
             read_only_cache: false,
             stored_in_readonly: false,
@@ -87,6 +88,7 @@ impl From<Account> for AccountSharedData {
             readonly_cache_store: 0,
             write_cache: 0,
             get_account_accessor: 0,
+            */
         }
     }
 }
@@ -195,6 +197,7 @@ impl WritableAccount for AccountSharedData {
             owner,
             executable,
             rent_epoch,
+            /*
             index_time: 0,
             read_only_cache: false,
             stored_in_readonly: false,
@@ -202,6 +205,7 @@ impl WritableAccount for AccountSharedData {
             readonly_cache_store: 0,
             write_cache: 0,
             get_account_accessor: 0,
+            */
         }
     }
 }

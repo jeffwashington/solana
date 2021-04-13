@@ -2303,9 +2303,11 @@ impl AccountsDb {
                 let result = self.read_only_accounts_cache.load(pubkey, slot);
                 m2.stop();
                 if let Some(mut account) = result {
+                    /*
                     account.read_only_cache = true;
                     account.index_time = index.as_us();
                     account.readonly_cache_lookup = m2.as_us();
+                    */
                     return Some((account, slot));
                 }
             }
@@ -2323,6 +2325,7 @@ impl AccountsDb {
                 is_cached = loaded_account.is_cached();
                 let mut loaded_account = loaded_account.account();
                 if !load_into_read_only_cache_only {
+                    /*
                     loaded_account.read_only_cache = false;
                     loaded_account.index_time = index.as_us();
                     loaded_account.readonly_cache_lookup = m2.as_us();
@@ -2333,6 +2336,7 @@ impl AccountsDb {
                         loaded_account.write_cache = 1;
                     }
                     loaded_account.get_account_accessor = m3.as_us();
+                    */
                 }
     
                 (loaded_account, slot)
@@ -2356,7 +2360,7 @@ impl AccountsDb {
                     let mut m3 = Measure::start("");
                     self.read_only_accounts_cache.store(pubkey, slot, &account);
                     m3.stop();
-                    account.readonly_cache_store = m3.as_us();
+                    //account.readonly_cache_store = m3.as_us();
                     Some((account, slot))
                 }
                 _ => None,
