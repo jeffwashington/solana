@@ -2289,6 +2289,7 @@ impl AccountsDb {
         };
         index.stop();
 
+        let mut m2 = Measure::start("");
         if self.caching_enabled {
             if load_into_read_only_cache_only {
                 if store_id == CACHE_VIRTUAL_STORAGE_ID {
@@ -2298,14 +2299,18 @@ impl AccountsDb {
                     return None;
                 }
             } else if store_id != CACHE_VIRTUAL_STORAGE_ID {
+
                 let result = self.read_only_accounts_cache.load(pubkey, slot);
+                m2.stop();
                 if let Some(mut account) = result {
                     account.read_only_cache = true;
                     account.index_time = index.as_us();
+                    account.readonly_cache_lookup = m2.as_us();
                     return Some((account, slot));
                 }
             }
         }
+        m2.stop();
 
         //TODO: thread this as a ref
         let mut is_cached = false;
@@ -2315,10 +2320,13 @@ impl AccountsDb {
             .map(|loaded_account| {
                 is_cached = loaded_account.is_cached();
                 let mut loaded_account = loaded_account.account();
-                loaded_account.read_only_cache = false;
-                loaded_account.index_time = index.as_us();
-                if !is_cached {
-                    loaded_account.stored_in_readonly = true;   
+                if !load_into_read_only_cache_only {
+                    loaded_account.read_only_cache = false;
+                    loaded_account.index_time = index.as_us();
+                    loaded_account.readonly_cache_lookup = m2.as_us();
+                    if !is_cached {
+                        loaded_account.stored_in_readonly = true;   
+                    }
                 }
     
                 (loaded_account, slot)
@@ -2326,7 +2334,7 @@ impl AccountsDb {
 
         if self.caching_enabled && !is_cached {
             match loaded_account {
-                Some((account, slot)) => {
+                Some((mut account, slot)) => {
                     /*
                     We show this store into the read-only cache for account 'A' and future loads of 'A' from the read-only cache are
                     safe/reflect 'A''s latest state on this fork.
@@ -2339,7 +2347,10 @@ impl AccountsDb {
                     However, by the assumption for contradiction above ,  'A' has already been updated in 'S' which means '(S, A)'
                     must exist in the write cache, which is a contradiction.
                     */
+                    let mut m3 = Measure::start("");
                     self.read_only_accounts_cache.store(pubkey, slot, &account);
+                    m3.stop();
+                    account.readonly_cache_store = m3.as_us();
                     Some((account, slot))
                 }
                 _ => None,

@@ -42,6 +42,8 @@ pub struct AccountSharedData {
     pub read_only_cache: bool,
     pub index_time: u64,
     pub stored_in_readonly: bool,
+    pub readonly_cache_lookup: u64,
+    pub readonly_cache_store: u64,
 }
 
 /// Compares two ReadableAccounts
@@ -79,6 +81,8 @@ impl From<Account> for AccountSharedData {
             index_time: 0,
             read_only_cache: false,
             stored_in_readonly: false,
+            readonly_cache_lookup:0,
+            readonly_cache_store: 0,
         }
     }
 }
@@ -190,6 +194,8 @@ impl WritableAccount for AccountSharedData {
             index_time: 0,
             read_only_cache: false,
             stored_in_readonly: false,
+            readonly_cache_lookup: 0,
+            readonly_cache_store: 0,
         }
     }
 }
