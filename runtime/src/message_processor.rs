@@ -61,7 +61,7 @@ pub struct ExecuteDetailsTimings2 {
     pub read_only_hits: u64,
     pub lookup_time: u64,
     pub stored: u64,
-    pub lamports: u64,
+    pub count: u64,
 }
 
 

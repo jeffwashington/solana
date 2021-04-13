@@ -267,7 +267,7 @@ impl Accounts {
                 if acct.stored_in_readonly {
                 details.stored += 1;  
                 }
-                details.lamports += acct.lamports;
+                details.count += 1;
             });
 
 
