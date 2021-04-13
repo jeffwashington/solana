@@ -259,6 +259,18 @@ impl Accounts {
                 accounts.push(account);
             }
             debug_assert_eq!(accounts.len(), message.account_keys.len());
+            accounts.iter().for_each(|acct| {
+                if acct.read_only_cache {
+                details.read_only_hits += 1;
+                }
+                details.lookup_time += acct.index_time;
+                if acct.stored_in_readonly {
+                details.stored += 1;  
+                }
+                details.lamports += acct.lamports;
+            });
+
+
 
             if let Some(payer_index) = payer_index {
                 if payer_index != 0 {
