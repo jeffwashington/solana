@@ -71,7 +71,6 @@ pub struct ExecuteDetailsTimings2 {
     pub instruction_len: u64,
     pub instruction_acct: u64,
     pub programs: u64,
-    pub last: std::time::Instant,
 }
 
 impl Default for ExecuteDetailsTimings2 {
@@ -92,7 +91,6 @@ impl Default for ExecuteDetailsTimings2 {
             instruction_acct: 0,
             programs: 0,
                     
-last: std::time::Instant::now(),
         }
     }
 }
