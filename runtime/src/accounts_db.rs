@@ -1074,7 +1074,7 @@ impl solana_frozen_abi::abi_example::AbiExample for AccountsDb {
 impl Default for AccountsDb {
     fn default() -> Self {
         let num_threads = get_thread_count();
-        const MAX_READ_ONLY_CACHE_DATA_SIZE: usize = 200_000_000;
+        const MAX_READ_ONLY_CACHE_DATA_SIZE: usize = 400_000_000;
 
         let mut bank_hashes = HashMap::new();
         bank_hashes.insert(0, BankHashInfo::default());
@@ -2274,6 +2274,7 @@ impl AccountsDb {
         max_root: Option<Slot>,
         load_into_read_only_cache_only: bool,
     ) -> Option<(AccountSharedData, Slot)> {
+        let mut index = Measure::start("");
         let (slot, store_id, offset) = {
             let (lock, index) = self.accounts_index.get(pubkey, Some(ancestors), max_root)?;
             let slot_list = lock.slot_list();
@@ -2286,6 +2287,7 @@ impl AccountsDb {
             (slot, store_id, offset)
             // `lock` released here
         };
+        index.stop();
 
         if self.caching_enabled {
             if load_into_read_only_cache_only {
@@ -2297,7 +2299,9 @@ impl AccountsDb {
                 }
             } else if store_id != CACHE_VIRTUAL_STORAGE_ID {
                 let result = self.read_only_accounts_cache.load(pubkey, slot);
-                if let Some(account) = result {
+                if let Some(mut account) = result {
+                    account.read_only_cache = true;
+                    account.index_time = index.as_us();
                     return Some((account, slot));
                 }
             }
@@ -2305,12 +2309,17 @@ impl AccountsDb {
 
         //TODO: thread this as a ref
         let mut is_cached = false;
-        let loaded_account = self
+        let mut loaded_account = self
             .get_account_accessor_from_cache_or_storage(slot, pubkey, store_id, offset)
             .get_loaded_account()
             .map(|loaded_account| {
                 is_cached = loaded_account.is_cached();
-                (loaded_account.account(), slot)
+                let mut loaded_account = loaded_account.account();
+                loaded_account.read_only_cache = false;
+                loaded_account.index_time = index.as_us();
+                loaded_account.stored_in_readonly = true;
+    
+                (loaded_account, slot)
             });
 
         if self.caching_enabled && !is_cached {

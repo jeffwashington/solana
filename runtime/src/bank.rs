@@ -2875,6 +2875,7 @@ impl Bank {
             self.check_transactions(txs, batch.lock_results(), max_age, &mut error_counters);
         load_time2.stop();
         let mut load_time = Measure::start("accounts_load");
+        let mut details = crate::message_processor::ExecuteDetailsTimings2::default();
         let mut loaded_accounts = self.rc.accounts.load_accounts(
             &self.ancestors,
             txs,
@@ -2883,6 +2884,7 @@ impl Bank {
             &mut error_counters,
             &self.rent_collector,
             &self.feature_set,
+            &mut details,
         );
         load_time.stop();
 
@@ -2911,6 +2913,16 @@ impl Bank {
                             &mut loaded_transaction.account_deps,
                             &mut loaded_transaction.loaders,
                         );
+
+                    loaded_transaction.accounts.iter().for_each(|acct| {
+                        if acct.read_only_cache {
+                        details.read_only_hits += 1;
+                        }
+                        details.lookup_time += acct.index_time;
+                        if acct.stored_in_readonly {
+                        details.stored += 1;  
+                        }
+                    });
 
                     let instruction_recorders = if enable_cpi_recording {
                         let ix_count = tx.message.instructions.len();
@@ -2984,10 +2996,11 @@ impl Bank {
         execution_time.stop();
 
         debug!(
-            "load: {}us execute: {}us txs_len={}",
+            "load: {}us execute: {}us txs_len={}, details: {:?}",
             load_time.as_us(),
             execution_time.as_us(),
             txs.len(),
+            details,
         );
         timings.load_us += load_time.as_us();
         timings.execute_us += execution_time.as_us();

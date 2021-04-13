@@ -57,6 +57,14 @@ impl Executors {
 }
 
 #[derive(Default, Debug)]
+pub struct ExecuteDetailsTimings2 {
+    pub read_only_hits: u64,
+    pub lookup_time: u64,
+    pub stored: u64,
+}
+
+
+#[derive(Default, Debug)]
 pub struct ExecuteDetailsTimings {
     pub serialize_us: u64,
     pub create_vm_us: u64,

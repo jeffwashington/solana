@@ -183,6 +183,7 @@ impl Accounts {
         error_counters: &mut ErrorCounters,
         rent_collector: &RentCollector,
         feature_set: &FeatureSet,
+        details: &mut crate::message_processor::ExecuteDetailsTimings2,
     ) -> Result<LoadedTransaction> {
         // Copy all the accounts
         let message = tx.message();
@@ -395,6 +396,7 @@ impl Accounts {
         error_counters: &mut ErrorCounters,
         rent_collector: &RentCollector,
         feature_set: &FeatureSet,
+        details: &mut crate::message_processor::ExecuteDetailsTimings2,
     ) -> Vec<TransactionLoadResult> {
         let fee_config = FeeConfig {
             secp256k1_program_enabled: feature_set
@@ -425,6 +427,7 @@ impl Accounts {
                         error_counters,
                         rent_collector,
                         feature_set,
+                        details,
                     ) {
                         Ok(loaded_transaction) => loaded_transaction,
                         Err(e) => return (Err(e), None),
