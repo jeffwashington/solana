@@ -728,6 +728,7 @@ impl AbiExample for OptionalDropCallback {
 /// are implemented elsewhere for versioning
 #[derive(AbiExample, Debug, Default)]
 pub struct Bank {
+    pub details :RwLock<crate::message_processor::ExecuteDetailsTimings2>,
     /// References to accounts, parent and signature status
     pub rc: BankRc,
 
@@ -1021,6 +1022,7 @@ impl Bank {
             FeeRateGovernor::new_derived(&parent.fee_rate_governor, parent.signature_count());
 
         let mut new = Bank {
+            details: RwLock::new(crate::message_processor::ExecuteDetailsTimings2::default()),
             rc,
             src,
             slot,
@@ -1176,6 +1178,7 @@ impl Bank {
             T::default()
         }
         let mut bank = Self {
+            details: RwLock::new(crate::message_processor::ExecuteDetailsTimings2::default()),
             rc: bank_rc,
             src: new(),
             blockhash_queue: RwLock::new(fields.blockhash_queue),
@@ -2857,6 +2860,8 @@ impl Bank {
         let mut error_counters = ErrorCounters::default();
         let mut load_time2 = Measure::start("accounts_load");
 
+        let mut details = crate::message_processor::ExecuteDetailsTimings2::default();
+
         let retryable_txs: Vec<_> = batch
             .lock_results()
             .iter()
@@ -2875,7 +2880,6 @@ impl Bank {
             self.check_transactions(txs, batch.lock_results(), max_age, &mut error_counters);
         load_time2.stop();
         let mut load_time = Measure::start("accounts_load");
-        let mut details = crate::message_processor::ExecuteDetailsTimings2::default();
         let mut loaded_accounts = self.rc.accounts.load_accounts(
             &self.ancestors,
             txs,
@@ -2994,6 +2998,30 @@ impl Bank {
         timings.load_us += load_time.as_us();
         timings.execute_us += execution_time.as_us();
         timings.details.other_load_us += load_time2.as_us();
+
+        let mut now = Instant::now();
+        {
+            let mut details2 = self.details.write().unwrap();
+            details2.read_only_hits += details.read_only_hits;
+            details2.lookup_time += details.lookup_time;
+            details2.stored += details.stored;
+            details2.count += details.count;
+            details2.readonly_cache_store += details.readonly_cache_store;
+            details2.write_cache += details.write_cache;
+            details2.not_found += details.not_found;
+            details2.read_only_cache_lookup += details.read_only_cache_lookup;
+            details2.get_account_accessor += details.get_account_accessor;
+            details2.non_loader += details.non_loader;
+            details2.instruction_len += details.instruction_len;
+            details2.instruction_acct += details.instruction_acct;
+            details2.programs += details.programs;
+            
+            if (now - details2.last).as_millis() > 1000 {
+                info!("details: {:?}", details);
+                *details2 = crate::message_processor::ExecuteDetailsTimings2::default();
+                details2.last = now;
+            }
+        }
 
         let mut tx_count: u64 = 0;
         let err_count = &mut error_counters.total;

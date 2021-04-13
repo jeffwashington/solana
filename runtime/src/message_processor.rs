@@ -56,7 +56,7 @@ impl Executors {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct ExecuteDetailsTimings2 {
     pub read_only_hits: u64,
     pub lookup_time: u64,
@@ -71,6 +71,30 @@ pub struct ExecuteDetailsTimings2 {
     pub instruction_len: u64,
     pub instruction_acct: u64,
     pub programs: u64,
+    pub last: std::time::Instant,
+}
+
+impl Default for ExecuteDetailsTimings2 {
+    fn default() -> Self {
+        Self {
+            read_only_hits: 0,
+            lookup_time:0,
+
+            stored: 0,
+            count: 0,
+            readonly_cache_store: 0,
+            write_cache: 0,
+            not_found: 0,
+            read_only_cache_lookup: 0,
+            get_account_accessor: 0,
+            non_loader: 0,
+            instruction_len: 0,
+            instruction_acct: 0,
+            programs: 0,
+                    
+last: std::time::Instant::now(),
+        }
+    }
 }
 
 
