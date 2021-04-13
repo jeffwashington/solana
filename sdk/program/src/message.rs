@@ -240,7 +240,7 @@ impl Sanitize for Message {
         Ok(())
     }
 }
-struct KeyPassedFromMessage<'a> {
+pub struct KeyPassedFromMessage<'a> {
     pub program_ids: Vec<&'a Pubkey>,
     pub instructions: &'a Vec<CompiledInstruction>,
    

@@ -24,7 +24,7 @@ use solana_sdk::{
     fee_calculator::{FeeCalculator, FeeConfig},
     genesis_config::ClusterType,
     hash::Hash,
-    message::Message,
+    message::{KeyPassedFromMessage, Message},
     native_loader, nonce,
     pubkey::Pubkey,
     transaction::Result,
@@ -200,9 +200,10 @@ impl Accounts {
             let demote_sysvar_write_locks =
                 feature_set.is_active(&feature_set::demote_sysvar_write_locks::id());
             details.instruction_len = message.instructions.len() as u64;
+            let k = KeyPassedFromMessage            ::new(&message);
             for (i, key) in message.account_keys.iter().enumerate() {
                 let mut mm = Measure::start("");
-                let inl = message.is_non_loader_key(key, i);
+                let inl = k.is_non_loader_key(key, i);
                 mm.stop();
                 details.non_loader += mm.as_ns();
 
