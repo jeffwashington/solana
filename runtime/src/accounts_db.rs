@@ -2327,6 +2327,9 @@ impl AccountsDb {
                     if !is_cached {
                         loaded_account.stored_in_readonly = true;   
                     }
+                    else {
+                        loaded_account.write_cache = 1;
+                    }
                 }
     
                 (loaded_account, slot)

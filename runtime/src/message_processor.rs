@@ -63,6 +63,7 @@ pub struct ExecuteDetailsTimings2 {
     pub stored: u64,
     pub count: u64,
     pub readonly_cache_store: u64,
+    pub write_cache: u64,
 }
 
 

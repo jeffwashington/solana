@@ -269,6 +269,7 @@ impl Accounts {
                 }
                 details.count += 1;
                 details.readonly_cache_store += acct.readonly_cache_store;
+                details.write_cache += acct.write_cache;
             });
 
 
