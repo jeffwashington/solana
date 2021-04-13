@@ -121,7 +121,7 @@ impl ExecuteDetailsTimings2 {
         self.read_only_cache_lookup += details.read_only_cache_lookup;
         self.get_account_accessor += details.get_account_accessor;
         self.non_loader += details.non_loader;
-        self.instruction_len += details.instruction_len;
+        self.instruction_len = std::cmp::max(self.instruction_len, details.instruction_len);
         self.instruction_acct += details.instruction_acct;
         self.programs += details.programs;
     }
