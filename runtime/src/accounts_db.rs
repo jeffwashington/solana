@@ -2317,7 +2317,9 @@ impl AccountsDb {
                 let mut loaded_account = loaded_account.account();
                 loaded_account.read_only_cache = false;
                 loaded_account.index_time = index.as_us();
-                loaded_account.stored_in_readonly = true;
+                if !is_cached {
+                    loaded_account.stored_in_readonly = true;   
+                }
     
                 (loaded_account, slot)
             });
