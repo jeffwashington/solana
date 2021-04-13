@@ -56,6 +56,27 @@ impl Executors {
     }
 }
 
+#[derive(Debug, Default)]
+pub struct ExecuteDetailsTimings2 {
+    pub read_only_hits: u64,
+    pub lookup_time: u64,
+    pub stored: u64,
+    pub count: u64,
+    pub readonly_cache_store: u64,
+    pub write_cache: u64,
+    pub not_found: u64,
+    pub read_only_cache_lookup: u64,
+    pub get_account_accessor: u64,
+    pub non_loader: u64,
+    pub instruction_len: u64,
+    pub instruction_acct: u64,
+    pub programs: u64,
+    pub state: u64,
+    pub exec_load: u64,
+    pub acct_load: u64,
+    pub acct_load_not_found: u64,
+}
+
 #[derive(Default, Debug)]
 pub struct ExecuteDetailsTimings {
     pub serialize_us: u64,
@@ -66,6 +87,29 @@ pub struct ExecuteDetailsTimings {
     pub total_account_count: u64,
     pub total_data_size: usize,
     pub data_size_changed: usize,
+    pub other_load_us: u64,
+}
+
+impl ExecuteDetailsTimings2 {
+    pub fn accumulate(&mut self, details: &ExecuteDetailsTimings2) {
+        self.read_only_hits += details.read_only_hits;
+        self.lookup_time += details.lookup_time;
+        self.stored += details.stored;
+        self.count += details.count;
+        self.readonly_cache_store += details.readonly_cache_store;
+        self.write_cache += details.write_cache;
+        self.not_found += details.not_found;
+        self.read_only_cache_lookup += details.read_only_cache_lookup;
+        self.get_account_accessor += details.get_account_accessor;
+        self.non_loader += details.non_loader;
+        self.instruction_len = std::cmp::max(self.instruction_len, details.instruction_len);
+        self.instruction_acct += details.instruction_acct;
+        self.programs += details.programs;
+        self.state += details.state;
+        self.exec_load += details.exec_load;
+        self.acct_load += details.acct_load;
+        self.acct_load_not_found += details.acct_load_not_found;
+    }
 }
 
 impl ExecuteDetailsTimings {
@@ -78,6 +122,7 @@ impl ExecuteDetailsTimings {
         self.total_account_count += other.total_account_count;
         self.total_data_size += other.total_data_size;
         self.data_size_changed += other.data_size_changed;
+        self.other_load_us += other.other_load_us;
     }
 }
 
