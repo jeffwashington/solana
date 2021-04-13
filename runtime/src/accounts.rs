@@ -217,8 +217,10 @@ impl Accounts {
                         if message.is_writable(i, demote_sysvar_write_locks) {
                             return Err(TransactionError::InvalidAccountIndex);
                         }
+                        details.instruction_acct += 1;
                         Self::construct_instructions_account(message, demote_sysvar_write_locks)
                     } else {
+                        let mut found = 0;
                         let (account, rent) = self
                             .accounts_db
                             .load(ancestors, key)
@@ -230,8 +232,12 @@ impl Accounts {
                                 } else {
                                     (account, 0)
                                 }
+                                found += 1;
                             })
                             .unwrap_or_default();
+                        if found == 0 {
+                            details.not_found += 1;
+                        }
 
                         if account.executable && bpf_loader_upgradeable::check_id(&account.owner) {
                             // The upgradeable loader requires the derived ProgramData account
@@ -278,7 +284,7 @@ impl Accounts {
                 details.readonly_cache_store += acct.readonly_cache_store;
                 details.write_cache += acct.write_cache;
                 if acct.lamports == 0 && acct.owner == Pubkey::default() {
-                    details.not_found += 1;
+                    //details.not_found += 1;
                 }
                 details.read_only_cache_lookup += acct.readonly_cache_lookup;
                 details.get_account_accessor += acct.get_account_accessor;
@@ -295,7 +301,7 @@ impl Accounts {
                 details.readonly_cache_store += acct.readonly_cache_store;
                 details.write_cache += acct.write_cache;
                 if acct.lamports == 0 && acct.owner == Pubkey::default() {
-                    details.not_found += 1;
+                    //details.not_found += 1;
                 }
                 details.read_only_cache_lookup += acct.readonly_cache_lookup;
                 details.get_account_accessor += acct.get_account_accessor;
