@@ -2952,7 +2952,7 @@ impl Bank {
                         instruction_recorders.as_deref(),
                         self.feature_set.clone(),
                         bpf_compute_budget,
-                        &mut timings.details2,
+                        &mut timings.details,
                     );
 
                     if enable_log_recording {
