@@ -4524,7 +4524,7 @@ impl AccountsDb {
 
         for acct in accounts.iter() {
             // put accounts we just stored in read only cache - as an experiment
-            self.read_only_accounts_cache.store(acct.0, slot, acct.1);
+            // self.read_only_accounts_cache.store(acct.0, slot, acct.1);
         }
 
         self.stats
