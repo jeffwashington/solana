@@ -21,6 +21,8 @@ use solana_runtime::{
         Bank, ExecuteTimings, InnerInstructionsList, TransactionBalancesSet,
         TransactionExecutionResult, TransactionLogMessages, TransactionResults,
     },
+    hashed_transaction::{HashedTransaction, HashedTransactionSlice},
+
     bank_forks::BankForks,
     bank_utils,
     commitment::VOTE_THRESHOLD_SIZE,
@@ -241,6 +243,39 @@ fn process_entries_with_callback(
     let mut tick_hashes = vec![];
     let mut rng = thread_rng();
 
+    let mut pubkeys = HashSet::new();
+    for entry in entries.iter() {
+        match entry {
+            EntryType::Tick(hash) => (),
+            EntryType::Transactions(transactions) => {
+                let hashed_txs: Vec<HashedTransaction> = transactions.iter().cloned().map(HashedTransaction::from).collect();
+                for transaction in hashed_txs.as_transactions_iter() {
+                    //for key in transaction.as_transactions_iter() {
+                    for key in &transaction.message.account_keys {
+                        pubkeys.insert(*key);
+                    }
+                }
+            }
+        }
+    }
+    if false {
+        let bank_ = bank.clone();
+        std::thread::Builder::new()
+            .name("solana-accounts-transaction-account-loader".to_string())
+            .spawn(move || {
+                for key in pubkeys {
+                    bank_.load_accounts_into_read_only_cache(&key);
+                }
+            })
+            .unwrap();
+    }
+    else {
+        //error!("loading accounts: {}", pubkeys.len());
+        for key in pubkeys {
+            bank.load_accounts_into_read_only_cache(&key);
+        }
+    }
+    //error!("done loading accounts");
     for entry in entries {
         match entry {
             EntryType::Tick(hash) => {
@@ -325,6 +360,8 @@ fn process_entries_with_callback(
     for hash in tick_hashes {
         bank.register_tick(&hash);
     }
+    info!("ExecuteTimings: {:?}", timings);
+    *timings = ExecuteTimings::default();
     Ok(())
 }
 

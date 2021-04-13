@@ -1074,7 +1074,7 @@ impl solana_frozen_abi::abi_example::AbiExample for AccountsDb {
 impl Default for AccountsDb {
     fn default() -> Self {
         let num_threads = get_thread_count();
-        const MAX_READ_ONLY_CACHE_DATA_SIZE: usize = 200_000_000;
+        const MAX_READ_ONLY_CACHE_DATA_SIZE: usize = 800_000_000;
 
         let mut bank_hashes = HashMap::new();
         bank_hashes.insert(0, BankHashInfo::default());
@@ -2259,7 +2259,11 @@ impl AccountsDb {
         ancestors: &Ancestors,
         pubkey: &Pubkey,
     ) -> Option<(AccountSharedData, Slot)> {
-        self.do_load(ancestors, pubkey, None)
+        self.do_load(ancestors, pubkey, None, false)
+    }
+
+    pub fn load_accounts_into_read_only_cache(&self, ancestors: &Ancestors, pubkey: &Pubkey) {
+        self.do_load(ancestors, pubkey, None, true);
     }
 
     fn do_load(
@@ -2267,7 +2271,9 @@ impl AccountsDb {
         ancestors: &Ancestors,
         pubkey: &Pubkey,
         max_root: Option<Slot>,
+        load_into_read_only_cache_only: bool,
     ) -> Option<(AccountSharedData, Slot)> {
+        let mut index = Measure::start("");
         let (slot, store_id, offset) = {
             let (lock, index) = self.accounts_index.get(pubkey, Some(ancestors), max_root)?;
             let slot_list = lock.slot_list();
@@ -2280,27 +2286,60 @@ impl AccountsDb {
             (slot, store_id, offset)
             // `lock` released here
         };
+        index.stop();
 
-        if self.caching_enabled && store_id != CACHE_VIRTUAL_STORAGE_ID {
-            let result = self.read_only_accounts_cache.load(pubkey, slot);
-            if let Some(account) = result {
-                return Some((account, slot));
+        let mut m2 = Measure::start("");
+        if self.caching_enabled {
+            if load_into_read_only_cache_only {
+                if store_id == CACHE_VIRTUAL_STORAGE_ID {
+                    return None;
+                }
+                if self.read_only_accounts_cache.in_cache(pubkey, slot) {
+                    return None;
+                }
+            } else if store_id != CACHE_VIRTUAL_STORAGE_ID {
+
+                let result = self.read_only_accounts_cache.load(pubkey, slot);
+                m2.stop();
+                if let Some(mut account) = result {
+                    account.read_only_cache = true;
+                    account.index_time = index.as_us();
+                    account.readonly_cache_lookup = m2.as_us();
+                    return Some((account, slot));
+                }
             }
         }
+        m2.stop();
 
         //TODO: thread this as a ref
         let mut is_cached = false;
-        let loaded_account = self
+        let mut m3 = Measure::start("");
+        let mut loaded_account = self
             .get_account_accessor_from_cache_or_storage(slot, pubkey, store_id, offset)
             .get_loaded_account()
             .map(|loaded_account| {
+                m3.stop();
                 is_cached = loaded_account.is_cached();
-                (loaded_account.account(), slot)
+                let mut loaded_account = loaded_account.account();
+                if !load_into_read_only_cache_only {
+                    loaded_account.read_only_cache = false;
+                    loaded_account.index_time = index.as_us();
+                    loaded_account.readonly_cache_lookup = m2.as_us();
+                    if !is_cached {
+                        loaded_account.stored_in_readonly = true;   
+                    }
+                    else {
+                        loaded_account.write_cache = 1;
+                    }
+                    loaded_account.get_account_accessor = m3.as_us();
+                }
+    
+                (loaded_account, slot)
             });
 
         if self.caching_enabled && !is_cached {
             match loaded_account {
-                Some((account, slot)) => {
+                Some((mut account, slot)) => {
                     /*
                     We show this store into the read-only cache for account 'A' and future loads of 'A' from the read-only cache are
                     safe/reflect 'A''s latest state on this fork.
@@ -2313,7 +2352,10 @@ impl AccountsDb {
                     However, by the assumption for contradiction above ,  'A' has already been updated in 'S' which means '(S, A)'
                     must exist in the write cache, which is a contradiction.
                     */
+                    let mut m3 = Measure::start("");
                     self.read_only_accounts_cache.store(pubkey, slot, &account);
+                    m3.stop();
+                    account.readonly_cache_store = m3.as_us();
                     Some((account, slot))
                 }
                 _ => None,
@@ -4385,6 +4427,14 @@ impl AccountsDb {
             is_cached_store,
         );
         store_accounts_time.stop();
+
+        //error!("Storing: {}", accounts.len());
+        for acct in accounts.iter() {
+            // put accounts we just stored in read only cache - as an experiment
+            //self.read_only_accounts_cache.store(acct.0, slot, acct.1);
+        }
+        //error!("Done storing: {}", accounts.len());
+
         self.stats
             .store_accounts
             .fetch_add(store_accounts_time.as_us(), Ordering::Relaxed);
@@ -8452,7 +8502,7 @@ pub mod tests {
         // Clean should not remove anything yet as nothing has been flushed
         db.clean_accounts(None);
         let account = db
-            .do_load(&Ancestors::default(), &account_key, Some(0))
+            .do_load(&Ancestors::default(), &account_key, Some(0), false)
             .unwrap();
         assert_eq!(account.0.lamports, 0);
         // since this item is in the cache, it should not be in the read only cache
@@ -8463,7 +8513,7 @@ pub mod tests {
         db.flush_accounts_cache(true, None);
         db.clean_accounts(None);
         assert!(db
-            .do_load(&Ancestors::default(), &account_key, Some(0))
+            .do_load(&Ancestors::default(), &account_key, Some(0), false)
             .is_none());
     }
 
@@ -8529,10 +8579,15 @@ pub mod tests {
         // entry in slot 1 is blocking cleanup of the zero-lamport account.
         let max_root = None;
         assert_eq!(
-            db.do_load(&Ancestors::default(), &zero_lamport_account_key, max_root,)
-                .unwrap()
-                .0
-                .lamports,
+            db.do_load(
+                &Ancestors::default(),
+                &zero_lamport_account_key,
+                max_root,
+                false
+            )
+            .unwrap()
+            .0
+            .lamports,
             0
         );
     }
@@ -8646,7 +8701,7 @@ pub mod tests {
         // Intra cache cleaning should not clean the entry for `account_key` from slot 0,
         // even though it was updated in slot `2` because of the ongoing scan
         let account = db
-            .do_load(&Ancestors::default(), &account_key, Some(0))
+            .do_load(&Ancestors::default(), &account_key, Some(0), false)
             .unwrap();
         assert_eq!(account.0.lamports, zero_lamport_account.lamports);
 
@@ -8654,7 +8709,7 @@ pub mod tests {
         // because we're still doing a scan on it.
         db.clean_accounts(None);
         let account = db
-            .do_load(&scan_ancestors, &account_key, Some(max_scan_root))
+            .do_load(&scan_ancestors, &account_key, Some(max_scan_root), false)
             .unwrap();
         assert_eq!(account.0.lamports, slot1_account.lamports);
 
@@ -8663,14 +8718,14 @@ pub mod tests {
         scan_tracker.exit().unwrap();
         db.clean_accounts(None);
         let account = db
-            .do_load(&scan_ancestors, &account_key, Some(max_scan_root))
+            .do_load(&scan_ancestors, &account_key, Some(max_scan_root), false)
             .unwrap();
         assert_eq!(account.0.lamports, slot1_account.lamports);
 
         // Simulate dropping the bank, which finally removes the slot from the cache
         db.purge_slot(1);
         assert!(db
-            .do_load(&scan_ancestors, &account_key, Some(max_scan_root))
+            .do_load(&scan_ancestors, &account_key, Some(max_scan_root), false)
             .is_none());
     }
 
@@ -8806,7 +8861,7 @@ pub mod tests {
         // a smaller max root
         for key in &keys {
             assert!(accounts_db
-                .do_load(&Ancestors::default(), key, Some(last_dead_slot))
+                .do_load(&Ancestors::default(), key, Some(last_dead_slot), false)
                 .is_some());
         }
 
@@ -8829,7 +8884,7 @@ pub mod tests {
         // as those have been purged from the accounts index for the dead slots.
         for key in &keys {
             assert!(accounts_db
-                .do_load(&Ancestors::default(), key, Some(last_dead_slot))
+                .do_load(&Ancestors::default(), key, Some(last_dead_slot), false)
                 .is_none());
         }
         // Each slot should only have one entry in the storage, since all other accounts were

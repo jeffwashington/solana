@@ -16,7 +16,7 @@ use crate::{
     inline_spl_token_v2_0,
     instruction_recorder::InstructionRecorder,
     log_collector::LogCollector,
-    message_processor::{ExecuteDetailsTimings, Executors, MessageProcessor},
+    message_processor::{ExecuteDetailsTimings, ExecuteDetailsTimings2, Executors, MessageProcessor},
     rent_collector::RentCollector,
     stakes::Stakes,
     status_cache::{SlotDelta, StatusCache},
@@ -105,6 +105,7 @@ pub struct ExecuteTimings {
     pub execute_us: u64,
     pub store_us: u64,
     pub details: ExecuteDetailsTimings,
+    pub details2: ExecuteDetailsTimings2,
 }
 
 impl ExecuteTimings {
@@ -114,6 +115,7 @@ impl ExecuteTimings {
         self.execute_us += other.execute_us;
         self.store_us += other.store_us;
         self.details.accumulate(&other.details);
+        self.details2.accumulate(&other.details2);
     }
 }
 
@@ -2899,6 +2901,9 @@ impl Bank {
         debug!("processing transactions: {}", hashed_txs.len());
         inc_new_counter_info!("bank-process_transactions", hashed_txs.len());
         let mut error_counters = ErrorCounters::default();
+        let mut load_time2 = Measure::start("accounts_load");
+
+        let mut details = crate::message_processor::ExecuteDetailsTimings2::default();
 
         let retryable_txs: Vec<_> = batch
             .lock_results()
@@ -2923,6 +2928,7 @@ impl Bank {
         );
         check_time.stop();
 
+        load_time2.stop();
         let mut load_time = Measure::start("accounts_load");
         let mut loaded_accounts = self.rc.accounts.load_accounts(
             &self.ancestors,
@@ -2932,6 +2938,7 @@ impl Bank {
             &mut error_counters,
             &self.rent_collector,
             &self.feature_set,
+            &mut details,
         );
         load_time.stop();
 
@@ -3043,6 +3050,9 @@ impl Bank {
         timings.check_us += check_time.as_us();
         timings.load_us += load_time.as_us();
         timings.execute_us += execution_time.as_us();
+        timings.details.other_load_us += load_time2.as_us();
+
+        timings.details2.accumulate(&details);
 
         let mut tx_count: u64 = 0;
         let err_count = &mut error_counters.total;
@@ -4371,6 +4381,13 @@ impl Bank {
 
     pub fn get_thread_pool(&self) -> &ThreadPool {
         &self.rc.accounts.accounts_db.thread_pool_clean
+    }
+
+    pub fn load_accounts_into_read_only_cache(&self, key: &Pubkey) {
+        self.rc
+            .accounts
+            .accounts_db
+            .load_accounts_into_read_only_cache(&self.ancestors, key);
     }
 
     pub fn update_accounts_hash_with_index_option(

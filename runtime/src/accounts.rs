@@ -8,6 +8,7 @@ use crate::{
     rent_collector::RentCollector,
     system_instruction_processor::{get_system_account_kind, SystemAccountKind},
 };
+use solana_measure::measure::Measure;
 use dashmap::{
     mapref::entry::Entry::{Occupied, Vacant},
     DashMap,
@@ -23,7 +24,7 @@ use solana_sdk::{
     fee_calculator::{FeeCalculator, FeeConfig},
     genesis_config::ClusterType,
     hash::Hash,
-    message::Message,
+    message::{KeyPassedFromMessage, Message},
     native_loader, nonce,
     pubkey::Pubkey,
     transaction::Result,
@@ -183,6 +184,7 @@ impl Accounts {
         error_counters: &mut ErrorCounters,
         rent_collector: &RentCollector,
         feature_set: &FeatureSet,
+        details: &mut crate::message_processor::ExecuteDetailsTimings2,
     ) -> Result<LoadedTransaction> {
         // Copy all the accounts
         let message = tx.message();
@@ -197,9 +199,15 @@ impl Accounts {
             let mut account_deps = Vec::with_capacity(message.account_keys.len());
             let demote_sysvar_write_locks =
                 feature_set.is_active(&feature_set::demote_sysvar_write_locks::id());
-
+            details.instruction_len = message.instructions.len() as u64;
+            let k = KeyPassedFromMessage            ::new(&message);
             for (i, key) in message.account_keys.iter().enumerate() {
-                let account = if message.is_non_loader_key(key, i) {
+                let mut mm = Measure::start("");
+                let inl = k.is_non_loader_key(key, i);
+                mm.stop();
+                details.non_loader += mm.as_ns();
+
+                let account = if inl {
                     if payer_index.is_none() {
                         payer_index = Some(i);
                     }
@@ -210,12 +218,16 @@ impl Accounts {
                         if message.is_writable(i, demote_sysvar_write_locks) {
                             return Err(TransactionError::InvalidAccountIndex);
                         }
+                        details.instruction_acct += 1;
                         Self::construct_instructions_account(message, demote_sysvar_write_locks)
                     } else {
+                        let mut asd = Measure::start("");
                         let (account, rent) = self
                             .accounts_db
                             .load(ancestors, key)
                             .map(|(mut account, _)| {
+                                asd.stop();
+                                details.acct_load += asd.as_us();
                                 if message.is_writable(i, demote_sysvar_write_locks) {
                                     let rent_due = rent_collector
                                         .collect_from_existing_account(&key, &mut account);
@@ -224,25 +236,40 @@ impl Accounts {
                                     (account, 0)
                                 }
                             })
-                            .unwrap_or_default();
+                            .unwrap_or_else(|| {
+                                details.acct_load_not_found += 1;
+                                asd.stop();
+                                details.acct_load += asd.as_us();
+                                (AccountSharedData::default(), 0)});
 
                         if account.executable && bpf_loader_upgradeable::check_id(&account.owner) {
+                            let mut asd = Measure::start("");
                             // The upgradeable loader requires the derived ProgramData account
                             if let Ok(UpgradeableLoaderState::Program {
                                 programdata_address,
                             }) = account.state()
                             {
+                                asd.stop();
+                                details.state += asd.as_us();
+                                let mut asd = Measure::start("");
                                 if let Some(account) = self
                                     .accounts_db
                                     .load(ancestors, &programdata_address)
                                     .map(|(account, _)| account)
                                 {
+                                    asd.stop();
+                                    details.exec_load += asd.as_us();
                                     account_deps.push((programdata_address, account));
                                 } else {
+                                    details.not_found += 1;
+                                    asd.stop();
+                                    details.exec_load += asd.as_us();
                                     error_counters.account_not_found += 1;
                                     return Err(TransactionError::ProgramAccountNotFound);
                                 }
                             } else {
+                                asd.stop();
+                                details.state += asd.as_us();
                                 error_counters.invalid_program_for_execution += 1;
                                 return Err(TransactionError::InvalidProgramForExecution);
                             }
@@ -253,11 +280,49 @@ impl Accounts {
                     }
                 } else {
                     // Fill in an empty account for the program slots.
+                    details.programs += 1;
                     AccountSharedData::default()
                 };
                 accounts.push(account);
             }
+            details.non_loader = details.non_loader / 1000;
             debug_assert_eq!(accounts.len(), message.account_keys.len());
+            accounts.iter().for_each(|acct| {
+                details.count += 1;
+                if acct.read_only_cache {
+                details.read_only_hits += 1;
+                }
+                details.lookup_time += acct.index_time;
+                if acct.stored_in_readonly {
+                details.stored += 1;  
+                }
+                details.readonly_cache_store += acct.readonly_cache_store;
+                details.write_cache += acct.write_cache;
+                if acct.lamports == 0 && acct.owner == Pubkey::default() {
+                    //details.not_found += 1;
+                }
+                details.read_only_cache_lookup += acct.readonly_cache_lookup;
+                details.get_account_accessor += acct.get_account_accessor;
+            });
+            account_deps.iter().for_each(|(add, acct)| {
+                details.count += 1;
+                if acct.read_only_cache {
+                details.read_only_hits += 1;
+                }
+                details.lookup_time += acct.index_time;
+                if acct.stored_in_readonly {
+                details.stored += 1;  
+                }
+                details.readonly_cache_store += acct.readonly_cache_store;
+                details.write_cache += acct.write_cache;
+                if acct.lamports == 0 && acct.owner == Pubkey::default() {
+                    //details.not_found += 1;
+                }
+                details.read_only_cache_lookup += acct.readonly_cache_lookup;
+                details.get_account_accessor += acct.get_account_accessor;
+            });
+
+
 
             if let Some(payer_index) = payer_index {
                 if payer_index != 0 {
@@ -395,6 +460,7 @@ impl Accounts {
         error_counters: &mut ErrorCounters,
         rent_collector: &RentCollector,
         feature_set: &FeatureSet,
+        details: &mut crate::message_processor::ExecuteDetailsTimings2,
     ) -> Vec<TransactionLoadResult> {
         let fee_config = FeeConfig {
             secp256k1_program_enabled: feature_set
@@ -424,6 +490,7 @@ impl Accounts {
                         error_counters,
                         rent_collector,
                         feature_set,
+                        details,
                     ) {
                         Ok(loaded_transaction) => loaded_transaction,
                         Err(e) => return (Err(e), None),
