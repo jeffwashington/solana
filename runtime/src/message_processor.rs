@@ -70,6 +70,7 @@ pub struct ExecuteDetailsTimings2 {
     pub non_loader: u64,
     pub instruction_len: u64,
     pub instruction_acct: u64,
+    pub programs: u64,
 }
 
 

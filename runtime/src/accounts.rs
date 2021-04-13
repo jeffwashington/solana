@@ -225,6 +225,7 @@ impl Accounts {
                             .accounts_db
                             .load(ancestors, key)
                             .map(|(mut account, _)| {
+                                found += 1;
                                 if message.is_writable(i, demote_sysvar_write_locks) {
                                     let rent_due = rent_collector
                                         .collect_from_existing_account(&key, &mut account);
@@ -232,7 +233,6 @@ impl Accounts {
                                 } else {
                                     (account, 0)
                                 }
-                                found += 1;
                             })
                             .unwrap_or_default();
                         if found == 0 {
@@ -266,6 +266,7 @@ impl Accounts {
                     }
                 } else {
                     // Fill in an empty account for the program slots.
+                    details.programs += 1;
                     AccountSharedData::default()
                 };
                 accounts.push(account);
