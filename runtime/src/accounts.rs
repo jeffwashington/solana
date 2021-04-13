@@ -270,6 +270,9 @@ impl Accounts {
                 details.count += 1;
                 details.readonly_cache_store += acct.readonly_cache_store;
                 details.write_cache += acct.write_cache;
+                if acct.lamports == 0 && acct.owner == Pubkey::default() {
+                    details.not_found += 1;
+                }
             });
 
 
