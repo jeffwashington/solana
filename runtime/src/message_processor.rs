@@ -56,7 +56,7 @@ impl Executors {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ExecuteDetailsTimings2 {
     pub read_only_hits: u64,
     pub lookup_time: u64,
@@ -71,30 +71,11 @@ pub struct ExecuteDetailsTimings2 {
     pub instruction_len: u64,
     pub instruction_acct: u64,
     pub programs: u64,
+    pub state: u64,
+    pub exec_load: u64,
+    pub acct_load: u64,
+    pub acct_load_not_found: u64,
 }
-
-impl Default for ExecuteDetailsTimings2 {
-    fn default() -> Self {
-        Self {
-            read_only_hits: 0,
-            lookup_time:0,
-
-            stored: 0,
-            count: 0,
-            readonly_cache_store: 0,
-            write_cache: 0,
-            not_found: 0,
-            read_only_cache_lookup: 0,
-            get_account_accessor: 0,
-            non_loader: 0,
-            instruction_len: 0,
-            instruction_acct: 0,
-            programs: 0,
-                    
-        }
-    }
-}
-
 
 #[derive(Default, Debug)]
 pub struct ExecuteDetailsTimings {
@@ -124,6 +105,10 @@ impl ExecuteDetailsTimings2 {
         self.instruction_len = std::cmp::max(self.instruction_len, details.instruction_len);
         self.instruction_acct += details.instruction_acct;
         self.programs += details.programs;
+        self.state += details.state;
+        self.exec_load += details.exec_load;
+        self.acct_load += details.acct_load;
+        self.acct_load_not_found += details.acct_load_not_found;
     }
 }
 

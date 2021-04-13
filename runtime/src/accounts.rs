@@ -221,12 +221,13 @@ impl Accounts {
                         details.instruction_acct += 1;
                         Self::construct_instructions_account(message, demote_sysvar_write_locks)
                     } else {
-                        let mut found = 0;
+                        let mut asd = Measure::start("");
                         let (account, rent) = self
                             .accounts_db
                             .load(ancestors, key)
                             .map(|(mut account, _)| {
-                                found += 1;
+                                asd.stop();
+                                details.acct_load += asd.as_us();
                                 if message.is_writable(i, demote_sysvar_write_locks) {
                                     let rent_due = rent_collector
                                         .collect_from_existing_account(&key, &mut account);
@@ -235,28 +236,39 @@ impl Accounts {
                                     (account, 0)
                                 }
                             })
-                            .unwrap_or_default();
-                        if found == 0 {
-                            details.not_found += 1;
-                        }
+                            .unwrap_or_else(|| {
+                                details.not_found += 1;
+                                asd.stop();
+                                details.acct_load += asd.as_us();
+                                (AccountSharedData::default(), 0)});
 
                         if account.executable && bpf_loader_upgradeable::check_id(&account.owner) {
+                            let mut asd = Measure::start("");
                             // The upgradeable loader requires the derived ProgramData account
                             if let Ok(UpgradeableLoaderState::Program {
                                 programdata_address,
                             }) = account.state()
                             {
+                                asd.stop();
+                                details.state += asd.as_us();
+                                let mut asd = Measure::start("");
                                 if let Some(account) = self
                                     .accounts_db
                                     .load(ancestors, &programdata_address)
                                     .map(|(account, _)| account)
                                 {
+                                    asd.stop();
+                                    details.exec_load += asd.as_us();
                                     account_deps.push((programdata_address, account));
                                 } else {
+                                    asd.stop();
+                                    details.exec_load += asd.as_us();
                                     error_counters.account_not_found += 1;
                                     return Err(TransactionError::ProgramAccountNotFound);
                                 }
                             } else {
+                                asd.stop();
+                                details.state += asd.as_us();
                                 error_counters.invalid_program_for_execution += 1;
                                 return Err(TransactionError::InvalidProgramForExecution);
                             }
