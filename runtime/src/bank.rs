@@ -15,7 +15,7 @@ use crate::{
     inline_spl_token_v2_0,
     instruction_recorder::InstructionRecorder,
     log_collector::LogCollector,
-    message_processor::{ExecuteDetailsTimings, Executors, MessageProcessor},
+    message_processor::{ExecuteDetailsTimings, ExecuteDetailsTimings2, Executors, MessageProcessor},
     rent_collector::RentCollector,
     stakes::Stakes,
     status_cache::{SlotDelta, StatusCache},
@@ -102,6 +102,7 @@ pub struct ExecuteTimings {
     pub execute_us: u64,
     pub store_us: u64,
     pub details: ExecuteDetailsTimings,
+    pub details2: ExecuteDetailsTimings2,
 }
 
 impl ExecuteTimings {
@@ -728,7 +729,7 @@ impl AbiExample for OptionalDropCallback {
 /// are implemented elsewhere for versioning
 #[derive(AbiExample, Debug, Default)]
 pub struct Bank {
-    pub details :RwLock<crate::message_processor::ExecuteDetailsTimings2>,
+    //pub details :RwLock<crate::message_processor::ExecuteDetailsTimings2>,
     /// References to accounts, parent and signature status
     pub rc: BankRc,
 
@@ -1022,7 +1023,6 @@ impl Bank {
             FeeRateGovernor::new_derived(&parent.fee_rate_governor, parent.signature_count());
 
         let mut new = Bank {
-            details: RwLock::new(crate::message_processor::ExecuteDetailsTimings2::default()),
             rc,
             src,
             slot,
@@ -1178,7 +1178,6 @@ impl Bank {
             T::default()
         }
         let mut bank = Self {
-            details: RwLock::new(crate::message_processor::ExecuteDetailsTimings2::default()),
             rc: bank_rc,
             src: new(),
             blockhash_queue: RwLock::new(fields.blockhash_queue),
@@ -2999,29 +2998,7 @@ impl Bank {
         timings.execute_us += execution_time.as_us();
         timings.details.other_load_us += load_time2.as_us();
 
-        let mut now = Instant::now();
-        {
-            let mut details2 = self.details.write().unwrap();
-            details2.read_only_hits += details.read_only_hits;
-            details2.lookup_time += details.lookup_time;
-            details2.stored += details.stored;
-            details2.count += details.count;
-            details2.readonly_cache_store += details.readonly_cache_store;
-            details2.write_cache += details.write_cache;
-            details2.not_found += details.not_found;
-            details2.read_only_cache_lookup += details.read_only_cache_lookup;
-            details2.get_account_accessor += details.get_account_accessor;
-            details2.non_loader += details.non_loader;
-            details2.instruction_len += details.instruction_len;
-            details2.instruction_acct += details.instruction_acct;
-            details2.programs += details.programs;
-            
-            if (now - details2.last).as_millis() > 1000 {
-                info!("details: {:?}", details);
-                *details2 = crate::message_processor::ExecuteDetailsTimings2::default();
-                details2.last = now;
-            }
-        }
+        timings.details2.accumulate(&details);
 
         let mut tx_count: u64 = 0;
         let err_count = &mut error_counters.total;

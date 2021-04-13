@@ -111,6 +111,24 @@ pub struct ExecuteDetailsTimings {
     pub other_load_us: u64,
 }
 
+impl ExecuteDetailsTimings2 {
+    pub fn accumulate(&mut self, details: &ExecuteDetailsTimings2) {
+        self.read_only_hits += details.read_only_hits;
+        self.lookup_time += details.lookup_time;
+        self.stored += details.stored;
+        self.count += details.count;
+        self.readonly_cache_store += details.readonly_cache_store;
+        self.write_cache += details.write_cache;
+        self.not_found += details.not_found;
+        self.read_only_cache_lookup += details.read_only_cache_lookup;
+        self.get_account_accessor += details.get_account_accessor;
+        self.non_loader += details.non_loader;
+        self.instruction_len += details.instruction_len;
+        self.instruction_acct += details.instruction_acct;
+        self.programs += details.programs;
+    }
+}
+
 impl ExecuteDetailsTimings {
     pub fn accumulate(&mut self, other: &ExecuteDetailsTimings) {
         self.serialize_us += other.serialize_us;

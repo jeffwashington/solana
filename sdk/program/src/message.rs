@@ -240,7 +240,20 @@ impl Sanitize for Message {
         Ok(())
     }
 }
+/*
+struct KeyPassedFromMessage {
 
+}
+
+impl KeyPassedFromMessage {
+    pub fn new(&Message) -> Self {
+        
+    }
+    pub fn is_non_loader_key(&self, key: &Pubkey, key_index: usize) -> bool {
+        !self.program_ids().contains(&key) || self.is_key_passed_to_program(key_index)
+    }
+}
+*/
 impl Message {
     pub fn new_with_compiled_instructions(
         num_required_signatures: u8,
