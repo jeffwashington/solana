@@ -2876,6 +2876,7 @@ impl Bank {
         load_time2.stop();
         let mut load_time = Measure::start("accounts_load");
         let mut details = crate::message_processor::ExecuteDetailsTimings2::default();
+        let mut details2 = crate::message_processor::ExecuteDetailsTimings2::default();
         let mut loaded_accounts = self.rc.accounts.load_accounts(
             &self.ancestors,
             txs,
@@ -2884,7 +2885,7 @@ impl Bank {
             &mut error_counters,
             &self.rent_collector,
             &self.feature_set,
-            &mut details,
+            &mut details2,
         );
         load_time.stop();
 
@@ -2922,6 +2923,7 @@ impl Bank {
                         if acct.stored_in_readonly {
                         details.stored += 1;  
                         }
+                        details.lamports += acct.lamports;
                     });
 
                     let instruction_recorders = if enable_cpi_recording {
@@ -2950,7 +2952,7 @@ impl Bank {
                         instruction_recorders.as_deref(),
                         self.feature_set.clone(),
                         bpf_compute_budget,
-                        &mut timings.details,
+                        &mut timings.details2,
                     );
 
                     if enable_log_recording {
