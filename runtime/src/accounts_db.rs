@@ -2314,10 +2314,12 @@ impl AccountsDb {
 
         //TODO: thread this as a ref
         let mut is_cached = false;
+        let mut m3 = Measure::start("");
         let mut loaded_account = self
             .get_account_accessor_from_cache_or_storage(slot, pubkey, store_id, offset)
             .get_loaded_account()
             .map(|loaded_account| {
+                m3.stop();
                 is_cached = loaded_account.is_cached();
                 let mut loaded_account = loaded_account.account();
                 if !load_into_read_only_cache_only {
@@ -2330,6 +2332,7 @@ impl AccountsDb {
                     else {
                         loaded_account.write_cache = 1;
                     }
+                    loaded_account.get_account_accessor = m3.as_us();
                 }
     
                 (loaded_account, slot)

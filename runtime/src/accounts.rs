@@ -274,6 +274,7 @@ impl Accounts {
                     details.not_found += 1;
                 }
                 details.read_only_cache_lookup += acct.readonly_cache_lookup;
+                details.get_account_accessor += acct.get_account_accessor;
             });
 
 
