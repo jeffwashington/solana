@@ -240,20 +240,33 @@ impl Sanitize for Message {
         Ok(())
     }
 }
-/*
-struct KeyPassedFromMessage {
-
+struct KeyPassedFromMessage<'a> {
+    pub program_ids: Vec<&'a Pubkey>,
+    pub instructions: &'a Vec<CompiledInstruction>,
+   
 }
 
-impl KeyPassedFromMessage {
-    pub fn new(&Message) -> Self {
-        
+impl<'a> KeyPassedFromMessage<'a> {
+    pub fn new(message: &'a Message) -> Self {
+        Self {
+            program_ids: message.program_ids(),
+            instructions: &message.instructions,
+        }
+    }
+    pub fn is_key_passed_to_program(&self, index: usize) -> bool {
+        if let Ok(index) = u8::try_from(index) {
+            for ix in self.instructions.iter() {
+                if ix.accounts.contains(&index) {
+                    return true;
+                }
+            }
+        }
+        false
     }
     pub fn is_non_loader_key(&self, key: &Pubkey, key_index: usize) -> bool {
-        !self.program_ids().contains(&key) || self.is_key_passed_to_program(key_index)
+        !self.program_ids.contains(&key) || self.is_key_passed_to_program(key_index)
     }
 }
-*/
 impl Message {
     pub fn new_with_compiled_instructions(
         num_required_signatures: u8,

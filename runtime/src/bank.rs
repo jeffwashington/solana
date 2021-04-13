@@ -111,6 +111,7 @@ impl ExecuteTimings {
         self.execute_us += other.execute_us;
         self.store_us += other.store_us;
         self.details.accumulate(&other.details);
+        self.details2.accumulate(&other.details2);
     }
 }
 
