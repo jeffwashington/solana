@@ -8,6 +8,7 @@ use crate::{
     rent_collector::RentCollector,
     system_instruction_processor::{get_system_account_kind, SystemAccountKind},
 };
+use solana_measure::measure::Measure;
 use dashmap::{
     mapref::entry::Entry::{Occupied, Vacant},
     DashMap,
@@ -198,9 +199,14 @@ impl Accounts {
             let mut account_deps = Vec::with_capacity(message.account_keys.len());
             let demote_sysvar_write_locks =
                 feature_set.is_active(&feature_set::demote_sysvar_write_locks::id());
-
+            details.instruction_len = message.instructions.len() as u64;
             for (i, key) in message.account_keys.iter().enumerate() {
-                let account = if message.is_non_loader_key(key, i) {
+                let mut mm = Measure::start("");
+                let inl = message.is_non_loader_key(key, i);
+                mm.stop();
+                details.non_loader += mm.as_ns();
+
+                let account = if inl {
                     if payer_index.is_none() {
                         payer_index = Some(i);
                     }
@@ -258,8 +264,26 @@ impl Accounts {
                 };
                 accounts.push(account);
             }
+            details.non_loader = details.non_loader / 1000;
             debug_assert_eq!(accounts.len(), message.account_keys.len());
             accounts.iter().for_each(|acct| {
+                if acct.read_only_cache {
+                details.read_only_hits += 1;
+                }
+                details.lookup_time += acct.index_time;
+                if acct.stored_in_readonly {
+                details.stored += 1;  
+                }
+                details.count += 1;
+                details.readonly_cache_store += acct.readonly_cache_store;
+                details.write_cache += acct.write_cache;
+                if acct.lamports == 0 && acct.owner == Pubkey::default() {
+                    details.not_found += 1;
+                }
+                details.read_only_cache_lookup += acct.readonly_cache_lookup;
+                details.get_account_accessor += acct.get_account_accessor;
+            });
+            account_deps.iter().for_each(|(add, acct)| {
                 if acct.read_only_cache {
                 details.read_only_hits += 1;
                 }

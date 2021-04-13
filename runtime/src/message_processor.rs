@@ -67,6 +67,8 @@ pub struct ExecuteDetailsTimings2 {
     pub not_found: u64,
     pub read_only_cache_lookup: u64,
     pub get_account_accessor: u64,
+    pub non_loader: u64,
+    pub instruction_len: u64,
 }
 
 
