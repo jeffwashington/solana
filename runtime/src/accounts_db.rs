@@ -4531,12 +4531,12 @@ impl AccountsDb {
         );
         store_accounts_time.stop();
 
-        error!("Storing: {}", accounts.len());
+        //error!("Storing: {}", accounts.len());
         for acct in accounts.iter() {
             // put accounts we just stored in read only cache - as an experiment
-            self.read_only_accounts_cache.store(acct.0, slot, acct.1);
+            //self.read_only_accounts_cache.store(acct.0, slot, acct.1);
         }
-        error!("Done storing: {}", accounts.len());
+        //error!("Done storing: {}", accounts.len());
 
         self.stats
             .store_accounts
