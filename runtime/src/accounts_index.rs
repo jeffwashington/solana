@@ -875,6 +875,16 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
             .map(ReadAccountMapEntry::from_account_map_entry)
     }
 
+    pub fn get_account_read_entrys(&self, pubkey: &[Pubkey]) -> Vec<Option<ReadAccountMapEntry<T>>> {
+        let maps = self.account_maps
+            .read()
+            .unwrap();
+        pubkey.iter().map(|pubkey|
+            maps.get(pubkey)
+            .cloned()
+            .map(ReadAccountMapEntry::from_account_map_entry)).collect::<Vec<_>>()
+    }
+
     fn get_account_write_entry(&self, pubkey: &Pubkey) -> Option<WriteAccountMapEntry<T>> {
         self.account_maps
             .read()
@@ -1104,6 +1114,34 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
                     self.latest_slot(ancestors, &locked_entry.slot_list(), max_root)?;
                 Some((locked_entry, found_index))
             })
+    }
+
+    /// Get an account
+    /// The latest account that appears in `ancestors` or `roots` is returned.
+    pub(crate) fn gets(
+        &self,
+        pubkey: &[Pubkey],
+        ancestors: Option<&Ancestors>,
+        max_root: Option<Slot>,
+        details: &mut crate::message_processor::ExecuteDetailsTimings2,
+    ) -> Vec<Option<(ReadAccountMapEntry<T>, usize)>> {
+        let mut m = Measure::start("");
+        self.get_account_read_entrys(pubkey).into_iter()
+            .map(|res| {
+                m.stop();
+                details.get_account_read_entrys += m.as_us();
+            res.and_then(|locked_entry| {
+                let mut m = Measure::start("");
+                let found_index =
+                    self.latest_slot(ancestors, &locked_entry.slot_list(), max_root)?;
+                details.latest_slot += m.as_us();
+                Some((locked_entry, found_index))
+            }).or_else(|| {
+                m.stop();
+                details.get_account_read_entrys += m.as_us();
+                None
+            })
+        }).collect::<Vec<_>>()
     }
 
     // Get the maximum root <= `max_allowed_root` from the given `slice`

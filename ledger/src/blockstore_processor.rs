@@ -258,6 +258,9 @@ fn process_entries_with_callback(
             }
         }
     }
+    let pubkeys = pubkeys.into_iter().collect::<Vec<_>>();
+
+    let mut details = solana_runtime::message_processor::ExecuteDetailsTimings2::default();
     if false {
         let bank_ = bank.clone();
         std::thread::Builder::new()
@@ -272,19 +275,22 @@ fn process_entries_with_callback(
     else {
         let mut mes = Measure::start("");
         //error!("loading accounts: {}", pubkeys.len());
-        for key in &pubkeys {
-            bank.load_accounts_into_read_only_cache(key);
-        }
+        //for key in &pubkeys {
+        bank.load_accounts_into_read_only_cache2(&pubkeys, &mut details);
+        //}
         mes.stop();
         timings.pre_load += mes.as_us();
+        error!("pre-load-1: {:?}", details);
+        let mut details = solana_runtime::message_processor::ExecuteDetailsTimings2::default();
         let mut mes = Measure::start("");
         // load everything again
         //error!("loading accounts: {}", pubkeys.len());
-        for key in &pubkeys {
-            bank.load_accounts_into_read_only_cache(key);
-        }
+        //for key in &pubkeys {
+            bank.load_accounts_into_read_only_cache2(&pubkeys, &mut details);
+        //}
         mes.stop();
         timings.second_pre_load += mes.as_us();
+        error!("pre-load-2: {:?}", details);
     }
     //error!("done loading accounts");
     for entry in entries {

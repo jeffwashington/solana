@@ -110,6 +110,7 @@ pub struct ExecuteTimings {
     pub second_pre_load: u64,
 }
 
+
 impl ExecuteTimings {
     pub fn accumulate(&mut self, other: &ExecuteTimings) {
         self.check_us += other.check_us;
@@ -120,6 +121,8 @@ impl ExecuteTimings {
         self.second_pre_load += other.second_pre_load;
         self.details.accumulate(&other.details);
         self.details2.accumulate(&other.details2);
+        self.pre_load += other.pre_load;
+        self.second_pre_load += other.second_pre_load;
     }
 }
 
@@ -4394,6 +4397,13 @@ impl Bank {
             .accounts
             .accounts_db
             .load_accounts_into_read_only_cache(&self.ancestors, key);
+    }
+
+    pub fn load_accounts_into_read_only_cache2(&self, key: &[Pubkey], details: &mut ExecuteDetailsTimings2) {
+        self.rc
+            .accounts
+            .accounts_db
+            .load_accounts_into_read_only_cache2(&self.ancestors, key, details);
     }
 
     pub fn update_accounts_hash_with_index_option(
