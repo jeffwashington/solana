@@ -878,6 +878,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
 
     pub fn get_account_read_entrys(&self, pubkey: &[Pubkey], details2: &mut crate::message_processor::ExecuteDetailsTimings2,) -> Vec<Option<ReadAccountMapEntry<T>>> {
         let mut m = Measure::start("");
+        details2.ct_get_account_read_entrys += 1;
         let mut details = crate::message_processor::ExecuteDetailsTimings2::default();
         let maps = self.account_maps
             .read()
