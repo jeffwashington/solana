@@ -898,6 +898,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
             let res = c.map(ReadAccountMapEntry::from_account_map_entry);
             m.stop();
             details.from_account_map_entry += m.as_ns();
+            details.inner_count += 1;
             res}
         ).collect::<Vec<_>>();
         details.read_account_maps /= 1000;
