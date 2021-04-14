@@ -1126,10 +1126,11 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
         details: &mut crate::message_processor::ExecuteDetailsTimings2,
     ) -> Vec<Option<(ReadAccountMapEntry<T>, usize)>> {
         let mut m = Measure::start("");
-        self.get_account_read_entrys(pubkey).into_iter()
+        let entries = self.get_account_read_entrys(pubkey);
+        m.stop();
+        details.get_account_read_entrys += m.as_us();
+        entries.into_iter()
             .map(|res| {
-                m.stop();
-                details.get_account_read_entrys += m.as_us();
             res.and_then(|locked_entry| {
                 let mut m = Measure::start("");
                 let found_index =
@@ -1137,8 +1138,6 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
                 details.latest_slot += m.as_us();
                 Some((locked_entry, found_index))
             }).or_else(|| {
-                m.stop();
-                details.get_account_read_entrys += m.as_us();
                 None
             })
         }).collect::<Vec<_>>()
