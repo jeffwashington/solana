@@ -889,7 +889,6 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
             let mut m = Measure::start("");
             let g = maps.get(pubkey);
             m.stop();
-            details.inner_count += 1;
             details.maps_get += m.as_ns();
             let mut m = Measure::start("");
             let c = g.cloned();
