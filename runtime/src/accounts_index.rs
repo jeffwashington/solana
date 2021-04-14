@@ -8,6 +8,8 @@ use dashmap::DashSet;
 use ouroboros::self_referencing;
 use solana_measure::measure::Measure;
 use crate::message_processor::ExecuteDetailsTimings2;
+use std::marker::PhantomData;
+use std::fmt::Debug;
 use solana_sdk::{
     clock::Slot,
     pubkey::{Pubkey, PUBKEY_BYTES},
@@ -204,7 +206,137 @@ impl Ancestors {
 }
 
 pub type RefCount = u64;
-pub type AccountMap<K, V> = BTreeMap<K, V>;
+//pub type AccountMap<K, V> = BTreeMap<K, V>;
+#[derive(Debug)]
+pub struct AccountMap<K, V> {
+    keys: Vec<K>,
+    values: Vec<V>,
+    all: Vec<(K, V)>,
+    /*root: Option<Root<K, V>>,
+    length: usize,*/
+}
+
+impl<K: Ord, V> Default for AccountMap<K, V> {
+    /// Creates an empty `BTreeMap`.
+    fn default() -> AccountMap<K, V> {
+        AccountMap::new()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum AccountMapEntryBtree<K: Ord> {
+    /// A vacant entry.
+    Vacant(VacantEntry<K>),
+
+    /// An occupied entry.
+    Occupied(OccupiedEntry<K>),
+}
+
+#[derive(Clone)]
+pub struct VacantEntry<K> {
+    pub index: usize,
+    pub key: K,
+}
+
+impl<K: Debug + Ord> Debug for VacantEntry<K> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("VacantEntry").field(self.key()).finish()
+    }
+}
+
+impl<K: Ord> AccountMapEntryBtree<K> {
+    pub fn or_insert_with<V, F>(self, default: F, btree: &mut AccountMap<K,V>) -> &V
+    where
+        F: FnOnce() -> V, 
+        {
+            match self {
+                AccountMapEntryBtree::Occupied(entry) => entry.into_mut(btree),
+                AccountMapEntryBtree::Vacant(entry) => entry.insert(default(), btree),
+            }
+        }    
+}
+
+impl<K: Ord> VacantEntry<K> {
+    /// Creates an empty `BTreeMap`.
+    pub fn key(&self) -> &K {
+        &self.key
+    }
+    pub fn new(key: K) -> Self {
+        let index = 0;
+        Self {
+            key,
+            index,
+        }
+    }
+    pub fn insert<V>(self, value: V, btree: &mut AccountMap<K,V>) -> &V {    
+        btree.insert(self.key, value)
+    }
+}
+
+
+
+/// A view into an occupied entry in a `BTreeMap`.
+/// It is part of the [`Entry`] enum.
+#[derive(Debug, Clone)]
+pub struct OccupiedEntry<K> {
+    pub index: usize,
+    pub key: K,
+}
+
+impl<K: Ord> OccupiedEntry<K> {
+    pub fn into_mut<V>(self, btree: &AccountMap<K,V>) -> &V {
+        btree.get(&self.key).unwrap()
+    }
+    pub fn get<'a, 'b, V>(&'a self, btree: &'b AccountMap<K,V>) -> &'b V {
+        btree.get(&self.key).unwrap()
+    }
+    pub fn remove<V>(self, btree: &mut AccountMap<K,V>) {
+        btree.remove(&self.key)
+    }
+}
+
+impl<K: Ord,V> AccountMap<K,V> {
+    pub fn new() -> Self {
+        Self {
+            keys: Vec::new(),
+            values: Vec::new(),
+            all: Vec::new(),
+        }
+    }
+    pub fn insert(&mut self, key: K, value: V) -> &V {
+        self.values.push(value);
+        self.values.last().unwrap()
+    }
+    pub fn entry(&self, key: K) -> AccountMapEntryBtree<K> {
+        AccountMapEntryBtree::Vacant(VacantEntry::new(key))
+    }
+    pub fn contains_key(&self, key: &K) -> bool {
+        false
+    }
+    pub fn get(&self, key: &K) -> Option<&V> {
+        None
+    }
+    pub fn remove(&mut self, key: &K) {
+        
+    }
+    pub fn keys(&self) -> std::slice::Iter<'_, K> {
+        self.keys.iter()
+    }
+    pub fn values(&self) -> std::slice::Iter<'_, V> {
+        self.values.iter()
+    }
+    pub fn iter(&self) -> std::slice::Iter<'_, (K, V)> {
+        self.all.iter()
+    }
+    pub fn range<T, R>(&self, range: R) -> Option<(K, K)>
+    where
+        T: Ord + ?Sized,
+        R: RangeBounds<T>,
+        K: core::borrow::Borrow<T> + Ord,     
+        {
+            None
+        }
+}
 
 type AccountMapEntry<T> = Arc<AccountMapEntryInner<T>>;
 
@@ -541,6 +673,7 @@ impl<'a, T: 'static + Clone> Iterator for AccountsIndexIterator<'a, T> {
             return None;
         }
 
+        /*
         let chunk: Vec<(Pubkey, AccountMapEntry<T>)> = self
             .account_maps
             .read()
@@ -549,6 +682,9 @@ impl<'a, T: 'static + Clone> Iterator for AccountsIndexIterator<'a, T> {
             .map(|(pubkey, account_map_entry)| (*pubkey, account_map_entry.clone()))
             .take(ITER_BATCH_SIZE)
             .collect();
+            TODO
+            */
+            let chunk: Self::Item = Vec::new();
 
         if chunk.is_empty() {
             self.is_finished = true;
@@ -925,10 +1061,11 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
         });
         let mut w_account_maps = self.account_maps.write().unwrap();
         let mut is_newly_inserted = false;
-        let account_entry = w_account_maps.entry(*pubkey).or_insert_with(|| {
+        let account_entry = w_account_maps.entry(*pubkey);
+        let account_entry = account_entry.or_insert_with(|| {
             is_newly_inserted = true;
             new_entry
-        });
+        }, &mut w_account_maps);
         let w_account_entry = WriteAccountMapEntry::from_account_map_entry(account_entry.clone());
         (w_account_entry, is_newly_inserted)
     }
@@ -952,9 +1089,9 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
         if !dead_keys.is_empty() {
             for key in dead_keys.iter() {
                 let mut w_index = self.account_maps.write().unwrap();
-                if let btree_map::Entry::Occupied(index_entry) = w_index.entry(**key) {
-                    if index_entry.get().slot_list.read().unwrap().is_empty() {
-                        index_entry.remove();
+                if let AccountMapEntryBtree::Occupied(index_entry) = w_index.entry(**key) {
+                    if index_entry.get(&w_index).slot_list.read().unwrap().is_empty() {
+                        index_entry.remove(&mut w_index);
 
                         // Note passing `None` to remove all the entries for this key
                         // is only safe because we have the lock for this key's entry
