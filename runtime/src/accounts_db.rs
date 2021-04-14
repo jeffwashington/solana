@@ -2266,6 +2266,108 @@ impl AccountsDb {
         self.do_load(ancestors, pubkey, None, true);
     }
 
+    pub fn load_accounts_into_read_only_cache2(&self, ancestors: &Ancestors, pubkey: &[Pubkey], details: &mut crate::message_processor::ExecuteDetailsTimings2) {
+        self.do_load2(ancestors, pubkey, None, details);
+    }
+
+    fn do_load2(
+        &self,
+        ancestors: &Ancestors,
+        pubkey: &[Pubkey],
+        max_root: Option<Slot>,
+        details: &mut crate::message_processor::ExecuteDetailsTimings2
+    ) {
+        details.count += pubkey.len() as u64;
+        let mut index = Measure::start("");
+        let items = {//(slot, store_id, offset) = {
+            let gets = /*(lock, index)*/ self.accounts_index.gets(pubkey, Some(ancestors), max_root, details);
+            gets.into_iter().map(|li| {
+                if li.is_some() {
+                    let (lock, index) = li.unwrap();
+                    let slot_list = lock.slot_list();
+                    let (
+                        slot,
+                        AccountInfo {
+                            store_id, offset, ..
+                        },
+                    ) = slot_list[index];
+                    Some((slot, store_id, offset))
+                }
+                else {
+                    details.not_found += 1;
+                    None
+                }
+            }).collect::<Vec<_>>()
+            // `lock` released here
+        };
+        index.stop();
+        details.lookup_time += index.as_us();
+
+        items.into_iter().enumerate().for_each(|(i, sso)|{
+            if sso.is_none() {
+                return;
+            }
+            let (slot, store_id, offset)            = sso.unwrap();
+            let mut m2 = Measure::start("");
+            if self.caching_enabled {
+                if store_id == CACHE_VIRTUAL_STORAGE_ID {
+                    details.write_cache += 1;
+                    return;
+                }
+                if self.read_only_accounts_cache.in_cache(&pubkey[i], slot) {
+                    m2.stop();
+                    details.read_only_hits += 1;
+                    details.read_only_cache_lookup += m2.as_us();
+                    return;
+                }
+            }
+            m2.stop();
+
+            //TODO: thread this as a ref
+            let mut is_cached = false;
+            let mut m3 = Measure::start("");
+            let mut loaded_account = self
+                .get_account_accessor_from_cache_or_storage(slot, &pubkey[i], store_id, offset)
+                .get_loaded_account()
+                .map(|loaded_account| {
+                    m3.stop();
+                    details.get_account_accessor += m3.as_us();
+                    is_cached = loaded_account.is_cached();
+                    let mut loaded_account = loaded_account.account();
+                    (loaded_account, slot)
+                }).or_else(|| {
+                    m3.stop();
+                    details.get_account_accessor += m3.as_us();
+                    None
+                });
+
+            if self.caching_enabled && !is_cached {
+                match loaded_account {
+                    Some((mut account, slot)) => {
+                        /*
+                        We show this store into the read-only cache for account 'A' and future loads of 'A' from the read-only cache are
+                        safe/reflect 'A''s latest state on this fork.
+                        This safety holds if during replay of slot 'S', we show we only read 'A' from the write cache,
+                        not the read-only cache, after it's been updated in replay of slot 'S'.
+                        Assume for contradiction this is not true, and we read 'A' from the read-only cache *after* it had been updated in 'S'.
+                        This means an entry '(S, A)' was added to the read-only cache after 'A' had been updated in 'S'.
+                        Now when '(S, A)' was being added to the read-only cache, it must have been true that  'is_cache == false',
+                        which means '(S', A)' does not exist in the write cache yet.
+                        However, by the assumption for contradiction above ,  'A' has already been updated in 'S' which means '(S, A)'
+                        must exist in the write cache, which is a contradiction.
+                        */
+                        let mut m3 = Measure::start("");
+                        self.read_only_accounts_cache.store(&pubkey[i], slot, &account);
+                        m3.stop();
+                        details.readonly_cache_store += m3.as_us();
+                    }
+                    _ => (),
+                }
+            }
+        });
+    }
+
+
     fn do_load(
         &self,
         ancestors: &Ancestors,
