@@ -75,6 +75,35 @@ impl From<Vec<(Slot, usize)>> for Ancestors {
     }
 }
 
+impl From<HashMap<Slot, usize>> for Ancestors {
+    fn from(source: HashMap<Slot, usize>) -> Ancestors {
+        let mut result = Self {
+            count: source.len(),
+            ..Ancestors::default()
+        };
+        if result.count > 0 {
+            result.min = Slot::MAX;
+            result.max = Slot::MIN;
+            source.iter().for_each(|(slot, _)| {
+                result.min = std::cmp::min(result.min, *slot);
+                result.max = std::cmp::max(result.max, *slot + 1);
+            });
+            let range = result.range();
+            if range > ANCESTORS_HASH_MAP_SIZE {
+                result.large_range_slots = source.into_iter().collect();
+            } else {
+                result.slots = vec![None; range as usize];
+                source.into_iter().for_each(|(mut slot, size)| {
+                    slot -= result.min;
+                    result.slots[slot as usize] = Some(size);
+                });
+            }
+        }
+
+        result
+    }
+}
+
 impl std::iter::FromIterator<(Slot, usize)> for Ancestors {
     fn from_iter<I>(iter: I) -> Self
     where
@@ -89,6 +118,18 @@ impl std::iter::FromIterator<(Slot, usize)> for Ancestors {
 }
 
 impl Ancestors {
+    pub fn get_hash_map(&self) -> HashMap<Slot, usize> {
+        let mut result = self.large_range_slots.clone();
+        if self.large_range_slots.is_empty() {
+            self.slots
+                .iter()
+                .enumerate()
+                .filter_map(|(size, i)| i.map(|val| (size as u64 + self.min, val)))
+                .for_each(|(key, value)| {result.insert(key, value);});
+        }
+        result
+    }
+
     pub fn keys(&self) -> Vec<Slot> {
         if self.large_range_slots.is_empty() {
             self.slots

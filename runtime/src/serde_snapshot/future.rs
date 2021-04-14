@@ -45,7 +45,7 @@ use std::sync::RwLock;
 #[derive(Clone, Deserialize)]
 pub(crate) struct DeserializableVersionedBank {
     pub(crate) blockhash_queue: BlockhashQueue,
-    pub(crate) ancestors: Ancestors,
+    pub(crate) ancestors: HashMap<Slot, usize>,
     pub(crate) hash: Hash,
     pub(crate) parent_hash: Hash,
     pub(crate) parent_slot: Slot,
@@ -122,7 +122,7 @@ impl From<DeserializableVersionedBank> for BankFieldsToDeserialize {
 #[derive(Serialize)]
 pub(crate) struct SerializableVersionedBank<'a> {
     pub(crate) blockhash_queue: &'a RwLock<BlockhashQueue>,
-    pub(crate) ancestors: &'a Ancestors,
+    pub(crate) ancestors: HashMap<Slot, usize>,
     pub(crate) hash: Hash,
     pub(crate) parent_hash: Hash,
     pub(crate) parent_slot: Slot,

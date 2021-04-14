@@ -568,7 +568,7 @@ impl NonceRollbackInfo for NonceRollbackFull {
 #[derive(Clone, Debug, Default)]
 pub(crate) struct BankFieldsToDeserialize {
     pub(crate) blockhash_queue: BlockhashQueue,
-    pub(crate) ancestors: Ancestors,
+    pub(crate) ancestors: HashMap<Slot, usize>,
     pub(crate) hash: Hash,
     pub(crate) parent_hash: Hash,
     pub(crate) parent_slot: Slot,
@@ -607,7 +607,7 @@ pub(crate) struct BankFieldsToDeserialize {
 #[derive(Debug)]
 pub(crate) struct BankFieldsToSerialize<'a> {
     pub(crate) blockhash_queue: &'a RwLock<BlockhashQueue>,
-    pub(crate) ancestors: &'a Ancestors,
+    pub(crate) ancestors: HashMap<Slot, usize>,
     pub(crate) hash: Hash,
     pub(crate) parent_hash: Hash,
     pub(crate) parent_slot: Slot,
@@ -1191,7 +1191,7 @@ impl Bank {
             rc: bank_rc,
             src: new(),
             blockhash_queue: RwLock::new(fields.blockhash_queue),
-            ancestors: fields.ancestors,
+            ancestors: fields.ancestors.into(),
             hash: RwLock::new(fields.hash),
             parent_hash: fields.parent_hash,
             parent_slot: fields.parent_slot,
@@ -1286,7 +1286,7 @@ impl Bank {
     pub(crate) fn get_fields_to_serialize(&self) -> BankFieldsToSerialize {
         BankFieldsToSerialize {
             blockhash_queue: &self.blockhash_queue,
-            ancestors: &self.ancestors,
+            ancestors: self.ancestors.get_hash_map(),
             hash: *self.hash.read().unwrap(),
             parent_hash: self.parent_hash,
             parent_slot: self.parent_slot,
