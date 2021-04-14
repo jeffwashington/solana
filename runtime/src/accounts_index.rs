@@ -303,6 +303,14 @@ impl<K: Ord,V> AccountMap<K,V> {
             all: Vec::new(),
         }
     }
+    pub fn get_index(&self, index: usize) -> Option<(&K, &V)> {
+        if index < self.values.len() {
+            Some((&self.keys[index], &self.values[index]))
+        }
+        else {
+            None
+        }
+    }
     pub fn insert(&mut self, key: K, value: V) -> &V {
         self.values.push(value);
         self.values.last().unwrap()
@@ -325,8 +333,8 @@ impl<K: Ord,V> AccountMap<K,V> {
     pub fn values(&self) -> std::slice::Iter<'_, V> {
         self.values.iter()
     }
-    pub fn iter(&self) -> std::slice::Iter<'_, (K, V)> {
-        self.all.iter()
+    pub fn iter(&self) -> AccountMapIter<'_, K, V> {//std::slice::Iter<'_, (K, V)> {
+        AccountMapIter::new(&self, 0)
     }
     pub fn range<T, R>(&self, range: R) -> Option<(K, K)>
     where
@@ -336,6 +344,34 @@ impl<K: Ord,V> AccountMap<K,V> {
         {
             None
         }
+}
+
+pub struct AccountMapIter<'a, K, V> {
+    pub index: usize,
+    pub btree: &'a AccountMap<K, V>,
+    //_dummy: PhantomData<V>,
+}
+impl<'a, K, V> AccountMapIter<'a, K, V> {
+    pub fn new(btree: &'a AccountMap<K, V>, index: usize) -> Self {
+        Self {
+            index,
+            btree,
+        }
+    }
+}
+impl<'a, K: Ord, V> Iterator for AccountMapIter<'a, K, V> {
+    // we will be counting with usize
+    type Item = (&'a K, &'a V);
+
+    // next() is the only required method
+    fn next(&mut self) -> Option<Self::Item> {
+
+     let result =   self.btree.get_index(self.index) 
+     ;
+     self.index += 1;
+
+     result
+    }    
 }
 
 type AccountMapEntry<T> = Arc<AccountMapEntryInner<T>>;
