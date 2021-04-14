@@ -81,6 +81,7 @@ pub struct ExecuteDetailsTimings2 {
     pub maps_get: u64,
     pub cloned: u64,
     pub from_account_map_entry: u64,
+    pub inner_count: u64,
 }
 
 #[derive(Default, Debug)]
@@ -115,6 +116,13 @@ impl ExecuteDetailsTimings2 {
         self.exec_load += details.exec_load;
         self.acct_load += details.acct_load;
         self.acct_load_not_found += details.acct_load_not_found;
+        self.get_account_read_entrys += details.get_account_read_entrys;
+        self.latest_slot += details.latest_slot;
+        self.read_account_maps += details.read_account_maps;
+        self.maps_get += details.maps_get;
+        self.cloned += details.cloned;
+        self.from_account_map_entry += details.from_account_map_entry;
+        self.inner_count += details.inner_count;
     }
 }
 
