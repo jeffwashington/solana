@@ -7,6 +7,7 @@ use bv::BitVec;
 use dashmap::DashSet;
 use ouroboros::self_referencing;
 use solana_measure::measure::Measure;
+use crate::message_processor::ExecuteDetailsTimings2;
 use solana_sdk::{
     clock::Slot,
     pubkey::{Pubkey, PUBKEY_BYTES},
@@ -875,29 +876,35 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
             .map(ReadAccountMapEntry::from_account_map_entry)
     }
 
-    pub fn get_account_read_entrys(&self, pubkey: &[Pubkey], details: &mut crate::message_processor::ExecuteDetailsTimings2,) -> Vec<Option<ReadAccountMapEntry<T>>> {
+    pub fn get_account_read_entrys(&self, pubkey: &[Pubkey], details2: &mut crate::message_processor::ExecuteDetailsTimings2,) -> Vec<Option<ReadAccountMapEntry<T>>> {
         let mut m = Measure::start("");
+        let mut details = crate::message_processor::ExecuteDetailsTimings2::default();
         let maps = self.account_maps
             .read()
             .unwrap();
             m.stop();
-            details.read_account_maps += m.as_us();
-        pubkey.iter().map(|pubkey|{
+            details.read_account_maps += m.as_ns();
+        let res = pubkey.iter().map(|pubkey|{
             let mut m = Measure::start("");
             let g = maps.get(pubkey);
             m.stop();
-            details.maps_get += m.as_us();
-            m.stop();
+            details.maps_get += m.as_ns();
             let mut m = Measure::start("");
             let c = g.cloned();
             m.stop();
-            details.cloned += m.as_us();
+            details.cloned += m.as_ns();
             let mut m = Measure::start("");
             let res = c.map(ReadAccountMapEntry::from_account_map_entry);
             m.stop();
-            details.from_account_map_entry += m.as_us();
+            details.from_account_map_entry += m.as_ns();
             res}
-        ).collect::<Vec<_>>()
+        ).collect::<Vec<_>>();
+        details.read_account_maps /= 1000;
+        details.maps_get /= 1000;
+        details.cloned /= 1000;
+        details.from_account_map_entry /= 1000;
+        details2.accumulate(&details);
+        res
     }
 
     fn get_account_write_entry(&self, pubkey: &Pubkey) -> Option<WriteAccountMapEntry<T>> {
