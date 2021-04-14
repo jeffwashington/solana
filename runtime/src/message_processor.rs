@@ -76,7 +76,6 @@ pub struct ExecuteDetailsTimings2 {
     pub acct_load: u64,
     pub acct_load_not_found: u64,
     pub get_account_read_entrys: u64,
-    pub get_account_read_entrys_not_found: u64,
     pub latest_slot: u64,
 }
 
