@@ -2278,9 +2278,10 @@ impl AccountsDb {
         details: &mut crate::message_processor::ExecuteDetailsTimings2
     ) {
         details.count += pubkey.len() as u64;
+        details.do_load2_count += 1;
         let mut index = Measure::start("");
         let items = {//(slot, store_id, offset) = {
-            let gets = /*(lock, index)*/ self.accounts_index.gets(pubkey, Some(ancestors), max_root, details);
+            let gets = /*(lock, index)*/ self.accounts_index.gets2(pubkey, Some(ancestors), max_root, details);
             gets.into_iter().map(|li| {
                 if li.is_some() {
                     let (lock, index) = li.unwrap();

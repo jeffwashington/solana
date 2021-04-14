@@ -82,6 +82,7 @@ pub struct ExecuteDetailsTimings2 {
     pub cloned: u64,
     pub from_account_map_entry: u64,
     pub inner_count: u64,
+    pub do_load2_count: u64,
 }
 
 #[derive(Default, Debug)]
@@ -123,6 +124,7 @@ impl ExecuteDetailsTimings2 {
         self.cloned += details.cloned;
         self.from_account_map_entry += details.from_account_map_entry;
         self.inner_count += details.inner_count;
+        self.do_load2_count += details.do_load2_count;
     }
 }
 

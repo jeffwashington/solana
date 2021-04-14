@@ -1142,7 +1142,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
 
     /// Get an account
     /// The latest account that appears in `ancestors` or `roots` is returned.
-    pub(crate) fn gets(
+    pub(crate) fn gets2(
         &self,
         pubkey: &[Pubkey],
         ancestors: Option<&Ancestors>,

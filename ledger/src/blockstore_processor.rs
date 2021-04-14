@@ -290,7 +290,7 @@ fn process_entries_with_callback(
         //}
         mes.stop();
         timings.second_pre_load += mes.as_us();
-        error!("pre-load-2: {:?}", details);
+        error!("pre-load-2: {:?} publickeys {}", details, pubkeys.len());
     }
     //error!("done loading accounts");
     for entry in entries {
