@@ -875,14 +875,29 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
             .map(ReadAccountMapEntry::from_account_map_entry)
     }
 
-    pub fn get_account_read_entrys(&self, pubkey: &[Pubkey]) -> Vec<Option<ReadAccountMapEntry<T>>> {
+    pub fn get_account_read_entrys(&self, pubkey: &[Pubkey], details: &mut crate::message_processor::ExecuteDetailsTimings2,) -> Vec<Option<ReadAccountMapEntry<T>>> {
+        let mut m = Measure::start("");
         let maps = self.account_maps
             .read()
             .unwrap();
-        pubkey.iter().map(|pubkey|
-            maps.get(pubkey)
-            .cloned()
-            .map(ReadAccountMapEntry::from_account_map_entry)).collect::<Vec<_>>()
+            m.stop();
+            details.read_account_maps += m.as_us();
+        pubkey.iter().map(|pubkey|{
+            let mut m = Measure::start("");
+            let g = maps.get(pubkey);
+            m.stop();
+            details.maps_get += m.as_us();
+            m.stop();
+            let mut m = Measure::start("");
+            let c = g.cloned();
+            m.stop();
+            details.cloned += m.as_us();
+            let mut m = Measure::start("");
+            let res = c.map(ReadAccountMapEntry::from_account_map_entry);
+            m.stop();
+            details.from_account_map_entry += m.as_us();
+            res}
+        ).collect::<Vec<_>>()
     }
 
     fn get_account_write_entry(&self, pubkey: &Pubkey) -> Option<WriteAccountMapEntry<T>> {
@@ -1126,7 +1141,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
         details: &mut crate::message_processor::ExecuteDetailsTimings2,
     ) -> Vec<Option<(ReadAccountMapEntry<T>, usize)>> {
         let mut m = Measure::start("");
-        let entries = self.get_account_read_entrys(pubkey);
+        let entries = self.get_account_read_entrys(pubkey, details);
         m.stop();
         details.get_account_read_entrys += m.as_us();
         entries.into_iter()

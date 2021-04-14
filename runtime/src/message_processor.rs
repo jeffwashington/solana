@@ -77,6 +77,10 @@ pub struct ExecuteDetailsTimings2 {
     pub acct_load_not_found: u64,
     pub get_account_read_entrys: u64,
     pub latest_slot: u64,
+    pub read_account_maps: u64,
+    pub maps_get: u64,
+    pub cloned: u64,
+    pub from_account_map_entry: u64,
 }
 
 #[derive(Default, Debug)]
