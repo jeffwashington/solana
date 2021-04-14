@@ -270,10 +270,21 @@ fn process_entries_with_callback(
             .unwrap();
     }
     else {
+        let mut mes = Measure::start("");
         //error!("loading accounts: {}", pubkeys.len());
         for key in pubkeys {
             bank.load_accounts_into_read_only_cache(&key);
         }
+        mes.stop();
+        timings.pre_load += mes.as_us();
+        let mut mes = Measure::start("");
+        // load everything again
+        //error!("loading accounts: {}", pubkeys.len());
+        for key in pubkeys {
+            bank.load_accounts_into_read_only_cache(&key);
+        }
+        mes.stop();
+        timings.second_pre_load += mes.as_us();
     }
     //error!("done loading accounts");
     for entry in entries {

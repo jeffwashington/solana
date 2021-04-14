@@ -106,6 +106,8 @@ pub struct ExecuteTimings {
     pub store_us: u64,
     pub details: ExecuteDetailsTimings,
     pub details2: ExecuteDetailsTimings2,
+    pub pre_load: u64,
+    pub second_pre_load: u64,
 }
 
 impl ExecuteTimings {
@@ -114,6 +116,8 @@ impl ExecuteTimings {
         self.load_us += other.load_us;
         self.execute_us += other.execute_us;
         self.store_us += other.store_us;
+        self.pre_load += other.pre_load;
+        self.second_pre_load += other.second_pre_load;
         self.details.accumulate(&other.details);
         self.details2.accumulate(&other.details2);
     }
