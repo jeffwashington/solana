@@ -4493,7 +4493,10 @@ impl AccountsDb {
             storage_maps.iter().for_each(|storage| {
             let accounts = storage.all_accounts();
                 accounts.into_iter().for_each(|stored_account| {
-                    let entry = accounts_map
+                    if slot == &71500402 {
+                        error!("account: {}", stored_account.pubkey);
+                                    }
+                        let entry = accounts_map
                         .entry(stored_account.meta.pubkey)
                         .or_insert_with(BTreeMap::new);
                     assert!(
