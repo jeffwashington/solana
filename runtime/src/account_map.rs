@@ -332,7 +332,7 @@ impl<V: Clone> AccountMap<V> {
         }
         //error!("outer: {}, inner: {}, len: {}, insert: {}", outer.outer_index, outer.inner_index, self.values.len(), index.insert);
         if self.count % 20_000 == 0 {
-            error!("count: {}, lens: {:?}", self.cumulative_lens);
+            error!("count: {}, lens: {:?}", self.count, self.cumulative_lens);
         }
         &self.values[outer.outer_index][outer.inner_index]
     }
