@@ -138,7 +138,7 @@ pub struct AccountMap<V> {
 
 impl<V: Clone> AccountMap<V> {
     pub fn new() -> Self {
-        let vec_size_max = 10_000;
+        let vec_size_max = 100_000;
         Self {
             keys: vec![Self::new_vec(vec_size_max)],
             values: vec![Self::new_vec(vec_size_max)],
@@ -331,7 +331,7 @@ impl<V: Clone> AccountMap<V> {
             self.values[outer.outer_index][outer.inner_index] = value;
         }
         //error!("outer: {}, inner: {}, len: {}, insert: {}", outer.outer_index, outer.inner_index, self.values.len(), index.insert);
-        if self.count % 20_000 == 0 {
+        if self.count % 1_000_000 == 0 {
             error!("count: {}, lens: {:?}", self.count, self.cumulative_lens);
         }
         &self.values[outer.outer_index][outer.inner_index]
