@@ -3,6 +3,7 @@ use crate::{
     inline_spl_token_v2_0::{self, SPL_TOKEN_ACCOUNT_MINT_OFFSET, SPL_TOKEN_ACCOUNT_OWNER_OFFSET},
     secondary_index::*,
 };
+use log::*;
 use bv::BitVec;
 use dashmap::DashSet;
 use ouroboros::self_referencing;
@@ -729,6 +730,18 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
         let mut is_newly_inserted = false;
         let account_entry = w_account_maps.entry(*pubkey).or_insert_with(|| {
             is_newly_inserted = true;
+            {
+                let sl = new_entry.slot_list.read().unwrap();
+                let mut in_slot = false;
+                sl.iter().for_each(|(slot, _)| {
+                    if slot == &71484741 {
+    in_slot = true;
+                    }
+                });
+                if in_slot {
+                    error!("jwash pubkey {:?} slotlist {:?}", pubkey, sl.iter().map(|(slot, _)| *slot as u64).collect::<Vec<_>>());
+                }
+            }
             new_entry
         });
         let w_account_entry = WriteAccountMapEntry::from_account_map_entry(account_entry.clone());
