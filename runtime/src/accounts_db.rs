@@ -4487,7 +4487,7 @@ impl AccountsDb {
                 .map(|storage| storage.approx_stored_count())
                 .sum();
                 if slot == &71500402 {
-                    error!("generate index for slot: {}, num_accounts: {}, index: {}", slot, num_accounts, i);
+                    error!("generate index for slot: {}, num_accounts: {}, index: {}", slot, num_accounts, index);
                                 }
             let mut accounts_map: AccountsMap = AccountsMap::with_capacity(num_accounts);
             storage_maps.iter().for_each(|storage| {
