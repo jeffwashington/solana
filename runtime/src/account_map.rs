@@ -131,8 +131,8 @@ pub struct AccountMap<V> {
 impl<V> AccountMap<V> {
     pub fn new() -> Self {
         Self {
-            keys: Vec::new(),
-            values: Vec::new(),
+            keys: Vec::with_capacity(25_000_000),
+            values: Vec::with_capacity(25_000_000),
             count: 0,
         }
     }
