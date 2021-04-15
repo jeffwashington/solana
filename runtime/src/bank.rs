@@ -5044,7 +5044,8 @@ pub(crate) mod tests {
     use super::*;
     use crate::{
         accounts_db::SHRINK_RATIO,
-        accounts_index::{AccountMap, Ancestors, ITER_BATCH_SIZE},
+        account_map::{AccountMap},
+        accounts_index::{Ancestors, ITER_BATCH_SIZE},
         genesis_utils::{
             activate_all_features, bootstrap_validator_stake_lamports,
             create_genesis_config_with_leader, create_genesis_config_with_vote_accounts,
@@ -6579,8 +6580,8 @@ pub(crate) mod tests {
         }
     }
 
-    fn map_to_test_bad_range() -> AccountMap<Pubkey, i8> {
-        let mut map: AccountMap<Pubkey, i8> = AccountMap::new();
+    fn map_to_test_bad_range() -> AccountMap<i8> {
+        let mut map: AccountMap<i8> = AccountMap::new();
         // when empty, AccountMap (= std::collections::BTreeMap) doesn't sanitize given range...
         map.insert(solana_sdk::pubkey::new_rand(), 1);
         map
