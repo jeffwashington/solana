@@ -32,7 +32,7 @@ use std::{
     },
 };
 
-impl< V> Default for AccountMap<V> {
+impl< V: Clone> Default for AccountMap<V> {
     /// Creates an empty `BTreeMap`.
     fn default() -> AccountMap<V> {
         AccountMap::new()
@@ -49,7 +49,7 @@ pub enum AccountMapEntryBtree {
 }
 
 impl AccountMapEntryBtree {
-    pub fn or_insert_with<V, F>(self, default: F, btree: &mut AccountMap<V>) -> &V
+    pub fn or_insert_with<V: Clone, F>(self, default: F, btree: &mut AccountMap<V>) -> &V
     where
         F: FnOnce() -> V, 
         {
@@ -83,7 +83,7 @@ impl VacantEntry {
             index,
         }
     }
-    pub fn insert<V>(self, value: V, btree: &mut AccountMap<V>) -> &V {    
+    pub fn insert<V: Clone>(self, value: V, btree: &mut AccountMap<V>) -> &V {    
         btree.insert_at_index(&self.index, self.key, value)
     }
 }
@@ -103,13 +103,13 @@ impl OccupiedEntry {
             index,
         }
     }
-    pub fn into_mut<V>(self, btree: &AccountMap<V>) -> &V {
+    pub fn into_mut<V: Clone>(self, btree: &AccountMap<V>) -> &V {
         btree.get_at_index(&self.index).unwrap()
     }
-    pub fn get<'a, 'b, V>(&'a self, btree: &'b AccountMap<V>) -> &'b V {
+    pub fn get<'a, 'b, V: Clone>(&'a self, btree: &'b AccountMap<V>) -> &'b V {
         btree.get_at_index(&self.index).unwrap()
     }
-    pub fn remove<V>(self, btree: &mut AccountMap<V>) {
+    pub fn remove<V: Clone>(self, btree: &mut AccountMap<V>) {
         btree.remove_at_index(&self.index);
     }
 }
@@ -120,44 +120,175 @@ pub struct AccountMapIndex {
     pub insert: bool,
 }
 
+#[derive(Debug, Clone)]
+pub struct InnerAccountMapIndex {
+    pub outer_index: usize,
+    pub inner_index: usize,
+}
+
 //pub type AccountMap<K, V> = BTreeMap<K, V>;
 #[derive(Debug)]
 pub struct AccountMap<V> {
-    keys: Vec<Pubkey>,
-    values: Vec<V>,
+    keys: Vec<Vec<Pubkey>>,
+    values: Vec<Vec<V>>,
     count: usize,
+    cumulative_lens: Vec<usize>,
+    vec_size_max: usize,
 }
 
-impl<V> AccountMap<V> {
+impl<V: Clone> AccountMap<V> {
     pub fn new() -> Self {
+        let vec_size_max = 1;
         Self {
-            keys: Vec::with_capacity(25_000_000),
-            values: Vec::with_capacity(25_000_000),
+            keys: vec![Self::new_vec(vec_size_max)],
+            values: vec![Self::new_vec(vec_size_max)],
             count: 0,
+            cumulative_lens: vec![0],
+            vec_size_max,
         }
     }
+
+    fn new_vec<T>(size: usize) -> Vec<T> {
+        Vec::with_capacity(size)
+    }
+
     pub fn get_index(&self, index: &AccountMapIndex) -> Option<(&Pubkey, &V)> {
-        if index.insert {
+        if index.insert || index.index >= self.count {
             None
         }
         else {
-            Some((&self.keys[index.index], &self.values[index.index]))
+            let outer = self.get_outer_index(index.index);
+            Some((&self.keys[outer.outer_index][outer.inner_index], &self.values[outer.outer_index][outer.inner_index]))
         }
     }
+
+    fn mv<U: Clone>(vec: &mut Vec<Vec<U>>, outer: usize, inner: usize, to_move: usize, value: U) {
+        let mut new_vec;
+        if to_move == 0 {
+            // could look forward to see if next outer can fit this new item without growing too big
+            new_vec = vec![value];
+        }
+        else {
+            new_vec = vec[outer][inner..].to_vec();
+            vec[outer].resize(inner + 1, value.clone());
+            vec[outer][inner] = value;
+        }
+        vec.insert(outer + 1, new_vec);
+    }
+
+    pub fn insert_at_index_alloc(&mut self, index: &AccountMapIndex, key: Pubkey, value: V, outer: &mut InnerAccountMapIndex ) {
+        let max = self.vec_size_max;
+        let max_move = max; // tune this later
+        let size = self.keys[outer.outer_index].len();
+        let to_move = size-outer.inner_index;
+        //error!("insert_at_index_alloc, outer: {}, inner: {}, len: {}, to_move: {}, size: {}, values: {:?}", outer.outer_index, outer.inner_index, self.count, to_move, size, self.keys);
+        if size > 0 && (to_move > max_move || size + 1 >= max) {
+            // have to add a new vector
+            Self::mv(&mut self.keys, outer.outer_index, outer.inner_index, to_move, key);
+            Self::mv(&mut self.values, outer.outer_index, outer.inner_index, to_move, value);
+            //error!("new keys: {:?}", self.keys);
+            self.cumulative_lens.insert(outer.outer_index, self.cumulative_lens[outer.outer_index]); // we inserted here
+            if to_move == 0 {
+                //self.cumulative_lens[outer.outer_index + 1] -= outer.inner_index;
+                outer.outer_index += 1;
+                outer.inner_index = 0;
+            }
+            else {
+                self.cumulative_lens[outer.outer_index] -= to_move;
+            }
+        }
+        else {
+            // no new vector - just insert
+            self.keys[outer.outer_index].insert(outer.inner_index, key);
+            self.values[outer.outer_index].insert(outer.inner_index, value);
+        }
+        // shift the rest of the cumulative offsets since we inserted
+        for outer_index in &mut self.cumulative_lens[outer.outer_index..] {
+            *outer_index += 1;
+        }
+        //error!("Inserted, lens: {:?}, keys: {:?}", self.cumulative_lens, self.keys);
+        self.count += 1;
+    }
+
+    pub fn get_outer_index(&self, given_index: usize) -> InnerAccountMapIndex {
+        let mut l = 0;
+        let mut index = l;
+        let mut inner_index = 0;
+        if self.count > 0 {
+            let mut r = self.cumulative_lens.len();
+            let mut iteration = 0;
+            loop {
+                index = (l + r) / 2;
+                let val = self.cumulative_lens[index];
+                let cmp = given_index.partial_cmp(&val).unwrap();
+                //error!("outer: left: {}, right: {}, count: {}, index: {}, cmp: {:?}, val: {:?}, iteration: {}", l, r, self.cumulative_lens.len(), index, cmp, val, iteration);
+                iteration += 1;
+                match cmp {
+                    Ordering::Equal => {
+                        if index + 1 < self.cumulative_lens.len() {
+                        index += 1;
+                        }
+                        break;},
+                    Ordering::Less => {r = index;
+                    },
+                    Ordering::Greater => {
+                        if index == r - 1 {
+                            index = r;
+                            break;
+                        }
+                        l = index;
+                        
+                    },
+                }
+                if r == l {
+                    break;
+                }
+            }
+            //error!("returning: index: {}, inner_index: {}, given_index: {}, cumulative_lens: {:?}", index, inner_index, given_index, self.cumulative_lens);
+            if index > 0 {
+                inner_index = given_index - self.cumulative_lens[index - 1];
+            }
+            else {
+                inner_index = given_index;
+            }
+            //error!("returned: outer: {}, inner_index: {}, given_index: {}, cumulative_lens: {:?}", index, inner_index, given_index, self.cumulative_lens);
+        }
+
+        InnerAccountMapIndex {
+            outer_index: index,
+            inner_index,
+        }
+    }
+/*
+    pub fn increment(&self, outer: &mut InnerAccountMapIndex) {
+        while outer.outer_index < self.values.len() {
+            let current = self.values[outer.outer_index];
+            outer.inner_index += 1;
+            if outer.inner_index < current.len() {
+                return;
+            }
+            outer.inner_index = 0;
+            outer.outer_index += 1;
+            // loop because we could have an empty inner array and we may need to increment outer again
+        }
+    }
+    */
 
     pub fn find(&self, key: &Pubkey) -> AccountMapIndex {
         let mut l = 0;
         let mut index = l;
         let mut insert = true;
         if self.count > 0 {
-            let count_minus_1 = self.count - 1;
             let mut r = self.count;
             let mut iteration = 0;
+            //error!("keys: {:?}", self.keys);
             loop {
                 index = (l + r) / 2;
-                let val = self.keys[index];
+                let outer = self.get_outer_index(index);
+                //error!("keys2: {:?}, outer: {:?}", self.keys, outer);
+                let val = self.keys[outer.outer_index][outer.inner_index];
                 let cmp = key.partial_cmp(&val).unwrap();
-                //error!("left: {}, right: {}, count: {}, index: {}, cmp: {:?}, key: {:?} val: {:?}, iteration: {}", l, r, self.count, index, cmp, val, key, iteration);
+                //error!("left: {}, right: {}, count: {}, index: {}, cmp: {:?}, key: {:?} val: {:?}, iteration: {}, keys: {:?}", l, r, self.count, index, cmp, val, key, iteration, self.keys);
                 iteration += 1;
                 match cmp {
                     Ordering::Equal => {insert = false;break;},
@@ -191,15 +322,16 @@ impl<V> AccountMap<V> {
         self.insert_at_index(&find, key, value)
     }
     pub fn insert_at_index(&mut self, index: &AccountMapIndex, key: Pubkey, value: V) -> &V {
+        let mut outer = self.get_outer_index(index.index);
+
         if index.insert {
-            self.keys.insert(index.index, key);
-            self.values.insert(index.index, value);
-            self.count += 1;
+            self.insert_at_index_alloc(index, key, value, &mut outer);
         }
         else {
-            self.values[index.index] = value;
+            self.values[outer.outer_index][outer.inner_index] = value;
         }
-        &self.values[index.index]
+        //error!("outer: {}, inner: {}, len: {}, insert: {}", outer.outer_index, outer.inner_index, self.values.len(), index.insert);
+        &self.values[outer.outer_index][outer.inner_index]
     }
     pub fn entry(&self, key: Pubkey) -> AccountMapEntryBtree {
         let find = self.find(&key);
@@ -216,19 +348,15 @@ impl<V> AccountMap<V> {
     }
     pub fn get(&self, key: &Pubkey) -> Option<&V> {
         let find = self.find(&key);
-        if find.insert {
-            None
-        }
-        else {
-            Some(&self.values[find.index])
-        }
+        self.get_at_index(&find)
     }
     pub fn get_at_index(&self, index: &AccountMapIndex) -> Option<&V> {
         if index.insert {
             None
         }
         else {
-            Some(&self.values[index.index])
+            let mut outer = self.get_outer_index(index.index);
+            Some(&self.values[outer.outer_index][outer.inner_index])
         }
     }
     pub fn remove(&mut self, key: &Pubkey) {
@@ -239,16 +367,21 @@ impl<V> AccountMap<V> {
         if index.insert {
         }
         else {
+            let mut outer = self.get_outer_index(index.index);
             self.count -= 1;
-            self.keys.remove(index.index);
-            self.values.remove(index.index);
+            // TODO - could shrink to zero size here
+            self.keys[outer.outer_index].remove(outer.inner_index);
+            self.values[outer.outer_index].remove(outer.inner_index);
+            for cumulative in &mut self.cumulative_lens[outer.outer_index..] {
+                *cumulative -= 1;
+            }
         }
     }
-    pub fn keys(&self) -> std::slice::Iter<'_, Pubkey> {
-        self.keys.iter()
+    pub fn keys(&self) -> AccountMapIterKeys<'_, V> {//std::slice::Iter<'_, (K, V)> {
+        AccountMapIterKeys::new(&self, AccountMapIndex {index: 0, insert: false,})
     }
-    pub fn values(&self) -> std::slice::Iter<'_, V> {
-        self.values.iter()
+    pub fn values(&self) -> AccountMapIterValues<'_, V> {//std::slice::Iter<'_, (K, V)> {
+        AccountMapIterValues::new(&self, AccountMapIndex {index: 0, insert: false,})
     }
     pub fn iter(&self) -> AccountMapIter<'_, V> {//std::slice::Iter<'_, (K, V)> {
         AccountMapIter::new(&self, AccountMapIndex {index: 0, insert: false,})
@@ -276,7 +409,7 @@ impl<'a, V> AccountMapIter<'a, V> {
         }
     }
 }
-impl<'a, V> Iterator for AccountMapIter<'a, V> {
+impl<'a, V:Clone> Iterator for AccountMapIter<'a, V> {
     type Item = (&'a Pubkey, &'a V);
 
     // next() is the only required method
@@ -289,6 +422,60 @@ impl<'a, V> Iterator for AccountMapIter<'a, V> {
         result
     }    
 }
+pub struct AccountMapIterValues<'a, V> {
+    pub index: AccountMapIndex,
+    pub btree: &'a AccountMap<V>,
+    //_dummy: PhantomData<V>,
+}
+impl<'a, V> AccountMapIterValues<'a, V> {
+    pub fn new(btree: &'a AccountMap<V>, index: AccountMapIndex) -> Self {
+        Self {
+            index,
+            btree,
+        }
+    }
+}
+impl<'a, V: Clone> Iterator for AccountMapIterValues<'a, V> {
+    type Item = &'a V;
+
+    // next() is the only required method
+    fn next(&mut self) -> Option<Self::Item> {
+        let result =   self.btree.get_index(&self.index).map(|(_,v)| v);
+        if result.is_some() {
+            self.index.index += 1;
+        }
+
+        result
+    }    
+}
+
+pub struct AccountMapIterKeys<'a, V: Clone> {
+    pub index: AccountMapIndex,
+    pub btree: &'a AccountMap<V>,
+    //_dummy: PhantomData<V>,
+}
+impl<'a, V: Clone> AccountMapIterKeys<'a, V> {
+    pub fn new(btree: &'a AccountMap<V>, index: AccountMapIndex) -> Self {
+        Self {
+            index,
+            btree,
+        }
+    }
+}
+impl<'a, V:Clone> Iterator for AccountMapIterKeys<'a, V> {
+    type Item = &'a Pubkey;
+
+    // next() is the only required method
+    fn next(&mut self) -> Option<Self::Item> {
+        let result =   self.btree.get_index(&self.index).map(|(k,_)| k);
+        if result.is_some() {
+            self.index.index += 1;
+        }
+
+        result
+    }    
+}
+
 
 #[cfg(test)]
 pub mod tests {
@@ -298,13 +485,15 @@ pub mod tests {
     use std::collections::HashMap;
 
     #[test]
-    fn test_account_map() {
+    fn test_account_map123() {
         solana_logger::setup();
+        let key0 = Pubkey::new(&[0u8; 32]);
         let key1 = Pubkey::new(&[1u8; 32]);
         let key2 = Pubkey::new(&[2u8; 32]);
         let key3= Pubkey::new(&[3u8; 32]);
 
         let mut m = AccountMap::new();
+        let val0 = 0;
         let val1 = 1;
         let val2 = 1;
         let val3 = 1;
@@ -322,6 +511,14 @@ pub mod tests {
         assert_eq!(3, m.len());
         assert_eq!(m.keys().collect::<Vec<_>>(), vec![&key1, &key2, &key3]);
         assert_eq!(m.values().collect::<Vec<_>>(), vec![&val1, &val2, &val3]);
+        m.remove(&key2);
+        assert_eq!(2, m.len());
+        assert_eq!(m.keys().collect::<Vec<_>>(), vec![&key1, &key3]);
+        m.insert(key0, val0);
+        assert_eq!(m.get(&key0).unwrap(), &val0);
+        assert_eq!(3, m.len());
+        assert_eq!(m.keys().collect::<Vec<_>>(), vec![&key0, &key1, &key3]);
+        assert_eq!(m.values().collect::<Vec<_>>(), vec![&val0, &val1, &val3]);
     }
 
     #[test]
