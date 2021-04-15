@@ -208,44 +208,44 @@ impl Ancestors {
 pub type RefCount = u64;
 //pub type AccountMap<K, V> = BTreeMap<K, V>;
 #[derive(Debug)]
-pub struct AccountMap<K, V> {
-    keys: Vec<K>,
+pub struct AccountMap<V> {
+    keys: Vec<Pubkey>,
     values: Vec<V>,
-    all: Vec<(K, V)>,
-    /*root: Option<Root<K, V>>,
+    all: Vec<(V)>,
+    /*root: Option<Root<V>>,
     length: usize,*/
 }
 
-impl<K: Ord, V> Default for AccountMap<K, V> {
+impl< V> Default for AccountMap<V> {
     /// Creates an empty `BTreeMap`.
-    fn default() -> AccountMap<K, V> {
+    fn default() -> AccountMap<V> {
         AccountMap::new()
     }
 }
 
 #[derive(Debug, Clone)]
-pub enum AccountMapEntryBtree<K: Ord> {
+pub enum AccountMapEntryBtree {
     /// A vacant entry.
-    Vacant(VacantEntry<K>),
+    Vacant(VacantEntry),
 
     /// An occupied entry.
-    Occupied(OccupiedEntry<K>),
+    Occupied(OccupiedEntry),
 }
 
 #[derive(Clone)]
-pub struct VacantEntry<K> {
+pub struct VacantEntry {
     pub index: usize,
-    pub key: K,
+    pub key: Pubkey,
 }
 
-impl<K: Debug + Ord> Debug for VacantEntry<K> {
+impl Debug for VacantEntry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("VacantEntry").field(self.key()).finish()
     }
 }
 
-impl<K: Ord> AccountMapEntryBtree<K> {
-    pub fn or_insert_with<V, F>(self, default: F, btree: &mut AccountMap<K,V>) -> &V
+impl AccountMapEntryBtree {
+    pub fn or_insert_with<V, F>(self, default: F, btree: &mut AccountMap<V>) -> &V
     where
         F: FnOnce() -> V, 
         {
@@ -256,19 +256,19 @@ impl<K: Ord> AccountMapEntryBtree<K> {
         }    
 }
 
-impl<K: Ord> VacantEntry<K> {
+impl VacantEntry {
     /// Creates an empty `BTreeMap`.
-    pub fn key(&self) -> &K {
+    pub fn key(&self) -> &Pubkey {
         &self.key
     }
-    pub fn new(key: K) -> Self {
+    pub fn new(key: Pubkey) -> Self {
         let index = 0;
         Self {
             key,
             index,
         }
     }
-    pub fn insert<V>(self, value: V, btree: &mut AccountMap<K,V>) -> &V {    
+    pub fn insert<V>(self, value: V, btree: &mut AccountMap<V>) -> &V {    
         btree.insert(self.key, value)
     }
 }
@@ -278,24 +278,24 @@ impl<K: Ord> VacantEntry<K> {
 /// A view into an occupied entry in a `BTreeMap`.
 /// It is part of the [`Entry`] enum.
 #[derive(Debug, Clone)]
-pub struct OccupiedEntry<K> {
+pub struct OccupiedEntry {
     pub index: usize,
-    pub key: K,
+    pub key: Pubkey,
 }
 
-impl<K: Ord> OccupiedEntry<K> {
-    pub fn into_mut<V>(self, btree: &AccountMap<K,V>) -> &V {
+impl OccupiedEntry {
+    pub fn into_mut<V>(self, btree: &AccountMap<V>) -> &V {
         btree.get(&self.key).unwrap()
     }
-    pub fn get<'a, 'b, V>(&'a self, btree: &'b AccountMap<K,V>) -> &'b V {
+    pub fn get<'a, 'b, V>(&'a self, btree: &'b AccountMap<V>) -> &'b V {
         btree.get(&self.key).unwrap()
     }
-    pub fn remove<V>(self, btree: &mut AccountMap<K,V>) {
+    pub fn remove<V>(self, btree: &mut AccountMap<V>) {
         btree.remove(&self.key)
     }
 }
 
-impl<K: Ord,V> AccountMap<K,V> {
+impl<V> AccountMap<V> {
     pub fn new() -> Self {
         Self {
             keys: Vec::new(),
@@ -303,7 +303,7 @@ impl<K: Ord,V> AccountMap<K,V> {
             all: Vec::new(),
         }
     }
-    pub fn get_index(&self, index: usize) -> Option<(&K, &V)> {
+    pub fn get_index(&self, index: usize) -> Option<(&Pubkey, &V)> {
         if index < self.values.len() {
             Some((&self.keys[index], &self.values[index]))
         }
@@ -311,57 +311,56 @@ impl<K: Ord,V> AccountMap<K,V> {
             None
         }
     }
-    pub fn insert(&mut self, key: K, value: V) -> &V {
+    pub fn insert(&mut self, key: Pubkey, value: V) -> &V {
         self.values.push(value);
         self.values.last().unwrap()
     }
-    pub fn entry(&self, key: K) -> AccountMapEntryBtree<K> {
+    pub fn entry(&self, key: Pubkey) -> AccountMapEntryBtree {
         AccountMapEntryBtree::Vacant(VacantEntry::new(key))
     }
-    pub fn contains_key(&self, key: &K) -> bool {
+    pub fn contains_key(&self, key: &Pubkey) -> bool {
         false
     }
-    pub fn get(&self, key: &K) -> Option<&V> {
+    pub fn get(&self, key: &Pubkey) -> Option<&V> {
         None
     }
-    pub fn remove(&mut self, key: &K) {
+    pub fn remove(&mut self, key: &Pubkey) {
         
     }
-    pub fn keys(&self) -> std::slice::Iter<'_, K> {
+    pub fn keys(&self) -> std::slice::Iter<'_, Pubkey> {
         self.keys.iter()
     }
     pub fn values(&self) -> std::slice::Iter<'_, V> {
         self.values.iter()
     }
-    pub fn iter(&self) -> AccountMapIter<'_, K, V> {//std::slice::Iter<'_, (K, V)> {
+    pub fn iter(&self) -> AccountMapIter<'_, V> {//std::slice::Iter<'_, (K, V)> {
         AccountMapIter::new(&self, 0)
     }
-    pub fn range<T, R>(&self, range: R) -> Option<(K, K)>
+    pub fn range<T, R>(&self, range: R) -> Option<(Pubkey, Pubkey)>
     where
         T: Ord + ?Sized,
         R: RangeBounds<T>,
-        K: core::borrow::Borrow<T> + Ord,     
         {
             None
         }
 }
 
-pub struct AccountMapIter<'a, K, V> {
+pub struct AccountMapIter<'a, V> {
     pub index: usize,
-    pub btree: &'a AccountMap<K, V>,
+    pub btree: &'a AccountMap<V>,
     //_dummy: PhantomData<V>,
 }
-impl<'a, K, V> AccountMapIter<'a, K, V> {
-    pub fn new(btree: &'a AccountMap<K, V>, index: usize) -> Self {
+impl<'a, V> AccountMapIter<'a, V> {
+    pub fn new(btree: &'a AccountMap<V>, index: usize) -> Self {
         Self {
             index,
             btree,
         }
     }
 }
-impl<'a, K: Ord, V> Iterator for AccountMapIter<'a, K, V> {
+impl<'a, V> Iterator for AccountMapIter<'a, V> {
     // we will be counting with usize
-    type Item = (&'a K, &'a V);
+    type Item = (&'a Pubkey, &'a V);
 
     // next() is the only required method
     fn next(&mut self) -> Option<Self::Item> {
@@ -665,7 +664,7 @@ pub struct AccountsIndexRootsStats {
 }
 
 pub struct AccountsIndexIterator<'a, T> {
-    account_maps: &'a RwLock<AccountMap<Pubkey, AccountMapEntry<T>>>,
+    account_maps: &'a RwLock<AccountMap<AccountMapEntry<T>>>,
     start_bound: Bound<Pubkey>,
     end_bound: Bound<Pubkey>,
     is_finished: bool,
@@ -681,7 +680,7 @@ impl<'a, T> AccountsIndexIterator<'a, T> {
     }
 
     pub fn new<R>(
-        account_maps: &'a RwLock<AccountMap<Pubkey, AccountMapEntry<T>>>,
+        account_maps: &'a RwLock<AccountMap<AccountMapEntry<T>>>,
         range: Option<R>,
     ) -> Self
     where
@@ -738,7 +737,7 @@ pub trait ZeroLamport {
 
 #[derive(Debug, Default)]
 pub struct AccountsIndex<T> {
-    pub account_maps: RwLock<AccountMap<Pubkey, AccountMapEntry<T>>>,
+    pub account_maps: RwLock<AccountMap<AccountMapEntry<T>>>,
     program_id_index: SecondaryIndex<DashMapSecondaryIndexEntry>,
     spl_token_mint_index: SecondaryIndex<DashMapSecondaryIndexEntry>,
     spl_token_owner_index: SecondaryIndex<RwLockSecondaryIndexEntry>,
