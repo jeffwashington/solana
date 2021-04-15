@@ -1142,7 +1142,8 @@ mod tests {
             error_counters,
             rent_collector,
             &FeatureSet::all_enabled(),
-        )
+            &mut crate::message_processor::ExecuteDetailsTimings2::default(),
+                )
     }
 
     fn load_accounts_with_fee(
@@ -2071,6 +2072,7 @@ mod tests {
             &mut error_counters,
             &rent_collector,
             &FeatureSet::all_enabled(),
+            &mut crate::message_processor::ExecuteDetailsTimings2::default(),
         )
     }
 
