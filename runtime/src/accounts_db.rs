@@ -4481,6 +4481,7 @@ impl AccountsDb {
         let mut last_slot = 0;
         let mut found_nonzero = false;
         let mut zero_count = 0;
+        let mut zero_slots = vec![];
         for (index, slot) in slots.iter().enumerate() {
             let now = Instant::now();
             if now.duration_since(last_log_update).as_secs() >= 2 {
@@ -4507,7 +4508,7 @@ impl AccountsDb {
                     }
                     if !found_nonzero {
                         if stored_account.account_meta.lamports > 0 {
-                            error!("Found NON zero account: {}, slot: {}, index: {}, lamports: {}, previous # of ZERO lamport accounts: {}", stored_account.meta.pubkey, slot, index, stored_account.account_meta.lamports, zero_count);
+                            error!("Found NON zero account: {}, slot: {}, index: {}, lamports: {}, previous # of ZERO lamport accounts: {}, slots with only zeros: {:?}", stored_account.meta.pubkey, slot, index, stored_account.account_meta.lamports, zero_count, zero_slots);
                             found_nonzero = true;
                         }
                         else {
@@ -4535,6 +4536,9 @@ impl AccountsDb {
                     );
                 })
             });
+            if !found_nonzero {
+                zero_slots.push(*slot);
+            }
             last_last_slot = last_slot;
             last_slot = *slot;
             // Need to restore indexes even with older write versions which may
