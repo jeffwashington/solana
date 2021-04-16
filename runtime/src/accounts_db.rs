@@ -4479,6 +4479,7 @@ impl AccountsDb {
         let mut last_log_update = Instant::now();
         let mut last_last_slot = 0;
         let mut last_slot = 0;
+        let mut found_nonzero = false;
         for (index, slot) in slots.iter().enumerate() {
             let now = Instant::now();
             if now.duration_since(last_log_update).as_secs() >= 2 {
@@ -4500,8 +4501,11 @@ impl AccountsDb {
             storage_maps.iter().for_each(|storage| {
             let accounts = storage.all_accounts();
                 accounts.into_iter().for_each(|stored_account| {
-                    if slot == &71500402 || last_slot == 71500402 || last_last_slot == 71500402 || stored_account.meta.pubkey == pk1 || stored_account.meta.pubkey == pk2 {
+                    if !found_nonzero || slot == &71500402 || last_slot == 71500402 || last_last_slot == 71500402 || stored_account.meta.pubkey == pk1 || stored_account.meta.pubkey == pk2 {
                         error!("Found account: {}, slot: {}, index: {}, lamports: {}", stored_account.meta.pubkey, slot, index, stored_account.account_meta.lamports);
+                    }
+                    if stored_account.account_meta.lamports > 0 {
+                        found_nonzero = true;
                     }
                     /*
                     if slot == &71500402 {
