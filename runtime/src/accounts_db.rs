@@ -4499,7 +4499,7 @@ impl AccountsDb {
             let accounts = storage.all_accounts();
                 accounts.into_iter().for_each(|stored_account| {
                     if slot == &71500402 || stored_account.meta.pubkey == pk1 || stored_account.meta.pubkey == pk2 {
-                        error!("Found account: {}, slot: {}, index: {}", stored_account.meta.pubkey, slot, index);
+                        error!("Found account: {}, slot: {}, index: {}, lamports: {}", stored_account.meta.pubkey, slot, index, stored_account.account_meta.lamports);
                     }
                     /*
                     if slot == &71500402 {
