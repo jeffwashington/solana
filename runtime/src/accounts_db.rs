@@ -4477,6 +4477,8 @@ impl AccountsDb {
 
 
         let mut last_log_update = Instant::now();
+        let mut last_last_slot = 0;
+        let mut last_slot = 0;
         for (index, slot) in slots.iter().enumerate() {
             let now = Instant::now();
             if now.duration_since(last_log_update).as_secs() >= 2 {
@@ -4499,7 +4501,7 @@ impl AccountsDb {
             let accounts = storage.all_accounts();
                 accounts.into_iter().for_each(|stored_account| {
                     if slot == &71500402 || stored_account.meta.pubkey == pk1 || stored_account.meta.pubkey == pk2 {
-                        error!("Found account: {}, slot: {}, index: {}, lamports: {}", stored_account.meta.pubkey, slot, index, stored_account.account_meta.lamports);
+                        error!("Found account: {}, slot: {}, index: {}, lamports: {}, last slot: {}, last last slot: {}", stored_account.meta.pubkey, slot, index, stored_account.account_meta.lamports, last_slot, last_last_slot);
                     }
                     /*
                     if slot == &71500402 {
@@ -4522,6 +4524,8 @@ impl AccountsDb {
                     );
                 })
             });
+            last_last_slot = last_slot;
+            last_slot = slot;
             // Need to restore indexes even with older write versions which may
             // be shielding other accounts. When they are then purged, the
             // original non-shielded account value will be visible when the account
