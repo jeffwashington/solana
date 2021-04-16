@@ -4505,12 +4505,14 @@ impl AccountsDb {
                     if slot == &71500402 || last_slot == 71500402 || last_last_slot == 71500402 || stored_account.meta.pubkey == pk1 || stored_account.meta.pubkey == pk2 {
                         error!("Found account: {}, slot: {}, index: {}, lamports: {}", stored_account.meta.pubkey, slot, index, stored_account.account_meta.lamports);
                     }
-                    if stored_account.account_meta.lamports > 0 {
-                        error!("Found NON zero account: {}, slot: {}, index: {}, lamports: {}, previous # of ZERO lamport accounts: {}", stored_account.meta.pubkey, slot, index, stored_account.account_meta.lamports, zero_count);
-                        found_nonzero = true;
-                    }
-                    else {
-                        zero_count += 1;
+                    if !found_nonzero {
+                        if stored_account.account_meta.lamports > 0 {
+                            error!("Found NON zero account: {}, slot: {}, index: {}, lamports: {}, previous # of ZERO lamport accounts: {}", stored_account.meta.pubkey, slot, index, stored_account.account_meta.lamports, zero_count);
+                            found_nonzero = true;
+                        }
+                        else {
+                            zero_count += 1;
+                        }
                     }
                     /*
                     if slot == &71500402 {
