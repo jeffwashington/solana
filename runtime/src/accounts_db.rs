@@ -29,6 +29,7 @@ use crate::{
     contains::Contains,
     read_only_accounts_cache::ReadOnlyAccountsCache,
 };
+use std::str::FromStr;
 use blake3::traits::digest::Digest;
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use dashmap::{
@@ -4471,8 +4472,8 @@ impl AccountsDb {
         #[allow(clippy::stable_sort_primitive)]
         slots.sort();
 
-        let pk1 = &Pubkey::from_str("7jEfU57R2sV2B1DddKdsqZsdHaHm3B15REb4abvP6Me2").unwrap();
-        let pk2 = &Pubkey::from_str("C57GmZLsPviiHZqWjYHo9is8QnMNq1Fc7SkYvLxLts24").unwrap();
+        let pk1 = Pubkey::from_str("7jEfU57R2sV2B1DddKdsqZsdHaHm3B15REb4abvP6Me2").unwrap();
+        let pk2 = Pubkey::from_str("C57GmZLsPviiHZqWjYHo9is8QnMNq1Fc7SkYvLxLts24").unwrap();
 
 
         let mut last_log_update = Instant::now();
@@ -4497,7 +4498,7 @@ impl AccountsDb {
             storage_maps.iter().for_each(|storage| {
             let accounts = storage.all_accounts();
                 accounts.into_iter().for_each(|stored_account| {
-                    if stored_account.meta.pubkey == key1 || stored_account.meta.pubkey == key2 {
+                    if stored_account.meta.pubkey == pk1 || stored_account.meta.pubkey == pk2 {
                         error!("Found account: {}, slot: {}, index: {}", stored_account.meta.pubkey, slot, index);
                     }
                     if slot == &71500402 {
