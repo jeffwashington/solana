@@ -4498,15 +4498,17 @@ impl AccountsDb {
             storage_maps.iter().for_each(|storage| {
             let accounts = storage.all_accounts();
                 accounts.into_iter().for_each(|stored_account| {
-                    if stored_account.meta.pubkey == pk1 || stored_account.meta.pubkey == pk2 {
+                    if slot == &71500402 || stored_account.meta.pubkey == pk1 || stored_account.meta.pubkey == pk2 {
                         error!("Found account: {}, slot: {}, index: {}", stored_account.meta.pubkey, slot, index);
                     }
+                    /*
                     if slot == &71500402 {
                         error!("account: {}", stored_account.meta.pubkey);
                                     }
                         let entry = accounts_map
                         .entry(stored_account.meta.pubkey)
                         .or_insert_with(BTreeMap::new);
+                        */
                     assert!(
                         // There should only be one update per write version for a specific slot
                         // and account
