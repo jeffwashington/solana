@@ -4505,10 +4505,11 @@ impl AccountsDb {
                     if slot == &71500402 {
                         error!("account: {}", stored_account.meta.pubkey);
                                     }
+                                    */
                         let entry = accounts_map
                         .entry(stored_account.meta.pubkey)
                         .or_insert_with(BTreeMap::new);
-                        */
+                        
                     assert!(
                         // There should only be one update per write version for a specific slot
                         // and account
