@@ -4503,7 +4503,7 @@ impl AccountsDb {
             storage_maps.iter().for_each(|storage| {
             let accounts = storage.all_accounts();
                 accounts.into_iter().for_each(|stored_account| {
-                    if slot == &71500402 || last_slot == 71500402 || last_last_slot == 71500402 || stored_account.meta.pubkey == pk1 || stored_account.meta.pubkey == pk2 {
+                    if slot == &71500402 || /*last_slot == 71500402 || last_last_slot == 71500402 || */stored_account.meta.pubkey == pk1 || stored_account.meta.pubkey == pk2 {
                         error!("Found account: {}, slot: {}, index: {}, lamports: {}", stored_account.meta.pubkey, slot, index, stored_account.account_meta.lamports);
                     }
                     if !found_nonzero {
