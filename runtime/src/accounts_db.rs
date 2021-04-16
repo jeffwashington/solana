@@ -4525,7 +4525,7 @@ impl AccountsDb {
                 })
             });
             last_last_slot = last_slot;
-            last_slot = slot;
+            last_slot = *slot;
             // Need to restore indexes even with older write versions which may
             // be shielding other accounts. When they are then purged, the
             // original non-shielded account value will be visible when the account
