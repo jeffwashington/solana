@@ -4494,7 +4494,7 @@ impl AccountsDb {
             let accounts = storage.all_accounts();
                 accounts.into_iter().for_each(|stored_account| {
                     if slot == &71500402 {
-                        error!("account: {}", stored_account.pubkey);
+                        error!("account: {}", stored_account.meta.pubkey);
                                     }
                         let entry = accounts_map
                         .entry(stored_account.meta.pubkey)
