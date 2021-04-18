@@ -1478,6 +1478,16 @@ impl AccountsDb {
 
         let mut key_timings = CleanKeyTimings::default();
         let pubkeys = self.construct_candidate_clean_keys(max_clean_root, &mut key_timings);
+        
+        let pk1 = Pubkey::from_str("7jEfU57R2sV2B1DddKdsqZsdHaHm3B15REb4abvP6Me2").unwrap();
+        let pk2 = Pubkey::from_str("C57GmZLsPviiHZqWjYHo9is8QnMNq1Fc7SkYvLxLts24").unwrap();
+
+        if pubkeys.contains(&pk1) {
+            error!("clean_accounts contains the magic key: {}", pk1);
+        }
+        if pubkeys.contains(&pk2) {
+            error!("clean_accounts contains the magic key: {}", pk2);
+        }
 
         let total_keys_count = pubkeys.len();
         let mut accounts_scan = Measure::start("accounts_scan");
@@ -1547,6 +1557,21 @@ impl AccountsDb {
             })
         };
         accounts_scan.stop();
+
+        if purges.contains(&pk1) {
+            error!("clean_accounts.purges contains the magic key: {}", pk1);
+        }
+        if purges.contains(&pk2) {
+            error!("clean_accounts.purges contains the magic key: {}", pk2);
+        }
+
+        if purges_in_root.contains(&pk1) {
+            error!("clean_accounts.purges_in_root contains the magic key: {}", pk1);
+        }
+        if purges_in_root.contains(&pk2) {
+            error!("clean_accounts.purges_in_root contains the magic key: {}", pk2);
+        }
+
 
         let mut clean_old_rooted = Measure::start("clean_old_roots");
         let (purged_account_slots, removed_accounts) =
