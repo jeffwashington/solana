@@ -7,6 +7,7 @@ use crate::{
     packet_hasher::PacketHasher,
     poh_recorder::{PohRecorder, PohRecorderError, TransactionRecorder, WorkingBankEntry},
     poh_service::{self, PohService},
+    cost_model::CostModel,
 };
 use crossbeam_channel::{Receiver as CrossbeamReceiver, RecvTimeoutError};
 use itertools::Itertools;
@@ -905,7 +906,18 @@ impl BankingStage {
     ) -> (usize, Vec<usize>) {
         let mut chunk_start = 0;
         let mut unprocessed_txs = vec![];
+            
 
+        /* TODO - 
+        // instead of using `MAX_NUM_TRANSACTIONS_PER_BATCH` to get chunks, invoking cost_model here to
+        // breaks `transactions` into chunks of re-organized transaction, each complies with cost
+        // model
+        let cost_model = CostModel::new();
+        let chunks = cost_model.pack_transactions_by_cost( transactions );
+        for &chunk in chunks  {
+            reuse below code
+        }
+        // */
         while chunk_start != transactions.len() {
             let chunk_end = std::cmp::min(
                 transactions.len(),
