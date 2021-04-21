@@ -1470,6 +1470,11 @@ impl AccountsDb {
     pub fn clean_accounts(&self, max_clean_root: Option<Slot>) {
         let max_clean_root = self.max_clean_root(max_clean_root);
 
+        {
+            let roots_tracker = &self.accounts_index.roots_tracker.read().unwrap().roots;
+            error!("jwash: roots: {}, min: {}, line: {}", roots_tracker.len(), roots_tracker.iter().min().unwrap(), line!());
+            }
+    
         // hold a lock to prevent slot shrinking from running because it might modify some rooted
         // slot storages which can not happen as long as we're cleaning accounts because we're also
         // modifying the rooted slot storages!
@@ -1674,6 +1679,12 @@ impl AccountsDb {
         self.handle_reclaims(&reclaims, None, false, None, reset_accounts);
 
         reclaims_time.stop();
+
+
+        {
+        let roots_tracker = &self.accounts_index.roots_tracker.read().unwrap().roots;
+        error!("jwash: roots: {}, min: {}", roots_tracker.len(), roots_tracker.iter().min().unwrap());
+        }
 
         self.clean_accounts_stats.report();
         datapoint_info!(
