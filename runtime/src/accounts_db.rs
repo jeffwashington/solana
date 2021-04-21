@@ -47,6 +47,7 @@ use solana_sdk::{
     pubkey::Pubkey,
 };
 use solana_vote_program::vote_state::MAX_LOCKOUT_HISTORY;
+use std::str::FromStr;
 use std::{
     borrow::Cow,
     boxed::Box,
