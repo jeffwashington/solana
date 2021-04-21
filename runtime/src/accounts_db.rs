@@ -1472,8 +1472,8 @@ impl AccountsDb {
 
         {
             let roots_tracker = &self.accounts_index.roots_tracker.read().unwrap().roots;
-            let min = roots_tracker.iter().min().unwrap();
-            let max = roots_tracker.iter().max().unwrap();
+            let min = *roots_tracker.get_all().iter().min().unwrap();
+            let max = *roots_tracker.get_all().iter().max().unwrap();
             let range = max - min;
             error!("jwash: roots: {}, min: {}, max: {}, range: {}, line: {}", roots_tracker.len(), min, max, range, line!());
         }
@@ -1686,8 +1686,8 @@ impl AccountsDb {
 
         {
             let roots_tracker = &self.accounts_index.roots_tracker.read().unwrap().roots;
-            let min = roots_tracker.iter().min().unwrap();
-            let max = roots_tracker.iter().max().unwrap();
+            let min = *roots_tracker.get_all().iter().min().unwrap();
+            let max = *roots_tracker.get_all().iter().max().unwrap();
             let range = max - min;
             error!("jwash: roots: {}, min: {}, max: {}, range: {}, line: {}", roots_tracker.len(), min, max, range, line!());
         }
