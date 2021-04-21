@@ -1472,8 +1472,11 @@ impl AccountsDb {
 
         {
             let roots_tracker = &self.accounts_index.roots_tracker.read().unwrap().roots;
-            error!("jwash: roots: {}, min: {}, line: {}", roots_tracker.len(), roots_tracker.iter().min().unwrap(), line!());
-            }
+            let min = roots_tracker.iter().min().unwrap();
+            let max = roots_tracker.iter().max().unwrap();
+            let range = max - min;
+            error!("jwash: roots: {}, min: {}, max: {}, range: {}, line: {}", roots_tracker.len(), min, max, range, line!());
+        }
     
         // hold a lock to prevent slot shrinking from running because it might modify some rooted
         // slot storages which can not happen as long as we're cleaning accounts because we're also
@@ -1682,8 +1685,11 @@ impl AccountsDb {
 
 
         {
-        let roots_tracker = &self.accounts_index.roots_tracker.read().unwrap().roots;
-        error!("jwash: roots: {}, min: {}", roots_tracker.len(), roots_tracker.iter().min().unwrap());
+            let roots_tracker = &self.accounts_index.roots_tracker.read().unwrap().roots;
+            let min = roots_tracker.iter().min().unwrap();
+            let max = roots_tracker.iter().max().unwrap();
+            let range = max - min;
+            error!("jwash: roots: {}, min: {}, max: {}, range: {}, line: {}", roots_tracker.len(), min, max, range, line!());
         }
 
         self.clean_accounts_stats.report();
