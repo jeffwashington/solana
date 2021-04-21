@@ -4686,7 +4686,16 @@ impl AccountsDb {
         #[allow(clippy::stable_sort_primitive)]
         slots.sort();
 
+        let pk1 = Pubkey::from_str("7jEfU57R2sV2B1DddKdsqZsdHaHm3B15REb4abvP6Me2").unwrap();
+        let pk2 = Pubkey::from_str("C57GmZLsPviiHZqWjYHo9is8QnMNq1Fc7SkYvLxLts24").unwrap();
+
+
         let mut last_log_update = Instant::now();
+        let mut last_last_slot = 0;
+        let mut last_slot = 0;
+        let mut found_nonzero = false;
+        let mut zero_count = 0;
+        let mut zero_slots = vec![];
         for (index, slot) in slots.iter().enumerate() {
             let now = Instant::now();
             if now.duration_since(last_log_update).as_secs() >= 2 {
@@ -4701,13 +4710,34 @@ impl AccountsDb {
                 .iter()
                 .map(|storage| storage.approx_stored_count())
                 .sum();
+                if slot == &71500402 {
+                    error!("generate index for slot: {}, num_accounts: {}, index: {}", slot, num_accounts, index);
+                                }
             let mut accounts_map: AccountsMap = AccountsMap::with_capacity(num_accounts);
             storage_maps.iter().for_each(|storage| {
-                let accounts = storage.all_accounts();
+            let accounts = storage.all_accounts();
                 accounts.into_iter().for_each(|stored_account| {
-                    let entry = accounts_map
+                    if slot == &71500402 || /*last_slot == 71500402 || last_last_slot == 71500402 || */stored_account.meta.pubkey == pk1 || stored_account.meta.pubkey == pk2 {
+                        error!("Found account: {}, slot: {}, index: {}, lamports: {}", stored_account.meta.pubkey, slot, index, stored_account.account_meta.lamports);
+                    }
+                    if !found_nonzero {
+                        if stored_account.account_meta.lamports > 0 {
+                            error!("Found NON zero account: {}, slot: {}, index: {}, lamports: {}, previous # of ZERO lamport accounts: {}, slots with only zeros: {:?}", stored_account.meta.pubkey, slot, index, stored_account.account_meta.lamports, zero_count, zero_slots);
+                            found_nonzero = true;
+                        }
+                        else {
+                            zero_count += 1;
+                        }
+                    }
+                    /*
+                    if slot == &71500402 {
+                        error!("account: {}", stored_account.meta.pubkey);
+                                    }
+                                    */
+                        let entry = accounts_map
                         .entry(stored_account.meta.pubkey)
                         .or_insert_with(BTreeMap::new);
+                        
                     assert!(
                         // There should only be one update per write version for a specific slot
                         // and account
@@ -4720,6 +4750,11 @@ impl AccountsDb {
                     );
                 })
             });
+            if !found_nonzero {
+                zero_slots.push(*slot);
+            }
+            last_last_slot = last_slot;
+            last_slot = *slot;
             // Need to restore indexes even with older write versions which may
             // be shielding other accounts. When they are then purged, the
             // original non-shielded account value will be visible when the account
