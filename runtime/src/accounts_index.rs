@@ -27,7 +27,7 @@ use std::{
 };
 
 pub const ITER_BATCH_SIZE: usize = 1000;
-
+use log::*;
 pub type SlotList<T> = Vec<(Slot, T)>;
 pub type SlotSlice<'s, T> = &'s [(Slot, T)];
 pub type Ancestors = HashMap<Slot, usize>;
@@ -584,6 +584,18 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
         });
         let mut w_account_maps = self.account_maps.write().unwrap();
         let mut is_newly_inserted = false;
+        {
+            let sl = new_entry.slot_list.read().unwrap();
+            let mut in_slot = false;
+            sl.iter().for_each(|(slot, _)| {
+                if slot == &71500402 {
+in_slot = true;
+                }
+            });
+            if in_slot {
+                error!("jwash pubkey {:?} slotlist {:?}", pubkey, sl.iter().map(|(slot, _)| *slot as u64).collect::<Vec<_>>());
+            }
+        }
         let account_entry = w_account_maps.entry(*pubkey).or_insert_with(|| {
             is_newly_inserted = true;
             new_entry
