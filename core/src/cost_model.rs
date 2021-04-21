@@ -3,7 +3,9 @@
 //! By doing so to improve leader performance.
 
 use solana_sdk::{
-    bpf_loader, bpf_loader_deprecated, bpf_loader_upgradeable, pubkey::Pubkey, system_program,
+    bpf_loader, bpf_loader_deprecated, bpf_loader_upgradeable, system_program,
+    pubkey::Pubkey, 
+    transaction::Transaction,
 };
 use solana_runtime::{
     hashed_transaction::HashedTransaction,
@@ -58,28 +60,6 @@ impl CostModel {
         }
     }
 
-    pub fn find_instruction_cost(
-        &self,
-        program_key: &Pubkey
-    ) -> &Cost {
-        match self.cost_metrics.get( &program_key ) {
-            Some(cost) => { cost }
-            None => {
-                debug!("Program key {:?} does not have assigned cost, using default {}", program_key, DEFAULT_PROGRAM_COST ); 
-                &DEFAULT_PROGRAM_COST
-            }
-        }
-    }
-
-    pub fn find_transaction_cost(
-        &self,
-        transaction: &HashedTransaction
-    ) -> &Cost {
-        // TODO - iter through instructions in `transaction`, return sum( cost(instruction) )
-        //self.find_instruction_cost( &system_program::id() )
-        &DEFAULT_PROGRAM_COST
-    }
-
     // NOTE - main function that breaks a collection of transactions into several smaller
     //        collection of transaction, each complies the cost limits (on both Chain_cost and
     //        block_cost). 
@@ -109,11 +89,75 @@ impl CostModel {
         }
         packages
     }
+
+    fn find_instruction_cost(
+        &self,
+        program_key: &Pubkey
+    ) -> &Cost {
+        match self.cost_metrics.get( &program_key ) {
+            Some(cost) => { cost }
+            None => {
+                debug!("Program key {:?} does not have assigned cost, using default {}", program_key, DEFAULT_PROGRAM_COST ); 
+                &DEFAULT_PROGRAM_COST
+            }
+        }
+    }
+
+    fn find_transaction_cost(
+        &self,
+        transaction: &Transaction
+    ) -> Cost {
+        let mut cost: Cost = 0;
+
+        for instruction in &transaction.message().instructions {
+            let program_id = transaction.message().account_keys[instruction.program_id_index as usize];
+            let instruction_cost =  self.find_instruction_cost( &program_id );
+            debug!("instruction {:?} has cost of {}", instruction, instruction_cost);
+            cost += instruction_cost;
+        }
+        cost
+    }
+
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use solana_sdk::{
+        signature::{Keypair, Signer},
+        message::{Message},
+        hash::{Hash},
+        system_transaction,
+        system_instruction::{self},
+        instruction::{CompiledInstruction},
+    };
+    use solana_runtime::{
+        bank::{ Bank },
+    };
+    use solana_ledger::{
+        genesis_utils::{create_genesis_config, GenesisConfigInfo},
+    };
+    use std::{
+        sync::{Arc},
+    };
+
+    fn test_setup() -> (
+        Keypair,
+        Hash,
+    ) {
+        solana_logger::setup();
+        let GenesisConfigInfo {
+            genesis_config,
+            mint_keypair,
+            ..
+        } = create_genesis_config(10);
+        let bank = Arc::new(Bank::new_no_wallclock_throttle(&genesis_config));
+        let start_hash = bank.last_blockhash();
+        (
+            mint_keypair,
+            start_hash,
+        )
+    }
 
     #[test]
     fn test_cost_model_initialization() {
@@ -133,4 +177,70 @@ mod tests {
         // unknown program is assigned with default cost
         assert_eq!( DEFAULT_PROGRAM_COST, *testee.find_instruction_cost( & Pubkey::from_str("unknown111111111111111111111111111111111111").unwrap() ) );
     }
+
+    #[test]
+    fn test_cost_model_simple_transaction() {
+        let (mint_keypair, start_hash ) = test_setup();
+
+        let keypair = Keypair::new();
+        let simple_transaction =
+                system_transaction::transfer(&mint_keypair, &keypair.pubkey(), 2, start_hash);
+        debug!("system_transaction simple_transaction {:?}", simple_transaction);
+
+        // expected cost for one system transfer instructions
+        let expected_cost = COST_UNIT * 1; 
+
+        let testee = CostModel::new();
+        assert_eq!( expected_cost, testee.find_transaction_cost( &simple_transaction ) );
+    }
+
+    #[test]
+    fn test_cost_model_transaction_many_transfer_instructions() {
+        let (mint_keypair, start_hash ) = test_setup();
+
+        let key1 = solana_sdk::pubkey::new_rand();
+        let key2 = solana_sdk::pubkey::new_rand();
+        let instructions =
+            system_instruction::transfer_many(&mint_keypair.pubkey(), &[(key1, 1), (key2, 1)]);
+        let message = Message::new(&instructions, Some(&mint_keypair.pubkey()));
+        let tx = Transaction::new(&[&mint_keypair], message, start_hash);
+        debug!("many transfer transaction {:?}", tx);
+
+        // expected cost for two system transfer instructions
+        let expected_cost = COST_UNIT * 2; 
+
+        let testee = CostModel::new();
+        assert_eq!( expected_cost, testee.find_transaction_cost( &tx) );
+    }
+
+    #[test]
+    fn test_cost_model_message_many_different_instructions() {
+        let (mint_keypair, start_hash ) = test_setup();
+
+        // construct a transaction with multiple random instructions
+        let key1 = solana_sdk::pubkey::new_rand();
+        let key2 = solana_sdk::pubkey::new_rand();
+        let prog1 = solana_sdk::pubkey::new_rand();
+        let prog2 = solana_sdk::pubkey::new_rand();
+        let instructions = vec![
+            CompiledInstruction::new(3, &(), vec![0, 1]),
+            CompiledInstruction::new(4, &(), vec![0, 2]),
+        ];
+        let tx = Transaction::new_with_compiled_instructions(
+            &[&mint_keypair],
+            &[key1, key2],
+            start_hash,
+            vec![prog1, prog2],
+            instructions,
+        );
+        debug!("many random transaction {:?}", tx);
+
+        // expected cost for two random/unknown program is
+        let expected_cost = DEFAULT_PROGRAM_COST * 2; 
+
+        let testee = CostModel::new();
+        assert_eq!( expected_cost, testee.find_transaction_cost( &tx) );
+    }
+
 }
+
