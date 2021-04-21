@@ -175,7 +175,7 @@ impl<T: 'static + Clone + IsCached> WriteAccountMapEntry<T> {
 
 #[derive(Debug, Default)]
 pub struct RootsTracker {
-    roots: HashSet<Slot>,
+    pub roots: HashSet<Slot>,
     max_root: Slot,
     uncleaned_roots: HashSet<Slot>,
     previous_uncleaned_roots: HashSet<Slot>,
@@ -262,7 +262,7 @@ pub struct AccountsIndex<T> {
     program_id_index: SecondaryIndex<DashMapSecondaryIndexEntry>,
     spl_token_mint_index: SecondaryIndex<DashMapSecondaryIndexEntry>,
     spl_token_owner_index: SecondaryIndex<RwLockSecondaryIndexEntry>,
-    roots_tracker: RwLock<RootsTracker>,
+    pub roots_tracker: RwLock<RootsTracker>,
     ongoing_scan_roots: RwLock<BTreeMap<Slot, u64>>,
     zero_lamport_pubkeys: DashSet<Pubkey>,
 }
