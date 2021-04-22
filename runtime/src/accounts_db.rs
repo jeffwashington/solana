@@ -1348,7 +1348,7 @@ impl AccountsDb {
         self.sender_bg_hasher = Some(sender);
     }
 
-    fn purge_keys_exact<'a, C: 'a>(
+    fn purge_keys_exact<'a, C: 'a + std::fmt::Debug>(
         &'a self,
         pubkey_to_slot_set: &'a [(Pubkey, C)],
     ) -> Vec<(u64, AccountInfo)>
@@ -1371,7 +1371,7 @@ impl AccountsDb {
             );
 
             if pubkey == &pk1 || pubkey == &pk2 || pubkey == &pk3 || pubkey == &pk4 {
-                error!("jwash:purge_keys_exact, {}, slots: {:?}, is_empty: {}", pubkey, slots_set.iter().collect::<Vec<_>>(), is_empty);
+                error!("jwash:purge_keys_exact, {}, slots: {:?}, is_empty: {}", pubkey, slots_set, is_empty);
             }
     
             if is_empty {
