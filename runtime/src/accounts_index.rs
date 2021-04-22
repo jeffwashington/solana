@@ -27,6 +27,7 @@ use std::{
         Arc, RwLock, RwLockReadGuard, RwLockWriteGuard,
     },
 };
+use std::str::FromStr;
 
 pub const ITER_BATCH_SIZE: usize = 1000;
 
@@ -1140,10 +1141,19 @@ in_slot = true;
     ) {
         let roots_tracker = &self.roots_tracker.read().unwrap();
         let max_root = Self::get_max_root(&roots_tracker.roots, &list, max_clean_root);
+        let pk3 = Pubkey::from_str("3XA7qhMGS3UgbtyKSVo4rHuAm5yMmic3zKqb616QJDmz").unwrap();
+        let pk4 = Pubkey::from_str("9iDXA8wAvN3u4BhRoP1yL3n2PE8KxcFoNVbz1Xd9k7xw").unwrap();
+
+        let matches = &pk3 == pubkey || &pk4 == pubkey;
 
         let mut purged_slots: HashSet<Slot> = HashSet::new();
         list.retain(|(slot, value)| {
             let should_purge = Self::can_purge(max_root, *slot) && !value.is_cached();
+    
+            if matches {
+                error!("jwash:purge_older_root_entries: {:?}, slot: {}, can_purge: {}, is_cache: {}, should_purge: {}", pubkey, slot, Self::can_purge(max_root, *slot), !value.is_cached(), should_purge);
+            }
+
             if should_purge {
                 reclaims.push((*slot, value.clone()));
                 purged_slots.insert(*slot);
