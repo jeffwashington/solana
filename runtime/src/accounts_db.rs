@@ -1489,12 +1489,20 @@ impl AccountsDb {
         
         let pk1 = Pubkey::from_str("7jEfU57R2sV2B1DddKdsqZsdHaHm3B15REb4abvP6Me2").unwrap();
         let pk2 = Pubkey::from_str("C57GmZLsPviiHZqWjYHo9is8QnMNq1Fc7SkYvLxLts24").unwrap();
+        let pk3 = Pubkey::from_str("3XA7qhMGS3UgbtyKSVo4rHuAm5yMmic3zKqb616QJDmz").unwrap();
+        let pk4 = Pubkey::from_str("9iDXA8wAvN3u4BhRoP1yL3n2PE8KxcFoNVbz1Xd9k7xw").unwrap();
 
         if pubkeys.contains(&pk1) {
-            error!("clean_accounts contains the magic key: {}", pk1);
+            error!("jwash: clean_accounts contains the magic key: {}", pk1);
         }
         if pubkeys.contains(&pk2) {
-            error!("clean_accounts contains the magic key: {}", pk2);
+            error!("jwash: clean_accounts contains the magic key: {}", pk2);
+        }
+        if pubkeys.contains(&pk3) {
+            error!("jwash: clean_accounts contains the magic key: {}", pk2);
+        }
+        if pubkeys.contains(&pk4) {
+            error!("jwash: clean_accounts contains the magic key: {}", pk2);
         }
 
         let total_keys_count = pubkeys.len();
@@ -4516,8 +4524,8 @@ impl AccountsDb {
 
         let pk1 = Pubkey::from_str("7jEfU57R2sV2B1DddKdsqZsdHaHm3B15REb4abvP6Me2").unwrap();
         let pk2 = Pubkey::from_str("C57GmZLsPviiHZqWjYHo9is8QnMNq1Fc7SkYvLxLts24").unwrap();
-
-
+        let pk3 = Pubkey::from_str("3XA7qhMGS3UgbtyKSVo4rHuAm5yMmic3zKqb616QJDmz").unwrap();
+        let pk4 = Pubkey::from_str("9iDXA8wAvN3u4BhRoP1yL3n2PE8KxcFoNVbz1Xd9k7xw").unwrap();
         let mut last_log_update = Instant::now();
         let mut last_last_slot = 0;
         let mut last_slot = 0;
@@ -4545,7 +4553,10 @@ impl AccountsDb {
             storage_maps.iter().for_each(|storage| {
             let accounts = storage.all_accounts();
                 accounts.into_iter().for_each(|stored_account| {
-                    if slot == &71500402 || slot == &71999188 || /*last_slot == 71500402 || last_last_slot == 71500402 || */stored_account.meta.pubkey == pk1 || stored_account.meta.pubkey == pk2 {
+                    if slot == &71500402 || slot == &71999188 /*last_slot == 71500402 || last_last_slot == 71500402 || */
+                    || stored_account.meta.pubkey == pk1 || stored_account.meta.pubkey == pk2 
+                    || stored_account.meta.pubkey == pk3 || stored_account.meta.pubkey == pk4 
+                    {
                         error!("Found account: {}, slot: {}, index: {}, lamports: {}", stored_account.meta.pubkey, slot, index, stored_account.account_meta.lamports);
                     }
                     if !found_nonzero {
