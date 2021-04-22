@@ -27,7 +27,7 @@ pub mod cluster_slot_state_verifier;
 pub mod cluster_slots;
 pub mod cluster_slots_service;
 pub mod consensus;
-pub mod cost_align_package;
+pub mod cost_aligned_package;
 pub mod cost_model;
 pub mod cost_tracker;
 pub mod crds;

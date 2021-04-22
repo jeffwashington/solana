@@ -75,10 +75,7 @@ mod tests {
     use solana_runtime::bank::Bank;
     use solana_sdk::{
         hash::Hash,
-        instruction::CompiledInstruction,
-        message::Message,
         signature::{Keypair, Signer},
-        system_instruction::{self},
         system_transaction,
     };
     use std::{
@@ -179,7 +176,7 @@ mod tests {
         let (mint_keypair, start_hash ) = test_setup();
         // build two transactions with same signed account
         let (tx1, keys1, cost1) = build_simple_transaction(&mint_keypair, &start_hash);
-        let (tx2, keys2, cost2) = build_simple_transaction(&mint_keypair, &start_hash);
+        let (_tx2, keys2, cost2) = build_simple_transaction(&mint_keypair, &start_hash);
 
         // build testee to have capacity for two simple transactions, but not for same accounts
         let mut testee = CostAlignedPackage::new( cmp::min(cost1, cost2), cost1 + cost2 );
@@ -200,7 +197,7 @@ mod tests {
         // build two transactions with diff accounts
         let (tx1, keys1, cost1) = build_simple_transaction(&mint_keypair, &start_hash);
         let second_account = Keypair::new();
-        let (tx2, keys2, cost2) = build_simple_transaction(&second_account, &start_hash);
+        let (_tx2, keys2, cost2) = build_simple_transaction(&second_account, &start_hash);
 
         // build testee to have capacity for each chain, but not enough room for both transactions
         let mut testee = CostAlignedPackage::new( cmp::max(cost1, cost2), cost1 + cost2 - 1 );
