@@ -1702,6 +1702,9 @@ impl AccountsDb {
                 }
                 true
             });
+            if matches && account_infos.len() == 1 {
+                error!("jwash:purges should have deleted this 0 lamport account from index: {}", pubkey);
+            }
         }
         store_counts_time.stop();
 
@@ -1962,7 +1965,7 @@ impl AccountsDb {
                         let matches = pkk == &pk1 || pkk == &pk2 || pkk == &pk3 || pkk == &pk4;
     
                         if matches {
-                            error!("jwash:do_srhink_slot_stores {}, matches: {}", pubkey, matches);
+                            error!("jwash:do_srhink_slot_stores {}, is_alive: {}", pubkey, is_alive);
                         }
             
                         if !is_alive {
