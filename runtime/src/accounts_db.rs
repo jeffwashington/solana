@@ -1608,6 +1608,14 @@ impl AccountsDb {
         let (purged_account_slots, removed_accounts) =
             self.clean_old_rooted_accounts(purges_in_root, max_clean_root);
 
+            if purged_account_slots.contains(&71500402) {
+                error!("jwash:purged_account_slots contains: {}", 71500402);
+            }
+
+            if purged_account_slots.contains(&71999188) {
+                error!("jwash:purged_account_slots contains: {}", 71999188);
+            }
+                    
         if self.caching_enabled {
             self.do_reset_uncleaned_roots(max_clean_root);
         } else {
