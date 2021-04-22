@@ -1581,12 +1581,6 @@ impl AccountsDb {
             error!("jwash:clean_accounts.purges contains the magic key: {}", pk2);
         }
 
-        if purges_in_root.contains(&pk1) {
-            error!("jwash:clean_accounts.purges_in_root contains the magic key: {}", pk1);
-        }
-        if purges_in_root.contains(&pk2) {
-            error!("jwash:clean_accounts.purges_in_root contains the magic key: {}", pk2);
-        }
         if purges.contains(&pk3) {
             error!("jwash:clean_accounts.purges contains the magic key: {}", pk3);
         }
@@ -1594,6 +1588,12 @@ impl AccountsDb {
             error!("jwash:clean_accounts.purges contains the magic key: {}", pk4);
         }
 
+        if purges_in_root.contains(&pk1) {
+            error!("jwash:clean_accounts.purges_in_root contains the magic key: {}", pk1);
+        }
+        if purges_in_root.contains(&pk2) {
+            error!("jwash:clean_accounts.purges_in_root contains the magic key: {}", pk2);
+        }
         if purges_in_root.contains(&pk3) {
             error!("jwash:clean_accounts.purges_in_root contains the magic key: {}", pk3);
         }
