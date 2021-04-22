@@ -1650,6 +1650,7 @@ impl AccountsDb {
                 *ref_count = self.accounts_index.ref_count_from_storage(&key);
             }
 
+            let pubkey=key;
             let matches = pubkey == &pk1 || pubkey == &pk2 || pubkey == &pk3 || pubkey == &pk4;
 
             account_infos.retain(|(slot, account_info)| {
