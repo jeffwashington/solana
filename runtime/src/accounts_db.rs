@@ -1677,6 +1677,10 @@ impl AccountsDb {
                 if was_reclaimed {
                     return false;
                 }
+                if matches {
+                error!("jwash:hacking: purges should have deleted this 0 lamport account from index: {}", pubkey)                    ;
+                    return false;
+                }
                 if let Some(store_count) = store_counts.get_mut(&account_info.store_id) {
                     if matches {
                         error!("jwash:dec store count: {}, slot: {}, refcount: {}", key, slot, store_count.0-1);    
@@ -1702,7 +1706,7 @@ impl AccountsDb {
                 }
                 true
             });
-            if matches {//} && account_infos.len() == 1 {
+            if matches && account_infos.len() > 0 {//} && account_infos.len() == 1 {
                 error!("jwash:purges should have deleted this 0 lamport account from index: {}, account_infos: {}, {:?}", pubkey, account_infos.len(), account_infos);
             }
         }
