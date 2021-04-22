@@ -238,6 +238,9 @@ impl RollingBitField {
     }
 
     pub fn remove(&mut self, key: &u64) {
+        if *key == 71500402 {
+            panic!("removing the bad root: {}", key);
+        }
         self.check_range(*key);
         let address = self.get_address(key);
         let value = self.bits.get(address);
