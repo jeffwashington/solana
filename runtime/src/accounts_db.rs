@@ -1702,8 +1702,8 @@ impl AccountsDb {
                 }
                 true
             });
-            if matches && account_infos.len() == 1 {
-                error!("jwash:purges should have deleted this 0 lamport account from index: {}", pubkey);
+            if matches {//} && account_infos.len() == 1 {
+                error!("jwash:purges should have deleted this 0 lamport account from index: {}, account_infos: {}, {:?}", pubkey, account_infos.len(), account_infos);
             }
         }
         store_counts_time.stop();
