@@ -1639,6 +1639,9 @@ impl AccountsDb {
 
         let mut store_counts_time = Measure::start("store_counts");
 
+        //let sr = 2;
+        //error!("slots removed contains {}, {}", sr, slots_removed)
+
         // Calculate store counts as if everything was purged
         // Then purge if we can
         let mut store_counts: HashMap<AppendVecId, (usize, HashSet<Pubkey>)> = HashMap::new();
@@ -1646,6 +1649,9 @@ impl AccountsDb {
             if purged_account_slots.contains_key(&key) {
                 *ref_count = self.accounts_index.ref_count_from_storage(&key);
             }
+
+            let matches = pubkey == &pk1 || pubkey == &pk2 || pubkey == &pk3 || pubkey == &pk4;
+
             account_infos.retain(|(slot, account_info)| {
                 let was_slot_purged = purged_account_slots
                     .get(&key)
@@ -1660,12 +1666,20 @@ impl AccountsDb {
                 // `clean_old_rooted_accounts()`
                 let was_reclaimed = removed_accounts
                     .get(&account_info.store_id)
-                    .map(|store_removed| store_removed.contains(&account_info.offset))
+                    .map(|store_removed| {
+                        let rem = store_removed.contains(&account_info.offset);
+                        if matches {
+                            error!("jwash:was_reclaimed: {}, slot: {}, removed: {}", key, slot, rem);    
+                        }
+                    rem})
                     .unwrap_or(false);
                 if was_reclaimed {
                     return false;
                 }
                 if let Some(store_count) = store_counts.get_mut(&account_info.store_id) {
+                    if matches {
+                        error!("jwash:dec store count: {}, slot: {}, refcount: {}", key, slot, store_count.0-1);    
+                    }
                     store_count.0 -= 1;
                     store_count.1.insert(*key);
                 } else {
@@ -1676,7 +1690,10 @@ impl AccountsDb {
                         .slot_store_count(*slot, account_info.store_id)
                         .unwrap()
                         - 1;
-                    debug!(
+                        if matches {
+                            error!("jwash:lookup/dec store count: {}, slot: {}, refcount: {}", key, slot, count);    
+                        }
+                        debug!(
                         "store_counts, inserting slot: {}, store id: {}, count: {}",
                         slot, account_info.store_id, count
                     );
