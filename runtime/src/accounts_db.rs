@@ -1892,12 +1892,26 @@ impl AccountsDb {
             write_version: u64,
         }
         debug!("do_shrink_slot_stores: slot: {}", slot);
+        let matches = slot == 71500402 || slot == 71999188        ;
         let mut stored_accounts: HashMap<Pubkey, FoundStoredAccount> = HashMap::new();
         let mut original_bytes = 0;
+        if matches {
+            error!("jwash: do_shrink_slot_stores: {}", slot);
+        }
+        let pk1 = Pubkey::from_str("7jEfU57R2sV2B1DddKdsqZsdHaHm3B15REb4abvP6Me2").unwrap();
+        let pk2 = Pubkey::from_str("C57GmZLsPviiHZqWjYHo9is8QnMNq1Fc7SkYvLxLts24").unwrap();
+        let pk3 = Pubkey::from_str("3XA7qhMGS3UgbtyKSVo4rHuAm5yMmic3zKqb616QJDmz").unwrap();
+        let pk4 = Pubkey::from_str("9iDXA8wAvN3u4BhRoP1yL3n2PE8KxcFoNVbz1Xd9k7xw").unwrap();
         for store in stores {
             let mut start = 0;
             original_bytes += store.total_bytes();
             while let Some((account, next)) = store.accounts.get_account(start) {
+                let pubkey = account.meta.pubkey;
+                let matches = pubkey == &pk1 || pubkey == &pk2 || pubkey == &pk3 || pubkey == &pk4;
+        
+                if matches {
+                    error!("jwash:do_srhink_slot_stores {}", pubkey);
+                }
                 match stored_accounts.entry(account.meta.pubkey) {
                     Entry::Occupied(mut occupied_entry) => {
                         if account.meta.write_version > occupied_entry.get().write_version {
@@ -1943,6 +1957,13 @@ impl AccountsDb {
                             .slot_list()
                             .iter()
                             .any(|(_slot, i)| i.store_id == *store_id && i.offset == *offset);
+
+                        let matches = pubkey == &pk1 || pubkey == &pk2 || pubkey == &pk3 || pubkey == &pk4;
+    
+                        if matches {
+                            error!("jwash:do_srhink_slot_stores {}, matches: {}", pubkey, matches);
+                        }
+            
                         if !is_alive {
                             // This pubkey was found in the storage, but no longer exists in the index.
                             // It would have had a ref to the storage from the initial store, but it will
