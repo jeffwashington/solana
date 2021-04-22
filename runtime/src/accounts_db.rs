@@ -1540,6 +1540,10 @@ impl AccountsDb {
                                 if !has_zero_lamport_accounts {
                                     self.accounts_index.remove_zero_lamport_key(pubkey);
                                 }
+                                if pubkey == &pk1 || pubkey == &pk2 || pubkey == &pk3 || pubkey == &pk4 {
+                                    error!("jwash:clean:get:{}, slots: {:?}, acct_info: {:?}, has_zero: {}, slot: {}, is_uncleaned_root: {}, in zero_lamport_pubkeys: {}", pubkey, slot_list, account_info, has_zero_lamport_accounts, slot, self.accounts_index.is_uncleaned_root(*slot),
+                                    self.accounts_index.zero_lamport_pubkeys().contains(pubkey));
+                                }
 
                                 // Release the lock
                                 let slot = *slot;

@@ -1153,7 +1153,7 @@ in_slot = true;
             let should_purge = Self::can_purge(max_root, *slot) && !value.is_cached();
     
             if matches {
-                error!("jwash:purge_older_root_entries: {:?}, slot: {}, can_purge: {}, is_cache: {}, should_purge: {}", pubkey, slot, Self::can_purge(max_root, *slot), !value.is_cached(), should_purge);
+                error!("jwash:purge_older_root_entries: {:?}, slot: {}, can_purge: {}, !is_cached: {}, should_purge: {}", pubkey, slot, Self::can_purge(max_root, *slot), !value.is_cached(), should_purge);
             }
 
             if should_purge {
