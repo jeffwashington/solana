@@ -1146,7 +1146,7 @@ in_slot = true;
         let pk3 = Pubkey::from_str("3XA7qhMGS3UgbtyKSVo4rHuAm5yMmic3zKqb616QJDmz").unwrap();
         let pk4 = Pubkey::from_str("9iDXA8wAvN3u4BhRoP1yL3n2PE8KxcFoNVbz1Xd9k7xw").unwrap();
 
-        let matches = &pk3 == pubkey || &pk4 == pubkey || &pk1 = pubkey || &pk2 == pubkey;
+        let matches = &pk3 == pubkey || &pk4 == pubkey || &pk1 == pubkey || &pk2 == pubkey;
 
         let mut purged_slots: HashSet<Slot> = HashSet::new();
         list.retain(|(slot, value)| {
