@@ -1499,10 +1499,10 @@ impl AccountsDb {
             error!("jwash: clean_accounts contains the magic key: {}", pk2);
         }
         if pubkeys.contains(&pk3) {
-            error!("jwash: clean_accounts contains the magic key: {}", pk2);
+            error!("jwash: clean_accounts contains the magic key: {}", pk3);
         }
         if pubkeys.contains(&pk4) {
-            error!("jwash: clean_accounts contains the magic key: {}", pk2);
+            error!("jwash: clean_accounts contains the magic key: {}", pk4);
         }
 
         let total_keys_count = pubkeys.len();
@@ -1575,17 +1575,30 @@ impl AccountsDb {
         accounts_scan.stop();
 
         if purges.contains(&pk1) {
-            error!("clean_accounts.purges contains the magic key: {}", pk1);
+            error!("jwash:clean_accounts.purges contains the magic key: {}", pk1);
         }
         if purges.contains(&pk2) {
-            error!("clean_accounts.purges contains the magic key: {}", pk2);
+            error!("jwash:clean_accounts.purges contains the magic key: {}", pk2);
         }
 
         if purges_in_root.contains(&pk1) {
-            error!("clean_accounts.purges_in_root contains the magic key: {}", pk1);
+            error!("jwash:clean_accounts.purges_in_root contains the magic key: {}", pk1);
         }
         if purges_in_root.contains(&pk2) {
-            error!("clean_accounts.purges_in_root contains the magic key: {}", pk2);
+            error!("jwash:clean_accounts.purges_in_root contains the magic key: {}", pk2);
+        }
+        if purges.contains(&pk3) {
+            error!("jwash:clean_accounts.purges contains the magic key: {}", pk3);
+        }
+        if purges.contains(&pk4) {
+            error!("jwash:clean_accounts.purges contains the magic key: {}", pk4);
+        }
+
+        if purges_in_root.contains(&pk3) {
+            error!("jwash:clean_accounts.purges_in_root contains the magic key: {}", pk3);
+        }
+        if purges_in_root.contains(&pk4) {
+            error!("jwash:clean_accounts.purges_in_root contains the magic key: {}", pk4);
         }
 
 
@@ -4547,7 +4560,7 @@ impl AccountsDb {
                 .map(|storage| storage.approx_stored_count())
                 .sum();
                 if slot == &71500402 {
-                    error!("generate index for slot: {}, num_accounts: {}, index: {}", slot, num_accounts, index);
+                    error!("jwash:generate index for slot: {}, num_accounts: {}, index: {}", slot, num_accounts, index);
                                 }
             let mut accounts_map: AccountsMap = AccountsMap::with_capacity(num_accounts);
             storage_maps.iter().for_each(|storage| {
@@ -4557,11 +4570,11 @@ impl AccountsDb {
                     || stored_account.meta.pubkey == pk1 || stored_account.meta.pubkey == pk2 
                     || stored_account.meta.pubkey == pk3 || stored_account.meta.pubkey == pk4 
                     {
-                        error!("Found account: {}, slot: {}, index: {}, lamports: {}", stored_account.meta.pubkey, slot, index, stored_account.account_meta.lamports);
+                        error!("jwash:Found account: {}, slot: {}, index: {}, lamports: {}", stored_account.meta.pubkey, slot, index, stored_account.account_meta.lamports);
                     }
                     if !found_nonzero {
                         if stored_account.account_meta.lamports > 0 {
-                            error!("Found NON zero account: {}, slot: {}, index: {}, lamports: {}, previous # of ZERO lamport accounts: {}, slots with only zeros: {:?}", stored_account.meta.pubkey, slot, index, stored_account.account_meta.lamports, zero_count, zero_slots);
+                            error!("jwash:Found NON zero account: {}, slot: {}, index: {}, lamports: {}, previous # of ZERO lamport accounts: {}, slots with only zeros: {:?}", stored_account.meta.pubkey, slot, index, stored_account.account_meta.lamports, zero_count, zero_slots);
                             found_nonzero = true;
                         }
                         else {

@@ -737,7 +737,7 @@ in_slot = true;
                 }
             });
             if in_slot {
-                error!("jwash pubkey {:?} slotlist {:?}", pubkey, sl.iter().map(|(slot, _)| *slot as u64).collect::<Vec<_>>());
+                error!("jwash: pubkey {:?} slotlist {:?}", pubkey, sl.iter().map(|(slot, _)| *slot as u64).collect::<Vec<_>>());
             }
         }
         let account_entry = w_account_maps.entry(*pubkey).or_insert_with(|| {
