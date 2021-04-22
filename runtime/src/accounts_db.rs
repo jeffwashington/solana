@@ -1694,11 +1694,18 @@ impl AccountsDb {
         // Only keep purges where the entire history of the account in the root set
         // can be purged. All AppendVecs for those updates are dead.
         let mut purge_filter = Measure::start("purge_filter");
-        purges.retain(|_pubkey, (account_infos, _ref_count)| {
-            for (_slot, account_info) in account_infos.iter() {
-                if store_counts.get(&account_info.store_id).unwrap().0 != 0 {
+        purges.retain(|pubkey, (account_infos, _ref_count)| {
+            for (slot, account_info) in account_infos.iter() {
+                let v = store_counts.get(&account_info.store_id).unwrap().0;
+                if pubkey == &pk1 || pubkey == &pk2 || pubkey == &pk3 || pubkey == &pk4 {
+                    error!("jwash:purges.retain {}, v: {:?}, account_infos.len(): {}, slot: {}", pubkey, v, account_infos.len(), slot);
+                }
+                if v != 0 {
                     return false;
                 }
+            }
+            if pubkey == &pk1 || pubkey == &pk2 || pubkey == &pk3 || pubkey == &pk4 {
+                error!("jwash:purges.retain true, {}, account_infos.len(): {}", pubkey, account_infos.len());
             }
             true
         });
