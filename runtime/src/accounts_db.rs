@@ -4574,7 +4574,8 @@ impl AccountsDb {
                     }
                     if !found_nonzero {
                         if stored_account.account_meta.lamports > 0 {
-                            error!("jwash:Found NON zero account: {}, slot: {}, index: {}, lamports: {}, previous # of ZERO lamport accounts: {}, slots with only zeros: {:?}", stored_account.meta.pubkey, slot, index, stored_account.account_meta.lamports, zero_count, zero_slots);
+                            error!("jwash:Found NON zero account: {}, slot: {}, index: {}, lamports: {}, previous # of ZERO lamport accounts: {}, slots with ", stored_account.meta.pubkey, slot, index, stored_account.account_meta.lamports, zero_count, 
+                        );//zero_slots);
                             found_nonzero = true;
                         }
                         else {
