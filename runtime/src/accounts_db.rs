@@ -1906,7 +1906,7 @@ impl AccountsDb {
             let mut start = 0;
             original_bytes += store.total_bytes();
             while let Some((account, next)) = store.accounts.get_account(start) {
-                let pubkey = account.meta.pubkey;
+                let pubkey = &account.meta.pubkey;
                 let matches = pubkey == &pk1 || pubkey == &pk2 || pubkey == &pk3 || pubkey == &pk4;
         
                 if matches {
@@ -1958,7 +1958,8 @@ impl AccountsDb {
                             .iter()
                             .any(|(_slot, i)| i.store_id == *store_id && i.offset == *offset);
 
-                        let matches = pubkey == &pk1 || pubkey == &pk2 || pubkey == &pk3 || pubkey == &pk4;
+                            let pkk = *pubkey;
+                        let matches = pkk == &pk1 || pkk == &pk2 || pkk == &pk3 || pkk == &pk4;
     
                         if matches {
                             error!("jwash:do_srhink_slot_stores {}, matches: {}", pubkey, matches);
