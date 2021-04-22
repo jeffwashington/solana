@@ -1371,7 +1371,7 @@ impl AccountsDb {
             );
 
             if pubkey == &pk1 || pubkey == &pk2 || pubkey == &pk3 || pubkey == &pk4 {
-                error!("jwash:purge_keys_exact, {}, slots: {:?}, is_empty", pubkey, slots_set, is_empty);
+                error!("jwash:purge_keys_exact, {}, slots: {:?}, is_empty: {}", pubkey, slots_set.iter().collect::<Vec<_>>(), is_empty);
             }
     
             if is_empty {
