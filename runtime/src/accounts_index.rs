@@ -741,13 +741,13 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
     }
 
     fn insert_new_entry_if_missing(&self, pubkey: &Pubkey) -> (WriteAccountMapEntry<T>, bool) {
-        let new_entry = Arc::new(AccountMapEntryInner {
-            ref_count: AtomicU64::new(0),
-            slot_list: RwLock::new(SlotList::with_capacity(1)),
-        });
         let mut w_account_maps = self.account_maps.write().unwrap();
         let mut is_newly_inserted = false;
         let account_entry = w_account_maps.entry(*pubkey).or_insert_with(|| {
+            let new_entry = Arc::new(AccountMapEntryInner {
+                ref_count: AtomicU64::new(0),
+                slot_list: RwLock::new(SlotList::with_capacity(1)),
+            });
             is_newly_inserted = true;
             new_entry
         });
