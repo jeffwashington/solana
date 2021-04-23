@@ -168,7 +168,7 @@ impl<V: Clone> AccountMap<V> {
             None
         }
         else {
-            let outer = self.get_outer_index(index.index);
+            let outer = self.get_outer_index(index.index, &mut Timings::default());
             Some((&self.keys[outer.outer_index][outer.inner_index], &self.values[outer.outer_index][outer.inner_index]))
         }
     }
@@ -267,7 +267,7 @@ impl<V: Clone> AccountMap<V> {
             //error!("returned: outer: {}, inner_index: {}, given_index: {}, cumulative_lens: {:?}", index, inner_index, given_index, self.cumulative_lens);
         }
         timings.lookups += 1;
-        timings.lookup_bin_searchs += count;
+        timings.lookup_bin_searches += count;
         
 
         InnerAccountMapIndex {
@@ -300,7 +300,7 @@ impl<V: Clone> AccountMap<V> {
             //error!("keys: {:?}", self.keys);
             loop {
                 index = (l + r) / 2;
-                let outer = self.get_outer_index(index, &Timings::default());
+                let outer = self.get_outer_index(index, &mut Timings::default());
                 //error!("keys2: {:?}, outer: {:?}", self.keys, outer);
                 let val = self.keys[outer.outer_index][outer.inner_index];
                 let cmp = key.partial_cmp(&val).unwrap();
@@ -340,7 +340,7 @@ impl<V: Clone> AccountMap<V> {
     pub fn insert_at_index(&mut self, index: &AccountMapIndex, key: Pubkey, value: V) -> &V {
         let mut timings = Timings::default();
         let mut m1 = Measure::start("");
-        let mut outer = self.get_outer_index(index.index, &timings);
+        let mut outer = self.get_outer_index(index.index, &mut timings);
         m1.stop();
 
         let mut m2 = Measure::start("");
@@ -392,7 +392,7 @@ impl<V: Clone> AccountMap<V> {
             None
         }
         else {
-            let mut outer = self.get_outer_index(index.index);
+            let mut outer = self.get_outer_index(index.index, &mut Timings::default());
             Some(&self.values[outer.outer_index][outer.inner_index])
         }
     }
@@ -404,7 +404,7 @@ impl<V: Clone> AccountMap<V> {
         if index.insert {
         }
         else {
-            let mut outer = self.get_outer_index(index.index);
+            let mut outer = self.get_outer_index(index.index, &mut Timings::default());
             self.count -= 1;
             // TODO - could shrink to zero size here
             self.keys[outer.outer_index].remove(outer.inner_index);
