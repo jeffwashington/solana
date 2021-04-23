@@ -1,0 +1,115 @@
+no logging
+[2021-04-23T20:45:05.585942994Z ERROR solana_runtime::account_map::tests] insert: 1 insert: 17, get: 3, size: 32768
+[2021-04-23T20:45:05.595208085Z ERROR solana_runtime::account_map::tests] insert: 0 insert: 7, get: 1, size: 32768
+[2021-04-23T20:45:05.629082681Z ERROR solana_runtime::account_map::tests] insert: 1 insert: 20, get: 7, size: 65536
+[2021-04-23T20:45:05.647997313Z ERROR solana_runtime::account_map::tests] insert: 0 insert: 14, get: 4, size: 65536
+[2021-04-23T20:45:05.720015974Z ERROR solana_runtime::account_map::tests] insert: 1 insert: 40, get: 18, size: 131072
+[2021-04-23T20:45:05.765000365Z ERROR solana_runtime::account_map::tests] insert: 0 insert: 30, get: 14, size: 131072
+[2021-04-23T20:45:05.926850706Z ERROR solana_runtime::account_map::tests] insert: 1 insert: 87, get: 42, size: 262144
+[2021-04-23T20:45:06.033312374Z ERROR solana_runtime::account_map::tests] insert: 0 insert: 69, get: 37, size: 262144
+[2021-04-23T20:45:06.408188252Z ERROR solana_runtime::account_map::tests] insert: 1 insert: 182, get: 117, size: 524288
+[2021-04-23T20:45:06.645413853Z ERROR solana_runtime::account_map::tests] insert: 0 insert: 152, get: 84, size: 524288
+[2021-04-23T20:45:07.540281683Z ERROR solana_runtime::account_map::tests] insert: 1 insert: 395, get: 334, size: 1048576
+[2021-04-23T20:45:08.037737615Z ERROR solana_runtime::account_map::tests] insert: 0 insert: 316, get: 181, size: 1048576
+[2021-04-23T20:45:10.177761960Z ERROR solana_runtime::account_map::tests] insert: 1 insert: 829, get: 942, size: 2097152
+[2021-04-23T20:45:11.241793460Z ERROR solana_runtime::account_map::tests] insert: 0 insert: 674, get: 389, size: 2097152
+[2021-04-23T20:45:16.381890673Z ERROR solana_runtime::account_map::tests] insert: 1 insert: 1785, get: 2560, size: 4194304
+[2021-04-23T20:45:18.704463507Z ERROR solana_runtime::account_map::tests] insert: 0 insert: 1414, get: 908, size: 4194304
+[2021-04-23T20:45:31.335684879Z ERROR solana_runtime::account_map::tests] insert: 1 insert: 3900, get: 7040, size: 8388608
+[2021-04-23T20:45:36.503266662Z ERROR solana_runtime::account_map::tests] insert: 0 insert: 3088, get: 2079, size: 8388608
+test account_map::tests::test_perf_dashmap ... test account_map::tests::test_perf_dashmap has been running for over 60 seconds
+[2021-04-23T20:46:08.049157840Z ERROR solana_runtime::account_map::tests] insert: 1 insert: 8533, get: 19300, size: 16777216
+[2021-04-23T20:46:19.532511861Z ERROR solana_runtime::account_map::tests] insert: 0 insert: 6782, get: 4700, size: 16777216
+[2021-04-23T20:47:35.162188700Z ERROR solana_runtime::account_map::tests] insert: 1 insert: 18953, get: 48474, size: 33554432
+[2021-04-23T20:48:00.637079034Z ERROR solana_runtime::account_map::tests] insert: 0 insert: 14784, get: 10690, size: 33554432
+
+logging
+[2021-04-23T21:39:56.696463905Z ERROR solana_runtime::account_map::tests] insert: 1 insert: 17, get: 3, size: 32768
+[2021-04-23T21:39:56.706085815Z ERROR solana_runtime::account_map::tests] insert: 0 insert: 7, get: 2, size: 32768
+[2021-04-23T21:39:56.743898331Z ERROR solana_runtime::account_map::tests] insert: 1 insert: 23, get: 8, size: 65536
+[2021-04-23T21:39:56.763501740Z ERROR solana_runtime::account_map::tests] insert: 0 insert: 15, get: 4, size: 65536
+[2021-04-23T21:39:56.843496063Z ERROR solana_runtime::account_map::tests] insert: 1 insert: 46, get: 19, size: 131072
+[2021-04-23T21:39:56.889845766Z ERROR solana_runtime::account_map::tests] insert: 0 insert: 32, get: 13, size: 131072
+[2021-04-23T21:39:57.064705880Z ERROR solana_runtime::account_map::tests] insert: 1 insert: 97, get: 45, size: 262144
+[2021-04-23T21:39:57.176240705Z ERROR solana_runtime::account_map::tests] insert: 0 insert: 73, get: 38, size: 262144
+[2021-04-23T21:39:57.579515701Z ERROR solana_runtime::account_map::tests] insert: 1 insert: 210, get: 115, size: 524288
+[2021-04-23T21:39:57.826622011Z ERROR solana_runtime::account_map::tests] insert: 0 insert: 160, get: 86, size: 524288
+[2021-04-23T21:39:58.425430072Z ERROR solana_runtime::account_map] count: 1000000, lens: 11, Timings { update_lens_us: 0, find_vec_us: 23, insert_vec_us: 94, lookups: 1000000, lookup_bin_searches: 2600010, mv: 0, insert: 33 }
+[2021-04-23T21:39:58.796366812Z ERROR solana_runtime::account_map::tests] insert: 1 insert: 453, get: 345, size: 1048576
+[2021-04-23T21:39:59.317931127Z ERROR solana_runtime::account_map::tests] insert: 0 insert: 336, get: 185, size: 1048576
+[2021-04-23T21:40:00.123307057Z ERROR solana_runtime::account_map] count: 1000000, lens: 11, Timings { update_lens_us: 0, find_vec_us: 23, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 2600010, mv: 0, insert: 30 }
+[2021-04-23T21:40:00.608643909Z ERROR solana_runtime::account_map] count: 2000000, lens: 21, Timings { update_lens_us: 0, find_vec_us: 25, insert_vec_us: 92, lookups: 1000000, lookup_bin_searches: 4400015, mv: 0, insert: 31 }
+[2021-04-23T21:40:01.628440812Z ERROR solana_runtime::account_map::tests] insert: 1 insert: 956, get: 965, size: 2097152
+[2021-04-23T21:40:02.729809901Z ERROR solana_runtime::account_map::tests] insert: 0 insert: 700, get: 400, size: 2097152
+[2021-04-23T21:40:03.981425865Z ERROR solana_runtime::account_map] count: 1000000, lens: 11, Timings { update_lens_us: 0, find_vec_us: 23, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 2600010, mv: 0, insert: 30 }
+[2021-04-23T21:40:04.461963408Z ERROR solana_runtime::account_map] count: 2000000, lens: 21, Timings { update_lens_us: 0, find_vec_us: 24, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 4400015, mv: 0, insert: 30 }
+[2021-04-23T21:40:04.967105250Z ERROR solana_runtime::account_map] count: 3000000, lens: 31, Timings { update_lens_us: 0, find_vec_us: 25, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 5000000, mv: 0, insert: 30 }
+[2021-04-23T21:40:05.512841066Z ERROR solana_runtime::account_map] count: 4000000, lens: 41, Timings { update_lens_us: 0, find_vec_us: 25, insert_vec_us: 98, lookups: 1000000, lookup_bin_searches: 5800031, mv: 0, insert: 37 }
+[2021-04-23T21:40:08.243351896Z ERROR solana_runtime::account_map::tests] insert: 1 insert: 2064, get: 2613, size: 4194304
+[2021-04-23T21:40:10.642888418Z ERROR solana_runtime::account_map::tests] insert: 0 insert: 1476, get: 923, size: 4194304
+[2021-04-23T21:40:12.820605633Z ERROR solana_runtime::account_map] count: 1000000, lens: 11, Timings { update_lens_us: 0, find_vec_us: 23, insert_vec_us: 90, lookups: 1000000, lookup_bin_searches: 2600010, mv: 0, insert: 30 }
+[2021-04-23T21:40:13.299775775Z ERROR solana_runtime::account_map] count: 2000000, lens: 21, Timings { update_lens_us: 0, find_vec_us: 25, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 4400015, mv: 0, insert: 30 }
+[2021-04-23T21:40:13.808052855Z ERROR solana_runtime::account_map] count: 3000000, lens: 31, Timings { update_lens_us: 0, find_vec_us: 25, insert_vec_us: 92, lookups: 1000000, lookup_bin_searches: 5000000, mv: 0, insert: 31 }
+[2021-04-23T21:40:14.337625509Z ERROR solana_runtime::account_map] count: 4000000, lens: 41, Timings { update_lens_us: 0, find_vec_us: 25, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 5800031, mv: 0, insert: 30 }
+[2021-04-23T21:40:14.894805159Z ERROR solana_runtime::account_map] count: 5000000, lens: 51, Timings { update_lens_us: 0, find_vec_us: 26, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 6000000, mv: 0, insert: 30 }
+[2021-04-23T21:40:15.455243545Z ERROR solana_runtime::account_map] count: 6000000, lens: 61, Timings { update_lens_us: 0, find_vec_us: 26, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 6000000, mv: 0, insert: 30 }
+[2021-04-23T21:40:16.033946319Z ERROR solana_runtime::account_map] count: 7000000, lens: 71, Timings { update_lens_us: 0, find_vec_us: 26, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 6600063, mv: 0, insert: 30 }
+[2021-04-23T21:40:16.660068778Z ERROR solana_runtime::account_map] count: 8000000, lens: 81, Timings { update_lens_us: 0, find_vec_us: 27, insert_vec_us: 103, lookups: 1000000, lookup_bin_searches: 7000000, mv: 0, insert: 43 }
+[2021-04-23T21:40:24.124379808Z ERROR solana_runtime::account_map::tests] insert: 1 insert: 4507, get: 7209, size: 8388608
+[2021-04-23T21:40:29.470937360Z ERROR solana_runtime::account_map::tests] insert: 0 insert: 3206, get: 2140, size: 8388608
+[2021-04-23T21:40:33.690897318Z ERROR solana_runtime::account_map] count: 1000000, lens: 11, Timings { update_lens_us: 0, find_vec_us: 23, insert_vec_us: 90, lookups: 1000000, lookup_bin_searches: 2600010, mv: 0, insert: 29 }
+[2021-04-23T21:40:34.166664266Z ERROR solana_runtime::account_map] count: 2000000, lens: 21, Timings { update_lens_us: 0, find_vec_us: 24, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 4400015, mv: 0, insert: 30 }
+[2021-04-23T21:40:34.670060759Z ERROR solana_runtime::account_map] count: 3000000, lens: 31, Timings { update_lens_us: 0, find_vec_us: 25, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 5000000, mv: 0, insert: 30 }
+[2021-04-23T21:40:35.192708013Z ERROR solana_runtime::account_map] count: 4000000, lens: 41, Timings { update_lens_us: 0, find_vec_us: 25, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 5800031, mv: 0, insert: 30 }
+[2021-04-23T21:40:35.751414249Z ERROR solana_runtime::account_map] count: 5000000, lens: 51, Timings { update_lens_us: 0, find_vec_us: 25, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 6000000, mv: 0, insert: 30 }
+[2021-04-23T21:40:36.309272574Z ERROR solana_runtime::account_map] count: 6000000, lens: 61, Timings { update_lens_us: 0, find_vec_us: 25, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 6000000, mv: 0, insert: 30 }
+[2021-04-23T21:40:36.881540829Z ERROR solana_runtime::account_map] count: 7000000, lens: 71, Timings { update_lens_us: 0, find_vec_us: 26, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 6600063, mv: 0, insert: 30 }
+[2021-04-23T21:40:37.467512440Z ERROR solana_runtime::account_map] count: 8000000, lens: 81, Timings { update_lens_us: 0, find_vec_us: 27, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 7000000, mv: 0, insert: 30 }
+[2021-04-23T21:40:38.069799206Z ERROR solana_runtime::account_map] count: 9000000, lens: 91, Timings { update_lens_us: 0, find_vec_us: 27, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 7000000, mv: 0, insert: 30 }
+[2021-04-23T21:40:38.679261056Z ERROR solana_runtime::account_map] count: 10000000, lens: 101, Timings { update_lens_us: 0, find_vec_us: 27, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 7000000, mv: 0, insert: 30 }
+[2021-04-23T21:40:39.288288926Z ERROR solana_runtime::account_map] count: 11000000, lens: 111, Timings { update_lens_us: 0, find_vec_us: 27, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 7000000, mv: 0, insert: 30 }
+[2021-04-23T21:40:39.894093119Z ERROR solana_runtime::account_map] count: 12000000, lens: 121, Timings { update_lens_us: 0, find_vec_us: 27, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 7000000, mv: 0, insert: 30 }
+[2021-04-23T21:40:40.504827291Z ERROR solana_runtime::account_map] count: 13000000, lens: 131, Timings { update_lens_us: 0, find_vec_us: 27, insert_vec_us: 92, lookups: 1000000, lookup_bin_searches: 7200127, mv: 0, insert: 31 }
+[2021-04-23T21:40:41.127649009Z ERROR solana_runtime::account_map] count: 14000000, lens: 141, Timings { update_lens_us: 0, find_vec_us: 29, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 8000000, mv: 0, insert: 30 }
+[2021-04-23T21:40:41.753208173Z ERROR solana_runtime::account_map] count: 15000000, lens: 151, Timings { update_lens_us: 0, find_vec_us: 29, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 8000000, mv: 0, insert: 31 }
+[2021-04-23T21:40:42.441113084Z ERROR solana_runtime::account_map] count: 16000000, lens: 161, Timings { update_lens_us: 0, find_vec_us: 29, insert_vec_us: 111, lookups: 1000000, lookup_bin_searches: 8000000, mv: 0, insert: 51 }
+test account_map::tests::test_perf_dashmap ... test account_map::tests::test_perf_dashmap has been running for over 60 seconds
+[2021-04-23T21:41:03.092719154Z ERROR solana_runtime::account_map::tests] insert: 1 insert: 9697, get: 20117, size: 16777216
+[2021-04-23T21:41:14.915068865Z ERROR solana_runtime::account_map::tests] insert: 0 insert: 6976, get: 4845, size: 16777216
+[2021-04-23T21:41:23.725113435Z ERROR solana_runtime::account_map] count: 1000000, lens: 11, Timings { update_lens_us: 0, find_vec_us: 23, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 2600010, mv: 0, insert: 30 }
+[2021-04-23T21:41:24.201088519Z ERROR solana_runtime::account_map] count: 2000000, lens: 21, Timings { update_lens_us: 0, find_vec_us: 24, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 4400015, mv: 0, insert: 30 }
+[2021-04-23T21:41:24.704940011Z ERROR solana_runtime::account_map] count: 3000000, lens: 31, Timings { update_lens_us: 0, find_vec_us: 25, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 5000000, mv: 0, insert: 30 }
+[2021-04-23T21:41:25.232550212Z ERROR solana_runtime::account_map] count: 4000000, lens: 41, Timings { update_lens_us: 0, find_vec_us: 25, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 5800031, mv: 0, insert: 30 }
+[2021-04-23T21:41:25.791954457Z ERROR solana_runtime::account_map] count: 5000000, lens: 51, Timings { update_lens_us: 0, find_vec_us: 26, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 6000000, mv: 0, insert: 30 }
+[2021-04-23T21:41:26.355514352Z ERROR solana_runtime::account_map] count: 6000000, lens: 61, Timings { update_lens_us: 0, find_vec_us: 25, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 6000000, mv: 0, insert: 30 }
+[2021-04-23T21:41:26.930513410Z ERROR solana_runtime::account_map] count: 7000000, lens: 71, Timings { update_lens_us: 0, find_vec_us: 26, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 6600063, mv: 0, insert: 30 }
+[2021-04-23T21:41:27.515704528Z ERROR solana_runtime::account_map] count: 8000000, lens: 81, Timings { update_lens_us: 0, find_vec_us: 27, insert_vec_us: 92, lookups: 1000000, lookup_bin_searches: 7000000, mv: 0, insert: 31 }
+[2021-04-23T21:41:28.115639277Z ERROR solana_runtime::account_map] count: 9000000, lens: 91, Timings { update_lens_us: 0, find_vec_us: 27, insert_vec_us: 92, lookups: 1000000, lookup_bin_searches: 7000000, mv: 0, insert: 31 }
+[2021-04-23T21:41:28.720970618Z ERROR solana_runtime::account_map] count: 10000000, lens: 101, Timings { update_lens_us: 0, find_vec_us: 27, insert_vec_us: 92, lookups: 1000000, lookup_bin_searches: 7000000, mv: 0, insert: 31 }
+[2021-04-23T21:41:29.328053492Z ERROR solana_runtime::account_map] count: 11000000, lens: 111, Timings { update_lens_us: 0, find_vec_us: 27, insert_vec_us: 92, lookups: 1000000, lookup_bin_searches: 7000000, mv: 0, insert: 31 }
+[2021-04-23T21:41:29.931638369Z ERROR solana_runtime::account_map] count: 12000000, lens: 121, Timings { update_lens_us: 0, find_vec_us: 27, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 7000000, mv: 0, insert: 30 }
+[2021-04-23T21:41:30.542023830Z ERROR solana_runtime::account_map] count: 13000000, lens: 131, Timings { update_lens_us: 0, find_vec_us: 27, insert_vec_us: 92, lookups: 1000000, lookup_bin_searches: 7200127, mv: 0, insert: 31 }
+[2021-04-23T21:41:31.164513315Z ERROR solana_runtime::account_map] count: 14000000, lens: 141, Timings { update_lens_us: 0, find_vec_us: 28, insert_vec_us: 92, lookups: 1000000, lookup_bin_searches: 8000000, mv: 0, insert: 31 }
+[2021-04-23T21:41:31.790579459Z ERROR solana_runtime::account_map] count: 15000000, lens: 151, Timings { update_lens_us: 0, find_vec_us: 28, insert_vec_us: 92, lookups: 1000000, lookup_bin_searches: 8000000, mv: 0, insert: 31 }
+[2021-04-23T21:41:32.416764392Z ERROR solana_runtime::account_map] count: 16000000, lens: 161, Timings { update_lens_us: 0, find_vec_us: 28, insert_vec_us: 92, lookups: 1000000, lookup_bin_searches: 8000000, mv: 0, insert: 31 }
+[2021-04-23T21:41:33.048750688Z ERROR solana_runtime::account_map] count: 17000000, lens: 171, Timings { update_lens_us: 0, find_vec_us: 28, insert_vec_us: 92, lookups: 1000000, lookup_bin_searches: 8000000, mv: 0, insert: 31 }
+[2021-04-23T21:41:33.693623800Z ERROR solana_runtime::account_map] count: 18000000, lens: 181, Timings { update_lens_us: 0, find_vec_us: 28, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 8000000, mv: 0, insert: 30 }
+[2021-04-23T21:41:34.338479583Z ERROR solana_runtime::account_map] count: 19000000, lens: 191, Timings { update_lens_us: 0, find_vec_us: 28, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 8000000, mv: 0, insert: 30 }
+[2021-04-23T21:41:34.983097824Z ERROR solana_runtime::account_map] count: 20000000, lens: 201, Timings { update_lens_us: 0, find_vec_us: 28, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 8000000, mv: 0, insert: 30 }
+[2021-04-23T21:41:35.628254147Z ERROR solana_runtime::account_map] count: 21000000, lens: 211, Timings { update_lens_us: 0, find_vec_us: 28, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 8000000, mv: 0, insert: 30 }
+[2021-04-23T21:41:36.274139012Z ERROR solana_runtime::account_map] count: 22000000, lens: 221, Timings { update_lens_us: 0, find_vec_us: 28, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 8000000, mv: 0, insert: 30 }
+[2021-04-23T21:41:36.923112623Z ERROR solana_runtime::account_map] count: 23000000, lens: 231, Timings { update_lens_us: 0, find_vec_us: 28, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 8000000, mv: 0, insert: 30 }
+[2021-04-23T21:41:37.570183040Z ERROR solana_runtime::account_map] count: 24000000, lens: 241, Timings { update_lens_us: 0, find_vec_us: 28, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 8000000, mv: 0, insert: 30 }
+[2021-04-23T21:41:38.217609588Z ERROR solana_runtime::account_map] count: 25000000, lens: 251, Timings { update_lens_us: 0, find_vec_us: 28, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 8000000, mv: 0, insert: 30 }
+[2021-04-23T21:41:38.871584280Z ERROR solana_runtime::account_map] count: 26000000, lens: 261, Timings { update_lens_us: 0, find_vec_us: 29, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 8400255, mv: 0, insert: 30 }
+[2021-04-23T21:41:39.539398770Z ERROR solana_runtime::account_map] count: 27000000, lens: 271, Timings { update_lens_us: 0, find_vec_us: 30, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 9000000, mv: 0, insert: 30 }
+[2021-04-23T21:41:40.209406636Z ERROR solana_runtime::account_map] count: 28000000, lens: 281, Timings { update_lens_us: 0, find_vec_us: 30, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 9000000, mv: 0, insert: 30 }
+[2021-04-23T21:41:40.890182072Z ERROR solana_runtime::account_map] count: 29000000, lens: 291, Timings { update_lens_us: 0, find_vec_us: 30, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 9000000, mv: 0, insert: 30 }
+[2021-04-23T21:41:41.561410680Z ERROR solana_runtime::account_map] count: 30000000, lens: 301, Timings { update_lens_us: 0, find_vec_us: 30, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 9000000, mv: 0, insert: 30 }
+[2021-04-23T21:41:42.234178771Z ERROR solana_runtime::account_map] count: 31000000, lens: 311, Timings { update_lens_us: 0, find_vec_us: 30, insert_vec_us: 91, lookups: 1000000, lookup_bin_searches: 9000000, mv: 0, insert: 30 }
+[2021-04-23T21:41:42.927791565Z ERROR solana_runtime::account_map] count: 32000000, lens: 321, Timings { update_lens_us: 0, find_vec_us: 30, insert_vec_us: 99, lookups: 1000000, lookup_bin_searches: 9000000, mv: 0, insert: 38 }
+[2021-04-23T21:41:43.665393299Z ERROR solana_runtime::account_map] count: 33000000, lens: 331, Timings { update_lens_us: 0, find_vec_us: 30, insert_vec_us: 111, lookups: 1000000, lookup_bin_searches: 9000000, mv: 0, insert: 51 }
+[2021-04-23T21:42:34.162593145Z ERROR solana_runtime::account_map::tests] insert: 1 insert: 20765, get: 50087, size: 33554432
+[2021-04-23T21:43:00.295940398Z ERROR solana_runtime::account_map::tests] insert: 0 insert: 15168, get: 10964, size: 33554432
+
+

@@ -344,7 +344,7 @@ impl<V: Clone> AccountMap<V> {
 
         index
     }
-    pub fn find(&self, key: &Pubkey) -> AccountMapIndex {
+    pub fn find(&self, key: &Pubkey, timings: &mut Timings) -> AccountMapIndex {
         let mut l = 0;
         let mut index = l;
         let mut insert = true;
@@ -380,7 +380,9 @@ impl<V: Clone> AccountMap<V> {
                     break;
                 }
             }
+            timings.lookup_bin_searches += iteration;
         }
+        timings.lookups += 1;
 
         AccountMapIndex {
             insert,
@@ -391,7 +393,7 @@ impl<V: Clone> AccountMap<V> {
         self.count
     }
     pub fn insert(&mut self, key: Pubkey, value: V) -> &V {
-        let find = self.find(&key);
+        let find = self.find(&key, &mut Timings::default());
         self.insert_at_index(&find, key, value)
     }
     pub fn insert_at_index(&mut self, index: &AccountMapIndex, key: Pubkey, value: V) -> &V {
@@ -432,7 +434,7 @@ impl<V: Clone> AccountMap<V> {
         &self.values[outer.outer_index][outer.inner_index]
     }
     pub fn entry(&self, key: Pubkey) -> AccountMapEntryBtree {
-        let find = self.find(&key);
+        let find = self.find(&key, &mut Timings::default());
         if find.insert {
             AccountMapEntryBtree::Vacant(VacantEntry::new(key, find))
         }
@@ -441,12 +443,37 @@ impl<V: Clone> AccountMap<V> {
         }
     }
     pub fn contains_key(&self, key: &Pubkey) -> bool {
-        let find = self.find(&key);
+        let find = self.find(&key, &mut Timings::default());
         !find.insert
     }
     pub fn get(&self, key: &Pubkey) -> Option<&V> {
-        let find = self.find(&key);
-        self.get_at_index(&find)
+        let mut timings = Timings::default();
+        let mut m1 = Measure::start("");
+        let find = self.find(&key, &mut timings);
+        m1.stop();
+        let res = self.get_at_index(&find);
+
+        {
+            let mut m = self.timings.write().unwrap();
+            m.find_vec_us += m1.as_ns();
+            m.lookups += timings.lookups;
+            m.lookup_bin_searches += timings.lookup_bin_searches;
+            m.insert += timings.insert;
+            m.mv += timings.mv;
+        //error!("outer: {}, inner: {}, len: {}, insert: {}", outer.outer_index, outer.inner_index, self.values.len(), index.insert);
+                if m.lookups % 100_000 == 0 {
+                let mut m = self.timings.write().unwrap();
+                m.find_vec_us /= 1000_000;
+                m.insert_vec_us /=1000_000;
+                m.mv /= 1000_000;
+                m.insert /=1000_000;
+        
+            error!("count: {}, lens: {:?}, {:?}", self.count, self.cumulative_lens.len(), *m);
+            *m = Timings::default();
+                }
+    }
+
+        res
     }
     pub fn get_at_index(&self, index: &AccountMapIndex) -> Option<&V> {
         if index.insert {
@@ -458,7 +485,7 @@ impl<V: Clone> AccountMap<V> {
         }
     }
     pub fn remove(&mut self, key: &Pubkey) {
-        let find = self.find(&key);
+        let find = self.find(&key, &mut Timings::default());
         self.remove_at_index(&find)
     }
     pub fn remove_at_index(&mut self, index: &AccountMapIndex) {
