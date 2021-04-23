@@ -133,6 +133,8 @@ pub struct Timings {
     pub insert_vec_us: u64,
     pub lookups: u64,
     pub lookup_bin_searches: u64,
+    pub mv: u64,
+    pub insert: u64,
 }
 
 //pub type AccountMap<K, V> = BTreeMap<K, V>;
@@ -187,7 +189,7 @@ impl<V: Clone> AccountMap<V> {
         vec.insert(outer + 1, new_vec);
     }
 
-    pub fn insert_at_index_alloc(&mut self, index: &AccountMapIndex, key: Pubkey, value: V, outer: &mut InnerAccountMapIndex ) {
+    pub fn insert_at_index_alloc(&mut self, index: &AccountMapIndex, key: Pubkey, value: V, outer: &mut InnerAccountMapIndex, timings: &mut Timings ) {
         let max = self.vec_size_max;
         let max_move = max; // tune this later
         let size = self.keys[outer.outer_index].len();
@@ -195,8 +197,11 @@ impl<V: Clone> AccountMap<V> {
         //error!("insert_at_index_alloc, outer: {}, inner: {}, len: {}, to_move: {}, size: {}, values: {:?}", outer.outer_index, outer.inner_index, self.count, to_move, size, self.keys);
         if size > 0 && (to_move > max_move || size + 1 >= max) {
             // have to add a new vector
+            let mut m1 = Measure::start();
             Self::mv(&mut self.keys, outer.outer_index, outer.inner_index, to_move, key);
             Self::mv(&mut self.values, outer.outer_index, outer.inner_index, to_move, value);
+            m1.stop();
+            timings.mv += m1.as_ns();
             //error!("new keys: {:?}", self.keys);
             self.cumulative_lens.insert(outer.outer_index, self.cumulative_lens[outer.outer_index]); // we inserted here
             if to_move == 0 {
@@ -210,8 +215,11 @@ impl<V: Clone> AccountMap<V> {
         }
         else {
             // no new vector - just insert
+            let mut m1 = Measure::start();
             self.keys[outer.outer_index].insert(outer.inner_index, key);
             self.values[outer.outer_index].insert(outer.inner_index, value);
+            m1.stop();
+            timings.insert += m1.as_ns();
         }
         // shift the rest of the cumulative offsets since we inserted
         for outer_index in &mut self.cumulative_lens[outer.outer_index..] {
@@ -345,7 +353,7 @@ impl<V: Clone> AccountMap<V> {
 
         let mut m2 = Measure::start("");
         if index.insert {
-            self.insert_at_index_alloc(index, key, value, &mut outer);
+            self.insert_at_index_alloc(index, key, value, &mut outer, &mut timings);
         }
         else {
             self.values[outer.outer_index][outer.inner_index] = value;
@@ -357,16 +365,19 @@ impl<V: Clone> AccountMap<V> {
             m.insert_vec_us += m2.as_ns();
             m.lookups += timings.lookups;
             m.lookup_bin_searches += timings.lookup_bin_searches;
+            m.insert += timings.insert;
+            m.mv += timings.mv;
         }
         //error!("outer: {}, inner: {}, len: {}, insert: {}", outer.outer_index, outer.inner_index, self.values.len(), index.insert);
         if self.count % 1_000_000 == 0 {
                 let mut m = self.timings.write().unwrap();
                 m.find_vec_us /= 1000_000;
                 m.insert_vec_us /=1000_000;
+                m.mv /= 1000_000;
+                m.insert /=1000_000;
         
             error!("count: {}, lens: {:?}, {:?}", self.count, self.cumulative_lens.len(), *m);
-            m.find_vec_us = 0;
-            m.insert_vec_us = 0;
+            *m = Timings::default();
     }
         &self.values[outer.outer_index][outer.inner_index]
     }
