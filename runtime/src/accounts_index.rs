@@ -923,6 +923,22 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
             .map(WriteAccountMapEntry::from_account_map_entry)
     }
 
+    pub fn bulk_insert_keys(&self, pubkeys: &[Pubkey]) {
+        let mut w_account_maps = self.account_maps.write().unwrap();
+        let mut is_newly_inserted = false;
+        for pubkey in pubkeys.iter() {
+            let account_entry = w_account_maps.entry(*pubkey);
+            let account_entry = account_entry.or_insert_with(|| {
+                let new_entry = Arc::new(AccountMapEntryInner {
+                    ref_count: AtomicU64::new(0),
+                    slot_list: RwLock::new(SlotList::with_capacity(1)),
+                });
+                is_newly_inserted = true;
+                new_entry
+            }, &mut w_account_maps);
+        }
+    }
+
     fn insert_new_entry_if_missing(&self, pubkey: &Pubkey) -> (WriteAccountMapEntry<T>, bool) {
         let new_entry = Arc::new(AccountMapEntryInner {
             ref_count: AtomicU64::new(0),
