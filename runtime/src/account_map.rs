@@ -197,7 +197,7 @@ impl<V: Clone> AccountMap<V> {
         //error!("insert_at_index_alloc, outer: {}, inner: {}, len: {}, to_move: {}, size: {}, values: {:?}", outer.outer_index, outer.inner_index, self.count, to_move, size, self.keys);
         if size > 0 && (to_move > max_move || size + 1 >= max) {
             // have to add a new vector
-            let mut m1 = Measure::start();
+            let mut m1 = Measure::start("");
             Self::mv(&mut self.keys, outer.outer_index, outer.inner_index, to_move, key);
             Self::mv(&mut self.values, outer.outer_index, outer.inner_index, to_move, value);
             m1.stop();
@@ -215,7 +215,7 @@ impl<V: Clone> AccountMap<V> {
         }
         else {
             // no new vector - just insert
-            let mut m1 = Measure::start();
+            let mut m1 = Measure::start("");
             self.keys[outer.outer_index].insert(outer.inner_index, key);
             self.values[outer.outer_index].insert(outer.inner_index, value);
             m1.stop();

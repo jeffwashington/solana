@@ -4624,6 +4624,34 @@ impl AccountsDb {
         #[allow(clippy::stable_sort_primitive)]
         slots.sort();
 
+        let mut keys = Vec::with_capacity(100_000_000);
+        for (index, slot) in slots.iter().enumerate() {
+            let now = Instant::now();
+            if now.duration_since(last_log_update).as_secs() >= 2 {
+                info!("getting pks: {}/{} slots...", index, slots.len());
+                last_log_update = now;
+            }
+            let storage_maps: Vec<Arc<AccountStorageEntry>> = self
+                .storage
+                .get_slot_storage_entries(*slot)
+                .unwrap_or_default();
+            let num_accounts = storage_maps
+                .iter()
+                .map(|storage| storage.approx_stored_count())
+                .sum();
+            let mut accounts_map: AccountsMap = AccountsMap::with_capacity(num_accounts);
+            storage_maps.iter().for_each(|storage| {
+                let accounts = storage.all_accounts();
+                accounts.into_iter().for_each(|stored_account| {
+                    keys.push(stored_account.meta.pubkey);
+                }
+            }
+        }
+
+        info!("sorting: {}", keys.len());
+        keys.sort();
+        info!("sorted: {}", keys.len());
+
         let mut last_log_update = Instant::now();
         for (index, slot) in slots.iter().enumerate() {
             let now = Instant::now();
