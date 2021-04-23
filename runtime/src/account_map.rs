@@ -131,6 +131,8 @@ pub struct Timings {
     pub update_lens_us: u64,
     pub find_vec_us: u64,
     pub insert_vec_us: u64,
+    pub lookups: u64,
+    pub lookup_bin_searches: u64,
 }
 
 //pub type AccountMap<K, V> = BTreeMap<K, V>;
@@ -219,14 +221,16 @@ impl<V: Clone> AccountMap<V> {
         self.count += 1;
     }
 
-    pub fn get_outer_index(&self, given_index: usize) -> InnerAccountMapIndex {
+    pub fn get_outer_index(&self, given_index: usize, timings: &mut Timings) -> InnerAccountMapIndex {
         let mut l = 0;
         let mut index = l;
         let mut inner_index = 0;
+        let mut count = 0;
         if self.count > 0 {
             let mut r = self.cumulative_lens.len();
             let mut iteration = 0;
             loop {
+                count += 1;
                 index = (l + r) / 2;
                 let val = self.cumulative_lens[index];
                 let cmp = given_index.partial_cmp(&val).unwrap();
@@ -262,6 +266,9 @@ impl<V: Clone> AccountMap<V> {
             }
             //error!("returned: outer: {}, inner_index: {}, given_index: {}, cumulative_lens: {:?}", index, inner_index, given_index, self.cumulative_lens);
         }
+        timings.lookups += 1;
+        timings.lookup_bin_searchs += count;
+        
 
         InnerAccountMapIndex {
             outer_index: index,
@@ -293,7 +300,7 @@ impl<V: Clone> AccountMap<V> {
             //error!("keys: {:?}", self.keys);
             loop {
                 index = (l + r) / 2;
-                let outer = self.get_outer_index(index);
+                let outer = self.get_outer_index(index, &Timings::default());
                 //error!("keys2: {:?}, outer: {:?}", self.keys, outer);
                 let val = self.keys[outer.outer_index][outer.inner_index];
                 let cmp = key.partial_cmp(&val).unwrap();
@@ -331,8 +338,9 @@ impl<V: Clone> AccountMap<V> {
         self.insert_at_index(&find, key, value)
     }
     pub fn insert_at_index(&mut self, index: &AccountMapIndex, key: Pubkey, value: V) -> &V {
+        let mut timings = Timings::default();
         let mut m1 = Measure::start("");
-        let mut outer = self.get_outer_index(index.index);
+        let mut outer = self.get_outer_index(index.index, &timings);
         m1.stop();
 
         let mut m2 = Measure::start("");
@@ -347,6 +355,8 @@ impl<V: Clone> AccountMap<V> {
             let mut m = self.timings.write().unwrap();
             m.find_vec_us += m1.as_ns();
             m.insert_vec_us += m2.as_ns();
+            m.lookups += timings.lookups;
+            m.lookup_bin_searches += timings.lookup_bin_searches;
         }
         //error!("outer: {}, inner: {}, len: {}, insert: {}", outer.outer_index, outer.inner_index, self.values.len(), index.insert);
         if self.count % 1_000_000 == 0 {
@@ -354,7 +364,7 @@ impl<V: Clone> AccountMap<V> {
                 m.find_vec_us /= 1000_000;
                 m.insert_vec_us /=1000_000;
         
-            error!("count: {}, lens: {:?}, {:?}", self.count, self.cumulative_lens.len(), self.timings);
+            error!("count: {}, lens: {:?}, {:?}", self.count, self.cumulative_lens.len(), *m);
             m.find_vec_us = 0;
             m.insert_vec_us = 0;
     }
