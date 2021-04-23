@@ -1,9 +1,9 @@
 //! `cost_aligned_package` is a collection of *ref* of  HashedTransactions that complies to
-//! the chain_max_cost and block_max_cost. 
-//! It does not own or copy `banking_stage` owned HashedTransactions. 
+//! the chain_max_cost and block_max_cost.
+//! It does not own or copy `banking_stage` owned HashedTransactions.
 use solana_runtime::hashed_transaction::HashedTransaction;
-use solana_sdk::{pubkey::Pubkey};
-use std::{collections::HashMap};
+use solana_sdk::pubkey::Pubkey;
+use std::collections::HashMap;
 
 #[derive(Debug)]
 pub struct CostAlignedPackage<'a> {
@@ -33,7 +33,7 @@ impl<'a> CostAlignedPackage<'a> {
             return true;
         }
 
-        // check each account against chain_max_cost, 
+        // check each account against chain_max_cost,
         for account_key in keys.iter() {
             match self.chained_costs.get(&account_key) {
                 Some(chained_cost) => {
@@ -53,7 +53,12 @@ impl<'a> CostAlignedPackage<'a> {
     // NOTE - somewhere we need to have a way to prevent the case that a single transaction
     //        exceeds limit(s); for now, we will always allow first transaction, regardless cost,
     //        be successfully inserted into a new CostAlignedPackage
-    pub fn add_transaction(&mut self, transaction: &'a HashedTransaction<'a>, keys: &[Pubkey], cost: &u32) {
+    pub fn add_transaction(
+        &mut self,
+        transaction: &'a HashedTransaction<'a>,
+        keys: &[Pubkey],
+        cost: &u32,
+    ) {
         // NOTE - making copy here :( what is the better way? Or maybe copying-once here is
         // unavailable?
         self.package.push(transaction);
@@ -63,7 +68,7 @@ impl<'a> CostAlignedPackage<'a> {
         self.package_cost += cost;
     }
 
-    pub fn package( &self ) -> &Vec<&HashedTransaction> {
+    pub fn package(&self) -> &Vec<&HashedTransaction> {
         &self.package
     }
 }
@@ -78,10 +83,7 @@ mod tests {
         signature::{Keypair, Signer},
         system_transaction,
     };
-    use std::{
-        sync::Arc,
-        cmp,
-    };
+    use std::{cmp, sync::Arc};
 
     fn test_setup() -> (Keypair, Hash) {
         solana_logger::setup();
@@ -95,16 +97,19 @@ mod tests {
         (mint_keypair, start_hash)
     }
 
-    fn build_simple_transaction(mint_keypair: &Keypair, start_hash: &Hash 
-        ) -> (HashedTransaction<'static>, Vec<Pubkey>, u32) {
+    fn build_simple_transaction(
+        mint_keypair: &Keypair,
+        start_hash: &Hash,
+    ) -> (HashedTransaction<'static>, Vec<Pubkey>, u32) {
         let keypair = Keypair::new();
         let simple_transaction =
             system_transaction::transfer(&mint_keypair, &keypair.pubkey(), 2, *start_hash);
 
-        ( HashedTransaction::from(simple_transaction), 
-          vec![mint_keypair.pubkey()],
-          5,
-        ) 
+        (
+            HashedTransaction::from(simple_transaction),
+            vec![mint_keypair.pubkey()],
+            5,
+        )
     }
 
     #[test]
@@ -119,96 +124,95 @@ mod tests {
 
     #[test]
     fn test_cost_aligned_package_ok_add_one() {
-        let (mint_keypair, start_hash ) = test_setup();
+        let (mint_keypair, start_hash) = test_setup();
         let (tx, keys, cost) = build_simple_transaction(&mint_keypair, &start_hash);
 
         // build testee to have capacity for one simple transaction
-        let mut testee = CostAlignedPackage::new( cost, cost );
-        assert_eq!( false, testee.would_exceed_limit( &keys, &cost ) );
-        testee.add_transaction( &tx, &keys, &cost );
-        assert_eq!( 1, testee.package().len() );
+        let mut testee = CostAlignedPackage::new(cost, cost);
+        assert_eq!(false, testee.would_exceed_limit(&keys, &cost));
+        testee.add_transaction(&tx, &keys, &cost);
+        assert_eq!(1, testee.package().len());
     }
 
     #[test]
     fn test_cost_aligned_package_ok_add_two_same_accounts() {
-        let (mint_keypair, start_hash ) = test_setup();
+        let (mint_keypair, start_hash) = test_setup();
         // build two transactions with same signed account
         let (tx1, keys1, cost1) = build_simple_transaction(&mint_keypair, &start_hash);
         let (tx2, keys2, cost2) = build_simple_transaction(&mint_keypair, &start_hash);
 
         // build testee to have capacity for two simple transactions, with same accounts
-        let mut testee = CostAlignedPackage::new( cost1 + cost2, cost1 + cost2 );
+        let mut testee = CostAlignedPackage::new(cost1 + cost2, cost1 + cost2);
         {
-            assert_eq!( false, testee.would_exceed_limit( &keys1, &cost1 ) );
-            testee.add_transaction( &tx1, &keys1, &cost1 );
+            assert_eq!(false, testee.would_exceed_limit(&keys1, &cost1));
+            testee.add_transaction(&tx1, &keys1, &cost1);
         }
         {
-            assert_eq!( false, testee.would_exceed_limit( &keys2, &cost2 ) );
-            testee.add_transaction( &tx2, &keys2, &cost2 );
+            assert_eq!(false, testee.would_exceed_limit(&keys2, &cost2));
+            testee.add_transaction(&tx2, &keys2, &cost2);
         }
-        assert_eq!( 2, testee.package().len() );
+        assert_eq!(2, testee.package().len());
     }
 
     #[test]
     fn test_cost_aligned_package_ok_add_two_diff_accounts() {
-        let (mint_keypair, start_hash ) = test_setup();
+        let (mint_keypair, start_hash) = test_setup();
         // build two transactions with diff accounts
         let (tx1, keys1, cost1) = build_simple_transaction(&mint_keypair, &start_hash);
         let second_account = Keypair::new();
         let (tx2, keys2, cost2) = build_simple_transaction(&second_account, &start_hash);
 
         // build testee to have capacity for two simple transactions, with same accounts
-        let mut testee = CostAlignedPackage::new( cmp::max(cost1, cost2), cost1 + cost2 );
+        let mut testee = CostAlignedPackage::new(cmp::max(cost1, cost2), cost1 + cost2);
         {
-            assert_eq!( false, testee.would_exceed_limit( &keys1, &cost1 ) );
-            testee.add_transaction( &tx1, &keys1, &cost1 );
+            assert_eq!(false, testee.would_exceed_limit(&keys1, &cost1));
+            testee.add_transaction(&tx1, &keys1, &cost1);
         }
         {
-            assert_eq!( false, testee.would_exceed_limit( &keys2, &cost2 ) );
-            testee.add_transaction( &tx2, &keys2, &cost2 );
+            assert_eq!(false, testee.would_exceed_limit(&keys2, &cost2));
+            testee.add_transaction(&tx2, &keys2, &cost2);
         }
-        assert_eq!( 2, testee.package().len() );
+        assert_eq!(2, testee.package().len());
     }
-
 
     #[test]
     fn test_cost_aligned_package_chain_reach_limit() {
-        let (mint_keypair, start_hash ) = test_setup();
+        let (mint_keypair, start_hash) = test_setup();
         // build two transactions with same signed account
         let (tx1, keys1, cost1) = build_simple_transaction(&mint_keypair, &start_hash);
         let (_tx2, keys2, cost2) = build_simple_transaction(&mint_keypair, &start_hash);
 
         // build testee to have capacity for two simple transactions, but not for same accounts
-        let mut testee = CostAlignedPackage::new( cmp::min(cost1, cost2), cost1 + cost2 );
-        // should have room for first transaction 
+        let mut testee = CostAlignedPackage::new(cmp::min(cost1, cost2), cost1 + cost2);
+        // should have room for first transaction
         {
-            assert_eq!( false, testee.would_exceed_limit( &keys1, &cost1 ) );
-            testee.add_transaction( &tx1, &keys1, &cost1 );
+            assert_eq!(false, testee.would_exceed_limit(&keys1, &cost1));
+            testee.add_transaction(&tx1, &keys1, &cost1);
         }
         // but no more sapce on the same chain (same signer account)
         {
-            assert_eq!( true, testee.would_exceed_limit( &keys2, &cost2 ) );
+            assert_eq!(true, testee.would_exceed_limit(&keys2, &cost2));
         }
     }
 
     #[test]
     fn test_cost_aligned_package_reach_limit() {
-        let (mint_keypair, start_hash ) = test_setup();
+        let (mint_keypair, start_hash) = test_setup();
         // build two transactions with diff accounts
         let (tx1, keys1, cost1) = build_simple_transaction(&mint_keypair, &start_hash);
         let second_account = Keypair::new();
         let (_tx2, keys2, cost2) = build_simple_transaction(&second_account, &start_hash);
 
         // build testee to have capacity for each chain, but not enough room for both transactions
-        let mut testee = CostAlignedPackage::new( cmp::max(cost1, cost2), cost1 + cost2 - 1 );
+        let mut testee = CostAlignedPackage::new(cmp::max(cost1, cost2), cost1 + cost2 - 1);
         // should have room for first transaction
         {
-            assert_eq!( false, testee.would_exceed_limit( &keys1, &cost1 ) );
-            testee.add_transaction( &tx1, &keys1, &cost1 );
+            assert_eq!(false, testee.would_exceed_limit(&keys1, &cost1));
+            testee.add_transaction(&tx1, &keys1, &cost1);
         }
         // but no more room for package as whole
         {
-            assert_eq!( true, testee.would_exceed_limit( &keys2, &cost2 ) );
+            assert_eq!(true, testee.would_exceed_limit(&keys2, &cost2));
         }
     }
 }

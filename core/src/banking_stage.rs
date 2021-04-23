@@ -906,56 +906,56 @@ impl BankingStage {
         let mut chunk_start = 0;
         let mut unprocessed_txs = vec![];
 
-        /* TODO -
-        // instead of using `MAX_NUM_TRANSACTIONS_PER_BATCH` to get chunks, invoking cost_model here to
-        // breaks `transactions` into chunks of re-organized transaction, each complies with cost
-        // model
+        //NOTE - invoking cost_model here to pack transactions into package that complies cost limits;
+        // original batching logic is unchanged, `MAX_NUM_TRANSACTIONS_PER_BATCH` will be applied to each package;
         let cost_model = CostModel::new();
-        let chunks = cost_model.pack_transactions_by_cost( transactions );
-        for &chunk in chunks  {
-            reuse below code
-        }
-        // */
-        while chunk_start != transactions.len() {
-            let chunk_end = std::cmp::min(
-                transactions.len(),
-                chunk_start + MAX_NUM_TRANSACTIONS_PER_BATCH,
-            );
-            let (result, retryable_txs_in_chunk) = Self::process_and_record_transactions(
-                bank,
-                &transactions[chunk_start..chunk_end],
-                poh,
-                chunk_start,
-                transaction_status_sender.clone(),
-                gossip_vote_sender,
-            );
-            trace!("process_transactions result: {:?}", result);
+        let chunks = cost_model.pack_transactions_by_cost(transactions);
+        for chunk in chunks {
+            let transasctions = &chunk[..];
+            // --- below are original code ---
+            while chunk_start != transactions.len() {
+                let chunk_end = std::cmp::min(
+                    transactions.len(),
+                    chunk_start + MAX_NUM_TRANSACTIONS_PER_BATCH,
+                );
+                let (result, retryable_txs_in_chunk) = Self::process_and_record_transactions(
+                    bank,
+                    &transactions[chunk_start..chunk_end],
+                    poh,
+                    chunk_start,
+                    transaction_status_sender.clone(),
+                    gossip_vote_sender,
+                );
+                trace!("process_transactions result: {:?}", result);
 
-            // Add the retryable txs (transactions that errored in a way that warrants a retry)
-            // to the list of unprocessed txs.
-            unprocessed_txs.extend_from_slice(&retryable_txs_in_chunk);
+                // Add the retryable txs (transactions that errored in a way that warrants a retry)
+                // to the list of unprocessed txs.
+                unprocessed_txs.extend_from_slice(&retryable_txs_in_chunk);
 
-            // If `bank_creation_time` is None, it's a test so ignore the option so
-            // allow processing
-            let should_bank_still_be_processing_txs =
-                Bank::should_bank_still_be_processing_txs(bank_creation_time, bank.ns_per_slot);
-            match (result, should_bank_still_be_processing_txs) {
-                (Err(PohRecorderError::MaxHeightReached), _) | (_, false) => {
-                    info!(
-                        "process transactions: max height reached slot: {} height: {}",
-                        bank.slot(),
-                        bank.tick_height()
-                    );
-                    // process_and_record_transactions has returned all retryable errors in
-                    // transactions[chunk_start..chunk_end], so we just need to push the remaining
-                    // transactions into the unprocessed queue.
-                    unprocessed_txs.extend(chunk_end..transactions.len());
-                    break;
+                // If `bank_creation_time` is None, it's a test so ignore the option so
+                // allow processing
+                let should_bank_still_be_processing_txs =
+                    Bank::should_bank_still_be_processing_txs(bank_creation_time, bank.ns_per_slot);
+                match (result, should_bank_still_be_processing_txs) {
+                    (Err(PohRecorderError::MaxHeightReached), _) | (_, false) => {
+                        info!(
+                            "process transactions: max height reached slot: {} height: {}",
+                            bank.slot(),
+                            bank.tick_height()
+                        );
+                        // process_and_record_transactions has returned all retryable errors in
+                        // transactions[chunk_start..chunk_end], so we just need to push the remaining
+                        // transactions into the unprocessed queue.
+                        unprocessed_txs.extend(chunk_end..transactions.len());
+                        break;
+                    }
+                    _ => (),
                 }
-                _ => (),
+                // Don't exit early on any other type of error, continue processing...
+                chunk_start = chunk_end;
             }
-            // Don't exit early on any other type of error, continue processing...
-            chunk_start = chunk_end;
+
+            // --- end of original code
         }
 
         (chunk_start, unprocessed_txs)
