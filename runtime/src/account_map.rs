@@ -191,7 +191,7 @@ impl<V: Clone> AccountMap<V> {
 
     pub fn insert_at_index_alloc(&mut self, index: &AccountMapIndex, key: Pubkey, value: V, outer: &mut InnerAccountMapIndex, timings: &mut Timings ) {
         let max = self.vec_size_max;
-        let max_move = max; // tune this later
+        let max_move = max / 100; // tune this later
         let size = self.keys[outer.outer_index].len();
         let to_move = size-outer.inner_index;
         //error!("insert_at_index_alloc, outer: {}, inner: {}, len: {}, to_move: {}, size: {}, values: {:?}", outer.outer_index, outer.inner_index, self.count, to_move, size, self.keys);
