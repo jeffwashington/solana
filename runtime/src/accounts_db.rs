@@ -4624,6 +4624,7 @@ impl AccountsDb {
         #[allow(clippy::stable_sort_primitive)]
         slots.sort();
 
+        let mut last_log_update = Instant::now();
         let mut keys = Vec::with_capacity(100_000_000);
         for (index, slot) in slots.iter().enumerate() {
             let now = Instant::now();
@@ -4644,8 +4645,8 @@ impl AccountsDb {
                 let accounts = storage.all_accounts();
                 accounts.into_iter().for_each(|stored_account| {
                     keys.push(stored_account.meta.pubkey);
-                }
-            }
+                });
+            })
         }
 
         info!("sorting: {}", keys.len());
