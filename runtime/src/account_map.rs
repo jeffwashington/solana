@@ -531,6 +531,54 @@ pub mod tests {
     use log::*;
     use solana_sdk::signature::{Keypair, Signer};
     use std::collections::HashMap;
+    use dashmap::DashMap;
+
+    #[test]
+    fn test_perf_dashmap() {
+        solana_logger::setup();
+
+        let mx = 12;
+        let mx_key_count = 2usize.pow(mx);
+        let mut keys_orig = Vec::with_capacity(mx_key_count);
+        for key_pow in 8..12u32 {
+            let key_count = 2usize.pow(key_pow);
+            while keys_orig.len() < key_count {
+                keys_orig.push(Pubkey::new_unique());
+            }
+            let mut keys = keys_orig.clone();
+            keys.sort();
+
+            let mut m = AccountMap::new();
+            let value = vec![0; 60];
+            let mut m1 = Measure::start("");
+            for i in 0..key_count {
+                m.insert(keys[i], value.clone());
+            }
+            m1.stop();
+
+            let mut m2 = Measure::start("");
+            for i in 0..key_count {
+                m.get(&keys_orig[i]);
+            }
+            m2.stop();
+            error!("insert: {} insert: {}, get: {}, size: {}", 1, m1.as_ms(), m2.as_ms(), key_count);
+
+            let mut m = DashMap::new();
+            let value = vec![0; 60];
+            let mut m1 = Measure::start("");
+            for i in 0..key_count {
+                m.insert(keys[i], value.clone());
+            }
+            m1.stop();
+
+            let mut m2 = Measure::start("");
+            for i in 0..key_count {
+                m.get(&keys_orig[i]);
+            }
+            m2.stop();
+            error!("insert: {} insert: {}, get: {}, size: {}", 1, m1.as_ms(), m2.as_ms(), key_count);
+        }
+    }
 
     #[test]
     fn test_account_map123() {
