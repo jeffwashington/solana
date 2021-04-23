@@ -126,6 +126,13 @@ pub struct InnerAccountMapIndex {
     pub inner_index: usize,
 }
 
+#[derive(Debug, Default)]
+pub struct Timings {
+    pub update_lens_us: u64,
+    pub find_vec_us: u64,
+    pub insert_vec_us: u64,
+}
+
 //pub type AccountMap<K, V> = BTreeMap<K, V>;
 #[derive(Debug)]
 pub struct AccountMap<V> {
@@ -134,6 +141,7 @@ pub struct AccountMap<V> {
     count: usize,
     cumulative_lens: Vec<usize>,
     vec_size_max: usize,
+    timings: RwLock<Timings>
 }
 
 impl<V: Clone> AccountMap<V> {
@@ -145,6 +153,7 @@ impl<V: Clone> AccountMap<V> {
             count: 0,
             cumulative_lens: vec![0],
             vec_size_max,
+            timings: RwLock::new(Timings::default()),
         }
     }
 
@@ -322,18 +331,33 @@ impl<V: Clone> AccountMap<V> {
         self.insert_at_index(&find, key, value)
     }
     pub fn insert_at_index(&mut self, index: &AccountMapIndex, key: Pubkey, value: V) -> &V {
+        let mut m1 = Measure::start("");
         let mut outer = self.get_outer_index(index.index);
+        m1.stop();
 
+        let mut m2 = Measure::start("");
         if index.insert {
             self.insert_at_index_alloc(index, key, value, &mut outer);
         }
         else {
             self.values[outer.outer_index][outer.inner_index] = value;
         }
+        m2.stop();
+        {
+            let mut m = self.timings.write().unwrap();
+            m.find_vec_us += m1.as_ns();
+            m.insert_vec_us += m2.as_ns();
+        }
         //error!("outer: {}, inner: {}, len: {}, insert: {}", outer.outer_index, outer.inner_index, self.values.len(), index.insert);
         if self.count % 1_000_000 == 0 {
-            error!("count: {}, lens: {:?}", self.count, self.cumulative_lens);
-        }
+                let mut m = self.timings.write().unwrap();
+                m.find_vec_us /= 1000_000;
+                m.insert_vec_us /=1000_000;
+        
+            error!("count: {}, lens: {:?}, {:?}", self.count, self.cumulative_lens.len(), self.timings);
+            m.find_vec_us = 0;
+            m.insert_vec_us = 0;
+    }
         &self.values[outer.outer_index][outer.inner_index]
     }
     pub fn entry(&self, key: Pubkey) -> AccountMapEntryBtree {
