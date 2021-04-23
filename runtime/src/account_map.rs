@@ -114,13 +114,13 @@ impl OccupiedEntry {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default, Copy)]
 pub struct AccountMapIndex {
-    pub index: usize,
     pub insert: bool,
+    pub total: InnerAccountMapIndex,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default, Copy)]
 pub struct InnerAccountMapIndex {
     pub outer_index: usize,
     pub inner_index: usize,
@@ -143,6 +143,7 @@ pub struct AccountMap<V> {
     keys: Vec<Vec<Pubkey>>,
     values: Vec<Vec<V>>,
     count: usize,
+    cumulative_min_key: Vec<Pubkey>,
     cumulative_lens: Vec<usize>,
     vec_size_max: usize,
     timings: RwLock<Timings>
@@ -154,6 +155,7 @@ impl<V: Clone> AccountMap<V> {
         Self {
             keys: vec![Self::new_vec(vec_size_max)],
             values: vec![Self::new_vec(vec_size_max)],
+            cumulative_min_key: Vec::new(),
             count: 0,
             cumulative_lens: vec![0],
             vec_size_max,
@@ -166,12 +168,11 @@ impl<V: Clone> AccountMap<V> {
     }
 
     pub fn get_index(&self, index: &AccountMapIndex) -> Option<(&Pubkey, &V)> {
-        if index.insert || index.index >= self.count {
+        if index.insert {
             None
         }
         else {
-            let outer = self.get_outer_index(index.index, &mut Timings::default());
-            Some((&self.keys[outer.outer_index][outer.inner_index], &self.values[outer.outer_index][outer.inner_index]))
+            Some((&self.keys[index.total.outer_index][index.total.inner_index], &self.values[index.total.outer_index][index.total.inner_index]))
         }
     }
 
@@ -183,8 +184,8 @@ impl<V: Clone> AccountMap<V> {
         }
         else {
             new_vec = vec[outer][inner..].to_vec();
-            vec[outer].resize(inner + 1, value.clone());
             vec[outer][inner] = value;
+            vec[outer].truncate(inner + 1);
         }
         vec.insert(outer + 1, new_vec);
     }
@@ -203,6 +204,12 @@ impl<V: Clone> AccountMap<V> {
             m1.stop();
             timings.mv += m1.as_ns();
             //error!("new keys: {:?}", self.keys);
+            if to_move == 0 {
+                self.cumulative_min_key.insert(outer.outer_index + 1, key);
+            }
+            else {
+                self.cumulative_min_key.insert(outer.outer_index + 1, self.keys[outer.outer_index + 1][0]);
+            }
             self.cumulative_lens.insert(outer.outer_index, self.cumulative_lens[outer.outer_index]); // we inserted here
             if to_move == 0 {
                 //self.cumulative_lens[outer.outer_index + 1] -= outer.inner_index;
@@ -220,6 +227,9 @@ impl<V: Clone> AccountMap<V> {
             self.values[outer.outer_index].insert(outer.inner_index, value);
             m1.stop();
             timings.insert += m1.as_ns();
+            if outer.inner_index == 0 {
+                self.cumulative_min_key.insert(outer.outer_index, key);
+            }
         }
         // shift the rest of the cumulative offsets since we inserted
         for outer_index in &mut self.cumulative_lens[outer.outer_index..] {
@@ -297,20 +307,59 @@ impl<V: Clone> AccountMap<V> {
         }
     }
     */
+    pub fn find_outer_index(&self, key: &Pubkey) -> usize {
+        let mut l = 0;
+        let mut index = l;
+        let mut insert = true;
 
+        if self.count > 0 {
+            let mut r = self.cumulative_min_key.len();
+            let mut iteration = 0;
+            error!("keys: {:?}", self.keys);
+            error!("cumulative_min_key: {:?}", self.cumulative_min_key);
+            loop {
+                error!("keys2: {:?}, outer: {:?}", self.keys, index);
+                let val = self.cumulative_min_key[index];
+                let cmp = key.partial_cmp(&val).unwrap();
+                error!("left: {}, right: {}, count: {}, index: {}, cmp: {:?}, key: {:?} val: {:?}, iteration: {}, keys: {:?}", l, r, self.count, index, cmp, val, key, iteration, self.keys);
+                iteration += 1;
+                match cmp {
+                    Ordering::Equal => {insert = false;break;},
+                    Ordering::Less => {r = index;
+                    },
+                    Ordering::Greater => {
+                        if index == r - 1 {
+                            index = r;
+                            break;
+                        }
+                        l = index;
+                        
+                    },
+                }
+                if r == l {
+                    break;
+                }
+            }
+        }
+
+        index
+    }
     pub fn find(&self, key: &Pubkey) -> AccountMapIndex {
         let mut l = 0;
         let mut index = l;
         let mut insert = true;
-        if self.count > 0 {
-            let mut r = self.count;
+
+        let outer_index = self.find_outer_index(key);
+        let keys = &self.keys[outer_index];
+        let len = keys.len();
+
+        if len > 0 {
+            let mut r = len;
             let mut iteration = 0;
             //error!("keys: {:?}", self.keys);
             loop {
                 index = (l + r) / 2;
-                let outer = self.get_outer_index(index, &mut Timings::default());
-                //error!("keys2: {:?}, outer: {:?}", self.keys, outer);
-                let val = self.keys[outer.outer_index][outer.inner_index];
+                let val = keys[index];
                 let cmp = key.partial_cmp(&val).unwrap();
                 //error!("left: {}, right: {}, count: {}, index: {}, cmp: {:?}, key: {:?} val: {:?}, iteration: {}, keys: {:?}", l, r, self.count, index, cmp, val, key, iteration, self.keys);
                 iteration += 1;
@@ -334,8 +383,8 @@ impl<V: Clone> AccountMap<V> {
         }
 
         AccountMapIndex {
-            index,
             insert,
+            total: InnerAccountMapIndex {outer_index, inner_index: index,},
         }
     }
     pub fn len(&self) -> usize {
@@ -348,7 +397,7 @@ impl<V: Clone> AccountMap<V> {
     pub fn insert_at_index(&mut self, index: &AccountMapIndex, key: Pubkey, value: V) -> &V {
         let mut timings = Timings::default();
         let mut m1 = Measure::start("");
-        let mut outer = self.get_outer_index(index.index, &mut timings);
+        let mut outer = index.total;
         m1.stop();
 
         let mut m2 = Measure::start("");
@@ -356,6 +405,7 @@ impl<V: Clone> AccountMap<V> {
             self.insert_at_index_alloc(index, key, value, &mut outer, &mut timings);
         }
         else {
+            panic!("do this");
             self.values[outer.outer_index][outer.inner_index] = value;
         }
         m2.stop();
@@ -403,7 +453,7 @@ impl<V: Clone> AccountMap<V> {
             None
         }
         else {
-            let mut outer = self.get_outer_index(index.index, &mut Timings::default());
+            let outer = index.total;
             Some(&self.values[outer.outer_index][outer.inner_index])
         }
     }
@@ -415,7 +465,7 @@ impl<V: Clone> AccountMap<V> {
         if index.insert {
         }
         else {
-            let mut outer = self.get_outer_index(index.index, &mut Timings::default());
+            let mut outer = index.total;// self.get_outer_index(index.index, &mut Timings::default());
             self.count -= 1;
             // TODO - could shrink to zero size here
             self.keys[outer.outer_index].remove(outer.inner_index);
@@ -426,13 +476,13 @@ impl<V: Clone> AccountMap<V> {
         }
     }
     pub fn keys(&self) -> AccountMapIterKeys<'_, V> {//std::slice::Iter<'_, (K, V)> {
-        AccountMapIterKeys::new(&self, AccountMapIndex {index: 0, insert: false,})
+        AccountMapIterKeys::new(&self, AccountMapIndex::default())// {index: 0, insert: false,})
     }
     pub fn values(&self) -> AccountMapIterValues<'_, V> {//std::slice::Iter<'_, (K, V)> {
-        AccountMapIterValues::new(&self, AccountMapIndex {index: 0, insert: false,})
+        AccountMapIterValues::new(&self,  AccountMapIndex::default())
     }
     pub fn iter(&self) -> AccountMapIter<'_, V> {//std::slice::Iter<'_, (K, V)> {
-        AccountMapIter::new(&self, AccountMapIndex {index: 0, insert: false,})
+        AccountMapIter::new(&self,  AccountMapIndex::default())
     }
     pub fn range<T, R>(&self, range: R) -> Option<(Pubkey, Pubkey)>
     where
@@ -464,7 +514,8 @@ impl<'a, V:Clone> Iterator for AccountMapIter<'a, V> {
     fn next(&mut self) -> Option<Self::Item> {
         let result =   self.btree.get_index(&self.index);
         if result.is_some() {
-            self.index.index += 1;
+            panic!("do this");
+            //self.index.index += 1;
         }
 
         result
@@ -490,7 +541,8 @@ impl<'a, V: Clone> Iterator for AccountMapIterValues<'a, V> {
     fn next(&mut self) -> Option<Self::Item> {
         let result =   self.btree.get_index(&self.index).map(|(_,v)| v);
         if result.is_some() {
-            self.index.index += 1;
+            panic!("do this");
+            //self.index.index += 1;
         }
 
         result
@@ -517,7 +569,8 @@ impl<'a, V:Clone> Iterator for AccountMapIterKeys<'a, V> {
     fn next(&mut self) -> Option<Self::Item> {
         let result =   self.btree.get_index(&self.index).map(|(k,_)| k);
         if result.is_some() {
-            self.index.index += 1;
+            panic!("do htis");
+            //self.index.index += 1;
         }
 
         result
