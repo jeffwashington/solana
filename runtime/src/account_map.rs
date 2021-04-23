@@ -537,10 +537,10 @@ pub mod tests {
     fn test_perf_dashmap() {
         solana_logger::setup();
 
-        let mx = 12;
+        let mx = 26u32;
         let mx_key_count = 2usize.pow(mx);
         let mut keys_orig = Vec::with_capacity(mx_key_count);
-        for key_pow in 8..12u32 {
+        for key_pow in 15..mx {
             let key_count = 2usize.pow(key_pow);
             while keys_orig.len() < key_count {
                 keys_orig.push(Pubkey::new_unique());
@@ -576,7 +576,7 @@ pub mod tests {
                 m.get(&keys_orig[i]);
             }
             m2.stop();
-            error!("insert: {} insert: {}, get: {}, size: {}", 1, m1.as_ms(), m2.as_ms(), key_count);
+            error!("insert: {} insert: {}, get: {}, size: {}", 0, m1.as_ms(), m2.as_ms(), key_count);
         }
     }
 
