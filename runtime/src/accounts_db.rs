@@ -1544,11 +1544,14 @@ impl AccountsDb {
                             {
                                 let slot_list = locked_entry.slot_list();
                                 let (slot, account_info) = &slot_list[index];
+                                let mut refcount = usize::MAX;
                                 if account_info.lamports == 0 {
+                                    let (a, b) = self.accounts_index
+                                    .roots_and_ref_count(&locked_entry, max_clean_root);
+                                    refcount = b;
                                     purges.insert(
                                         *pubkey,
-                                        self.accounts_index
-                                            .roots_and_ref_count(&locked_entry, max_clean_root),
+                                        (a,b),
                                     );
                                 }
 
@@ -1562,8 +1565,8 @@ impl AccountsDb {
                                     self.accounts_index.remove_zero_lamport_key(pubkey);
                                 }
                                 if pubkey == &pk1 || pubkey == &pk2 || pubkey == &pk3 || pubkey == &pk4 {
-                                    error!("jwash:clean:get:{}, slots: {:?}, acct_info: {:?}, has_zero: {}, slot: {}, is_uncleaned_root: {}, in zero_lamport_pubkeys: {}", pubkey, slot_list, account_info, has_zero_lamport_accounts, slot, self.accounts_index.is_uncleaned_root(*slot),
-                                    self.accounts_index.zero_lamport_pubkeys().contains(pubkey));
+                                    error!("jwash:clean:get:{}, slots: {:?}, acct_info: {:?}, has_zero: {}, slot: {}, is_uncleaned_root: {}, in zero_lamport_pubkeys: {}, refcount: {}", pubkey, slot_list, account_info, has_zero_lamport_accounts, slot, self.accounts_index.is_uncleaned_root(*slot),
+                                    self.accounts_index.zero_lamport_pubkeys().contains(pubkey), refcount);
                                 }
 
                                 // Release the lock
