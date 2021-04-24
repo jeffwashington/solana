@@ -1193,8 +1193,8 @@ in_slot = true;
                     account_indexes,
                 );
                 if ct > 0 {
-                    //locked_entry.ref_count().fetch_sub(ct as usize, Ordering::Relaxed);
-                    error!("should -- refcount: {}", pubkey);
+                    locked_entry.ref_count().fetch_sub(ct as usize, Ordering::Relaxed);
+                    error!("deleted: {} from refcount: {}", ct, pubkey);
                 }
             });
         }
