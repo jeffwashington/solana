@@ -1194,8 +1194,10 @@ in_slot = true;
                 );
             });
             if ct > 0 {
-                locked_entry.ref_count().fetch_sub(ct as u64, Ordering::Relaxed);
-                error!("deleted: {} from refcount: {}", ct, pubkey);
+                assert!(locked_entry.ref_count().load(Ordering::Relaxed) >= ct);
+                locked_entry
+                    .ref_count()
+                    .fetch_sub(ct as u64, Ordering::Relaxed);
             }
         }
     }
