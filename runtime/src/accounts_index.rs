@@ -1183,20 +1183,20 @@ in_slot = true;
         account_indexes: &HashSet<AccountIndex>,
     ) {
         if let Some(mut locked_entry) = self.get_account_write_entry(pubkey) {
+            let mut ct = 0;
             locked_entry.slot_list_mut(|slot_list| {
-                let ct = 
-                self.purge_older_root_entries(
+                ct = self.purge_older_root_entries(
                     pubkey,
                     slot_list,
                     reclaims,
                     max_clean_root,
                     account_indexes,
                 );
-                if ct > 0 {
-                    locked_entry.ref_count().fetch_sub(ct as u64, Ordering::Relaxed);
-                    error!("deleted: {} from refcount: {}", ct, pubkey);
-                }
             });
+            if ct > 0 {
+                locked_entry.ref_count().fetch_sub(ct as u64, Ordering::Relaxed);
+                error!("deleted: {} from refcount: {}", ct, pubkey);
+            }
         }
     }
 
