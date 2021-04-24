@@ -1544,7 +1544,7 @@ impl AccountsDb {
                             {
                                 let slot_list = locked_entry.slot_list();
                                 let (slot, account_info) = &slot_list[index];
-                                let mut refcount = usize::MAX;
+                                let mut refcount = u64::MAX;
                                 if account_info.lamports == 0 {
                                     let (a, b) = self.accounts_index
                                     .roots_and_ref_count(&locked_entry, max_clean_root);

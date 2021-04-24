@@ -1141,7 +1141,8 @@ in_slot = true;
         reclaims: &mut SlotList<T>,
         max_clean_root: Option<Slot>,
         account_indexes: &HashSet<AccountIndex>,
-    ) {
+    ) -> usize {
+        let mut count = 0;
         let roots_tracker = &self.roots_tracker.read().unwrap();
         let max_root = Self::get_max_root(&roots_tracker.roots, &list, max_clean_root);
         let pk1 = Pubkey::from_str("DUMMY_7jEfU57R2sV2B1DddKdsqZsdHaHm3B15REb4abvP6Me2").unwrap_or(Pubkey::new_unique());
@@ -1163,10 +1164,14 @@ in_slot = true;
                 reclaims.push((*slot, value.clone()));
                 purged_slots.insert(*slot);
             }
+            if should_purge {
+                count += 1;
+            }
             !should_purge
         });
 
         self.purge_secondary_indexes_by_inner_key(pubkey, Some(&purged_slots), account_indexes);
+        count
     }
 
     // `is_cached` closure is needed to work around the generic (`T`) indexed type.
@@ -1179,6 +1184,7 @@ in_slot = true;
     ) {
         if let Some(mut locked_entry) = self.get_account_write_entry(pubkey) {
             locked_entry.slot_list_mut(|slot_list| {
+                let ct = 
                 self.purge_older_root_entries(
                     pubkey,
                     slot_list,
@@ -1186,6 +1192,10 @@ in_slot = true;
                     max_clean_root,
                     account_indexes,
                 );
+                if ct > 0 {
+                    //locked_entry.ref_count().fetch_sub(ct as usize, Ordering::Relaxed);
+                    error!("should -- refcount: {}", pubkey);
+                }
             });
         }
     }
