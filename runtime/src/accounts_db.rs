@@ -1688,8 +1688,8 @@ impl AccountsDb {
                     return false;
                 }
                 if matches {
-                error!("jwash:hacking: purging this 0 lamport account from index: {}", pubkey)                    ;
-                    return false;
+                error!("jwash:should be hacking: purging this 0 lamport account from index: {}", pubkey)                    ;
+                    //return false;
                 }
                 if let Some(store_count) = store_counts.get_mut(&account_info.store_id) {
                     if matches {
