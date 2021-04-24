@@ -1193,7 +1193,7 @@ in_slot = true;
                     account_indexes,
                 );
                 if ct > 0 {
-                    locked_entry.ref_count().fetch_sub(ct as usize, Ordering::Relaxed);
+                    locked_entry.ref_count().fetch_sub(ct as u64, Ordering::Relaxed);
                     error!("deleted: {} from refcount: {}", ct, pubkey);
                 }
             });
