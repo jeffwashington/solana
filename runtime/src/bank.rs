@@ -4407,6 +4407,12 @@ impl Bank {
             self.clean_accounts(true);
             self.shrink_all_slots();
             error!("jwash:clean2 done");
+            self.clean_accounts(true);
+            self.shrink_all_slots();
+            error!("jwash:clean3 done");
+            self.clean_accounts(true);
+            self.shrink_all_slots();
+            error!("jwash:clean4 done");
         }
         panic!("done with verify_snapshot_bank");
         // Order and short-circuiting is significant; verify_hash requires a valid bank hash
