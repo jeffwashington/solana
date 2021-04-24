@@ -1297,7 +1297,7 @@ impl AccountsDb {
             };
             let matches = pubkey == &pk1 || pubkey == &pk2 || pubkey == &pk3 || pubkey == &pk4;
             if matches {
-                error!("jwash:{}, no_delete: {}, infos: {:?}", pubkey, no_delete, account_infos);
+                error!("jwash:{}, no_delete: {}, infos: {:?}, refct: {}", pubkey, no_delete, account_infos, ref_count_from_storage);
             }
 
             if no_delete {
