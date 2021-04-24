@@ -1265,6 +1265,7 @@ impl AccountsDb {
         // then increment their storage count.
         let mut already_counted = HashSet::new();
         for (pubkey, (account_infos, ref_count_from_storage)) in purges.iter() {
+            let mut sc = usize::MAX;
             let no_delete = if account_infos.len() as u64 != *ref_count_from_storage {
                 debug!(
                     "calc_delete_dependencies(),
@@ -1288,7 +1289,8 @@ impl AccountsDb {
                         account_info.store_id,
                         store_counts.get(&account_info.store_id).unwrap().0,
                     );
-                    if store_counts.get(&account_info.store_id).unwrap().0 != 0 {
+                    sc = store_counts.get(&account_info.store_id).unwrap().0;
+                    if sc != 0 {
                         no_delete = true;
                         break;
                     }
@@ -1297,7 +1299,7 @@ impl AccountsDb {
             };
             let matches = pubkey == &pk1 || pubkey == &pk2 || pubkey == &pk3 || pubkey == &pk4;
             if matches {
-                error!("jwash:{}, no_delete: {}, infos: {:?}, refct: {}", pubkey, no_delete, account_infos, ref_count_from_storage);
+                error!("jwash:{}, no_delete: {}, infos: {:?}, refct: {}, store_count: {}", pubkey, no_delete, account_infos, ref_count_from_storage, sc);
             }
 
             if no_delete {
