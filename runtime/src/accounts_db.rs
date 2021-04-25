@@ -1985,7 +1985,7 @@ impl AccountsDb {
                             .any(|(_slot, i)| i.store_id == *store_id && i.offset == *offset);
 
                             let pkk = *pubkey;
-                        let matches = pkk == &pk1 || pkk == &pk2 || pkk == &pk3 || pkk == &pk4 || pubkey == &pk5;
+                        let matches = pkk == &pk1 || pkk == &pk2 || pkk == &pk3 || pkk == &pk4 || pkk == &pk5;
     
                         if matches {
                             error!("jwash:do_srhink_slot_stores {}, is_alive: {}", pubkey, is_alive);
