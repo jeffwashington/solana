@@ -4192,7 +4192,7 @@ impl AccountsDb {
                 let pk4 = Pubkey::from_str("9iDXA8wAvN3u4BhRoP1yL3n2PE8KxcFoNVbz1Xd9k7xw").unwrap();
                 let pk5 = Pubkey::from_str("FzasQ2WtmxrN8JngZfh1sAvH1CCTyKihsTcnESKkNo8c").unwrap();
         
-                let matches = &pk3 == pubkey || &pk4 == pubkey || &pk1 == pubkey || &pk2 == pubkey || &pk5 == pubkey;
+                let matches = pk3 == pubkey || pk4 == pubkey || pk1 == pubkey || pk2 == pubkey || pk5 == pubkey;
                 if slot == 72921034 || slot == 71500402 || slot == 71999188 || matches {
                     error!("jwash:finalize_dead_slot_removal: {}, slot: {}", )
                 }
