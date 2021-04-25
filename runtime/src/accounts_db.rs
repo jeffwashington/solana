@@ -1677,22 +1677,27 @@ impl AccountsDb {
                     .map(|slots_removed| slots_removed.contains(slot))
                     .unwrap_or(false);
                 if was_slot_purged {
+                    if slot == &72921034 || slot == &71500402 || slot == &71999188 {
+                        error!("jwash:was_reclaimed: {}, slot: {}, was_slot_purged: {}", key, slot, was_slot_purged);    
+                    }
                     // No need to look up the slot storage below if the entire
                     // slot was purged
                     return false;
                 }
                 // Check if this update in `slot` to the account with `key` was reclaimed earlier by
                 // `clean_old_rooted_accounts()`
+                let mut inner=false;
                 let was_reclaimed = removed_accounts
                     .get(&account_info.store_id)
                     .map(|store_removed| {
                         let rem = store_removed.contains(&account_info.offset);
-                        if matches {
-                            error!("jwash:was_reclaimed: {}, slot: {}, removed: {}", key, slot, rem);    
-                        }
+                        inner=true;
                     rem})
                     .unwrap_or(false);
-                if was_reclaimed {
+                    if matches {
+                        error!("jwash:was_reclaimed: {}, slot: {}, was_reclaimed: {}, inner: {}, was_slot_purged: {}", key, slot, was_reclaimed, inner, was_slot_purged);    
+                    }
+            if was_reclaimed {
                     return false;
                 }
                 if matches {
@@ -4105,6 +4110,7 @@ impl AccountsDb {
         let mut dead_slots = HashSet::new();
         let mut new_shrink_candidates: ShrinkCandidates = HashMap::new();
         for (slot, account_info) in reclaims {
+            
             // No cached accounts should make it here
             assert_ne!(account_info.store_id, CACHE_VIRTUAL_STORAGE_ID);
             if let Some(ref mut reclaimed_offsets) = reclaimed_offsets {
