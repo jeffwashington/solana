@@ -1514,6 +1514,7 @@ impl AccountsDb {
         let pk2 = Pubkey::from_str("C57GmZLsPviiHZqWjYHo9is8QnMNq1Fc7SkYvLxLts24").unwrap();
         let pk3 = Pubkey::from_str("3XA7qhMGS3UgbtyKSVo4rHuAm5yMmic3zKqb616QJDmz").unwrap();
         let pk4 = Pubkey::from_str("9iDXA8wAvN3u4BhRoP1yL3n2PE8KxcFoNVbz1Xd9k7xw").unwrap();
+        let pk5 = Pubkey::from_str("FzasQ2WtmxrN8JngZfh1sAvH1CCTyKihsTcnESKkNo8c").unwrap();
 
         if pubkeys.contains(&pk1) {
             error!("jwash: clean_accounts contains the magic key: {}", pk1);
@@ -1564,7 +1565,7 @@ impl AccountsDb {
                                 if !has_zero_lamport_accounts {
                                     self.accounts_index.remove_zero_lamport_key(pubkey);
                                 }
-                                if pubkey == &pk1 || pubkey == &pk2 || pubkey == &pk3 || pubkey == &pk4 {
+                                if pubkey == &pk1 || pubkey == &pk2 || pubkey == &pk3 || pubkey == &pk4 || pubkey == &pk5 {
                                     error!("jwash:clean:get:{}, slots: {:?}, acct_info: {:?}, has_zero: {}, slot: {}, is_uncleaned_root: {}, in zero_lamport_pubkeys: {}, refcount: {}", pubkey, slot_list, account_info, has_zero_lamport_accounts, slot, self.accounts_index.is_uncleaned_root(*slot),
                                     self.accounts_index.zero_lamport_pubkeys().contains(pubkey), refcount);
                                 }
@@ -4632,6 +4633,7 @@ impl AccountsDb {
         let pk2 = Pubkey::from_str("C57GmZLsPviiHZqWjYHo9is8QnMNq1Fc7SkYvLxLts24").unwrap();
         let pk3 = Pubkey::from_str("3XA7qhMGS3UgbtyKSVo4rHuAm5yMmic3zKqb616QJDmz").unwrap();
         let pk4 = Pubkey::from_str("9iDXA8wAvN3u4BhRoP1yL3n2PE8KxcFoNVbz1Xd9k7xw").unwrap();
+        let pk5 = Pubkey::from_str("FzasQ2WtmxrN8JngZfh1sAvH1CCTyKihsTcnESKkNo8c").unwrap();
         let mut last_log_update = Instant::now();
         let mut last_last_slot = 0;
         let mut last_slot = 0;
@@ -4661,7 +4663,7 @@ impl AccountsDb {
                 accounts.into_iter().for_each(|stored_account| {
                     if slot == &72921034 || slot == &71500402 || slot == &71999188 /*last_slot == 71500402 || last_last_slot == 71500402 || */
                     || stored_account.meta.pubkey == pk1 || stored_account.meta.pubkey == pk2 
-                    || stored_account.meta.pubkey == pk3 || stored_account.meta.pubkey == pk4 
+                    || stored_account.meta.pubkey == pk3 || stored_account.meta.pubkey == pk4 || stored_account.meta.pubkey == pk5
                     {
                         error!("jwash:Found account: {}, slot: {}, index: {}, lamports: {}", stored_account.meta.pubkey, slot, index, stored_account.account_meta.lamports);
                     }
