@@ -4182,8 +4182,20 @@ impl AccountsDb {
         // Should only be `Some` for non-cached slots
         purged_stored_account_slots: Option<&mut AccountSlots>,
     ) {
+        error!("jwash:finalize_dead_slot_removal, len: {}", purged_slot_pubkeys.len());
         if let Some(purged_stored_account_slots) = purged_stored_account_slots {
             for (slot, pubkey) in purged_slot_pubkeys {
+
+                let pk1 = Pubkey::from_str("DUMMY_7jEfU57R2sV2B1DddKdsqZsdHaHm3B15REb4abvP6Me2").unwrap_or(Pubkey::new_unique());
+                let pk2 = Pubkey::from_str("C57GmZLsPviiHZqWjYHo9is8QnMNq1Fc7SkYvLxLts24").unwrap();
+                let pk3 = Pubkey::from_str("3XA7qhMGS3UgbtyKSVo4rHuAm5yMmic3zKqb616QJDmz").unwrap();
+                let pk4 = Pubkey::from_str("9iDXA8wAvN3u4BhRoP1yL3n2PE8KxcFoNVbz1Xd9k7xw").unwrap();
+                let pk5 = Pubkey::from_str("FzasQ2WtmxrN8JngZfh1sAvH1CCTyKihsTcnESKkNo8c").unwrap();
+        
+                let matches = &pk3 == pubkey || &pk4 == pubkey || &pk1 == pubkey || &pk2 == pubkey || &pk5 == pubkey;
+                if slot == &72921034 || slot == &71500402 || slot == &71999188 || matches {
+                    error!("jwash:finalize_dead_slot_removal: {}, slot: {}", )
+                }
                 purged_stored_account_slots
                     .entry(pubkey)
                     .or_default()
