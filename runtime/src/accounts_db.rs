@@ -1259,6 +1259,7 @@ impl AccountsDb {
         let pk2 = Pubkey::from_str("C57GmZLsPviiHZqWjYHo9is8QnMNq1Fc7SkYvLxLts24").unwrap();
         let pk3 = Pubkey::from_str("3XA7qhMGS3UgbtyKSVo4rHuAm5yMmic3zKqb616QJDmz").unwrap();
         let pk4 = Pubkey::from_str("9iDXA8wAvN3u4BhRoP1yL3n2PE8KxcFoNVbz1Xd9k7xw").unwrap();
+        let pk5 = Pubkey::from_str("FzasQ2WtmxrN8JngZfh1sAvH1CCTyKihsTcnESKkNo8c").unwrap();
 
         // Another pass to check if there are some filtered accounts which
         // do not match the criteria of deleting all appendvecs which contain them
@@ -1297,7 +1298,7 @@ impl AccountsDb {
                 }
                 no_delete
             };
-            let matches = pubkey == &pk1 || pubkey == &pk2 || pubkey == &pk3 || pubkey == &pk4;
+            let matches = pubkey == &pk1 || pubkey == &pk2 || pubkey == &pk3 || pubkey == &pk4 || pubkey == &pk5;
             if matches {
                 error!("jwash:{}, no_delete: {}, infos: {:?}, refct: {}, store_count: {}", pubkey, no_delete, account_infos, ref_count_from_storage, sc);
             }
@@ -1374,6 +1375,7 @@ impl AccountsDb {
         let pk2 = Pubkey::from_str("C57GmZLsPviiHZqWjYHo9is8QnMNq1Fc7SkYvLxLts24").unwrap();
         let pk3 = Pubkey::from_str("3XA7qhMGS3UgbtyKSVo4rHuAm5yMmic3zKqb616QJDmz").unwrap();
         let pk4 = Pubkey::from_str("9iDXA8wAvN3u4BhRoP1yL3n2PE8KxcFoNVbz1Xd9k7xw").unwrap();
+        let pk5 = Pubkey::from_str("FzasQ2WtmxrN8JngZfh1sAvH1CCTyKihsTcnESKkNo8c").unwrap();
         for (pubkey, slots_set) in pubkey_to_slot_set {
             let is_empty = self.accounts_index.purge_exact(
                 &pubkey,
@@ -1382,7 +1384,7 @@ impl AccountsDb {
                 &self.account_indexes,
             );
 
-            if pubkey == &pk1 || pubkey == &pk2 || pubkey == &pk3 || pubkey == &pk4 {
+            if pubkey == &pk1 || pubkey == &pk2 || pubkey == &pk3 || pubkey == &pk4 || pubkey == &pk5 {
                 error!("jwash:purge_keys_exact, {}, slots: {:?}, is_empty: {}", pubkey, slots_set, is_empty);
             }
     
@@ -1667,7 +1669,7 @@ impl AccountsDb {
             }
 
             let pubkey=key;
-            let matches = pubkey == &pk1 || pubkey == &pk2 || pubkey == &pk3 || pubkey == &pk4;
+            let matches = pubkey == &pk1 || pubkey == &pk2 || pubkey == &pk3 || pubkey == &pk4 || pubkey == &pk5;
 
             account_infos.retain(|(slot, account_info)| {
                 let was_slot_purged = purged_account_slots
@@ -1738,14 +1740,14 @@ impl AccountsDb {
         purges.retain(|pubkey, (account_infos, _ref_count)| {
             for (slot, account_info) in account_infos.iter() {
                 let v = store_counts.get(&account_info.store_id).unwrap().0;
-                if pubkey == &pk1 || pubkey == &pk2 || pubkey == &pk3 || pubkey == &pk4 {
+                if pubkey == &pk1 || pubkey == &pk2 || pubkey == &pk3 || pubkey == &pk4 || pubkey == &pk5 {
                     error!("jwash:purges.retain {}, v: {:?}, account_infos.len(): {}, slot: {}", pubkey, v, account_infos.len(), slot);
                 }
                 if v != 0 {
                     return false;
                 }
             }
-            if pubkey == &pk1 || pubkey == &pk2 || pubkey == &pk3 || pubkey == &pk4 {
+            if pubkey == &pk1 || pubkey == &pk2 || pubkey == &pk3 || pubkey == &pk4 || pubkey == &pk5 {
                 error!("jwash:purges.retain true, {}, account_infos.len(): {}", pubkey, account_infos.len());
             }
             true
@@ -1925,12 +1927,13 @@ impl AccountsDb {
         let pk2 = Pubkey::from_str("C57GmZLsPviiHZqWjYHo9is8QnMNq1Fc7SkYvLxLts24").unwrap();
         let pk3 = Pubkey::from_str("3XA7qhMGS3UgbtyKSVo4rHuAm5yMmic3zKqb616QJDmz").unwrap();
         let pk4 = Pubkey::from_str("9iDXA8wAvN3u4BhRoP1yL3n2PE8KxcFoNVbz1Xd9k7xw").unwrap();
+        let pk5 = Pubkey::from_str("FzasQ2WtmxrN8JngZfh1sAvH1CCTyKihsTcnESKkNo8c").unwrap();
         for store in stores {
             let mut start = 0;
             original_bytes += store.total_bytes();
             while let Some((account, next)) = store.accounts.get_account(start) {
                 let pubkey = &account.meta.pubkey;
-                let matches = pubkey == &pk1 || pubkey == &pk2 || pubkey == &pk3 || pubkey == &pk4;
+                let matches = pubkey == &pk1 || pubkey == &pk2 || pubkey == &pk3 || pubkey == &pk4 || pubkey == &pk5;
         
                 if matches {
                     error!("jwash:do_srhink_slot_stores {}", pubkey);
@@ -1982,7 +1985,7 @@ impl AccountsDb {
                             .any(|(_slot, i)| i.store_id == *store_id && i.offset == *offset);
 
                             let pkk = *pubkey;
-                        let matches = pkk == &pk1 || pkk == &pk2 || pkk == &pk3 || pkk == &pk4;
+                        let matches = pkk == &pk1 || pkk == &pk2 || pkk == &pk3 || pkk == &pk4 || pubkey == &pk5;
     
                         if matches {
                             error!("jwash:do_srhink_slot_stores {}, is_alive: {}", pubkey, is_alive);
