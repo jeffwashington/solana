@@ -4194,7 +4194,7 @@ impl AccountsDb {
         
                 let matches = pk3 == pubkey || pk4 == pubkey || pk1 == pubkey || pk2 == pubkey || pk5 == pubkey;
                 if slot == 72921034 || slot == 71500402 || slot == 71999188 || matches {
-                    error!("jwash:finalize_dead_slot_removal: {}, slot: {}", )
+                    error!("jwash:finalize_dead_slot_removal: {}, slot: {}", pubkey, slot);)
                 }
                 purged_stored_account_slots
                     .entry(pubkey)
