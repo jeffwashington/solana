@@ -4236,6 +4236,10 @@ impl AccountsDb {
         let mut measure = Measure::start("clean_stored_dead_slots-ms");
         let mut stores: Vec<Arc<AccountStorageEntry>> = vec![];
         for slot in dead_slots.iter() {
+            if slot == &72921034 || slot == &71500402 || slot == &71999188 {
+                error!("clean_stored_dead_slots: {}", slot);
+            }
+    
             if let Some(slot_storage) = self.storage.get_slot_stores(*slot) {
                 for store in slot_storage.read().unwrap().values() {
                     stores.push(store.clone());
