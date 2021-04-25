@@ -1195,10 +1195,12 @@ in_slot = true;
                 );
             });
             if ct > 0 {
+                /*
                 assert!(locked_entry.ref_count().load(Ordering::Relaxed) >= ct as u64);
                 locked_entry
                     .ref_count()
                     .fetch_sub(ct as u64, Ordering::Relaxed);
+                    */
             }
         }
     }
