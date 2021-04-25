@@ -4193,7 +4193,7 @@ impl AccountsDb {
                 let pk5 = Pubkey::from_str("FzasQ2WtmxrN8JngZfh1sAvH1CCTyKihsTcnESKkNo8c").unwrap();
         
                 let matches = &pk3 == pubkey || &pk4 == pubkey || &pk1 == pubkey || &pk2 == pubkey || &pk5 == pubkey;
-                if slot == &72921034 || slot == &71500402 || slot == &71999188 || matches {
+                if slot == 72921034 || slot == 71500402 || slot == 71999188 || matches {
                     error!("jwash:finalize_dead_slot_removal: {}, slot: {}", )
                 }
                 purged_stored_account_slots
