@@ -1198,7 +1198,7 @@ impl AccountsDb {
         purges_in_root: Vec<Pubkey>,
         max_clean_root: Option<Slot>,
     ) -> ReclaimResult {
-        error!("jwash:clean_old_rooted_accounts: max_clean_root: {:?}", max_clean_root);
+        error!("jwash:clean_old_rooted_accounts: max_clean_root: {:?}, purges_in_root: {}", max_clean_root, purges_in_root.len());
 
         if purges_in_root.is_empty() {
             return (HashMap::new(), HashMap::new());
