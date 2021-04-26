@@ -1255,7 +1255,7 @@ impl AccountsDb {
         purges: &HashMap<Pubkey, (SlotList<AccountInfo>, u64)>,
         store_counts: &mut HashMap<AppendVecId, (usize, HashSet<Pubkey>)>,
     ) {
-        let pk1 = Pubkey::from_str("DUMMY_7jEfU57R2sV2B1DddKdsqZsdHaHm3B15REb4abvP6Me2").unwrap_or(Pubkey::new_unique());
+        let pk1 = Pubkey::from_str("2yDfbsYuxXrZUbbYbsgRvJkd72k8YTrLrChw8WMMazz5").unwrap_or(Pubkey::new_unique()); // 7jEfU57R2sV2B1DddKdsqZsdHaHm3B15REb4abvP6Me2
         let pk2 = Pubkey::from_str("C57GmZLsPviiHZqWjYHo9is8QnMNq1Fc7SkYvLxLts24").unwrap_or(Pubkey::new_unique());
         let pk3 = Pubkey::from_str("3XA7qhMGS3UgbtyKSVo4rHuAm5yMmic3zKqb616QJDmz").unwrap();
         let pk4 = Pubkey::from_str("9iDXA8wAvN3u4BhRoP1yL3n2PE8KxcFoNVbz1Xd9k7xw").unwrap();
@@ -1371,7 +1371,7 @@ impl AccountsDb {
         let mut reclaims = Vec::new();
         let mut dead_keys = Vec::new();
 
-        let pk1 = Pubkey::from_str("DUMMY_7jEfU57R2sV2B1DddKdsqZsdHaHm3B15REb4abvP6Me2").unwrap_or(Pubkey::new_unique());
+        let pk1 = Pubkey::from_str("2yDfbsYuxXrZUbbYbsgRvJkd72k8YTrLrChw8WMMazz5").unwrap_or(Pubkey::new_unique()); // 7jEfU57R2sV2B1DddKdsqZsdHaHm3B15REb4abvP6Me2
         let pk2 = Pubkey::from_str("DUMMY_C57GmZLsPviiHZqWjYHo9is8QnMNq1Fc7SkYvLxLts24").unwrap_or(Pubkey::new_unique());
         let pk3 = Pubkey::from_str("3XA7qhMGS3UgbtyKSVo4rHuAm5yMmic3zKqb616QJDmz").unwrap();
         let pk4 = Pubkey::from_str("9iDXA8wAvN3u4BhRoP1yL3n2PE8KxcFoNVbz1Xd9k7xw").unwrap();
@@ -1512,7 +1512,7 @@ impl AccountsDb {
         let mut key_timings = CleanKeyTimings::default();
         let pubkeys = self.construct_candidate_clean_keys(max_clean_root, &mut key_timings);
         
-        let pk1 = Pubkey::from_str("DUMMY_7jEfU57R2sV2B1DddKdsqZsdHaHm3B15REb4abvP6Me2").unwrap_or(Pubkey::new_unique());
+        let pk1 = Pubkey::from_str("2yDfbsYuxXrZUbbYbsgRvJkd72k8YTrLrChw8WMMazz5").unwrap_or(Pubkey::new_unique()); // 7jEfU57R2sV2B1DddKdsqZsdHaHm3B15REb4abvP6Me2
         let pk2 = Pubkey::from_str("DUMMY_C57GmZLsPviiHZqWjYHo9is8QnMNq1Fc7SkYvLxLts24").unwrap_or(Pubkey::new_unique());
         let pk3 = Pubkey::from_str("3XA7qhMGS3UgbtyKSVo4rHuAm5yMmic3zKqb616QJDmz").unwrap();
         let pk4 = Pubkey::from_str("9iDXA8wAvN3u4BhRoP1yL3n2PE8KxcFoNVbz1Xd9k7xw").unwrap();
@@ -1929,7 +1929,7 @@ impl AccountsDb {
         if matches {
             error!("jwash: do_shrink_slot_stores: {}", slot);
         }
-        let pk1 = Pubkey::from_str("DUMMY_7jEfU57R2sV2B1DddKdsqZsdHaHm3B15REb4abvP6Me2").unwrap_or(Pubkey::new_unique());
+        let pk1 = Pubkey::from_str("2yDfbsYuxXrZUbbYbsgRvJkd72k8YTrLrChw8WMMazz5").unwrap_or(Pubkey::new_unique()); // 7jEfU57R2sV2B1DddKdsqZsdHaHm3B15REb4abvP6Me2
         let pk2 = Pubkey::from_str("DUMMY_C57GmZLsPviiHZqWjYHo9is8QnMNq1Fc7SkYvLxLts24").unwrap_or(Pubkey::new_unique());
         let pk3 = Pubkey::from_str("3XA7qhMGS3UgbtyKSVo4rHuAm5yMmic3zKqb616QJDmz").unwrap();
         let pk4 = Pubkey::from_str("9iDXA8wAvN3u4BhRoP1yL3n2PE8KxcFoNVbz1Xd9k7xw").unwrap();
@@ -4213,7 +4213,7 @@ let mut inside=false;
         if let Some(purged_stored_account_slots) = purged_stored_account_slots {
             for (slot, pubkey) in purged_slot_pubkeys {
 
-                let pk1 = Pubkey::from_str("DUMMY_7jEfU57R2sV2B1DddKdsqZsdHaHm3B15REb4abvP6Me2").unwrap_or(Pubkey::new_unique());
+                let pk1 = Pubkey::from_str("2yDfbsYuxXrZUbbYbsgRvJkd72k8YTrLrChw8WMMazz5").unwrap_or(Pubkey::new_unique()); // 7jEfU57R2sV2B1DddKdsqZsdHaHm3B15REb4abvP6Me2
                 let pk2 = Pubkey::from_str("DUMMY_C57GmZLsPviiHZqWjYHo9is8QnMNq1Fc7SkYvLxLts24").unwrap_or(Pubkey::new_unique());
                 let pk3 = Pubkey::from_str("3XA7qhMGS3UgbtyKSVo4rHuAm5yMmic3zKqb616QJDmz").unwrap();
                 let pk4 = Pubkey::from_str("9iDXA8wAvN3u4BhRoP1yL3n2PE8KxcFoNVbz1Xd9k7xw").unwrap();
@@ -4675,7 +4675,7 @@ let mut inside=false;
         #[allow(clippy::stable_sort_primitive)]
         slots.sort();
 
-        let pk1 = Pubkey::from_str("DUMMY_7jEfU57R2sV2B1DddKdsqZsdHaHm3B15REb4abvP6Me2").unwrap_or(Pubkey::new_unique());
+        let pk1 = Pubkey::from_str("2yDfbsYuxXrZUbbYbsgRvJkd72k8YTrLrChw8WMMazz5").unwrap_or(Pubkey::new_unique()); // 7jEfU57R2sV2B1DddKdsqZsdHaHm3B15REb4abvP6Me2
         let pk2 = Pubkey::from_str("DUMMY_C57GmZLsPviiHZqWjYHo9is8QnMNq1Fc7SkYvLxLts24").unwrap_or(Pubkey::new_unique());
         let pk3 = Pubkey::from_str("3XA7qhMGS3UgbtyKSVo4rHuAm5yMmic3zKqb616QJDmz").unwrap();
         let pk4 = Pubkey::from_str("9iDXA8wAvN3u4BhRoP1yL3n2PE8KxcFoNVbz1Xd9k7xw").unwrap();
