@@ -1234,6 +1234,8 @@ impl AccountsDb {
         let reset_accounts = false;
 
         let mut reclaim_result = (HashMap::new(), HashMap::new());
+        error!("jwash:clean_old_rooted_accounts.handle_reclaims: {}", reclaims.len());
+
         self.handle_reclaims(
             &reclaims,
             None,
@@ -1850,7 +1852,6 @@ impl AccountsDb {
         reclaim_result: Option<&mut ReclaimResult>,
         reset_accounts: bool,
     ) {
-        error!("jwash:handle_reclaims: {}", reclaims.len());
         if reclaims.is_empty() {
             return;
         }
