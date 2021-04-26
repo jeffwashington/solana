@@ -2,9 +2,7 @@
 //! of un-parallelizeble transactions (eg, transactions as same writable key sets).
 //! By doing so to improve leader performance.
 
-use crate::{
-    cost_aligned_package::CostAlignedPackage,
-};
+use crate::cost_tracker::CostTracker;
 use solana_sdk::{
     bpf_loader, bpf_loader_deprecated, bpf_loader_upgradeable, pubkey::Pubkey, system_program,
     transaction::Transaction,
@@ -23,7 +21,7 @@ use Pubkey as ProgramKey;
 #[derive(Debug)]
 pub struct CostModel {
     cost_metrics: HashMap<ProgramKey, Cost>,
-    cost_aligned_package: CostAlignedPackage,
+    cost_tracker: CostTracker,
 }
 
 macro_rules! costmetrics {
@@ -34,51 +32,36 @@ macro_rules! costmetrics {
     }}
 }
 
+impl Default for CostModel {
+    fn default() -> Self {
+        CostModel::new()
+    }
+}
+
 impl CostModel {
     pub fn new() -> Self {
         Self::new_with_config(CHAIN_MAX_COST, BLOCK_MAX_COST)
     }
-        /*
-        // NOTE: message.rs has following lazy_static program ids. Can probably use them to define
-        // `cost` for each type.
-        // NOTE: since each instruction has `compute budget`, possible to derive `cost` from `budget`?
-        let parse = |s| Pubkey::from_str(s).unwrap();
-        Self {
-            cost_metrics: costmetrics![
-                parse("Config1111111111111111111111111111111111111") => COST_UNIT * 1,
-                parse("Feature111111111111111111111111111111111111") => COST_UNIT * 1,
-                parse("NativeLoader1111111111111111111111111111111") => COST_UNIT * 1,
-                parse("Stake11111111111111111111111111111111111111") => COST_UNIT * 1,
-                parse("StakeConfig11111111111111111111111111111111") => COST_UNIT * 1,
-                parse("Vote111111111111111111111111111111111111111") => COST_UNIT * 5,
-                system_program::id()                                 => COST_UNIT * 1,
-                bpf_loader::id()                                     => COST_UNIT * 1_000,
-                bpf_loader_deprecated::id()                          => COST_UNIT * 1_000,
-                bpf_loader_upgradeable::id()                         => COST_UNIT * 1_000
-            ],
-            cost_aligned_package: CostAlignedPackage::new(CHAIN_MAX_COST, BLOCK_MAX_COST),
-        }
-    }
-    // */
 
-    pub fn can_fit_this (
-        &mut self,
-        transaction: &Transaction,
-    ) -> Option<()> {
+    pub fn try_to_add_transaction(&mut self, transaction: &Transaction) -> Option<()> {
         // NOTE: taking a simplistic approach - chaining transactions by signer-accounts, which
         //       says transactions share same signer accounts can not be parallelized.
         //       Notice each transaction can have more than one signer accounts, in this case,
         //       the cost of this transaction is added to all accounts.
-        let signed_keys =
-            &transaction.message().account_keys[0..transaction.message().header.num_required_signatures as usize];
+        let signed_keys = &transaction.message().account_keys
+            [0..transaction.message().header.num_required_signatures as usize];
         let transaction_cost = self.find_transaction_cost(&transaction);
 
-        if self.cost_aligned_package.would_exceed_limit(&signed_keys, &transaction_cost) {
-            debug!("can not fit transaction {:?}", transaction );
+        if self
+            .cost_tracker
+            .would_exceed_limit(&signed_keys, &transaction_cost)
+        {
+            debug!("can not fit transaction {:?}", transaction);
             None
         } else {
-            debug!("transaction {:?} added to block", transaction );
-            self.cost_aligned_package.add_transaction(&signed_keys, &transaction_cost);
+            debug!("transaction {:?} added to block", transaction);
+            self.cost_tracker
+                .add_transaction(&signed_keys, &transaction_cost);
             Some(())
         }
     }
@@ -90,21 +73,20 @@ impl CostModel {
         let parse = |s| Pubkey::from_str(s).unwrap();
         Self {
             cost_metrics: costmetrics![
-                parse("Config1111111111111111111111111111111111111") => COST_UNIT * 1,
-                parse("Feature111111111111111111111111111111111111") => COST_UNIT * 1,
-                parse("NativeLoader1111111111111111111111111111111") => COST_UNIT * 1,
-                parse("Stake11111111111111111111111111111111111111") => COST_UNIT * 1,
-                parse("StakeConfig11111111111111111111111111111111") => COST_UNIT * 1,
-                parse("Vote111111111111111111111111111111111111111") => COST_UNIT * 5,
-                system_program::id()                                 => COST_UNIT * 1,
+                parse("Config1111111111111111111111111111111111111") => COST_UNIT,
+                parse("Feature111111111111111111111111111111111111") => COST_UNIT,
+                parse("NativeLoader1111111111111111111111111111111") => COST_UNIT,
+                parse("Stake11111111111111111111111111111111111111") => COST_UNIT,
+                parse("StakeConfig11111111111111111111111111111111") => COST_UNIT,
+                parse("Vote111111111111111111111111111111111111111") => COST_UNIT,
+                system_program::id()                                 => COST_UNIT,
                 bpf_loader::id()                                     => COST_UNIT * 1_000,
                 bpf_loader_deprecated::id()                          => COST_UNIT * 1_000,
                 bpf_loader_upgradeable::id()                         => COST_UNIT * 1_000
             ],
-            cost_aligned_package: CostAlignedPackage::new(chain_max, block_max),
+            cost_tracker: CostTracker::new(chain_max, block_max),
         }
     }
-
 
     fn find_instruction_cost(&self, program_key: &Pubkey) -> &Cost {
         match self.cost_metrics.get(&program_key) {
@@ -267,7 +249,7 @@ mod tests {
         let mut program_ids: Vec<Pubkey> = vec![];
         let mut instructions: Vec<CompiledInstruction> = vec![];
 
-        accounts.push( solana_sdk::pubkey::new_rand() );
+        accounts.push(solana_sdk::pubkey::new_rand());
         program_ids.push(solana_sdk::pubkey::new_rand());
         instructions.push(CompiledInstruction::new(2, &(), vec![0, 1]));
         let tx = Transaction::new_with_compiled_instructions(
@@ -280,7 +262,7 @@ mod tests {
         debug!("A random transaction {:?}", tx);
 
         let mut testee = CostModel::new();
-        assert!(testee.can_fit_this(&tx).is_some());
+        assert!(testee.try_to_add_transaction(&tx).is_some());
     }
 
     #[test]
@@ -306,8 +288,9 @@ mod tests {
         debug!("many random transaction {:?}", tx);
 
         // build model allows three transaction in total, but chain max is 1
-        let mut testee = CostModel::new_with_config(DEFAULT_PROGRAM_COST*1, DEFAULT_PROGRAM_COST*3);
-        assert!(testee.can_fit_this(&tx).is_none());
+        let mut testee =
+            CostModel::new_with_config(DEFAULT_PROGRAM_COST * 1, DEFAULT_PROGRAM_COST * 3);
+        assert!(testee.try_to_add_transaction(&tx).is_none());
     }
 
     #[test]
@@ -315,7 +298,8 @@ mod tests {
         let (_mint_keypair, start_hash) = test_setup();
 
         // build model allows one transaction in total
-        let mut testee = CostModel::new_with_config(DEFAULT_PROGRAM_COST*1, DEFAULT_PROGRAM_COST*1);
+        let mut testee =
+            CostModel::new_with_config(DEFAULT_PROGRAM_COST * 1, DEFAULT_PROGRAM_COST * 1);
 
         {
             let signer_account = Keypair::new();
@@ -328,7 +312,7 @@ mod tests {
             );
             debug!("Some random transaction {:?}", tx);
             // the first transaction will fit
-            assert!(testee.can_fit_this(&tx).is_some());
+            assert!(testee.try_to_add_transaction(&tx).is_some());
         }
 
         {
@@ -342,7 +326,7 @@ mod tests {
             );
             debug!("Some random transaction {:?}", tx);
             // the second transaction will not fit
-            assert!(testee.can_fit_this(&tx).is_none());
+            assert!(testee.try_to_add_transaction(&tx).is_none());
         }
     }
 }

@@ -995,14 +995,7 @@ impl BankingStage {
                 if secp256k1_program_enabled {
                     tx.verify_precompiles().ok()?;
                 }
-
-        // TODO - can add cost_model as a filter in this process, all transactions are filtered out
-        //        eg., not included in Some() below, will be add to buffeted_packets and be retried
-        //        again in next process_loop. 
-        //        So in this way, cost_model no longer need to return vec[vec[&hashedTransaction]],
-        //        rather just a "not full, full" statusu
-        //
-                cost_model.can_fit_this( &tx )?;
+                cost_model.try_to_add_transaction(&tx)?;
                 let message_bytes = Self::packet_message(p)?;
                 let message_hash = Message::hash_raw_message(message_bytes);
                 Some((
