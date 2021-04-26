@@ -1694,7 +1694,7 @@ impl AccountsDb {
                         inner=true;
                     rem})
                     .unwrap_or(false);
-                    if matches {
+                    if matches || slot == &72921034 || slot == &71500402 || slot == &71999188 || slot == &71535137 {
                         error!("jwash:was_reclaimed: {}, slot: {}, was_reclaimed: {}, inner: {}, was_slot_purged: {}", key, slot, was_reclaimed, inner, was_slot_purged);    
                     }
             if was_reclaimed {
@@ -1884,6 +1884,7 @@ impl AccountsDb {
         dead_slots: &HashSet<Slot>,
         purged_account_slots: Option<&mut AccountSlots>,
     ) {
+        error!("process_dead_slots: {}", dead_slots.len());
         if dead_slots.is_empty() {
             return;
         }
