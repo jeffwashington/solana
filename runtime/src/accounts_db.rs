@@ -1649,7 +1649,7 @@ impl AccountsDb {
                 error!("jwash:purged_account_slots contains: {}", 71999188);
             }
             */
-        error!("jwash:after clean_old_rooted_accounts: purged_account_slots: {}, removed_accounts: {}", purged_account_slots, removed_accounts);
+        error!("jwash:after clean_old_rooted_accounts: purged_account_slots: {}, removed_accounts: {}", purged_account_slots.len(), removed_accounts.len());
                     
         if self.caching_enabled {
             self.do_reset_uncleaned_roots(max_clean_root);
