@@ -1862,7 +1862,7 @@ impl AccountsDb {
             if let Some((ref mut x, ref mut y)) = reclaim_result {
                 (Some(x), Some(y))
             } else {
-                error!("jwash:handle_reclaims: no reclaim_result");
+                //error!("jwash:handle_reclaims: no reclaim_result");
                 (None, None)
             };
         let dead_slots = self.remove_dead_accounts(
