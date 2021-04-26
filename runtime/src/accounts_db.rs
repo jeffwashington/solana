@@ -2003,7 +2003,7 @@ impl AccountsDb {
                             // It would have had a ref to the storage from the initial store, but it will
                             // not exist in the re-written slot. Unref it to keep the index consistent with
                             // rewriting the storage entries.
-                            locked_entry.unref()
+                            locked_entry.unref();
                         } else {
                             alive_total += *account_size as u64;
                         }
@@ -5024,7 +5024,7 @@ impl AccountsDb {
                             // It would have had a ref to the storage from the initial store, but it will
                             // not exist in the re-written slot. Unref it to keep the index consistent with
                             // rewriting the storage entries.
-                            locked_entry.unref()
+                            locked_entry.unref();
                         } else {
                             alive_total += *account_size as u64;
                         }

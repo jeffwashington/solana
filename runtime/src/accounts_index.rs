@@ -111,7 +111,7 @@ impl<T: Clone> ReadAccountMapEntry<T> {
         &self.borrow_owned_entry_contents().ref_count
     }
 
-    pub fn unref(&self) -> usize {
+    pub fn unref(&self) -> u64 {
         self.ref_count().fetch_sub(1, Ordering::Relaxed)
     }
 }
