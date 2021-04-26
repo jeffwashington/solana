@@ -111,8 +111,8 @@ impl<T: Clone> ReadAccountMapEntry<T> {
         &self.borrow_owned_entry_contents().ref_count
     }
 
-    pub fn unref(&self) {
-        self.ref_count().fetch_sub(1, Ordering::Relaxed);
+    pub fn unref(&self) -> usize {
+        self.ref_count().fetch_sub(1, Ordering::Relaxed)
     }
 }
 
@@ -1097,8 +1097,22 @@ in_slot = true;
     }
 
     pub fn unref_from_storage(&self, pubkey: &Pubkey) {
+        let pk1 = Pubkey::from_str("2yDfbsYuxXrZUbbYbsgRvJkd72k8YTrLrChw8WMMazz5").unwrap_or(Pubkey::new_unique()); // 7jEfU57R2sV2B1DddKdsqZsdHaHm3B15REb4abvP6Me2
+        let pk2 = Pubkey::from_str("DUMMY_C57GmZLsPviiHZqWjYHo9is8QnMNq1Fc7SkYvLxLts24").unwrap_or(Pubkey::new_unique());
+        let pk3 = Pubkey::from_str("3XA7qhMGS3UgbtyKSVo4rHuAm5yMmic3zKqb616QJDmz").unwrap();
+        let pk4 = Pubkey::from_str("9iDXA8wAvN3u4BhRoP1yL3n2PE8KxcFoNVbz1Xd9k7xw").unwrap();
+        let pk5 = Pubkey::from_str("FzasQ2WtmxrN8JngZfh1sAvH1CCTyKihsTcnESKkNo8c").unwrap();
+
+        let matches = pubkey == &pk1 || pubkey == &pk2 || pubkey == &pk3 || pubkey == &pk4 || pubkey == &pk5;
+
+        let mut found = false;
+        let mut refcount = 0;
         if let Some(locked_entry) = self.get_account_read_entry(pubkey) {
-            locked_entry.unref();
+            found = true;
+            refcount = locked_entry.unref();
+        }
+        if matches {
+            error!("jwash:unref_from_storage, {}, found: {}, refcount_old: {}", pubkey, found, refcount);
         }
     }
 
