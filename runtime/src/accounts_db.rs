@@ -2001,19 +2001,20 @@ impl AccountsDb {
                             .any(|(_slot, i)| i.store_id == *store_id && i.offset == *offset);
 
     
-                        if matches || matches_slot{
-                            error!("jwash:do_shrink_slot_stores {}, is_alive: {}", pubkey, is_alive);
-                        }
-            
+                        let mut rc = u64::MAX;
                         if !is_alive {
                             // This pubkey was found in the storage, but no longer exists in the index.
                             // It would have had a ref to the storage from the initial store, but it will
                             // not exist in the re-written slot. Unref it to keep the index consistent with
                             // rewriting the storage entries.
-                            locked_entry.unref();
+                            rc = locked_entry.unref();
                         } else {
                             alive_total += *account_size as u64;
                         }
+                        if matches || matches_slot{
+                            error!("jwash:do_shrink_slot_stores {}, is_alive: {}, rc: {}", pubkey, is_alive, rc);
+                        }
+
                         is_alive
                     } else {
                         if matches || matches_slot{

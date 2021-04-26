@@ -4404,7 +4404,7 @@ impl Bank {
         if self.slot() > 0 {
             self.clean_accounts(true);
             self.shrink_all_slots();
-            panic!("done with verify_snapshot_bank");
+            //panic!("done with verify_snapshot_bank");
             error!("jwash:clean2");
             self.clean_accounts(true);
             self.shrink_all_slots();
