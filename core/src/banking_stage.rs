@@ -894,56 +894,46 @@ impl BankingStage {
         let mut chunk_start = 0;
         let mut unprocessed_txs = vec![];
 
-        //NOTE - invoking cost_model here to pack transactions into package that complies cost limits;
-        // original batching logic is unchanged, `MAX_NUM_TRANSACTIONS_PER_BATCH` will be applied to each package;
-        let cost_model = CostModel::new();
-        let chunks = cost_model.pack_transactions_by_cost(transactions);
-        for chunk in chunks {
-            let transasctions = &chunk[..];
-            // --- below are original code ---
-            while chunk_start != transactions.len() {
-                let chunk_end = std::cmp::min(
-                    transactions.len(),
-                    chunk_start + MAX_NUM_TRANSACTIONS_PER_BATCH,
-                );
-                let (result, retryable_txs_in_chunk) = Self::process_and_record_transactions(
-                    bank,
-                    &transactions[chunk_start..chunk_end],
-                    poh,
-                    chunk_start,
-                    transaction_status_sender.clone(),
-                    gossip_vote_sender,
-                );
-                trace!("process_transactions result: {:?}", result);
+        while chunk_start != transactions.len() {
+            let chunk_end = std::cmp::min(
+                transactions.len(),
+                chunk_start + MAX_NUM_TRANSACTIONS_PER_BATCH,
+            );
+            let (result, retryable_txs_in_chunk) = Self::process_and_record_transactions(
+                bank,
+                &transactions[chunk_start..chunk_end],
+                poh,
+                chunk_start,
+                transaction_status_sender.clone(),
+                gossip_vote_sender,
+            );
+            trace!("process_transactions result: {:?}", result);
 
-                // Add the retryable txs (transactions that errored in a way that warrants a retry)
-                // to the list of unprocessed txs.
-                unprocessed_txs.extend_from_slice(&retryable_txs_in_chunk);
+            // Add the retryable txs (transactions that errored in a way that warrants a retry)
+            // to the list of unprocessed txs.
+            unprocessed_txs.extend_from_slice(&retryable_txs_in_chunk);
 
-                // If `bank_creation_time` is None, it's a test so ignore the option so
-                // allow processing
-                let should_bank_still_be_processing_txs =
-                    Bank::should_bank_still_be_processing_txs(bank_creation_time, bank.ns_per_slot);
-                match (result, should_bank_still_be_processing_txs) {
-                    (Err(PohRecorderError::MaxHeightReached), _) | (_, false) => {
-                        info!(
-                            "process transactions: max height reached slot: {} height: {}",
-                            bank.slot(),
-                            bank.tick_height()
-                        );
-                        // process_and_record_transactions has returned all retryable errors in
-                        // transactions[chunk_start..chunk_end], so we just need to push the remaining
-                        // transactions into the unprocessed queue.
-                        unprocessed_txs.extend(chunk_end..transactions.len());
-                        break;
-                    }
-                    _ => (),
+            // If `bank_creation_time` is None, it's a test so ignore the option so
+            // allow processing
+            let should_bank_still_be_processing_txs =
+                Bank::should_bank_still_be_processing_txs(bank_creation_time, bank.ns_per_slot);
+            match (result, should_bank_still_be_processing_txs) {
+                (Err(PohRecorderError::MaxHeightReached), _) | (_, false) => {
+                    info!(
+                        "process transactions: max height reached slot: {} height: {}",
+                        bank.slot(),
+                        bank.tick_height()
+                    );
+                    // process_and_record_transactions has returned all retryable errors in
+                    // transactions[chunk_start..chunk_end], so we just need to push the remaining
+                    // transactions into the unprocessed queue.
+                    unprocessed_txs.extend(chunk_end..transactions.len());
+                    break;
                 }
-                // Don't exit early on any other type of error, continue processing...
-                chunk_start = chunk_end;
+                _ => (),
             }
-
-            // --- end of original code
+            // Don't exit early on any other type of error, continue processing...
+            chunk_start = chunk_end;
         }
 
         (chunk_start, unprocessed_txs)
@@ -996,6 +986,7 @@ impl BankingStage {
         transaction_indexes: &[usize],
         secp256k1_program_enabled: bool,
     ) -> (Vec<HashedTransaction<'static>>, Vec<usize>) {
+        let mut cost_model = CostModel::new();
         transaction_indexes
             .iter()
             .filter_map(|tx_index| {
@@ -1004,6 +995,14 @@ impl BankingStage {
                 if secp256k1_program_enabled {
                     tx.verify_precompiles().ok()?;
                 }
+
+        // TODO - can add cost_model as a filter in this process, all transactions are filtered out
+        //        eg., not included in Some() below, will be add to buffeted_packets and be retried
+        //        again in next process_loop. 
+        //        So in this way, cost_model no longer need to return vec[vec[&hashedTransaction]],
+        //        rather just a "not full, full" statusu
+        //
+                cost_model.can_fit_this( &tx )?;
                 let message_bytes = Self::packet_message(p)?;
                 let message_hash = Message::hash_raw_message(message_bytes);
                 Some((
