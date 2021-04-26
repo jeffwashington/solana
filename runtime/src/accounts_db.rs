@@ -1885,7 +1885,7 @@ impl AccountsDb {
         dead_slots: &HashSet<Slot>,
         purged_account_slots: Option<&mut AccountSlots>,
     ) {
-        error!("process_dead_slots: {}", dead_slots.len());
+        error!("jwash:process_dead_slots: {}", dead_slots.len());
         if dead_slots.is_empty() {
             return;
         }
@@ -4112,7 +4112,7 @@ impl AccountsDb {
     ) -> HashSet<Slot> {
         let mut dead_slots = HashSet::new();
         let mut new_shrink_candidates: ShrinkCandidates = HashMap::new();
-        error!("remove_dead_accounts: {}", reclaims.len());
+        error!("jwash:remove_dead_accounts: {}", reclaims.len());
         for (slot, account_info) in reclaims {
             
             // No cached accounts should make it here
@@ -4164,7 +4164,7 @@ impl AccountsDb {
                 }
             }
             if slot == &72921034 || slot == &71500402 || slot == &71999188 || slot == &71535137 {
-                error!("remove_dead_accounts: slot {}, get_account_storage_entry: {}, dead_slots_insert: {}, count: {}, new_shrink_candidates: {}", slot, get_account_storage_entry, dead_slots_insert, outer_count, new_shrink_candidates2);
+                error!("jwash:remove_dead_accounts: slot {}, get_account_storage_entry: {}, dead_slots_insert: {}, count: {}, new_shrink_candidates: {}", slot, get_account_storage_entry, dead_slots_insert, outer_count, new_shrink_candidates2);
             }
         }
 
@@ -4174,7 +4174,7 @@ impl AccountsDb {
                 for (slot, slot_shrink_candidates) in new_shrink_candidates {
                     for (store_id, store) in slot_shrink_candidates {
                         if slot == 72921034 || slot == 71500402 || slot == 71999188 || slot == 71535137 {
-                            error!("shrink_candidate_slots: slot {}, store_id: {}", slot, store_id);
+                            error!("jwash:shrink_candidate_slots: slot {}, store_id: {}", slot, store_id);
                         }
                         shrink_candidate_slots
                             .entry(slot)
@@ -4240,8 +4240,13 @@ let mut inside=false;
         let dead_slots: Vec<_> = dead_slots_iter
             .clone()
             .map(|slot| {
+                let mut clean_dead_slot = false;
                 if let Some(latest) = self.accounts_index.clean_dead_slot(*slot) {
+                    clean_dead_slot = true;
                     accounts_index_root_stats = latest;
+                }
+                if slot == &72921034 || slot == &71500402 || slot == &71999188 || slot == &71535137 {
+                    error!("jwash:finalize_dead_slot_removal: slot: {}, clean_dead_slot: {}", slot, clean_dead_slot);
                 }
                 *slot
             })
@@ -4269,7 +4274,7 @@ let mut inside=false;
         let mut stores: Vec<Arc<AccountStorageEntry>> = vec![];
         for slot in dead_slots.iter() {
             if slot == &72921034 || slot == &71500402 || slot == &71999188 || slot == &71535137 {
-                error!("clean_stored_dead_slots: {}", slot);
+                error!("jwash:clean_stored_dead_slots: {}", slot);
             }
     
             if let Some(slot_storage) = self.storage.get_slot_stores(*slot) {
