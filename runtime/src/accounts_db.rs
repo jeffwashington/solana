@@ -1243,7 +1243,7 @@ impl AccountsDb {
             Some(&mut reclaim_result),
             reset_accounts,
         );
-        error!("jwash:clean_old_rooted_accounts.after handle_reclaims:reclaim_result{}", reclaim_result.len());
+        error!("jwash:clean_old_rooted_accounts.after handle_reclaims:reclaim_result{:?}", (reclaim_result.0.len(), reclaim_result.1.len()));
         measure.stop();
         debug!("{} {}", clean_rooted, measure);
         inc_new_counter_info!("clean-old-root-reclaim-ms", measure.as_ms() as usize);
