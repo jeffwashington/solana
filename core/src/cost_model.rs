@@ -78,7 +78,7 @@ impl CostModel {
                 parse("NativeLoader1111111111111111111111111111111") => COST_UNIT,
                 parse("Stake11111111111111111111111111111111111111") => COST_UNIT,
                 parse("StakeConfig11111111111111111111111111111111") => COST_UNIT,
-                parse("Vote111111111111111111111111111111111111111") => COST_UNIT,
+                parse("Vote111111111111111111111111111111111111111") => COST_UNIT * 5,
                 system_program::id()                                 => COST_UNIT,
                 bpf_loader::id()                                     => COST_UNIT * 1_000,
                 bpf_loader_deprecated::id()                          => COST_UNIT * 1_000,
