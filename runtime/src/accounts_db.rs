@@ -1885,7 +1885,6 @@ impl AccountsDb {
         dead_slots: &HashSet<Slot>,
         purged_account_slots: Option<&mut AccountSlots>,
     ) {
-        error!("jwash:process_dead_slots: {}", dead_slots.len());
         if dead_slots.is_empty() {
             return;
         }
@@ -4112,7 +4111,8 @@ impl AccountsDb {
     ) -> HashSet<Slot> {
         let mut dead_slots = HashSet::new();
         let mut new_shrink_candidates: ShrinkCandidates = HashMap::new();
-        error!("jwash:remove_dead_accounts: {}", reclaims.len());
+        //if reclaims.len() > 0 {}
+        //error!("jwash:remove_dead_accounts: {}", reclaims.len());
         for (slot, account_info) in reclaims {
             
             // No cached accounts should make it here
