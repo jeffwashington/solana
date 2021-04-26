@@ -4259,9 +4259,9 @@ let mut inside=false;
                 if slot == &72921034 || slot == &71500402 || slot == &71999188 || slot == &71535137 {
                     error!("jwash:finalize_dead_slot_removal: slot: {}, clean_dead_slot: {}", slot, clean_dead_slot);
                     for pk in &pks {
-                        let found = self.accounts_index.get(pk, None, None);
-                        let rc = found.map(|a| a.0.ref_count().load(Ordering::Relaxed)).unwrap_or(u64::MAX);
-                        error!("jwash:{}, refcount: {}", pk, rc);
+                        let found = self.accounts_index.get_account_read_entry(pk);
+                        let rc = found.map(|a| {
+                            error!("jwash:{}, refcount: {}, slot_list: {:?}", pk, a.ref_count().load(Ordering::Relaxed), a.slot_list());});
                     }
                     
                 }
