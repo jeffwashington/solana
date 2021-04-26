@@ -1851,6 +1851,7 @@ impl AccountsDb {
         reset_accounts: bool,
     ) {
         if reclaims.is_empty() {
+            error!("jwash:handle_reclaims empty");
             return;
         }
         let (purged_account_slots, reclaimed_offsets) =
@@ -4122,17 +4123,24 @@ impl AccountsDb {
             if let Some(expected_slot) = expected_slot {
                 assert_eq!(*slot, expected_slot);
             }
+            let mut get_account_storage_entry = false;
+            let mut dead_slots_insert = false;
+            let mut new_shrink_candidates2 = false;
+            let mut outer_count = 0;
             if let Some(store) = self
                 .storage
                 .get_account_storage_entry(*slot, account_info.store_id)
             {
+                get_account_storage_entry = true;
                 assert_eq!(
                     *slot, store.slot(),
                     "AccountDB::accounts_index corrupted. Storage pointed to: {}, expected: {}, should only point to one slot",
                     store.slot(), *slot
                 );
                 let count = store.remove_account(account_info.stored_size, reset_accounts);
+                outer_count = count;
                 if count == 0 {
+                    dead_slots_insert = true;
                     dead_slots.insert(*slot);
                 } else if self.caching_enabled
                     && (self.page_align(store.alive_bytes() as u64) as f64
@@ -4144,12 +4152,16 @@ impl AccountsDb {
                     // because slots should only have one storage entry, namely the one that was
                     // created by `flush_slot_cache()`.
                     {
+                        new_shrink_candidates2 = true;
                         new_shrink_candidates
                             .entry(*slot)
                             .or_default()
                             .insert(store.append_vec_id(), store);
                     }
                 }
+            }
+            if slot == &72921034 || slot == &71500402 || slot == &71999188 || slot == &71535137 {
+                error!("remove_dead_accounts: slot {}, get_account_storage_entry: {}, dead_slots_insert: {}, count: {}, new_shrink_candidates: {}", slot, get_account_storage_entry, dead_slots_insert, outer_count, new_shrink_candidates2);
             }
         }
 
