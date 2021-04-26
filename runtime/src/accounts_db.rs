@@ -1243,6 +1243,7 @@ impl AccountsDb {
             Some(&mut reclaim_result),
             reset_accounts,
         );
+        error!("jwash:clean_old_rooted_accounts.after handle_reclaims:reclaim_result{}", reclaim_result.len());
         measure.stop();
         debug!("{} {}", clean_rooted, measure);
         inc_new_counter_info!("clean-old-root-reclaim-ms", measure.as_ms() as usize);
@@ -1782,6 +1783,7 @@ impl AccountsDb {
         // Don't reset from clean, since the pubkeys in those stores may need to be unref'ed
         // and those stores may be used for background hashing.
         let reset_accounts = false;
+        error!("jwash:handle_reclaims calling with None");
         self.handle_reclaims(&reclaims, None, false, None, reset_accounts);
 
         reclaims_time.stop();
@@ -1860,6 +1862,7 @@ impl AccountsDb {
             if let Some((ref mut x, ref mut y)) = reclaim_result {
                 (Some(x), Some(y))
             } else {
+                error!("jwash:handle_reclaims: no reclaim_result");
                 (None, None)
             };
         let dead_slots = self.remove_dead_accounts(
@@ -4275,7 +4278,7 @@ let mut inside=false;
         let mut stores: Vec<Arc<AccountStorageEntry>> = vec![];
         for slot in dead_slots.iter() {
             if slot == &72921034 || slot == &71500402 || slot == &71999188 || slot == &71535137 {
-                error!("jwash:clean_stored_dead_slots: {}", slot);
+                error!("jwash:clean_stored_dead_slots: {}, purged_account_slots.is_some: {}", slot, purged_account_slots.is_some());
             }
     
             if let Some(slot_storage) = self.storage.get_slot_stores(*slot) {
