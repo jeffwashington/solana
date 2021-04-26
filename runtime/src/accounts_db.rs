@@ -1783,8 +1783,9 @@ impl AccountsDb {
         // Don't reset from clean, since the pubkeys in those stores may need to be unref'ed
         // and those stores may be used for background hashing.
         let reset_accounts = false;
-        error!("jwash:handle_reclaims calling with None");
-        let reclaim_result = None;
+        error!("jwash:handle_reclaims calling with NOW NOT None");
+        let mut reclaim_result = ReclaimResult::default();
+        let reclaim_result = Some(&mut reclaim_result);
         self.handle_reclaims(&reclaims, None, false, reclaim_result, reset_accounts);
 
         reclaims_time.stop();
@@ -4230,7 +4231,7 @@ let mut inside=false;
         let pk4 = Pubkey::from_str("9iDXA8wAvN3u4BhRoP1yL3n2PE8KxcFoNVbz1Xd9k7xw").unwrap();
         let pk5 = Pubkey::from_str("FzasQ2WtmxrN8JngZfh1sAvH1CCTyKihsTcnESKkNo8c").unwrap();
         let pks = [&pk1, &pk2, &pk3, &pk4, &pk5];
-        error!("jwash:finalize_dead_slot_removal, len: {}, purged_stored_account_slots.is_some: {}", purged_slot_pubkeys.len(), purged_stored_account_slots.is_some());
+        error!("jwash:finalize_dead_slot_removal, len: {}, purged_stored_account_slots.is_some: {}, purged_slot_pubkeys: {}", purged_slot_pubkeys.len(), purged_stored_account_slots.is_some(), purged_slot_pubkeys.len());
         if let Some(purged_stored_account_slots) = purged_stored_account_slots {
             for (slot, pubkey) in purged_slot_pubkeys {
 
@@ -4318,7 +4319,7 @@ let mut inside=false;
                                 let pubkey = &account.meta.pubkey;
                                 let matches = pubkey == &pk1 || pubkey == &pk2 || pubkey == &pk3 || pubkey == &pk4 || pubkey == &pk5;
                                 if matches {
-                                    error!("jwash:clean_stored_dead_slots:{}, store_id: {}, slot: {}", pubkey, store.id.load(Ordering::Relaxed), store.slot());
+                                    error!("jwash:clean_stored_dead_slots: {}, store_id: {}, slot: {}", pubkey, store.id.load(Ordering::Relaxed), store.slot());
                                 }
 
                                 (store.slot(), account.meta.pubkey)})
