@@ -4171,7 +4171,7 @@ impl AccountsDb {
                 let mut shrink_candidate_slots = self.shrink_candidate_slots.lock().unwrap();
                 for (slot, slot_shrink_candidates) in new_shrink_candidates {
                     for (store_id, store) in slot_shrink_candidates {
-                        if slot == &72921034 || slot == &71500402 || slot == &71999188 || slot == &71535137 {
+                        if slot == 72921034 || slot == 71500402 || slot == 71999188 || slot == 71535137 {
                             error!("shrink_candidate_slots: slot {}, store_id: {}", slot, store_id);
                         }
                         shrink_candidate_slots
