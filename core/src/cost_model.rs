@@ -288,8 +288,7 @@ mod tests {
         debug!("many random transaction {:?}", tx);
 
         // build model allows three transaction in total, but chain max is 1
-        let mut testee =
-            CostModel::new_with_config(DEFAULT_PROGRAM_COST, DEFAULT_PROGRAM_COST * 3);
+        let mut testee = CostModel::new_with_config(DEFAULT_PROGRAM_COST, DEFAULT_PROGRAM_COST * 3);
         assert!(testee.try_to_add_transaction(&tx).is_none());
     }
 
@@ -298,8 +297,7 @@ mod tests {
         let (_mint_keypair, start_hash) = test_setup();
 
         // build model allows one transaction in total
-        let mut testee =
-            CostModel::new_with_config(DEFAULT_PROGRAM_COST, DEFAULT_PROGRAM_COST);
+        let mut testee = CostModel::new_with_config(DEFAULT_PROGRAM_COST, DEFAULT_PROGRAM_COST);
 
         {
             let signer_account = Keypair::new();
