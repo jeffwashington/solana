@@ -1677,7 +1677,7 @@ impl AccountsDb {
                     .map(|slots_removed| slots_removed.contains(slot))
                     .unwrap_or(false);
                 if was_slot_purged {
-                    if slot == &72921034 || slot == &71500402 || slot == &71999188 {
+                    if slot == &72921034 || slot == &71500402 || slot == &71999188 || slot == &71535137 {
                         error!("jwash:was_reclaimed: {}, slot: {}, was_slot_purged: {}", key, slot, was_slot_purged);    
                     }
                     // No need to look up the slot storage below if the entire
@@ -1922,7 +1922,7 @@ impl AccountsDb {
             write_version: u64,
         }
         debug!("do_shrink_slot_stores: slot: {}", slot);
-        let matches = slot == 71500402 || slot == 71999188        ;
+        let matches = slot == 71500402 || slot == 71999188   || slot == 71535137     ;
         let mut stored_accounts: HashMap<Pubkey, FoundStoredAccount> = HashMap::new();
         let mut original_bytes = 0;
         if matches {
@@ -4173,14 +4173,14 @@ let mut inside=false;
                 inside=true;
                 for x in slot_stores.read().unwrap().values() {
                     if x.count() != 0 {
-                        if slot == &72921034 || slot == &71500402 || slot == &71999188 {
+                        if slot == &72921034 || slot == &71500402 || slot == &71999188 || slot == &71535137 {
                             error!("dead_slots.retain: {}, false, count: {}", slot, x.count());
                         }
                         return false;
                     }
                 }
             }
-            if slot == &72921034 || slot == &71500402 || slot == &71999188 {
+            if slot == &72921034 || slot == &71500402 || slot == &71999188 || slot == &71535137{
                 error!("dead_slots.retain: {}, true, inside: {}", slot, inside);
             }
             true
@@ -4207,7 +4207,7 @@ let mut inside=false;
                 let pk5 = Pubkey::from_str("FzasQ2WtmxrN8JngZfh1sAvH1CCTyKihsTcnESKkNo8c").unwrap();
         
                 let matches = pk3 == pubkey || pk4 == pubkey || pk1 == pubkey || pk2 == pubkey || pk5 == pubkey;
-                if slot == 72921034 || slot == 71500402 || slot == 71999188 || matches {
+                if slot == 72921034 || slot == 71500402 || slot == 71999188 || slot == 71535137 || matches {
                     error!("jwash:finalize_dead_slot_removal: {}, slot: {}", pubkey, slot);
                 }
                 purged_stored_account_slots
@@ -4250,7 +4250,7 @@ let mut inside=false;
         let mut measure = Measure::start("clean_stored_dead_slots-ms");
         let mut stores: Vec<Arc<AccountStorageEntry>> = vec![];
         for slot in dead_slots.iter() {
-            if slot == &72921034 || slot == &71500402 || slot == &71999188 {
+            if slot == &72921034 || slot == &71500402 || slot == &71999188 || slot == &71535137 {
                 error!("clean_stored_dead_slots: {}", slot);
             }
     
@@ -4694,7 +4694,7 @@ let mut inside=false;
             storage_maps.iter().for_each(|storage| {
             let accounts = storage.all_accounts();
                 accounts.into_iter().for_each(|stored_account| {
-                    if slot == &72921034 || slot == &71500402 || slot == &71999188 /*last_slot == 71500402 || last_last_slot == 71500402 || */
+                    if slot == &72921034 || slot == &71500402 || slot == &71999188 || slot == &71535137 /*last_slot == 71500402 || last_last_slot == 71500402 || */
                     || stored_account.meta.pubkey == pk1 || stored_account.meta.pubkey == pk2 
                     || stored_account.meta.pubkey == pk3 || stored_account.meta.pubkey == pk4 || stored_account.meta.pubkey == pk5
                     {
