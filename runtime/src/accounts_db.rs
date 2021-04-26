@@ -4110,6 +4110,7 @@ impl AccountsDb {
     ) -> HashSet<Slot> {
         let mut dead_slots = HashSet::new();
         let mut new_shrink_candidates: ShrinkCandidates = HashMap::new();
+        error!("remove_dead_accounts: {}", reclaims.len());
         for (slot, account_info) in reclaims {
             
             // No cached accounts should make it here
