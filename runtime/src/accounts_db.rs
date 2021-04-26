@@ -1850,8 +1850,8 @@ impl AccountsDb {
         reclaim_result: Option<&mut ReclaimResult>,
         reset_accounts: bool,
     ) {
+        error!("jwash:handle_reclaims: {}", reclaims.len());
         if reclaims.is_empty() {
-            error!("jwash:handle_reclaims empty");
             return;
         }
         let (purged_account_slots, reclaimed_offsets) =
