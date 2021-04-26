@@ -4168,12 +4168,20 @@ impl AccountsDb {
         }
 
         dead_slots.retain(|slot| {
+let mut inside=false;
             if let Some(slot_stores) = self.storage.get_slot_stores(*slot) {
+                inside=true;
                 for x in slot_stores.read().unwrap().values() {
                     if x.count() != 0 {
+                        if slot == &72921034 || slot == &71500402 || slot == &71999188 {
+                            error!("dead_slots.retain: {}, false, count: {}", slot, x.count());
+                        }
                         return false;
                     }
                 }
+            }
+            if slot == &72921034 || slot == &71500402 || slot == &71999188 {
+                error!("dead_slots.retain: {}, true, inside: {}", slot, inside);
             }
             true
         });
