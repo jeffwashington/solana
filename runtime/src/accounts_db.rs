@@ -1198,7 +1198,7 @@ impl AccountsDb {
         purges_in_root: Vec<Pubkey>,
         max_clean_root: Option<Slot>,
     ) -> ReclaimResult {
-        error!("jwash:clean_old_rooted_accounts: max_clean_root: {:?}, purges_in_root: {}", max_clean_root, purges_in_root.len());
+        error!("jwash:clean_old_rooted_accounts: max_clean_root: {:?}, purges_in_root: {}", max_clean_root, purges_in_root.len()); // TODO: this is 21M?
 
         if purges_in_root.is_empty() {
             return (HashMap::new(), HashMap::new());
@@ -1784,7 +1784,8 @@ impl AccountsDb {
         // and those stores may be used for background hashing.
         let reset_accounts = false;
         error!("jwash:handle_reclaims calling with None");
-        self.handle_reclaims(&reclaims, None, false, None, reset_accounts);
+        let reclaim_result = None;
+        self.handle_reclaims(&reclaims, None, false, reclaim_result, reset_accounts);
 
         reclaims_time.stop();
 
@@ -1929,6 +1930,7 @@ impl AccountsDb {
         }
         debug!("do_shrink_slot_stores: slot: {}", slot);
         let matches = slot == 71500402 || slot == 71999188   || slot == 71535137     ;
+        let matches_slot = matches;
         let mut stored_accounts: HashMap<Pubkey, FoundStoredAccount> = HashMap::new();
         let mut original_bytes = 0;
         if matches {
@@ -1944,10 +1946,10 @@ impl AccountsDb {
             original_bytes += store.total_bytes();
             while let Some((account, next)) = store.accounts.get_account(start) {
                 let pubkey = &account.meta.pubkey;
-                let matches = pubkey == &pk1 || pubkey == &pk2 || pubkey == &pk3 || pubkey == &pk4 || pubkey == &pk5;
+                let matches = pubkey == &pk1 || pubkey == &pk2 || pubkey == &pk3 || pubkey == &pk4 || pubkey == &pk5 || matches_slot;
         
                 if matches {
-                    error!("jwash:do_srhink_slot_stores {}", pubkey);
+                    error!("jwash: do_shrink_slot_stores {}, slot: {}", pubkey, slot);
                 }
                 match stored_accounts.entry(account.meta.pubkey) {
                     Entry::Occupied(mut occupied_entry) => {
@@ -1989,17 +1991,17 @@ impl AccountsDb {
                         offset,
                         ..
                     } = stored_account;
+                    let pkk = *pubkey;
+                    let matches = pkk == &pk1 || pkk == &pk2 || pkk == &pk3 || pkk == &pk4 || pkk == &pk5;
                     if let Some((locked_entry, _)) = self.accounts_index.get(pubkey, None, None) {
                         let is_alive = locked_entry
                             .slot_list()
                             .iter()
                             .any(|(_slot, i)| i.store_id == *store_id && i.offset == *offset);
 
-                            let pkk = *pubkey;
-                        let matches = pkk == &pk1 || pkk == &pk2 || pkk == &pk3 || pkk == &pk4 || pkk == &pk5;
     
-                        if matches {
-                            error!("jwash:do_srhink_slot_stores {}, is_alive: {}", pubkey, is_alive);
+                        if matches || matches_slot{
+                            error!("jwash:do_shrink_slot_stores {}, is_alive: {}", pubkey, is_alive);
                         }
             
                         if !is_alive {
@@ -2013,6 +2015,10 @@ impl AccountsDb {
                         }
                         is_alive
                     } else {
+                        if matches || matches_slot{
+                            error!("jwash:do_shrink_slot_stores {}, not found, store_id: {}", pubkey, store_id);
+                        }
+
                         false
                     }
                 })
@@ -4218,7 +4224,7 @@ let mut inside=false;
         // Should only be `Some` for non-cached slots
         purged_stored_account_slots: Option<&mut AccountSlots>,
     ) {
-        error!("jwash:finalize_dead_slot_removal, len: {}, purged_stored_account_slots: {}", purged_slot_pubkeys.len(), purged_stored_account_slots.is_some());
+        error!("jwash:finalize_dead_slot_removal, len: {}, purged_stored_account_slots.is_some: {}", purged_slot_pubkeys.len(), purged_stored_account_slots.is_some());
         if let Some(purged_stored_account_slots) = purged_stored_account_slots {
             for (slot, pubkey) in purged_slot_pubkeys {
 
