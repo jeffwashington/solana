@@ -183,7 +183,7 @@ mod tests {
         );
 
         // expected cost for one system transfer instructions
-        let expected_cost = COST_UNIT * 1;
+        let expected_cost = COST_UNIT;
 
         let testee = CostModel::new();
         assert_eq!(
@@ -289,7 +289,7 @@ mod tests {
 
         // build model allows three transaction in total, but chain max is 1
         let mut testee =
-            CostModel::new_with_config(DEFAULT_PROGRAM_COST * 1, DEFAULT_PROGRAM_COST * 3);
+            CostModel::new_with_config(DEFAULT_PROGRAM_COST, DEFAULT_PROGRAM_COST * 3);
         assert!(testee.try_to_add_transaction(&tx).is_none());
     }
 
@@ -299,7 +299,7 @@ mod tests {
 
         // build model allows one transaction in total
         let mut testee =
-            CostModel::new_with_config(DEFAULT_PROGRAM_COST * 1, DEFAULT_PROGRAM_COST * 1);
+            CostModel::new_with_config(DEFAULT_PROGRAM_COST, DEFAULT_PROGRAM_COST);
 
         {
             let signer_account = Keypair::new();
