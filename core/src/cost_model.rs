@@ -2,8 +2,9 @@
 //! of un-parallelizeble transactions (eg, transactions as same writable key sets).
 //! By doing so to improve leader performance.
 
-use crate::packaging_optimizer::PackagingOptimizer;
-use solana_runtime::hashed_transaction::HashedTransaction;
+use crate::{
+    cost_aligned_package::CostAlignedPackage,
+};
 use solana_sdk::{
     bpf_loader, bpf_loader_deprecated, bpf_loader_upgradeable, pubkey::Pubkey, system_program,
     transaction::Transaction,
@@ -22,9 +23,7 @@ use Pubkey as ProgramKey;
 #[derive(Debug)]
 pub struct CostModel {
     cost_metrics: HashMap<ProgramKey, Cost>,
-    cost_tracker: CostTracker,
-    chain_max_cost: Cost,
-    block_max_cost: Cost,
+    cost_aligned_package: CostAlignedPackage,
 }
 
 macro_rules! costmetrics {
@@ -37,6 +36,9 @@ macro_rules! costmetrics {
 
 impl CostModel {
     pub fn new() -> Self {
+        Self::new_with_config(CHAIN_MAX_COST, BLOCK_MAX_COST)
+    }
+        /*
         // NOTE: message.rs has following lazy_static program ids. Can probably use them to define
         // `cost` for each type.
         // NOTE: since each instruction has `compute budget`, possible to derive `cost` from `budget`?
@@ -54,52 +56,55 @@ impl CostModel {
                 bpf_loader_deprecated::id()                          => COST_UNIT * 1_000,
                 bpf_loader_upgradeable::id()                         => COST_UNIT * 1_000
             ],
-            chain_max_cost: CHAIN_MAX_COST,
-            block_max_cost: BLOCK_MAX_COST,
+            cost_aligned_package: CostAlignedPackage::new(CHAIN_MAX_COST, BLOCK_MAX_COST),
+        }
+    }
+    // */
+
+    pub fn can_fit_this (
+        &mut self,
+        transaction: &Transaction,
+    ) -> Option<()> {
+        // NOTE: taking a simplistic approach - chaining transactions by signer-accounts, which
+        //       says transactions share same signer accounts can not be parallelized.
+        //       Notice each transaction can have more than one signer accounts, in this case,
+        //       the cost of this transaction is added to all accounts.
+        let signed_keys =
+            &transaction.message().account_keys[0..transaction.message().header.num_required_signatures as usize];
+        let transaction_cost = self.find_transaction_cost(&transaction);
+
+        if self.cost_aligned_package.would_exceed_limit(&signed_keys, &transaction_cost) {
+            debug!("can not fit transaction {:?}", transaction );
+            None
+        } else {
+            debug!("transaction {:?} added to block", transaction );
+            self.cost_aligned_package.add_transaction(&signed_keys, &transaction_cost);
+            Some(())
         }
     }
 
-    // NOTE - main function that breaks a collection of transactions into several smaller
-    //        collection of transaction, each complies the cost limits (on both Chain_cost and
-    //        block_cost).
-    pub fn pack_transactions_by_cost(
-        &self,
-        transactions: &[HashedTransaction],
-    ) -> Vec<Vec<&HashedTransaction>> {
-        let mut packages: Vec<Vec<&HashedTransaction>> = vec![];
-
-        // TODO - should it panic is the given parameters are invalid (say chain_max > block_max)
-        let mut packaging_optimizer =
-            PackagingOptimizer::new(self.chain_max_cost, self.block_max_cost);
-
-        for hashed_transaction in transactions {
-            let tx = hashed_transaction.transaction();
-            // NOTE: taking a simplistic approach - chaining transactions by signer-accounts, which
-            //       says transactions share same signer accounts can not be parallelized.
-            //       Notice each transaction can have more than one signer accounts, in this case,
-            //       the cost of this transaction is added to all accounts.
-            let signed_keys =
-                &tx.message().account_keys[0..tx.message().header.num_required_signatures as usize];
-            let transaction_cost = self.find_transaction_cost(&tx);
-            packaging_optimizer.add_transaction(
-                &hashed_transaction,
-                &signed_keys,
-                &transaction_cost,
-            );
+    fn new_with_config(chain_max: u32, block_max: u32) -> Self {
+        // NOTE: message.rs has following lazy_static program ids. Can probably use them to define
+        // `cost` for each type.
+        // NOTE: since each instruction has `compute budget`, possible to derive `cost` from `budget`?
+        let parse = |s| Pubkey::from_str(s).unwrap();
+        Self {
+            cost_metrics: costmetrics![
+                parse("Config1111111111111111111111111111111111111") => COST_UNIT * 1,
+                parse("Feature111111111111111111111111111111111111") => COST_UNIT * 1,
+                parse("NativeLoader1111111111111111111111111111111") => COST_UNIT * 1,
+                parse("Stake11111111111111111111111111111111111111") => COST_UNIT * 1,
+                parse("StakeConfig11111111111111111111111111111111") => COST_UNIT * 1,
+                parse("Vote111111111111111111111111111111111111111") => COST_UNIT * 5,
+                system_program::id()                                 => COST_UNIT * 1,
+                bpf_loader::id()                                     => COST_UNIT * 1_000,
+                bpf_loader_deprecated::id()                          => COST_UNIT * 1_000,
+                bpf_loader_upgradeable::id()                         => COST_UNIT * 1_000
+            ],
+            cost_aligned_package: CostAlignedPackage::new(chain_max, block_max),
         }
-        match packaging_optimizer.get_packages() {
-            Ok(p) => {
-                packages.extend(p);
-            }
-            Err(why) => {
-                debug!("Failed to packing transaction by cost, reason {}; returning the original inputs", why);
-                let mut p: Vec<&HashedTransaction> = vec![];
-                p.extend(transactions.iter().as_ref());
-                packages.push(p);
-            }
-        }
-        packages
     }
+
 
     fn find_instruction_cost(&self, program_key: &Pubkey) -> &Cost {
         match self.cost_metrics.get(&program_key) {
@@ -156,13 +161,6 @@ mod tests {
         let bank = Arc::new(Bank::new_no_wallclock_throttle(&genesis_config));
         let start_hash = bank.last_blockhash();
         (mint_keypair, start_hash)
-    }
-
-    #[test]
-    fn test_cost_model_initialization() {
-        let testee = CostModel::new();
-        assert_eq!(CHAIN_MAX_COST, testee.chain_max_cost);
-        assert_eq!(BLOCK_MAX_COST, testee.block_max_cost);
     }
 
     #[test]
@@ -258,5 +256,93 @@ mod tests {
 
         let testee = CostModel::new();
         assert_eq!(expected_cost, testee.find_transaction_cost(&tx));
+    }
+
+    #[test]
+    fn test_cost_model_can_fit_transaction() {
+        let (mint_keypair, start_hash) = test_setup();
+
+        // construct a transaction with a random instructions
+        let mut accounts: Vec<Pubkey> = vec![];
+        let mut program_ids: Vec<Pubkey> = vec![];
+        let mut instructions: Vec<CompiledInstruction> = vec![];
+
+        accounts.push( solana_sdk::pubkey::new_rand() );
+        program_ids.push(solana_sdk::pubkey::new_rand());
+        instructions.push(CompiledInstruction::new(2, &(), vec![0, 1]));
+        let tx = Transaction::new_with_compiled_instructions(
+            &[&mint_keypair],
+            &accounts[..],
+            start_hash,
+            program_ids,
+            instructions,
+        );
+        debug!("A random transaction {:?}", tx);
+
+        let mut testee = CostModel::new();
+        assert!(testee.can_fit_this(&tx).is_some());
+    }
+
+    #[test]
+    fn test_cost_model_cannot_fit_transaction_on_chain_limit() {
+        let (mint_keypair, start_hash) = test_setup();
+
+        // construct a transaction with two random instructions with same signer
+        let key1 = solana_sdk::pubkey::new_rand();
+        let key2 = solana_sdk::pubkey::new_rand();
+        let prog1 = solana_sdk::pubkey::new_rand();
+        let prog2 = solana_sdk::pubkey::new_rand();
+        let instructions = vec![
+            CompiledInstruction::new(3, &(), vec![0, 1]),
+            CompiledInstruction::new(4, &(), vec![0, 2]),
+        ];
+        let tx = Transaction::new_with_compiled_instructions(
+            &[&mint_keypair],
+            &[key1, key2],
+            start_hash,
+            vec![prog1, prog2],
+            instructions,
+        );
+        debug!("many random transaction {:?}", tx);
+
+        // build model allows three transaction in total, but chain max is 1
+        let mut testee = CostModel::new_with_config(DEFAULT_PROGRAM_COST*1, DEFAULT_PROGRAM_COST*3);
+        assert!(testee.can_fit_this(&tx).is_none());
+    }
+
+    #[test]
+    fn test_cost_model_cannot_fit_transaction_on_block_limit() {
+        let (_mint_keypair, start_hash) = test_setup();
+
+        // build model allows one transaction in total
+        let mut testee = CostModel::new_with_config(DEFAULT_PROGRAM_COST*1, DEFAULT_PROGRAM_COST*1);
+
+        {
+            let signer_account = Keypair::new();
+            let tx = Transaction::new_with_compiled_instructions(
+                &[&signer_account],
+                &[solana_sdk::pubkey::new_rand()],
+                start_hash,
+                vec![solana_sdk::pubkey::new_rand()],
+                vec![CompiledInstruction::new(2, &(), vec![0, 1])],
+            );
+            debug!("Some random transaction {:?}", tx);
+            // the first transaction will fit
+            assert!(testee.can_fit_this(&tx).is_some());
+        }
+
+        {
+            let signer_account = Keypair::new();
+            let tx = Transaction::new_with_compiled_instructions(
+                &[&signer_account],
+                &[solana_sdk::pubkey::new_rand()],
+                start_hash,
+                vec![solana_sdk::pubkey::new_rand()],
+                vec![CompiledInstruction::new(2, &(), vec![0, 1])],
+            );
+            debug!("Some random transaction {:?}", tx);
+            // the second transaction will not fit
+            assert!(testee.can_fit_this(&tx).is_none());
+        }
     }
 }
