@@ -1649,6 +1649,7 @@ impl AccountsDb {
                 error!("jwash:purged_account_slots contains: {}", 71999188);
             }
             */
+        error!("jwash:after clean_old_rooted_accounts: purged_account_slots: {}, removed_accounts: {}", purged_account_slots, removed_accounts);
                     
         if self.caching_enabled {
             self.do_reset_uncleaned_roots(max_clean_root);
@@ -4214,7 +4215,7 @@ let mut inside=false;
         // Should only be `Some` for non-cached slots
         purged_stored_account_slots: Option<&mut AccountSlots>,
     ) {
-        error!("jwash:finalize_dead_slot_removal, len: {}", purged_slot_pubkeys.len());
+        error!("jwash:finalize_dead_slot_removal, len: {}, purged_stored_account_slots: {}", purged_slot_pubkeys.len(), purged_stored_account_slots.is_some());
         if let Some(purged_stored_account_slots) = purged_stored_account_slots {
             for (slot, pubkey) in purged_slot_pubkeys {
 
