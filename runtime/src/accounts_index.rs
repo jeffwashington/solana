@@ -187,6 +187,8 @@ pub struct RollingBitField {
     max: u64, // exclusive
     bits: BitVec,
     count: usize,
+    // these are items that are true, lower than min, that would cause us to exceed max_width if we stored them in our bit field
+    excess: HashSet<u64>,
 }
 // functionally similar to a hashset
 // Relies on there being a sliding window of key values. The key values continue to increase.
@@ -202,6 +204,7 @@ impl RollingBitField {
             count: 0,
             min: 0,
             max: 0,
+            excess: HashSet::new(),
         }
     }
 
@@ -210,50 +213,85 @@ impl RollingBitField {
         key % self.max_width
     }
 
-    fn check_range(&self, key: u64) {
-        assert!(
-            self.count == 0
-                || (self.max.saturating_sub(key) <= self.max_width as u64
-                    && key.saturating_sub(self.min) < self.max_width as u64),
-            "out of range: count: {}, min: {}, max: {}, width: {}, key: {}",
-            self.count,
-            self.min,
-            self.max,
-            self.max_width,
-            key
-        );
-    }
-
     pub fn range_width(&self) -> u64 {
         // note that max isn't updated on remove, so it can be above the current max
         self.max - self.min
     }
 
     pub fn insert(&mut self, key: u64) {
-        self.check_range(key);
-        let address = self.get_address(&key);
-        let value = self.bits.get(address);
-        if !value {
-            self.bits.set(address, true);
-            if self.count == 0 {
-                self.min = key;
-                self.max = key + 1;
-            } else {
-                self.min = std::cmp::min(self.min, key);
-                self.max = std::cmp::max(self.max, key + 1);
+        let bits_empty = self.count == 0 || self.count == self.excess.len();
+        let update_bits = if bits_empty {
+            true // nothing in bits, so in range
+        } else if key < self.min {
+            // bits not empty and this insert is before min, so add to excess
+            if self.excess.insert(key) {
+                self.count += 1;
             }
-            self.count += 1;
+            false
+        } else if key < self.max {
+            true // fits current bit field range
+        } else {
+            // key is >= max
+            let new_max = key + 1;
+            loop {
+                let new_width = new_max.saturating_sub(self.min);
+                if new_width <= self.max_width {
+                    // this key will fit the max range
+                    break;
+                }
+
+                // have to move min items from bits to excess to make room for this new max
+                let inserted = self.excess.insert(self.min);
+                assert!(inserted);
+
+                let key = self.min;
+                let address = self.get_address(&key);
+                self.bits.set(address, false);
+                self.purge(&key);
+            }
+
+            true // moved things to excess if necessary
+        };
+
+        if update_bits {
+            let address = self.get_address(&key);
+            let value = self.bits.get(address);
+            if !value {
+                self.bits.set(address, true);
+                if bits_empty {
+                    self.min = key;
+                    self.max = key + 1;
+                } else {
+                    self.min = std::cmp::min(self.min, key);
+                    self.max = std::cmp::max(self.max, key + 1);
+                }
+                self.count += 1;
+            }
         }
     }
 
-    pub fn remove(&mut self, key: &u64) {
-        self.check_range(*key);
-        let address = self.get_address(key);
-        let value = self.bits.get(address);
-        if value {
-            self.count -= 1;
-            self.bits.set(address, false);
-            self.purge(key);
+    pub fn remove(&mut self, key: &u64) -> bool {
+        if key >= &self.min {
+            // if asked to remove something bigger than max, then no-op
+            if key < &self.max {
+                let address = self.get_address(key);
+                let get = self.bits.get(address);
+                if get {
+                    self.count -= 1;
+                    self.bits.set(address, false);
+                    self.purge(key);
+                }
+                get
+            } else {
+                false
+            }
+        } else {
+            // asked to remove something < min. would be in excess if it exists
+            let remove = self.excess.remove(key);
+            if remove {
+                self.count -= 1;
+            }
+            remove
         }
     }
 
@@ -282,10 +320,14 @@ impl RollingBitField {
     }
 
     pub fn contains(&self, key: &u64) -> bool {
-        let result = self.contains_assume_in_range(key);
-        // A contains call outside min and max is allowed. The answer will be false.
-        // Only need to do range check if we found true.
-        result && (key >= &self.min && key < &self.max)
+        let in_range = key >= &self.min && key < &self.max;
+        if in_range {
+            self.contains_assume_in_range(key)
+        } else if key >= &self.max {
+            false
+        } else {
+            self.excess.contains(key)
+        }
     }
 
     pub fn len(&self) -> usize {
@@ -1485,7 +1527,6 @@ pub mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "out of range")]
     fn test_bitfield_insert_wide() {
         solana_logger::setup();
         let width = 16;
@@ -1493,12 +1534,18 @@ pub mod tests {
         let (mut bitfield, _hash) = setup_wide(width, start);
 
         let slot = start + width;
-        // assert here -- higher than max range
+        let all = bitfield.get_all();
+        // higher than max range by 1
         bitfield.insert(slot);
+        assert!(bitfield.contains(&slot));
+        for slot in all {
+            assert!(bitfield.contains(&slot));
+        }
+        assert_eq!(bitfield.excess.len(), 1);
+        assert_eq!(bitfield.count, 3);
     }
 
     #[test]
-    #[should_panic(expected = "out of range")]
     fn test_bitfield_insert_wide_before() {
         solana_logger::setup();
         let width = 16;
@@ -1508,6 +1555,9 @@ pub mod tests {
         let slot = start + 1 - width;
         // assert here - would make min too low, causing too wide of a range
         bitfield.insert(slot);
+        assert_eq!(1, bitfield.excess.len());
+        assert_eq!(3, bitfield.count);
+        assert!(bitfield.contains(&slot));
     }
 
     #[test]
@@ -1517,9 +1567,11 @@ pub mod tests {
         let start = 100;
         let (mut bitfield, _hash) = setup_wide(width, start);
 
-        let slot = start + 2 - width; // this item would make our width exactly equal to what is allowed
+        let slot = start + 2 - width; // this item would make our width exactly equal to what is allowed, but it is also inserting prior to min
         bitfield.insert(slot);
+        assert_eq!(1, bitfield.excess.len());
         assert!(bitfield.contains(&slot));
+        assert_eq!(3, bitfield.count);
     }
 
     #[test]
@@ -1551,24 +1603,22 @@ pub mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "out of range")]
     fn test_bitfield_remove_wide() {
         let width = 16;
         let start = 0;
         let (mut bitfield, _hash) = setup_wide(width, start);
         let slot = width;
         // not set anyway, so no need to assert
-        bitfield.remove(&slot);
+        assert!(!bitfield.remove(&slot));
     }
 
     #[test]
-    #[should_panic(expected = "out of range")]
     fn test_bitfield_remove_wide_before() {
         let width = 16;
         let start = 100;
         let (mut bitfield, _hash) = setup_wide(width, start);
         let slot = start + 1 - width;
-        bitfield.remove(&slot);
+        assert!(!bitfield.remove(&slot));
     }
 
     fn compare(hashset: &HashSet<u64>, bitfield: &RollingBitField) {
