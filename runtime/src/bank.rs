@@ -2078,6 +2078,7 @@ impl Bank {
         clean.stop();
 
         let mut shrink = Measure::start("shrink");
+        error!("jwash:exhaustively_free_unused_resource");
         self.shrink_all_slots();
         shrink.stop();
 

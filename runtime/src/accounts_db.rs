@@ -4224,15 +4224,16 @@ let mut inside=false;
         // Should only be `Some` for non-cached slots
         purged_stored_account_slots: Option<&mut AccountSlots>,
     ) {
+        let pk1 = Pubkey::from_str("2yDfbsYuxXrZUbbYbsgRvJkd72k8YTrLrChw8WMMazz5").unwrap_or(Pubkey::new_unique()); // 7jEfU57R2sV2B1DddKdsqZsdHaHm3B15REb4abvP6Me2
+        let pk2 = Pubkey::from_str("DUMMY_C57GmZLsPviiHZqWjYHo9is8QnMNq1Fc7SkYvLxLts24").unwrap_or(Pubkey::new_unique());
+        let pk3 = Pubkey::from_str("3XA7qhMGS3UgbtyKSVo4rHuAm5yMmic3zKqb616QJDmz").unwrap();
+        let pk4 = Pubkey::from_str("9iDXA8wAvN3u4BhRoP1yL3n2PE8KxcFoNVbz1Xd9k7xw").unwrap();
+        let pk5 = Pubkey::from_str("FzasQ2WtmxrN8JngZfh1sAvH1CCTyKihsTcnESKkNo8c").unwrap();
+        let pks = [&pk1, &pk2, &pk3, &pk4, &pk5];
         error!("jwash:finalize_dead_slot_removal, len: {}, purged_stored_account_slots.is_some: {}", purged_slot_pubkeys.len(), purged_stored_account_slots.is_some());
         if let Some(purged_stored_account_slots) = purged_stored_account_slots {
             for (slot, pubkey) in purged_slot_pubkeys {
 
-                let pk1 = Pubkey::from_str("2yDfbsYuxXrZUbbYbsgRvJkd72k8YTrLrChw8WMMazz5").unwrap_or(Pubkey::new_unique()); // 7jEfU57R2sV2B1DddKdsqZsdHaHm3B15REb4abvP6Me2
-                let pk2 = Pubkey::from_str("DUMMY_C57GmZLsPviiHZqWjYHo9is8QnMNq1Fc7SkYvLxLts24").unwrap_or(Pubkey::new_unique());
-                let pk3 = Pubkey::from_str("3XA7qhMGS3UgbtyKSVo4rHuAm5yMmic3zKqb616QJDmz").unwrap();
-                let pk4 = Pubkey::from_str("9iDXA8wAvN3u4BhRoP1yL3n2PE8KxcFoNVbz1Xd9k7xw").unwrap();
-                let pk5 = Pubkey::from_str("FzasQ2WtmxrN8JngZfh1sAvH1CCTyKihsTcnESKkNo8c").unwrap();
         
                 let matches = pk3 == pubkey || pk4 == pubkey || pk1 == pubkey || pk2 == pubkey || pk5 == pubkey;
                 if slot == 72921034 || slot == 71500402 || slot == 71999188 || slot == 71535137 || matches {
@@ -4257,6 +4258,12 @@ let mut inside=false;
                 }
                 if slot == &72921034 || slot == &71500402 || slot == &71999188 || slot == &71535137 {
                     error!("jwash:finalize_dead_slot_removal: slot: {}, clean_dead_slot: {}", slot, clean_dead_slot);
+                    for pk in &pks {
+                        let found = self.accounts_index.get(pk, None, None);
+                        let rc = found.map(|a| a.0.ref_count().load(Ordering::Relaxed)).unwrap_or(u64::MAX);
+                        error!("jwash:{}, refcount: {}", pk, rc);
+                    }
+                    
                 }
                 *slot
             })
