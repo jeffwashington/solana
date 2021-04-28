@@ -497,15 +497,15 @@ pub struct AccountsIndexRootsStats {
     pub previous_uncleaned_roots_len: usize,
 }
 
-pub struct AccountsIndexIterator<'a, T> {
-    account_maps: &'a RwLock<AccountMap<AccountMapEntry<T>>>,
-    start_bound: Bound<Pubkey>,
-    end_bound: Bound<Pubkey>,
+pub struct AccountsIndexIterator<'a, T, K> {
+    account_maps: &'a RwLock<AccountMap<AccountMapEntry<T>, K>>,
+    start_bound: Bound<K>,
+    end_bound: Bound<K>,
     is_finished: bool,
 }
 
-impl<'a, T> AccountsIndexIterator<'a, T> {
-    fn clone_bound(bound: Bound<&Pubkey>) -> Bound<Pubkey> {
+impl<'a, T, K: Clone + Debug + PartialOrd + Copy> AccountsIndexIterator<'a, T, K> {
+    fn clone_bound(bound: Bound<&K>) -> Bound<K> {
         match bound {
             Unbounded => Unbounded,
             Included(k) => Included(*k),
@@ -514,11 +514,11 @@ impl<'a, T> AccountsIndexIterator<'a, T> {
     }
 
     pub fn new<R>(
-        account_maps: &'a RwLock<AccountMap<AccountMapEntry<T>>>,
+        account_maps: &'a RwLock<AccountMap<AccountMapEntry<T>, K>>,
         range: Option<R>,
     ) -> Self
     where
-        R: RangeBounds<Pubkey>,
+        R: RangeBounds<K>,
     {
         Self {
             start_bound: range
@@ -535,7 +535,7 @@ impl<'a, T> AccountsIndexIterator<'a, T> {
     }
 }
 
-impl<'a, T: 'static + Clone> Iterator for AccountsIndexIterator<'a, T> {
+impl<'a, T: 'static + Clone> Iterator for AccountsIndexIterator<'a, T, Pubkey> {
     type Item = Vec<(Pubkey, AccountMapEntry<T>)>;
     fn next(&mut self) -> Option<Self::Item> {
         if self.is_finished {
@@ -571,7 +571,7 @@ pub trait ZeroLamport {
 
 #[derive(Debug, Default)]
 pub struct AccountsIndex<T> {
-    pub account_maps: RwLock<AccountMap<AccountMapEntry<T>>>,
+    pub account_maps: RwLock<AccountMap<AccountMapEntry<T>, Pubkey>>,
     program_id_index: SecondaryIndex<DashMapSecondaryIndexEntry>,
     spl_token_mint_index: SecondaryIndex<DashMapSecondaryIndexEntry>,
     spl_token_owner_index: SecondaryIndex<RwLockSecondaryIndexEntry>,
@@ -581,7 +581,7 @@ pub struct AccountsIndex<T> {
 }
 
 impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
-    fn iter<R>(&self, range: Option<R>) -> AccountsIndexIterator<T>
+    fn iter<R>(&self, range: Option<R>) -> AccountsIndexIterator<T, Pubkey>
     where
         R: RangeBounds<Pubkey>,
     {

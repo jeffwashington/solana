@@ -32,24 +32,24 @@ use std::{
     },
 };
 
-impl< V: Clone> Default for AccountMap<V> {
+impl< V: Clone, K: Clone + Debug + PartialOrd> Default for AccountMap<V, K> {
     /// Creates an empty `BTreeMap`.
-    fn default() -> AccountMap<V> {
+    fn default() -> AccountMap<V, K> {
         AccountMap::new()
     }
 }
 
 #[derive(Debug, Clone)]
-pub enum AccountMapEntryBtree {
+pub enum AccountMapEntryBtree<K: Clone + Debug + PartialOrd> {
     /// A vacant entry.
-    Vacant(VacantEntry),
+    Vacant(VacantEntry<K>),
 
     /// An occupied entry.
     Occupied(OccupiedEntry),
 }
 
-impl AccountMapEntryBtree {
-    pub fn or_insert_with<V: Clone, F>(self, default: F, btree: &mut AccountMap<V>) -> &V
+impl<K: Clone + Debug + PartialOrd> AccountMapEntryBtree<K> {
+    pub fn or_insert_with<V: Clone, F>(self, default: F, btree: &mut AccountMap<V, K>) -> &V
     where
         F: FnOnce() -> V, 
         {
@@ -61,29 +61,29 @@ impl AccountMapEntryBtree {
 }
 
 #[derive(Clone)]
-pub struct VacantEntry {
+pub struct VacantEntry<K> {
     pub index: AccountMapIndex,
-    pub key: Pubkey,
+    pub key: K,
 }
 
-impl Debug for VacantEntry {
+impl<K: Clone + Debug + PartialOrd> Debug for VacantEntry<K> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("VacantEntry").field(self.key()).finish()
     }
 }
 
-impl VacantEntry {
+impl<K: Clone + Debug + PartialOrd> VacantEntry<K> {
     /// Creates an empty `BTreeMap`.
-    pub fn key(&self) -> &Pubkey {
+    pub fn key(&self) -> &K {
         &self.key
     }
-    pub fn new(key: Pubkey, index: AccountMapIndex) -> Self {
+    pub fn new(key: K, index: AccountMapIndex) -> Self {
         Self {
             key,
             index,
         }
     }
-    pub fn insert<V: Clone>(self, value: V, btree: &mut AccountMap<V>) -> &V {    
+    pub fn insert<V: Clone>(self, value: V, btree: &mut AccountMap<V, K>) -> &V {    
         btree.insert_at_index(&self.index, self.key, value, &mut Timings::default())
     }
 }
@@ -103,13 +103,13 @@ impl OccupiedEntry {
             index,
         }
     }
-    pub fn into_mut<V: Clone>(self, btree: &AccountMap<V>) -> &V {
+    pub fn into_mut<V: Clone, K: Clone + Debug + PartialOrd>(self, btree: &AccountMap<V, K>) -> &V {
         btree.get_at_index(&self.index).unwrap()
     }
-    pub fn get<'a, 'b, V: Clone>(&'a self, btree: &'b AccountMap<V>) -> &'b V {
+    pub fn get<'a, 'b, V: Clone, K: Clone + Debug + PartialOrd>(&'a self, btree: &'b AccountMap<V, K>) -> &'b V {
         btree.get_at_index(&self.index).unwrap()
     }
-    pub fn remove<V: Clone>(self, btree: &mut AccountMap<V>) {
+    pub fn remove<V: Clone, K: Clone + Debug + PartialOrd>(self, btree: &mut AccountMap<V, K>) {
         btree.remove_at_index(&self.index);
     }
 }
@@ -139,19 +139,21 @@ pub struct Timings {
     pub insert: u64,
 }
 
+type kkk = [u8; 30];
+
 //pub type AccountMap<K, V> = BTreeMap<K, V>;
 #[derive(Debug)]
-pub struct AccountMap<V> {
-    keys: Vec<Vec<Pubkey>>,
+pub struct AccountMap<V, K> {
+    keys: Vec<Vec<K>>,
     values: Vec<Vec<V>>,
     count: usize,
-    cumulative_min_key: Vec<Pubkey>,
+    cumulative_min_key: Vec<K>,
     cumulative_lens: Vec<usize>,
     vec_size_max: usize,
     timings: RwLock<Timings>
 }
 
-impl<V: Clone> AccountMap<V> {
+impl<V: Clone, K: Clone + Debug + PartialOrd> AccountMap<V, K> {
     pub fn new() -> Self {
         let vec_size_max = 10_000;
         Self {
@@ -169,7 +171,7 @@ impl<V: Clone> AccountMap<V> {
         Vec::with_capacity(size)
     }
 
-    pub fn get_index(&self, index: &AccountMapIndex) -> Option<(&Pubkey, &V)> {
+    pub fn get_index(&self, index: &AccountMapIndex) -> Option<(&K, &V)> {
         if index.insert {
             None
         }
@@ -208,7 +210,7 @@ impl<V: Clone> AccountMap<V> {
         vec.insert(outer + 1, new_vec);
     }
 
-    pub fn insert_at_index_alloc(&mut self, index: &AccountMapIndex, key: Pubkey, value: V, outer: &mut InnerAccountMapIndex, timings: &mut Timings ) {
+    pub fn insert_at_index_alloc(&mut self, index: &AccountMapIndex, key: K, value: V, outer: &mut InnerAccountMapIndex, timings: &mut Timings ) {
         let max = self.vec_size_max;
         let max_move = max / 100; // tune this later
         let size = self.keys[outer.outer_index].len();
@@ -217,7 +219,7 @@ impl<V: Clone> AccountMap<V> {
         if size > 0 && (to_move > max_move || size + 1 >= max) {
             // have to add a new vector
             let mut m1 = Measure::start("");
-            Self::mv(&mut self.keys, outer.outer_index, outer.inner_index, to_move, key);
+            Self::mv(&mut self.keys, outer.outer_index, outer.inner_index, to_move, key.clone());
             Self::mv(&mut self.values, outer.outer_index, outer.inner_index, to_move, value);
             m1.stop();
             timings.mv += m1.as_ns();
@@ -226,7 +228,7 @@ impl<V: Clone> AccountMap<V> {
                 self.cumulative_min_key.insert(outer.outer_index + 1, key);
             }
             else {
-                self.cumulative_min_key.insert(outer.outer_index + 1, self.keys[outer.outer_index + 1][0]);
+                self.cumulative_min_key.insert(outer.outer_index + 1, self.keys[outer.outer_index + 1][0].clone());
             }
             self.cumulative_lens.insert(outer.outer_index, self.cumulative_lens[outer.outer_index]); // we inserted here
             if to_move == 0 {
@@ -241,7 +243,7 @@ impl<V: Clone> AccountMap<V> {
         else {
             // no new vector - just insert
             let mut m1 = Measure::start("");
-            self.keys[outer.outer_index].insert(outer.inner_index, key);
+            self.keys[outer.outer_index].insert(outer.inner_index, key.clone());
             self.values[outer.outer_index].insert(outer.inner_index, value);
             m1.stop();
             timings.insert += m1.as_ns();
@@ -325,7 +327,7 @@ impl<V: Clone> AccountMap<V> {
         }
     }
     */
-    pub fn find_outer_index(&self, key: &Pubkey, timings: &mut Timings) -> usize {
+    pub fn find_outer_index(&self, key: &K, timings: &mut Timings) -> usize {
         let mut l = 0;
         let mut index = l;
         let mut insert = true;
@@ -338,8 +340,8 @@ impl<V: Clone> AccountMap<V> {
             loop {
                 index = (l + r) / 2;
                 info!("keys2: {:?}, outer: {:?}", self.keys, index);
-                let val = self.cumulative_min_key[index];
-                let cmp = key.partial_cmp(&val).unwrap();
+                let val = &self.cumulative_min_key[index];
+                let cmp = key.partial_cmp(val).unwrap();
                 info!("fo: left: {}, right: {}, count: {}, index: {}, cmp: {:?}, key: {:?} val: {:?}, iteration: {}, keys: {:?}", l, r, self.count, index, cmp, val, key, iteration, self.keys);
                 iteration += 1;
                 match cmp {
@@ -365,7 +367,7 @@ impl<V: Clone> AccountMap<V> {
 
         index
     }
-    pub fn find_outer_index_fast(&self, key: &Pubkey) -> usize {
+    pub fn find_outer_index_fast(&self, key: &K) -> usize {
         let mut l = 0;
         let mut index = l;
         let mut insert = true;
@@ -377,8 +379,8 @@ impl<V: Clone> AccountMap<V> {
             loop {
                 index = (l + r) / 2;
                 info!("keys2: {:?}, outer: {:?}", self.keys, index);
-                let val = self.cumulative_min_key[index];
-                let cmp = key.partial_cmp(&val).unwrap();
+                let val = &self.cumulative_min_key[index];
+                let cmp = key.partial_cmp(val).unwrap();
                 //info!("fo: left: {}, right: {}, count: {}, index: {}, cmp: {:?}, key: {:?} val: {:?}, iteration: {}, keys: {:?}", l, r, self.count, index, cmp, val, key, iteration, self.keys);
                 match cmp {
                     Ordering::Equal => {insert = false;break;},
@@ -401,7 +403,7 @@ impl<V: Clone> AccountMap<V> {
 
         index
     }
-    pub fn find(&self, key: &Pubkey, timings: &mut Timings) -> AccountMapIndex {
+    pub fn find(&self, key: &K, timings: &mut Timings) -> AccountMapIndex {
         let mut l = 0;
         let mut index = l;
         let mut insert = true;
@@ -454,7 +456,7 @@ impl<V: Clone> AccountMap<V> {
             total: InnerAccountMapIndex {outer_index, inner_index: index,},
         }
     }
-    pub fn find_fast(&self, key: &Pubkey) -> AccountMapIndex {
+    pub fn find_fast(&self, key: &K) -> AccountMapIndex {
         let mut l = 0;
         let mut index = l;
         let mut insert = true;
@@ -505,12 +507,12 @@ impl<V: Clone> AccountMap<V> {
     pub fn len(&self) -> usize {
         self.count
     }
-    pub fn insert(&mut self, key: Pubkey, value: V) -> &V {
+    pub fn insert(&mut self, key: K, value: V) -> &V {
         let mut timings = Timings::default();
         let find = self.find(&key, &mut timings);
         self.insert_at_index(&find, key, value, &mut timings)
     }
-    pub fn insert_at_index(&mut self, index: &AccountMapIndex, key: Pubkey, value: V, timings: &mut Timings) -> &V {
+    pub fn insert_at_index(&mut self, index: &AccountMapIndex, key: K, value: V, timings: &mut Timings) -> &V {
         let mut m1 = Measure::start("");
         let mut outer = index.total;
         m1.stop();
@@ -554,7 +556,7 @@ impl<V: Clone> AccountMap<V> {
     }
         &self.values[outer.outer_index][outer.inner_index]
     }
-    pub fn entry(&self, key: Pubkey) -> AccountMapEntryBtree {
+    pub fn entry(&self, key: K) -> AccountMapEntryBtree<K> {
         let find = self.find(&key, &mut Timings::default());
         if find.insert {
             AccountMapEntryBtree::Vacant(VacantEntry::new(key, find))
@@ -563,11 +565,11 @@ impl<V: Clone> AccountMap<V> {
             AccountMapEntryBtree::Occupied(OccupiedEntry::new(find))
         }
     }
-    pub fn contains_key(&self, key: &Pubkey) -> bool {
+    pub fn contains_key(&self, key: &K) -> bool {
         let find = self.find(&key, &mut Timings::default());
         !find.insert
     }
-    pub fn get(&self, key: &Pubkey) -> Option<&V> {
+    pub fn get(&self, key: &K) -> Option<&V> {
         let mut timings = Timings::default();
         let mut m1 = Measure::start("");
         let find = self.find(&key, &mut timings);
@@ -604,7 +606,7 @@ impl<V: Clone> AccountMap<V> {
 
         res
     }
-    pub fn get_fast(&self, key: &Pubkey) -> Option<&V> {
+    pub fn get_fast(&self, key: &K) -> Option<&V> {
         let find = self.find_fast(&key);
         let res = self.get_at_index(&find);
         res
@@ -618,7 +620,7 @@ impl<V: Clone> AccountMap<V> {
             Some(&self.values[outer.outer_index][outer.inner_index])
         }
     }
-    pub fn remove(&mut self, key: &Pubkey) {
+    pub fn remove(&mut self, key: &K) {
         let find = self.find(&key, &mut Timings::default());
         self.remove_at_index(&find)
     }
@@ -636,16 +638,16 @@ impl<V: Clone> AccountMap<V> {
             }
         }
     }
-    pub fn keys(&self) -> AccountMapIterKeys<'_, V> {//std::slice::Iter<'_, (K, V)> {
+    pub fn keys(&self) -> AccountMapIterKeys<'_, V, K> {//std::slice::Iter<'_, (K, V)> {
         AccountMapIterKeys::new(&self, AccountMapIndex::default())// {index: 0, insert: false,})
     }
-    pub fn values(&self) -> AccountMapIterValues<'_, V> {//std::slice::Iter<'_, (K, V)> {
+    pub fn values(&self) -> AccountMapIterValues<'_, V, K> {//std::slice::Iter<'_, (K, V)> {
         AccountMapIterValues::new(&self,  AccountMapIndex::default())
     }
-    pub fn iter(&self) -> AccountMapIter<'_, V> {//std::slice::Iter<'_, (K, V)> {
+    pub fn iter(&self) -> AccountMapIter<'_, V, K> {//std::slice::Iter<'_, (K, V)> {
         AccountMapIter::new(&self,  AccountMapIndex::default())
     }
-    pub fn range<T, R>(&self, range: R) -> Option<(Pubkey, Pubkey)>
+    pub fn range<T, R>(&self, range: R) -> Option<(K, K)>
     where
         T: Ord + ?Sized,
         R: RangeBounds<T>,
@@ -655,21 +657,21 @@ impl<V: Clone> AccountMap<V> {
         }
 }
 
-pub struct AccountMapIter<'a, V> {
+pub struct AccountMapIter<'a, V, K> {
     pub index: AccountMapIndex,
-    pub btree: &'a AccountMap<V>,
+    pub btree: &'a AccountMap<V, K>,
     //_dummy: PhantomData<V>,
 }
-impl<'a, V> AccountMapIter<'a, V> {
-    pub fn new(btree: &'a AccountMap<V>, index: AccountMapIndex) -> Self {
+impl<'a, V, K> AccountMapIter<'a, V, K> {
+    pub fn new(btree: &'a AccountMap<V, K>, index: AccountMapIndex) -> Self {
         Self {
             index,
             btree,
         }
     }
 }
-impl<'a, V:Clone> Iterator for AccountMapIter<'a, V> {
-    type Item = (&'a Pubkey, &'a V);
+impl<'a, V:Clone, K: Clone + Debug + PartialOrd> Iterator for AccountMapIter<'a, V, K> {
+    type Item = (&'a K, &'a V);
 
     // next() is the only required method
     fn next(&mut self) -> Option<Self::Item> {
@@ -682,20 +684,20 @@ impl<'a, V:Clone> Iterator for AccountMapIter<'a, V> {
         result
     }    
 }
-pub struct AccountMapIterValues<'a, V> {
+pub struct AccountMapIterValues<'a, V, K> {
     pub index: AccountMapIndex,
-    pub btree: &'a AccountMap<V>,
+    pub btree: &'a AccountMap<V, K>,
     //_dummy: PhantomData<V>,
 }
-impl<'a, V> AccountMapIterValues<'a, V> {
-    pub fn new(btree: &'a AccountMap<V>, index: AccountMapIndex) -> Self {
+impl<'a, V, K> AccountMapIterValues<'a, V, K> {
+    pub fn new(btree: &'a AccountMap<V, K>, index: AccountMapIndex) -> Self {
         Self {
             index,
             btree,
         }
     }
 }
-impl<'a, V: Clone> Iterator for AccountMapIterValues<'a, V> {
+impl<'a, V: Clone, K: Clone + Debug + PartialOrd> Iterator for AccountMapIterValues<'a, V, K> {
     type Item = &'a V;
 
     // next() is the only required method
@@ -709,21 +711,21 @@ impl<'a, V: Clone> Iterator for AccountMapIterValues<'a, V> {
     }    
 }
 
-pub struct AccountMapIterKeys<'a, V: Clone> {
+pub struct AccountMapIterKeys<'a, V: Clone, K> {
     pub index: AccountMapIndex,
-    pub btree: &'a AccountMap<V>,
+    pub btree: &'a AccountMap<V, K>,
     //_dummy: PhantomData<V>,
 }
-impl<'a, V: Clone> AccountMapIterKeys<'a, V> {
-    pub fn new(btree: &'a AccountMap<V>, index: AccountMapIndex) -> Self {
+impl<'a, V: Clone, K> AccountMapIterKeys<'a, V, K> {
+    pub fn new(btree: &'a AccountMap<V, K>, index: AccountMapIndex) -> Self {
         Self {
             index,
             btree,
         }
     }
 }
-impl<'a, V:Clone> Iterator for AccountMapIterKeys<'a, V> {
-    type Item = &'a Pubkey;
+impl<'a, V:Clone, K: Clone + Debug + PartialOrd> Iterator for AccountMapIterKeys<'a, V, K> {
+    type Item = &'a K;
 
     // next() is the only required method
     fn next(&mut self) -> Option<Self::Item> {
