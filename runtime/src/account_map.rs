@@ -84,7 +84,7 @@ impl VacantEntry {
         }
     }
     pub fn insert<V: Clone>(self, value: V, btree: &mut AccountMap<V>) -> &V {    
-        btree.insert_at_index(&self.index, self.key, value)
+        btree.insert_at_index(&self.index, self.key, value, &mut Timings::default())
     }
 }
 
@@ -502,18 +502,18 @@ impl<V: Clone> AccountMap<V> {
         self.count
     }
     pub fn insert(&mut self, key: Pubkey, value: V) -> &V {
-        let find = self.find(&key, &mut Timings::default());
-        self.insert_at_index(&find, key, value)
-    }
-    pub fn insert_at_index(&mut self, index: &AccountMapIndex, key: Pubkey, value: V) -> &V {
         let mut timings = Timings::default();
+        let find = self.find(&key, &mut timings);
+        self.insert_at_index(&find, key, value, &mut timings)
+    }
+    pub fn insert_at_index(&mut self, index: &AccountMapIndex, key: Pubkey, value: V, timings: &mut Timings) -> &V {
         let mut m1 = Measure::start("");
         let mut outer = index.total;
         m1.stop();
 
         let mut m2 = Measure::start("");
         if index.insert {
-            self.insert_at_index_alloc(index, key, value, &mut outer, &mut timings);
+            self.insert_at_index_alloc(index, key, value, &mut outer, timings);
         }
         else {
             panic!("do this");
