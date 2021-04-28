@@ -423,8 +423,8 @@ impl<V: Clone> AccountMap<V> {
                 //error!("keys: {:?}", self.keys);
                 loop {
                     index = (l + r) / 2;
-                    let val = keys[index];
-                    let cmp = key.partial_cmp(&val).unwrap();
+                    let val = &keys[index];
+                    let cmp = key.partial_cmp(val).unwrap();
                     //error!("left: {}, right: {}, count: {}, index: {}, cmp: {:?}, key: {:?} val: {:?}, iteration: {}, keys: {:?}", l, r, self.count, index, cmp, val, key, iteration, self.keys);
                     iteration += 1;
                     match cmp {
@@ -473,8 +473,8 @@ impl<V: Clone> AccountMap<V> {
                 //error!("keys: {:?}", self.keys);
                 loop {
                     index = (l + r) / 2;
-                    let val = keys[index];
-                    let cmp = key.partial_cmp(&val).unwrap();
+                    let val = &keys[index];
+                    let cmp = key.partial_cmp(val).unwrap();
                     //error!("left: {}, right: {}, count: {}, index: {}, cmp: {:?}, key: {:?} val: {:?}, iteration: {}, keys: {:?}", l, r, self.count, index, cmp, val, key, iteration, self.keys);
                     iteration += 1;
                     match cmp {
