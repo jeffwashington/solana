@@ -133,6 +133,7 @@ pub struct Timings {
     pub insert_vec_ms: u64,
     pub lookups: u64,
     pub lookup_bin_searches: u64,
+    pub outer_bin_searches: u64,
     pub mv: u64,
     pub insert: u64,
 }
@@ -323,14 +324,14 @@ impl<V: Clone> AccountMap<V> {
         }
     }
     */
-    pub fn find_outer_index(&self, key: &Pubkey) -> usize {
+    pub fn find_outer_index(&self, key: &Pubkey, timings: &mut Timings) -> usize {
         let mut l = 0;
         let mut index = l;
         let mut insert = true;
 
+        let mut iteration = 0;
         if self.count > 0 {
             let mut r = self.cumulative_min_key.len();
-            let mut iteration = 0;
             info!("keys: {:?}", self.keys);
             info!("cumulative_min_key: {:?}", self.cumulative_min_key);
             loop {
@@ -358,6 +359,8 @@ impl<V: Clone> AccountMap<V> {
                 }
             }
         }
+        timings.lookup_bin_searches += iteration;
+        timings.outer_bin_searches += iteration;
 
         index
     }
@@ -366,7 +369,7 @@ impl<V: Clone> AccountMap<V> {
         let mut index = l;
         let mut insert = true;
 
-        let outer_index = self.find_outer_index(key);
+        let outer_index = self.find_outer_index(key, timings);
         if outer_index >= self.keys.len() {
 
         }
@@ -478,10 +481,12 @@ impl<V: Clone> AccountMap<V> {
         {
             let mut m = self.timings.write().unwrap();
             m.find_vec_ms += m1.as_ns();
+            m.insert_vec_ms += m1.as_ns();
             m.lookups += timings.lookups;
             m.lookup_bin_searches += timings.lookup_bin_searches;
             m.insert += timings.insert;
             m.mv += timings.mv;
+            m.outer_bin_searches += timings.outer_bin_searches;
         //error!("outer: {}, inner: {}, len: {}, insert: {}", outer.outer_index, outer.inner_index, self.values.len(), index.insert);
                 if m.lookups % 1_000_000 == 0 {
                 //let mut m = self.timings.write().unwrap();
@@ -491,9 +496,10 @@ impl<V: Clone> AccountMap<V> {
                 m.insert /=1000_000;
                 if m.lookups > 0 {
                     m.lookup_bin_searches /= m.lookups;
+                    m.outer_bin_searches /= m.lookups;
                 }
         
-            error!("count: {}, lens: {:?}, {:?}", self.count, self.cumulative_lens.len(), *m);
+            error!("count: {}, lens: {:?}, {:?}, ideal: {}", self.count, self.cumulative_lens.len(), *m, (self.count as f64).log2());
             *m = Timings::default();
                 }
     }
