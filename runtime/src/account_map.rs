@@ -152,7 +152,7 @@ pub struct AccountMap<V> {
 
 impl<V: Clone> AccountMap<V> {
     pub fn new() -> Self {
-        let vec_size_max = 100_000;
+        let vec_size_max = 10_000;
         Self {
             keys: vec![Self::new_vec(vec_size_max)],
             values: vec![Self::new_vec(vec_size_max)],
@@ -364,6 +364,42 @@ impl<V: Clone> AccountMap<V> {
 
         index
     }
+    pub fn find_outer_index_fast(&self, key: &Pubkey) -> usize {
+        let mut l = 0;
+        let mut index = l;
+        let mut insert = true;
+
+        if self.count > 0 {
+            let mut r = self.cumulative_min_key.len();
+            info!("keys: {:?}", self.keys);
+            info!("cumulative_min_key: {:?}", self.cumulative_min_key);
+            loop {
+                index = (l + r) / 2;
+                info!("keys2: {:?}, outer: {:?}", self.keys, index);
+                let val = self.cumulative_min_key[index];
+                let cmp = key.partial_cmp(&val).unwrap();
+                //info!("fo: left: {}, right: {}, count: {}, index: {}, cmp: {:?}, key: {:?} val: {:?}, iteration: {}, keys: {:?}", l, r, self.count, index, cmp, val, key, iteration, self.keys);
+                match cmp {
+                    Ordering::Equal => {insert = false;break;},
+                    Ordering::Less => {r = index;
+                    },
+                    Ordering::Greater => {
+                        if index == r - 1 {
+                            // we only compared min index, so if we are greater and down to this is the only option, then it fits here
+                            break;
+                        }
+                        l = index;
+                        
+                    },
+                }
+                if r == l {
+                    break;
+                }
+            }
+        }
+
+        index
+    }
     pub fn find(&self, key: &Pubkey, timings: &mut Timings) -> AccountMapIndex {
         let mut l = 0;
         let mut index = l;
@@ -408,6 +444,54 @@ impl<V: Clone> AccountMap<V> {
             }
         }
         timings.lookups += 1;
+
+        AccountMapIndex {
+            insert,
+            total: InnerAccountMapIndex {outer_index, inner_index: index,},
+        }
+    }
+    pub fn find_fast(&self, key: &Pubkey) -> AccountMapIndex {
+        let mut l = 0;
+        let mut index = l;
+        let mut insert = true;
+
+        let outer_index = self.find_outer_index_fast(key);
+        if outer_index >= self.keys.len() {
+
+        }
+        else {
+            let keys = &self.keys[outer_index];
+            let len = keys.len();
+
+            if len > 0 {
+                let mut r = len;
+                let mut iteration = 0;
+                //error!("keys: {:?}", self.keys);
+                loop {
+                    index = (l + r) / 2;
+                    let val = keys[index];
+                    let cmp = key.partial_cmp(&val).unwrap();
+                    //error!("left: {}, right: {}, count: {}, index: {}, cmp: {:?}, key: {:?} val: {:?}, iteration: {}, keys: {:?}", l, r, self.count, index, cmp, val, key, iteration, self.keys);
+                    iteration += 1;
+                    match cmp {
+                        Ordering::Equal => {insert = false;break;},
+                        Ordering::Less => {r = index;
+                        },
+                        Ordering::Greater => {
+                            if index == r - 1 {
+                                index = r;
+                                break;
+                            }
+                            l = index;
+                            
+                        },
+                    }
+                    if r == l {
+                        break;
+                    }
+                }
+            }
+        }
 
         AccountMapIndex {
             insert,
@@ -510,6 +594,11 @@ impl<V: Clone> AccountMap<V> {
                 }
     }
 
+        res
+    }
+    pub fn get_fast(&self, key: &Pubkey) -> Option<&V> {
+        let find = self.find_fast(&key);
+        let res = self.get_at_index(&find);
         res
     }
     pub fn get_at_index(&self, index: &AccountMapIndex) -> Option<&V> {
@@ -673,25 +762,43 @@ pub mod tests {
 
             let mut m2 = Measure::start("");
             for i in 0..key_count {
-                m.get(&keys_orig[i]);
+                m.get_fast(&keys_orig[i]);
             }
             m2.stop();
-            error!("insert: {} insert: {}, get: {}, size: {}", 1, m1.as_ms(), m2.as_ms(), key_count);
+            //error!("insert: {} insert: {}, get: {}, size: {}", 1, m1.as_ms(), m2.as_ms(), key_count);
 
             let mut m = DashMap::new();
             let value = vec![0; 60];
-            let mut m1 = Measure::start("");
+            let mut m11 = Measure::start("");
             for i in 0..key_count {
                 m.insert(keys[i], value.clone());
             }
-            m1.stop();
+            m11.stop();
 
-            let mut m2 = Measure::start("");
+            let mut m22 = Measure::start("");
             for i in 0..key_count {
                 m.get(&keys_orig[i]);
             }
-            m2.stop();
-            error!("insert: {} insert: {}, get: {}, size: {}", 0, m1.as_ms(), m2.as_ms(), key_count);
+            m22.stop();
+            //error!("insert: {} insert: {}, get: {}, size: {}", 0, m11.as_ms(), m22.as_ms(), key_count);
+            error!("dm insert: {} get: {}, size: {}", (m11.as_ns() as f64) / (m1.as_ns() as f64), (m22.as_ns() as f64) / (m2.as_ns() as f64), key_count);
+/*
+            let mut m = HashMap::new();
+            let value = vec![0; 60];
+            let mut m111 = Measure::start("");
+            for i in 0..key_count {
+                m.insert(keys[i], value.clone());
+            }
+            m111.stop();
+
+            let mut m222 = Measure::start("");
+            for i in 0..key_count {
+                m.get(&keys_orig[i]);
+            }
+            m222.stop();
+            //error!("insert: {} insert: {}, get: {}, size: {}", 0, m11.as_ms(), m22.as_ms(), key_count);
+            error!("hm insert: {} get: {}, size: {}", (m111.as_ns() as f64) / (m1.as_ns() as f64), (m222.as_ns() as f64) / (m2.as_ns() as f64), key_count);
+            */
         }
     }
 
