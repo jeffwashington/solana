@@ -130,6 +130,7 @@ pub struct InnerAccountMapIndex {
 pub struct Timings {
     pub update_lens_us: u64,
     pub find_vec_ms: u64,
+    pub outer_index_find_ms: u64,
     pub insert_vec_ms: u64,
     pub lookups: u64,
     pub lookup_bin_searches: u64,
@@ -405,7 +406,10 @@ impl<V: Clone> AccountMap<V> {
         let mut index = l;
         let mut insert = true;
 
+        let mut m1 = Measure::start("");
         let outer_index = self.find_outer_index(key, timings);
+        m1.stop();
+        timings.outer_index_find_ms += m1.as_ns();
         if outer_index >= self.keys.len() {
 
         }
@@ -523,6 +527,7 @@ impl<V: Clone> AccountMap<V> {
         {
             let mut m = self.timings.write().unwrap();
             m.find_vec_ms += m1.as_ns();
+            m.outer_index_find_ms += timings.outer_index_find_ms;
             m.insert_vec_ms += m2.as_ns();
             m.lookups += timings.lookups;
             m.lookup_bin_searches += timings.lookup_bin_searches;
@@ -535,6 +540,7 @@ impl<V: Clone> AccountMap<V> {
                 let mut m = self.timings.write().unwrap();
                 m.find_vec_ms /= 1000_000;
                 m.insert_vec_ms /=1000_000;
+                m.outer_index_find_ms /= 1000_000;
                 m.mv /= 1000_000;
                 m.insert /=1000_000;
                 if m.lookups > 0 {
@@ -573,6 +579,7 @@ impl<V: Clone> AccountMap<V> {
             m.find_vec_ms += m1.as_ns();
             //m.insert_vec_ms += m1.as_ns();
             m.lookups += timings.lookups;
+            m.outer_index_find_ms += timings.outer_index_find_ms;
             m.lookup_bin_searches += timings.lookup_bin_searches;
             m.insert += timings.insert;
             m.mv += timings.mv;
@@ -582,6 +589,7 @@ impl<V: Clone> AccountMap<V> {
                 //let mut m = self.timings.write().unwrap();
                 m.find_vec_ms /= 1000_000;
                 m.insert_vec_ms /=1000_000;
+                m.outer_index_find_ms /= 1000_000;
                 m.mv /= 1000_000;
                 m.insert /=1000_000;
                 if m.lookups > 0 {
@@ -767,6 +775,11 @@ pub mod tests {
             m2.stop();
             //error!("insert: {} insert: {}, get: {}, size: {}", 1, m1.as_ms(), m2.as_ms(), key_count);
 
+            // log find metrics
+            for i in 0..key_count {
+                m.get(&keys_orig[i]);
+            }
+
             let mut m = DashMap::new();
             let value = vec![0; 60];
             let mut m11 = Measure::start("");
@@ -781,6 +794,7 @@ pub mod tests {
             }
             m22.stop();
             //error!("insert: {} insert: {}, get: {}, size: {}", 0, m11.as_ms(), m22.as_ms(), key_count);
+
             error!("dm insert: {} get: {}, size: {}", (m11.as_ns() as f64) / (m1.as_ns() as f64), (m22.as_ns() as f64) / (m2.as_ns() as f64), key_count);
 /*
             let mut m = HashMap::new();
