@@ -172,7 +172,23 @@ impl<V: Clone> AccountMap<V> {
             None
         }
         else {
-            Some((&self.keys[index.total.outer_index][index.total.inner_index], &self.values[index.total.outer_index][index.total.inner_index]))
+            assert!(self.keys.len() == self.values.len());
+            let mut outer = index.total.outer_index;
+            let mut inner = index.total.inner_index;
+            let mut keys = &self.keys[outer];
+
+            while inner >= keys.len() {
+                inner = 0;
+                outer += 1;
+                if outer >= self.keys.len() {
+                    return None;
+                }
+                keys = &self.keys[outer];
+            }
+            let key = &keys[inner];
+            let value = &self.values[outer];
+            let value = &value[inner];
+            Some((key, value))
         }
     }
 
@@ -321,7 +337,7 @@ impl<V: Clone> AccountMap<V> {
                 error!("keys2: {:?}, outer: {:?}", self.keys, index);
                 let val = self.cumulative_min_key[index];
                 let cmp = key.partial_cmp(&val).unwrap();
-                error!("left: {}, right: {}, count: {}, index: {}, cmp: {:?}, key: {:?} val: {:?}, iteration: {}, keys: {:?}", l, r, self.count, index, cmp, val, key, iteration, self.keys);
+                error!("fo: left: {}, right: {}, count: {}, index: {}, cmp: {:?}, key: {:?} val: {:?}, iteration: {}, keys: {:?}", l, r, self.count, index, cmp, val, key, iteration, self.keys);
                 iteration += 1;
                 match cmp {
                     Ordering::Equal => {insert = false;break;},
@@ -329,7 +345,7 @@ impl<V: Clone> AccountMap<V> {
                     },
                     Ordering::Greater => {
                         if index == r - 1 {
-                            index = r;
+                            // we only compared min index, so if we are greater and down to this is the only option, then it fits here
                             break;
                         }
                         l = index;
@@ -350,37 +366,42 @@ impl<V: Clone> AccountMap<V> {
         let mut insert = true;
 
         let outer_index = self.find_outer_index(key);
-        let keys = &self.keys[outer_index];
-        let len = keys.len();
+        if outer_index >= self.keys.len() {
 
-        if len > 0 {
-            let mut r = len;
-            let mut iteration = 0;
-            //error!("keys: {:?}", self.keys);
-            loop {
-                index = (l + r) / 2;
-                let val = keys[index];
-                let cmp = key.partial_cmp(&val).unwrap();
-                //error!("left: {}, right: {}, count: {}, index: {}, cmp: {:?}, key: {:?} val: {:?}, iteration: {}, keys: {:?}", l, r, self.count, index, cmp, val, key, iteration, self.keys);
-                iteration += 1;
-                match cmp {
-                    Ordering::Equal => {insert = false;break;},
-                    Ordering::Less => {r = index;
-                    },
-                    Ordering::Greater => {
-                        if index == r - 1 {
-                            index = r;
-                            break;
-                        }
-                        l = index;
-                        
-                    },
+        }
+        else {
+            let keys = &self.keys[outer_index];
+            let len = keys.len();
+
+            if len > 0 {
+                let mut r = len;
+                let mut iteration = 0;
+                //error!("keys: {:?}", self.keys);
+                loop {
+                    index = (l + r) / 2;
+                    let val = keys[index];
+                    let cmp = key.partial_cmp(&val).unwrap();
+                    //error!("left: {}, right: {}, count: {}, index: {}, cmp: {:?}, key: {:?} val: {:?}, iteration: {}, keys: {:?}", l, r, self.count, index, cmp, val, key, iteration, self.keys);
+                    iteration += 1;
+                    match cmp {
+                        Ordering::Equal => {insert = false;break;},
+                        Ordering::Less => {r = index;
+                        },
+                        Ordering::Greater => {
+                            if index == r - 1 {
+                                index = r;
+                                break;
+                            }
+                            l = index;
+                            
+                        },
+                    }
+                    if r == l {
+                        break;
+                    }
                 }
-                if r == l {
-                    break;
-                }
+                timings.lookup_bin_searches += iteration;
             }
-            timings.lookup_bin_searches += iteration;
         }
         timings.lookups += 1;
 
@@ -568,8 +589,7 @@ impl<'a, V: Clone> Iterator for AccountMapIterValues<'a, V> {
     fn next(&mut self) -> Option<Self::Item> {
         let result =   self.btree.get_index(&self.index).map(|(_,v)| v);
         if result.is_some() {
-            panic!("do this");
-            //self.index.index += 1;
+            self.index.total.inner_index += 1;
         }
 
         result
@@ -596,8 +616,7 @@ impl<'a, V:Clone> Iterator for AccountMapIterKeys<'a, V> {
     fn next(&mut self) -> Option<Self::Item> {
         let result =   self.btree.get_index(&self.index).map(|(k,_)| k);
         if result.is_some() {
-            panic!("do htis");
-            //self.index.index += 1;
+            self.index.total.inner_index += 1;
         }
 
         result
