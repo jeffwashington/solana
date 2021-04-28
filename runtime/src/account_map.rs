@@ -484,7 +484,7 @@ impl<V: Clone> AccountMap<V> {
             m.mv += timings.mv;
         //error!("outer: {}, inner: {}, len: {}, insert: {}", outer.outer_index, outer.inner_index, self.values.len(), index.insert);
                 if m.lookups % 100_000 == 0 {
-                let mut m = self.timings.write().unwrap();
+                //let mut m = self.timings.write().unwrap();
                 m.find_vec_us /= 1000_000;
                 m.insert_vec_us /=1000_000;
                 m.mv /= 1000_000;
