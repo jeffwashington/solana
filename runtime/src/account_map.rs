@@ -531,7 +531,7 @@ impl<V: Clone> AccountMap<V> {
             m.outer_bin_searches += timings.outer_bin_searches;
         }
         //error!("outer: {}, inner: {}, len: {}, insert: {}", outer.outer_index, outer.inner_index, self.values.len(), index.insert);
-        if self.count % 1_000_000 == 0 {
+        if self.count % 5_000_000 == 0 {
                 let mut m = self.timings.write().unwrap();
                 m.find_vec_ms /= 1000_000;
                 m.insert_vec_ms /=1000_000;
@@ -578,7 +578,7 @@ impl<V: Clone> AccountMap<V> {
             m.mv += timings.mv;
             m.outer_bin_searches += timings.outer_bin_searches;
         //error!("outer: {}, inner: {}, len: {}, insert: {}", outer.outer_index, outer.inner_index, self.values.len(), index.insert);
-                if m.lookups % 1_000_000 == 0 {
+                if m.lookups % 5_000_000 == 0 {
                 //let mut m = self.timings.write().unwrap();
                 m.find_vec_ms /= 1000_000;
                 m.insert_vec_ms /=1000_000;
