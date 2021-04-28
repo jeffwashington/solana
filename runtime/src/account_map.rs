@@ -129,8 +129,8 @@ pub struct InnerAccountMapIndex {
 #[derive(Debug, Default)]
 pub struct Timings {
     pub update_lens_us: u64,
-    pub find_vec_us: u64,
-    pub insert_vec_us: u64,
+    pub find_vec_ms: u64,
+    pub insert_vec_ms: u64,
     pub lookups: u64,
     pub lookup_bin_searches: u64,
     pub mv: u64,
@@ -435,8 +435,8 @@ impl<V: Clone> AccountMap<V> {
         m2.stop();
         {
             let mut m = self.timings.write().unwrap();
-            m.find_vec_us += m1.as_ns();
-            m.insert_vec_us += m2.as_ns();
+            m.find_vec_ms += m1.as_ns();
+            m.insert_vec_ms += m2.as_ns();
             m.lookups += timings.lookups;
             m.lookup_bin_searches += timings.lookup_bin_searches;
             m.insert += timings.insert;
@@ -445,8 +445,8 @@ impl<V: Clone> AccountMap<V> {
         //error!("outer: {}, inner: {}, len: {}, insert: {}", outer.outer_index, outer.inner_index, self.values.len(), index.insert);
         if self.count % 1_000_000 == 0 {
                 let mut m = self.timings.write().unwrap();
-                m.find_vec_us /= 1000_000;
-                m.insert_vec_us /=1000_000;
+                m.find_vec_ms /= 1000_000;
+                m.insert_vec_ms /=1000_000;
                 m.mv /= 1000_000;
                 m.insert /=1000_000;
         
@@ -477,7 +477,7 @@ impl<V: Clone> AccountMap<V> {
 
         {
             let mut m = self.timings.write().unwrap();
-            m.find_vec_us += m1.as_ns();
+            m.find_vec_ms += m1.as_ns();
             m.lookups += timings.lookups;
             m.lookup_bin_searches += timings.lookup_bin_searches;
             m.insert += timings.insert;
@@ -485,10 +485,13 @@ impl<V: Clone> AccountMap<V> {
         //error!("outer: {}, inner: {}, len: {}, insert: {}", outer.outer_index, outer.inner_index, self.values.len(), index.insert);
                 if m.lookups % 100_000 == 0 {
                 //let mut m = self.timings.write().unwrap();
-                m.find_vec_us /= 1000_000;
-                m.insert_vec_us /=1000_000;
+                m.find_vec_ms /= 1000_000;
+                m.insert_vec_ms /=1000_000;
                 m.mv /= 1000_000;
                 m.insert /=1000_000;
+                if m.lookups > 0 {
+                    m.lookup_bin_searches /= m.lookups;
+                }
         
             error!("count: {}, lens: {:?}, {:?}", self.count, self.cumulative_lens.len(), *m);
             *m = Timings::default();
