@@ -56,6 +56,11 @@ impl CostTracker {
         }
         self.package_cost += cost;
     }
+
+    pub fn reset(&mut self) {
+        self.chained_costs.clear();
+        self.package_cost = 0;
+    }
 }
 
 #[cfg(test)]
@@ -196,6 +201,38 @@ mod tests {
         // but no more room for package as whole
         {
             assert_eq!(true, testee.would_exceed_limit(&keys2, &cost2));
+        }
+    }
+
+    #[test]
+    fn test_cost_tracker_reset() {
+        let (mint_keypair, start_hash) = test_setup();
+        // build two transactions with same signed account
+        let (_tx1, keys1, cost1) = build_simple_transaction(&mint_keypair, &start_hash);
+        let (_tx2, keys2, cost2) = build_simple_transaction(&mint_keypair, &start_hash);
+
+        // build testee to have capacity for two simple transactions, but not for same accounts
+        let mut testee = CostTracker::new(cmp::min(cost1, cost2), cost1 + cost2);
+        // should have room for first transaction
+        {
+            assert_eq!(false, testee.would_exceed_limit(&keys1, &cost1));
+            testee.add_transaction(&keys1, &cost1);
+            assert_eq!(1, testee.chained_costs.len());
+            assert_eq!(cost1, testee.package_cost);
+        }
+        // but no more sapce on the same chain (same signer account)
+        {
+            assert_eq!(true, testee.would_exceed_limit(&keys2, &cost2));
+        }
+        // reset the tracker
+        {
+            testee.reset();
+            assert_eq!(0, testee.chained_costs.len());
+            assert_eq!(0, testee.package_cost);
+        }
+        //now the second transactino can be added 
+        {
+            assert_eq!(false, testee.would_exceed_limit(&keys2, &cost2));
         }
     }
 }
