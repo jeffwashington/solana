@@ -334,6 +334,7 @@ impl<V: Clone> AccountMap<V> {
             info!("keys: {:?}", self.keys);
             info!("cumulative_min_key: {:?}", self.cumulative_min_key);
             loop {
+                index = (l + r) / 2;
                 info!("keys2: {:?}, outer: {:?}", self.keys, index);
                 let val = self.cumulative_min_key[index];
                 let cmp = key.partial_cmp(&val).unwrap();
@@ -636,7 +637,7 @@ pub mod tests {
     fn test_perf_dashmap() {
         solana_logger::setup();
 
-        let mx = 26u32;
+        let mx = 26u32;//26u32;
         let mx_key_count = 2usize.pow(mx);
         let mut keys_orig = Vec::with_capacity(mx_key_count);
         for key_pow in 15..mx {
