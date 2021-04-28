@@ -780,7 +780,7 @@ pub mod tests {
                 m.get(&keys_orig[i]);
             }
 
-            let mut m = DashMap::new();
+            let mut m = BTreeMap::new();
             let value = vec![0; 60];
             let mut m11 = Measure::start("");
             for i in 0..key_count {
@@ -795,7 +795,7 @@ pub mod tests {
             m22.stop();
             //error!("insert: {} insert: {}, get: {}, size: {}", 0, m11.as_ms(), m22.as_ms(), key_count);
 
-            error!("dm insert: {} get: {}, size: {}", (m11.as_ns() as f64) / (m1.as_ns() as f64), (m22.as_ns() as f64) / (m2.as_ns() as f64), key_count);
+            error!("bm insert: {} get: {}, size: {}", (m11.as_ns() as f64) / (m1.as_ns() as f64), (m22.as_ns() as f64) / (m2.as_ns() as f64), key_count);
 /*
             let mut m = HashMap::new();
             let value = vec![0; 60];
