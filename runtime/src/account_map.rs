@@ -331,13 +331,13 @@ impl<V: Clone> AccountMap<V> {
         if self.count > 0 {
             let mut r = self.cumulative_min_key.len();
             let mut iteration = 0;
-            error!("keys: {:?}", self.keys);
-            error!("cumulative_min_key: {:?}", self.cumulative_min_key);
+            info!("keys: {:?}", self.keys);
+            info!("cumulative_min_key: {:?}", self.cumulative_min_key);
             loop {
-                error!("keys2: {:?}, outer: {:?}", self.keys, index);
+                info!("keys2: {:?}, outer: {:?}", self.keys, index);
                 let val = self.cumulative_min_key[index];
                 let cmp = key.partial_cmp(&val).unwrap();
-                error!("fo: left: {}, right: {}, count: {}, index: {}, cmp: {:?}, key: {:?} val: {:?}, iteration: {}, keys: {:?}", l, r, self.count, index, cmp, val, key, iteration, self.keys);
+                info!("fo: left: {}, right: {}, count: {}, index: {}, cmp: {:?}, key: {:?} val: {:?}, iteration: {}, keys: {:?}", l, r, self.count, index, cmp, val, key, iteration, self.keys);
                 iteration += 1;
                 match cmp {
                     Ordering::Equal => {insert = false;break;},
