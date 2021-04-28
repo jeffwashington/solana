@@ -153,7 +153,7 @@ pub struct AccountMap<V> {
 
 impl<V: Clone> AccountMap<V> {
     pub fn new() -> Self {
-        let vec_size_max = 100_000;
+        let vec_size_max = 10_000;
         Self {
             keys: vec![Self::new_vec(vec_size_max)],
             values: vec![Self::new_vec(vec_size_max)],
