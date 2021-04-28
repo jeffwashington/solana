@@ -65,6 +65,10 @@ impl CostModel {
             Some(())
         }
     }
+    
+    pub fn reset(&mut self) {
+        self.cost_tracker.reset();
+    }
 
     fn new_with_config(chain_max: u32, block_max: u32) -> Self {
         // NOTE: message.rs has following lazy_static program ids. Can probably use them to define
