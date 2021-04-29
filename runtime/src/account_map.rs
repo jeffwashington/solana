@@ -161,16 +161,15 @@ pub struct AccountMapSlicer<V> {
 }
 
 
-type slicer_key_type = [u8; 30];
+type slicer_key_type = [u8; 31];
 type outer_key_type = Pubkey;
 use std::convert::TryInto;
 impl<V: Clone> AccountMapSlicer<V> {
     pub fn new() -> Self {
-        let data = (0..65536)
+        let data = (0..256)
             .into_iter()
             .map(|_| MyAccountMap::<V, slicer_key_type>::new())
             .collect::<Vec<_>>();
-        assert_eq!(data.len(), 65536);
         Self { data, }
     }
 
@@ -181,8 +180,8 @@ impl<V: Clone> AccountMapSlicer<V> {
     fn split(key: &outer_key_type) -> (usize, &[u8])
     {
         let raw = key.as_ref();
-        let num = (raw[0] as usize) * 256 + (raw[1] as usize);
-        (num, &raw[2..32])
+        let num = raw[0] as usize;//) * 256 + (raw[1] as usize);
+        (num, &raw[1..32])
     }
 
     pub fn insert(&mut self, key: &outer_key_type, value: V) -> &V {
@@ -261,7 +260,7 @@ pub struct MyAccountMap<V, K> {
 
 impl<V: Clone, K: Clone + Debug + PartialOrd> MyAccountMap<V, K> {
     pub fn new() -> Self {
-        let vec_size_max = 10_000;
+        let vec_size_max = 100_000 / 256;
         Self {
             keys: vec![Self::new_vec(vec_size_max)],
             values: vec![Self::new_vec(vec_size_max)],
@@ -943,12 +942,13 @@ pub mod tests {
             //error!("insert: {} insert: {}, get: {}, size: {}", 0, m11.as_ms(), m22.as_ms(), key_count);
 
             error!(
-                "bt insert {} get {} size {} time_insert_ms {} time_get_ms {}",
+                "bt insert {} get {} size {} time_insert_ms {} time_get_ms {}, data lens: {:?}",
                 (m11.as_ns() as f64) / (m1.as_ns() as f64),
                 (m22.as_ns() as f64) / (m2.as_ns() as f64),
                 key_count,
                 m1.as_ms(),
-                m2.as_ms()
+                m2.as_ms(),
+                [0],//m.data.iter().map(|a| a.len()).collect::<Vec<_>>(),
             );
             /*
             let mut m = HashMap::new();
