@@ -2591,6 +2591,7 @@ mod tests {
                 None::<Box<dyn Fn()>>,
                 &BankingStageStats::default(),
                 &recorder,
+                &Arc::new(Mutex::new(CostModel::new())),
             );
             assert_eq!(buffered_packets[0].1.len(), num_conflicting_transactions);
             // When the poh recorder has a bank, should process all non conflicting buffered packets.
@@ -2607,6 +2608,7 @@ mod tests {
                     None::<Box<dyn Fn()>>,
                     &BankingStageStats::default(),
                     &recorder,
+                    &Arc::new(Mutex::new(CostModel::new())),
                 );
                 if num_expected_unprocessed == 0 {
                     assert!(buffered_packets.is_empty())
@@ -2672,6 +2674,7 @@ mod tests {
                         test_fn,
                         &BankingStageStats::default(),
                         &recorder,
+                        &Arc::new(Mutex::new(CostModel::new())),
                     );
 
                     // Check everything is correct. All indexes after `interrupted_iteration`
