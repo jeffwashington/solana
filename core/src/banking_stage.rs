@@ -261,6 +261,7 @@ impl BankingStage {
             LruCache::new(DEFAULT_LRU_SIZE),
             PacketHasher::default(),
         )));
+        let cost_model = Arc::new(Mutex::new(CostModel::new()));
         // Many banks that process transactions in parallel.
         let bank_thread_hdls: Vec<JoinHandle<()>> = (0..num_threads)
             .map(|i| {
@@ -277,6 +278,7 @@ impl BankingStage {
                 let transaction_status_sender = transaction_status_sender.clone();
                 let gossip_vote_sender = gossip_vote_sender.clone();
                 let duplicates = duplicates.clone();
+                let cost_model = cost_model.clone();
                 Builder::new()
                     .name("solana-banking-stage-tx".to_string())
                     .spawn(move || {
@@ -292,6 +294,7 @@ impl BankingStage {
                             transaction_status_sender,
                             gossip_vote_sender,
                             &duplicates,
+                            &cost_model,
                         );
                     })
                     .unwrap()
@@ -339,6 +342,7 @@ impl BankingStage {
         has_more_unprocessed_transactions
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn consume_buffered_packets(
         my_pubkey: &Pubkey,
         max_tx_ingestion_ns: u128,
@@ -349,6 +353,7 @@ impl BankingStage {
         test_fn: Option<impl Fn()>,
         banking_stage_stats: &BankingStageStats,
         recorder: &TransactionRecorder,
+        cost_model: &Arc<Mutex<CostModel>>,
     ) {
         let mut rebuffered_packets_len = 0;
         let mut new_tx_count = 0;
@@ -366,6 +371,7 @@ impl BankingStage {
                     &original_unprocessed_indexes,
                     my_pubkey,
                     *next_leader,
+                    cost_model,
                 );
                 Self::update_buffered_packets_with_new_unprocessed(
                     original_unprocessed_indexes,
@@ -384,6 +390,7 @@ impl BankingStage {
                             transaction_status_sender.clone(),
                             gossip_vote_sender,
                             banking_stage_stats,
+                            cost_model,
                         );
                     if processed < verified_txs_len
                         || !Bank::should_bank_still_be_processing_txs(
@@ -486,6 +493,7 @@ impl BankingStage {
         gossip_vote_sender: &ReplayVoteSender,
         banking_stage_stats: &BankingStageStats,
         recorder: &TransactionRecorder,
+        cost_model: &Arc<Mutex<CostModel>>,
     ) -> BufferedPacketsDecision {
         let bank_start;
         let (
@@ -526,6 +534,7 @@ impl BankingStage {
                     None::<Box<dyn Fn()>>,
                     banking_stage_stats,
                     recorder,
+                    cost_model,
                 );
             }
             BufferedPacketsDecision::Forward => {
@@ -596,6 +605,7 @@ impl BankingStage {
         transaction_status_sender: Option<TransactionStatusSender>,
         gossip_vote_sender: ReplayVoteSender,
         duplicates: &Arc<Mutex<(LruCache<u64, ()>, PacketHasher)>>,
+        cost_model: &Arc<Mutex<CostModel>>,
     ) {
         let recorder = poh_recorder.lock().unwrap().recorder();
         let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
@@ -614,6 +624,7 @@ impl BankingStage {
                     &gossip_vote_sender,
                     &banking_stage_stats,
                     &recorder,
+                    cost_model,
                 );
                 if matches!(decision, BufferedPacketsDecision::Hold)
                     || matches!(decision, BufferedPacketsDecision::ForwardAndHold)
@@ -648,6 +659,7 @@ impl BankingStage {
                 &banking_stage_stats,
                 duplicates,
                 &recorder,
+                cost_model,
             ) {
                 Ok(()) | Err(RecvTimeoutError::Timeout) => (),
                 Err(RecvTimeoutError::Disconnected) => break,
@@ -985,8 +997,8 @@ impl BankingStage {
         msgs: &Packets,
         transaction_indexes: &[usize],
         secp256k1_program_enabled: bool,
+        cost_model: &Arc<Mutex<CostModel>>,
     ) -> (Vec<HashedTransaction<'static>>, Vec<usize>) {
-        let mut cost_model = CostModel::new();
         transaction_indexes
             .iter()
             .filter_map(|tx_index| {
@@ -995,7 +1007,7 @@ impl BankingStage {
                 if secp256k1_program_enabled {
                     tx.verify_precompiles().ok()?;
                 }
-                cost_model.try_to_add_transaction(&tx)?;
+                cost_model.lock().unwrap().try_to_add_transaction(&tx)?;
                 let message_bytes = Self::packet_message(p)?;
                 let message_hash = Message::hash_raw_message(message_bytes);
                 Some((
@@ -1054,12 +1066,14 @@ impl BankingStage {
         transaction_status_sender: Option<TransactionStatusSender>,
         gossip_vote_sender: &ReplayVoteSender,
         banking_stage_stats: &BankingStageStats,
+        cost_model: &Arc<Mutex<CostModel>>,
     ) -> (usize, usize, Vec<usize>) {
         let mut packet_conversion_time = Measure::start("packet_conversion");
         let (transactions, transaction_to_packet_indexes) = Self::transactions_from_packets(
             msgs,
             &packet_indexes,
             bank.secp256k1_program_enabled(),
+            cost_model,
         );
         packet_conversion_time.stop();
 
@@ -1117,6 +1131,7 @@ impl BankingStage {
         transaction_indexes: &[usize],
         my_pubkey: &Pubkey,
         next_leader: Option<Pubkey>,
+        cost_model: &Arc<Mutex<CostModel>>,
     ) -> Vec<usize> {
         // Check if we are the next leader. If so, let's not filter the packets
         // as we'll filter it again while processing the packets.
@@ -1131,6 +1146,7 @@ impl BankingStage {
             msgs,
             &transaction_indexes,
             bank.secp256k1_program_enabled(),
+            cost_model,
         );
 
         let tx_count = transaction_to_packet_indexes.len();
@@ -1182,6 +1198,7 @@ impl BankingStage {
         banking_stage_stats: &BankingStageStats,
         duplicates: &Arc<Mutex<(LruCache<u64, ()>, PacketHasher)>>,
         recorder: &TransactionRecorder,
+        cost_model: &Arc<Mutex<CostModel>>,
     ) -> Result<(), RecvTimeoutError> {
         let mut recv_time = Measure::start("process_packets_recv");
         let mms = verified_receiver.recv_timeout(recv_timeout)?;
@@ -1231,6 +1248,7 @@ impl BankingStage {
                     transaction_status_sender.clone(),
                     gossip_vote_sender,
                     banking_stage_stats,
+                    cost_model,
                 );
 
             new_tx_count += processed;
@@ -1261,6 +1279,7 @@ impl BankingStage {
                         &packet_indexes,
                         &my_pubkey,
                         next_leader,
+                        cost_model,
                     );
                     Self::push_unprocessed(
                         buffered_packets,

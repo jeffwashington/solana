@@ -43,7 +43,8 @@ impl CostModel {
         Self::new_with_config(CHAIN_MAX_COST, BLOCK_MAX_COST)
     }
 
-    pub fn try_to_add_transaction(&mut self, transaction: &Transaction) -> Option<()> {
+    // returns total block cost if succeeded in adding;
+    pub fn try_to_add_transaction(&mut self, transaction: &Transaction) -> Option<u32> {
         // NOTE: taking a simplistic approach - chaining transactions by signer-accounts, which
         //       says transactions share same signer accounts can not be parallelized.
         //       Notice each transaction can have more than one signer accounts, in this case,
@@ -62,10 +63,14 @@ impl CostModel {
             debug!("transaction {:?} added to block", transaction);
             self.cost_tracker
                 .add_transaction(&signed_keys, &transaction_cost);
-            Some(())
+            Some(*self.cost_tracker.package_cost())
         }
     }
-    
+
+    pub fn total_cost(&self) -> &u32 {
+        self.cost_tracker.package_cost()
+    }
+
     pub fn reset(&mut self) {
         self.cost_tracker.reset();
     }
@@ -135,7 +140,10 @@ mod tests {
         system_instruction::{self},
         system_transaction,
     };
-    use std::sync::Arc;
+    use std::{
+        sync::{Arc, Mutex},
+        thread::{self, JoinHandle},
+    };
 
     fn test_setup() -> (Keypair, Hash) {
         solana_logger::setup();
@@ -330,5 +338,43 @@ mod tests {
             // the second transaction will not fit
             assert!(testee.try_to_add_transaction(&tx).is_none());
         }
+    }
+
+    #[test]
+    fn test_cost_model_can_be_shared_concurrently() {
+        let (mint_keypair, start_hash) = test_setup();
+        let number_threads = 10;
+        let expected_total_cost = COST_UNIT * number_threads;
+
+        let cost_model = Arc::new(Mutex::new(CostModel::new()));
+
+        let thread_handlers: Vec<JoinHandle<()>> = (0..number_threads)
+            .map(|_| {
+                // each thread creates its own simple transaction
+                let simple_transaction = system_transaction::transfer(
+                    &mint_keypair,
+                    &Keypair::new().pubkey(),
+                    2,
+                    start_hash,
+                );
+                let cost_model = cost_model.clone();
+                thread::spawn(move || {
+                    assert!(cost_model
+                        .lock()
+                        .unwrap()
+                        .try_to_add_transaction(&simple_transaction)
+                        .is_some());
+                })
+            })
+            .collect();
+
+        for th in thread_handlers {
+            th.join().unwrap();
+        }
+
+        assert_eq!(
+            expected_total_cost,
+            *cost_model.lock().unwrap().total_cost()
+        );
     }
 }

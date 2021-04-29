@@ -1,5 +1,4 @@
-//! `cost_tracker` keeps track of of tranasctino cost per chained accounts and for block
-//! oeverall.
+//! `cost_tracker` keeps tracking tranasction cost per chained accounts as well as for entire block
 use solana_sdk::pubkey::Pubkey;
 use std::collections::HashMap;
 
@@ -55,6 +54,10 @@ impl CostTracker {
             *self.chained_costs.entry(*account_key).or_insert(0) += cost;
         }
         self.package_cost += cost;
+    }
+
+    pub fn package_cost(&self) -> &u32 {
+        &self.package_cost
     }
 
     pub fn reset(&mut self) {
@@ -230,7 +233,7 @@ mod tests {
             assert_eq!(0, testee.chained_costs.len());
             assert_eq!(0, testee.package_cost);
         }
-        //now the second transactino can be added 
+        //now the second transaction can be added
         {
             assert_eq!(false, testee.would_exceed_limit(&keys2, &cost2));
         }
