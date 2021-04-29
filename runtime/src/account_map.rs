@@ -503,7 +503,7 @@ impl<V: Clone, K: Clone + Debug + PartialOrd> MyAccountMap<V, K> {
 
         index
     }
-    pub fn find_outer_index_fast(&self, key: &K) -> usize {
+    pub fn find_outer_index_fast(&self, key: &K) -> (usize, bool) {
         let mut l = 0;
         let mut index = l;
         let mut insert = true;
@@ -540,7 +540,7 @@ impl<V: Clone, K: Clone + Debug + PartialOrd> MyAccountMap<V, K> {
             }
         }
 
-        index
+        (index, insert)
     }
     pub fn find(&self, key: &K, timings: &mut Timings) -> AccountMapIndex {
         let mut l = 0;
@@ -602,47 +602,51 @@ impl<V: Clone, K: Clone + Debug + PartialOrd> MyAccountMap<V, K> {
     pub fn find_fast(&self, key: &K) -> AccountMapIndex {
         let mut l = 0;
         let mut index = l;
-        let mut insert = true;
 
-        let outer_index = self.find_outer_index_fast(key);
-        if outer_index >= self.keys.len() {
-        } else {
-            let keys = &self.keys[outer_index];
-            let len = keys.len();
+        let (outer_index, mut insert) = self.find_outer_index_fast(key);
+        if !insert {
+            index = 0;
+        }
+        else {
+            if outer_index >= self.keys.len() {
+            } else {
+                let keys = &self.keys[outer_index];
+                let len = keys.len();
 
-            if len > 0 {
-                let mut r = len;
-                let mut iteration = 0;
-                //error!("keys: {:?}", self.keys);
-                loop {
-                    index = (l + r) / 2;
-                    let val = &keys[index];
-                    let cmp = key.partial_cmp(val).unwrap();
-                    //error!("left: {}, right: {}, count: {}, index: {}, cmp: {:?}, key: {:?} val: {:?}, iteration: {}, keys: {:?}", l, r, self.count, index, cmp, val, key, iteration, self.keys);
-                    iteration += 1;
-                    match cmp {
-                        Ordering::Equal => {
-                            insert = false;
-                            break;
-                        }
-                        Ordering::Less => {
-                            r = index;
-                        }
-                        Ordering::Greater => {
-                            if index == r - 1 {
-                                index = r;
+                if len > 0 {
+                    let mut r = len;
+                    let mut iteration = 0;
+                    //error!("keys: {:?}", self.keys);
+                    l = 1; // if we weren't equal, then we are after the first 
+                    loop {
+                        index = (l + r) / 2;
+                        let val = &keys[index];
+                        let cmp = key.partial_cmp(val).unwrap();
+                        //error!("left: {}, right: {}, count: {}, index: {}, cmp: {:?}, key: {:?} val: {:?}, iteration: {}, keys: {:?}", l, r, self.count, index, cmp, val, key, iteration, self.keys);
+                        iteration += 1;
+                        match cmp {
+                            Ordering::Equal => {
+                                insert = false;
                                 break;
                             }
-                            l = index;
+                            Ordering::Less => {
+                                r = index;
+                            }
+                            Ordering::Greater => {
+                                if index == r - 1 {
+                                    index = r;
+                                    break;
+                                }
+                                l = index;
+                            }
                         }
-                    }
-                    if r == l {
-                        break;
+                        if r == l {
+                            break;
+                        }
                     }
                 }
             }
         }
-
         AccountMapIndex {
             insert,
             total: InnerAccountMapIndex {
@@ -906,7 +910,7 @@ pub mod tests {
         let mx_key_count = 2usize.pow(mx);
         let mut keys_orig = Vec::with_capacity(mx_key_count);
         for key_pow in 15..mx {
-            for vec_size in [100, 1_000, 10_000, 100_000, 1_000_000].iter().cloned() {
+            for vec_size in [1, 100, 1_000, 10_000, 100_000, 1_000_000, 10_000_000].iter().cloned() {
                 let key_count = 2usize.pow(key_pow);
             while keys_orig.len() < key_count {
                 keys_orig.push(Pubkey::new_rand());
@@ -918,15 +922,19 @@ pub mod tests {
             let value = vec![0; 60];
             let mut m1 = Measure::start("");
             for i in 0..key_count {
-                m.insert(&keys[i], value.clone());
+                m.insert(&keys[i], vec![keys[i].as_ref()[0]; 60]);
             }
             m1.stop();
 
             let mut m2 = Measure::start("");
             for i in 0..key_count {
-                assert!(m.get_fast(&keys_orig[i]).is_some());
+                m.get_fast(&keys_orig[i]).is_some();
             }
             m2.stop();
+            for i in 0..(key_count/1000) {
+                assert_eq!(m.get_fast(&keys_orig[i]).unwrap()[0], keys_orig[i].as_ref()[0]);
+            }
+
             //error!("insert: {} insert: {}, get: {}, size: {}", 1, m1.as_ms(), m2.as_ms(), key_count);
             /*
                         // log find metrics
@@ -938,7 +946,7 @@ pub mod tests {
             let value = vec![0; 60];
             let mut m11 = Measure::start("");
             for i in 0..key_count {
-                m.insert(&keys[i], value.clone());
+                m.insert(&keys[i], vec![keys[i].as_ref()[0]; 60]);
             }
             m11.stop();
 
@@ -947,6 +955,9 @@ pub mod tests {
                 assert!(m.get_fast(&keys_orig[i]).is_some());
             }
             m22.stop();
+            for i in 0..(key_count/1000) {
+                assert_eq!(m.get_fast(&keys_orig[i]).unwrap()[0], keys_orig[i].as_ref()[0]);
+            }
             //error!("insert: {} insert: {}, get: {}, size: {}", 0, m11.as_ms(), m22.as_ms(), key_count);
 
             error!(
