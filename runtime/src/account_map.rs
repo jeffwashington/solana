@@ -902,7 +902,7 @@ pub mod tests {
         for key_pow in 15..mx {
             let key_count = 2usize.pow(key_pow);
             while keys_orig.len() < key_count {
-                keys_orig.push(Pubkey::new_unique());
+                keys_orig.push(Pubkey::new_rand());
             }
             let mut keys = keys_orig.clone();
             keys.sort();
