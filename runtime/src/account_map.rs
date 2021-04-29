@@ -914,7 +914,10 @@ pub mod tests {
             for vec_size in [1, 100, 1_000, 10_000, 100_000, 1_000_000, 10_000_000].iter().cloned() {
                 let key_count = 2usize.pow(key_pow);
             while keys_orig.len() < key_count {
-                keys_orig.push(Pubkey::new_rand());
+                let mut pk = Pubkey::new_rand();
+                pk.as_mut()[0] = (keys_orig.len() % 256) as u8;
+                pk.as_mut()[1] = ((keys_orig.len() / 256) % 256) as u8;
+                keys_orig.push(pk);
             }
             let mut keys = keys_orig.clone();
             keys.sort();
