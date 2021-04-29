@@ -32,7 +32,7 @@ use std::{
 impl<V: Clone, K: Clone + Debug + PartialOrd> Default for MyAccountMap<V, K> {
     /// Creates an empty `BTreeMap`.
     fn default() -> MyAccountMap<V, K> {
-        MyAccountMap::new()
+        MyAccountMap::new(100_000)
     }
 }
 
@@ -165,16 +165,22 @@ type slicer_key_type = [u8; 31];
 type outer_key_type = Pubkey;
 use std::convert::TryInto;
 impl<V: Clone> AccountMapSlicer<V> {
-    pub fn new() -> Self {
-        let data = (0..256)
+    pub fn new(vec_size_max: usize) -> Self {
+        let div = 256;
+        let data = (0..div)
             .into_iter()
-            .map(|_| MyAccountMap::<V, slicer_key_type>::new())
+            .map(|_| MyAccountMap::<V, slicer_key_type>::new(vec_size_max / div))
             .collect::<Vec<_>>();
         Self { data, }
     }
 
     pub fn len(&self) -> usize {
         self.data.iter().map(|d| d.len()).sum::<usize>()
+    }
+
+    pub fn max_sub_len(&self) -> (usize, usize) {
+        (self.data.iter().map(|d| d.len()).max().unwrap(),
+        self.data.iter().map(|d| d.len()).min().unwrap())
     }
 
     fn split(key: &outer_key_type) -> (usize, &[u8; 31])
@@ -260,8 +266,8 @@ pub struct MyAccountMap<V, K> {
 }
 
 impl<V: Clone, K: Clone + Debug + PartialOrd> MyAccountMap<V, K> {
-    pub fn new() -> Self {
-        let vec_size_max = 100_000 / 256;
+    pub fn new(mut vec_size_max: usize) -> Self {
+        vec_size_max = std::cmp::max(vec_size_max, 1);
         Self {
             keys: vec![Self::new_vec(vec_size_max)],
             values: vec![Self::new_vec(vec_size_max)],
@@ -684,7 +690,7 @@ impl<V: Clone, K: Clone + Debug + PartialOrd> MyAccountMap<V, K> {
             m.outer_bin_searches += timings.outer_bin_searches;
         }
         //error!("outer: {}, inner: {}, len: {}, insert: {}", outer.outer_index, outer.inner_index, self.values.len(), index.insert);
-        if self.count % 5_000_000 == 0 {
+        if false {//self.count % 5_000_000 == 0 {
             let mut m = self.timings.write().unwrap();
             m.find_vec_ms /= 1000_000;
             m.insert_vec_ms /= 1000_000;
@@ -900,14 +906,15 @@ pub mod tests {
         let mx_key_count = 2usize.pow(mx);
         let mut keys_orig = Vec::with_capacity(mx_key_count);
         for key_pow in 15..mx {
-            let key_count = 2usize.pow(key_pow);
+            for vec_size in [100, 1_000, 10_000, 100_000].iter().cloned() {
+                let key_count = 2usize.pow(key_pow);
             while keys_orig.len() < key_count {
                 keys_orig.push(Pubkey::new_rand());
             }
             let mut keys = keys_orig.clone();
             keys.sort();
 
-            let mut m = MyAccountMap::new();
+            let mut m = MyAccountMap::new(vec_size);
             let value = vec![0; 60];
             let mut m1 = Measure::start("");
             for i in 0..key_count {
@@ -927,7 +934,7 @@ pub mod tests {
                             m.get(&keys_orig[i]);
                         }
             */
-            let mut m = AccountMapSlicer::new();
+            let mut m = AccountMapSlicer::new(vec_size);
             let value = vec![0; 60];
             let mut m11 = Measure::start("");
             for i in 0..key_count {
@@ -943,13 +950,15 @@ pub mod tests {
             //error!("insert: {} insert: {}, get: {}, size: {}", 0, m11.as_ms(), m22.as_ms(), key_count);
 
             error!(
-                "bt insert {} get {} size {} time_insert_ms {} time_get_ms {}, data lens: {:?}",
+                "bt insert {} get {} size {} vec_size {} time_insert_ms {} time_get_ms {} data lens {:?}, minmax {:?}",
                 (m11.as_ns() as f64) / (m1.as_ns() as f64),
                 (m22.as_ns() as f64) / (m2.as_ns() as f64),
                 key_count,
+                vec_size,
                 m1.as_ms(),
                 m2.as_ms(),
                 [0],//m.data.iter().map(|a| a.len()).collect::<Vec<_>>(),
+                m.max_sub_len(),
             );
             /*
             let mut m = HashMap::new();
@@ -970,6 +979,7 @@ pub mod tests {
             */
         }
     }
+    }
 
     #[test]
     fn test_account_map123() {
@@ -979,7 +989,7 @@ pub mod tests {
         let key2 = Pubkey::new(&[2u8; 32]);
         let key3 = Pubkey::new(&[3u8; 32]);
 
-        let mut m = AccountMapSlicer::new();
+        let mut m = AccountMapSlicer::new(100_000);
         let val0 = 0;
         let val1 = 1;
         let val2 = 1;
@@ -1015,7 +1025,7 @@ pub mod tests {
         let key2 = Pubkey::new(&[2u8; 32]);
         let key3 = Pubkey::new(&[3u8; 32]);
 
-        let mut m = AccountMapSlicer::new();
+        let mut m = AccountMapSlicer::new(100_000);
         let val1 = 1;
         let val2 = 1;
         let val3 = 1;
