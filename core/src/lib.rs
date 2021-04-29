@@ -50,7 +50,6 @@ pub mod non_circulating_supply;
 pub mod optimistic_confirmation_verifier;
 pub mod optimistically_confirmed_bank_tracker;
 pub mod outstanding_requests;
-pub mod packaging_optimizer;
 pub mod packet_hasher;
 pub mod ping_pong;
 pub mod poh_recorder;

@@ -999,7 +999,6 @@ impl BankingStage {
         secp256k1_program_enabled: bool,
         cost_model: &Arc<Mutex<CostModel>>,
     ) -> (Vec<HashedTransaction<'static>>, Vec<usize>) {
-        let mut cost_model = CostModel::new();
         transaction_indexes
             .iter()
             .filter_map(|tx_index| {
