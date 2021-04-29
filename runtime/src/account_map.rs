@@ -161,12 +161,12 @@ pub struct AccountMapSlicer<V> {
 }
 
 
-type slicer_key_type = [u8; 31];
+type slicer_key_type = [u8; 30];
 type outer_key_type = Pubkey;
 use std::convert::TryInto;
 impl<V: Clone> AccountMapSlicer<V> {
     pub fn new(vec_size_max: usize) -> Self {
-        let div = 256;
+        let div = 65536;
         let data = (0..div)
             .into_iter()
             .map(|_| MyAccountMap::<V, slicer_key_type>::new(vec_size_max / div))
@@ -183,11 +183,12 @@ impl<V: Clone> AccountMapSlicer<V> {
         self.data.iter().map(|d| d.len()).min().unwrap())
     }
 
-    fn split(key: &outer_key_type) -> (usize, &[u8; 31])
+    fn split(key: &outer_key_type) -> (usize, &[u8; 30])
     {
         let raw = key.as_ref();
-        let num = raw[0] as usize;//) * 256 + (raw[1] as usize);
-        let aref = arrayref::array_ref![raw, 1, 31];
+        let num = (raw[0] as usize) * 256 + (raw[1] as usize);
+        const x:usize = 2;
+        let aref = arrayref::array_ref![raw, x, 32-x];
         (num, aref)
     }
 
