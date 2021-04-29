@@ -922,7 +922,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
             .cloned()
             .map(WriteAccountMapEntry::from_account_map_entry)
     }
-
+/*
     pub fn bulk_insert_keys(&self, pubkeys: &[Pubkey]) {
         let mut w_account_maps = self.account_maps.write().unwrap();
         let mut is_newly_inserted = false;
@@ -938,6 +938,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
             }, &mut w_account_maps);
         }
     }
+    */
 
     fn insert_new_entry_if_missing(&self, pubkey: &Pubkey) -> (WriteAccountMapEntry<T>, bool) {
         let new_entry = Arc::new(AccountMapEntryInner {
@@ -946,11 +947,10 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
         });
         let mut w_account_maps = self.account_maps.write().unwrap();
         let mut is_newly_inserted = false;
-        let account_entry = w_account_maps.entry(*pubkey);
-        let account_entry = account_entry.or_insert_with(|| {
+        let account_entry = w_account_maps.entry(*pubkey).or_insert_with(|| {
             is_newly_inserted = true;
             new_entry
-        }, &mut w_account_maps);
+        });
         let w_account_entry = WriteAccountMapEntry::from_account_map_entry(account_entry.clone());
         (w_account_entry, is_newly_inserted)
     }
@@ -974,9 +974,9 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
         if !dead_keys.is_empty() {
             for key in dead_keys.iter() {
                 let mut w_index = self.account_maps.write().unwrap();
-                if let AccountMapEntryBtree::Occupied(index_entry) = w_index.entry(**key) {
-                    if index_entry.get(&w_index).slot_list.read().unwrap().is_empty() {
-                        index_entry.remove(&mut w_index);
+                if let btree_map::Entry::Occupied(index_entry) = w_index.entry(**key) {
+                    if index_entry.get().slot_list.read().unwrap().is_empty() {
+                        index_entry.remove();
 
                         // Note passing `None` to remove all the entries for this key
                         // is only safe because we have the lock for this key's entry

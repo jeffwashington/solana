@@ -4652,7 +4652,7 @@ impl AccountsDb {
         info!("sorting: {}", keys.len());
         keys.sort();
         info!("sorted: {}", keys.len());
-        self.accounts_index.bulk_insert_keys(&keys);
+        //self.accounts_index.bulk_insert_keys(&keys);
         info!("bulk insert keys: {}", keys.len());
 
         let mut last_log_update = Instant::now();
