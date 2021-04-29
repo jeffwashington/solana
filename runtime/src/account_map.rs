@@ -751,7 +751,7 @@ pub mod tests {
     fn test_perf_dashmap() {
         solana_logger::setup();
 
-        let mx = 26u32;//26u32;
+        let mx = 27u32;//26u32;
         let mx_key_count = 2usize.pow(mx);
         let mut keys_orig = Vec::with_capacity(mx_key_count);
         for key_pow in 15..mx {
@@ -776,12 +776,12 @@ pub mod tests {
             }
             m2.stop();
             //error!("insert: {} insert: {}, get: {}, size: {}", 1, m1.as_ms(), m2.as_ms(), key_count);
-
+/*
             // log find metrics
             for i in 0..key_count {
                 m.get(&keys_orig[i]);
             }
-
+*/
             let mut m = BTreeMap::new();
             let value = vec![0; 60];
             let mut m11 = Measure::start("");
@@ -797,7 +797,7 @@ pub mod tests {
             m22.stop();
             //error!("insert: {} insert: {}, get: {}, size: {}", 0, m11.as_ms(), m22.as_ms(), key_count);
 
-            error!("bm insert: {} get: {}, size: {}", (m11.as_ns() as f64) / (m1.as_ns() as f64), (m22.as_ns() as f64) / (m2.as_ns() as f64), key_count);
+            error!("bt insert {} get {} size {} time_insert_ms {} time_get_ms {}", (m11.as_ns() as f64) / (m1.as_ns() as f64), (m22.as_ns() as f64) / (m2.as_ns() as f64), key_count, m1.as_ms(), m2.as_ms());
 /*
             let mut m = HashMap::new();
             let value = vec![0; 60];
