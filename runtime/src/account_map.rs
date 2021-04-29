@@ -177,11 +177,12 @@ impl<V: Clone> AccountMapSlicer<V> {
         self.data.iter().map(|d| d.len()).sum::<usize>()
     }
 
-    fn split(key: &outer_key_type) -> (usize, &[u8])
+    fn split(key: &outer_key_type) -> (usize, &[u8; 31])
     {
         let raw = key.as_ref();
         let num = raw[0] as usize;//) * 256 + (raw[1] as usize);
-        (num, &raw[1..32])
+        let aref = arrayref::array_ref![raw, 1, 31];
+        (num, aref)
     }
 
     pub fn insert(&mut self, key: &outer_key_type, value: V) -> &V {
