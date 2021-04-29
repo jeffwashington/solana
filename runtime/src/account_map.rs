@@ -906,7 +906,7 @@ pub mod tests {
         let mx_key_count = 2usize.pow(mx);
         let mut keys_orig = Vec::with_capacity(mx_key_count);
         for key_pow in 15..mx {
-            for vec_size in [100, 1_000, 10_000, 100_000].iter().cloned() {
+            for vec_size in [100, 1_000, 10_000, 100_000, 1_000_000].iter().cloned() {
                 let key_count = 2usize.pow(key_pow);
             while keys_orig.len() < key_count {
                 keys_orig.push(Pubkey::new_rand());
@@ -914,7 +914,7 @@ pub mod tests {
             let mut keys = keys_orig.clone();
             keys.sort();
 
-            let mut m = MyAccountMap::new(vec_size);
+            let mut m = MyAccountMap::new(vec_size / 256);
             let value = vec![0; 60];
             let mut m1 = Measure::start("");
             for i in 0..key_count {
