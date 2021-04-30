@@ -934,12 +934,12 @@ pub mod tests {
 
             let mut m23 = Measure::start("");
             for i in 0..key_count {
-                m.get_fast(&keys_orig[i]);
+                m.get(&keys_orig[i]);
             }
             m23.stop();
             for i in 0..(key_count / 1000) {
                 assert_eq!(
-                    m.get_fast(&keys_orig[i]).unwrap()[0],
+                    m.get(&keys_orig[i]).unwrap()[0],
                     keys_orig[i].as_ref()[0]
                 );
             }
