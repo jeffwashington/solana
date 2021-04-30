@@ -93,7 +93,10 @@ impl OccupiedEntry {
     pub fn new(index: AccountMapIndex) -> Self {
         Self { index }
     }
-    pub fn into_mut<V: Clone, K: Clone + Debug + PartialOrd>(self, btree: &MyAccountMap<V, K>) -> &V {
+    pub fn into_mut<V: Clone, K: Clone + Debug + PartialOrd>(
+        self,
+        btree: &MyAccountMap<V, K>,
+    ) -> &V {
         btree.get_at_index(&self.index).unwrap()
     }
     pub fn get<'a, 'b, V: Clone, K: Clone + Debug + PartialOrd>(
@@ -131,7 +134,7 @@ pub struct Timings {
     pub mv: u64,
     pub insert: u64,
 }
-use byteorder::{LittleEndian, BigEndian, ReadBytesExt}; // 1.2.7
+use byteorder::{BigEndian, LittleEndian, ReadBytesExt}; // 1.2.7
 
 type kkk = [u8; 30];
 /*
@@ -160,7 +163,6 @@ pub struct AccountMapSlicer<V> {
     data: Vec<MyAccountMap<V, slicer_key_type>>,
 }
 
-
 type slicer_key_type = [u8; 30];
 type outer_key_type = Pubkey;
 use std::convert::TryInto;
@@ -171,7 +173,7 @@ impl<V: Clone> AccountMapSlicer<V> {
             .into_iter()
             .map(|_| MyAccountMap::<V, slicer_key_type>::new(vec_size_max / div))
             .collect::<Vec<_>>();
-        Self { data, }
+        Self { data }
     }
 
     pub fn len(&self) -> usize {
@@ -179,16 +181,17 @@ impl<V: Clone> AccountMapSlicer<V> {
     }
 
     pub fn max_sub_len(&self) -> (usize, usize) {
-        (self.data.iter().map(|d| d.len()).max().unwrap(),
-        self.data.iter().map(|d| d.len()).min().unwrap())
+        (
+            self.data.iter().map(|d| d.len()).max().unwrap(),
+            self.data.iter().map(|d| d.len()).min().unwrap(),
+        )
     }
 
-    fn split(key: &outer_key_type) -> (usize, &[u8; 30])
-    {
+    fn split(key: &outer_key_type) -> (usize, &[u8; 30]) {
         let raw = key.as_ref();
         let num = (raw[0] as usize) * 256 + (raw[1] as usize);
-        const x:usize = 2;
-        let aref = arrayref::array_ref![raw, x, 32-x];
+        const x: usize = 2;
+        let aref = arrayref::array_ref![raw, x, 32 - x];
         (num, aref)
     }
 
@@ -607,8 +610,7 @@ impl<V: Clone, K: Clone + Debug + PartialOrd> MyAccountMap<V, K> {
         let (outer_index, mut insert) = self.find_outer_index_fast(key);
         if !insert {
             index = 0;
-        }
-        else {
+        } else {
             if outer_index >= self.keys.len() {
             } else {
                 let keys = &self.keys[outer_index];
@@ -618,7 +620,7 @@ impl<V: Clone, K: Clone + Debug + PartialOrd> MyAccountMap<V, K> {
                     let mut r = len;
                     let mut iteration = 0;
                     //error!("keys: {:?}", self.keys);
-                    l = 1; // if we weren't equal, then we are after the first 
+                    l = 1; // if we weren't equal, then we are after the first
                     loop {
                         index = (l + r) / 2;
                         let val = &keys[index];
@@ -695,7 +697,8 @@ impl<V: Clone, K: Clone + Debug + PartialOrd> MyAccountMap<V, K> {
             m.outer_bin_searches += timings.outer_bin_searches;
         }
         //error!("outer: {}, inner: {}, len: {}, insert: {}", outer.outer_index, outer.inner_index, self.values.len(), index.insert);
-        if false {//self.count % 5_000_000 == 0 {
+        if false {
+            //self.count % 5_000_000 == 0 {
             let mut m = self.timings.write().unwrap();
             m.find_vec_ms /= 1000_000;
             m.insert_vec_ms /= 1000_000;
@@ -911,8 +914,7 @@ pub mod tests {
         let mx_key_count = 2usize.pow(mx);
         let mut keys_orig = Vec::with_capacity(mx_key_count);
         for key_pow in 15..mx {
-            for vec_size in [1, 100, 1_000, 10_000, 100_000, 1_000_000, 10_000_000].iter().cloned() {
-                let key_count = 2usize.pow(key_pow);
+            let key_count = 2usize.pow(key_pow);
             while keys_orig.len() < key_count {
                 let mut pk = Pubkey::new_rand();
                 pk.as_mut()[0] = (keys_orig.len() % 256) as u8;
@@ -922,78 +924,111 @@ pub mod tests {
             let mut keys = keys_orig.clone();
             keys.sort();
 
-            let mut m = MyAccountMap::new(vec_size / 256);
+            let mut m = BTreeMap::new();
             let value = vec![0; 60];
-            let mut m1 = Measure::start("");
+            let mut m13 = Measure::start("");
             for i in 0..key_count {
                 m.insert(&keys[i], vec![keys[i].as_ref()[0]; 60]);
             }
-            m1.stop();
+            m13.stop();
 
-            let mut m2 = Measure::start("");
+            let mut m23 = Measure::start("");
             for i in 0..key_count {
-                m.get_fast(&keys_orig[i]).is_some();
+                m.get_fast(&keys_orig[i]);
             }
-            m2.stop();
-            for i in 0..(key_count/1000) {
-                assert_eq!(m.get_fast(&keys_orig[i]).unwrap()[0], keys_orig[i].as_ref()[0]);
+            m23.stop();
+            for i in 0..(key_count / 1000) {
+                assert_eq!(
+                    m.get_fast(&keys_orig[i]).unwrap()[0],
+                    keys_orig[i].as_ref()[0]
+                );
             }
 
-            //error!("insert: {} insert: {}, get: {}, size: {}", 1, m1.as_ms(), m2.as_ms(), key_count);
-            /*
-                        // log find metrics
-                        for i in 0..key_count {
-                            m.get(&keys_orig[i]);
-                        }
-            */
-            let mut m = AccountMapSlicer::new(vec_size);
-            let value = vec![0; 60];
-            let mut m11 = Measure::start("");
-            for i in 0..key_count {
-                m.insert(&keys[i], vec![keys[i].as_ref()[0]; 60]);
-            }
-            m11.stop();
+            for vec_size in [1, 100, 1_000, 10_000, 100_000, 1_000_000, 10_000_000]
+                .iter()
+                .cloned()
+            {
+                let mut m = MyAccountMap::new(vec_size / 256);
+                let value = vec![0; 60];
+                let mut m1 = Measure::start("");
+                for i in 0..key_count {
+                    m.insert(&keys[i], vec![keys[i].as_ref()[0]; 60]);
+                }
+                m1.stop();
 
-            let mut m22 = Measure::start("");
-            for i in 0..key_count {
-                assert!(m.get_fast(&keys_orig[i]).is_some());
-            }
-            m22.stop();
-            for i in 0..(key_count/1000) {
-                assert_eq!(m.get_fast(&keys_orig[i]).unwrap()[0], keys_orig[i].as_ref()[0]);
-            }
-            //error!("insert: {} insert: {}, get: {}, size: {}", 0, m11.as_ms(), m22.as_ms(), key_count);
+                let mut m2 = Measure::start("");
+                for i in 0..key_count {
+                    m.get_fast(&keys_orig[i]);
+                }
+                m2.stop();
+                for i in 0..(key_count / 1000) {
+                    assert_eq!(
+                        m.get_fast(&keys_orig[i]).unwrap()[0],
+                        keys_orig[i].as_ref()[0]
+                    );
+                }
 
-            error!(
-                "bt insert {} get {} size {} vec_size {} time_insert_ms {} time_get_ms {} data lens {:?}, minmax {:?}",
-                (m11.as_ns() as f64) / (m1.as_ns() as f64),
+                //error!("insert: {} insert: {}, get: {}, size: {}", 1, m1.as_ms(), m2.as_ms(), key_count);
+                /*
+                            // log find metrics
+                            for i in 0..key_count {
+                                m.get(&keys_orig[i]);
+                            }
+                */
+                let mut m = AccountMapSlicer::new(vec_size);
+                let value = vec![0; 60];
+                let mut m11 = Measure::start("");
+                for i in 0..key_count {
+                    m.insert(&keys[i], vec![keys[i].as_ref()[0]; 60]);
+                }
+                m11.stop();
+
+                let mut m22 = Measure::start("");
+                for i in 0..key_count {
+                    m.get_fast(&keys_orig[i]);
+                }
+                m22.stop();
+                for i in 0..(key_count / 1000) {
+                    assert_eq!(
+                        m.get_fast(&keys_orig[i]).unwrap()[0],
+                        keys_orig[i].as_ref()[0]
+                    );
+                }
+                //error!("insert: {} insert: {}, get: {}, size: {}", 0, m11.as_ms(), m22.as_ms(), key_count);
+
+                error!(
+                "bt get {} size {} {} {} {} vec_size {} time_insert_ms {} time_get_ms {} data lens {:?}, minmax {:?}, insert {}",
                 (m22.as_ns() as f64) / (m2.as_ns() as f64),
                 key_count,
+                m23.as_ms(),
+                m2.as_ms(),
+                m22.as_ms(),
                 vec_size,
                 m1.as_ms(),
                 m2.as_ms(),
                 [0],//m.data.iter().map(|a| a.len()).collect::<Vec<_>>(),
                 m.max_sub_len(),
+                (m11.as_ns() as f64) / (m1.as_ns() as f64),
             );
-            /*
-            let mut m = HashMap::new();
-            let value = vec![0; 60];
-            let mut m111 = Measure::start("");
-            for i in 0..key_count {
-                m.insert(keys[i], value.clone());
-            }
-            m111.stop();
+                /*
+                let mut m = HashMap::new();
+                let value = vec![0; 60];
+                let mut m111 = Measure::start("");
+                for i in 0..key_count {
+                    m.insert(keys[i], value.clone());
+                }
+                m111.stop();
 
-            let mut m222 = Measure::start("");
-            for i in 0..key_count {
-                m.get(&keys_orig[i]);
+                let mut m222 = Measure::start("");
+                for i in 0..key_count {
+                    m.get(&keys_orig[i]);
+                }
+                m222.stop();
+                //error!("insert: {} insert: {}, get: {}, size: {}", 0, m11.as_ms(), m22.as_ms(), key_count);
+                error!("hm insert: {} get: {}, size: {}", (m111.as_ns() as f64) / (m1.as_ns() as f64), (m222.as_ns() as f64) / (m2.as_ns() as f64), key_count);
+                */
             }
-            m222.stop();
-            //error!("insert: {} insert: {}, get: {}, size: {}", 0, m11.as_ms(), m22.as_ms(), key_count);
-            error!("hm insert: {} get: {}, size: {}", (m111.as_ns() as f64) / (m1.as_ns() as f64), (m222.as_ns() as f64) / (m2.as_ns() as f64), key_count);
-            */
         }
-    }
     }
 
     #[test]
