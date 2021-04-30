@@ -944,6 +944,26 @@ pub mod tests {
                 );
             }
 
+            let mut m = HashMap::new();
+            let value = vec![0; 60];
+            let mut m14 = Measure::start("");
+            for i in 0..key_count {
+                m.insert(&keys[i], vec![keys[i].as_ref()[0]; 60]);
+            }
+            m14.stop();
+
+            let mut m24 = Measure::start("");
+            for i in 0..key_count {
+                m.get(&keys_orig[i]);
+            }
+            m24.stop();
+            for i in 0..(key_count / 1000) {
+                assert_eq!(
+                    m.get(&keys_orig[i]).unwrap()[0],
+                    keys_orig[i].as_ref()[0]
+                );
+            }
+
             for vec_size in [1, 100, 1_000, 10_000, 100_000, 1_000_000, 10_000_000]
                 .iter()
                 .cloned()
@@ -997,12 +1017,13 @@ pub mod tests {
                 //error!("insert: {} insert: {}, get: {}, size: {}", 0, m11.as_ms(), m22.as_ms(), key_count);
 
                 error!(
-                "bt get {} size {} {} {} {} vec_size {} time_insert_ms {} time_get_ms {} data lens {:?}, minmax {:?}, insert {}",
+                "bt get {} size {} {} {} {} {} vec_size {} time_insert_ms {} time_get_ms {} data lens {:?}, minmax {:?}, insert {}",
                 (m22.as_ns() as f64) / (m2.as_ns() as f64),
                 key_count,
                 m23.as_ms(),
                 m2.as_ms(),
                 m22.as_ms(),
+                m24.as_ms(),
                 vec_size,
                 m1.as_ms(),
                 m2.as_ms(),
