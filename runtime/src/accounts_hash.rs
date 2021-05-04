@@ -27,6 +27,7 @@ pub struct HashStats {
     pub flatten_time_total_us: u64,
     pub flatten_time_old_total_us: u64,
     pub flatten_time_old_copy_total_us: u64,
+    pub flatten_time_clone_total_us: u64,
     pub flatten_time_old_specific_total_us: u64,
     pub pre_scan_flatten_time_total_us: u64,
     pub hash_total: usize,
@@ -49,6 +50,7 @@ impl HashStats {
             ("sort", self.sort_time_total_us, i64),
             ("hash_total", self.hash_total, i64),
             ("flatten", self.flatten_time_total_us, i64),
+            ("flatten_clone", self.flatten_time_clone_total_us, i64),
             ("flatten_old_copy", self.flatten_time_old_copy_total_us, i64),
             ("flatten_old", self.flatten_time_old_total_us, i64),
             ("flatten_specific", self.flatten_time_old_specific_total_us, i64),
@@ -607,6 +609,7 @@ impl AccountsHash {
     {
         Self::flatten_hash_intermediate_old(data_sections_by_pubkey.clone(), stats);
         Self::flatten_hash_intermediate_old_copy(data_sections_by_pubkey.clone(), stats);
+        Self::flatten_hash_intermediate_clone(data_sections_by_pubkey.clone(), stats);
 
         // flatten this:
         // vec: just a level of hierarchy
@@ -656,6 +659,60 @@ impl AccountsHash {
         flatten_time.stop();
         stats.flatten_time_total_us += flatten_time.as_us();
         stats.unreduced_entries += raw_len;
+        data_by_pubkey
+    }
+    fn flatten_hash_intermediate_clone<T>(
+        mut data_sections_by_pubkey: Vec<Vec<Vec<T>>>,
+        stats: &mut HashStats,
+    ) -> Vec<Vec<T>>
+    where
+        T: Clone,
+    {
+        // flatten this:
+        // vec: just a level of hierarchy
+        //   vec: 1 vec per PUBKEY_BINS_FOR_CALCULATING_HASHES
+        //     vec: Intermediate data whose pubkey belongs in this division
+        // into this:
+        // vec: 1 vec per PUBKEY_BINS_FOR_CALCULATING_HASHES
+        //   vec: Intermediate data whose pubkey belongs in this division
+        let mut flatten_time = Measure::start("flatten");
+        let mut data_by_pubkey: Vec<Vec<T>> = vec![];
+        let mut lens = vec![];
+        // pass=0: calculate final lens, then allocate vecs with capacity
+        // pass=1: copy data into vecs with correct capacity
+        for pass in 0..2 {
+            for outer in &mut data_sections_by_pubkey {
+                let outer_len = outer.len();
+                for pubkey_index in 0..outer_len {
+                    let this_len = outer[pubkey_index].len();
+                    if this_len == 0 {
+                        continue;
+                    }
+                    if pass == 0 {
+                        if lens.len() <= pubkey_index {
+                            lens.extend(vec![0; pubkey_index - lens.len() + 1]);
+                        }
+
+                        lens[pubkey_index] += outer[pubkey_index].len();
+                    } else {
+                        let mut data = vec![];
+                        std::mem::swap(&mut data, &mut outer[pubkey_index]);
+
+                        data_by_pubkey[pubkey_index].extend(data);
+                    }
+                }
+            }
+
+            if pass == 0 {
+                data_by_pubkey = Vec::with_capacity(lens.len());
+                for (i, len) in lens.iter().enumerate() {
+                    data_by_pubkey.insert(i, Vec::with_capacity(*len));
+                }
+                lens = vec![]; // we don't need this anymore
+            }
+        }
+        flatten_time.stop();
+        stats.flatten_time_clone_total_us += flatten_time.as_us();
         data_by_pubkey
     }
 
