@@ -62,7 +62,7 @@ impl HashStats {
     }
 }
 
-#[derive(Default, Debug, PartialEq, Clone)]
+#[derive(Default, Debug, PartialEq, Clone, Copy)]
 pub struct CalculateHashIntermediate {
     pub version: u64,
     pub hash: Hash,
@@ -488,7 +488,7 @@ impl AccountsHash {
         stats: &mut HashStats,
     ) -> Vec<Vec<T>>
     where
-        T: Clone,
+        T: Copy,
     {
         // flatten this:
         // vec: just a level of hierarchy
