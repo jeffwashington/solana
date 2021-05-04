@@ -25,6 +25,9 @@ pub struct HashStats {
     pub hash_time_total_us: u64,
     pub sort_time_total_us: u64,
     pub flatten_time_total_us: u64,
+    pub flatten_time_old_total_us: u64,
+    pub flatten_time_old_copy_total_us: u64,
+    pub flatten_time_old_specific_total_us: u64,
     pub pre_scan_flatten_time_total_us: u64,
     pub hash_total: usize,
     pub unreduced_entries: usize,
@@ -46,6 +49,9 @@ impl HashStats {
             ("sort", self.sort_time_total_us, i64),
             ("hash_total", self.hash_total, i64),
             ("flatten", self.flatten_time_total_us, i64),
+            ("flatten_old_copy", self.flatten_time_old_copy_total_us, i64),
+            ("flatten_old", self.flatten_time_old_total_us, i64),
+            ("flatten_specific", self.flatten_time_old_specific_total_us, i64),
             ("unreduced_entries", self.unreduced_entries as i64, i64),
             (
                 "num_snapshot_storage",
@@ -62,7 +68,7 @@ impl HashStats {
     }
 }
 
-#[derive(Default, Debug, PartialEq, Clone)]
+#[derive(Default, Debug, PartialEq, Clone, Copy)]
 pub struct CalculateHashIntermediate {
     pub version: u64,
     pub hash: Hash,
@@ -483,7 +489,7 @@ impl AccountsHash {
         hashes.par_sort_unstable_by(|a, b| a.0.cmp(&b.0));
     }
 
-    fn flatten_hash_intermediate<T>(
+    fn flatten_hash_intermediate_old<T>(
         data_sections_by_pubkey: Vec<Vec<Vec<T>>>,
         stats: &mut HashStats,
     ) -> Vec<Vec<T>>
@@ -499,7 +505,6 @@ impl AccountsHash {
         //   vec: Intermediate data whose pubkey belongs in this division
         let mut flatten_time = Measure::start("flatten");
         let mut data_by_pubkey: Vec<Vec<T>> = vec![];
-        let mut raw_len = 0;
         for mut outer in data_sections_by_pubkey {
             let outer_len = outer.len();
             for pubkey_index in 0..outer_len {
@@ -507,7 +512,6 @@ impl AccountsHash {
                 if this_len == 0 {
                     continue;
                 }
-                raw_len += this_len;
                 let mut data = vec![];
                 std::mem::swap(&mut data, &mut outer[pubkey_index]);
 
@@ -516,6 +520,137 @@ impl AccountsHash {
                 }
 
                 data_by_pubkey[pubkey_index].extend(data);
+            }
+        }
+        flatten_time.stop();
+        stats.flatten_time_old_total_us += flatten_time.as_us();
+        data_by_pubkey
+    }    
+    fn flatten_hash_intermediate_old_specific(
+        data_sections_by_pubkey: Vec<Vec<Vec<CalculateHashIntermediate>>>,
+        stats: &mut HashStats,
+    ) -> Vec<Vec<CalculateHashIntermediate>>
+    {
+        // flatten this:
+        // vec: just a level of hierarchy
+        //   vec: 1 vec per PUBKEY_BINS_FOR_CALCULATING_HASHES
+        //     vec: Intermediate data whose pubkey belongs in this division
+        // into this:
+        // vec: 1 vec per PUBKEY_BINS_FOR_CALCULATING_HASHES
+        //   vec: Intermediate data whose pubkey belongs in this division
+        let mut flatten_time = Measure::start("flatten");
+        let mut data_by_pubkey: Vec<Vec<CalculateHashIntermediate>> = vec![];
+        for mut outer in data_sections_by_pubkey {
+            let outer_len = outer.len();
+            for pubkey_index in 0..outer_len {
+                let this_len = outer[pubkey_index].len();
+                if this_len == 0 {
+                    continue;
+                }
+                let mut data = vec![];
+                std::mem::swap(&mut data, &mut outer[pubkey_index]);
+
+                if data_by_pubkey.len() <= pubkey_index {
+                    data_by_pubkey.extend(vec![vec![]; pubkey_index - data_by_pubkey.len() + 1]);
+                }
+
+                data_by_pubkey[pubkey_index].extend(data);
+            }
+        }
+        flatten_time.stop();
+        stats.flatten_time_old_specific_total_us += flatten_time.as_us();
+        data_by_pubkey
+    }        
+    fn flatten_hash_intermediate_old_copy<T>(
+        data_sections_by_pubkey: Vec<Vec<Vec<T>>>,
+        stats: &mut HashStats,
+    ) -> Vec<Vec<T>>
+    where
+        T: Copy,
+    {
+        // flatten this:
+        // vec: just a level of hierarchy
+        //   vec: 1 vec per PUBKEY_BINS_FOR_CALCULATING_HASHES
+        //     vec: Intermediate data whose pubkey belongs in this division
+        // into this:
+        // vec: 1 vec per PUBKEY_BINS_FOR_CALCULATING_HASHES
+        //   vec: Intermediate data whose pubkey belongs in this division
+        let mut flatten_time = Measure::start("flatten");
+        let mut data_by_pubkey: Vec<Vec<T>> = vec![];
+        for mut outer in data_sections_by_pubkey {
+            let outer_len = outer.len();
+            for pubkey_index in 0..outer_len {
+                let this_len = outer[pubkey_index].len();
+                if this_len == 0 {
+                    continue;
+                }
+                let mut data = vec![];
+                std::mem::swap(&mut data, &mut outer[pubkey_index]);
+
+                if data_by_pubkey.len() <= pubkey_index {
+                    data_by_pubkey.extend(vec![vec![]; pubkey_index - data_by_pubkey.len() + 1]);
+                }
+
+                data_by_pubkey[pubkey_index].extend(data);
+            }
+        }
+        flatten_time.stop();
+        stats.flatten_time_old_copy_total_us += flatten_time.as_us();
+        data_by_pubkey
+    }    
+    fn flatten_hash_intermediate<T>(
+        mut data_sections_by_pubkey: Vec<Vec<Vec<T>>>,
+        stats: &mut HashStats,
+    ) -> Vec<Vec<T>>
+    where
+        T: Copy,
+    {
+        Self::flatten_hash_intermediate_old(data_sections_by_pubkey.clone(), stats);
+        Self::flatten_hash_intermediate_old_copy(data_sections_by_pubkey.clone(), stats);
+
+        // flatten this:
+        // vec: just a level of hierarchy
+        //   vec: 1 vec per PUBKEY_BINS_FOR_CALCULATING_HASHES
+        //     vec: Intermediate data whose pubkey belongs in this division
+        // into this:
+        // vec: 1 vec per PUBKEY_BINS_FOR_CALCULATING_HASHES
+        //   vec: Intermediate data whose pubkey belongs in this division
+        let mut flatten_time = Measure::start("flatten");
+        let mut data_by_pubkey: Vec<Vec<T>> = vec![];
+        let mut raw_len = 0;
+        let mut lens = vec![];
+        // pass=0: calculate final lens, then allocate vecs with capacity
+        // pass=1: copy data into vecs with correct capacity
+        for pass in 0..2 {
+            for outer in &mut data_sections_by_pubkey {
+                let outer_len = outer.len();
+                for pubkey_index in 0..outer_len {
+                    let this_len = outer[pubkey_index].len();
+                    if this_len == 0 {
+                        continue;
+                    }
+                    if pass == 0 {
+                        raw_len += this_len;
+                        if lens.len() <= pubkey_index {
+                            lens.extend(vec![0; pubkey_index - lens.len() + 1]);
+                        }
+
+                        lens[pubkey_index] += outer[pubkey_index].len();
+                    } else {
+                        let mut data = vec![];
+                        std::mem::swap(&mut data, &mut outer[pubkey_index]);
+
+                        data_by_pubkey[pubkey_index].extend(data);
+                    }
+                }
+            }
+
+            if pass == 0 {
+                data_by_pubkey = Vec::with_capacity(lens.len());
+                for (i, len) in lens.iter().enumerate() {
+                    data_by_pubkey.insert(i, Vec::with_capacity(*len));
+                }
+                lens = vec![]; // we don't need this anymore
             }
         }
         flatten_time.stop();
@@ -695,6 +830,8 @@ impl AccountsHash {
         is_last_pass: bool,
         mut previous_state: PreviousPass,
     ) -> (Hash, u64, PreviousPass) {
+        Self::flatten_hash_intermediate_old_specific(data_sections_by_pubkey.clone(), &mut stats);
+
         let outer = Self::flatten_hash_intermediate(data_sections_by_pubkey, &mut stats);
 
         let sorted_data_by_pubkey = Self::sort_hash_intermediate(outer, &mut stats);
@@ -993,7 +1130,7 @@ pub mod tests {
         account_maps.push(val);
 
         let result = AccountsHash::rest_of_hash_calculation(
-            vec![vec![vec![account_maps[0].clone()]]],
+            vec![vec![vec![account_maps[0]]]],
             &mut HashStats::default(),
             false, // not last pass
             PreviousPass::default(),
@@ -1007,7 +1144,7 @@ pub mod tests {
         assert_eq!(previous_pass.lamports, account_maps[0].lamports);
 
         let result = AccountsHash::rest_of_hash_calculation(
-            vec![vec![vec![account_maps[1].clone()]]],
+            vec![vec![vec![account_maps[1]]]],
             &mut HashStats::default(),
             false, // not last pass
             previous_pass,
@@ -1417,13 +1554,13 @@ pub mod tests {
         let val3 = CalculateHashIntermediate::new(3, hash2, 4, 1, key);
         let val4 = CalculateHashIntermediate::new(4, hash2, 4, 1, key);
 
-        let src = vec![vec![val2.clone()], vec![val.clone()]];
+        let src = vec![vec![val2], vec![val]];
         let result = AccountsHash::sort_hash_intermediate(src.clone(), &mut stats);
         assert_eq!(result, src);
 
         let src = vec![
-            vec![val2.clone(), val.clone()],
-            vec![val3.clone(), val4.clone()],
+            vec![val2, val],
+            vec![val3, val4],
         ];
         let sorted = vec![vec![val, val2], vec![val4, val3]];
         let result = AccountsHash::sort_hash_intermediate(src, &mut stats);
@@ -1453,13 +1590,13 @@ pub mod tests {
             AccountsHash::compare_two_hash_entries(&val, &val2)
         );
 
-        let list = vec![val.clone(), val2.clone()];
+        let list = vec![val, val2];
         let mut list_bkup = list.clone();
         list_bkup.sort_by(AccountsHash::compare_two_hash_entries);
         let list = AccountsHash::sort_hash_intermediate(vec![list], &mut HashStats::default());
         assert_eq!(list, vec![list_bkup]);
 
-        let list = vec![val2, val.clone()]; // reverse args
+        let list = vec![val2, val]; // reverse args
         let mut list_bkup = list.clone();
         list_bkup.sort_by(AccountsHash::compare_two_hash_entries);
         let list = AccountsHash::sort_hash_intermediate(vec![list], &mut HashStats::default());
@@ -1498,7 +1635,7 @@ pub mod tests {
         let hash = Hash::new_unique();
         let mut account_maps: Vec<CalculateHashIntermediate> = Vec::new();
         let val = CalculateHashIntermediate::new(0, hash, 1, Slot::default(), key);
-        account_maps.push(val.clone());
+        account_maps.push(val);
 
         let result = AccountsHash::de_dup_accounts_from_stores(true, &account_maps[..]);
         assert_eq!(result, (vec![val.hash], val.lamports as u128));

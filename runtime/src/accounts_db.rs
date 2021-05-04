@@ -5641,10 +5641,10 @@ pub mod tests {
             },
         );
         let mut expected = vec![Vec::new(); bins];
-        expected[0].push(raw_expected[0].clone());
-        expected[0].push(raw_expected[1].clone());
-        expected[bins - 1].push(raw_expected[2].clone());
-        expected[bins - 1].push(raw_expected[3].clone());
+        expected[0].push(raw_expected[0]);
+        expected[0].push(raw_expected[1]);
+        expected[bins - 1].push(raw_expected[2]);
+        expected[bins - 1].push(raw_expected[3]);
         assert_eq!(result, vec![expected]);
 
         let bins = 4;
@@ -5658,10 +5658,10 @@ pub mod tests {
             },
         );
         let mut expected = vec![Vec::new(); bins];
-        expected[0].push(raw_expected[0].clone());
-        expected[1].push(raw_expected[1].clone());
-        expected[2].push(raw_expected[2].clone());
-        expected[bins - 1].push(raw_expected[3].clone());
+        expected[0].push(raw_expected[0]);
+        expected[1].push(raw_expected[1]);
+        expected[2].push(raw_expected[2]);
+        expected[bins - 1].push(raw_expected[3]);
         assert_eq!(result, vec![expected]);
 
         let bins = 256;
@@ -5675,10 +5675,10 @@ pub mod tests {
             },
         );
         let mut expected = vec![Vec::new(); bins];
-        expected[0].push(raw_expected[0].clone());
-        expected[127].push(raw_expected[1].clone());
-        expected[128].push(raw_expected[2].clone());
-        expected[bins - 1].push(raw_expected.last().unwrap().clone());
+        expected[0].push(raw_expected[0]);
+        expected[127].push(raw_expected[1]);
+        expected[128].push(raw_expected[2]);
+        expected[bins - 1].push(*raw_expected.last().unwrap());
         assert_eq!(result, vec![expected]);
 
         // enough stores to get to 2nd chunk
@@ -5726,8 +5726,8 @@ pub mod tests {
             },
         );
         let mut expected = vec![Vec::new(); bins];
-        expected[0].push(raw_expected[0].clone());
-        expected[0].push(raw_expected[1].clone());
+        expected[0].push(raw_expected[0]);
+        expected[0].push(raw_expected[1]);
         assert_eq!(result, vec![expected]);
 
         // just the second bin of 2
@@ -5742,8 +5742,8 @@ pub mod tests {
         );
 
         let mut expected = vec![Vec::new(); bins];
-        expected[bins - 1].push(raw_expected[2].clone());
-        expected[bins - 1].push(raw_expected[3].clone());
+        expected[bins - 1].push(raw_expected[2]);
+        expected[bins - 1].push(raw_expected[3]);
         assert_eq!(result, vec![expected]);
 
         // 1 bin at a time of 4
@@ -5759,7 +5759,7 @@ pub mod tests {
                 },
             );
             let mut expected = vec![Vec::new(); bins];
-            expected[bin].push(raw_expected[bin].clone());
+            expected[bin].push(raw_expected[bin]);
             assert_eq!(result, vec![expected]);
         }
 
@@ -5778,7 +5778,7 @@ pub mod tests {
             let mut expected = vec![];
             if let Some(index) = bin_locations.iter().position(|&r| r == bin) {
                 expected = vec![Vec::new(); bins];
-                expected[bin].push(raw_expected[index].clone());
+                expected[bin].push(raw_expected[index]);
             }
             assert_eq!(result, vec![expected]);
         }
@@ -5809,7 +5809,7 @@ pub mod tests {
         assert_eq!(result.len(), 2); // 2 chunks
         assert_eq!(result[0].len(), 0); // nothing found in first slots
         let mut expected = vec![Vec::new(); bins];
-        expected[127].push(raw_expected[1].clone());
+        expected[127].push(raw_expected[1]);
         assert_eq!(result[1].len(), bins);
         assert_eq!(result[1], expected);
     }
