@@ -22,7 +22,7 @@ use crate::{
     accounts_cache::{AccountsCache, CachedAccount, SlotCache},
     accounts_hash::{AccountsHash, CalculateHashIntermediate, HashStats, PreviousPass},
     accounts_index::{
-        AccountIndex, AccountIndexGetResult, AccountsIndex, AccountsIndexRootsStats, Ancestors,
+        AccountIndex, AccountIndexGetResult, AccountsIndex, AccountIndexItem, AccountsIndexRootsStats, Ancestors,
         IndexKey, IsCached, SlotList, SlotSlice, ZeroLamport,
     },
     append_vec::{AppendVec, StoredAccountMeta, StoredMeta},
@@ -762,6 +762,7 @@ pub struct AccountsDb {
     pub accounts_cache: AccountsCache,
 
     sender_bg_hasher: Option<Sender<CachedAccount>>,
+    sender_secondary_indexer: Option<Sender<AccountIndexItem>>,
     pub read_only_accounts_cache: ReadOnlyAccountsCache,
 
     recycle_stores: RwLock<RecycleStores>,
@@ -1190,11 +1191,13 @@ impl Default for AccountsDb {
 
         let mut bank_hashes = HashMap::new();
         bank_hashes.insert(0, BankHashInfo::default());
+        let account_indexes = HashSet::new();
         AccountsDb {
-            accounts_index: AccountsIndex::default(),
+            accounts_index: AccountsIndex::new(account_indexes),
             storage: AccountStorage::default(),
             accounts_cache: AccountsCache::default(),
             sender_bg_hasher: None,
+            sender_secondary_indexer: None,
             read_only_accounts_cache: ReadOnlyAccountsCache::new(MAX_READ_ONLY_CACHE_DATA_SIZE),
             recycle_stores: RwLock::new(RecycleStores::default()),
             uncleaned_pubkeys: DashMap::new(),
@@ -1220,7 +1223,7 @@ impl Default for AccountsDb {
             shrink_stats: ShrinkStats::default(),
             stats: AccountsStats::default(),
             cluster_type: None,
-            account_indexes: HashSet::new(),
+            account_indexes,
             caching_enabled: false,
             #[cfg(test)]
             load_delay: u64::default(),
@@ -1246,6 +1249,7 @@ impl AccountsDb {
                 paths,
                 temp_paths: None,
                 cluster_type: Some(*cluster_type),
+                accounts_index: AccountsIndex::new(account_indexes),
                 account_indexes,
                 caching_enabled,
                 ..Self::default()
@@ -1258,6 +1262,7 @@ impl AccountsDb {
                 paths,
                 temp_paths: Some(temp_dirs),
                 cluster_type: Some(*cluster_type),
+                accounts_index: AccountsIndex::new(account_indexes),
                 account_indexes,
                 caching_enabled,
                 ..Self::default()
