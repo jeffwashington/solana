@@ -2533,7 +2533,7 @@ fn process_account_indexes(matches: &ArgMatches) -> AccountSecondaryIndexes {
     let account_indexes_exclude_keys: HashSet<Pubkey> = matches
         .values_of("account_index_exclude_key")
         .unwrap_or_default()
-        .map(|value| Pubkey::from_str(value).expect("invalid pubkey"))
+        .map(|value| {error!("pubkey: {}", value); Pubkey::from_str(value).expect("invalid pubkey")})
         .collect();
 
     let exclude_keys = !account_indexes_exclude_keys.is_empty();
