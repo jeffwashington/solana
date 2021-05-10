@@ -20,6 +20,7 @@ use std::{
         btree_map::{self, BTreeMap},
         HashMap, HashSet,
     },
+    hash::Hash,
     marker::PhantomData,
     ops::{
         Bound,
@@ -156,6 +157,124 @@ impl<K: Clone + Debug + PartialOrd> subset<K> for Pubkey {
     }
 }
 */
+use std::collections::hash_map::DefaultHasher;
+//pub type MyAccountMap<K, V> = BTreeMap<K, V>;
+type outer_key_type = Pubkey;
+#[derive(Debug)]
+pub struct AMap<V> {
+    keys: Vec<Vec<Pubkey>>,
+    values: Vec<Vec<V>>,
+    count: usize,
+    timings: RwLock<Timings>,
+    bins: usize,
+}
+use std::hash::Hasher;
+impl<V: Clone> AMap<V> {
+    pub fn new(bins: usize) -> Self {
+        let keys = (0..bins)
+            .into_iter()
+            .map(|_| Vec::new())
+            .collect::<Vec<_>>();
+        let values = (0..bins)
+            .into_iter()
+            .map(|_| Vec::new())
+            .collect::<Vec<_>>();
+        Self {
+            keys,
+            values,
+            count: 0,
+            timings: RwLock::new(Timings::default()),
+            bins,
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.count
+    }
+
+    fn hash(key: &Pubkey) -> u64 {
+        let mut s = DefaultHasher::new();
+        key.hash(&mut s);
+        s.finish()
+    }
+
+    pub fn insert(&mut self, key: &outer_key_type, mut value: V) -> Option<V> {
+        let bucket = (Self::hash(key) as usize) % self.bins;
+        for (i, item) in self.keys[bucket].iter().enumerate() {
+            if item == key {
+                // already exists
+                std::mem::swap(&mut self.values[bucket][i], &mut value);
+                return Some(value);
+            }
+        }
+        self.keys[bucket].push(*key);
+        self.values[bucket].push(value);
+        self.count += 1;
+        None
+    }
+    pub fn remove(&mut self, key: &outer_key_type) {
+        panic!("do this");
+    }
+    pub fn get_fast(&self, key: &outer_key_type) -> Option<&V> {
+        let bucket = (Self::hash(key) as usize) % self.bins;
+        for (i, item) in self.keys[bucket].iter().enumerate() {
+            if item == key {
+                // already exists
+                let v = &self.values[bucket][i];
+                return Some(v);
+            }
+        }
+        None
+    }
+    pub fn get(&self, key: &outer_key_type) -> Option<&V> {
+        self.get_fast(key)
+    }
+    /*
+    pub fn keys(&self) -> AccountMapIterKeys<'_, V, outer_key_type> {
+        //std::slice::Iter<'_, (K, V)> {
+        AccountMapIterKeys::new(&self, AccountMapIndex::default()) // {index: 0, insert: false,})
+    }
+    */
+
+    /*
+    pub fn entry(&self, key: K) -> AccountMapEntryBtree<K> {
+        let (pre, post) = key.split();
+        self.data[0].entry(post)
+    }
+    pub fn contains_key(&self, key: &K) -> bool {
+        let find = self.find(&key, &mut Timings::default());
+        !find.insert
+    }
+    pub fn get_fast(&self, key: &outer_key_type) -> Option<&V> {
+        None
+    }
+    pub fn get_at_index(&self, index: &AccountMapIndex) -> Option<&V> {
+        None
+    }
+    pub fn remove(&mut self, key: &K) {}
+    pub fn keys(&self) -> AccountMapIterKeys<'_, V, K> {
+        //std::slice::Iter<'_, (K, V)> {
+        AccountMapIterKeys::new(&self, AccountMapIndex::default()) // {index: 0, insert: false,})
+    }
+    pub fn values(&self) -> AccountMapIterValues<'_, V, K> {
+        //std::slice::Iter<'_, (K, V)> {
+        AccountMapIterValues::new(&self, AccountMapIndex::default())
+    }
+    pub fn iter(&self) -> AccountMapIter<'_, V, K> {
+        //std::slice::Iter<'_, (K, V)> {
+        AccountMapIter::new(&self, AccountMapIndex::default())
+    }
+    pub fn range<T, R>(&self, range: R) -> Option<(K, K)>
+    where
+        T: Ord + ?Sized,
+        R: RangeBounds<T>,
+    {
+        panic!("not supported");
+        None
+    }
+    */
+}
+
 pub type AccountMap<V, K> = BTreeMap<K, V>;
 #[derive(Debug)]
 pub struct AccountMapSlicer<V> {
@@ -164,7 +283,6 @@ pub struct AccountMapSlicer<V> {
 }
 
 type slicer_key_type = [u8; 30];
-type outer_key_type = Pubkey;
 use std::convert::TryInto;
 impl<V: Clone> AccountMapSlicer<V> {
     pub fn new(vec_size_max: usize) -> Self {
@@ -913,6 +1031,7 @@ pub mod tests {
         let mx = 27u32; //26u32;
         let mx_key_count = 2usize.pow(mx);
         let mut keys_orig = Vec::with_capacity(mx_key_count);
+        let mut first = true;
         for key_pow in 15..mx {
             let key_count = 2usize.pow(key_pow);
             while keys_orig.len() < key_count {
@@ -938,10 +1057,7 @@ pub mod tests {
             }
             m23.stop();
             for i in 0..(key_count / 1000) {
-                assert_eq!(
-                    m.get(&keys_orig[i]).unwrap()[0],
-                    keys_orig[i].as_ref()[0]
-                );
+                assert_eq!(m.get(&keys_orig[i]).unwrap()[0], keys_orig[i].as_ref()[0]);
             }
 
             let mut m = HashMap::new();
@@ -958,16 +1074,35 @@ pub mod tests {
             }
             m24.stop();
             for i in 0..(key_count / 1000) {
-                assert_eq!(
-                    m.get(&keys_orig[i]).unwrap()[0],
-                    keys_orig[i].as_ref()[0]
-                );
+                assert_eq!(m.get(&keys_orig[i]).unwrap()[0], keys_orig[i].as_ref()[0]);
             }
 
-            for vec_size in [1, 100, 1_000, 10_000, 100_000, 1_000_000, 10_000_000]
+            for vec_size in [100, 1_000, 10_000, 100_000, 1_000_000, 10_000_000]
                 .iter()
                 .cloned()
             {
+                // anatoly
+
+                let mut m = AMap::new(vec_size);
+                let value = vec![0; 60];
+                let mut mati = Measure::start("");
+                for i in 0..key_count {
+                    m.insert(&keys[i], vec![keys[i].as_ref()[0]; 60]);
+                }
+                mati.stop();
+
+                let mut mat = Measure::start("");
+                for i in 0..key_count {
+                    m.get_fast(&keys_orig[i]);
+                }
+                mat.stop();
+                for i in 0..(key_count / 1000) {
+                    assert_eq!(
+                        m.get_fast(&keys_orig[i]).unwrap()[0],
+                        keys_orig[i].as_ref()[0]
+                    );
+                }
+
                 let mut m = MyAccountMap::new(vec_size / 256);
                 let value = vec![0; 60];
                 let mut m1 = Measure::start("");
@@ -1016,14 +1151,19 @@ pub mod tests {
                 }
                 //error!("insert: {} insert: {}, get: {}, size: {}", 0, m11.as_ms(), m22.as_ms(), key_count);
 
+                if first {
+                    error!("bt get ratio size BTreeMap MyAccountMap AccountMapSlicer HashMap anatoly parameter(vec_size)");
+                    first = false;
+                }
                 error!(
-                "bt get {} size {} {} {} {} {} vec_size {} time_insert_ms {} time_get_ms {} data lens {:?}, minmax {:?}, insert {}",
+                "bt get {} {} {} {} {} {} {} {} time_insert_ms {} time_get_ms {} data lens {:?}, minmax {:?}, insert {}",
                 (m22.as_ns() as f64) / (m2.as_ns() as f64),
                 key_count,
                 m23.as_ms(),
                 m2.as_ms(),
                 m22.as_ms(),
                 m24.as_ms(),
+                mat.as_ms(),
                 vec_size,
                 m1.as_ms(),
                 m2.as_ms(),
