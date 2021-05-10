@@ -2540,7 +2540,7 @@ fn process_account_indexes(matches: &ArgMatches) -> AccountSecondaryIndexes {
             if let Ok(k) = Pubkey::from_str(value) {
                 k
             }else{
-                panic!("pubkey: {}, {:?}, {:?}, {:?}", value, Pubkey::from_str("BadStake11111111111111111111111111111111111"), Pubkey::from_str("kinXdEcpDQeHPEuQnqmUgtYykqKGVFq6CeVX5iAHJq6"), Pubkey::from_str(value));
+                panic!("pubkey: {}, {:?}, {:?}, {:?}, {:?}, {:?}", value, Pubkey::from_str("BadStake11111111111111111111111111111111111"), Pubkey::from_str("kinXdEcpDQeHPEuQnqmUgtYykqKGVFq6CeVX5iAHJq6"), Pubkey::from_str(value), value == "kinXdEcpDQeHPEuQnqmUgtYykqKGVFq6CeVX5iAHJq6", value);
 
             }
         })
