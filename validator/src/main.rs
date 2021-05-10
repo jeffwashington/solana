@@ -2528,7 +2528,6 @@ fn process_account_indexes(matches: &ArgMatches) -> AccountSecondaryIndexes {
         .values_of("account_index_include_key")
         .unwrap_or_default()
         .map(|value| {
-            panic!("pubkey: {}", value);
             Pubkey::from_str(value).expect("invalid pubkey3")
         })
         .collect();
