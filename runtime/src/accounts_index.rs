@@ -99,6 +99,9 @@ impl AccountSecondaryIndexes {
                 if !r {
                     error!("jwash: excluding: {}, {:?}, exclude: {}", key, options.keys, options.exclude);
                 }
+                else {
+                    error!("jwash: INcluding: {}, {:?}, exclude: {}", key, options.keys, options.exclude);
+                }
             r},
             None => true, // include all keys
         }
