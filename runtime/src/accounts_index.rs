@@ -94,15 +94,14 @@ impl AccountSecondaryIndexes {
         self.indexes.contains(index)
     }
     pub fn include_key(&self, key: &Pubkey) -> bool {
-        let r = 
         match &self.keys {
-            Some(options) => options.exclude ^ options.keys.contains(key),
+            Some(options) => {let r = options.exclude ^ options.keys.contains(key);
+                if !r {
+                    error!("jwash: excluding: {}, {:?}, exclude: {}", key, options.keys, options.exclude);
+                }
+            r},
             None => true, // include all keys
-        };
-        if !r {
-            error!("jwash: excluding: {}, {:?}, exclude: {}", key, self.keys, self.exclude);
         }
-        r
     }
 }
 
