@@ -225,7 +225,19 @@ impl<V: Clone> AMap<V> {
     }
 
     fn hash(&self, key: &Pubkey) -> u64 {
-        self.hasher.hash_packet(key)
+        let data = key.as_ref();
+        /*
+        let d1 = u128::from_ne_bytes(data[0..15]);
+        let d2 = u128::from_ne_bytes(data[16..32]);
+        let d3 = d1 ^ d2;
+        */
+        let d1 = u64::from_ne_bytes(*arrayref::array_ref![data[0..8], 0, 8]);
+        let d2 = u64::from_ne_bytes(*arrayref::array_ref![data[8..16], 0, 8]);
+        let d3 = u64::from_ne_bytes(*arrayref::array_ref![data[16..24], 0, 8]);
+        let d4 = u64::from_ne_bytes(*arrayref::array_ref![data[24..32], 0, 8]);
+        let dall = d1 ^ d2 ^ d3 ^ d4;
+        //self.hasher.hash_packet(key)
+        dall
     }
 
     pub fn insert(&mut self, key: &outer_key_type, mut value: V) -> Option<V> {
