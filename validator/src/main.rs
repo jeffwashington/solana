@@ -2529,7 +2529,7 @@ fn process_account_indexes(matches: &ArgMatches) -> AccountSecondaryIndexes {
         .unwrap_or_default()
         .map(|value| {
             error!("pubkey: {}", value);
-            Pubkey::from_str(value).expect("invalid pubkey")
+            Pubkey::from_str(value).expect("invalid pubkey3")
         })
         .collect();
 
@@ -2538,7 +2538,7 @@ fn process_account_indexes(matches: &ArgMatches) -> AccountSecondaryIndexes {
         .unwrap_or_default()
         .map(|value| {
             error!("pubkey: {}", value);
-            Pubkey::from_str(value).expect("invalid pubkey")
+            Pubkey::from_str(value).expect("invalid pubkey2")
         })
         .collect();
 
