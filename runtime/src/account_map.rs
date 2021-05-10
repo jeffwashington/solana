@@ -1082,25 +1082,33 @@ pub mod tests {
                 .cloned()
             {
                 // anatoly
+                let good = (key_count / vec_size) < 10_000;
 
                 let mut m = AMap::new(vec_size);
                 let value = vec![0; 60];
                 let mut mati = Measure::start("");
-                for i in 0..key_count {
-                    m.insert(&keys[i], vec![keys[i].as_ref()[0]; 60]);
+                if good {
+                        for i in 0..key_count {
+                        m.insert(&keys[i], vec![keys[i].as_ref()[0]; 60]);
+                    }
+                    mati.stop();
                 }
-                mati.stop();
 
                 let mut mat = Measure::start("");
-                for i in 0..key_count {
-                    m.get_fast(&keys_orig[i]);
+                if good {
+                    for i in 0..key_count {
+                        m.get_fast(&keys_orig[i]);
+                    }
+                    mat.stop();
+                    for i in 0..(key_count / 1000) {
+                        assert_eq!(
+                            m.get_fast(&keys_orig[i]).unwrap()[0],
+                            keys_orig[i].as_ref()[0]
+                        );
+                    }
                 }
-                mat.stop();
-                for i in 0..(key_count / 1000) {
-                    assert_eq!(
-                        m.get_fast(&keys_orig[i]).unwrap()[0],
-                        keys_orig[i].as_ref()[0]
-                    );
+                else {
+                    mat.stop();
                 }
 
                 let mut m = MyAccountMap::new(vec_size / 256);
