@@ -13,6 +13,8 @@ use solana_sdk::{
     clock::Slot,
     pubkey::{Pubkey, PUBKEY_BYTES},
 };
+use rand::{thread_rng, Rng};
+
 use std::cmp::Ordering;
 use std::fmt::Debug;
 use std::{
@@ -44,6 +46,33 @@ pub enum AccountMapEntryBtree<K: Clone + Debug + PartialOrd> {
 
     /// An occupied entry.
     Occupied(OccupiedEntry),
+}
+
+#[derive(Clone)]
+pub struct PubkeyHasher {
+    seed1: u128,
+    seed2: u128,
+}
+
+impl Default for PubkeyHasher {
+    fn default() -> Self {
+        Self {
+            seed1: thread_rng().gen::<u128>(),
+            seed2: thread_rng().gen::<u128>(),
+        }
+    }
+}
+
+impl PubkeyHasher {
+    pub fn hash_packet(&self, packet: &Pubkey) -> u64 {
+        let mut hasher = AHasher::new_with_keys(self.seed1, self.seed2);
+        hasher.write(&packet.as_ref());
+        hasher.finish()
+    }
+
+    pub fn reset(&mut self) {
+        *self = Self::default();
+    }
 }
 
 impl<K: Clone + Debug + PartialOrd> AccountMapEntryBtree<K> {
@@ -158,15 +187,17 @@ impl<K: Clone + Debug + PartialOrd> subset<K> for Pubkey {
 }
 */
 use std::collections::hash_map::DefaultHasher;
+use ahash::AHasher;
+
 //pub type MyAccountMap<K, V> = BTreeMap<K, V>;
 type outer_key_type = Pubkey;
-#[derive(Debug)]
 pub struct AMap<V> {
     keys: Vec<Vec<Pubkey>>,
     values: Vec<Vec<V>>,
     count: usize,
     timings: RwLock<Timings>,
     bins: usize,
+    hasher: PubkeyHasher,
 }
 use std::hash::Hasher;
 impl<V: Clone> AMap<V> {
@@ -185,6 +216,7 @@ impl<V: Clone> AMap<V> {
             count: 0,
             timings: RwLock::new(Timings::default()),
             bins,
+            hasher: PubkeyHasher::default(),
         }
     }
 
@@ -192,14 +224,12 @@ impl<V: Clone> AMap<V> {
         self.count
     }
 
-    fn hash(key: &Pubkey) -> u64 {
-        let mut s = DefaultHasher::new();
-        key.hash(&mut s);
-        s.finish()
+    fn hash(&self, key: &Pubkey) -> u64 {
+        self.hasher.hash_packet(key)
     }
 
     pub fn insert(&mut self, key: &outer_key_type, mut value: V) -> Option<V> {
-        let bucket = (Self::hash(key) as usize) % self.bins;
+        let bucket = (self.hash(key) as usize) % self.bins;
         for (i, item) in self.keys[bucket].iter().enumerate() {
             if item == key {
                 // already exists
@@ -216,7 +246,7 @@ impl<V: Clone> AMap<V> {
         panic!("do this");
     }
     pub fn get_fast(&self, key: &outer_key_type) -> Option<&V> {
-        let bucket = (Self::hash(key) as usize) % self.bins;
+        let bucket = (self.hash(key) as usize) % self.bins;
         for (i, item) in self.keys[bucket].iter().enumerate() {
             if item == key {
                 // already exists

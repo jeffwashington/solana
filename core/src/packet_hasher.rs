@@ -5,6 +5,7 @@ use ahash::AHasher;
 use rand::{thread_rng, Rng};
 use solana_perf::packet::Packet;
 use std::hash::Hasher;
+use solana_sdk::pubkey::Pubkey;
 
 #[derive(Clone)]
 pub struct PacketHasher {
@@ -32,3 +33,4 @@ impl PacketHasher {
         *self = Self::default();
     }
 }
+
