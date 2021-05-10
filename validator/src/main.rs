@@ -2537,8 +2537,12 @@ fn process_account_indexes(matches: &ArgMatches) -> AccountSecondaryIndexes {
         .values_of("account_index_exclude_key")
         .unwrap_or_default()
         .map(|value| {
-            error!("pubkey: {}, {:?}, {:?}, {:?}", value, Pubkey::from_str("BadStake11111111111111111111111111111111111"), Pubkey::from_str("kinXdEcpDQeHPEuQnqmUgtYykqKGVFq6CeVX5iAHJq6"), Pubkey::from_str(value));
-            Pubkey::from_str(value).expect("invalid pubkey2: {:?}", Pubkey::from_str(value))
+            if let Ok(k) = Pubkey::from_str(value) {
+                k
+            }else{
+                panic!("pubkey: {}, {:?}, {:?}, {:?}", value, Pubkey::from_str("BadStake11111111111111111111111111111111111"), Pubkey::from_str("kinXdEcpDQeHPEuQnqmUgtYykqKGVFq6CeVX5iAHJq6"), Pubkey::from_str(value));
+
+            }
         })
         .collect();
 
