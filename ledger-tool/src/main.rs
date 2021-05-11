@@ -1696,7 +1696,7 @@ fn main() {
                                 .unwrap();
 
                             let ins = results.insert(pubkey, (hash, balance));
-                            assert!(ins.is_none(), "duplicate: {:?}, {}, {}, {}, path: {:?}", ins, pubkey, hash, balance, path);
+                            assert!(ins.is_none(), "duplicate: {:?}, {}, {}, {}, path: {:?}, results: {}", ins, pubkey, hash, balance, path, results.len());
                         }
                     } else {
                         break;
