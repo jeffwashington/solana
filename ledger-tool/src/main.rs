@@ -1705,8 +1705,8 @@ fn main() {
                 results
             }
 
-            let bad_results = parse_log(&bad);
             let mut good_results = parse_log(&good);
+            let bad_results = parse_log(&bad);
 
             println!("good results len: {}", good_results.len());
             println!("bad results len: {}", bad_results.len());
