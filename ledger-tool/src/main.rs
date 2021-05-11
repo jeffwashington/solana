@@ -1695,7 +1695,8 @@ fn main() {
                                 .parse::<u64>()
                                 .unwrap();
 
-                            assert!(results.insert(pubkey, (hash, balance)).is_none());
+                            let ins = results.insert(pubkey, (hash, balance));
+                            assert!(ins.is_none(), "duplicate: {:?}, {}, {}, {}, path: {:?}", ins, pubkey, hash, balance, path);
                         }
                     } else {
                         break;
