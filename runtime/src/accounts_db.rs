@@ -2727,6 +2727,7 @@ impl AccountsDb {
 
         if self.caching_enabled && store_id != CACHE_VIRTUAL_STORAGE_ID {
             let result = self.read_only_accounts_cache.load(pubkey, slot);
+            error!("looked2 up pk in read_only_cache: found: {:?}, {}", result, pubkey);
             if &pk == pubkey {
                 error!("looked up pk in read_only_cache: found: {:?}, {}", result, pubkey);
             }
@@ -2755,6 +2756,7 @@ impl AccountsDb {
             However, by the assumption for contradiction above ,  'A' has already been updated in 'S' which means '(S, A)'
             must exist in the write cache, which is a contradiction.
             */
+            error!("storing2 pk in read_only_cache: {:?}, {}", account, pubkey);
             if &pk == pubkey {
                 error!("storing pk in read_only_cache: {:?}, {}", account, pubkey);
             }
@@ -2768,7 +2770,7 @@ impl AccountsDb {
         }
         Some((account, slot))
     }
-
+    
     pub fn load_account_hash(
         &self,
         ancestors: &Ancestors,
