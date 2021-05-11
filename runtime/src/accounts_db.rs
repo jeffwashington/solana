@@ -2770,7 +2770,7 @@ impl AccountsDb {
         }
         Some((account, slot))
     }
-    
+
     pub fn load_account_hash(
         &self,
         ancestors: &Ancestors,
@@ -4427,9 +4427,9 @@ impl AccountsDb {
             .iter()
             .map(|(pubkey, hash, lamports)| {
                 // Only enable for finding account diff mismatch
-                error!("x: {:?}", pubkey);
-                error!("y: {:?}", hash);
-                error!("z: {:?}", lamports);
+                println!("x: {:?}", pubkey);
+                println!("y: {:?}", hash);
+                println!("z: {:?}", lamports);
                 (*pubkey, *hash)
             })
             .collect();
