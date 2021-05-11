@@ -1677,7 +1677,6 @@ fn main() {
                     if let Some(Ok(line)) = line {
                         if let Some(pubkey) = pubkey_regex.captures_iter(&line).next() {
                             let line = lines.next().unwrap().unwrap();
-                            error!("line: {}", line);
                             let hash = hash_regex.captures_iter(&line).next().unwrap();
                             let line = lines.next().unwrap().unwrap();
                             let balance = balance_regex.captures_iter(&line).next().unwrap();
