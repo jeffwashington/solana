@@ -135,6 +135,7 @@ impl Accounts {
                 cluster_type,
                 account_indexes,
                 caching_enabled,
+                false,
             )),
             account_locks: Mutex::new(AccountLocks::default()),
         }
@@ -819,6 +820,7 @@ impl Accounts {
             .expect("No bank hash was found for this bank, that should not be possible")
             .clone();
         hash_info.hash = delta_hash;
+        println!("bank hash info: {:?}", hash_info);
         hash_info
     }
 
