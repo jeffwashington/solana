@@ -1672,6 +1672,7 @@ fn main() {
                 let f = BufReader::new(File::open(path).unwrap());
                 let mut results = BTreeMap::new();
                 let mut lines = f.lines();
+                let pk = Pubkey::from_str("5KW2RMYEAwr38GXNMa3PPe22sa2rbFjb9DFjCgegiT4H").unwrap();
                 loop {
                     let line = lines.next();
                     if let Some(Ok(line)) = line {
@@ -1694,6 +1695,10 @@ fn main() {
                                 .as_str()
                                 .parse::<u64>()
                                 .unwrap();
+
+                            if pk == pubkey {
+                                error!("found: {:?}, in: {:?}", (pubkey, (hash, balance)), path);
+                            }
 
                             let ins = results.insert(pubkey, (hash, balance));
                             assert!(ins.is_none(), "duplicate: {:?}, {}, {}, {}, path: {:?}, results: {}", ins, pubkey, hash, balance, path, results.len());

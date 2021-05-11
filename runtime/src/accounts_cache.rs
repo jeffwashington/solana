@@ -108,9 +108,9 @@ pub type CachedAccount = Arc<CachedAccountInner>;
 #[derive(Debug)]
 pub struct CachedAccountInner {
     pub account: AccountSharedData,
-    hash: RwLock<Option<Hash>>,
+    pub hash: RwLock<Option<Hash>>,
     slot: Slot,
-    pubkey: Pubkey,
+    pub pubkey: Pubkey,
 }
 
 impl CachedAccountInner {

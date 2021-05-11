@@ -1442,11 +1442,23 @@ impl AccountsDb {
             let result = receiver.recv();
             match result {
                 Ok(account) => {
+                    let pk = Pubkey::from_str("5KW2RMYEAwr38GXNMa3PPe22sa2rbFjb9DFjCgegiT4H").unwrap();
+
+                    let ct = 
                     // if we hold the only ref, then this account doesn't need to be hashed, we ignore this account and it will disappear
-                    if Arc::strong_count(&account) > 1 {
+                    Arc::strong_count(&account);
+                    if ct > 1 {
                         // this will cause the hash to be calculated and store inside account if it needs to be calculated
-                        let _ = (*account).hash();
-                    };
+                        let a = (*account).hash();
+                        if pk == account.pubkey {
+                            error!("hashed: {}, {}", account.pubkey, a);
+                        }
+                    } else {
+                        if pk == account.pubkey {
+                            error!("did not hash: {}", account.pubkey);
+                        }
+
+                    }
                 }
                 Err(_) => {
                     break;
