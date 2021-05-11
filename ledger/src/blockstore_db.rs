@@ -353,7 +353,12 @@ impl Rocks {
     }
 
     fn get_cf(&self, cf: &ColumnFamily, key: &[u8]) -> Result<Option<Vec<u8>>> {
-        let opt = self.0.get_cf(cf, key)?.map(|db_vec| db_vec.to_vec());
+        let mut opts = rocksdb::ReadOptions::default();
+        opts.set_verify_checksums(false);
+        let opt = self
+            .0
+            .get_cf_opt(cf, key, &opts)?
+            .map(|db_vec| db_vec.to_vec());
         Ok(opt)
     }
 
