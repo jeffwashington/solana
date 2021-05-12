@@ -1254,6 +1254,7 @@ pub mod tests {
         for key_pow in 15..mx {
             let key_count = 2usize.pow(key_pow);
             let m = Vec::with_capacity(key_count * 10000);
+            m.push(32u8);
             size = m.len();
             std::thread::sleep(std::time::Duration::from_secs(3));
         }
