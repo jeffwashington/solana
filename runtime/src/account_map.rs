@@ -1250,6 +1250,15 @@ pub mod tests {
         let mx_key_count = 2usize.pow(mx);
         let mut keys_orig = Vec::with_capacity(mx_key_count);
         let mut first = true;
+        let mut size = 0;
+        for key_pow in 15..mx {
+            let key_count = 2usize.pow(key_pow);
+            let m = Vec::with_capacity(key_count * 10000);
+            size = m.len();
+            std::thread::sleep(std::time::Duration::from_secs(3));
+        }
+        error!("m: {}", size);
+
         for pass in 0..2 {
             for key_pow in 15..mx {
                 let key_count = 2usize.pow(key_pow);
