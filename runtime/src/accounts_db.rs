@@ -4974,10 +4974,11 @@ impl AccountsDb {
         let total_processed_slots_across_all_threads = AtomicU64::new(0);
         let outer_slots_len = slots.len();
         let chunk_size = outer_slots_len; // approximately 400k slots in a snapshot
-        for pass in 0..2 {
+        let mut was_first = false;
+        let mut data = 0;
+        for pass in 0..4 {
             let mut last_log_update = Instant::now();
             let mut my_last_reported_number_of_processed_slots = 0;
-            let mut was_first = false;
             let mut len = 0;
             let mut accts = 0;
             info!(
@@ -4996,13 +4997,14 @@ impl AccountsDb {
                     was_first = was_first || 0 == previous_total_processed_slots_across_all_threads;
                     if was_first {
                         info!(
-                            "generating index: {}/{} slots..., len: {}, accts: {}, pass: {}",
+                            "generating index: {}/{} slots..., len: {}, accts: {}, pass: {}, data len: {}",
                             previous_total_processed_slots_across_all_threads
                                 + my_total_newly_processed_slots_since_last_report,
                             outer_slots_len,
                             len,
                             accts,
                             pass,
+                            data,
                         );
                     }
                     last_log_update = now;
@@ -5038,28 +5040,35 @@ impl AccountsDb {
                 // be shielding other accounts. When they are then purged, the
                 // original non-shielded account value will be visible when the account
                 // is restored from the append-vec
-                if !accounts_map.is_empty() && pass == 1 {
+                if !accounts_map.is_empty() && pass != 1 {
                     let mut _reclaims: Vec<(u64, AccountInfo)> = vec![];
                     let dirty_keys = accounts_map.iter().map(|(pubkey, _info)| *pubkey).collect();
-                    self.uncleaned_pubkeys.insert(*slot, dirty_keys);
-                    for (pubkey, account_infos) in accounts_map.into_iter() {
-                        for (_, (store_id, stored_account)) in account_infos.into_iter() {
-                            accts += 1;
-                            let account_info = AccountInfo {
-                                store_id,
-                                offset: stored_account.offset,
-                                stored_size: stored_account.stored_size,
-                                lamports: stored_account.account_meta.lamports,
-                            };
-                            self.accounts_index.insert_new_if_missing(
-                                *slot,
-                                &pubkey,
-                                &stored_account.account_meta.owner,
-                                &stored_account.data,
-                                &self.account_indexes,
-                                account_info,
-                                &mut _reclaims,
-                            );
+                    if pass == 1 {
+                        self.uncleaned_pubkeys.insert(*slot, dirty_keys);
+                    }
+                    else if pass == 2 || pass == 3 {
+                        for (pubkey, account_infos) in accounts_map.into_iter() {
+                            for (_, (store_id, stored_account)) in account_infos.into_iter() {
+                                let account_info = AccountInfo {
+                                    store_id,
+                                    offset: stored_account.offset,
+                                    stored_size: stored_account.stored_size,
+                                    lamports: stored_account.account_meta.lamports,
+                                };
+                                if pass == 3 {
+                                    accts += 1;
+                                    self.accounts_index.insert_new_if_missing(
+                                        *slot,
+                                        &pubkey,
+                                        &stored_account.account_meta.owner,
+                                        &stored_account.data,
+                                        &self.account_indexes,
+                                        account_info,
+                                        &mut _reclaims,
+                                    );
+                                    data += stored_account.data.len();
+                                }
+                            }
                         }
                     }
                     len = self.accounts_index.len();
