@@ -326,7 +326,8 @@ impl Shred {
         //
         // On the other hand, if this function is called locally, the payload size should match
         // the `expected_data_size`.
-        assert!(payload.len() >= expected_data_size);
+        payload.resize(SHRED_PAYLOAD_SIZE, 0);
+        //assert!(payload.len() >= expected_data_size);
         payload.truncate(expected_data_size);
         let shred = if common_header.shred_type == ShredType(CODING_SHRED) {
             let coding_header: CodingShredHeader =

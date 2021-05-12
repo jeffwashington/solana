@@ -3221,6 +3221,8 @@ impl AccountsDb {
     }
 
     pub fn hash_stored_account(slot: Slot, account: &StoredAccountMeta) -> Hash {
+        use std::str::FromStr;
+        let h =         
         Self::hash_account_data(
             slot,
             account.account_meta.lamports,
@@ -3229,10 +3231,18 @@ impl AccountsDb {
             account.account_meta.rent_epoch,
             account.data,
             &account.meta.pubkey,
-        )
+        );
+        let pk = Pubkey::from_str("5KW2RMYEAwr38GXNMa3PPe22sa2rbFjb9DFjCgegiT4H").unwrap();
+        if account.meta.pubkey == pk {
+            error!("{}, {}, slot: {}, account: {:?}", account.meta.pubkey, h, slot, account);
+        }
+
+        h
     }
 
     pub fn hash_account(slot: Slot, account: &AccountSharedData, pubkey: &Pubkey) -> Hash {
+        use std::str::FromStr;
+        let h =         
         Self::hash_account_data(
             slot,
             account.lamports,
@@ -3241,7 +3251,13 @@ impl AccountsDb {
             account.rent_epoch,
             &account.data(),
             pubkey,
-        )
+        );
+        let pk = Pubkey::from_str("5KW2RMYEAwr38GXNMa3PPe22sa2rbFjb9DFjCgegiT4H").unwrap();
+        if pubkey == &pk {
+            error!("{}, {}, slot: {}, account: {:?}", pubkey, h, slot, account);
+        }
+
+        h
     }
 
     fn hash_frozen_account_data(account: &AccountSharedData) -> Hash {
