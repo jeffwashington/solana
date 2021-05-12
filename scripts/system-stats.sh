@@ -24,6 +24,6 @@ while true; do
   # if nvidia-smi exists, report gpu stats
   gpu_report=""
   date="$(date)"
-  report="${date}, {cpu_report}, ${gpu_report}"
+  report="${date}, ${cpu_report}, ${gpu_report}"
   echo $report
 done
