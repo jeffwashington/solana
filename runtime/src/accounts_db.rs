@@ -4974,7 +4974,7 @@ impl AccountsDb {
         let total_processed_slots_across_all_threads = AtomicU64::new(0);
         let outer_slots_len = slots.len();
         let chunk_size = outer_slots_len; // approximately 400k slots in a snapshot
-        for pass = 0..2 {
+        for pass in 0..2 {
             let mut last_log_update = Instant::now();
             let mut my_last_reported_number_of_processed_slots = 0;
             let mut was_first = false;
