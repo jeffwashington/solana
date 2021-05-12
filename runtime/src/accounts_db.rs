@@ -5048,6 +5048,7 @@ impl AccountsDb {
                                 stored_size: stored_account.stored_size,
                                 lamports: stored_account.account_meta.lamports,
                             };
+                            let l = self.accounts_index.len();
                             self.accounts_index.insert_new_if_missing(
                                 *slot,
                                 &pubkey,
@@ -5057,6 +5058,8 @@ impl AccountsDb {
                                 account_info,
                                 &mut _reclaims,
                             );
+                            let l2 = self.accounts_index.len();
+                            assert!(l == l2 || l + 1 == l2);
                         }
                     }
                     len += self.accounts_index.len();
