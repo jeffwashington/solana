@@ -4060,6 +4060,7 @@ impl AccountsDb {
                 "{} mismatched account hash(es) found",
                 mismatch_found.load(Ordering::Relaxed)
             );
+            panic!("mismatch");
             return Err(MismatchedAccountHash);
         }
 
