@@ -40,6 +40,5 @@ while true; do
   fi
 
   report="${cpu_report}${gpu_report}"
-  ./scripts/metrics-write-datapoint.sh "system-stats,hostname=$HOSTNAME $report"
-  sleep 1
+  echo $report
 done
