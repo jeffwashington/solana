@@ -1250,26 +1250,36 @@ pub mod tests {
         let mx_key_count = 2usize.pow(mx);
         let mut keys_orig = Vec::with_capacity(mx_key_count);
         let mut first = true;
-        for key_pow in 15..mx {
-            let key_count = 2usize.pow(key_pow);
-            error!("creating keys: {}", key_count - keys_orig.len());
-            while keys_orig.len() < key_count {
-                let mut pk = Pubkey::new_rand();
-                pk.as_mut()[0] = (keys_orig.len() % 256) as u8;
-                pk.as_mut()[1] = ((keys_orig.len() / 256) % 256) as u8;
-                keys_orig.push(pk);
-            }
-            let mut keys = keys_orig.clone();
-            keys.sort();
+        for pass in 0..2 {
+            for key_pow in 15..mx {
+                let key_count = 2usize.pow(key_pow);
+                if pass == 0 {
+                    error!("creating keys: {}", key_count - keys_orig.len());
+                    while keys_orig.len() < key_count {
+                        let mut pk = Pubkey::new_rand();
+                        pk.as_mut()[0] = (keys_orig.len() % 256) as u8;
+                        pk.as_mut()[1] = ((keys_orig.len() / 256) % 256) as u8;
+                        keys_orig.push(pk);
+                    }
+                }
+                else {
+                    std::thread::sleep(Duration::from_secs(3));
 
-            let mut m = BTreeMap::new();
-            let value = vec![0; 60];
-            let mut m13 = Measure::start("");
-            error!("inserting: {}", key_count);
-            for i in 0..key_count {
-                m.insert(&keys[i], vec![keys[i].as_ref()[0]; 60]);
+                    //let mut keys = keys_orig.clone();
+                    //keys.sort();
+                    let keys = keys_orig;
+
+                    let mut m = BTreeMap::new();
+                    let value = vec![0; 60];
+                    let mut m13 = Measure::start("");
+                    error!("inserting: {}", key_count);
+                    for i in 0..key_count {
+                        m.insert(&keys[i], vec![keys[i].as_ref()[0]; 60]);
+                    }
+                    m13.stop();
+                }
+
             }
-            m13.stop();
         }
     }
 
