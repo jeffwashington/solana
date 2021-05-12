@@ -4063,7 +4063,7 @@ impl AccountsDb {
             return Err(MismatchedAccountHash);
         }
 
-        //panic!("stop");
+        panic!("stop");
 
         scan.stop();
         let total_lamports = *total_lamports.lock().unwrap();
