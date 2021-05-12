@@ -5024,21 +5024,29 @@ impl AccountsDb {
                     let dirty_keys = accounts_map.iter().map(|(pubkey, _info)| *pubkey).collect();
                     self.uncleaned_pubkeys.insert(*slot, dirty_keys);
                     for (pubkey, account_infos) in accounts_map.into_iter() {
-                        for (_, (store_id, stored_account)) in account_infos.into_iter() {
+                        let mut lock = self.accounts_index.start_bulk_insert();
+                        for (_, (store_id, stored_account)) in account_infos.iter() {
                             let account_info = AccountInfo {
-                                store_id,
+                                store_id: *store_id,
                                 offset: stored_account.offset,
                                 stored_size: stored_account.stored_size,
                                 lamports: stored_account.account_meta.lamports,
                             };
-                            self.accounts_index.insert_new_if_missing(
+                            self.accounts_index.bulk_insert(
                                 *slot,
                                 &pubkey,
+                                account_info,
+                                &mut lock,
+                            );
+                        }
+                        drop(lock);
+                        for (_, (_store_id, stored_account)) in account_infos.iter() {
+                            self.accounts_index.update_secondary_indexes(
+                                &pubkey,
+                                *slot,
                                 &stored_account.account_meta.owner,
                                 &stored_account.data,
                                 &self.account_indexes,
-                                account_info,
-                                &mut _reclaims,
                             );
                         }
                     }

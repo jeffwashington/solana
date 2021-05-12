@@ -492,9 +492,12 @@ pub trait ZeroLamport {
     fn is_zero_lamport(&self) -> bool;
 }
 
-#[derive(Debug)]
+type MapType<T> = AccountMap<Pubkey, AccountMapEntry<T>>;
+type ReadWriteLockMapType<'a, T> = RwLockWriteGuard<'a, AccountMap<Pubkey, AccountMapEntry<T>>>;
+
+#[derive(Debug, Default)]
 pub struct AccountsIndex<T> {
-    pub account_maps: RwLock<AccountMap<Pubkey, AccountMapEntry<T>>>,
+    pub account_maps: RwLock<MapType<T>>,
     program_id_index: SecondaryIndex<DashMapSecondaryIndexEntry>,
     spl_token_mint_index: SecondaryIndex<DashMapSecondaryIndexEntry>,
     spl_token_owner_index: SecondaryIndex<RwLockSecondaryIndexEntry>,
@@ -1086,7 +1089,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
         max_root
     }
 
-    fn update_secondary_indexes(
+    pub(crate) fn update_secondary_indexes(
         &self,
         pubkey: &Pubkey,
         account_owner: &Pubkey,
@@ -1138,6 +1141,35 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
                 }
             }
         }
+    }
+
+    // Same functionally to upsert, but doesn't take the read lock
+    // initially on the accounts_map
+    // Can save time when inserting lots of new keys
+    pub fn start_bulk_insert(&self) -> ReadWriteLockMapType<T> {
+        self.account_maps.write().unwrap()
+    }
+
+    pub fn bulk_insert(
+        &self,
+        slot: Slot,
+        pubkey: &Pubkey,
+        account_info: T,
+        w_account_maps: &mut ReadWriteLockMapType<T>,
+    ) {
+        let new_entry = Arc::new(AccountMapEntryInner {
+            ref_count: AtomicU64::new(0),
+            slot_list: RwLock::new(SlotList::with_capacity(1)),
+        });
+        let account_entry = w_account_maps.entry(*pubkey).or_insert_with(|| new_entry);
+
+        let mut w_account_entry =
+            WriteAccountMapEntry::from_account_map_entry(account_entry.clone());
+        if account_info.is_zero_lamport() {
+            self.zero_lamport_pubkeys.insert(*pubkey);
+        }
+        let mut reclaims = SlotList::<T>::default();
+        w_account_entry.update(slot, account_info, &mut reclaims);
     }
 
     // Same functionally to upsert, but doesn't take the read lock
