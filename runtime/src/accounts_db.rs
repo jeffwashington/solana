@@ -1442,7 +1442,7 @@ impl AccountsDb {
             let result = receiver.recv();
             match result {
                 Ok(account) => {
-                    let pk = Pubkey::from_str("5KW2RMYEAwr38GXNMa3PPe22sa2rbFjb9DFjCgegiT4H").unwrap();
+                    let pk = Pubkey::from_str("73jDcxchGj4RkbMGw6EHPrwGu8hwDYaBQmxcLSz7E3y4").unwrap();
 
                     let ct = 
                     // if we hold the only ref, then this account doesn't need to be hashed, we ignore this account and it will disappear
@@ -2735,7 +2735,7 @@ impl AccountsDb {
             self.read_index_for_accessor_or_load_slow(ancestors, pubkey, max_root, false)?;
         // Notice the subtle `?` at previous line, we bail out pretty early if missing.
 
-        let pk = Pubkey::from_str("5KW2RMYEAwr38GXNMa3PPe22sa2rbFjb9DFjCgegiT4H").unwrap();
+        let pk = Pubkey::from_str("73jDcxchGj4RkbMGw6EHPrwGu8hwDYaBQmxcLSz7E3y4").unwrap();
 
         if self.caching_enabled && store_id != CACHE_VIRTUAL_STORAGE_ID {
             let result = self.read_only_accounts_cache.load(pubkey, slot);
@@ -5043,7 +5043,7 @@ impl AccountsDb {
         let total_processed_slots_across_all_threads = AtomicU64::new(0);
         let outer_slots_len = slots.len();
         let chunk_size = (outer_slots_len / 7) + 1; // approximately 400k slots in a snapshot
-        let pk = Pubkey::from_str("5KW2RMYEAwr38GXNMa3PPe22sa2rbFjb9DFjCgegiT4H").unwrap();
+        let pk = Pubkey::from_str("73jDcxchGj4RkbMGw6EHPrwGu8hwDYaBQmxcLSz7E3y4").unwrap();
         let pk2 = Pubkey::from_str("9Ax68VyU9KSnx9SZcMCjvsU7ETiZk7c3PFZKSqn4L8rr").unwrap();
         
 
