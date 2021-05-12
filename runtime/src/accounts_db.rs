@@ -4980,7 +4980,9 @@ impl AccountsDb {
             let mut was_first = false;
             let mut len = 0;
             let mut accts = 0;
-            for (index, slot) in slots.iter().enumerate() {
+            info!(
+                "generating index:pass: {}", pass);
+                for (index, slot) in slots.iter().enumerate() {
                 let now = Instant::now();
                 if now.duration_since(last_log_update).as_secs() >= 2 {
                     let my_total_newly_processed_slots_since_last_report =
@@ -4994,12 +4996,13 @@ impl AccountsDb {
                     was_first = was_first || 0 == previous_total_processed_slots_across_all_threads;
                     if was_first {
                         info!(
-                            "generating index: {}/{} slots..., len: {}, accts: {}",
+                            "generating index: {}/{} slots..., len: {}, accts: {}, pass: {}",
                             previous_total_processed_slots_across_all_threads
                                 + my_total_newly_processed_slots_since_last_report,
                             outer_slots_len,
                             len,
                             accts,
+                            pass,
                         );
                     }
                     last_log_update = now;
