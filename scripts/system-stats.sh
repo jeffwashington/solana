@@ -23,21 +23,6 @@ while true; do
 
   # if nvidia-smi exists, report gpu stats
   gpu_report=""
-  if [ -x "$(command -v nvidia-smi)" ]; then
-    mapfile -t individual_gpu_usage < <(nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total --format=csv,nounits,noheader)
-    total_gpu_usage=0
-    total_gpu_mem_usage=0
-    num_gpus=${#individual_gpu_usage[@]}
-    for entry in "${individual_gpu_usage[@]}"
-    do
-      read -r compute mem_used mem_total <<< "${entry//,/}"
-      total_gpu_usage=$(awk "BEGIN {print $total_gpu_usage + $compute }")
-      total_gpu_mem_usage=$(awk "BEGIN {print $total_gpu_mem_usage + $mem_used / $mem_total * 100}")
-    done
-    avg_gpu_usage=$(awk "BEGIN {print $total_gpu_usage / $num_gpus}")
-    avg_gpu_mem_usage=$(awk "BEGIN {print $total_gpu_mem_usage / $num_gpus}")
-    gpu_report=",avg_gpu_usage=$avg_gpu_usage,avg_gpu_mem_usage=$avg_gpu_mem_usage"
-  fi
 
   report="${cpu_report}${gpu_report}"
   echo $report
