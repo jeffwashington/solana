@@ -4147,7 +4147,7 @@ impl AccountsDb {
                 Some(&self.thread_pool_clean),
             )
         } else {
-            self.calculate_accounts_hash(slot, ancestors, false)
+            self.calculate_accounts_hash(slot, ancestors, true)
                 .unwrap()
         }
     }
