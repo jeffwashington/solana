@@ -4974,7 +4974,7 @@ impl AccountsDb {
         let total_processed_slots_across_all_threads = AtomicU64::new(0);
         let outer_slots_len = slots.len();
         let chunk_size = outer_slots_len; // approximately 400k slots in a snapshot
-        slots.par_chunks(chunk_size).for_each(|slots| {
+        for pass = 0..2 {
             let mut last_log_update = Instant::now();
             let mut my_last_reported_number_of_processed_slots = 0;
             let mut was_first = false;
@@ -5035,7 +5035,7 @@ impl AccountsDb {
                 // be shielding other accounts. When they are then purged, the
                 // original non-shielded account value will be visible when the account
                 // is restored from the append-vec
-                if !accounts_map.is_empty() {
+                if !accounts_map.is_empty() && pass == 1 {
                     let mut _reclaims: Vec<(u64, AccountInfo)> = vec![];
                     let dirty_keys = accounts_map.iter().map(|(pubkey, _info)| *pubkey).collect();
                     self.uncleaned_pubkeys.insert(*slot, dirty_keys);
@@ -5062,7 +5062,7 @@ impl AccountsDb {
                     len = self.accounts_index.len();
                 }
             }
-        });
+        }
         error!("line: {}", line!());
         // Need to add these last, otherwise older updates will be cleaned
         for slot in slots {
