@@ -4973,11 +4973,13 @@ impl AccountsDb {
         slots.sort();
         let total_processed_slots_across_all_threads = AtomicU64::new(0);
         let outer_slots_len = slots.len();
-        let chunk_size = (outer_slots_len / 7) + 1; // approximately 400k slots in a snapshot
+        let chunk_size = outer_slots_len; // approximately 400k slots in a snapshot
         slots.par_chunks(chunk_size).for_each(|slots| {
             let mut last_log_update = Instant::now();
             let mut my_last_reported_number_of_processed_slots = 0;
             let mut was_first = false;
+            let mut len = 0;
+            let mut accts = 0;
             for (index, slot) in slots.iter().enumerate() {
                 let now = Instant::now();
                 if now.duration_since(last_log_update).as_secs() >= 2 {
@@ -4992,10 +4994,12 @@ impl AccountsDb {
                     was_first = was_first || 0 == previous_total_processed_slots_across_all_threads;
                     if was_first {
                         info!(
-                            "generating index: {}/{} slots...",
+                            "generating index: {}/{} slots..., len: {}, accts: {}",
                             previous_total_processed_slots_across_all_threads
                                 + my_total_newly_processed_slots_since_last_report,
-                            outer_slots_len
+                            outer_slots_len,
+                            len,
+                            accts,
                         );
                     }
                     last_log_update = now;
@@ -5037,6 +5041,7 @@ impl AccountsDb {
                     self.uncleaned_pubkeys.insert(*slot, dirty_keys);
                     for (pubkey, account_infos) in accounts_map.into_iter() {
                         for (_, (store_id, stored_account)) in account_infos.into_iter() {
+                            accts += 1;
                             let account_info = AccountInfo {
                                 store_id,
                                 offset: stored_account.offset,
@@ -5054,15 +5059,17 @@ impl AccountsDb {
                             );
                         }
                     }
+                    len += self.accounts_index.len();
                 }
             }
         });
-
+        error!("line: {}", line!());
         // Need to add these last, otherwise older updates will be cleaned
         for slot in slots {
             self.accounts_index.add_root(slot, false);
         }
 
+        error!("line: {}", line!());
         let mut stored_sizes_and_counts = HashMap::new();
         for account_entry in self.accounts_index.account_maps.read().unwrap().values() {
             for (_slot, account_entry) in account_entry.slot_list.read().unwrap().iter() {
@@ -5073,6 +5080,8 @@ impl AccountsDb {
                 storage_entry_meta.1 += 1;
             }
         }
+
+        error!("line: {}", line!());
         for slot_stores in self.storage.0.iter() {
             for (id, store) in slot_stores.value().read().unwrap().iter() {
                 // Should be default at this point

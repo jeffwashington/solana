@@ -501,6 +501,7 @@ pub struct AccountsIndex<T> {
     roots_tracker: RwLock<RootsTracker>,
     ongoing_scan_roots: RwLock<BTreeMap<Slot, u64>>,
     zero_lamport_pubkeys: DashSet<Pubkey>,
+    len: RwLock<usize>,
 }
 
 impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
@@ -822,6 +823,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
             slot_list: RwLock::new(SlotList::with_capacity(1)),
         });
         let mut w_account_maps = self.account_maps.write().unwrap();
+        *self.len.write().unwrap() = w_account_maps.len();
         let mut is_newly_inserted = false;
         let account_entry = w_account_maps.entry(*pubkey).or_insert_with(|| {
             is_newly_inserted = true;
@@ -1129,6 +1131,10 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
                 }
             }
         }
+    }
+
+    pub fn len(&self) -> usize {
+        *self.len.read().unwrap()
     }
 
     // Same functionally to upsert, but doesn't take the read lock
