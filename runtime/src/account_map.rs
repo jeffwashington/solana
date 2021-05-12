@@ -1267,7 +1267,7 @@ pub mod tests {
 
                     //let mut keys = keys_orig.clone();
                     //keys.sort();
-                    let keys = keys_orig;
+                    let keys = &keys_orig;
 
                     let mut m = BTreeMap::new();
                     let value = vec![0; 60];
