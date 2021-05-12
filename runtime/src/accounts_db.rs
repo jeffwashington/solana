@@ -2777,7 +2777,7 @@ impl AccountsDb {
                 error!("storing2 pk in read_only_cache: {:?}, {}", account, pubkey);
             }
 
-            //self.read_only_accounts_cache.store(pubkey, slot, &account);
+            self.read_only_accounts_cache.store(pubkey, slot, &account);
         }else if is_cached{
             if &pk == pubkey {
                 error!("pk is in write cache: {:?}, {}", account, pubkey);
