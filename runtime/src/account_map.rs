@@ -1277,8 +1277,10 @@ pub mod tests {
                         m.insert(&keys[i], vec![keys[i].as_ref()[0]; 60]);
                     }
                     m13.stop();
+                    std::thread::sleep(std::time::Duration::from_secs(1));
+                    drop(m);
+                    std::thread::sleep(std::time::Duration::from_secs(1));
                 }
-
             }
         }
     }
