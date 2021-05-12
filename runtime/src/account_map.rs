@@ -1253,7 +1253,8 @@ pub mod tests {
         let mut size = 0;
         for key_pow in 15..mx {
             let key_count = 2usize.pow(key_pow);
-            let sz = std::cmp::max(key_count * 5000, 40_000_000_000);
+            let sz = std::cmp::min(key_count * 5000, 40_000_000_000);
+            error!("allocating: {}, {}", key_count, size);
             let mut m = Vec::with_capacity(sz);
             m.push(32u8);
             size = m.len();
