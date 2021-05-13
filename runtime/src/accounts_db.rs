@@ -3301,7 +3301,7 @@ impl AccountsDb {
         h
     }
 
-    pub fn hash_account<T: ReadableAccount + std::fmt::Debug>(slot: Slot, account: &T, pubkey: &Pubkey) -> Hash {
+    pub fn hash_account<T: ReadableAccount>(slot: Slot, account: &T, pubkey: &Pubkey) -> Hash {
         use std::str::FromStr;
         let h = Self::hash_account_data(
             slot,
@@ -3314,7 +3314,7 @@ impl AccountsDb {
         );
         let pk = Pubkey::from_str("5KW2RMYEAwr38GXNMa3PPe22sa2rbFjb9DFjCgegiT4H").unwrap();
         if pubkey == &pk {
-            error!("{}, {}, slot: {}, account: {:?}", pubkey, h, slot, account);
+            error!("{}, {}, slot: {}", pubkey, h, slot);
         }
 
         h
