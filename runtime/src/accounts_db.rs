@@ -3301,7 +3301,7 @@ impl AccountsDb {
         h
     }
 
-    pub fn hash_account<T: ReadableAccount>(slot: Slot, account: &T, pubkey: &Pubkey) -> Hash {
+    pub fn hash_account<T: ReadableAccount + Debug>(slot: Slot, account: &T, pubkey: &Pubkey) -> Hash {
         use std::str::FromStr;
         let h = Self::hash_account_data(
             slot,
