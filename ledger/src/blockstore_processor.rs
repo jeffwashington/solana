@@ -524,10 +524,10 @@ fn do_process_blockstore_from_root(
 
     datapoint_info!(
         "process_blockstore_from_root",
-        ("total_time_us", now.elapsed().as_us() as i64),
-        ("frozen_banks", bank_forks.frozen_banks().len() as i64),
-        ("slot", bank_forks.root() as i64),
-        ("forks", initial_forks.len() as i64),
+        ("total_time_us", now.elapsed().as_micros(), i64),
+        ("frozen_banks", bank_forks.frozen_banks().len(), i64),
+        ("slot", bank_forks.root(), i64),
+        ("forks", initial_forks.len(), i64)
     );
 
     info!("ledger processing timing: {:?}", timing);
