@@ -5035,17 +5035,25 @@ impl AccountsDb {
                             accounts_map.iter().map(|(pubkey, _info)| *pubkey).collect();
                         self.uncleaned_pubkeys.insert(*slot, dirty_keys);
 
-                        let infos: Vec<_> = accounts_map.iter().map(|(pubkey, account_infos)| {
-                            account_infos.iter().map(|(_, (store_id, stored_account))| {
-                                (pubkey, AccountInfo {
-                                    store_id: *store_id,
-                                    offset: stored_account.offset,
-                                    stored_size: stored_account.stored_size,
-                                    lamports: stored_account.account_meta.lamports,
-                                })
-                            }).collect::<Vec<_>>()
-                        }).collect();
-                        
+                        let infos: Vec<_> = accounts_map
+                            .iter()
+                            .map(|(pubkey, account_infos)| {
+                                account_infos
+                                    .iter()
+                                    .map(|(_, (store_id, stored_account))| {
+                                        (
+                                            pubkey,
+                                            AccountInfo {
+                                                store_id: *store_id,
+                                                offset: stored_account.offset,
+                                                stored_size: stored_account.stored_size,
+                                                lamports: stored_account.account_meta.lamports,
+                                            },
+                                        )
+                                    })
+                                    .collect::<Vec<_>>()
+                            })
+                            .collect();
                         let mut lock = self.accounts_index.get_account_maps_write_lock();
                         infos.into_iter().for_each(|item| {
                             item.into_iter().for_each(|(pubkey, account_info)| {
