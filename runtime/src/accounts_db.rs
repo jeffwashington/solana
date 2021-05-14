@@ -5050,6 +5050,9 @@ impl AccountsDb {
                             }
                         }
                         drop(lock);
+                        let dirty_keys =
+                            accounts_map.iter().map(|(pubkey, _info)| *pubkey).collect();
+                        self.uncleaned_pubkeys.insert(*slot, dirty_keys);
                         if !self.account_indexes.is_empty() {
                             for (pubkey, account_infos) in accounts_map.into_iter() {
                                 for (_, (_store_id, stored_account)) in account_infos.iter() {
@@ -5060,12 +5063,8 @@ impl AccountsDb {
                                         &self.account_indexes,
                                     );
                                 }
-                                //dirty_keys.push(pubkey);
                             }
                         }
-                        let dirty_keys =
-                            accounts_map.iter().map(|(pubkey, _info)| *pubkey).collect();
-                        self.uncleaned_pubkeys.insert(*slot, dirty_keys);
                     }
                 }
                 scan_time_sum
