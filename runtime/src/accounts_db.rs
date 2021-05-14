@@ -5030,7 +5030,6 @@ impl AccountsDb {
                     // is restored from the append-vec
                     if !accounts_map.is_empty() {
                         let mut _reclaims: Vec<(u64, AccountInfo)> = vec![];
-                        let mut dirty_keys = Vec::with_capacity(accounts_map.len());
                         let mut lock = self.accounts_index.get_account_maps_write_lock();
                         for (pubkey, account_infos) in accounts_map.iter() {
                             for (_, (store_id, stored_account)) in account_infos.iter() {
@@ -5051,17 +5050,21 @@ impl AccountsDb {
                             }
                         }
                         drop(lock);
-                        for (pubkey, account_infos) in accounts_map.into_iter() {
-                            for (_, (_store_id, stored_account)) in account_infos.iter() {
-                                self.accounts_index.update_secondary_indexes(
-                                    &pubkey,
-                                    &stored_account.account_meta.owner,
-                                    &stored_account.data,
-                                    &self.account_indexes,
-                                );
+                        if !self.account_indexes.is_empty() {
+                            for (pubkey, account_infos) in accounts_map.into_iter() {
+                                for (_, (_store_id, stored_account)) in account_infos.iter() {
+                                    self.accounts_index.update_secondary_indexes(
+                                        &pubkey,
+                                        &stored_account.account_meta.owner,
+                                        &stored_account.data,
+                                        &self.account_indexes,
+                                    );
+                                }
+                                //dirty_keys.push(pubkey);
                             }
-                            dirty_keys.push(pubkey);
                         }
+                        let dirty_keys =
+                            accounts_map.iter().map(|(pubkey, _info)| *pubkey).collect();
                         self.uncleaned_pubkeys.insert(*slot, dirty_keys);
                     }
                 }
