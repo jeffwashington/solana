@@ -5030,9 +5030,7 @@ impl AccountsDb {
                     // is restored from the append-vec
                     if !accounts_map.is_empty() {
                         let mut _reclaims: Vec<(u64, AccountInfo)> = vec![];
-                        let dirty_keys =
-                            accounts_map.iter().map(|(pubkey, _info)| *pubkey).collect();
-                        self.uncleaned_pubkeys.insert(*slot, dirty_keys);
+                        let mut dirty_keys = Vec::with_capacity(accounts_map.len());
                         let mut lock = self.accounts_index.get_account_maps_write_lock();
                         for (pubkey, account_infos) in accounts_map.iter() {
                             for (_, (store_id, stored_account)) in account_infos.iter() {
@@ -5062,7 +5060,9 @@ impl AccountsDb {
                                     &self.account_indexes,
                                 );
                             }
+                            dirty_keys.push(pubkey);
                         }
+                        self.uncleaned_pubkeys.insert(*slot, dirty_keys);
                     }
                 }
                 scan_time_sum
