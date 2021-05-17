@@ -1197,6 +1197,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
                     new_item
                 });
                 if !is_newly_inserted {
+                    error!("jwash:duplicate item: {}, {}", pubkey, slot);
                     let mut w_account_entry =
                         WriteAccountMapEntry::from_account_map_entry(account_entry.clone());
                     w_account_entry.update(slot, account_info, &mut reclaims);
