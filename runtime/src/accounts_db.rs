@@ -5031,43 +5031,35 @@ impl AccountsDb {
                     // is restored from the append-vec
                     if !accounts_map.is_empty() {
                         let mut _reclaims: Vec<(u64, AccountInfo)> = vec![];
-                        let dirty_keys =
-                            accounts_map.iter().map(|(pubkey, _info)| *pubkey).collect();
-                        self.uncleaned_pubkeys.insert(*slot, dirty_keys);
-
-                        let infos: Vec<_> = accounts_map
+                        let mut len = 0;
+                        let dirty_keys = accounts_map
                             .iter()
-                            .map(|(pubkey, account_infos)| {
-                                account_infos
-                                    .iter()
-                                    .map(|(_, (store_id, stored_account))| {
-                                        (
-                                            pubkey,
-                                            AccountInfo {
-                                                store_id: *store_id,
-                                                offset: stored_account.offset,
-                                                stored_size: stored_account.stored_size,
-                                                lamports: stored_account.account_meta.lamports,
-                                            },
-                                        )
-                                    })
-                                    .collect::<Vec<_>>()
+                            .map(|(pubkey, infos)| {
+                                len += infos.len();
+                                *pubkey
                             })
                             .collect();
-                        let mut lock = self.accounts_index.get_account_maps_write_lock();
-                        infos.into_iter().for_each(|item| {
-                            item.into_iter().for_each(|(pubkey, account_info)| {
-                                self.accounts_index
-                                    .insert_new_if_missing_into_primary_index(
-                                        *slot,
-                                        &pubkey,
-                                        account_info,
-                                        &mut _reclaims,
-                                        &mut lock,
-                                    );
-                            });
+                        self.uncleaned_pubkeys.insert(*slot, dirty_keys);
+
+                        let mut items = Vec::with_capacity(len);
+                        accounts_map.iter().for_each(|(pubkey, account_infos)| {
+                            account_infos
+                                .iter()
+                                .for_each(|(_, (store_id, stored_account))| {
+                                    items.push((
+                                        pubkey,
+                                        AccountInfo {
+                                            store_id: *store_id,
+                                            offset: stored_account.offset,
+                                            stored_size: stored_account.stored_size,
+                                            lamports: stored_account.account_meta.lamports,
+                                        },
+                                    ));
+                                });
                         });
-                        drop(lock);
+
+                        self.accounts_index
+                            .insert_new_if_missing_into_primary_index(*slot, items);
                         if !self.account_indexes.is_empty() {
                             for (pubkey, account_infos) in accounts_map.into_iter() {
                                 for (_, (_store_id, stored_account)) in account_infos.iter() {

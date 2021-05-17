@@ -1164,31 +1164,44 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
     // initially on the accounts_map
     // Can save time when inserting lots of new keys.
     // But, does NOT update secondary index
+    #[allow(clippy::needless_collect)]
     pub(crate) fn insert_new_if_missing_into_primary_index(
         &self,
         slot: Slot,
-        pubkey: &Pubkey,
-        account_info: T,
-        reclaims: &mut SlotList<T>,
-        w_account_maps: &mut ReadWriteLockMapType<T>,
+        items: Vec<(&Pubkey, T)>,
     ) {
-        // assume not in cache
-        let mut is_newly_inserted = false;
-        let account_entry = w_account_maps.entry(*pubkey).or_insert_with(|| {
-            is_newly_inserted = true;
-            Arc::new(AccountMapEntryInner {
-                ref_count: AtomicU64::new(if account_info.is_cached() { 0 } else { 1 }),
-                slot_list: RwLock::new(vec![(slot, account_info.clone())]),
+        let potentially_new_items = items
+            .iter()
+            .map(|(pubkey, account_info)| {
+                // this doesn't need a lock - we are in a constrained, insert-only environment
+                if account_info.is_zero_lamport() {
+                    self.zero_lamport_pubkeys.insert(**pubkey);
+                }
+                Arc::new(AccountMapEntryInner {
+                    ref_count: AtomicU64::new(if account_info.is_cached() { 0 } else { 1 }),
+                    slot_list: RwLock::new(vec![(slot, account_info.clone())]),
+                })
             })
-        });
-        if account_info.is_zero_lamport() {
-            self.zero_lamport_pubkeys.insert(*pubkey);
-        }
-        if !is_newly_inserted {
-            let mut w_account_entry =
-                WriteAccountMapEntry::from_account_map_entry(account_entry.clone());
-            w_account_entry.update(slot, account_info, reclaims);
-        }
+            .collect::<Vec<_>>();
+
+        let mut reclaims = SlotList::new();
+
+        let mut w_account_maps = self.get_account_maps_write_lock();
+        items
+            .into_iter()
+            .zip(potentially_new_items.into_iter())
+            .for_each(|((pubkey, account_info), new_item)| {
+                let mut is_newly_inserted = false;
+                let account_entry = w_account_maps.entry(*pubkey).or_insert_with(|| {
+                    is_newly_inserted = true;
+                    new_item
+                });
+                if !is_newly_inserted {
+                    let mut w_account_entry =
+                        WriteAccountMapEntry::from_account_map_entry(account_entry.clone());
+                    w_account_entry.update(slot, account_info, &mut reclaims);
+                }
+            });
     }
 
     // Updates the given pubkey at the given slot with the new account information.
@@ -2213,64 +2226,47 @@ pub mod tests {
     #[test]
     fn test_insert_new_with_lock_no_ancestors() {
         let key = Keypair::new();
-        let mut gc = Vec::new();
         let slot = 0;
 
         let index = AccountsIndex::<bool>::default();
-        let mut w_account_maps = index.get_account_maps_write_lock();
         let account_info = true;
-        index.insert_new_if_missing_into_primary_index(
-            slot,
-            &key.pubkey(),
-            account_info,
-            &mut gc,
-            &mut w_account_maps,
-        );
-        drop(w_account_maps);
-        assert!(gc.is_empty());
+        let pubkey = &key.pubkey();
+        let items = vec![(pubkey, account_info)];
+        index.insert_new_if_missing_into_primary_index(slot, items);
 
         assert!(index.zero_lamport_pubkeys().is_empty());
 
         let mut ancestors = Ancestors::default();
-        assert!(index.get(&key.pubkey(), Some(&ancestors), None).is_none());
-        assert!(index.get(&key.pubkey(), None, None).is_none());
+        assert!(index.get(&pubkey, Some(&ancestors), None).is_none());
+        assert!(index.get(&pubkey, None, None).is_none());
 
         let mut num = 0;
         index.unchecked_scan_accounts("", &ancestors, |_pubkey, _index| num += 1);
         assert_eq!(num, 0);
         ancestors.insert(slot, 0);
-        assert!(index.get(&key.pubkey(), Some(&ancestors), None).is_some());
-        assert_eq!(index.ref_count_from_storage(&key.pubkey()), 1);
+        assert!(index.get(&pubkey, Some(&ancestors), None).is_some());
+        assert_eq!(index.ref_count_from_storage(&pubkey), 1);
         index.unchecked_scan_accounts("", &ancestors, |_pubkey, _index| num += 1);
         assert_eq!(num, 1);
 
         // not zero lamports
-        let mut gc = Vec::new();
         let index = AccountsIndex::<AccountInfoTest>::default();
-        let mut w_account_maps = index.get_account_maps_write_lock();
         let account_info: AccountInfoTest = 0 as AccountInfoTest;
-        index.insert_new_if_missing_into_primary_index(
-            slot,
-            &key.pubkey(),
-            account_info,
-            &mut gc,
-            &mut w_account_maps,
-        );
-        drop(w_account_maps);
-        assert!(gc.is_empty());
+        let items = vec![(pubkey, account_info)];
+        index.insert_new_if_missing_into_primary_index(slot, items);
 
         assert!(!index.zero_lamport_pubkeys().is_empty());
 
         let mut ancestors = Ancestors::default();
-        assert!(index.get(&key.pubkey(), Some(&ancestors), None).is_none());
-        assert!(index.get(&key.pubkey(), None, None).is_none());
+        assert!(index.get(&pubkey, Some(&ancestors), None).is_none());
+        assert!(index.get(&pubkey, None, None).is_none());
 
         let mut num = 0;
         index.unchecked_scan_accounts("", &ancestors, |_pubkey, _index| num += 1);
         assert_eq!(num, 0);
         ancestors.insert(slot, 0);
-        assert!(index.get(&key.pubkey(), Some(&ancestors), None).is_some());
-        assert_eq!(index.ref_count_from_storage(&key.pubkey()), 0); // cached, so 0
+        assert!(index.get(&pubkey, Some(&ancestors), None).is_some());
+        assert_eq!(index.ref_count_from_storage(&pubkey), 0); // cached, so 0
         index.unchecked_scan_accounts("", &ancestors, |_pubkey, _index| num += 1);
         assert_eq!(num, 1);
     }
