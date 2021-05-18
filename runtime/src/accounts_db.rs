@@ -4452,22 +4452,29 @@ impl AccountsDb {
         startup: bool,
     ) -> SlotList<AccountInfo> {
         let mut reclaims = SlotList::<AccountInfo>::with_capacity(infos.len() * 2);
-        let info = infos.into_iter().zip(accounts.iter()).collect::<Vec<_>>();
-        self.accounts_index.upsert_batch(slot, info.iter(), &self.account_indexes, &mut reclaims);
-        /*
-        for (info, pubkey_account) in infos.into_iter().zip(accounts.iter()) {
-            let pubkey = pubkey_account.0;
-            self.accounts_index.upsert2(
+
+        if startup {
+            let info = infos.into_iter().zip(accounts.iter()).collect::<Vec<_>>();
+            self.accounts_index.upsert_batch(
                 slot,
-                pubkey,
-                &pubkey_account.1.owner(),
-                &pubkey_account.1.data(),
+                info.into_iter(),
                 &self.account_indexes,
-                info,
                 &mut reclaims,
             );
+        } else {
+            for (info, pubkey_account) in infos.into_iter().zip(accounts.iter()) {
+                let pubkey = pubkey_account.0;
+                self.accounts_index.upsert(
+                    slot,
+                    pubkey,
+                    &pubkey_account.1.owner(),
+                    &pubkey_account.1.data(),
+                    &self.account_indexes,
+                    info,
+                    &mut reclaims,
+                );
+            }
         }
-        */
         reclaims
     }
 

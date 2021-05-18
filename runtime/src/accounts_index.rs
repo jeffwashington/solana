@@ -1219,17 +1219,31 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
     pub fn upsert_batch<'a>(
         &'a self,
         slot: Slot,
-        items: impl Iterator<Item = &'a (T, (&'a Pubkey, &'a (impl ReadableAccount + 'a)))>,
+        items: impl Iterator<Item = (T, &'a (&'a Pubkey, &'a (impl ReadableAccount + 'a)))> + Clone,
         account_indexes: &'a AccountSecondaryIndexes,
         reclaims: &'a mut SlotList<T>,
-    ) -> bool {
-        false
+    ) {
+        let mut w_account_maps = self.account_maps.write().unwrap();
+
+        for (info, pubkey_account) in items.clone() {
+            let pubkey = pubkey_account.0;
+            self.insert_new_if_missing_into_primary_index(slot, pubkey, info, reclaims, &mut w_account_maps);
+        }
+        drop(w_account_maps);
+
+        if !account_indexes.is_empty() {
+            for (_info, pubkey_account) in items {
+                let pubkey = pubkey_account.0;
+                let account = pubkey_account.1;
+                self.update_secondary_indexes(pubkey, account.owner(), account.data(), account_indexes);
+            }
+        }
     }
 
     // Updates the given pubkey at the given slot with the new account information.
     // Returns true if the pubkey was newly inserted into the index, otherwise, if the
     // pubkey updates an existing entry in the index, returns false.
-    pub fn upsert2(
+    pub fn upsert(
         &self,
         slot: Slot,
         pubkey: &Pubkey,
