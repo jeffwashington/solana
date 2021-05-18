@@ -2118,7 +2118,7 @@ impl Bank {
         // accounts that were included in the bank delta hash when the bank was frozen,
         // and if we clean them here, any newly created snapshot's hash for this bank
         // may not match the frozen hash.
-        self.clean_accounts(true);
+        self.clean_accounts(true, false);
         clean.stop();
 
         let mut shrink = Measure::start("shrink");
@@ -4521,7 +4521,7 @@ impl Bank {
     pub fn verify_snapshot_bank(&self) -> bool {
         let mut clean_time = Measure::start("clean");
         if self.slot() > 0 {
-            self.clean_accounts(true);
+            self.clean_accounts(true, true);
         }
         clean_time.stop();
 
@@ -4803,7 +4803,7 @@ impl Bank {
             .add_program(program_id, process_instruction_with_context);
     }
 
-    pub fn clean_accounts(&self, skip_last: bool) {
+    pub fn clean_accounts(&self, skip_last: bool, is_startup: bool) {
         let max_clean_slot = if skip_last {
             // Don't clean the slot we're snapshotting because it may have zero-lamport
             // accounts that were included in the bank delta hash when the bank was frozen,
@@ -4813,7 +4813,7 @@ impl Bank {
         } else {
             None
         };
-        self.rc.accounts.accounts_db.clean_accounts(max_clean_slot);
+        self.rc.accounts.accounts_db.clean_accounts(max_clean_slot, is_startup);
     }
 
     pub fn shrink_all_slots(&self, is_startup: bool) {

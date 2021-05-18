@@ -1057,11 +1057,14 @@ impl ShrinkStats {
         let last = self.last_report.load(Ordering::Relaxed);
         let now = solana_sdk::timing::timestamp();
 
-        let should_report = force || now.saturating_sub(last) > 1000
-            && self
-                .last_report
-                .compare_exchange(last, now, Ordering::Relaxed, Ordering::Relaxed)
-                == Ok(last);
+        let should_report = force
+            || now.saturating_sub(last) > 1000
+                && self.last_report.compare_exchange(
+                    last,
+                    now,
+                    Ordering::Relaxed,
+                    Ordering::Relaxed,
+                ) == Ok(last);
 
         if should_report {
             datapoint_info!(
@@ -1590,7 +1593,7 @@ impl AccountsDb {
     // collection
     // Only remove those accounts where the entire rooted history of the account
     // can be purged because there are no live append vecs in the ancestors
-    pub fn clean_accounts(&self, max_clean_root: Option<Slot>) {
+    pub fn clean_accounts(&self, max_clean_root: Option<Slot>, is_startup: bool) {
         let max_clean_root = self.max_clean_root(max_clean_root);
 
         // hold a lock to prevent slot shrinking from running because it might modify some rooted
@@ -1606,7 +1609,7 @@ impl AccountsDb {
         let mut accounts_scan = Measure::start("accounts_scan");
         // parallel scan the index.
         let (mut purges_zero_lamports, purges_old_accounts) = {
-            self.thread_pool_clean.install(|| {
+            let inner = || {
                 pubkeys
                     .par_chunks(4096)
                     .map(|pubkeys: &[Pubkey]| {
@@ -1674,7 +1677,12 @@ impl AccountsDb {
                             m1
                         },
                     )
-            })
+            };
+            if is_startup {
+                inner()
+            } else {
+                self.thread_pool_clean.install(inner)
+            }
         };
         accounts_scan.stop();
 
