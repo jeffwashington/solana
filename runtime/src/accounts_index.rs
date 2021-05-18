@@ -10,6 +10,7 @@ use log::*;
 use ouroboros::self_referencing;
 use solana_measure::measure::Measure;
 use solana_sdk::{
+    account::ReadableAccount,
     clock::Slot,
     pubkey::{Pubkey, PUBKEY_BYTES},
 };
@@ -1215,10 +1216,20 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
         }
     }
 
+    pub fn upsert_batch<'a>(
+        &'a self,
+        slot: Slot,
+        items: impl Iterator<Item = &'a (T, (&'a Pubkey, &'a (impl ReadableAccount + 'a)))>,
+        account_indexes: &'a AccountSecondaryIndexes,
+        reclaims: &'a mut SlotList<T>,
+    ) -> bool {
+        false
+    }
+
     // Updates the given pubkey at the given slot with the new account information.
     // Returns true if the pubkey was newly inserted into the index, otherwise, if the
     // pubkey updates an existing entry in the index, returns false.
-    pub fn upsert(
+    pub fn upsert2(
         &self,
         slot: Slot,
         pubkey: &Pubkey,

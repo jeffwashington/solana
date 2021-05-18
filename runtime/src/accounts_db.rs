@@ -2067,6 +2067,7 @@ impl AccountsDb {
                 Some(&hashes),
                 Some(Box::new(move |_, _| shrunken_store.clone())),
                 Some(Box::new(write_versions.into_iter())),
+                startup,
             );
 
             // `store_accounts_frozen()` above may have purged accounts from some
@@ -3756,12 +3757,14 @@ impl AccountsDb {
                 // will be able to find the account in storage
                 let flushed_store =
                     self.create_and_insert_store(slot, aligned_total_size, "flush_slot_cache");
+                let startup = false;
                 self.store_accounts_frozen(
                     slot,
                     &accounts,
                     Some(&hashes),
                     Some(Box::new(move |_, _| flushed_store.clone())),
                     None,
+                    startup,
                 );
                 // If the above sizing function is correct, just one AppendVec is enough to hold
                 // all the data for the slot
@@ -4446,11 +4449,15 @@ impl AccountsDb {
         slot: Slot,
         infos: Vec<AccountInfo>,
         accounts: &[(&Pubkey, &impl ReadableAccount)],
+        startup: bool,
     ) -> SlotList<AccountInfo> {
         let mut reclaims = SlotList::<AccountInfo>::with_capacity(infos.len() * 2);
+        let info = infos.into_iter().zip(accounts.iter()).collect::<Vec<_>>();
+        self.accounts_index.upsert_batch(slot, info.iter(), &self.account_indexes, &mut reclaims);
+        /*
         for (info, pubkey_account) in infos.into_iter().zip(accounts.iter()) {
             let pubkey = pubkey_account.0;
-            self.accounts_index.upsert(
+            self.accounts_index.upsert2(
                 slot,
                 pubkey,
                 &pubkey_account.1.owner(),
@@ -4460,6 +4467,7 @@ impl AccountsDb {
                 &mut reclaims,
             );
         }
+        */
         reclaims
     }
 
@@ -4718,8 +4726,9 @@ impl AccountsDb {
             .or_insert_with(BankHashInfo::default);
         slot_info.stats.merge(&stats);
 
+        let startup = false;
         // we use default hashes for now since the same account may be stored to the cache multiple times
-        self.store_accounts_unfrozen(slot, accounts, None, is_cached_store);
+        self.store_accounts_unfrozen(slot, accounts, None, is_cached_store, startup);
         self.report_store_timings();
     }
 
@@ -4850,6 +4859,7 @@ impl AccountsDb {
         accounts: &[(&Pubkey, &AccountSharedData)],
         hashes: Option<&[&Hash]>,
         is_cached_store: bool,
+        startup: bool,
     ) {
         // This path comes from a store to a non-frozen slot.
         // If a store is dead here, then a newer update for
@@ -4867,6 +4877,7 @@ impl AccountsDb {
             None::<Box<dyn Iterator<Item = u64>>>,
             is_cached_store,
             reset_accounts,
+            startup,
         );
     }
 
@@ -4877,6 +4888,7 @@ impl AccountsDb {
         hashes: Option<&[impl Borrow<Hash>]>,
         storage_finder: Option<StorageFinder<'a>>,
         write_version_producer: Option<Box<dyn Iterator<Item = StoredMetaWriteVersion>>>,
+        startup: bool,
     ) -> StoreAccountsTiming {
         // stores on a frozen slot should not reset
         // the append vec so that hashing could happen on the store
@@ -4891,6 +4903,7 @@ impl AccountsDb {
             write_version_producer,
             is_cached_store,
             reset_accounts,
+            startup,
         )
     }
 
@@ -4903,6 +4916,7 @@ impl AccountsDb {
         write_version_producer: Option<Box<dyn Iterator<Item = u64>>>,
         is_cached_store: bool,
         reset_accounts: bool,
+        startup: bool,
     ) -> StoreAccountsTiming {
         let storage_finder: StorageFinder<'a> = storage_finder
             .unwrap_or_else(|| Box::new(move |slot, size| self.find_storage_candidate(slot, size)));
@@ -4939,7 +4953,7 @@ impl AccountsDb {
         // after the account are stored by the above `store_accounts_to`
         // call and all the accounts are stored, all reads after this point
         // will know to not check the cache anymore
-        let mut reclaims = self.update_index(slot, infos, accounts);
+        let mut reclaims = self.update_index(slot, infos, accounts, startup);
 
         // For each updated account, `reclaims` should only have at most one
         // item (if the account was previously updated in this slot).
@@ -5446,6 +5460,7 @@ impl AccountsDb {
             start.stop();
             create_and_insert_store_elapsed = start.as_us();
 
+            let startup = false;
             // here, we're writing back alive_accounts. That should be an atomic operation
             // without use of rather wide locks in this whole function, because we're
             // mutating rooted slots; There should be no writers to them.
@@ -5455,6 +5470,7 @@ impl AccountsDb {
                 Some(&hashes),
                 Some(Box::new(move |_, _| shrunken_store.clone())),
                 Some(Box::new(write_versions.into_iter())),
+                startup,
             );
 
             let mut start = Measure::start("write_storage_elapsed");
