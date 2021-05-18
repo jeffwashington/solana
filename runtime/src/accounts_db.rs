@@ -1053,11 +1053,11 @@ struct ShrinkStats {
 }
 
 impl ShrinkStats {
-    fn report(&self) {
+    fn report(&self, force: bool) {
         let last = self.last_report.load(Ordering::Relaxed);
         let now = solana_sdk::timing::timestamp();
 
-        let should_report = now.saturating_sub(last) > 1000
+        let should_report = force || now.saturating_sub(last) > 1000
             && self
                 .last_report
                 .compare_exchange(last, now, Ordering::Relaxed, Ordering::Relaxed)
@@ -2155,7 +2155,7 @@ impl AccountsDb {
             original_bytes.saturating_sub(aligned_total),
             Ordering::Relaxed,
         );
-        self.shrink_stats.report();
+        self.shrink_stats.report(false);
     }
 
     // Reads all accounts in given slot's AppendVecs and filter only to alive,
@@ -2217,6 +2217,7 @@ impl AccountsDb {
                     self.shrink_slot_forced(*slot, startup);
                 }
             });
+            self.shrink_stats.report(true);
         } else {
             for slot in self.all_slots_in_storage() {
                 if self.caching_enabled {
@@ -5550,7 +5551,7 @@ impl AccountsDb {
         self.shrink_stats
             .recycle_stores_write_elapsed
             .fetch_add(recycle_stores_write_elapsed.as_us(), Ordering::Relaxed);
-        self.shrink_stats.report();
+        self.shrink_stats.report(false);
 
         alive_accounts_len
     }
