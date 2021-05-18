@@ -509,6 +509,7 @@ pub trait ZeroLamport {
 
 type MapType<T> = AccountMap<Pubkey, AccountMapEntry<T>>;
 type AccountMapsWriteLock<'a, T> = RwLockWriteGuard<'a, AccountMap<Pubkey, AccountMapEntry<T>>>;
+type ReadLockMapType<'a, T> = RwLockReadGuard<'a, AccountMap<Pubkey, AccountMapEntry<T>>>;
 
 #[derive(Debug)]
 pub struct AccountsIndex<T> {
@@ -837,10 +838,15 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
     }
 
     pub fn get_account_read_entry(&self, pubkey: &Pubkey) -> Option<ReadAccountMapEntry<T>> {
-        self.account_maps
-            .read()
-            .unwrap()
-            .get(pubkey)
+        self.get_account_read_entry_with_lock(pubkey, &self.account_maps.read().unwrap())
+    }
+
+    pub fn get_account_read_entry_with_lock(
+        &self,
+        pubkey: &Pubkey,
+        lock: &ReadLockMapType<'_, T>,
+    ) -> Option<ReadAccountMapEntry<T>> {
+        lock.get(pubkey)
             .cloned()
             .map(ReadAccountMapEntry::from_account_map_entry)
     }
@@ -1181,6 +1187,10 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
 
     pub(crate) fn get_account_maps_write_lock(&self) -> AccountMapsWriteLock<T> {
         self.account_maps.write().unwrap()
+    }
+
+    pub(crate) fn get_account_maps_read_lock(&self) -> ReadLockMapType<T> {
+        self.account_maps.read().unwrap()
     }
 
     // Same functionally to upsert, but doesn't take the read lock
