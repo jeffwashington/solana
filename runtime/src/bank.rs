@@ -7333,7 +7333,7 @@ pub(crate) mod tests {
         bank.squash();
         bank.force_flush_accounts_cache();
         let hash = bank.update_accounts_hash();
-        bank.clean_accounts(false);
+        bank.clean_accounts(false, false);
         assert_eq!(bank.update_accounts_hash(), hash);
 
         let bank0 = Arc::new(new_from_parent(&bank));
@@ -7353,14 +7353,14 @@ pub(crate) mod tests {
 
         info!("bank0 purge");
         let hash = bank0.update_accounts_hash();
-        bank0.clean_accounts(false);
+        bank0.clean_accounts(false, false);
         assert_eq!(bank0.update_accounts_hash(), hash);
 
         assert_eq!(bank0.get_account(&keypair.pubkey()).unwrap().lamports(), 10);
         assert_eq!(bank1.get_account(&keypair.pubkey()), None);
 
         info!("bank1 purge");
-        bank1.clean_accounts(false);
+        bank1.clean_accounts(false, false);
 
         assert_eq!(bank0.get_account(&keypair.pubkey()).unwrap().lamports(), 10);
         assert_eq!(bank1.get_account(&keypair.pubkey()), None);
@@ -7381,7 +7381,7 @@ pub(crate) mod tests {
         assert_eq!(bank0.get_account(&keypair.pubkey()), None);
         assert_eq!(bank1.get_account(&keypair.pubkey()), None);
         bank1.force_flush_accounts_cache();
-        bank1.clean_accounts(false);
+        bank1.clean_accounts(false, false);
 
         assert!(bank1.verify_bank_hash());
     }
@@ -10604,7 +10604,7 @@ pub(crate) mod tests {
 
         // Clean accounts, which should add earlier slots to the shrink
         // candidate set
-        bank2.clean_accounts(false);
+        bank2.clean_accounts(false, false);
 
         // Slots 0 and 1 should be candidates for shrinking, but slot 2
         // shouldn't because none of its accounts are outdated by a later
@@ -10660,7 +10660,7 @@ pub(crate) mod tests {
         goto_end_of_slot(Arc::<Bank>::get_mut(&mut bank).unwrap());
 
         bank.squash();
-        bank.clean_accounts(false);
+        bank.clean_accounts(false, false);
         let force_to_return_alive_account = 0;
         assert_eq!(
             bank.process_stale_slot_with_budget(22, force_to_return_alive_account),
@@ -11917,7 +11917,7 @@ pub(crate) mod tests {
                         current_major_fork_bank.squash();
                         // Try to get cache flush/clean to overlap with the scan
                         current_major_fork_bank.force_flush_accounts_cache();
-                        current_major_fork_bank.clean_accounts(false);
+                        current_major_fork_bank.clean_accounts(false, false);
                     }
                 },
             )
@@ -11953,7 +11953,7 @@ pub(crate) mod tests {
                         current_bank.squash();
                         if current_bank.slot() % 2 == 0 {
                             current_bank.force_flush_accounts_cache();
-                            current_bank.clean_accounts(true);
+                            current_bank.clean_accounts(true, false);
                         }
                         prev_bank = current_bank.clone();
                         current_bank = Arc::new(Bank::new_from_parent(
@@ -12680,7 +12680,7 @@ pub(crate) mod tests {
         bank2.squash();
 
         drop(bank1);
-        bank2.clean_accounts(false);
+        bank2.clean_accounts(false, false);
 
         let expected_ref_count_for_cleaned_up_keys = 0;
         let expected_ref_count_for_keys_only_in_slot_2 = bank2
