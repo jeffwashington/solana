@@ -803,7 +803,7 @@ pub struct AccountsDb {
 
     pub bank_hashes: RwLock<HashMap<Slot, BankHashInfo>>,
 
-    stats: AccountsStats,
+    pub stats: AccountsStats,
 
     clean_accounts_stats: CleanAccountsStats,
 
@@ -831,7 +831,7 @@ pub struct AccountsDb {
 }
 
 #[derive(Debug, Default)]
-struct AccountsStats {
+pub struct AccountsStats {
     delta_hash_scan_time_total_us: AtomicU64,
     delta_hash_accumulate_time_total_us: AtomicU64,
     delta_hash_num: AtomicU64,
@@ -1053,7 +1053,7 @@ struct ShrinkStats {
 }
 
 impl ShrinkStats {
-    fn report(&self, force: bool) {
+    fn report(&self, force: bool, accounts: Option<&AccountsDb>) {
         let last = self.last_report.load(Ordering::Relaxed);
         let now = solana_sdk::timing::timestamp();
 
@@ -1138,6 +1138,24 @@ impl ShrinkStats {
                 (
                     "bytes_removed",
                     self.bytes_removed.swap(0, Ordering::Relaxed) as i64,
+                    i64
+                ),
+                (
+                    "store_append_accounts",
+                    accounts.unwrap().stats
+                    .store_append_accounts.load(Ordering::Relaxed) as i64,
+                    i64
+                ),
+                (
+                    "store_find_store",
+                    accounts.unwrap().stats
+                    .store_find_store.load(Ordering::Relaxed) as i64,
+                    i64
+                ),
+                (
+                    "store_hash_accounts",
+                    accounts.unwrap().stats
+                    .store_hash_accounts.load(Ordering::Relaxed) as i64,
                     i64
                 ),
             );
@@ -2163,7 +2181,7 @@ impl AccountsDb {
             original_bytes.saturating_sub(aligned_total),
             Ordering::Relaxed,
         );
-        self.shrink_stats.report(false);
+        self.shrink_stats.report(false, Some(&self));
     }
 
     // Reads all accounts in given slot's AppendVecs and filter only to alive,
@@ -2225,7 +2243,7 @@ impl AccountsDb {
                     self.shrink_slot_forced(*slot, startup);
                 }
             });
-            self.shrink_stats.report(true);
+            self.shrink_stats.report(true, Some(&self));
         } else {
             for slot in self.all_slots_in_storage() {
                 if self.caching_enabled {
@@ -5559,7 +5577,7 @@ impl AccountsDb {
         self.shrink_stats
             .recycle_stores_write_elapsed
             .fetch_add(recycle_stores_write_elapsed.as_us(), Ordering::Relaxed);
-        self.shrink_stats.report(false);
+        self.shrink_stats.report(false, Some(&self));
 
         alive_accounts_len
     }
