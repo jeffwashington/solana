@@ -852,6 +852,7 @@ pub struct AccountsStats {
     store_find_existing: AtomicU64,
     dropped_stores: AtomicU64,
     store_uncleaned_update: AtomicU64,
+    read_only_cache: AtomicU64,
 }
 
 #[derive(Debug, Default)]
@@ -1156,6 +1157,18 @@ impl ShrinkStats {
                     "store_hash_accounts",
                     accounts.unwrap().stats
                     .store_hash_accounts.load(Ordering::Relaxed) as i64,
+                    i64
+                ),
+                (
+                    "build_meta_time",
+                    accounts.unwrap().stats
+                    .build_meta_time.load(Ordering::Relaxed) as i64,
+                    i64
+                ),
+                (
+                    "read_only_cache",
+                    accounts.unwrap().stats
+                    .read_only_cache.load(Ordering::Relaxed) as i64,
                     i64
                 ),
             );
@@ -3881,7 +3894,10 @@ impl AccountsDb {
         let accounts_and_meta_to_store: Vec<_> = accounts
             .iter()
             .map(|(pubkey, account)| {
+                let mut cache = Measure::start("build_meta");
                 self.read_only_accounts_cache.remove(pubkey, slot);
+                cache.stop();
+                time1 += cache.as_us();
                 // this is the source of Some(Account) or None.
                 // Some(Account) = store 'Account'
                 // None = store a default/empty account with 0 lamports
@@ -3903,7 +3919,10 @@ impl AccountsDb {
             .calc_stored_meta
             .fetch_add(calc_stored_meta_time.as_us(), Ordering::Relaxed);
 
-        if self.caching_enabled && is_cached_store {
+            self.stats
+            .read_only_cache
+            .fetch_add(time1, Ordering::Relaxed);
+            if self.caching_enabled && is_cached_store {
             self.write_accounts_to_cache(slot, hashes, &accounts_and_meta_to_store)
         } else {
             match hashes {
