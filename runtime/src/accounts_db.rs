@@ -1061,7 +1061,7 @@ impl ShrinkStats {
         // thus, the first 'report' call would always log.
         // Instead, the first call now initialializes 'last_report' to now.
         let first_call = last == 0;
-        let should_report = now.saturating_sub(last) > 1000
+        let should_report = now.saturating_sub(last) > 500
             && self
                 .last_report
                 .compare_exchange(last, now, Ordering::Relaxed, Ordering::Relaxed)
