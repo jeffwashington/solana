@@ -1223,12 +1223,11 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
         account_indexes: &'a AccountSecondaryIndexes,
         reclaims: &'a mut SlotList<T>,
     ) {
-        let mut w_account_maps = self.account_maps.read().unwrap();
+        let w_account_maps = self.account_maps.read().unwrap();
 
         for (info, pubkey_account) in items.clone() {
             let pubkey = pubkey_account.0;
 
-            let mut is_newly_inserted = false;
             let account_entry = w_account_maps.get(pubkey);
             if account_entry.is_none() {
                 panic!("not found");

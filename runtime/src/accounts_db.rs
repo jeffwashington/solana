@@ -1059,13 +1059,14 @@ impl ShrinkStats {
         let now = solana_sdk::timing::timestamp();
 
         let should_report = force
-            || now.saturating_sub(last) > 1000
-                && self.last_report.compare_exchange(
-                    last,
-                    now,
-                    Ordering::Relaxed,
-                    Ordering::Relaxed,
-                ) == Ok(last);
+            || last != 0
+                && (now.saturating_sub(last) > 1000
+                    && self.last_report.compare_exchange(
+                        last,
+                        now,
+                        Ordering::Relaxed,
+                        Ordering::Relaxed,
+                    ) == Ok(last));
 
         if should_report {
             datapoint_info!(
@@ -1143,32 +1144,47 @@ impl ShrinkStats {
                 ),
                 (
                     "store_append_accounts",
-                    accounts.unwrap().stats
-                    .store_append_accounts.load(Ordering::Relaxed) as i64,
+                    accounts
+                        .unwrap()
+                        .stats
+                        .store_append_accounts
+                        .load(Ordering::Relaxed) as i64,
                     i64
                 ),
                 (
                     "store_find_store",
-                    accounts.unwrap().stats
-                    .store_find_store.load(Ordering::Relaxed) as i64,
+                    accounts
+                        .unwrap()
+                        .stats
+                        .store_find_store
+                        .load(Ordering::Relaxed) as i64,
                     i64
                 ),
                 (
                     "store_hash_accounts",
-                    accounts.unwrap().stats
-                    .store_hash_accounts.load(Ordering::Relaxed) as i64,
+                    accounts
+                        .unwrap()
+                        .stats
+                        .store_hash_accounts
+                        .load(Ordering::Relaxed) as i64,
                     i64
                 ),
                 (
                     "build_meta_time",
-                    accounts.unwrap().stats
-                    .build_meta_time.load(Ordering::Relaxed) as i64,
+                    accounts
+                        .unwrap()
+                        .stats
+                        .calc_stored_meta
+                        .load(Ordering::Relaxed) as i64,
                     i64
                 ),
                 (
                     "read_only_cache",
-                    accounts.unwrap().stats
-                    .read_only_cache.load(Ordering::Relaxed) as i64,
+                    accounts
+                        .unwrap()
+                        .stats
+                        .read_only_cache
+                        .load(Ordering::Relaxed) as i64,
                     i64
                 ),
             );
@@ -2253,14 +2269,14 @@ impl AccountsDb {
             let chunk_size = std::cmp::max(slots.len() / 8, 1); // approximately 400k slots in a snapshot
             slots.par_chunks(chunk_size).for_each(|slots| {
                 for slot in slots {
-                    self.shrink_slot_forced(*slot, startup);
+                    self.shrink_slot_forced(*slot, is_startup);
                 }
             });
             self.shrink_stats.report(true, Some(&self));
         } else {
             for slot in self.all_slots_in_storage() {
                 if self.caching_enabled {
-                    self.shrink_slot_forced(slot, startup);
+                    self.shrink_slot_forced(slot, false);
                 } else {
                     self.do_shrink_slot_forced_v1(slot);
                 }
@@ -3891,6 +3907,7 @@ impl AccountsDb {
         is_cached_store: bool,
     ) -> Vec<AccountInfo> {
         let mut calc_stored_meta_time = Measure::start("calc_stored_meta");
+        let mut time1 = 0;
         let accounts_and_meta_to_store: Vec<_> = accounts
             .iter()
             .map(|(pubkey, account)| {
@@ -3918,11 +3935,10 @@ impl AccountsDb {
         self.stats
             .calc_stored_meta
             .fetch_add(calc_stored_meta_time.as_us(), Ordering::Relaxed);
-
-            self.stats
+        self.stats
             .read_only_cache
-            .fetch_add(time1, Ordering::Relaxed);
-            if self.caching_enabled && is_cached_store {
+            .fetch_add(time1 / 1000, Ordering::Relaxed);
+        if self.caching_enabled && is_cached_store {
             self.write_accounts_to_cache(slot, hashes, &accounts_and_meta_to_store)
         } else {
             match hashes {
