@@ -717,9 +717,30 @@ fn open_genesis_config_by(ledger_path: &Path, matches: &ArgMatches<'_>) -> Genes
 fn assert_capitalization(bank: &Bank) {
     assert!(bank.calculate_and_verify_capitalization());
 }
+use std::fs::{DirEntry};
+use std::io::prelude::*;
+use solana_measure::measure::Measure;
 
 #[allow(clippy::cognitive_complexity)]
 fn main() {
+        solana_logger::setup();
+        let dir = "/home/jwash/sol/solana/mainnet-beta/validator-ledger/accounts";
+        let mut files = Vec::new();
+        for (i, file) in fs::read_dir(dir).unwrap().enumerate() {
+            let mut file = File::open(file.unwrap().path()).unwrap();
+            files.push(file);
+            if i % 20_000 == 0 {
+        let mut m = Measure::start("lsof");
+        Command::new("lsof")
+            //.args(&["/C", "echo hello"])
+            .output()
+            .expect("failed to execute process");
+        m.stop();
+        error!("{} {}", i, m.as_ms());
+            }
+        }
+    return;
+
     // Ignore SIGUSR1 to prevent long-running calls being killed by logrotate
     // in warehouse deployments
     #[cfg(unix)]
