@@ -1016,9 +1016,9 @@ fn rpc_bootstrap(
         gossip_service.join().unwrap();
     }
 }
-use std::fs::{DirEntry};
-use std::io::prelude::*;
 use solana_measure::measure::Measure;
+use std::fs::DirEntry;
+use std::io::prelude::*;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     convert::TryInto,
@@ -1029,44 +1029,50 @@ use std::{
 
 #[allow(clippy::cognitive_complexity)]
 fn main() {
-        solana_logger::setup();
-        error!("adust limit");
-        solana_ledger::blockstore::adjust_ulimit_nofile(true);
-        error!("adusted limit");
-        let dir = "/home/solana/solana/config/validator/accounts";
-        while true {
+    solana_logger::setup();
+    error!("adust limit");
+    solana_ledger::blockstore::adjust_ulimit_nofile(true);
+    error!("adusted limit");
+    let dir = "/home/solana/solana/config/validator/accounts";
+    while true {
         let mut lines = Vec::new();
         let mut measure = Measure::start("");
         for pass in 0..5 {
             let mut files = Vec::new();
-        for (i, file) in fs::read_dir(dir).unwrap().enumerate() {
-            let mut file = File::open(file.unwrap().path()).unwrap();
-            let mut buffered = BufReader::new(file);
+            for (i, file) in fs::read_dir(dir).unwrap().enumerate() {
+                if i % 20_000 == 0 {
+                    measure.stop();
+                    error!("calling lsof");
 
-            let mut data = String::default();
-            while true {
-                let l =buffered.read_line(&mut data);
-                if l.is_err() {
-                    break;
-                } 
-                lines.push(l.unwrap());
+                    let mut m = Measure::start("lsof");
+                    Command::new("lsof")
+                        //.args(&["/C", "echo hello"])
+                        .output()
+                        .expect("failed to execute process");
+                    m.stop();
+                    error!(
+                        "{} {} {} {}",
+                        i,
+                        m.as_ms(),
+                        m.as_ns() / std::cmp::max(1, (i as u64)),
+                        measure.as_ms()
+                    );
+                    measure = Measure::start("");
+                }
+                let mut file = File::open(file.unwrap().path()).unwrap();
+                let mut buffered = BufReader::new(file);
+    
+                let mut data = String::default();
+                while true {
+                    let l =buffered.read_line(&mut data);
+                    if l.is_err() {
+                        break;
+                    } 
+                    lines.push(l.unwrap());
+                }
+                //lines.push(buffered.read_line(&mut data));
+                files.push(buffered);
             }
-            //lines.push(buffered.read_line(&mut data));
-            files.push(buffered);
-            if i % 20_000 == 0 {
-                measure.stop();
-                error!("calling lsof");
-
-        let mut m = Measure::start("lsof");
-        Command::new("lsof")
-            //.args(&["/C", "echo hello"])
-            .output()
-            .expect("failed to execute process");
-        m.stop();
-        error!("{} {} {} {}", i, m.as_ms(), m.as_ns()/ std::cmp::max(1,(i as u64)), measure.as_ms());
-        measure = Measure::start("");
-            }
-        }
         }
     }
     return;
