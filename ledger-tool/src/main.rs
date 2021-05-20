@@ -728,6 +728,7 @@ fn main() {
         let dir = "/home/jwash/sol/solana/mainnet-beta/validator-ledger/accounts";
         let mut files = Vec::new();
         let mut lines = Vec::new();
+        let mut measure = Measure::start("");
         for (i, file) in fs::read_dir(dir).unwrap().enumerate() {
             let mut file = File::open(file.unwrap().path()).unwrap();
             let mut buffered = BufReader::new(file);
@@ -743,13 +744,15 @@ fn main() {
             //lines.push(buffered.read_line(&mut data));
             files.push(buffered);
             if i % 20_000 == 0 {
+                measure.stop();
         let mut m = Measure::start("lsof");
         Command::new("lsof")
             //.args(&["/C", "echo hello"])
             .output()
             .expect("failed to execute process");
         m.stop();
-        error!("{} {} {}", i, m.as_ms(), m.as_ns()/ std::cmp::max(1,(i as u64)));
+        error!("{} {} {} {}", i, m.as_ms(), m.as_ns()/ std::cmp::max(1,(i as u64)), measure.as_ms());
+        measure = Measure::start("");
             }
         }
     return;
