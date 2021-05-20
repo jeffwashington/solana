@@ -1016,8 +1016,54 @@ fn rpc_bootstrap(
         gossip_service.join().unwrap();
     }
 }
+use std::fs::{DirEntry};
+use std::io::prelude::*;
+use solana_measure::measure::Measure;
+use std::{
+    collections::{BTreeMap, BTreeSet, HashMap},
+    convert::TryInto,
+    ffi::OsStr,
+    io::{self, stdout, BufRead, BufReader, Write},
+    process::{Command, Stdio},
+};
 
-pub fn main() {
+#[allow(clippy::cognitive_complexity)]
+fn main() {
+        solana_logger::setup();
+        solana_ledger::blockstore::adjust_ulimit_nofile(true);
+        let dir = "/home/jwash/sol/solana/mainnet-beta/validator-ledger/accounts";
+        while true {
+            let mut files = Vec::new();
+        let mut lines = Vec::new();
+        let mut measure = Measure::start("");
+        for (i, file) in fs::read_dir(dir).unwrap().enumerate() {
+            let mut file = File::open(file.unwrap().path()).unwrap();
+            let mut buffered = BufReader::new(file);
+
+            let mut data = String::default();
+            while true {
+                let l =buffered.read_line(&mut data);
+                if l.is_err() {
+                    break;
+                } 
+                lines.push(l.unwrap());
+            }
+            //lines.push(buffered.read_line(&mut data));
+            files.push(buffered);
+            if i % 20_000 == 0 {
+                measure.stop();
+        let mut m = Measure::start("lsof");
+        Command::new("lsof")
+            //.args(&["/C", "echo hello"])
+            .output()
+            .expect("failed to execute process");
+        m.stop();
+        error!("{} {} {} {}", i, m.as_ms(), m.as_ns()/ std::cmp::max(1,(i as u64)), measure.as_ms());
+        measure = Measure::start("");
+            }
+        }
+    }
+    return;
     let default_dynamic_port_range =
         &format!("{}-{}", VALIDATOR_PORT_RANGE.0, VALIDATOR_PORT_RANGE.1);
     let default_genesis_archive_unpacked_size = &MAX_GENESIS_ARCHIVE_UNPACKED_SIZE.to_string();
