@@ -742,7 +742,7 @@ fn main() {
             .output()
             .expect("failed to execute process");
         m.stop();
-        error!("{} {} {}", i, m.as_ms(), m.as_ns()/ (i as u64));
+        error!("{} {} {}", i, m.as_ms(), m.as_ns()/ std::cmp::max(1,(i as u64)));
             }
         }
     return;
