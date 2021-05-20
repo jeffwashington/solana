@@ -113,10 +113,10 @@ impl<T> AccountMapEntryInner<T> {
     }
 }
 
-pub enum AccountIndexGetResult<'a, T: 'static, U> {
+pub enum AccountIndexGetResult<'a, T: 'static> {
     Found(ReadAccountMapEntry<T>, usize),
     NotFoundOnFork,
-    Missing(std::sync::RwLockReadGuard<'a, AccountMap<U, AccountMapEntry<T>>>),
+    Missing(AccountMapsReadLock<'a, T>),
 }
 
 #[self_referencing]
@@ -1091,7 +1091,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
         pubkey: &Pubkey,
         ancestors: Option<&Ancestors>,
         max_root: Option<Slot>,
-    ) -> AccountIndexGetResult<'_, T, Pubkey> {
+    ) -> AccountIndexGetResult<'_, T> {
         let read_lock = self.account_maps.read().unwrap();
         let account = read_lock
             .get(pubkey)
@@ -1109,6 +1109,32 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
                 }
             }
             None => AccountIndexGetResult::Missing(read_lock),
+        }
+    }
+
+    /// Get an account
+    /// The latest account that appears in `ancestors` or `roots` is returned.
+    pub(crate) fn get_with_lock(
+        &self,
+        pubkey: &Pubkey,
+        max_root: Option<Slot>,
+        read_lock: &AccountMapsReadLock<T>,
+    ) -> AccountIndexGetResult<'_, T> {
+        let account = read_lock
+            .get(pubkey)
+            .cloned()
+            .map(ReadAccountMapEntry::from_account_map_entry);
+
+        match account {
+            Some(locked_entry) => {
+                let slot_list = locked_entry.slot_list();
+                let found_index = self.latest_slot(None, slot_list, max_root);
+                match found_index {
+                    Some(found_index) => AccountIndexGetResult::Found(locked_entry, found_index),
+                    None => AccountIndexGetResult::NotFoundOnFork,
+                }
+            }
+            None => AccountIndexGetResult::Missing(self.get_account_maps_read_lock()),
         }
     }
 
@@ -1561,7 +1587,7 @@ pub mod tests {
         }
     }
 
-    impl<'a, T: 'static, U> AccountIndexGetResult<'a, T, U> {
+    impl<'a, T: 'static> AccountIndexGetResult<'a, T> {
         pub fn unwrap(self) -> (ReadAccountMapEntry<T>, usize) {
             match self {
                 AccountIndexGetResult::Found(lock, size) => (lock, size),
