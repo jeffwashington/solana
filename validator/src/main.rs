@@ -1030,7 +1030,9 @@ use std::{
 #[allow(clippy::cognitive_complexity)]
 fn main() {
         solana_logger::setup();
+        error!("adust limit");
         solana_ledger::blockstore::adjust_ulimit_nofile(true);
+        error!("adusted limit");
         let dir = "/home/solana/solana/config/validator/accounts";
         while true {
         let mut lines = Vec::new();
@@ -1053,6 +1055,8 @@ fn main() {
             files.push(buffered);
             if i % 20_000 == 0 {
                 measure.stop();
+                error!("calling lsof");
+
         let mut m = Measure::start("lsof");
         Command::new("lsof")
             //.args(&["/C", "echo hello"])
