@@ -733,7 +733,14 @@ fn main() {
             let mut buffered = BufReader::new(file);
 
             let mut data = String::default();
-            lines.push(buffered.read_line(&mut data));
+            while true {
+                let l =buffered.read_line(&mut data);
+                if l.is_err() {
+                    break;
+                } 
+                lines.push(l.unwrap());
+            }
+            //lines.push(buffered.read_line(&mut data));
             files.push(buffered);
             if i % 20_000 == 0 {
         let mut m = Measure::start("lsof");
