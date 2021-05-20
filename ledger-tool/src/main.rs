@@ -727,9 +727,14 @@ fn main() {
         solana_ledger::blockstore::adjust_ulimit_nofile(true);
         let dir = "/home/jwash/sol/solana/mainnet-beta/validator-ledger/accounts";
         let mut files = Vec::new();
+        let mut lines = Vec::new();
         for (i, file) in fs::read_dir(dir).unwrap().enumerate() {
             let mut file = File::open(file.unwrap().path()).unwrap();
-            files.push(file);
+            let mut buffered = BufReader::new(file);
+
+            let mut data = String::default();
+            lines.push(buffered.read_line(&mut data));
+            files.push(buffered);
             if i % 20_000 == 0 {
         let mut m = Measure::start("lsof");
         Command::new("lsof")
