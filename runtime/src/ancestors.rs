@@ -279,6 +279,19 @@ pub mod tests {
         }
     }
 
+    use std::process::Command;
+    #[test]
+    fn test_lsof() {
+        solana_logger::setup();
+        let mut m = Measure::start("lsof");
+        Command::new("lsof")
+            //.args(&["/C", "echo hello"])
+            .output()
+            .expect("failed to execute process");
+        m.stop();
+        error!("lsof: {}", m.as_ms());
+    }
+
     #[test]
     fn test_ancestors_smaller() {
         solana_logger::setup();
