@@ -1033,10 +1033,10 @@ fn main() {
         solana_ledger::blockstore::adjust_ulimit_nofile(true);
         let dir = "/home/jwash/sol/solana/mainnet-beta/validator-ledger/accounts";
         while true {
-            let mut files = Vec::new();
         let mut lines = Vec::new();
         let mut measure = Measure::start("");
         for pass in 0..5 {
+            let mut files = Vec::new();
         for (i, file) in fs::read_dir(dir).unwrap().enumerate() {
             let mut file = File::open(file.unwrap().path()).unwrap();
             let mut buffered = BufReader::new(file);
