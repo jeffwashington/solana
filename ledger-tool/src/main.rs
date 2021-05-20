@@ -742,7 +742,7 @@ fn main() {
             .output()
             .expect("failed to execute process");
         m.stop();
-        error!("{} {} {}", i, m.as_ms(), i as u64 / m.as_ns());
+        error!("{} {} {}", i, m.as_ms(), m.as_ns()/ (i as u64));
             }
         }
     return;
