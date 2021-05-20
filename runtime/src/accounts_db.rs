@@ -4276,6 +4276,8 @@ impl AccountsDb {
     ) -> Result<(), BankHashVerificationError> {
         use BankHashVerificationError::*;
 
+        self.calculate_accounts_hash_helper(false, slot, ancestors);
+
         let (calculated_hash, calculated_lamports) =
             self.calculate_accounts_hash(slot, ancestors, true)?;
 
