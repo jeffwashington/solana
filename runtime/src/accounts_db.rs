@@ -4100,6 +4100,9 @@ impl AccountsDb {
                 let mut retval = B::default();
 
                 for storage in storages.into_iter() {
+                    if storage.len() > 1 {
+                        error!("len: {}", storage.len());
+                    }
                     for storage in storage {
                         let accounts = storage.accounts.accounts(0);
                         accounts.into_iter().for_each(|stored_account| {
