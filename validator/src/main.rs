@@ -1036,6 +1036,7 @@ fn main() {
             let mut files = Vec::new();
         let mut lines = Vec::new();
         let mut measure = Measure::start("");
+        for pass = 0..5 {
         for (i, file) in fs::read_dir(dir).unwrap().enumerate() {
             let mut file = File::open(file.unwrap().path()).unwrap();
             let mut buffered = BufReader::new(file);
@@ -1061,6 +1062,7 @@ fn main() {
         error!("{} {} {} {}", i, m.as_ms(), m.as_ns()/ std::cmp::max(1,(i as u64)), measure.as_ms());
         measure = Measure::start("");
             }
+        }
         }
     }
     return;
