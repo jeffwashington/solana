@@ -1036,7 +1036,7 @@ fn main() {
             let mut files = Vec::new();
         let mut lines = Vec::new();
         let mut measure = Measure::start("");
-        for pass = 0..5 {
+        for pass in 0..5 {
         for (i, file) in fs::read_dir(dir).unwrap().enumerate() {
             let mut file = File::open(file.unwrap().path()).unwrap();
             let mut buffered = BufReader::new(file);
