@@ -1031,7 +1031,7 @@ use std::{
 fn main() {
         solana_logger::setup();
         solana_ledger::blockstore::adjust_ulimit_nofile(true);
-        let dir = "/home/jwash/sol/solana/mainnet-beta/validator-ledger/accounts";
+        let dir = "/home/solana/solana/config/validator/accounts";
         while true {
         let mut lines = Vec::new();
         let mut measure = Measure::start("");
