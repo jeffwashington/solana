@@ -1596,6 +1596,7 @@ impl AccountsDb {
     // can be purged because there are no live append vecs in the ancestors
     pub fn clean_accounts(&self, max_clean_root: Option<Slot>, is_startup: bool) {
         let max_clean_root = self.max_clean_root(max_clean_root);
+        error!("clean_accounts: is_startup: {}", is_startup);
 
         // hold a lock to prevent slot shrinking from running because it might modify some rooted
         // slot storages which can not happen as long as we're cleaning accounts because we're also
