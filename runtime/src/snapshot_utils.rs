@@ -592,7 +592,7 @@ pub fn remove_snapshot<P: AsRef<Path>>(slot: Slot, snapshot_path: P) -> Result<(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn bank_from_archive<P: AsRef<Path>>(
+pub fn bank_from_archive2<P: AsRef<Path>>(
     account_paths: &[PathBuf],
     frozen_account_pubkeys: &[Pubkey],
     snapshot_path: &Path,
@@ -635,7 +635,7 @@ pub fn bank_from_archive<P: AsRef<Path>>(
         accounts_db_caching_enabled,
     )?;
 
-    if !bank.verify_snapshot_bank() {
+    if !bank.verify_snapshot_bank2() {
         panic!("Snapshot bank for slot {} failed to verify", bank.slot());
     }
     measure.stop();
@@ -946,7 +946,7 @@ pub fn snapshot_bank(
 
 /// Convenience function to create a snapshot archive out of any Bank, regardless of state.  The
 /// Bank will be frozen during the process.
-pub fn bank_to_snapshot_archive<P: AsRef<Path>, Q: AsRef<Path>>(
+pub fn bank_to_snapshot_archive2<P: AsRef<Path>, Q: AsRef<Path>>(
     snapshot_path: P,
     bank: &Bank,
     snapshot_version: Option<SnapshotVersion>,
@@ -959,8 +959,8 @@ pub fn bank_to_snapshot_archive<P: AsRef<Path>, Q: AsRef<Path>>(
 
     assert!(bank.is_complete());
     bank.squash(); // Bank may not be a root
-    bank.force_flush_accounts_cache();
-    bank.clean_accounts(true, false);
+    bank.force_flush_accounts_cache2();
+    bank.clean_accounts2(true, false);
     bank.update_accounts_hash();
     bank.rehash(); // Bank accounts may have been manually modified by the caller
 

@@ -557,7 +557,7 @@ impl RepairService {
     }
 
     #[allow(dead_code)]
-    fn process_new_duplicate_slots(
+    fn process_new_duplicate_slots2(
         new_duplicate_slots: &[Slot],
         duplicate_slot_repair_statuses: &mut HashMap<Slot, DuplicateSlotRepairStatus>,
         cluster_slots: &ClusterSlots,
@@ -576,7 +576,7 @@ impl RepairService {
             root_bank.clear_slot_signatures(*slot);
 
             // Clear the accounts for this slot
-            root_bank.remove_unrooted_slot(*slot);
+            root_bank.remove_unrooted_slot2(*slot);
 
             // Clear the slot-related data in blockstore. This will:
             // 1) Clear old shreds allowing new ones to be inserted

@@ -371,7 +371,7 @@ pub struct ProcessOptions {
     pub allow_dead_slots: bool,
 }
 
-pub fn process_blockstore(
+pub fn process_blockstore2(
     genesis_config: &GenesisConfig,
     blockstore: &Blockstore,
     account_paths: Vec<PathBuf>,
@@ -407,7 +407,7 @@ pub fn process_blockstore(
         &recyclers,
         cache_block_time_sender,
     );
-    do_process_blockstore_from_root(
+    do_process_blockstore_from_root2(
         blockstore,
         bank0,
         &opts,
@@ -418,7 +418,7 @@ pub fn process_blockstore(
 }
 
 // Process blockstore from a known root bank
-pub(crate) fn process_blockstore_from_root(
+pub(crate) fn process_blockstore_from_root2(
     blockstore: &Blockstore,
     bank: Bank,
     opts: &ProcessOptions,
@@ -426,7 +426,7 @@ pub(crate) fn process_blockstore_from_root(
     transaction_status_sender: Option<&TransactionStatusSender>,
     cache_block_time_sender: Option<&CacheBlockTimeSender>,
 ) -> BlockstoreProcessorResult {
-    do_process_blockstore_from_root(
+    do_process_blockstore_from_root2(
         blockstore,
         Arc::new(bank),
         opts,
@@ -436,7 +436,7 @@ pub(crate) fn process_blockstore_from_root(
     )
 }
 
-fn do_process_blockstore_from_root(
+fn do_process_blockstore_from_root2(
     blockstore: &Blockstore,
     bank: Arc<Bank>,
     opts: &ProcessOptions,
@@ -494,7 +494,7 @@ fn do_process_blockstore_from_root(
             if opts.full_leader_cache {
                 leader_schedule_cache.set_max_schedules(std::usize::MAX);
             }
-            let mut initial_forks = load_frozen_forks(
+            let mut initial_forks = load_frozen_forks2(
                 &bank,
                 &meta,
                 blockstore,
@@ -886,7 +886,7 @@ fn process_next_slots(
 // Iterate through blockstore processing slots starting from the root slot pointed to by the
 // given `meta` and return a vector of frozen bank forks
 #[allow(clippy::too_many_arguments)]
-fn load_frozen_forks(
+fn load_frozen_forks2(
     root_bank: &Arc<Bank>,
     root_meta: &SlotMeta,
     blockstore: &Blockstore,
@@ -1007,7 +1007,7 @@ fn load_frozen_forks(
                     // Must be called after `squash()`, so that AccountsDb knows what
                     // the roots are for the cache flushing in exhaustively_free_unused_resource().
                     // This could take few secs; so update last_free later
-                    new_root_bank.exhaustively_free_unused_resource();
+                    new_root_bank.exhaustively_free_unused_resource2();
                     last_free = Instant::now();
                 }
 

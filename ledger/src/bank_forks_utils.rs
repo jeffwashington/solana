@@ -29,7 +29,7 @@ fn to_loadresult(
     })
 }
 
-pub fn load(
+pub fn load2(
     genesis_config: &GenesisConfig,
     blockstore: &Blockstore,
     account_paths: Vec<PathBuf>,
@@ -60,7 +60,7 @@ pub fn load(
                     process::exit(1);
                 }
 
-                let deserialized_bank = snapshot_utils::bank_from_archive(
+                let deserialized_bank = snapshot_utils::bank_from_archive2(
                     &account_paths,
                     &process_options.frozen_accounts,
                     &snapshot_config.snapshot_path,
@@ -91,7 +91,7 @@ pub fn load(
                 }
 
                 return to_loadresult(
-                    blockstore_processor::process_blockstore_from_root(
+                    blockstore_processor::process_blockstore_from_root2(
                         blockstore,
                         deserialized_bank,
                         &process_options,
@@ -110,7 +110,7 @@ pub fn load(
 
     info!("Processing ledger from genesis");
     to_loadresult(
-        blockstore_processor::process_blockstore(
+        blockstore_processor::process_blockstore2(
             &genesis_config,
             &blockstore,
             account_paths,

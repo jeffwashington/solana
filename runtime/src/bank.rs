@@ -2111,11 +2111,11 @@ impl Bank {
 
     // Should not be called outside of startup, will race with
     // concurrent cleaning logic in AccountsBackgroundService
-    pub fn exhaustively_free_unused_resource(&self) {
+    pub fn exhaustively_free_unused_resource2(&self) {
         let mut flush = Measure::start("flush");
         // Flush all the rooted accounts. Must be called after `squash()`,
         // so that AccountsDb knows what the roots are.
-        self.force_flush_accounts_cache();
+        self.force_flush_accounts_cache2();
         flush.stop();
 
         let mut clean = Measure::start("clean");
@@ -2123,7 +2123,7 @@ impl Bank {
         // accounts that were included in the bank delta hash when the bank was frozen,
         // and if we clean them here, any newly created snapshot's hash for this bank
         // may not match the frozen hash.
-        self.clean_accounts(true, false);
+        self.clean_accounts2(true, false);
         clean.stop();
 
         let mut shrink = Measure::start("shrink");
@@ -2558,8 +2558,8 @@ impl Bank {
         }
     }
 
-    pub fn remove_unrooted_slot(&self, slot: Slot) {
-        self.rc.accounts.accounts_db.remove_unrooted_slot(slot)
+    pub fn remove_unrooted_slot2(&self, slot: Slot) {
+        self.rc.accounts.accounts_db.remove_unrooted_slot2(slot)
     }
 
     pub fn set_shrink_paths(&self, paths: Vec<PathBuf>) {
@@ -4039,18 +4039,18 @@ impl Bank {
         }
     }
 
-    pub fn force_flush_accounts_cache(&self) {
+    pub fn force_flush_accounts_cache2(&self) {
         self.rc
             .accounts
             .accounts_db
-            .flush_accounts_cache(true, Some(self.slot()))
+            .flush_accounts_cache2(true, Some(self.slot()))
     }
 
-    pub fn flush_accounts_cache_if_needed(&self) {
+    pub fn flush_accounts_cache_if_needed2(&self) {
         self.rc
             .accounts
             .accounts_db
-            .flush_accounts_cache(false, Some(self.slot()))
+            .flush_accounts_cache2(false, Some(self.slot()))
     }
 
     pub fn expire_old_recycle_stores(&self) {
@@ -4523,10 +4523,10 @@ impl Bank {
 
     /// A snapshot bank should be purged of 0 lamport accounts which are not part of the hash
     /// calculation and could shield other real accounts.
-    pub fn verify_snapshot_bank(&self) -> bool {
+    pub fn verify_snapshot_bank2(&self) -> bool {
         let mut clean_time = Measure::start("clean");
         if self.slot() > 0 {
-            self.clean_accounts(true, true);
+            self.clean_accounts2(true, true);
         }
         clean_time.stop();
 
@@ -4808,7 +4808,7 @@ impl Bank {
             .add_program(program_id, process_instruction_with_context);
     }
 
-    pub fn clean_accounts(&self, skip_last: bool, is_startup: bool) {
+    pub fn clean_accounts2(&self, skip_last: bool, is_startup: bool) {
         let max_clean_slot = if skip_last {
             // Don't clean the slot we're snapshotting because it may have zero-lamport
             // accounts that were included in the bank delta hash when the bank was frozen,
@@ -4821,7 +4821,7 @@ impl Bank {
         self.rc
             .accounts
             .accounts_db
-            .clean_accounts(max_clean_slot, is_startup);
+            .clean_accounts2(max_clean_slot, is_startup);
     }
 
     pub fn shrink_all_slots(&self, is_startup: bool) {

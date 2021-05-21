@@ -315,7 +315,7 @@ impl RollingBitField {
         }
     }
 
-    pub fn remove(&mut self, key: &u64) -> bool {
+    pub fn remove2(&mut self, key: &u64) -> bool {
         if key >= &self.min {
             // if asked to remove something bigger than max, then no-op
             if key < &self.max {
@@ -1408,13 +1408,13 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
 
     /// Remove the slot when the storage for the slot is freed
     /// Accounts no longer reference this slot.
-    pub fn clean_dead_slot(&self, slot: Slot) -> Option<AccountsIndexRootsStats> {
+    pub fn clean_dead_slot2(&self, slot: Slot) -> Option<AccountsIndexRootsStats> {
         let (roots_len, uncleaned_roots_len, previous_uncleaned_roots_len, roots_range) = {
             let mut w_roots_tracker = self.roots_tracker.write().unwrap();
             let removed_from_unclean_roots = w_roots_tracker.uncleaned_roots.remove(&slot);
             let removed_from_previous_uncleaned_roots =
                 w_roots_tracker.previous_uncleaned_roots.remove(&slot);
-            if !w_roots_tracker.roots.remove(&slot) {
+            if !w_roots_tracker.roots.remove2(&slot) {
                 if removed_from_unclean_roots {
                     error!("clean_dead_slot-removed_from_unclean_roots: {}", slot);
                     inc_new_counter_error!("clean_dead_slot-removed_from_unclean_roots", 1, 1);

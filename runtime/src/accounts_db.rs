@@ -1319,7 +1319,7 @@ impl AccountsDb {
     }
 
     /// Reclaim older states of accounts older than max_clean_root for AccountsDb bloat mitigation
-    fn clean_accounts_older_than_root(
+    fn clean_accounts_older_than_root2(
         &self,
         purges: Vec<Pubkey>,
         max_clean_root: Option<Slot>,
@@ -1356,7 +1356,7 @@ impl AccountsDb {
         let reset_accounts = false;
 
         let mut reclaim_result = ReclaimResult::default();
-        self.handle_reclaims(
+        self.handle_reclaims2(
             &reclaims,
             None,
             false,
@@ -1594,7 +1594,7 @@ impl AccountsDb {
     // collection
     // Only remove those accounts where the entire rooted history of the account
     // can be purged because there are no live append vecs in the ancestors
-    pub fn clean_accounts(&self, max_clean_root: Option<Slot>, is_startup: bool) {
+    pub fn clean_accounts2(&self, max_clean_root: Option<Slot>, is_startup: bool) {
         let max_clean_root = self.max_clean_root(max_clean_root);
 
         // hold a lock to prevent slot shrinking from running because it might modify some rooted
@@ -1689,7 +1689,7 @@ impl AccountsDb {
 
         let mut clean_old_rooted = Measure::start("clean_old_roots");
         let (purged_account_slots, removed_accounts) =
-            self.clean_accounts_older_than_root(purges_old_accounts, max_clean_root);
+            self.clean_accounts_older_than_root2(purges_old_accounts, max_clean_root);
 
         if self.caching_enabled {
             self.do_reset_uncleaned_roots(max_clean_root);
@@ -1787,7 +1787,7 @@ impl AccountsDb {
         let reset_accounts = false;
         let mut reclaim_result = ReclaimResult::default();
         let reclaim_result = Some(&mut reclaim_result);
-        self.handle_reclaims(&reclaims, None, false, reclaim_result, reset_accounts);
+        self.handle_reclaims2(&reclaims, None, false, reclaim_result, reset_accounts);
 
         reclaims_time.stop();
 
@@ -1841,7 +1841,7 @@ impl AccountsDb {
     /// * `reset_accounts` - Reset the append_vec store when the store is dead (count==0)
     ///    From the clean and shrink paths it should be false since there may be an in-progress
     ///    hash operation and the stores may hold accounts that need to be unref'ed.
-    fn handle_reclaims(
+    fn handle_reclaims2(
         &self,
         reclaims: SlotSlice<AccountInfo>,
         expected_single_dead_slot: Option<Slot>,
@@ -1872,12 +1872,12 @@ impl AccountsDb {
                 assert!(dead_slots.contains(&expected_single_dead_slot));
             }
         }
-        self.process_dead_slots(&dead_slots, purged_account_slots);
+        self.process_dead_slots2(&dead_slots, purged_account_slots);
     }
 
     // Must be kept private!, does sensitive cleanup that should only be called from
     // supported pipelines in AccountsDb
-    fn process_dead_slots(
+    fn process_dead_slots2(
         &self,
         dead_slots: &HashSet<Slot>,
         purged_account_slots: Option<&mut AccountSlots>,
@@ -1886,7 +1886,7 @@ impl AccountsDb {
             return;
         }
         let mut clean_dead_slots = Measure::start("reclaims::clean_dead_slots");
-        self.clean_stored_dead_slots(&dead_slots, purged_account_slots);
+        self.clean_stored_dead_slots2(&dead_slots, purged_account_slots);
         clean_dead_slots.stop();
 
         let mut purge_removed_slots = Measure::start("reclaims::purge_removed_slots");
@@ -3055,10 +3055,10 @@ impl AccountsDb {
             .is_none());
     }
 
-    pub fn purge_slot(&self, slot: Slot) {
+    pub fn purge_slot2(&self, slot: Slot) {
         let mut slots = HashSet::new();
         slots.insert(slot);
-        self.purge_slots(&slots);
+        self.purge_slots2(&slots);
     }
 
     fn recycle_slot_stores(
@@ -3089,7 +3089,7 @@ impl AccountsDb {
         recycle_stores_write_elapsed.as_us()
     }
 
-    fn purge_slots_from_cache_and_store<'a>(
+    fn purge_slots_from_cache_and_store2<'a>(
         &'a self,
         can_exist_in_cache: bool,
         removed_slots: impl Iterator<Item = &'a Slot>,
@@ -3110,7 +3110,7 @@ impl AccountsDb {
                 }
                 num_cached_slots_removed += 1;
                 total_removed_cached_bytes += slot_cache.total_bytes();
-                self.purge_slot_cache(*remove_slot, slot_cache);
+                self.purge_slot_cache2(*remove_slot, slot_cache);
             } else if let Some((_, slot_removed_storages)) = self.storage.0.remove(&remove_slot) {
                 // Because AccountsBackgroundService synchronously flushes from the accounts cache
                 // and handles all Bank::drop() (the cleanup function that leads to this
@@ -3187,14 +3187,14 @@ impl AccountsDb {
             .purge_stats
             .safety_checks_elapsed
             .fetch_add(safety_checks_elapsed.as_us(), Ordering::Relaxed);
-        self.purge_slots_from_cache_and_store(
+        self.purge_slots_from_cache_and_store2(
             false,
             removed_slots.iter(),
             &self.clean_accounts_stats.purge_stats,
         );
     }
 
-    fn purge_slot_cache(&self, purged_slot: Slot, slot_cache: SlotCache) {
+    fn purge_slot_cache2(&self, purged_slot: Slot, slot_cache: SlotCache) {
         let mut purged_slot_pubkeys: HashSet<(Slot, Pubkey)> = HashSet::new();
         let pubkey_to_slot_set: Vec<(Pubkey, Slot)> = slot_cache
             .iter()
@@ -3203,10 +3203,10 @@ impl AccountsDb {
                 (*account.key(), purged_slot)
             })
             .collect();
-        self.purge_slot_cache_pubkeys(purged_slot, purged_slot_pubkeys, pubkey_to_slot_set, true);
+        self.purge_slot_cache_pubkeys2(purged_slot, purged_slot_pubkeys, pubkey_to_slot_set, true);
     }
 
-    fn purge_slot_cache_pubkeys(
+    fn purge_slot_cache_pubkeys2(
         &self,
         purged_slot: Slot,
         purged_slot_pubkeys: HashSet<(Slot, Pubkey)>,
@@ -3219,7 +3219,7 @@ impl AccountsDb {
         let reclaims = self.purge_keys_exact(&pubkey_to_slot_set);
         assert_eq!(reclaims.len(), num_purged_keys);
         if is_dead {
-            self.finalize_dead_slot_removal(
+            self.finalize_dead_slot_removal2(
                 std::iter::once(&purged_slot),
                 purged_slot_pubkeys,
                 None,
@@ -3228,7 +3228,7 @@ impl AccountsDb {
     }
 
     #[allow(clippy::needless_collect)]
-    fn purge_slots(&self, slots: &HashSet<Slot>) {
+    fn purge_slots2(&self, slots: &HashSet<Slot>) {
         // `add_root()` should be called first
         let mut safety_checks_elapsed = Measure::start("safety_checks_elapsed");
         let non_roots: Vec<&Slot> = slots
@@ -3239,7 +3239,7 @@ impl AccountsDb {
         self.external_purge_slots_stats
             .safety_checks_elapsed
             .fetch_add(safety_checks_elapsed.as_us(), Ordering::Relaxed);
-        self.purge_slots_from_cache_and_store(
+        self.purge_slots_from_cache_and_store2(
             true,
             non_roots.into_iter(),
             &self.external_purge_slots_stats,
@@ -3252,14 +3252,14 @@ impl AccountsDb {
     // 1. Unsafe with scan because it can remove a slot in the middle
     // of a scan.
     // 2. Doesn't handle cache flushes that happen during the slot deletion (see comment below).
-    pub fn remove_unrooted_slot(&self, remove_slot: Slot) {
+    pub fn remove_unrooted_slot2(&self, remove_slot: Slot) {
         if self.accounts_index.is_root(remove_slot) {
             panic!("Trying to remove accounts for rooted slot {}", remove_slot);
         }
 
         if let Some(slot_cache) = self.accounts_cache.remove_slot(remove_slot) {
             // If the slot is still in the cache, remove it from the cache
-            self.purge_slot_cache(remove_slot, slot_cache);
+            self.purge_slot_cache2(remove_slot, slot_cache);
         }
 
         // TODO: Handle if the slot was flushed to storage while we were removing the cached
@@ -3297,7 +3297,7 @@ impl AccountsDb {
             }
         }
 
-        self.handle_reclaims(&reclaims, Some(remove_slot), false, None, false);
+        self.handle_reclaims2(&reclaims, Some(remove_slot), false, None, false);
 
         // After handling the reclaimed entries, this slot's
         // storage entries should be purged from self.storage
@@ -3495,7 +3495,7 @@ impl AccountsDb {
     // 1) Any remaining roots if there are > MAX_CACHE_SLOTS remaining slots in the cache,
     // 2) It there are still > MAX_CACHE_SLOTS remaining slots in the cache, the excess
     // unrooted slots
-    pub fn flush_accounts_cache(&self, force_flush: bool, requested_flush_root: Option<Slot>) {
+    pub fn flush_accounts_cache2(&self, force_flush: bool, requested_flush_root: Option<Slot>) {
         #[cfg(not(test))]
         assert!(requested_flush_root.is_some());
 
@@ -3513,7 +3513,7 @@ impl AccountsDb {
         // given `requested_flush_root`, even if some of the later roots cannot be used for
         // cleaning due to an ongoing scan
         let (total_new_cleaned_roots, num_cleaned_roots_flushed) = self
-            .flush_rooted_accounts_cache(
+            .flush_rooted_accounts_cache2(
                 requested_flush_root,
                 Some((&mut account_bytes_saved, &mut num_accounts_saved)),
             );
@@ -3531,7 +3531,7 @@ impl AccountsDb {
                 // Cannot do any cleaning on roots past `requested_flush_root` because future
                 // snapshots may need updates from those later slots, hence we pass `None`
                 // for `should_clean`.
-                self.flush_rooted_accounts_cache(None, None)
+                self.flush_rooted_accounts_cache2(None, None)
             } else {
                 (0, 0)
             };
@@ -3544,7 +3544,7 @@ impl AccountsDb {
             .filter_map(|old_slot| {
                 // Don't flush slots that are known to be unrooted
                 if old_slot > max_flushed_root {
-                    Some(self.flush_slot_cache(old_slot, None::<&mut fn(&_, &_) -> bool>))
+                    Some(self.flush_slot_cache2(old_slot, None::<&mut fn(&_, &_) -> bool>))
                 } else {
                     unflushable_unrooted_slot_count += 1;
                     None
@@ -3589,7 +3589,7 @@ impl AccountsDb {
             let rand_slot = frozen_slots.choose(&mut thread_rng());
             if let Some(rand_slot) = rand_slot {
                 let random_flush_stats =
-                    self.flush_slot_cache(*rand_slot, None::<&mut fn(&_, &_) -> bool>);
+                    self.flush_slot_cache2(*rand_slot, None::<&mut fn(&_, &_) -> bool>);
                 info!(
                     "Flushed random slot: num_remaining: {} {:?}",
                     num_slots_remaining, random_flush_stats,
@@ -3598,7 +3598,7 @@ impl AccountsDb {
         }
     }
 
-    fn flush_rooted_accounts_cache(
+    fn flush_rooted_accounts_cache2(
         &self,
         requested_flush_root: Option<Slot>,
         should_clean: Option<(&mut usize, &mut usize)>,
@@ -3654,7 +3654,7 @@ impl AccountsDb {
                 should_flush_f.as_mut()
             };
 
-            if self.flush_slot_cache(root, should_flush_f).did_flush {
+            if self.flush_slot_cache2(root, should_flush_f).did_flush {
                 num_roots_flushed += 1;
             }
 
@@ -3679,7 +3679,7 @@ impl AccountsDb {
     // `should_flush_f` is an optional closure that determines whether a given
     // account should be flushed. Passing `None` will by default flush all
     // accounts
-    fn flush_slot_cache(
+    fn flush_slot_cache2(
         &self,
         slot: Slot,
         mut should_flush_f: Option<&mut impl FnMut(&Pubkey, &AccountSharedData) -> bool>,
@@ -3719,7 +3719,7 @@ impl AccountsDb {
             let is_dead_slot = accounts.is_empty();
             // Remove the account index entries from earlier roots that are outdated by later roots.
             // Safe because queries to the index will be reading updates from later roots.
-            self.purge_slot_cache_pubkeys(
+            self.purge_slot_cache_pubkeys2(
                 slot,
                 purged_slot_pubkeys,
                 pubkey_to_slot_set,
@@ -4518,7 +4518,7 @@ impl AccountsDb {
         dead_slots
     }
 
-    fn finalize_dead_slot_removal<'a>(
+    fn finalize_dead_slot_removal2<'a>(
         &'a self,
         dead_slots_iter: impl Iterator<Item = &'a Slot> + Clone,
         purged_slot_pubkeys: HashSet<(Slot, Pubkey)>,
@@ -4541,7 +4541,7 @@ impl AccountsDb {
         let dead_slots: Vec<_> = dead_slots_iter
             .clone()
             .map(|slot| {
-                if let Some(latest) = self.accounts_index.clean_dead_slot(*slot) {
+                if let Some(latest) = self.accounts_index.clean_dead_slot2(*slot) {
                     rooted_cleaned_count += 1;
                     accounts_index_root_stats = latest;
                 } else {
@@ -4567,7 +4567,7 @@ impl AccountsDb {
         }
     }
 
-    fn clean_stored_dead_slots(
+    fn clean_stored_dead_slots2(
         &self,
         dead_slots: &HashSet<Slot>,
         purged_account_slots: Option<&mut AccountSlots>,
@@ -4598,7 +4598,7 @@ impl AccountsDb {
                     })
             })
         };
-        self.finalize_dead_slot_removal(
+        self.finalize_dead_slot_removal2(
             dead_slots.iter(),
             purged_slot_pubkeys,
             purged_account_slots,
@@ -4943,7 +4943,7 @@ impl AccountsDb {
         //
         // From 1) and 2) we guarantee passing Some(slot), true is safe
         let mut handle_reclaims_time = Measure::start("handle_reclaims");
-        self.handle_reclaims(&reclaims, Some(slot), true, None, reset_accounts);
+        self.handle_reclaims2(&reclaims, Some(slot), true, None, reset_accounts);
         handle_reclaims_time.stop();
         self.stats
             .store_handle_reclaims

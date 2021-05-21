@@ -913,7 +913,7 @@ impl Accounts {
     /// Purge a slot if it is not a root
     /// Root slots cannot be purged
     pub fn purge_slot(&self, slot: Slot) {
-        self.accounts_db.purge_slot(slot);
+        self.accounts_db.purge_slot2(slot);
     }
 
     /// Add a slot to root.  Root slots cannot be purged

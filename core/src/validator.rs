@@ -398,7 +398,9 @@ impl Validator {
                 cache_block_time_service,
             },
             tower,
-        ) = new_banks_from_ledger(
+                                // jwash top
+
+        ) = new_banks_from_ledger2(
             &id,
             vote_account,
             config,
@@ -1024,7 +1026,7 @@ fn post_process_restored_tower(
 }
 
 #[allow(clippy::type_complexity)]
-fn new_banks_from_ledger(
+fn new_banks_from_ledger2(
     validator_identity: &Pubkey,
     vote_account: &Pubkey,
     config: &ValidatorConfig,
@@ -1113,7 +1115,7 @@ fn new_banks_from_ledger(
             TransactionHistoryServices::default()
         };
 
-    let (mut bank_forks, mut leader_schedule_cache, snapshot_hash) = bank_forks_utils::load(
+    let (mut bank_forks, mut leader_schedule_cache, snapshot_hash) = bank_forks_utils::load2(
         &genesis_config,
         &blockstore,
         config.account_paths.clone(),
@@ -1162,7 +1164,7 @@ fn new_banks_from_ledger(
         );
         leader_schedule_cache.set_root(&bank_forks.root_bank());
 
-        let archive_file = solana_runtime::snapshot_utils::bank_to_snapshot_archive(
+        let archive_file = solana_runtime::snapshot_utils::bank_to_snapshot_archive2(
             ledger_path,
             &bank_forks.root_bank(),
             None,

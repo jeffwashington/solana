@@ -120,7 +120,8 @@ impl SnapshotRequestHandler {
                     // That's because `snapshot_root_bank.slot()` must be root at this point,
                     // and contains relevant updates because each bank has at least 1 account update due
                     // to sysvar maintenance. Otherwise, this would cause missing storages in the snapshot
-                    snapshot_root_bank.force_flush_accounts_cache();
+                    // jwash top
+                    snapshot_root_bank.force_flush_accounts_cache2();
                     // Ensure all roots <= `self.slot()` have been flushed.
                     // Note `max_flush_root` could be larger than self.slot() if there are
                     // `> MAX_CACHE_SLOT` cached and rooted slots which triggered earlier flushes.
@@ -154,7 +155,8 @@ impl SnapshotRequestHandler {
                 // accounts that were included in the bank delta hash when the bank was frozen,
                 // and if we clean them here, the newly created snapshot's hash may not match
                 // the frozen hash.
-                snapshot_root_bank.clean_accounts(true, false);
+                // jwash top
+                snapshot_root_bank.clean_accounts2(true, false);
                 clean_time.stop();
 
                 if accounts_db_caching_enabled {
@@ -341,7 +343,8 @@ impl AccountsBackgroundService {
                     // cache up to bank.slot(), so should be safe as long
                     // as any later snapshots that are taken are of
                     // slots >= bank.slot()
-                    bank.flush_accounts_cache_if_needed();
+                    // jwash top
+                    bank.flush_accounts_cache_if_needed2();
                 }
 
                 if let Some(snapshot_block_height) = snapshot_block_height {
@@ -370,9 +373,11 @@ impl AccountsBackgroundService {
                             // cache up to bank.slot(), so should be safe as long
                             // as any later snapshots that are taken are of
                             // slots >= bank.slot()
-                            bank.force_flush_accounts_cache();
+                            // jwash top
+                            bank.force_flush_accounts_cache2();
                         }
-                        bank.clean_accounts(true, false);
+                        // jwash top
+                        bank.clean_accounts2(true, false);
                         last_cleaned_block_height = bank.block_height();
                     }
                 }
