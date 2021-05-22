@@ -1741,6 +1741,8 @@ fn main() {
                 bpf_jit: !matches.is_present("no_bpf_jit"),
                 accounts_db_caching_enabled: !arg_matches.is_present("no_accounts_db_caching"),
                 allow_dead_slots: arg_matches.is_present("allow_dead_slots"),
+                accounts_db_test_hash_calculation: arg_matches
+                    .is_present("accounts_db_test_hash_calculation"),
                 ..ProcessOptions::default()
             };
             let print_accounts_stats = arg_matches.is_present("print_accounts_stats");
