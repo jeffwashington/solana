@@ -4428,11 +4428,12 @@ impl Bank {
     /// Recalculate the hash_internal_state from the account stores. Would be used to verify a
     /// snapshot.
     #[must_use]
-    fn verify_bank_hash(&self) -> bool {
+    fn verify_bank_hash(&self, is_startup: bool) -> bool {
         self.rc.accounts.verify_bank_hash_and_lamports(
             self.slot(),
             &self.ancestors,
             self.capitalization(),
+            is_startup,
         )
     }
 
@@ -4501,6 +4502,7 @@ impl Bank {
         &self,
         use_index: bool,
         debug_verify: bool,
+        is_startup: bool,
     ) -> Hash {
         let (hash, total_lamports) = self
             .rc
@@ -4512,13 +4514,14 @@ impl Bank {
                 self.slot(),
                 &self.ancestors,
                 Some(self.capitalization()),
+                is_startup,
             );
         assert_eq!(total_lamports, self.capitalization());
         hash
     }
 
-    pub fn update_accounts_hash(&self) -> Hash {
-        self.update_accounts_hash_with_index_option(true, false)
+    pub fn update_accounts_hash(&self, is_startup: bool) -> Hash {
+        self.update_accounts_hash_with_index_option(true, false, is_startup)
     }
 
     /// A snapshot bank should be purged of 0 lamport accounts which are not part of the hash
@@ -4537,7 +4540,7 @@ impl Bank {
         shrink_all_slots_time.stop();
 
         let mut verify_time = Measure::start("verify_bank_hash");
-        let mut verify = self.verify_bank_hash();
+        let mut verify = self.verify_bank_hash(true);
         verify_time.stop();
 
         let mut verify2_time = Measure::start("verify_hash");

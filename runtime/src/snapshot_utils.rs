@@ -965,7 +965,7 @@ pub fn bank_to_snapshot_archive<P: AsRef<Path>, Q: AsRef<Path>>(
     bank.squash(); // Bank may not be a root
     bank.force_flush_accounts_cache();
     bank.clean_accounts(true, false);
-    bank.update_accounts_hash();
+    bank.update_accounts_hash(false);
     bank.rehash(); // Bank accounts may have been manually modified by the caller
 
     let temp_dir = tempfile::tempdir_in(snapshot_path)?;

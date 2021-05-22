@@ -1117,6 +1117,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
     pub(crate) fn get_with_lock(
         &self,
         pubkey: &Pubkey,
+        ancestors: Option<&Ancestors>,
         max_root: Option<Slot>,
         read_lock: &AccountMapsReadLock<T>,
     ) -> AccountIndexGetResult<'_, T> {
@@ -1128,7 +1129,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
         match account {
             Some(locked_entry) => {
                 let slot_list = locked_entry.slot_list();
-                let found_index = self.latest_slot(None, slot_list, max_root);
+                let found_index = self.latest_slot(ancestors, slot_list, max_root);
                 match found_index {
                     Some(found_index) => AccountIndexGetResult::Found(locked_entry, found_index),
                     None => AccountIndexGetResult::NotFoundOnFork,

@@ -102,7 +102,7 @@ impl SnapshotRequestHandler {
                 let previous_hash = if test_hash_calculation {
                     // We have to use the index version here.
                     // We cannot calculate the non-index way because cache has not been flushed and stores don't match reality.
-                    snapshot_root_bank.update_accounts_hash_with_index_option(true, false)
+                    snapshot_root_bank.update_accounts_hash_with_index_option(true, false, false)
                 } else {
                     Hash::default()
                 };
@@ -140,6 +140,7 @@ impl SnapshotRequestHandler {
                 let this_hash = snapshot_root_bank.update_accounts_hash_with_index_option(
                     use_index_hash_calculation,
                     test_hash_calculation,
+                    false,
                 );
                 let hash_for_testing = if test_hash_calculation {
                     assert_eq!(previous_hash, this_hash);

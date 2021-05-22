@@ -635,11 +635,14 @@ impl Accounts {
         slot: Slot,
         ancestors: &Ancestors,
         total_lamports: u64,
+        is_startup: bool,
     ) -> bool {
-        if let Err(err) =
-            self.accounts_db
-                .verify_bank_hash_and_lamports(slot, ancestors, total_lamports)
-        {
+        if let Err(err) = self.accounts_db.verify_bank_hash_and_lamports(
+            slot,
+            ancestors,
+            total_lamports,
+            is_startup,
+        ) {
             warn!("verify_bank_hash failed: {:?}", err);
             false
         } else {

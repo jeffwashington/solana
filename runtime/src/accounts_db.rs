@@ -1625,6 +1625,7 @@ impl AccountsDb {
                             let get = if is_startup {
                                 self.accounts_index.get_with_lock(
                                     pubkey,
+                                    None,
                                     max_clean_root,
                                     lock_ref.unwrap(),
                                 )
@@ -3995,6 +3996,7 @@ impl AccountsDb {
         slot: Slot,
         ancestors: &Ancestors,
         check_hash: bool,
+        is_startup: bool,
     ) -> Result<(Hash, u64), BankHashVerificationError> {
         use BankHashVerificationError::*;
         let mut scan = Measure::start("scan");
@@ -4015,11 +4017,26 @@ impl AccountsDb {
             keys.par_chunks(chunks)
                 .map(|pubkeys| {
                     let mut sum = 0u128;
+                    let lock = if is_startup {
+                        Some(self.accounts_index.get_account_maps_read_lock())
+                    } else {
+                        None
+                    };
+                    let lock_ref = lock.as_ref();
                     let result: Vec<Hash> = pubkeys
                         .iter()
                         .filter_map(|pubkey| {
-                            if let AccountIndexGetResult::Found(lock, index) =
+                            let get = if is_startup {
+                                self.accounts_index.get_with_lock(
+                                    pubkey,
+                                    Some(ancestors), Some(slot),
+                                    lock_ref.unwrap(),
+                                )
+                            } else {
                                 self.accounts_index.get(pubkey, Some(ancestors), Some(slot))
+                            };
+                            if let AccountIndexGetResult::Found(lock, index) =
+                                get
                             {
                                 let (slot, account_info) = &lock.slot_list()[index];
                                 if account_info.lamports != 0 {
@@ -4107,12 +4124,22 @@ impl AccountsDb {
         bank_hash_info.snapshot_hash
     }
 
-    pub fn update_accounts_hash(&self, slot: Slot, ancestors: &Ancestors) -> (Hash, u64) {
-        self.update_accounts_hash_with_index_option(true, false, slot, ancestors, None)
+    pub fn update_accounts_hash(
+        &self,
+        slot: Slot,
+        ancestors: &Ancestors,
+        is_startup: bool,
+    ) -> (Hash, u64) {
+        self.update_accounts_hash_with_index_option(true, false, slot, ancestors, None, is_startup)
     }
 
-    pub fn update_accounts_hash_test(&self, slot: Slot, ancestors: &Ancestors) -> (Hash, u64) {
-        self.update_accounts_hash_with_index_option(true, true, slot, ancestors, None)
+    pub fn update_accounts_hash_test(
+        &self,
+        slot: Slot,
+        ancestors: &Ancestors,
+        is_startup: bool,
+    ) -> (Hash, u64) {
+        self.update_accounts_hash_with_index_option(true, true, slot, ancestors, None, is_startup)
     }
 
     /// Scan through all the account storage in parallel
@@ -4154,6 +4181,7 @@ impl AccountsDb {
         use_index: bool,
         slot: Slot,
         ancestors: &Ancestors,
+        is_startup: bool,
     ) -> (Hash, u64) {
         if !use_index {
             let combined_maps = self.get_snapshot_storages(slot);
@@ -4163,7 +4191,7 @@ impl AccountsDb {
                 Some(&self.thread_pool_clean),
             )
         } else {
-            self.calculate_accounts_hash(slot, ancestors, false)
+            self.calculate_accounts_hash(slot, ancestors, false, is_startup)
                 .unwrap()
         }
     }
@@ -4175,13 +4203,14 @@ impl AccountsDb {
         slot: Slot,
         ancestors: &Ancestors,
         expected_capitalization: Option<u64>,
+        is_startup: bool,
     ) -> (Hash, u64) {
         let (hash, total_lamports) =
-            self.calculate_accounts_hash_helper(use_index, slot, ancestors);
+            self.calculate_accounts_hash_helper(use_index, slot, ancestors, is_startup);
         if debug_verify {
             // calculate the other way (store or non-store) and verify results match.
             let (hash_other, total_lamports_other) =
-                self.calculate_accounts_hash_helper(!use_index, slot, ancestors);
+                self.calculate_accounts_hash_helper(!use_index, slot, ancestors, is_startup);
 
             let success = hash == hash_other
                 && total_lamports == total_lamports_other
@@ -4306,11 +4335,12 @@ impl AccountsDb {
         slot: Slot,
         ancestors: &Ancestors,
         total_lamports: u64,
+        is_startup: bool,
     ) -> Result<(), BankHashVerificationError> {
         use BankHashVerificationError::*;
 
         let (calculated_hash, calculated_lamports) =
-            self.calculate_accounts_hash(slot, ancestors, true)?;
+            self.calculate_accounts_hash(slot, ancestors, true, is_startup)?;
 
         if calculated_lamports != total_lamports {
             warn!(
