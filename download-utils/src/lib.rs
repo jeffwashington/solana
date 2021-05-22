@@ -153,62 +153,60 @@ where
         F: Fn(&DownloadProgressRecord) -> bool,
     {
         fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-            match self.response.read(buf) {
-                Ok(n) => {
-                    self.current_bytes += n;
-                    let total_bytes_f32 = self.current_bytes as f32;
-                    let diff_bytes_f32 = (self.current_bytes - self.last_print_bytes) as f32;
-                    let last_throughput = diff_bytes_f32 / self.last_print.elapsed().as_secs_f32();
-                    let mut estimated_remaining_time: f32 = f32::MAX;
-                    if last_throughput > 0_f32 {
-                        estimated_remaining_time =
-                            (self.download_size - self.current_bytes as f32) / last_throughput;
-                    }
-                    let mut progress_record = DownloadProgressRecord {
-                        elapsed_time: self.start_time.elapsed(),
-                        last_elapsed_time: self.last_print.elapsed(),
-                        last_throughput,
-                        total_throughput: self.current_bytes as f32
-                            / self.start_time.elapsed().as_secs_f32(),
-                        total_bytes: self.download_size as usize,
-                        current_bytes: self.current_bytes,
-                        percentage_done: 100f32 * (total_bytes_f32 / self.download_size),
-                        estimated_remaining_time,
-                        notification_count: self.notification_count,
-                    };
-                    let mut to_update_progress = false;
-                    if progress_record.last_elapsed_time.as_secs() > 5 {
-                        self.last_print = Instant::now();
-                        self.last_print_bytes = self.current_bytes;
-                        to_update_progress = true;
-                        self.notification_count += 1;
-                        progress_record.notification_count = self.notification_count
-                    }
+            let n = self.response.read(buf)?;
 
-                    if self.use_progress_bar {
-                        self.progress_bar.inc(n as u64);
-                    } else if to_update_progress {
-                        info!(
-                            "downloaded {} bytes {:.1}% {:.1} bytes/s",
-                            self.current_bytes,
-                            progress_record.percentage_done,
-                            progress_record.last_throughput,
-                        );
-                    }
-
-                    if let Some(callback) = &self.callback {
-                        if to_update_progress && !callback(&progress_record) {
-                            info!("Download is aborted by the caller");
-                            return Err(io::Error::new(
-                                io::ErrorKind::Other,
-                                "Download is aborted by the caller",
-                            ));
-                        }
-                    }
-                    Ok(n)
-                }
-                Err(e) => Err(e),
+            self.current_bytes += n;
+            let total_bytes_f32 = self.current_bytes as f32;
+            let diff_bytes_f32 = (self.current_bytes - self.last_print_bytes) as f32;
+            let last_throughput = diff_bytes_f32 / self.last_print.elapsed().as_secs_f32();
+            let mut estimated_remaining_time: f32 = f32::MAX;
+            if last_throughput > 0_f32 {
+                estimated_remaining_time =
+                    (self.download_size - self.current_bytes as f32) / last_throughput;
             }
+            let mut progress_record = DownloadProgressRecord {
+                elapsed_time: self.start_time.elapsed(),
+                last_elapsed_time: self.last_print.elapsed(),
+                last_throughput,
+                total_throughput: self.current_bytes as f32
+                    / self.start_time.elapsed().as_secs_f32(),
+                total_bytes: self.download_size as usize,
+                current_bytes: self.current_bytes,
+                percentage_done: 100f32 * (total_bytes_f32 / self.download_size),
+                estimated_remaining_time,
+                notification_count: self.notification_count,
+            };
+            let mut to_update_progress = false;
+            if progress_record.last_elapsed_time.as_secs() > 5 {
+                self.last_print = Instant::now();
+                self.last_print_bytes = self.current_bytes;
+                to_update_progress = true;
+                self.notification_count += 1;
+                progress_record.notification_count = self.notification_count
+            }
+
+            if self.use_progress_bar {
+                self.progress_bar.inc(n as u64);
+            } else if to_update_progress {
+                info!(
+                    "downloaded {} bytes {:.1}% {:.1} bytes/s",
+                    self.current_bytes,
+                    progress_record.percentage_done,
+                    progress_record.last_throughput,
+                );
+            }
+
+            if let Some(callback) = &self.callback {
+                if to_update_progress && !callback(&progress_record) {
+                    info!("Download is aborted by the caller");
+                    return Err(io::Error::new(
+                        io::ErrorKind::Other,
+                        "Download is aborted by the caller",
+                    ));
+                }
+            }
+
+            Ok(n)
         }
     }
 
