@@ -1740,6 +1740,12 @@ fn main() {
                 poh_verify: !arg_matches.is_present("skip_poh_verify"),
                 bpf_jit: !matches.is_present("no_bpf_jit"),
                 accounts_db_caching_enabled: !arg_matches.is_present("no_accounts_db_caching"),
+                limit_load_slot_count_from_snapshot: value_t!(
+                    arg_matches,
+                    "limit_load_slot_count_from_snapshot",
+                    usize
+                )
+                .ok(),
                 allow_dead_slots: arg_matches.is_present("allow_dead_slots"),
                 accounts_db_test_hash_calculation: arg_matches
                     .is_present("accounts_db_test_hash_calculation"),
