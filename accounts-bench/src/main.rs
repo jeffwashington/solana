@@ -110,7 +110,9 @@ fn main() {
         } else {
             let mut pubkeys: Vec<Pubkey> = vec![];
             let mut time = Measure::start("hash");
-            let results = accounts.accounts_db.update_accounts_hash(0, &ancestors);
+            let results = accounts
+                .accounts_db
+                .update_accounts_hash(0, &ancestors, false);
             time.stop();
             let mut time_store = Measure::start("hash using store");
             let results_store = accounts.accounts_db.update_accounts_hash_with_index_option(
@@ -119,6 +121,7 @@ fn main() {
                 solana_sdk::clock::Slot::default(),
                 &ancestors,
                 None,
+                false,
             );
             time_store.stop();
             if results != results_store {

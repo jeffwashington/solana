@@ -84,7 +84,7 @@ pub fn load(
                 );
 
                 if process_options.accounts_db_test_hash_calculation {
-                    deserialized_bank.update_accounts_hash_with_index_option(false, true);
+                    deserialized_bank.update_accounts_hash_with_index_option(false, true, false);
                 }
 
                 if deserialized_snapshot_hash != (archive_slot, archive_snapshot_hash) {
