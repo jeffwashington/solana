@@ -4014,13 +4014,13 @@ impl AccountsDb {
         let mismatch_found = AtomicU64::new(0);
         // Pick a chunk size big enough to allow us to produce output vectors that are smaller than the overall size.
         // We'll also accumulate the lamports within each chunk and fewer chunks results in less contention to accumulate the sum.
-        let chunks = crate::accounts_hash::MERKLE_FANOUT.pow(4);
+        let chunks = crate::accounts_hash::MERKLE_FANOUT.pow(3);
         let total_lamports = Mutex::<u64>::new(0);
         let get_hashes = || {
             keys.par_chunks(chunks)
                 .map(|pubkeys| {
                     let mut sum = 0u128;
-                    let lock = if is_startup {
+                    let lock = if check_hash || is_startup {
                         Some(self.accounts_index.get_account_maps_read_lock())
                     } else {
                         None
@@ -4029,7 +4029,7 @@ impl AccountsDb {
                     let result: Vec<Hash> = pubkeys
                         .iter()
                         .filter_map(|pubkey| {
-                            let get = if is_startup {
+                            let get = if check_hash || is_startup {
                                 self.accounts_index.get_with_lock(
                                     pubkey,
                                     Some(ancestors), Some(slot),
@@ -4118,6 +4118,8 @@ impl AccountsDb {
             ("hash", hash_time.as_us(), i64),
             ("hash_total", hash_total, i64),
             ("collect", collect.as_us(), i64),
+            ("chunks", chunks, i64),
+            ("key_count", keys.len(), i64),
         );
         Ok((accumulated_hash, total_lamports))
     }
