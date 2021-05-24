@@ -4524,6 +4524,8 @@ impl Bank {
     /// A snapshot bank should be purged of 0 lamport accounts which are not part of the hash
     /// calculation and could shield other real accounts.
     pub fn verify_snapshot_bank(&self) -> bool {
+        self.update_accounts_hash_with_index_option(false, true);
+        
         let mut clean_time = Measure::start("clean");
         if self.slot() > 0 {
             self.clean_accounts(true, true);

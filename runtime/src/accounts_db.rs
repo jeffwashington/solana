@@ -4202,6 +4202,7 @@ impl AccountsDb {
                     slot,
                     pubkey,
                 );
+
                 let max = accum.len();
                 if max == 0 {
                     accum.extend(vec![Vec::new(); bins]);

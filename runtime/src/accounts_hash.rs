@@ -671,6 +671,11 @@ impl AccountsHash {
                     // first entry for this key that starts in our slice
                     result.push(now.hash);
                     sum += now.lamports as u128;
+                    let last_slot = 76391270;
+                    if last_slot == now.slot {
+                        error!("jwash: {:?}", now);
+                    }
+    
                 }
                 for (k, now) in slice.iter().enumerate().skip(i + 1) {
                     if now.pubkey != last {
