@@ -4198,6 +4198,7 @@ impl Bank {
                 .feature_builtins
                 .extend_from_slice(&additional_builtins.feature_builtins);
         }
+        /*
         for builtin in builtins.genesis_builtins {
             self.add_builtin(
                 &builtin.name,
@@ -4205,6 +4206,7 @@ impl Bank {
                 builtin.process_instruction_with_context,
             );
         }
+        */
         self.feature_builtins = Arc::new(builtins.feature_builtins);
 
         self.apply_feature_activations(true);
