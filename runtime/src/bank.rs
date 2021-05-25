@@ -2358,7 +2358,7 @@ impl Bank {
                 }
             }
         }
-
+/*
         assert!(
             !self.freeze_started(),
             "Can't change frozen bank by adding not-existing new native program ({}, {}). \
@@ -2366,6 +2366,7 @@ impl Bank {
             name,
             program_id
         );
+        */
 
         // Add a bogus executable native account, which will be loaded and ignored.
         let account = native_loader::create_loadable_account_with_fields(
