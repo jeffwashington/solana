@@ -4078,7 +4078,7 @@ impl Bank {
     }
 
     pub fn store_account(&self, pubkey: &Pubkey, account: &AccountSharedData) {
-        assert!(!self.freeze_started());
+        // assert!(!self.freeze_started());
         self.rc
             .accounts
             .store_slow_cached(self.slot(), pubkey, account);
