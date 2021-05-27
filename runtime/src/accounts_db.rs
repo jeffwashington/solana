@@ -21,7 +21,10 @@
 use crate::{
     accounts_background_service::{DroppedSlotsSender, SendDroppedBankCallback},
     accounts_cache::{AccountsCache, CachedAccount, SlotCache},
-    accounts_hash::{AccountsHash, CalculateHashIntermediate, HashStats, PreviousPass},
+    accounts_hash::{
+        AccountsHash, CalculateHashIntermediate2, HashStats,
+        PreviousPass,
+    },
     accounts_index::{
         AccountIndexGetResult, AccountSecondaryIndexes, AccountsIndex, AccountsIndexRootsStats,
         IndexKey, IsCached, SlotList, SlotSlice, ZeroLamport,
@@ -4133,6 +4136,7 @@ impl AccountsDb {
                                         |loaded_account| {
                                             let loaded_hash = loaded_account.loaded_hash();
                                             let balance = account_info.lamports;
+                
                                             if check_hash {
                                                 let computed_hash =
                                                     loaded_account.compute_hash(*slot, pubkey);
@@ -4207,17 +4211,20 @@ impl AccountsDb {
     }
 
     /// Scan through all the account storage in parallel
-    fn scan_account_storage_no_bank<F, B>(
+    fn scan_account_storage_no_bank<F, F2, B, C>(
         snapshot_storages: &SortedStorages,
         scan_func: F,
-    ) -> Vec<B>
+        after_func: F2,
+    ) -> Vec<C>
     where
         F: Fn(LoadedAccount, &mut B, Slot) + Send + Sync,
+        F2: Fn(B) -> C + Send + Sync,
         B: Send + Default,
+        C: Send + Default,
     {
         // Without chunks, we end up with 1 output vec for each outer snapshot storage.
         // This results in too many vectors to be efficient.
-        const MAX_ITEMS_PER_CHUNK: Slot = 5_000;
+        const MAX_ITEMS_PER_CHUNK: Slot = 10_000;
         let chunks = 1 + (snapshot_storages.range_width() as Slot / MAX_ITEMS_PER_CHUNK);
         (0..chunks)
             .into_par_iter()
@@ -4237,7 +4244,7 @@ impl AccountsDb {
                         }
                     }
                 }
-                retval
+                after_func(retval)
             })
             .collect()
     }
@@ -4287,24 +4294,35 @@ impl AccountsDb {
         (hash, total_lamports)
     }
 
+    const fn num_bits<T>() -> usize { std::mem::size_of::<T>() * 8 }
+
+fn log_2(x: u32) -> u32 {
+    assert!(x > 0);
+    Self::num_bits::<u32>() as u32 - x.leading_zeros() - 1
+}
+
     fn scan_snapshot_stores(
         storage: &SortedStorages,
         mut stats: &mut crate::accounts_hash::HashStats,
         bins: usize,
         bin_range: &Range<usize>,
-    ) -> Vec<Vec<Vec<CalculateHashIntermediate>>> {
-        let max_plus_1 = std::u8::MAX as usize + 1;
+    ) -> Vec<Vec<Vec<CalculateHashIntermediate2>>> {
+        let max_plus_1 = usize::MAX;
+        let bits = Self::log_2(bins as u32);
+        let bits = 16 - bits;
         assert!(bins <= max_plus_1 && bins > 0);
         assert!(bin_range.start < bins && bin_range.end <= bins && bin_range.start < bin_range.end);
         let mut time = Measure::start("scan all accounts");
         stats.num_snapshot_storage = storage.len();
-        let result: Vec<Vec<Vec<CalculateHashIntermediate>>> = Self::scan_account_storage_no_bank(
+        let result: Vec<Vec<Vec<CalculateHashIntermediate2>>> = Self::scan_account_storage_no_bank(
             storage,
             |loaded_account: LoadedAccount,
-             accum: &mut Vec<Vec<CalculateHashIntermediate>>,
+             accum: &mut Vec<Vec<CalculateHashIntermediate2>>,
              slot: Slot| {
                 let pubkey = *loaded_account.pubkey();
-                let pubkey_to_bin_index = pubkey.as_ref()[0] as usize * bins / max_plus_1;
+                let as_ref = pubkey.as_ref();
+                let pubkey_to_bin_index = ((as_ref[0] as usize * 256 + as_ref[1] as usize) as usize) >> bits;
+        
                 if !bin_range.contains(&pubkey_to_bin_index) {
                     return;
                 }
@@ -4318,11 +4336,9 @@ impl AccountsDb {
                     raw_lamports
                 };
 
-                let source_item = CalculateHashIntermediate::new(
-                    version,
+                let source_item = CalculateHashIntermediate2::new(
                     loaded_account.loaded_hash(),
                     balance,
-                    slot,
                     pubkey,
                 );
                 let max = accum.len();
@@ -4331,12 +4347,45 @@ impl AccountsDb {
                 }
                 accum[pubkey_to_bin_index].push(source_item);
             },
+            Self::sort_and_simplify,
         );
         time.stop();
         stats.scan_time_total_us += time.as_us();
         result
     }
 
+    fn sort_and_simplify(
+        accum: Vec<Vec<CalculateHashIntermediate2>>,
+    ) -> Vec<Vec<CalculateHashIntermediate2>> {
+        accum
+            .into_iter()
+            .map(|mut items| {
+                items.par_sort_by(AccountsHash::compare_two_hash_entries2);
+                let mut result = Vec::with_capacity(items.len());
+                if !items.is_empty() {
+                    for i in 0..items.len() {
+                        let item = &items[i];
+                        let new_item = CalculateHashIntermediate2::new(
+                            item.hash,
+                            item.lamports,
+                            item.pubkey,
+                        );
+                        if i > 0 && items[i - 1].pubkey == item.pubkey {
+                            let len = result.len();
+                            // pubkey found a second time in this batch of slots, so only take the last one - most recent slot or most recent write version
+                            result[len - 1] = new_item;
+
+                        }
+                        else {
+                            result.push(new_item);
+                        }
+                    }
+                }
+                result
+            })
+            .collect()
+    }
+    
     // modeled after get_accounts_delta_hash
     // intended to be faster than calculate_accounts_hash
     pub fn calculate_accounts_hash_without_index(
@@ -4347,7 +4396,7 @@ impl AccountsDb {
             let mut stats = HashStats::default();
             // When calculating hashes, it is helpful to break the pubkeys found into bins based on the pubkey value.
             // More bins means smaller vectors to sort, copy, etc.
-            const PUBKEY_BINS_FOR_CALCULATING_HASHES: usize = 64;
+            const PUBKEY_BINS_FOR_CALCULATING_HASHES: usize = 16384;
 
             // # of passes should be a function of the total # of accounts that are active.
             // higher passes = slower total time, lower dynamic memory usage
@@ -4386,6 +4435,7 @@ impl AccountsDb {
                     &mut stats,
                     pass == num_scan_passes - 1,
                     previous_pass,
+                    &bounds,
                 );
                 previous_pass = for_next_pass;
                 final_result = (hash, lamports);
@@ -5982,6 +6032,7 @@ pub mod tests {
                 assert_eq!(slot_expected, slot);
                 accum.push(expected);
             },
+            |a| a,
         );
         assert_eq!(calls.load(Ordering::Relaxed), 1);
         assert_eq!(result, vec![vec![expected]]);

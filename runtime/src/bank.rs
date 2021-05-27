@@ -1347,7 +1347,7 @@ impl Bank {
             drop_callback: RwLock::new(OptionalDropCallback(None)),
             freeze_started: AtomicBool::new(fields.hash != Hash::default()),
         };
-        bank.finish_init(genesis_config, additional_builtins);
+        //bank.finish_init(genesis_config, additional_builtins);
 
         // Sanity assertions between bank snapshot and genesis config
         // Consider removing from serializable bank state
@@ -4625,6 +4625,8 @@ impl Bank {
     /// calculation and could shield other real accounts.
     pub fn verify_snapshot_bank(&self) -> bool {
         info!("cleaning..");
+        self.update_accounts_hash_with_index_option(false, true);
+
         let mut clean_time = Measure::start("clean");
         if self.slot() > 0 {
             self.clean_accounts(true, true);
@@ -12762,6 +12764,67 @@ pub(crate) mod tests {
     fn test_clean_dropped_unrooted_frozen_banks() {
         solana_logger::setup();
         do_test_clean_dropped_unrooted_banks(FreezeBank1::Yes);
+    }
+
+    use std::fs::File;
+    use std::io::{self, BufRead};
+    use std::path::Path;
+    // The output is wrapped in a Result to allow matching on errors
+// Returns an Iterator to the Reader of the lines of the file.
+fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
+where P: AsRef<Path>, {
+    let file = File::open(filename)?;
+    Ok(io::BufReader::new(file).lines())
+}
+
+    #[test]
+    fn test_log() {
+        solana_logger::setup();
+        let mut jwash = vec![HashSet::new(); 2];
+        if let Ok(lines) = read_lines("/Users/jeffreywashington/dev/s4/diff2.txt") {
+            // Consumes the iterator, returns an (Optional) String
+            for line2 in lines {
+                if let Ok(line) = line2 {
+                    let split = line.split("CalculateHashIntermediate").collect::<Vec<_>>().clone();
+                    let left = split.first().unwrap();
+                    let right = split.last().unwrap();
+                    if left.contains("jwash2") {
+                        continue;
+                    }
+
+                    let index = if left.contains("jwash") {
+0
+                    }
+                    else {
+                        1
+                    };
+                    if jwash[index].contains(&right.to_string()) {
+                        panic!("duplicate: {}", right);
+                    }
+                    jwash[index].insert(right.to_string());
+                    //error!("{}", ip);
+                }
+            }
+            error!("{}, {}", jwash[0].len(), jwash[1].len());
+            let jwash0 = jwash[0].iter().cloned().collect::<Vec<_>>();
+
+            for k in jwash0 {
+                if jwash[1].contains(&k) {
+                    jwash[1].remove(&k);
+                }
+                else {
+                    error!("jwash contained: {}", k);
+                }
+            }
+
+            for k in &jwash[1] {
+                error!("miggy contained: {}", k);
+            }
+
+        }
+        else {
+            error!("not found");
+        }
     }
 
     #[test]
