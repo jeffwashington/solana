@@ -5143,6 +5143,7 @@ impl AccountsDb {
                     keys.iter()
                         .filter_map(|slot| {
                             let r: Option<(SnapshotStorage, Slot)> =
+                            // get_rooted_from_list
                                 if *slot <= snapshot_slot && self.accounts_index.is_root(*slot) {
                                     self.storage.0.get(&slot).map_or_else(
                                         || None,
