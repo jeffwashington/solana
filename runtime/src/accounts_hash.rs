@@ -558,6 +558,7 @@ impl AccountsHash {
             // point to the next pubkey > key
             first_items[min_index] = (&bin[index].pubkey, division_index);
             indexes[division_index] = index;
+            break;
         }
 
         (
