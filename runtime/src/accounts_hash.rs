@@ -510,7 +510,6 @@ impl AccountsHash {
         stats: &mut HashStats,
         range: &Range<usize>,
     ) -> (Vec<Vec<Hash>>, u64) {
-        error!("{}", line!());
         // 1. eliminate zero lamport accounts
         // 2. pick the highest slot or (slot = and highest version) of each pubkey
         // 3. produce this output:
@@ -547,12 +546,12 @@ impl AccountsHash {
         let division_index = first_item.1;
         let bin = &pubkey_division[division_index][bin];
         let mut index = indexes[division_index];
-        let max_index = bin.len() - 1;
-        while index < max_index {
-            index += 1;
+        index += 1;
+        while index < bin.len() {
 
             // still more items where we found the previous key, so just increment the index for that slot group, skipping all pubkeys that are equal
             if &bin[index].pubkey == key {
+                index += 1;
                 continue; // duplicate entries of same pubkey, so keep skipping
             }
 
@@ -582,7 +581,6 @@ impl AccountsHash {
     ) -> (Vec<Hash>, u64) {
         let len = pubkey_division.len();
         let mut item_len = 0;
-        error!("len: {}, {}", len, line!());
         let mut indexes = vec![0; len];
         let mut first_items = Vec::with_capacity(len);
 
