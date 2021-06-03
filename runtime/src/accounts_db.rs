@@ -4598,12 +4598,14 @@ impl AccountsDb {
             let mut previous_pass = PreviousPass::default();
             let mut final_result = (Hash::default(), 0);
 
+            error!("{}", line!());
             for pass in 0..num_scan_passes {
                 let bounds = Range {
                     start: pass * bins_per_pass,
                     end: (pass + 1) * bins_per_pass,
                 };
 
+                error!("{}", line!());
                 let result = Self::scan_snapshot_stores(
                     &storages,
                     &mut stats,
@@ -4612,6 +4614,7 @@ impl AccountsDb {
                     check_hash,
                 )?;
 
+                error!("{}", line!());
                 let (hash, lamports, for_next_pass) = AccountsHash::rest_of_hash_calculation(
                     result,
                     &mut stats,

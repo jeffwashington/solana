@@ -510,6 +510,7 @@ impl AccountsHash {
         stats: &mut HashStats,
         range: &Range<usize>,
     ) -> (Vec<Vec<Hash>>, u64) {
+        error!("{}", line!());
         // 1. eliminate zero lamport accounts
         // 2. pick the highest slot or (slot = and highest version) of each pubkey
         // 3. produce this output:
@@ -581,6 +582,7 @@ impl AccountsHash {
     ) -> (Vec<Hash>, u64) {
         let len = pubkey_division.len();
         let mut item_len = 0;
+        error!("len: {}, {}", len, line!());
         let mut indexes = vec![0; len];
         let mut first_items = Vec::with_capacity(len);
 
