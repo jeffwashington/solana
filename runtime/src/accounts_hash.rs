@@ -645,8 +645,9 @@ impl AccountsHash {
                             loop_stop -= 1;
                         }
                     }
-                    std::cmp::Ordering::Less => {break; // we stop searching when we find someone greater than the min
-                    },
+                    std::cmp::Ordering::Less => {
+                        break; // we stop searching when we find someone greater than the min
+                    }
                     std::cmp::Ordering::Greater => {
                         panic!("bad sorting");
                     }
@@ -677,43 +678,123 @@ impl AccountsHash {
                 min_index -= 1; // we exhausted the list at entry min_index and deleted that entry completely, so we only have to re-sort up to the previous item
             }
 
-            // min_index now is the index of the last item that needs to be re-sorted
-            let first_sorted_index = min_index + 1;
-            if min_index > 0 {
-                first_items[0..first_sorted_index].sort_unstable_by(Self::compare_two_dup_accounts);
-            }
-            let mut start_search = first_sorted_index;
-            for i in 0..=min_index {
-                let seek = &first_items[i];
-                if let Err(mut index) = first_items[start_search..].binary_search_by(|probe| Self::compare_two_dup_accounts(probe, seek)) {
-                    index += start_search; // offset from 0
-                    new_indexes[i] = index; // re-use this vector
-                    start_search = index; // next search looks >= index
-                }
-                else {
-                    panic!("found item");
-                }
-            }
-            
-            previous_first_items.truncate(first_items.len());
-            let mut start_search = first_sorted_index;
-
-            // sort into the other list and then swap pointers
-            for i in 0..=min_index {
-                let insert_index = new_indexes[0];
-                let dest_index_start = start_search - first_sorted_index;
-                let dest_index_end = insert_index - first_sorted_index;
-                assert_eq!(dest_index_end - dest_index_start, insert_index - start_search, "{}, {}, {}, {}, i: {}, min_index: {}", dest_index_end , dest_index_start, insert_index , start_search, i, min_index);
-                previous_first_items[dest_index_start..dest_index_end].copy_from_slice(&first_items[start_search..insert_index]);
-                previous_first_items[dest_index_end] = first_items[i];
-                start_search = insert_index;
-            }
-            let dest_index_start = start_search - first_sorted_index;
-            assert_eq!(dest_index_start, start_search, "{}, {}, min_index: {}", dest_index_start, start_search, min_index);
-            previous_first_items[dest_index_start..].copy_from_slice(&first_items[start_search..]);
-            std::mem::swap(&mut previous_first_items, &mut first_items);
+            Self::swap(
+                &mut first_items,
+                &mut previous_first_items,
+                min_index,
+                &mut new_indexes,
+            );
         }
         (hashes, overall_sum, item_len)
+    }
+
+    fn swap<'a>(
+        first_items: &'a mut Vec<DupAccountFirstEntry>,
+        previous_first_items: &'a mut Vec<DupAccountFirstEntry>,
+        min_index: usize,
+        new_indexes: &'a mut Vec<usize>,
+    ) {
+        const debug: bool = false;
+        // min_index now is the index of the last item that needs to be re-sorted
+        let first_sorted_index = min_index + 1;
+        if min_index > 0 {
+            first_items[0..first_sorted_index].sort_unstable_by(Self::compare_two_dup_accounts);
+        }
+        let mut start_search = first_sorted_index;
+        for i in 0..first_sorted_index {
+            let seek = &first_items[i];
+            if let Err(mut index) = first_items[start_search..]
+                .binary_search_by(|probe| Self::compare_two_dup_accounts(probe, seek))
+            {
+                index += start_search; // offset from 0
+                new_indexes[i] = index; // re-use this vector
+                start_search = index; // next search looks >= index
+            } else {
+                panic!("found item");
+            }
+        }
+
+        previous_first_items.truncate(first_items.len());
+        let mut start_search = first_sorted_index;
+
+        if debug {
+            error!("new_indexes: {:?}", new_indexes);
+            error!("start_search: {:?}", start_search);
+            error!("first_items: {:?}", first_items);
+        }
+
+        // sort into the other list and then swap pointers
+        let mut dest_start = 0;
+        for i in 0..first_sorted_index {
+            let insert_index = new_indexes[i];
+            let dest_index_end = dest_start + insert_index - first_sorted_index;
+            if debug {
+                assert!(
+                    dest_index_end >= dest_start,
+                    "{}, {}, {}, {}, i: {}, min_index: {}",
+                    dest_index_end,
+                    dest_start,
+                    insert_index,
+                    start_search,
+                    i,
+                    min_index
+                );
+                assert!(
+                    insert_index >= start_search,
+                    "{}, {}, {}, {}, i: {}, min_index: {}",
+                    dest_index_end,
+                    dest_start,
+                    insert_index,
+                    start_search,
+                    i,
+                    min_index
+                );
+
+                assert_eq!(
+                    dest_index_end - dest_start,
+                    insert_index - start_search,
+                    "{}, {}, {}, {}, i: {}, min_index: {}",
+                    dest_index_end,
+                    dest_start,
+                    insert_index,
+                    start_search,
+                    i,
+                    min_index
+                );
+                error!(
+                    "copy from {}..{} to {}..{}",
+                    start_search, insert_index, dest_start, dest_index_end
+                );
+            }
+            previous_first_items[dest_start..dest_index_end]
+                .copy_from_slice(&first_items[start_search..insert_index]);
+            if debug {
+                error!("assign to: {}", dest_index_end);
+            }
+            previous_first_items[dest_index_end] = first_items[i];
+            start_search = insert_index;
+            dest_start = dest_index_end + 1;
+            if debug {
+                error!(
+                    "looping, start_search: {}, dest_start: {}",
+                    start_search, dest_start
+                );
+            }
+        }
+        if debug {
+            assert_eq!(
+                dest_start, start_search,
+                "{}, {}, min_index: {}",
+                dest_start, start_search, min_index
+            );
+            error!("copy from {}.. to {}..", start_search, dest_start);
+        }
+        previous_first_items[dest_start..].copy_from_slice(&first_items[start_search..]);
+        if debug {
+            error!("after_reordering: {:?}", previous_first_items);
+        }
+
+        std::mem::swap(previous_first_items, first_items);
     }
 
     // input:
@@ -1353,7 +1434,7 @@ pub mod tests {
 
     #[test]
     fn test_accountsdb_de_dup_accounts_zero_chunks() {
-        let (hashes, lamports) = AccountsHash::de_dup_accounts_in_parallel(
+        let (hashes, lamports, _) = AccountsHash::de_dup_accounts_in_parallel(
             &[vec![vec![CalculateHashIntermediate::default()]]],
             0,
         );
@@ -1385,11 +1466,11 @@ pub mod tests {
         assert_eq!(empty, hashes);
         assert_eq!(lamports, 0);
 
-        let (hashes, lamports) = AccountsHash::de_dup_accounts_in_parallel(&[], 1);
+        let (hashes, lamports, _) = AccountsHash::de_dup_accounts_in_parallel(&[], 1);
         assert_eq!(vec![Hash::default(); 0], hashes);
         assert_eq!(lamports, 0);
 
-        let (hashes, lamports) = AccountsHash::de_dup_accounts_in_parallel(&[], 2);
+        let (hashes, lamports, _) = AccountsHash::de_dup_accounts_in_parallel(&[], 2);
         assert_eq!(vec![Hash::default(); 0], hashes);
         assert_eq!(lamports, 0);
     }
@@ -1486,8 +1567,10 @@ pub mod tests {
                         .iter()
                         .map(|item| CalculateHashIntermediate::from(item.clone()))
                         .collect()]];
-                    let (hashes2, lamports2) = AccountsHash::de_dup_accounts_in_parallel(&slice, 1);
-                    let (hashes3, lamports3) = AccountsHash::de_dup_accounts_in_parallel(&slice, 2);
+                    let (hashes2, lamports2, _) =
+                        AccountsHash::de_dup_accounts_in_parallel(&slice, 1);
+                    let (hashes3, lamports3, _) =
+                        AccountsHash::de_dup_accounts_in_parallel(&slice, 2);
                     let (hashes4, lamports4) = AccountsHash::de_dup_and_eliminate_zeros(
                         slice.to_vec(),
                         &mut HashStats::default(),
@@ -2136,12 +2219,16 @@ pub mod tests {
 
         let offset = 2;
         let input = vec![
-            CalculateHashIntermediate::new(
+            CalculateHashIntermediate::new_without_slot(
                 Hash::new_unique(),
                 u64::MAX - offset,
                 Pubkey::new_unique(),
             ),
-            CalculateHashIntermediate::new(Hash::new_unique(), offset + 1, Pubkey::new_unique()),
+            CalculateHashIntermediate::new_without_slot(
+                Hash::new_unique(),
+                offset + 1,
+                Pubkey::new_unique(),
+            ),
         ];
         AccountsHash::de_dup_accounts_in_parallel(&[vec![input]], 1);
     }
@@ -2153,12 +2240,12 @@ pub mod tests {
 
         let offset = 2;
         let input = vec![
-            vec![CalculateHashIntermediate::new(
+            vec![CalculateHashIntermediate::new_without_slot(
                 Hash::new_unique(),
                 u64::MAX - offset,
                 Pubkey::new_unique(),
             )],
-            vec![CalculateHashIntermediate::new(
+            vec![CalculateHashIntermediate::new_without_slot(
                 Hash::new_unique(),
                 offset + 1,
                 Pubkey::new_unique(),
@@ -2169,5 +2256,66 @@ pub mod tests {
             &mut HashStats::default(),
             &empty_range(),
         );
+    }
+
+    fn verify(one: &Vec<DupAccountFirstEntry>, two: &Vec<DupAccountFirstEntry>) {
+        verify_start(one, two, 0);
+    }
+
+    fn verify_start(
+        one: &Vec<DupAccountFirstEntry>,
+        two: &Vec<DupAccountFirstEntry>,
+        start: usize,
+    ) {
+        for i in (start + 1)..one.len() {
+            assert!(
+                AccountsHash::compare_two_dup_accounts(&one[i - 1], &one[i])
+                    == std::cmp::Ordering::Less,
+                "i: {}, one: {:?}",
+                i,
+                one
+            );
+        }
+    }
+
+    #[test]
+    fn test_accountsdb_swap() {
+        solana_logger::setup();
+        let mut first = vec![(Pubkey::new(&[2; 32]), 0)];
+        let first_len = first.len();
+        let mut second = first.clone();
+        let mut new_indexes = vec![0; first_len];
+        AccountsHash::swap(&mut first, &mut second, 0, &mut new_indexes);
+
+        for min_index in 0..2 {
+            error!("min_index: {}", min_index);
+            let mut first = vec![(Pubkey::new(&[2; 32]), 3), (Pubkey::new(&[2; 32]), 2)];
+            let mut second = first.clone();
+            let mut new_indexes = vec![0; first.len()];
+            verify_start(&first, &second, min_index + 1);
+            AccountsHash::swap(&mut first, &mut second, min_index, &mut new_indexes);
+            verify(&first, &second);
+
+            let mut first = vec![(Pubkey::new(&[2; 32]), 2), (Pubkey::new(&[2; 32]), 3)];
+            let mut second = first.clone();
+            let mut new_indexes = vec![0; first.len()];
+            verify_start(&first, &second, min_index + 1);
+            AccountsHash::swap(&mut first, &mut second, min_index, &mut new_indexes);
+            verify(&first, &second);
+        }
+
+        for min_index in 0..3 {
+            error!("min_index of 3: {}", min_index);
+            let mut first = vec![
+                (Pubkey::new(&[2; 32]), 3),
+                (Pubkey::new(&[0; 32]), 2),
+                (Pubkey::new(&[1; 32]), 2),
+            ];
+            let mut second = first.clone();
+            let mut new_indexes = vec![0; first.len()];
+            verify_start(&first, &second, min_index + 1);
+            AccountsHash::swap(&mut first, &mut second, min_index, &mut new_indexes);
+            verify(&first, &second);
+        }
     }
 }
