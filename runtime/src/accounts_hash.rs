@@ -518,18 +518,22 @@ impl AccountsHash {
         //     vec: individual hashes in pubkey order
         let mut zeros = Measure::start("eliminate zeros");
         let overall_sum = Mutex::new(0u64);
+        let unreduced_entries = Mutex::new(0usize);
         let hashes: Vec<Vec<Hash>> = (range.start..range.end)
             .into_par_iter()
             .map(|bin| {
-                let (hashes, sum) = Self::de_dup_accounts_in_parallel(&sorted_data_by_pubkey, bin);
+                let (hashes, sum, unreduced_entries_count) = Self::de_dup_accounts_in_parallel(&sorted_data_by_pubkey, bin);
                 let mut overall = overall_sum.lock().unwrap();
                 *overall = Self::checked_cast_for_capitalization(sum as u128 + *overall as u128);
+                
+                *unreduced_entries.lock().unwrap() += unreduced_entries_count;
                 hashes
             })
             .collect();
         zeros.stop();
         stats.zeros_time_total_us += zeros.as_us();
         let sum = *overall_sum.lock().unwrap();
+        stats.unreduced_entries = *unreduced_entries.lock().unwrap();
         (hashes, sum)
     }
 
@@ -579,7 +583,7 @@ impl AccountsHash {
     fn de_dup_accounts_in_parallel(
         pubkey_division: &[Vec<Vec<CalculateHashIntermediate>>],
         bin: usize,
-    ) -> (Vec<Hash>, u64) {
+    ) -> (Vec<Hash>, u64, usize) {
         let len = pubkey_division.len();
         let mut item_len = 0;
         let mut indexes = vec![0; len];
@@ -645,7 +649,7 @@ impl AccountsHash {
                 hashes.push(item.hash);
             }
         }
-        (hashes, overall_sum)
+        (hashes, overall_sum, item_len)
     }
 
     // input:
