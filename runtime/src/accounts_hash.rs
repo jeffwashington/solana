@@ -642,9 +642,9 @@ impl AccountsHash {
                             loop_stop -= 1;
                         }
                     }
-                    std::cmp::Ordering::Greater => {break; // we stop searching when we find someone greater than the min
+                    std::cmp::Ordering::Less => {break; // we stop searching when we find someone greater than the min
                     },
-                    std::cmp::Ordering::Less => {
+                    std::cmp::Ordering::Greater => {
                         panic!("bad sorting");
                     }
                 }
