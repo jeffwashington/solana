@@ -1260,6 +1260,10 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
         let potentially_new_items = items
             .iter()
             .map(|(_pubkey, account_info)| {
+                if account_info.is_zero_lamport() {
+                    self.zero_lamport_pubkeys.insert(*pubkey);
+                }
+
                 // this value is equivalent to what update() below would have created if we inserted a new item
                 WriteAccountMapEntry::new_entry_after_update(slot, account_info)
             })
@@ -1277,9 +1281,6 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
                     &mut w_account_maps,
                     new_item,
                 );
-                if account_info.is_zero_lamport() {
-                    self.zero_lamport_pubkeys.insert(*pubkey);
-                }
                 if let Some(mut w_account_entry) = account_entry {
                     w_account_entry.update(slot, account_info, &mut _reclaims);
                 }
