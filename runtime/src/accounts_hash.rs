@@ -541,12 +541,12 @@ impl AccountsHash {
     fn get_item<'a, 'b>(
         min_index: usize,
         bin: usize,
-        first_items: &'a mut Vec<(&'b Pubkey, usize)>,
+        first_items: &'a mut Vec<(Pubkey, usize)>,
         pubkey_division: &'b [Vec<Vec<CalculateHashIntermediate>>],
         indexes: &'a mut Vec<usize>,
     ) -> (bool, &'b CalculateHashIntermediate) {
         let first_item = first_items[min_index];
-        let key = first_item.0;
+        let key = &first_item.0;
         let division_index = first_item.1;
         let bin = &pubkey_division[division_index][bin];
         let mut index = indexes[division_index];
@@ -560,7 +560,7 @@ impl AccountsHash {
             }
 
             // point to the next pubkey > key
-            first_items[min_index] = (&bin[index].pubkey, division_index);
+            first_items[min_index] = (bin[index].pubkey, division_index);
             indexes[division_index] = index;
             break;
         }
@@ -594,7 +594,7 @@ impl AccountsHash {
                 let sub = &bins[bin];
                 if !sub.is_empty() {
                     item_len += bins[bin].len();
-                    first_items.push((&bins[bin][0].pubkey, i));
+                    first_items.push((bins[bin][0].pubkey, i));
                 }
             }
         });
