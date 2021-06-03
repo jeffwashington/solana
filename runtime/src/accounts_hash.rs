@@ -91,6 +91,8 @@ impl CalculateHashIntermediate {
     }
 }
 
+type DupAccountFirstEntry = (Pubkey, usize);
+
 #[derive(Default, Debug)]
 pub struct CumulativeOffset {
     pub index: Vec<usize>,
@@ -522,10 +524,10 @@ impl AccountsHash {
         let hashes: Vec<Vec<Hash>> = (range.start..range.end)
             .into_par_iter()
             .map(|bin| {
-                let (hashes, sum, unreduced_entries_count) = Self::de_dup_accounts_in_parallel(&sorted_data_by_pubkey, bin);
+                let (hashes, sum, unreduced_entries_count) =
+                    Self::de_dup_accounts_in_parallel(&sorted_data_by_pubkey, bin);
                 let mut overall = overall_sum.lock().unwrap();
                 *overall = Self::checked_cast_for_capitalization(sum as u128 + *overall as u128);
-                
                 *unreduced_entries.lock().unwrap() += unreduced_entries_count;
                 hashes
             })
@@ -552,7 +554,6 @@ impl AccountsHash {
         let mut index = indexes[division_index];
         index += 1;
         while index < bin.len() {
-
             // still more items where we found the previous key, so just increment the index for that slot group, skipping all pubkeys that are equal
             if &bin[index].pubkey == key {
                 index += 1;
@@ -575,6 +576,20 @@ impl AccountsHash {
             &bin[index - 1],
         )
     }
+
+    fn compare_two_dup_accounts(
+        a: &DupAccountFirstEntry,
+        b: &DupAccountFirstEntry,
+    ) -> std::cmp::Ordering {
+        // note partial_cmp only returns None with floating point comparisons
+        let result = a.0.partial_cmp(&b.0).unwrap();
+        if result == std::cmp::Ordering::Equal {
+            return a.1.partial_cmp(&b.1).unwrap();
+        } else {
+            result
+        }
+    }
+
     // 1. eliminate zero lamport accounts
     // 2. pick the highest slot or (slot = and highest version) of each pubkey
     // 3. produce this output:
@@ -600,9 +615,10 @@ impl AccountsHash {
         });
         let mut overall_sum = 0;
         let mut hashes: Vec<Hash> = Vec::with_capacity(item_len);
+        first_items.sort_unstable_by(Self::compare_two_dup_accounts);
 
         while !first_items.is_empty() {
-            let mut loop_stop = { first_items.len() - 1 }; // we increment at the beginning of the loop
+            let mut loop_stop = first_items.len() - 1; // we increment at the beginning of the loop
             let mut min_index = 0;
             let mut min_pubkey = first_items[min_index].0;
             let mut first_item_index = 0; // we will start iterating at item 1. +=1 is first instruction in loop
@@ -612,9 +628,6 @@ impl AccountsHash {
                 let (key, _) = first_items[first_item_index];
                 let cmp = min_pubkey.cmp(&key);
                 match cmp {
-                    std::cmp::Ordering::Less => {
-                        continue; // we still have the min item
-                    }
                     std::cmp::Ordering::Equal => {
                         // we found an item that masks an earlier slot, so skip the earlier item
                         let (exhausted, _) = Self::get_item(
@@ -629,13 +642,17 @@ impl AccountsHash {
                             loop_stop -= 1;
                         }
                     }
-                    std::cmp::Ordering::Greater => (),
+                    std::cmp::Ordering::Greater => {break; // we stop searching when we find someone greater than the min
+                    },
+                    std::cmp::Ordering::Less => {
+                        panic!("bad sorting");
+                    }
                 }
                 // this is the new min pubkey
                 min_index = first_item_index;
                 min_pubkey = key;
             }
-            let (_, item) = Self::get_item(
+            let (exhausted_min_item_list, item) = Self::get_item(
                 min_index,
                 bin,
                 &mut first_items,
@@ -648,6 +665,24 @@ impl AccountsHash {
                 );
                 hashes.push(item.hash);
             }
+
+            // now, items 0..=min_index are no longer sorted correctly, so we have to re-sort those items
+            if exhausted_min_item_list {
+                if min_index == 0 {
+                    continue; // we found the item from entry 0, and it was exhausted, so everything else is still sorted and entry 0 was deleted from the list
+                }
+                min_index -= 1; // we exhausted the list at entry min_index and deleted that entry completely, so we only have to re-sort up to the previous item
+            }
+/*
+            // min_index now is the index of the last item that needs to be re-sorted
+            if min_index > 0 {
+                first_items[0..=min_index].sort_unstable_by(Self::compare_two_dup_accounts);
+
+            }
+            */
+            first_items.sort_unstable_by(Self::compare_two_dup_accounts);
+
+
         }
         (hashes, overall_sum, item_len)
     }
