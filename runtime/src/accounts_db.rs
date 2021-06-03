@@ -5570,7 +5570,7 @@ impl AccountsDb {
                         let dirty_pubkey_mask = self
                             .accounts_index
                             .insert_new_if_missing_into_primary_index(*slot, items);
-
+/*
                         assert_eq!(dirty_pubkey_mask.len(), items_len);
 
                         let mut dirty_pubkey_mask_iter = dirty_pubkey_mask.iter();
@@ -5583,6 +5583,7 @@ impl AccountsDb {
                         if !dirty_pubkeys.is_empty() {
                             self.uncleaned_pubkeys.insert(*slot, dirty_pubkeys);
                         }
+                        */
 
                         if !self.account_indexes.is_empty() {
                             for (pubkey, (_, _store_id, stored_account)) in accounts_map.iter() {
