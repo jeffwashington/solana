@@ -703,11 +703,13 @@ impl AccountsHash {
                 let insert_index = new_indexes[0];
                 let dest_index_start = start_search - first_sorted_index;
                 let dest_index_end = insert_index - first_sorted_index;
+                assert_eq!(dest_index_end - dest_index_start, insert_index - start_search, "{}, {}, {}, {}, i: {}, min_index: {}", dest_index_end , dest_index_start, insert_index , start_search, i, min_index);
                 previous_first_items[dest_index_start..dest_index_end].copy_from_slice(&first_items[start_search..insert_index]);
                 previous_first_items[dest_index_end] = first_items[i];
                 start_search = insert_index;
             }
             let dest_index_start = start_search - first_sorted_index;
+            assert_eq!(dest_index_start, start_search, "{}, {}, min_index: {}", dest_index_start, start_search, min_index);
             previous_first_items[dest_index_start..].copy_from_slice(&first_items[start_search..]);
             std::mem::swap(&mut previous_first_items, &mut first_items);
         }
