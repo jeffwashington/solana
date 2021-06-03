@@ -1259,7 +1259,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
     ) -> Vec<bool> {
         let potentially_new_items = items
             .iter()
-            .map(|(_pubkey, account_info)| {
+            .map(|(pubkey, account_info)| {
                 if account_info.is_zero_lamport() {
                     self.zero_lamport_pubkeys.insert(*pubkey);
                 }
