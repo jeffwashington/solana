@@ -533,7 +533,7 @@ impl AccountsHash {
         zeros.stop();
         stats.zeros_time_total_us += zeros.as_us();
         let sum = *overall_sum.lock().unwrap();
-        stats.unreduced_entries = *unreduced_entries.lock().unwrap();
+        stats.unreduced_entries += *unreduced_entries.lock().unwrap();
         (hashes, sum)
     }
 
