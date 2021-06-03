@@ -1261,7 +1261,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
             .iter()
             .map(|(pubkey, account_info)| {
                 if account_info.is_zero_lamport() {
-                    self.zero_lamport_pubkeys.insert(*pubkey);
+                    self.zero_lamport_pubkeys.insert(**pubkey);
                 }
 
                 // this value is equivalent to what update() below would have created if we inserted a new item
