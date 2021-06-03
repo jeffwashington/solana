@@ -603,6 +603,7 @@ impl AccountsHash {
         let mut item_len = 0;
         let mut indexes = vec![0; len];
         let mut first_items = Vec::with_capacity(len);
+        let mut new_indexes = vec![0; len];
 
         pubkey_division.iter().enumerate().for_each(|(i, bins)| {
             if bins.len() > bin {
@@ -613,6 +614,8 @@ impl AccountsHash {
                 }
             }
         });
+        let mut previous_first_items = first_items.clone();
+
         let mut overall_sum = 0;
         let mut hashes: Vec<Hash> = Vec::with_capacity(item_len);
         first_items.sort_unstable_by(Self::compare_two_dup_accounts);
@@ -673,16 +676,40 @@ impl AccountsHash {
                 }
                 min_index -= 1; // we exhausted the list at entry min_index and deleted that entry completely, so we only have to re-sort up to the previous item
             }
-/*
+
             // min_index now is the index of the last item that needs to be re-sorted
+            let first_sorted_index = min_index + 1;
             if min_index > 0 {
-                first_items[0..=min_index].sort_unstable_by(Self::compare_two_dup_accounts);
-
+                first_items[0..first_sorted_index].sort_unstable_by(Self::compare_two_dup_accounts);
             }
-            */
-            first_items.sort_unstable_by(Self::compare_two_dup_accounts);
+            let mut start_search = first_sorted_index;
+            for i in 0..=min_index {
+                let seek = &first_items[i];
+                if let Err(mut index) = first_items[start_search..].binary_search_by(|probe| Self::compare_two_dup_accounts(probe, seek)) {
+                    index += start_search; // offset from 0
+                    new_indexes[i] = index; // re-use this vector
+                    start_search = index; // next search looks >= index
+                }
+                else {
+                    panic!("found item");
+                }
+            }
+            
+            previous_first_items.truncate(first_items.len());
+            let mut start_search = first_sorted_index;
 
-
+            // sort into the other list and then swap pointers
+            for i in 0..=min_index {
+                let insert_index = new_indexes[0];
+                let dest_index_start = start_search - first_sorted_index;
+                let dest_index_end = insert_index - first_sorted_index;
+                previous_first_items[dest_index_start..dest_index_end].copy_from_slice(&first_items[start_search..insert_index]);
+                previous_first_items[dest_index_end] = first_items[i];
+                start_search = insert_index;
+            }
+            let dest_index_start = start_search - first_sorted_index;
+            previous_first_items[dest_index_start..].copy_from_slice(&first_items[start_search..]);
+            std::mem::swap(&mut previous_first_items, &mut first_items);
         }
         (hashes, overall_sum, item_len)
     }
