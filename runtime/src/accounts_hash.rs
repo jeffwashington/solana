@@ -623,7 +623,7 @@ impl AccountsHash {
         while !first_items.is_empty() {
             let mut loop_stop = first_items.len() - 1; // we increment at the beginning of the loop
             let mut first_item_index = artificial_start_index; // we will start iterating at item 1. +=1 is first instruction in loop
-            assert!(first_item_index <= loop_stop);
+            assert!(first_item_index <= loop_stop, "first_item_index: {}, loop_stop: {}, artificial: {}", first_item_index, loop_stop, artificial_start_index);
             let mut min_index = first_item_index;
             let mut min_pubkey = first_items[first_item_index].0;
 
