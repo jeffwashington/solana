@@ -694,7 +694,7 @@ impl AccountsHash {
         min_index: usize,
         new_indexes: &'a mut Vec<usize>,
     ) {
-        const debug: bool = true;
+        const debug: bool = false;
         // min_index now is the index of the last item that needs to be re-sorted
         let first_sorted_index = min_index + 1;
         if min_index > 0 {
@@ -716,7 +716,7 @@ impl AccountsHash {
 
         previous_first_items.truncate(first_items.len());
         let mut start_search = first_sorted_index;
-        let print = false;
+        let print = debug && true;
         if debug && print {
             error!("new_indexes: {:?}", new_indexes);
             error!("start_search: {:?}", start_search);
@@ -725,9 +725,10 @@ impl AccountsHash {
 
         // sort into the other list and then swap pointers
         let mut dest_start = 0;
+        let mut next_src_copy_start = first_sorted_index;
         for i in 0..first_sorted_index {
             let insert_index = new_indexes[i];
-            let dest_index_end = dest_start + insert_index - first_sorted_index;
+            let dest_index_end = dest_start + insert_index - next_src_copy_start;
             if debug {
                 assert!(
                     dest_index_end >= dest_start,
@@ -735,65 +736,65 @@ impl AccountsHash {
                     dest_index_end,
                     dest_start,
                     insert_index,
-                    start_search,
+                    next_src_copy_start,
                     i,
                     min_index
                 );
                 assert!(
-                    insert_index >= start_search,
+                    insert_index >= next_src_copy_start,
                     "{}, {}, {}, {}, i: {}, min_index: {}",
                     dest_index_end,
                     dest_start,
                     insert_index,
-                    start_search,
+                    next_src_copy_start,
                     i,
                     min_index
                 );
 
                 assert_eq!(
                     dest_index_end - dest_start,
-                    insert_index - start_search,
+                    insert_index - next_src_copy_start,
                     "{}, {}, {}, {}, i: {}, min_index: {}",
                     dest_index_end,
                     dest_start,
                     insert_index,
-                    start_search,
+                    next_src_copy_start,
                     i,
                     min_index
                 );
                 if print {
-                error!(
-                    "copy from {}..{} to {}..{}",
-                    start_search, insert_index, dest_start, dest_index_end
-                );
-            }
+                    error!(
+                        "copy from {}..{} to {}..{}",
+                        next_src_copy_start, insert_index, dest_start, dest_index_end
+                    );
+                }
             }
             previous_first_items[dest_start..dest_index_end]
-                .copy_from_slice(&first_items[start_search..insert_index]);
+                .copy_from_slice(&first_items[next_src_copy_start..insert_index]);
             if debug && print {
-                error!("assign to: {}", dest_index_end);
+                error!("assign to: {} from {}", dest_index_end, i);
             }
             previous_first_items[dest_index_end] = first_items[i];
-            start_search = insert_index;
+            next_src_copy_start = insert_index;
             dest_start = dest_index_end + 1;
             if debug && print {
                 error!(
-                    "looping, start_search: {}, dest_start: {}",
-                    start_search, dest_start
+                    "looping, start_search: {}, dest_start: {}, result: {:?}",
+                    start_search, dest_start, previous_first_items,
                 );
             }
         }
         if debug {
             assert_eq!(
-                dest_start, start_search,
+                dest_start, next_src_copy_start,
                 "{}, {}, min_index: {}",
-                dest_start, start_search, min_index
+                dest_start, next_src_copy_start, min_index
             );
             if print {
-            error!("copy from {}.. to {}..", start_search, dest_start);
+                error!("copy from {}.. to {}..", next_src_copy_start, dest_start);
             }
         }
-        previous_first_items[dest_start..].copy_from_slice(&first_items[start_search..]);
+        previous_first_items[dest_start..].copy_from_slice(&first_items[next_src_copy_start..]);
         if debug && print {
             error!("after_reordering: {:?}", previous_first_items);
         }
@@ -2314,6 +2315,73 @@ pub mod tests {
                 (Pubkey::new(&[2; 32]), 3),
                 (Pubkey::new(&[0; 32]), 2),
                 (Pubkey::new(&[1; 32]), 2),
+            ];
+            let mut second = first.clone();
+            let mut new_indexes = vec![0; first.len()];
+            verify_start(&first, &second, min_index + 1);
+            AccountsHash::swap(&mut first, &mut second, min_index, &mut new_indexes);
+            verify(&first, &second);
+        }
+
+        for min_index in 0..3 {
+            error!("min_index of 4: {}", min_index);
+            let mut first = vec![
+                (Pubkey::new(&[2; 32]), 3),
+                (Pubkey::new(&[0; 32]), 2),
+                (Pubkey::new(&[1; 32]), 2),
+            ];
+            let mut second = first.clone();
+            let mut new_indexes = vec![0; first.len()];
+            verify_start(&first, &second, min_index + 1);
+            AccountsHash::swap(&mut first, &mut second, min_index, &mut new_indexes);
+            verify(&first, &second);
+        }
+
+        for min_index in 0..3 {
+            error!("min_index of 5: {}", min_index);
+            let mut first = vec![
+                (Pubkey::new(&[2; 32]), 3),
+                (Pubkey::new(&[0; 32]), 1),
+                (Pubkey::new(&[0; 32]), 2),
+            ];
+            let mut second = first.clone();
+            let mut new_indexes = vec![0; first.len()];
+            verify_start(&first, &second, min_index + 1);
+            AccountsHash::swap(&mut first, &mut second, min_index, &mut new_indexes);
+            verify(&first, &second);
+        }
+        for min_index in 0..3 {
+            error!("min_index of 6: {}", min_index);
+            let mut first = vec![
+                (Pubkey::new(&[2; 32]), 3),
+                (Pubkey::new(&[0; 32]), 2),
+                (Pubkey::new(&[4; 32]), 1),
+            ];
+            let mut second = first.clone();
+            let mut new_indexes = vec![0; first.len()];
+            verify_start(&first, &second, min_index + 1);
+            AccountsHash::swap(&mut first, &mut second, min_index, &mut new_indexes);
+            verify(&first, &second);
+        }
+        for min_index in 1..3 {
+            error!("min_index of 7: {}", min_index);
+            let mut first = vec![
+                (Pubkey::new(&[2; 32]), 3),
+                (Pubkey::new(&[0; 32]), 2),
+                (Pubkey::new(&[1; 32]), 1),
+            ];
+            let mut second = first.clone();
+            let mut new_indexes = vec![0; first.len()];
+            verify_start(&first, &second, min_index + 1);
+            AccountsHash::swap(&mut first, &mut second, min_index, &mut new_indexes);
+            verify(&first, &second);
+        }
+        for min_index in 1..3 {
+            error!("min_index of 8: {}", min_index);
+            let mut first = vec![
+                (Pubkey::new(&[2; 32]), 3),
+                (Pubkey::new(&[0; 32]), 2),
+                (Pubkey::new(&[0; 32]), 1),
             ];
             let mut second = first.clone();
             let mut new_indexes = vec![0; first.len()];
