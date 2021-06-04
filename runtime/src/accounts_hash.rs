@@ -694,7 +694,7 @@ impl AccountsHash {
         min_index: usize,
         new_indexes: &'a mut Vec<usize>,
     ) {
-        const debug: bool = false;
+        const debug: bool = true;
         // min_index now is the index of the last item that needs to be re-sorted
         let first_sorted_index = min_index + 1;
         if min_index > 0 {
@@ -716,8 +716,8 @@ impl AccountsHash {
 
         previous_first_items.truncate(first_items.len());
         let mut start_search = first_sorted_index;
-
-        if debug {
+        let print = false;
+        if debug && print {
             error!("new_indexes: {:?}", new_indexes);
             error!("start_search: {:?}", start_search);
             error!("first_items: {:?}", first_items);
@@ -768,13 +768,13 @@ impl AccountsHash {
             }
             previous_first_items[dest_start..dest_index_end]
                 .copy_from_slice(&first_items[start_search..insert_index]);
-            if debug {
+            if debug && print {
                 error!("assign to: {}", dest_index_end);
             }
             previous_first_items[dest_index_end] = first_items[i];
             start_search = insert_index;
             dest_start = dest_index_end + 1;
-            if debug {
+            if debug && print {
                 error!(
                     "looping, start_search: {}, dest_start: {}",
                     start_search, dest_start
@@ -787,7 +787,9 @@ impl AccountsHash {
                 "{}, {}, min_index: {}",
                 dest_start, start_search, min_index
             );
+            if print {
             error!("copy from {}.. to {}..", start_search, dest_start);
+            }
         }
         previous_first_items[dest_start..].copy_from_slice(&first_items[start_search..]);
         if debug {
