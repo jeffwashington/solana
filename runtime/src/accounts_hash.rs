@@ -761,10 +761,12 @@ impl AccountsHash {
                     i,
                     min_index
                 );
+                if print {
                 error!(
                     "copy from {}..{} to {}..{}",
                     start_search, insert_index, dest_start, dest_index_end
                 );
+            }
             }
             previous_first_items[dest_start..dest_index_end]
                 .copy_from_slice(&first_items[start_search..insert_index]);
@@ -792,7 +794,7 @@ impl AccountsHash {
             }
         }
         previous_first_items[dest_start..].copy_from_slice(&first_items[start_search..]);
-        if debug {
+        if debug && print {
             error!("after_reordering: {:?}", previous_first_items);
         }
 
