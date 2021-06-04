@@ -623,6 +623,7 @@ impl AccountsHash {
         while !first_items.is_empty() {
             let mut loop_stop = first_items.len() - 1; // we increment at the beginning of the loop
             let mut first_item_index = artificial_start_index; // we will start iterating at item 1. +=1 is first instruction in loop
+            assert!(first_item_index <= loop_stop);
             let mut min_index = first_item_index;
             let mut min_pubkey = first_items[first_item_index].0;
 
@@ -722,6 +723,18 @@ impl AccountsHash {
             } else {
                 panic!("found item");
             }
+        }
+
+        if min_index == 0 {
+            let new_index = new_indexes[0];
+            if new_index == 0 {
+                // we are in order already
+                return;
+            }
+            let new_item = first_items[0];
+            first_items.copy_within(1..new_index, 0);
+            first_items[new_index - 1] = new_item;
+            return
         }
 
         previous_first_items.truncate(item_count);
@@ -2300,7 +2313,8 @@ pub mod tests {
         let first_len = first.len();
         let mut second = first.clone();
         let mut new_indexes = vec![0; first_len];
-        AccountsHash::swap(&mut first, &mut second, 0, &mut new_indexes);
+        let mut artificial_start_index = 0;
+        AccountsHash::swap(&mut first, &mut second, 0, &mut new_indexes, &mut artificial_start_index);
 
         for min_index in 0..2 {
             error!("min_index: {}", min_index);
@@ -2308,14 +2322,16 @@ pub mod tests {
             let mut second = first.clone();
             let mut new_indexes = vec![0; first.len()];
             verify_start(&first, &second, min_index + 1);
-            AccountsHash::swap(&mut first, &mut second, min_index, &mut new_indexes);
+            let mut artificial_start_index = 0;
+            AccountsHash::swap(&mut first, &mut second, min_index, &mut new_indexes, &mut artificial_start_index);
             verify(&first, &second);
 
             let mut first = vec![(Pubkey::new(&[2; 32]), 2), (Pubkey::new(&[2; 32]), 3)];
             let mut second = first.clone();
             let mut new_indexes = vec![0; first.len()];
             verify_start(&first, &second, min_index + 1);
-            AccountsHash::swap(&mut first, &mut second, min_index, &mut new_indexes);
+            let mut artificial_start_index = 0;
+            AccountsHash::swap(&mut first, &mut second, min_index, &mut new_indexes, &mut artificial_start_index);
             verify(&first, &second);
         }
 
@@ -2329,7 +2345,8 @@ pub mod tests {
             let mut second = first.clone();
             let mut new_indexes = vec![0; first.len()];
             verify_start(&first, &second, min_index + 1);
-            AccountsHash::swap(&mut first, &mut second, min_index, &mut new_indexes);
+            let mut artificial_start_index = 0;
+            AccountsHash::swap(&mut first, &mut second, min_index, &mut new_indexes, &mut artificial_start_index);
             verify(&first, &second);
         }
 
@@ -2343,7 +2360,8 @@ pub mod tests {
             let mut second = first.clone();
             let mut new_indexes = vec![0; first.len()];
             verify_start(&first, &second, min_index + 1);
-            AccountsHash::swap(&mut first, &mut second, min_index, &mut new_indexes);
+            let mut artificial_start_index = 0;
+            AccountsHash::swap(&mut first, &mut second, min_index, &mut new_indexes, &mut artificial_start_index);
             verify(&first, &second);
         }
 
@@ -2357,7 +2375,8 @@ pub mod tests {
             let mut second = first.clone();
             let mut new_indexes = vec![0; first.len()];
             verify_start(&first, &second, min_index + 1);
-            AccountsHash::swap(&mut first, &mut second, min_index, &mut new_indexes);
+            let mut artificial_start_index = 0;
+            AccountsHash::swap(&mut first, &mut second, min_index, &mut new_indexes, &mut artificial_start_index);
             verify(&first, &second);
         }
         for min_index in 0..3 {
@@ -2370,7 +2389,8 @@ pub mod tests {
             let mut second = first.clone();
             let mut new_indexes = vec![0; first.len()];
             verify_start(&first, &second, min_index + 1);
-            AccountsHash::swap(&mut first, &mut second, min_index, &mut new_indexes);
+            let mut artificial_start_index = 0;
+            AccountsHash::swap(&mut first, &mut second, min_index, &mut new_indexes, &mut artificial_start_index);
             verify(&first, &second);
         }
         for min_index in 1..3 {
@@ -2383,7 +2403,8 @@ pub mod tests {
             let mut second = first.clone();
             let mut new_indexes = vec![0; first.len()];
             verify_start(&first, &second, min_index + 1);
-            AccountsHash::swap(&mut first, &mut second, min_index, &mut new_indexes);
+            let mut artificial_start_index = 0;
+            AccountsHash::swap(&mut first, &mut second, min_index, &mut new_indexes, &mut artificial_start_index);
             verify(&first, &second);
         }
         for min_index in 1..3 {
@@ -2396,7 +2417,8 @@ pub mod tests {
             let mut second = first.clone();
             let mut new_indexes = vec![0; first.len()];
             verify_start(&first, &second, min_index + 1);
-            AccountsHash::swap(&mut first, &mut second, min_index, &mut new_indexes);
+            let mut artificial_start_index = 0;
+            AccountsHash::swap(&mut first, &mut second, min_index, &mut new_indexes, &mut artificial_start_index);
             verify(&first, &second);
         }
     }
