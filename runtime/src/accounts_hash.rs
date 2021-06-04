@@ -619,12 +619,12 @@ impl AccountsHash {
         let mut overall_sum = 0;
         let mut hashes: Vec<Hash> = Vec::with_capacity(item_len);
         first_items.sort_unstable_by(Self::compare_two_dup_accounts);
-
+        let mut artificial_start_index = 0;
         while !first_items.is_empty() {
             let mut loop_stop = first_items.len() - 1; // we increment at the beginning of the loop
-            let mut min_index = 0;
-            let mut min_pubkey = first_items[min_index].0;
-            let mut first_item_index = 0; // we will start iterating at item 1. +=1 is first instruction in loop
+            let mut first_item_index = artificial_start_index; // we will start iterating at item 1. +=1 is first instruction in loop
+            let mut min_index = first_item_index;
+            let mut min_pubkey = first_items[first_item_index].0;
 
             while first_item_index < loop_stop {
                 first_item_index += 1;
@@ -683,6 +683,7 @@ impl AccountsHash {
                 &mut previous_first_items,
                 min_index,
                 &mut new_indexes,
+                &mut artificial_start_index,
             );
         }
         (hashes, overall_sum, item_len)
@@ -693,13 +694,22 @@ impl AccountsHash {
         previous_first_items: &'a mut Vec<DupAccountFirstEntry>,
         min_index: usize,
         new_indexes: &'a mut Vec<usize>,
+        artificial_start_index: &'a mut usize,
     ) {
         const debug: bool = false;
         // min_index now is the index of the last item that needs to be re-sorted
         let first_sorted_index = min_index + 1;
+        let item_count = first_items.len();
         if min_index > 0 {
             first_items[0..first_sorted_index].sort_unstable_by(Self::compare_two_dup_accounts);
         }
+        else if item_count > 1 {
+            if first_items[0].0 > first_items[1].0 {
+                *artificial_start_index += 1;
+                return;
+            }
+        }
+        *artificial_start_index = 0;
         let mut start_search = first_sorted_index;
         for i in 0..first_sorted_index {
             let seek = &first_items[i];
@@ -714,7 +724,7 @@ impl AccountsHash {
             }
         }
 
-        previous_first_items.truncate(first_items.len());
+        previous_first_items.truncate(item_count);
         let mut start_search = first_sorted_index;
         let print = debug && true;
         if debug && print {
