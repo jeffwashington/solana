@@ -704,15 +704,14 @@ impl AccountsHash {
         if min_index > 0 {
             first_items[0..first_sorted_index].sort_unstable_by(Self::compare_two_dup_accounts);
         }
-        /* buggy somehow
-        else if item_count > 1 {
+        else if item_count > 1 && *artificial_start_index == 0 {
             if first_items[0].0 > first_items[1].0 {
                 *artificial_start_index += 1;
                 return;
             }
         }
         *artificial_start_index = 0;
-        */
+        
         let mut start_search = first_sorted_index;
         for i in 0..first_sorted_index {
             let seek = &first_items[i];
