@@ -23,8 +23,8 @@ while true; do
 
   # if nvidia-smi exists, report gpu stats
   gpu_report=""
-
-  report="${cpu_report}${gpu_report}"
+  datt=$(date)
+  report="${datt} ${cpu_report} ${gpu_report}"
   #./scripts/metrics-write-datapoint.sh "system-stats,hostname=$HOSTNAME $report"
   echo $report
   sleep 1
