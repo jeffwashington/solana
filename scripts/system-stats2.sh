@@ -26,6 +26,6 @@ while true; do
   datt=$(date)
   report="${datt} ${cpu_report} ${gpu_report}"
   #./scripts/metrics-write-datapoint.sh "system-stats,hostname=$HOSTNAME $report"
-  echo $report
+  echo $report >> mem3.log
   sleep 1
 done
