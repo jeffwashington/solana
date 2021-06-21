@@ -4449,7 +4449,14 @@ impl AccountsDb {
             .collect();
         collect.stop();
 
-        error!("scanning: {:?}", &keys[0..5]);
+        let len = self
+            .accounts_index
+            .account_maps
+            .read()
+            .unwrap().len();
+
+        let end = std::cmp::min(5, keys.len());
+        error!("scanning: {:?}, len: {}", &keys[0..end], len);
 
         let mut scan = Measure::start("scan");
         let mismatch_found = AtomicU64::new(0);
