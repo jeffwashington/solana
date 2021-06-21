@@ -4466,6 +4466,7 @@ impl AccountsDb {
                                 self.accounts_index.get(pubkey, Some(ancestors), Some(slot))
                             {
                                 let (slot, account_info) = &lock.slot_list()[index];
+                                error!("{}, {}, {:?}", slot, pubkey, account_info);
                                 if account_info.lamports != 0 {
                                     // Because we're keeping the `lock' here, there is no need
                                     // to use retry_to_get_account_accessor()
@@ -4833,6 +4834,8 @@ impl AccountsDb {
                     balance,
                     *pubkey,
                 );
+
+                error!("found: {:?}", source_item);
 
                 if check_hash {
                     let computed_hash = loaded_account.compute_hash(slot, pubkey);
