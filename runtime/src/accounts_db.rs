@@ -4449,6 +4449,8 @@ impl AccountsDb {
             .collect();
         collect.stop();
 
+        error!("scanning: {:?}", &keys[0..5]);
+
         let mut scan = Measure::start("scan");
         let mismatch_found = AtomicU64::new(0);
         // Pick a chunk size big enough to allow us to produce output vectors that are smaller than the overall size.
@@ -4806,6 +4808,7 @@ impl AccountsDb {
         let range = bin_range.end - bin_range.start;
         let sort_time = AtomicU64::new(0);
 
+        error!("scanning");
         let result: Vec<Vec<Vec<CalculateHashIntermediate>>> = Self::scan_account_storage_no_bank(
             accounts_cache_and_ancestors,
             storage,
@@ -4814,6 +4817,9 @@ impl AccountsDb {
              slot: Slot| {
                 let pubkey = loaded_account.pubkey();
                 let mut pubkey_to_bin_index = bin_calculator.bin_from_pubkey(pubkey);
+                error!("found: {:?}, {:?}, {:?}", loaded_account.loaded_hash(),
+                loaded_account.lamports(),
+                *pubkey);
                 if !bin_range.contains(&pubkey_to_bin_index) {
                     return;
                 }
@@ -4834,8 +4840,6 @@ impl AccountsDb {
                     balance,
                     *pubkey,
                 );
-
-                error!("found: {:?}", source_item);
 
                 if check_hash {
                     let computed_hash = loaded_account.compute_hash(slot, pubkey);
