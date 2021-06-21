@@ -4824,9 +4824,9 @@ impl AccountsDb {
              slot: Slot| {
                 let pubkey = loaded_account.pubkey();
                 let mut pubkey_to_bin_index = bin_calculator.bin_from_pubkey(pubkey);
-                error!("found: {:?}, {:?}, {:?}", loaded_account.loaded_hash(),
+                /*
                 loaded_account.lamports(),
-                *pubkey);
+                *pubkey);*/
                 if !bin_range.contains(&pubkey_to_bin_index) {
                     return;
                 }
@@ -4867,6 +4867,10 @@ impl AccountsDb {
             },
             |x| {
                 let (result, timing) = Self::sort_slot_storage_scan(x);
+                result.iter().flatten().for_each(|x| {
+                error!("found: {:?}", x);
+                });
+
                 sort_time.fetch_add(timing, Ordering::Relaxed);
                 result
             },
