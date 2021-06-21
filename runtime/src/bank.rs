@@ -5114,8 +5114,8 @@ impl Bank {
 
         if !debug_do_not_add_builtins {
             self.ensure_feature_builtins(init_finish_or_warp, &new_feature_activations);
+            self.reconfigure_token2_native_mint();
         }
-        self.reconfigure_token2_native_mint();
         self.ensure_no_storage_rewards_pool();
     }
 
