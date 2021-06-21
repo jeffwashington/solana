@@ -4444,8 +4444,9 @@ impl AccountsDb {
             .account_maps
             .read()
             .unwrap()
-            .keys()
-            .cloned()
+            .iter()
+            .map(|btree| btree.keys().cloned())
+            .flatten()
             .collect();
         collect.stop();
 
@@ -5935,7 +5936,15 @@ impl AccountsDb {
         }
 
         let mut stored_sizes_and_counts = HashMap::new();
-        for account_entry in self.accounts_index.account_maps.read().unwrap().values() {
+        for account_entry in self
+            .accounts_index
+            .account_maps
+            .read()
+            .unwrap()
+            .iter()
+            .map(|i| i.values())
+            .flatten()
+        {
             for (_slot, account_entry) in account_entry.slot_list.read().unwrap().iter() {
                 let storage_entry_meta = stored_sizes_and_counts
                     .entry(account_entry.store_id)
@@ -5984,7 +5993,15 @@ impl AccountsDb {
         #[allow(clippy::stable_sort_primitive)]
         roots.sort();
         info!("{}: accounts_index roots: {:?}", label, roots,);
-        for (pubkey, account_entry) in self.accounts_index.account_maps.read().unwrap().iter() {
+        for (pubkey, account_entry) in self
+            .accounts_index
+            .account_maps
+            .read()
+            .unwrap()
+            .iter()
+            .map(|i| i.iter())
+            .flatten()
+        {
             info!("  key: {} ref_count: {}", pubkey, account_entry.ref_count(),);
             info!(
                 "      slots: {:?}",
