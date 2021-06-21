@@ -545,7 +545,7 @@ impl AccountsHash {
     fn get_item<'a, 'b>(
         min_index: usize,
         bin: usize,
-        first_items: &'a mut Vec<(Pubkey, usize)>,
+        first_items: &'a mut Vec<(&'b Pubkey, usize)>,
         pubkey_division: &'b [Vec<Vec<CalculateHashIntermediate>>],
         indexes: &'a mut Vec<usize>,
     ) -> (bool, &'b CalculateHashIntermediate) {
@@ -557,13 +557,13 @@ impl AccountsHash {
         index += 1;
         while index < bin.len() {
             // still more items where we found the previous key, so just increment the index for that slot group, skipping all pubkeys that are equal
-            if &bin[index].pubkey == key {
+            if &&bin[index].pubkey == key {
                 index += 1;
                 continue; // duplicate entries of same pubkey, so keep skipping
             }
 
             // point to the next pubkey > key
-            first_items[min_index] = (bin[index].pubkey, division_index);
+            first_items[min_index] = (&bin[index].pubkey, division_index);
             indexes[division_index] = index;
             break;
         }
@@ -601,7 +601,7 @@ impl AccountsHash {
                 let sub = &bins[pubkey_bin];
                 if !sub.is_empty() {
                     item_len += bins[pubkey_bin].len();
-                    first_items.push((bins[pubkey_bin][0].pubkey, i));
+                    first_items.push((&bins[pubkey_bin][0].pubkey, i));
                 }
             }
         });
