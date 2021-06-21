@@ -609,7 +609,7 @@ pub trait ZeroLamport {
 }
 
 fn get_bin_pubkey(pubkey: &Pubkey) -> usize {
-    (pubkey.as_ref()[5] as usize) * BINS / 256
+    (pubkey.as_ref()[0] as usize) * BINS / 256 // TODO: this should not be 0 later
 }
 
 type MapType<T> = Vec<AccountMap<Pubkey, AccountMapEntry<T>>>;
