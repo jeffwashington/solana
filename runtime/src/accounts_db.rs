@@ -4456,8 +4456,6 @@ impl AccountsDb {
             .unwrap().len();
 
         let end = std::cmp::min(5, keys.len());
-        error!("scanning: {:?}, len: {}", &keys[0..end], len);
-
         let mut scan = Measure::start("scan");
         let mismatch_found = AtomicU64::new(0);
         // Pick a chunk size big enough to allow us to produce output vectors that are smaller than the overall size.
@@ -4475,7 +4473,6 @@ impl AccountsDb {
                                 self.accounts_index.get(pubkey, Some(ancestors), Some(slot))
                             {
                                 let (slot, account_info) = &lock.slot_list()[index];
-                                error!("{}, {}, {:?}", slot, pubkey, account_info.lamports);
                                 if account_info.lamports != 0 {
                                     // Because we're keeping the `lock' here, there is no need
                                     // to use retry_to_get_account_accessor()
@@ -4815,7 +4812,6 @@ impl AccountsDb {
         let range = bin_range.end - bin_range.start;
         let sort_time = AtomicU64::new(0);
 
-        error!("scanning");
         let result: Vec<Vec<Vec<CalculateHashIntermediate>>> = Self::scan_account_storage_no_bank(
             accounts_cache_and_ancestors,
             storage,
@@ -4867,10 +4863,6 @@ impl AccountsDb {
             },
             |x| {
                 let (result, timing) = Self::sort_slot_storage_scan(x);
-                result.iter().flatten().for_each(|x| {
-                error!("found: {:?} {}, {}", x.pubkey, x.lamports, x.hash);
-                });
-
                 sort_time.fetch_add(timing, Ordering::Relaxed);
                 result
             },
