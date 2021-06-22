@@ -1392,7 +1392,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
         &self,
         slot: Slot,
         items: Vec<(&Pubkey, T)>,
-    ) -> (Vec<Pubkey>, u64) {
+    ) -> (Vec<Pubkey>, u64, u64) {
         let mut binned = vec![Vec::with_capacity(items.len() / 16); BINS];
         items.into_iter().for_each(|(pubkey, account_info)| {
             let bin = get_bin_pubkey(pubkey);
@@ -1401,14 +1401,17 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
             // this value is equivalent to what update() below would have created if we inserted a new item
         });
 
-        let mut m = Measure::start("");
         let mut w_account_maps = self.get_account_maps_write_lock();
+        let mut m = Measure::start("");
         let e1 = EvilPtr::new(&mut w_account_maps);
+        let tm = AtomicU64::new(0);
 
         let pre_existing_items = unsafe {
             binned
                 .into_par_iter()
                 .map(|bins| {
+                    let mut m_inner = Measure::start("");
+
                     let mut pre_existing_items = Vec::with_capacity(bins.len());
                     let mut _reclaims = SlotList::new();
                     let w_account_maps = &mut *e1.deref();
@@ -1429,14 +1432,17 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
                                 pre_existing_items.push(*pubkey);
                             }
                         });
+                    m_inner.stop();
+                    tm.fetch_add(m_inner.as_us(), Ordering::Relaxed);
                     pre_existing_items
                 })
                 .flatten()
                 .collect::<Vec<_>>()
         };
+        error!("pre_existing: {}", pre_existing_items.len());
 
         m.stop();
-        (pre_existing_items, m.as_us())
+        (pre_existing_items, m.as_us(), tm.load(Ordering::Relaxed))
     }
 
     // Updates the given pubkey at the given slot with the new account information.

@@ -165,6 +165,8 @@ pub struct ErrorCounters {
 struct GenerateIndexTimings {
     pub index_time: u64,
     pub scan_time: u64,
+    pub uncleaned_pubkeys: u64,
+    pub insertion_time_us: u64,
 }
 
 impl GenerateIndexTimings {
@@ -174,6 +176,8 @@ impl GenerateIndexTimings {
             // we cannot accurately measure index insertion time because of many threads and lock contention
             ("total_us", self.index_time, i64),
             ("scan_stores_us", self.scan_time, i64),
+            ("uncleaned_pubkeys", self.uncleaned_pubkeys, i64),
+            ("insertion_time_us", self.insertion_time_us, i64),
         );
     }
 }
@@ -5834,7 +5838,7 @@ impl AccountsDb {
         accounts_map
     }
 
-    fn generate_index_for_slot<'a>(&self, accounts_map: GenerateIndexAccountsMap<'a>, slot: &Slot) {
+    fn generate_index_for_slot<'a>(&self, accounts_map: GenerateIndexAccountsMap<'a>, slot: &Slot) -> u64 {
         if !accounts_map.is_empty() {
             let len = accounts_map.len();
 
@@ -5853,7 +5857,7 @@ impl AccountsDb {
                     ));
                 });
 
-            let (dirty_pubkeys, _timing) = self
+            let (dirty_pubkeys, _timing, timing2) = self
                 .accounts_index
                 .insert_new_if_missing_into_primary_index(*slot, items);
 
@@ -5875,6 +5879,10 @@ impl AccountsDb {
                     );
                 }
             }
+            timing2
+        }
+        else {
+            0
         }
     }
 
@@ -5890,6 +5898,7 @@ impl AccountsDb {
         let outer_slots_len = slots.len();
         let chunk_size = (outer_slots_len / 7) + 1; // approximately 400k slots in a snapshot
         let mut index_time = Measure::start("index");
+        let insertion_time = AtomicU64::new(0);
         let scan_time: u64 = slots
             .par_chunks(chunk_size)
             .map(|slots| {
@@ -5910,15 +5919,18 @@ impl AccountsDb {
                     scan_time.stop();
                     scan_time_sum += scan_time.as_us();
 
-                    self.generate_index_for_slot(accounts_map, slot);
+                    insertion_time.fetch_add(self.generate_index_for_slot(accounts_map, slot), Ordering::Relaxed);
                 }
                 scan_time_sum
             })
             .sum();
         index_time.stop();
+        
         let timings = GenerateIndexTimings {
             scan_time,
             index_time: index_time.as_us(),
+            uncleaned_pubkeys: self.uncleaned_pubkeys.iter().map(|(kv)| kv.value().len()).sum::<usize>() as u64,
+            insertion_time_us: insertion_time.load(Ordering::Relaxed),
         };
         timings.report();
 
