@@ -6018,6 +6018,7 @@ impl AccountsDb {
                     self.generate_index_for_slot2(batch),
                     Ordering::Relaxed,
                 );
+                log_status.report(0);
                 scan_time_sum
             })
             .sum();
