@@ -589,9 +589,9 @@ impl<'a, T: 'static + Clone> Iterator for AccountsIndexIterator<'a, T> {
             .map(|i| {
                 i.range((self.start_bound, self.end_bound))
                     .map(|(pubkey, account_map_entry)| (*pubkey, account_map_entry.clone()))
-                    .take(ITER_BATCH_SIZE)
             })
             .flatten()
+            .take(ITER_BATCH_SIZE)
             .collect();
 
         if chunk.is_empty() {
