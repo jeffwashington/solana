@@ -5991,7 +5991,7 @@ impl AccountsDb {
         }
         let total_processed_slots_across_all_threads = AtomicU64::new(0);
         let outer_slots_len = slots.len();
-        let chunk_size = (outer_slots_len / 7) + 1; // approximately 400k slots in a snapshot
+        let chunk_size = (outer_slots_len / 24) + 1; // approximately 400k slots in a snapshot
         let mut index_time = Measure::start("index");
         let insertion_time = AtomicU64::new(0);
         error!("start generate_index");
