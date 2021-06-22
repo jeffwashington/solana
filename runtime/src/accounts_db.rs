@@ -5994,6 +5994,7 @@ impl AccountsDb {
         let chunk_size = (outer_slots_len / 7) + 1; // approximately 400k slots in a snapshot
         let mut index_time = Measure::start("index");
         let insertion_time = AtomicU64::new(0);
+        error!("start generate_index");
         let scan_time: u64 = slots
             .par_chunks(chunk_size)
             .map(|slots| {
