@@ -4475,7 +4475,7 @@ impl AccountsDb {
                                 self.accounts_index.get(pubkey, Some(ancestors), Some(slot))
                             {
                                 let (slot, account_info) = &lock.slot_list()[index];
-                                error!("{}, {}, {:?}", slot, pubkey, account_info);
+                                error!("{}, {}, {:?}", slot, pubkey, account_info.lamports);
                                 if account_info.lamports != 0 {
                                     // Because we're keeping the `lock' here, there is no need
                                     // to use retry_to_get_account_accessor()
@@ -4868,7 +4868,7 @@ impl AccountsDb {
             |x| {
                 let (result, timing) = Self::sort_slot_storage_scan(x);
                 result.iter().flatten().for_each(|x| {
-                error!("found: {:?}", x);
+                error!("found: {:?} {}, {}", x.pubkey, x.lamports, x.hash);
                 });
 
                 sort_time.fetch_add(timing, Ordering::Relaxed);
