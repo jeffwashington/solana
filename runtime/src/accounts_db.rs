@@ -6033,6 +6033,14 @@ impl AccountsDb {
             insertion_time_us: insertion_time.load(Ordering::Relaxed),
         };
         timings.report();
+        error!("total items in index: {}", self
+        .accounts_index
+        .account_maps
+        .read()
+        .unwrap()
+        .iter()
+        .map(|i| i.len())
+        .sum::<usize>());
         panic!("tha's enough");
 
         // Need to add these last, otherwise older updates will be cleaned
