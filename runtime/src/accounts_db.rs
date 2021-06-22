@@ -5839,9 +5839,9 @@ impl AccountsDb {
             let len = accounts_map.len();
 
             let mut items = Vec::with_capacity(len);
-            let mut dirty_pubkeys = accounts_map
+            accounts_map
                 .iter()
-                .map(|(pubkey, (_, store_id, stored_account))| {
+                .for_each(|(pubkey, (_, store_id, stored_account))| {
                     items.push((
                         pubkey,
                         AccountInfo {
@@ -5851,24 +5851,16 @@ impl AccountsDb {
                             lamports: stored_account.account_meta.lamports,
                         },
                     ));
-                    *pubkey
-                })
-                .collect::<Vec<_>>();
+                });
 
-            let items_len = items.len();
-            let dirty_pubkey_mask = self
+            let (dirty_pubkeys, _timing) = self
                 .accounts_index
                 .insert_new_if_missing_into_primary_index(*slot, items);
 
-            assert_eq!(dirty_pubkey_mask.len(), items_len);
-
-            let mut dirty_pubkey_mask_iter = dirty_pubkey_mask.iter();
-
-            // dirty_pubkey_mask will return true if an item has multiple rooted entries for
+            // dirty_pubkeys will contain items with multiple rooted entries for
             // a given pubkey. If there is just a single item, there is no cleaning to
             // be done on that pubkey. Prune the touched pubkey set here for only those
             // pubkeys with multiple updates.
-            dirty_pubkeys.retain(|_k| *dirty_pubkey_mask_iter.next().unwrap());
             if !dirty_pubkeys.is_empty() {
                 self.uncleaned_pubkeys.insert(*slot, dirty_pubkeys);
             }

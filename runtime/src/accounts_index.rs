@@ -1392,7 +1392,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
         &self,
         slot: Slot,
         items: Vec<(&Pubkey, T)>,
-    ) -> (Vec<bool>, u64) {
+    ) -> (Vec<Pubkey>, u64) {
         let mut binned = vec![Vec::with_capacity(items.len() / 16); BINS];
         items.into_iter().for_each(|(pubkey, account_info)| {
             let bin = get_bin_pubkey(pubkey);
@@ -1405,32 +1405,38 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
         let mut w_account_maps = self.get_account_maps_write_lock();
         let e1 = EvilPtr::new(&mut w_account_maps);
 
-        unsafe {
-            binned.into_par_iter().for_each(|bins| {
-                let mut _reclaims = SlotList::new();
-                let w_account_maps = &mut *e1.deref();
-                //let mut bin = &(*e2.deref())[bin];
-                //let bin = binned[bin];
-                bins.into_iter()
-                    .for_each(|(pubkey, account_info, new_item)| {
-                        let account_entry = self.insert_new_entry_if_missing_with_lock(
-                            pubkey,
-                            w_account_maps,
-                            new_item,
-                        );
-                        if account_info.is_zero_lamport() {
-                            self.zero_lamport_pubkeys.insert(*pubkey);
-                        }
-                        if let Some(mut w_account_entry) = account_entry {
-                            w_account_entry.update(slot, account_info, &mut _reclaims);
-                            //true
-                        }
-                    });
-            });
-        }
+        let pre_existing_items = unsafe {
+            binned
+                .into_par_iter()
+                .map(|bins| {
+                    let mut pre_existing_items = Vec::with_capacity(bins.len());
+                    let mut _reclaims = SlotList::new();
+                    let w_account_maps = &mut *e1.deref();
+                    //let mut bin = &(*e2.deref())[bin];
+                    //let bin = binned[bin];
+                    bins.into_iter()
+                        .for_each(|(pubkey, account_info, new_item)| {
+                            let account_entry = self.insert_new_entry_if_missing_with_lock(
+                                pubkey,
+                                w_account_maps,
+                                new_item,
+                            );
+                            if account_info.is_zero_lamport() {
+                                self.zero_lamport_pubkeys.insert(*pubkey);
+                            }
+                            if let Some(mut w_account_entry) = account_entry {
+                                w_account_entry.update(slot, account_info, &mut _reclaims);
+                                pre_existing_items.push(*pubkey);
+                            }
+                        });
+                    pre_existing_items
+                })
+                .flatten()
+                .collect::<Vec<_>>()
+        };
 
         m.stop();
-        (vec![], m.as_us())
+        (pre_existing_items, m.as_us())
     }
 
     // Updates the given pubkey at the given slot with the new account information.
