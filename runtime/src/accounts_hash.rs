@@ -532,7 +532,7 @@ impl AccountsHash {
                         Self::checked_cast_for_capitalization(sum as u128 + *overall as u128);
                 }
                 unreduced_entries.fetch_add(unreduced_entries_count, Ordering::Relaxed);
-                hash_total.fetch_add(hahses.len(), Ordering::Relaxed);
+                hash_total.fetch_add(hashes.len(), Ordering::Relaxed);
                 hashes
             })
             .collect();
