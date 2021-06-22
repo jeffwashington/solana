@@ -5838,29 +5838,61 @@ impl AccountsDb {
         accounts_map
     }
 
-    fn generate_index_for_slot<'a>(&self, accounts_map: GenerateIndexAccountsMap<'a>, slot: &Slot) -> u64 {
-        if !accounts_map.is_empty() {
-            let len = accounts_map.len();
-
-            let mut items = Vec::with_capacity(len);
-            accounts_map
+    fn generate_index_for_slot2<'a>(
+        &self,
+        to_add: Vec<(Slot, Vec<Arc<AccountStorageEntry>>)>,
+    ) -> u64 {
+        if !to_add.is_empty() {
+            let items =
+            to_add.into_iter().map(|(slot, storage_maps)| {
+                let num_accounts = storage_maps
                 .iter()
-                .for_each(|(pubkey, (_, store_id, stored_account))| {
-                    items.push((
-                        pubkey,
-                        AccountInfo {
-                            store_id: *store_id,
-                            offset: stored_account.offset,
-                            stored_size: stored_account.stored_size,
-                            lamports: stored_account.account_meta.lamports,
-                        },
-                    ));
-                });
+                .map(|storage| storage.approx_stored_count())
+                .sum();
+                let mut accounts_map = GenerateIndexAccountsMap::with_capacity(num_accounts);
+            storage_maps.iter().for_each(|storage| {
+                let accounts = storage.all_accounts();
+                accounts.into_iter().for_each(|stored_account| {
+                    let this_version = stored_account.meta.write_version;
+                    match accounts_map.entry(stored_account.meta.pubkey) {
+                        std::collections::hash_map::Entry::Vacant(entry) => {
+                            entry.insert((this_version, storage.append_vec_id(), stored_account));
+                        }
+                        std::collections::hash_map::Entry::Occupied(mut entry) => {
+                            let occupied_version = entry.get().0;
+                            if occupied_version < this_version {
+                                entry.insert((this_version, storage.append_vec_id(), stored_account));
+                            } else {
+                                assert!(occupied_version != this_version);
+                            }
+                        }
+                    }
+                })
+            });
+            (
+                slot,
+                accounts_map
+                    .iter()
+                    .map(|(pubkey, (_, store_id, stored_account))| {
+                        (
+                            *pubkey,
+                            AccountInfo {
+                                store_id: *store_id,
+                                offset: stored_account.offset,
+                                stored_size: stored_account.stored_size,
+                                lamports: stored_account.account_meta.lamports,
+                            },
+                        )
+                    })
+                    .collect::<Vec<_>>(),
+            )
+            }).collect::<Vec<_>>();
 
             let (dirty_pubkeys, _timing, timing2) = self
                 .accounts_index
-                .insert_new_if_missing_into_primary_index(*slot, items);
+                .insert_new_if_missing_into_primary_index(items);
 
+                /*
             // dirty_pubkeys will contain items with multiple rooted entries for
             // a given pubkey. If there is just a single item, there is no cleaning to
             // be done on that pubkey. Prune the touched pubkey set here for only those
@@ -5868,7 +5900,9 @@ impl AccountsDb {
             if !dirty_pubkeys.is_empty() {
                 self.uncleaned_pubkeys.insert(*slot, dirty_pubkeys);
             }
+            */
 
+            /*TODO
             if !self.account_indexes.is_empty() {
                 for (pubkey, (_, _store_id, stored_account)) in accounts_map.iter() {
                     self.accounts_index.update_secondary_indexes(
@@ -5879,9 +5913,70 @@ impl AccountsDb {
                     );
                 }
             }
+            */
             timing2
+        } else {
+            0
         }
-        else {
+    }
+
+    fn generate_index_for_slot<'a>(
+        &self,
+        to_add: Vec<(Slot, GenerateIndexAccountsMap<'a>)>,
+    ) -> u64 {
+        if !to_add.is_empty() {
+            let mut items = 
+            to_add
+                .iter()
+                .map(|(slot, accounts_map)| {
+                    (
+                        *slot,
+                        accounts_map
+                            .iter()
+                            .map(|(pubkey, (_, store_id, stored_account))| {
+                                (
+                                    *pubkey,
+                                    AccountInfo {
+                                        store_id: *store_id,
+                                        offset: stored_account.offset,
+                                        stored_size: stored_account.stored_size,
+                                        lamports: stored_account.account_meta.lamports,
+                                    },
+                                )
+                            })
+                            .collect::<Vec<_>>(),
+                    )
+                })
+                .collect::<Vec<_>>();
+
+            let (dirty_pubkeys, _timing, timing2) = self
+                .accounts_index
+                .insert_new_if_missing_into_primary_index(items);
+
+                /*
+            // dirty_pubkeys will contain items with multiple rooted entries for
+            // a given pubkey. If there is just a single item, there is no cleaning to
+            // be done on that pubkey. Prune the touched pubkey set here for only those
+            // pubkeys with multiple updates.
+            if !dirty_pubkeys.is_empty() {
+                self.uncleaned_pubkeys.insert(*slot, dirty_pubkeys);
+            }
+            */
+
+            /*TODO
+            if !self.account_indexes.is_empty() {
+                for (pubkey, (_, _store_id, stored_account)) in accounts_map.iter() {
+                    self.accounts_index.update_secondary_indexes(
+                        pubkey,
+                        &stored_account.account_meta.owner,
+                        stored_account.data,
+                        &self.account_indexes,
+                    );
+                }
+            }
+            */
+            timing2
+        } else {
             0
         }
     }
@@ -5908,6 +6003,7 @@ impl AccountsDb {
                     outer_slots_len as u64,
                 );
                 let mut scan_time_sum = 0;
+                let mut batch = Vec::with_capacity(slots.len());
                 for (index, slot) in slots.iter().enumerate() {
                     let mut scan_time = Measure::start("scan");
                     log_status.report(index as u64);
@@ -5915,21 +6011,24 @@ impl AccountsDb {
                         .storage
                         .get_slot_storage_entries(*slot)
                         .unwrap_or_default();
-                    let accounts_map = Self::process_storage_slot(&storage_maps);
-                    scan_time.stop();
-                    scan_time_sum += scan_time.as_us();
-
-                    insertion_time.fetch_add(self.generate_index_for_slot(accounts_map, slot), Ordering::Relaxed);
+                    batch.push((*slot, storage_maps));
                 }
+                insertion_time.fetch_add(
+                    self.generate_index_for_slot2(batch),
+                    Ordering::Relaxed,
+                );
                 scan_time_sum
             })
             .sum();
         index_time.stop();
-        
         let timings = GenerateIndexTimings {
             scan_time,
             index_time: index_time.as_us(),
-            uncleaned_pubkeys: self.uncleaned_pubkeys.iter().map(|(kv)| kv.value().len()).sum::<usize>() as u64,
+            uncleaned_pubkeys: self
+                .uncleaned_pubkeys
+                .iter()
+                .map(|kv| kv.value().len())
+                .sum::<usize>() as u64,
             insertion_time_us: insertion_time.load(Ordering::Relaxed),
         };
         timings.report();

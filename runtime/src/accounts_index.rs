@@ -1390,16 +1390,15 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
     #[allow(clippy::needless_collect)]
     pub(crate) fn insert_new_if_missing_into_primary_index(
         &self,
-        slot: Slot,
-        items: Vec<(&Pubkey, T)>,
+        items: Vec<(Slot, Vec<(Pubkey, T)>)>,
     ) -> (Vec<Pubkey>, u64, u64) {
-        let mut binned = vec![Vec::with_capacity(items.len() / 16); BINS];
-        items.into_iter().for_each(|(pubkey, account_info)| {
-            let bin = get_bin_pubkey(pubkey);
+        let mut binned = vec![Vec::with_capacity(items.len() / BINS * 2); BINS];
+        items.into_iter().for_each(|(slot, items)| items.into_iter().for_each(|(pubkey, account_info)| {
+            let bin = get_bin_pubkey(&pubkey);
             let info = WriteAccountMapEntry::new_entry_after_update(slot, &account_info);
-            binned[bin].push((pubkey, account_info, info));
+            binned[bin].push((slot, pubkey, account_info, info));
             // this value is equivalent to what update() below would have created if we inserted a new item
-        });
+        }));
 
         let mut w_account_maps = self.get_account_maps_write_lock();
         let mut m = Measure::start("");
@@ -1418,18 +1417,18 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
                     //let mut bin = &(*e2.deref())[bin];
                     //let bin = binned[bin];
                     bins.into_iter()
-                        .for_each(|(pubkey, account_info, new_item)| {
+                        .for_each(|(slot, pubkey, account_info, new_item)| {
                             let account_entry = self.insert_new_entry_if_missing_with_lock(
-                                pubkey,
+                                &pubkey,
                                 w_account_maps,
                                 new_item,
                             );
                             if account_info.is_zero_lamport() {
-                                self.zero_lamport_pubkeys.insert(*pubkey);
+                                self.zero_lamport_pubkeys.insert(pubkey);
                             }
                             if let Some(mut w_account_entry) = account_entry {
                                 w_account_entry.update(slot, account_info, &mut _reclaims);
-                                pre_existing_items.push(*pubkey);
+                                pre_existing_items.push(pubkey);
                             }
                         });
                     m_inner.stop();
