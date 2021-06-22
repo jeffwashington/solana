@@ -6003,8 +6003,9 @@ impl AccountsDb {
                     2,
                     outer_slots_len as u64,
                 );
+                let len = slots.len();
                 let mut scan_time_sum = 0;
-                let mut batch = Vec::with_capacity(slots.len());
+                let mut batch = Vec::with_capacity(len);
                 for (index, slot) in slots.iter().enumerate() {
                     let mut scan_time = Measure::start("scan");
                     log_status.report(index as u64);
@@ -6019,7 +6020,7 @@ impl AccountsDb {
                     self.generate_index_for_slot2(batch),
                     Ordering::Relaxed,
                 );
-                log_status.report(0);
+                log_status.report(len);
                 scan_time_sum
             })
             .sum();
