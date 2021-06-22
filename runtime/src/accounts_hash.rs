@@ -689,6 +689,7 @@ impl AccountsHash {
         let cumulative = CumulativeOffsets::from_raw(&hashes);
         let mut hash_total = cumulative.total_count;
         stats.hash_total += hash_total;
+        error!("adding {} to {}", hash_total, stats.hash_total);
         next_pass.reduced_hashes = previous_state.reduced_hashes;
 
         const TARGET_FANOUT_LEVEL: usize = 3;
