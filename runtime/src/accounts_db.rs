@@ -6011,6 +6011,7 @@ impl AccountsDb {
                         .storage
                         .get_slot_storage_entries(*slot)
                         .unwrap_or_default();
+                    scan_time.stop();
                     batch.push((*slot, storage_maps));
                 }
                 insertion_time.fetch_add(
