@@ -6020,7 +6020,7 @@ impl AccountsDb {
                     self.generate_index_for_slot2(batch),
                     Ordering::Relaxed,
                 );
-                log_status.report(len);
+                log_status.report(len as u64);
                 scan_time_sum
             })
             .sum();
