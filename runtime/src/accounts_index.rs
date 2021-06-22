@@ -1439,7 +1439,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
                 .flatten()
                 .collect::<Vec<_>>()
         };
-        error!("pre_existing: {}", pre_existing_items.len());
+        //error!("pre_existing: {}", pre_existing_items.len());
 
         m.stop();
         (pre_existing_items, m.as_us(), tm.load(Ordering::Relaxed))
