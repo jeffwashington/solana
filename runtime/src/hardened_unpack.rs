@@ -1,6 +1,7 @@
 use solana_sdk::genesis_config::{DEFAULT_GENESIS_ARCHIVE, DEFAULT_GENESIS_FILE};
 use {
     bzip2::bufread::BzDecoder,
+    crate::seekable_buffering_reader::SeekableBufferingReader,
     log::*,
     rand::{thread_rng, Rng},
     solana_sdk::genesis_config::GenesisConfig,
@@ -91,7 +92,8 @@ pub enum UnpackPath<'a> {
 }
 
 fn unpack_archive<'a, A: Read, C>(
-    archive: &mut Archive<A>,
+    buf: Option<&'a mut SeekableBufferingReader>,
+    archive: &'a mut Archive<A>,
     apparent_limit_size: u64,
     actual_limit_size: u64,
     limit_count: u64,
@@ -179,7 +181,17 @@ where
             last_log_update = now;
         }
     }
-    info!("unpacked {} entries total", total_entries);
+    if let Some(buf) = buf {
+        let len = buf.len();
+        let calls = std::cmp::max(1, buf.calls());
+        info!(
+            "unpacked {} entries total, raw bytes: {}, calls: {}, bytes/call: {}",
+            total_entries,
+            len,
+            calls,
+            len / calls
+        );
+    }
 
     return Ok(());
 
@@ -215,6 +227,7 @@ impl ParallelSelector {
 }
 
 pub fn unpack_snapshot<A: Read>(
+    buf: Option<&mut SeekableBufferingReader>,
     archive: &mut Archive<A>,
     ledger_dir: &Path,
     account_paths: &[PathBuf],
@@ -225,6 +238,7 @@ pub fn unpack_snapshot<A: Read>(
     let mut i = 0;
 
     unpack_archive(
+        buf,
         archive,
         MAX_SNAPSHOT_ARCHIVE_UNPACKED_APPARENT_SIZE,
         MAX_SNAPSHOT_ARCHIVE_UNPACKED_ACTUAL_SIZE,
@@ -366,6 +380,7 @@ fn unpack_genesis<A: Read>(
     max_genesis_archive_unpacked_size: u64,
 ) -> Result<()> {
     unpack_archive(
+        None::<&mut SeekableBufferingReader>,
         archive,
         max_genesis_archive_unpacked_size,
         max_genesis_archive_unpacked_size,

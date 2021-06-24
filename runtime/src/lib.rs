@@ -32,6 +32,7 @@ mod pubkey_bins;
 mod read_only_accounts_cache;
 pub mod rent_collector;
 pub mod secondary_index;
+mod seekable_buffering_reader;
 pub mod serde_snapshot;
 pub mod snapshot_package;
 pub mod snapshot_utils;

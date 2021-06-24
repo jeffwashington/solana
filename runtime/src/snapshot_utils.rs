@@ -5,6 +5,7 @@ use {
         bank::{Bank, BankSlotDelta, Builtins},
         bank_forks::ArchiveFormat,
         hardened_unpack::{unpack_snapshot, ParallelSelector, UnpackError, UnpackedAppendVecMap},
+        seekable_buffering_reader::SeekableBufferingReader,
         serde_snapshot::{
             bank_from_stream, bank_to_stream, SerdeStyle, SnapshotStorage, SnapshotStorages,
         },
@@ -794,23 +795,51 @@ fn untar_snapshot_in<P: AsRef<Path>>(
     let account_paths_map = match archive_format {
         ArchiveFormat::TarBzip2 => {
             let tar = BzDecoder::new(BufReader::new(tar_name));
-            let mut archive = Archive::new(tar);
-            unpack_snapshot(&mut archive, unpack_dir, account_paths, parallel_selector)?
+            let mut buf = SeekableBufferingReader::new(tar);
+            let mut archive = Archive::new(buf.clone());
+            unpack_snapshot(
+                Some(&mut buf),
+                &mut archive,
+                unpack_dir,
+                account_paths,
+                parallel_selector,
+            )?
         }
         ArchiveFormat::TarGzip => {
             let tar = GzDecoder::new(BufReader::new(tar_name));
-            let mut archive = Archive::new(tar);
-            unpack_snapshot(&mut archive, unpack_dir, account_paths, parallel_selector)?
+            let mut buf = SeekableBufferingReader::new(tar);
+            let mut archive = Archive::new(buf.clone());
+            unpack_snapshot(
+                Some(&mut buf),
+                &mut archive,
+                unpack_dir,
+                account_paths,
+                parallel_selector,
+            )?
         }
         ArchiveFormat::TarZstd => {
             let tar = zstd::stream::read::Decoder::new(BufReader::new(tar_name))?;
-            let mut archive = Archive::new(tar);
-            unpack_snapshot(&mut archive, unpack_dir, account_paths, parallel_selector)?
+            let mut buf = SeekableBufferingReader::new(tar);
+            let mut archive = Archive::new(buf.clone());
+            unpack_snapshot(
+                Some(&mut buf),
+                &mut archive,
+                unpack_dir,
+                account_paths,
+                parallel_selector,
+            )?
         }
         ArchiveFormat::Tar => {
             let tar = BufReader::new(tar_name);
-            let mut archive = Archive::new(tar);
-            unpack_snapshot(&mut archive, unpack_dir, account_paths, parallel_selector)?
+            let mut buf = SeekableBufferingReader::new(tar);
+            let mut archive = Archive::new(buf.clone());
+            unpack_snapshot(
+                Some(&mut buf),
+                &mut archive,
+                unpack_dir,
+                account_paths,
+                parallel_selector,
+            )?
         }
     };
     Ok(account_paths_map)
