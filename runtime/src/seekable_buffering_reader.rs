@@ -5,7 +5,7 @@ use {
         io::*,
         sync::{
             atomic::{AtomicBool, AtomicUsize, Ordering},
-            Arc, Mutex, RwLock,
+            Arc, Condvar, Mutex, RwLock,
         },
         thread::{Builder, JoinHandle},
     },
@@ -21,7 +21,9 @@ pub struct SeekableBufferingReaderInner {
     pub calls: AtomicUsize,
     pub error: RwLock<std::io::Result<usize>>,
     pub bg_reader: Mutex<Option<JoinHandle<()>>>,
+    pub file_read_complete: AtomicBool,
     pub stop: AtomicBool,
+    pub new_data_signal: (Mutex<bool>, Condvar),
 }
 
 pub struct SeekableBufferingReader {
@@ -60,7 +62,9 @@ impl SeekableBufferingReader {
             calls: AtomicUsize::new(0),
             error: RwLock::new(Ok(0)),
             bg_reader: Mutex::new(None),
+            file_read_complete: AtomicBool::new(false),
             stop: AtomicBool::new(false),
+            new_data_signal: (Mutex::new(false), Condvar::new()),
         };
         let result = Self {
             instance: Arc::new(inner),
@@ -84,27 +88,34 @@ impl SeekableBufferingReader {
         let mut time = Measure::start("");
         const CHUNK_SIZE: usize = 65536 * 2;
         let mut data = [0u8; CHUNK_SIZE];
+        let (_lock, cvar) = &self.instance.new_data_signal;
         loop {
             if self.instance.stop.load(Ordering::Relaxed) {
+                self.set_error(std::io::Error::from(std::io::ErrorKind::TimedOut));
                 info!("stopped before file reading was finished");
                 break;
             }
             let result = reader.read(&mut data);
             match result {
                 Ok(size) => {
+                    if size == 0 {
+                        self.instance
+                            .file_read_complete
+                            .store(true, Ordering::Relaxed);
+                        cvar.notify_all(); // notify after read complete is set
+                        break;
+                    }
                     self.instance
                         .new_data
                         .write()
                         .unwrap()
                         .push(data[0..size].to_vec());
                     self.instance.len.fetch_add(size, Ordering::Relaxed);
-                    if size == 0 {
-                        break;
-                    }
+
+                    cvar.notify_all(); // notify after data added
                 }
                 Err(err) => {
-                    error!("error reading file");
-                    *self.instance.error.write().unwrap() = Err(err);
+                    self.set_error(err);
                     break;
                 }
             }
@@ -116,22 +127,40 @@ impl SeekableBufferingReader {
             self.instance.len.load(Ordering::Relaxed)
         );
     }
-    fn transfer_data(&self) {
+    fn set_error(&self, error: std::io::Error) {
+        error!("error reading file");
+        *self.instance.error.write().unwrap() = Err(error);
+        let (_lock, cvar) = &self.instance.new_data_signal;
+        cvar.notify_all(); // notify after error is set
+    }
+    fn transfer_data(&self) -> bool {
         let mut from_lock = self.instance.new_data.write().unwrap();
         if from_lock.is_empty() {
-            return;
+            return false;
         }
         let mut new_data: Vec<Vec<u8>> = vec![];
         std::mem::swap(&mut *from_lock, &mut new_data);
         drop(from_lock);
         let mut to_lock = self.instance.data.write().unwrap();
         to_lock.append(&mut new_data);
+        true
     }
     pub fn calls(&self) -> usize {
         self.instance.calls.load(Ordering::Relaxed)
     }
     pub fn len(&self) -> usize {
         self.instance.len.load(Ordering::Relaxed)
+    }
+    fn wait_for_new_data(&self) -> bool {
+        let (lock, cvar) = &self.instance.new_data_signal;
+        let data = lock.lock().unwrap();
+        let res = cvar
+            .wait_timeout(data, std::time::Duration::from_millis(1000))
+            .unwrap();
+        if res.1.timed_out() {
+            return true;
+        }
+        return false;
     }
 }
 
@@ -141,9 +170,7 @@ impl Read for SeekableBufferingReader {
 
         let mut remaining_request = request_len;
         let mut offset_in_dest = 0;
-        let mut transferred_data = false;
         while remaining_request > 0 {
-            let lock = self.instance.data.read().unwrap();
             {
                 let error = self.instance.error.read().unwrap();
                 if error.is_err() {
@@ -155,14 +182,19 @@ impl Read for SeekableBufferingReader {
                     return stored_error;
                 }
             }
+            let lock = self.instance.data.read().unwrap();
             if self.last_buffer_index >= lock.len() {
-                if !transferred_data {
-                    transferred_data = true;
-                    drop(lock);
-                    self.transfer_data();
+                drop(lock);
+                if self.transfer_data() {
                     continue;
                 }
-                break; // no more to read right now
+                if self.instance.file_read_complete.load(Ordering::Relaxed) {
+                    break; // eof reached
+                }
+                // no data to transfer, and file not finished, so wait:
+                let timed_out = self.wait_for_new_data();
+                info!("Waiting on new data, timed out: {}", timed_out);
+                continue;
             }
             let source = &lock[self.last_buffer_index];
             let full_len = source.len();
