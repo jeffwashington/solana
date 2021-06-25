@@ -1384,17 +1384,22 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
         let expected_duplicates_per_bin = expected_items_per_bin / 100; // estimate
         let bins_per_chunk = 4;
         let mut binned = vec![vec![]; bins_per_chunk];
-        let chunk_index_from_bin_index = |bin_index| bin_index / bins_per_chunk;
+        let get_chunk_index_from_bin_index = |bin_index| bin_index / bins_per_chunk;
+        let get_bin_index_within_chunk = |bin_index| bin_index % bins_per_chunk;
         (0..BINS).into_iter().for_each(|bin_index| {
-            let chunk_index = chunk_index_from_bin_index(bin_index);
-            binned[chunk_index].push((bin_index, Vec::with_capacity(expected_items_per_bin)));
+            let chunk_index = get_chunk_index_from_bin_index(bin_index);
+            let bin = &mut binned[chunk_index];
+            let bin_index_within_chunk = get_bin_index_within_chunk(bin_index);
+            assert_eq!(bin_index_within_chunk, bin.len());
+            bin.push((bin_index, Vec::with_capacity(expected_items_per_bin)));
         });
         items.for_each(|(pubkey, account_info)| {
             // this value is equivalent to what update() below would have created if we inserted a new item
             let info = WriteAccountMapEntry::new_entry_after_update(slot, account_info);
             let bin_index = get_bin_pubkey(pubkey);
-            let chunk_index = chunk_index_from_bin_index(bin_index);
-            binned[chunk_index][bin_index].1.push((pubkey, info));
+            let chunk_index = get_chunk_index_from_bin_index(bin_index);
+            let bin_index_within_chunk = get_bin_index_within_chunk(bin_index);
+            binned[chunk_index][bin_index_within_chunk].1.push((pubkey, info));
         });
 
         let insertion_time = AtomicU64::new(0);
