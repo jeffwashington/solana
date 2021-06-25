@@ -192,6 +192,12 @@ impl SeekableBufferingReader {
             }
         }
         time.stop();
+        {
+            *request.0.lock().unwrap() = true;
+            request.1.notify_one();
+        }
+
+        error!("waiting to join allocator");
         let _ = handle.unwrap().join();
         self.instance.len.fetch_add(total_len, Ordering::Relaxed);
         error!(
