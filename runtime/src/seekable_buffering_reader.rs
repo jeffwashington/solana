@@ -257,7 +257,6 @@ impl SeekableBufferingReader {
 
 impl Read for SeekableBufferingReader {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        error!("{}, {}, {}", file!(), line!(), buf.len());
         let request_len = buf.len();
 
         let mut remaining_request = request_len;
@@ -315,7 +314,6 @@ impl Read for SeekableBufferingReader {
                 remaining_request -= bytes_to_transfer;
             }
         }
-        error!("{}, {}, {}", file!(), line!(), offset_in_dest);
 
         self.instance.calls.fetch_add(1, Ordering::Relaxed);
         Ok(offset_in_dest)
