@@ -5621,7 +5621,6 @@ pub(crate) mod tests {
         );
     }
 
-
     #[test]
     fn test_big_mem() {
         solana_logger::setup();
@@ -5630,6 +5629,50 @@ pub(crate) mod tests {
         for i in 0..40 {
             f.push(vec![0u8; size]);
         }
+        let mut m = Measure::start("");
+        for i in 0..40 {
+            let mut t = vec![];
+            std::mem::swap(&mut t, &mut f[i]);
+            for k in 0..size {
+                t[k] = (k % 256) as u8;
+            }
+            std::mem::swap(&mut t, &mut f[i]);
+        }
+        m.stop();
+        error!("m: {}", m);
+    }
+
+    #[test]
+    fn test_big_mem2() {
+        solana_logger::setup();
+        let mut f = vec![];
+        let size = 1_000_000_000;
+        let forty = 20;
+        for i in 0..forty {
+            f.push(vec![0u8; size]);
+        }
+        let mut f2 = vec![];
+        let size = 1_000_000_000;
+        for i in 0..forty {
+            f2.push(vec![0u8; size]);
+        }
+        let handle = Builder::new()
+        .name("solana-compressed_file_reader".to_string())
+        .spawn(move || {
+            let mut m = Measure::start("");
+            for i in 0..forty {
+                let mut t = vec![];
+                std::mem::swap(&mut t, &mut f2[i]);
+                for k in 0..size {
+                    t[k] = (k % 256) as u8;
+                }
+                std::mem::swap(&mut t, &mut f2[i]);
+            }
+            m.stop();
+            error!("m2: {}", m);
+    
+        });
+       
         let mut m = Measure::start("");
         for i in 0..40 {
             let mut t = vec![];
