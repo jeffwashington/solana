@@ -5970,6 +5970,7 @@ impl AccountsDb {
             insertion_time_us: insertion_time_us.load(Ordering::Relaxed),
         };
         timings.report();
+        panic!("done");
 
         // Need to add these last, otherwise older updates will be cleaned
         for slot in slots {
