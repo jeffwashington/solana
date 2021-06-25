@@ -5677,7 +5677,7 @@ pub(crate) mod tests {
             error!("m3: {}", m);
     
         });
-        let handle = Builder::new()
+        let handle2 = Builder::new()
         .name("solana-compressed_file_reader".to_string())
         .spawn(move || {
             let mut m = Measure::start("");
@@ -5703,6 +5703,8 @@ pub(crate) mod tests {
         }
         m.stop();
         error!("m: {}", m);
+        handle.unwrap().join();
+        handle2.unwrap().join();
     }
 
     #[test]
