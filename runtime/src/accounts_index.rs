@@ -1380,37 +1380,49 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
         item_len: usize,
         items: impl Iterator<Item = (&'a Pubkey, T)>,
     ) -> (Vec<Pubkey>, u64) {
-        let mut binned = vec![Vec::with_capacity(item_len * 2 / BINS); BINS];
+        let expected_items_per_bin = item_len * 2 / BINS; // estimate
+        let expected_duplicates_per_bin = expected_items_per_bin / 100; // estimate
+        let bins_per_chunk = 4;
+        let mut binned = vec![vec![]; bins_per_chunk];
+        let chunk_index_from_bin_index = |bin_index| bin_index / bins_per_chunk;
+        (0..BINS).into_iter().for_each(|bin_index| {
+            let chunk_index = chunk_index_from_bin_index(bin_index);
+            binned[chunk_index].push((bin_index, Vec::with_capacity(expected_items_per_bin)));
+        });
         items.for_each(|(pubkey, account_info)| {
-            let bin = get_bin_pubkey(pubkey);
             // this value is equivalent to what update() below would have created if we inserted a new item
             let info = WriteAccountMapEntry::new_entry_after_update(slot, account_info);
-            binned[bin].push((pubkey, info));
+            let bin_index = get_bin_pubkey(pubkey);
+            let chunk_index = chunk_index_from_bin_index(bin_index);
+            binned[chunk_index][bin_index].1.push((pubkey, info));
         });
 
         let insertion_time = AtomicU64::new(0);
 
         let duplicate_keys = binned
             .into_par_iter()
-            .enumerate()
-            .map(|(pubkey_bin, items)| {
+            .map(|chunk| {
                 let mut _reclaims = SlotList::new();
-                let mut w_account_maps = self.account_maps[pubkey_bin].write().unwrap();
-                let mut insert_time = Measure::start("insert_into_primary_index"); // really should be in each loop
-                let mut duplicate_keys = Vec::with_capacity(items.len());
-                items.into_iter().for_each(|(pubkey, new_item)| {
-                    let already_exists = self.insert_new_entry_if_missing_with_lock(
-                        pubkey,
-                        &mut w_account_maps,
-                        new_item,
-                    );
-                    if let Some((mut w_account_entry, account_info)) = already_exists {
-                        w_account_entry.update(slot, account_info, &mut _reclaims);
-                        duplicate_keys.push(*pubkey);
-                    }
+                let expected_duplicates_per_bin = expected_duplicates_per_bin * bins_per_chunk;
+                let mut duplicate_keys = Vec::with_capacity(expected_duplicates_per_bin);
+                chunk.into_iter().for_each(|bin_data| {
+                    let (pubkey_bin, items): (usize, Vec<_>) = bin_data;
+                    let mut w_account_maps = self.account_maps[pubkey_bin].write().unwrap();
+                    let mut insert_time = Measure::start("insert_into_primary_index"); // really should be in each loop
+                    items.into_iter().for_each(|(pubkey, new_item)| {
+                        let already_exists = self.insert_new_entry_if_missing_with_lock(
+                            pubkey,
+                            &mut w_account_maps,
+                            new_item,
+                        );
+                        if let Some((mut w_account_entry, account_info)) = already_exists {
+                            w_account_entry.update(slot, account_info, &mut _reclaims);
+                            duplicate_keys.push(*pubkey);
+                        }
+                    });
+                    insert_time.stop();
+                    insertion_time.fetch_add(insert_time.as_us(), Ordering::Relaxed);
                 });
-                insert_time.stop();
-                insertion_time.fetch_add(insert_time.as_us(), Ordering::Relaxed);
                 duplicate_keys
             })
             .flatten()
