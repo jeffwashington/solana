@@ -5647,7 +5647,7 @@ pub(crate) mod tests {
         solana_logger::setup();
         let mut f = vec![];
         let size = 1_000_000_000;
-        let forty = 20;
+        let forty = 40;
         for i in 0..forty {
             f.push(vec![0u8; size]);
         }
@@ -5661,6 +5661,7 @@ pub(crate) mod tests {
         for i in 0..forty {
             f3.push(vec![0u8; size]);
         }
+        error!("start");
         let handle = Builder::new()
         .name("solana-compressed_file_reader".to_string())
         .spawn(move || {
