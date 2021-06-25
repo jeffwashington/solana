@@ -5639,7 +5639,7 @@ pub(crate) mod tests {
             std::mem::swap(&mut t, &mut f[i]);
         }
         m.stop();
-        error!("m: {}", m);
+        error!("maa: {}", m);
     }
 
     #[test]
@@ -5656,6 +5656,27 @@ pub(crate) mod tests {
         for i in 0..forty {
             f2.push(vec![0u8; size]);
         }
+        let mut f3 = vec![];
+        let size = 1_000_000_000;
+        for i in 0..forty {
+            f3.push(vec![0u8; size]);
+        }
+        let handle = Builder::new()
+        .name("solana-compressed_file_reader".to_string())
+        .spawn(move || {
+            let mut m = Measure::start("");
+            for i in 0..forty {
+                let mut t = vec![];
+                std::mem::swap(&mut t, &mut f3[i]);
+                for k in 0..size {
+                    t[k] = (k % 256) as u8;
+                }
+                std::mem::swap(&mut t, &mut f3[i]);
+            }
+            m.stop();
+            error!("m3: {}", m);
+    
+        });
         let handle = Builder::new()
         .name("solana-compressed_file_reader".to_string())
         .spawn(move || {
