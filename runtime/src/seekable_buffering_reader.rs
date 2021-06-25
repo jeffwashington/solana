@@ -91,6 +91,7 @@ impl SeekableBufferingReader {
         let (_lock, cvar) = &self.instance.new_data_signal;
         let mut notify = 0;
         let mut read = 0;
+        let mut allocate = 0;
         let notify_all = || {
             let mut time_notify = Measure::start("notify");
             cvar.notify_all();
@@ -98,6 +99,8 @@ impl SeekableBufferingReader {
             time_notify.as_us()
         };
 
+        let mut chunk_index = 0;
+        let mut total_len = 0;
         loop {
             if self.instance.stop.load(Ordering::Relaxed) {
                 self.set_error(std::io::Error::from(std::io::ErrorKind::TimedOut));
@@ -117,13 +120,18 @@ impl SeekableBufferingReader {
                         notify += notify_all(); // notify after read complete is set
                         break;
                     }
+                    total_len += size;
+                    let mut m = Measure::start("");
                     let new_data = data[0..size].to_vec();
+                    m.stop();
+                    allocate += m.as_us();
                     self.instance
                         .new_data
                         .write()
                         .unwrap()
                         .push(new_data);
-                    self.instance.len.fetch_add(size, Ordering::Relaxed);
+                    chunk_index += 1;
+                    //
 
                     notify += notify_all(); // notify after data added
                 }
@@ -134,12 +142,15 @@ impl SeekableBufferingReader {
             }
         }
         time.stop();
+        self.instance.len.fetch_add(total_len, Ordering::Relaxed);        
         error!(
-            "reading entire decompressed file took: {} us, bytes: {}, read_us: {}, notify_us: {}",
+            "reading entire decompressed file took: {} us, bytes: {}, read_us: {}, notify_us: {}, allocate_us: {}, chunks: {}",
             time.as_us(),
             self.instance.len.load(Ordering::Relaxed),
             read,
             notify,
+            allocate,
+            chunk_index,
         );
     }
     fn set_error(&self, error: std::io::Error) {
