@@ -1,7 +1,7 @@
 use solana_sdk::genesis_config::{DEFAULT_GENESIS_ARCHIVE, DEFAULT_GENESIS_FILE};
 use {
-    bzip2::bufread::BzDecoder,
     crate::seekable_buffering_reader::SeekableBufferingReader,
+    bzip2::bufread::BzDecoder,
     log::*,
     rand::{thread_rng, Rng},
     solana_sdk::genesis_config::GenesisConfig,
@@ -580,7 +580,7 @@ mod tests {
 
     fn finalize_and_unpack_snapshot(archive: tar::Builder<Vec<u8>>) -> Result<()> {
         with_finalize_and_unpack(archive, |a, b| {
-            unpack_snapshot(a, b, &[PathBuf::new()], None).map(|_| ())
+            unpack_snapshot(None, a, b, &[PathBuf::new()], None).map(|_| ())
         })
     }
 
