@@ -89,30 +89,43 @@ impl SeekableBufferingReader {
         const CHUNK_SIZE: usize = 65536 * 2;
         let mut data = [0u8; CHUNK_SIZE];
         let (_lock, cvar) = &self.instance.new_data_signal;
+        let mut notify = 0;
+        let mut read = 0;
+        let notify_all = || {
+            let mut time_notify = Measure::start("notify");
+            cvar.notify_all();
+            time_notify.stop();
+            time_notify.as_us()
+        };
+
         loop {
             if self.instance.stop.load(Ordering::Relaxed) {
                 self.set_error(std::io::Error::from(std::io::ErrorKind::TimedOut));
                 info!("stopped before file reading was finished");
                 break;
             }
+            let mut time_read = Measure::start("read");
             let result = reader.read(&mut data);
+            time_read.stop();
+            read += time_read.as_us();
             match result {
                 Ok(size) => {
                     if size == 0 {
                         self.instance
                             .file_read_complete
                             .store(true, Ordering::Relaxed);
-                        cvar.notify_all(); // notify after read complete is set
+                        notify += notify_all(); // notify after read complete is set
                         break;
                     }
+                    let new_data = data[0..size].to_vec();
                     self.instance
                         .new_data
                         .write()
                         .unwrap()
-                        .push(data[0..size].to_vec());
+                        .push(new_data);
                     self.instance.len.fetch_add(size, Ordering::Relaxed);
 
-                    cvar.notify_all(); // notify after data added
+                    notify += notify_all(); // notify after data added
                 }
                 Err(err) => {
                     self.set_error(err);
@@ -122,9 +135,11 @@ impl SeekableBufferingReader {
         }
         time.stop();
         error!(
-            "reading entire decompressed file took: {} us, bytes: {}",
+            "reading entire decompressed file took: {} us, bytes: {}, read_us: {}, notify_us: {}",
             time.as_us(),
-            self.instance.len.load(Ordering::Relaxed)
+            self.instance.len.load(Ordering::Relaxed),
+            read,
+            notify,
         );
     }
     fn set_error(&self, error: std::io::Error) {
