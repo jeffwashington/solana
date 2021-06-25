@@ -183,7 +183,7 @@ impl SeekableBufferingReader {
                     break;
                 }
                 let mut time_read = Measure::start("read");
-                let result = reader.read(&mut static_data[..]);
+                let result = reader.read(&mut static_data[0..(read_end-read_start)]);
                 time_read.stop();
                 read += time_read.as_us();
                 match result {
