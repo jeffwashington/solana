@@ -5959,6 +5959,7 @@ impl AccountsDb {
                     self.generate_secondary_index_for_slot(&accounts_map);
                 }
                 let iter = all.into_iter().map(|(a,b,c)| (a,b,c.into_iter()));
+                let mut scan_time = Measure::start("batch insert");
                 let insert_us = self.generate_primary_index_for_slot(iter);
                 insertion_time_us.fetch_add(insert_us, Ordering::Relaxed);
                 error!("chunk done");
