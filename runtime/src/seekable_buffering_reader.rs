@@ -141,6 +141,7 @@ impl SeekableBufferingReader {
 
             let mut dest_data;
             let mut timeout_us = 0;
+            let mut m = Measure::start("");
             loop {
                 let data = receiver.recv_timeout(std::time::Duration::from_micros(timeout_us));
                 match data {
@@ -155,6 +156,8 @@ impl SeekableBufferingReader {
                     }
                 }
             }
+            m.stop();
+            allocate += m.as_us();
 
             let mut time_read = Measure::start("read");
             let result = reader.read(&mut dest_data[..]);
@@ -170,9 +173,6 @@ impl SeekableBufferingReader {
                         break;
                     }
                     total_len += size;
-                    let mut m = Measure::start("");
-                    m.stop();
-                    allocate += m.as_us();
                     self.instance.new_data.write().unwrap().push(dest_data);
                     chunk_index += 1;
                     //
