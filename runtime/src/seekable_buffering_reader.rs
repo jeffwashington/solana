@@ -127,6 +127,7 @@ impl SeekableBufferingReader {
                         if *lock {
                             break 'outer;
                         }
+                        break;
                     }
                 }
                 error!("done making vecs");
