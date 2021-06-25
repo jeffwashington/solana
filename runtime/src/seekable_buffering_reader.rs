@@ -118,6 +118,7 @@ impl SeekableBufferingReader {
                         }
                         let _ = sender.send(v);
                     }
+                    error!("sent {} vecs", max_bins);
 
                     loop {
                         // wait for a request for more
@@ -128,6 +129,7 @@ impl SeekableBufferingReader {
                         }
                     }
                 }
+                error!("done making vecs");
             });
 
         let mut chunk_index = 0;
@@ -141,6 +143,7 @@ impl SeekableBufferingReader {
 
             let mut dest_data;
             let mut timeout_us = 0;
+            let mut attempts = 0;
             let mut m = Measure::start("");
             loop {
                 let data = receiver.recv_timeout(std::time::Duration::from_micros(timeout_us));
@@ -148,7 +151,11 @@ impl SeekableBufferingReader {
                     Err(RecvTimeoutError::Disconnected) => break 'outer,
                     Err(RecvTimeoutError::Timeout) => {
                         request.1.notify_one();
+                        attempts += 1;
                         timeout_us = 100; // we can wait longer now that we requested
+                        if attempts % 1000 == 0 {
+                            error!("attempts to get new vecs: {}", attempts);
+                        }
                     }
                     Ok(new_buffer) => {
                         dest_data = new_buffer;
