@@ -5622,7 +5622,7 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn test_big_mem() {
+    fn test_big_mem1() {
         solana_logger::setup();
         let mut f = vec![];
         let size = 1_000_000_000;
