@@ -5674,7 +5674,7 @@ pub(crate) mod tests {
         });
        
         let mut m = Measure::start("");
-        for i in 0..40 {
+        for i in 0..forty {
             let mut t = vec![];
             std::mem::swap(&mut t, &mut f[i]);
             for k in 0..size {
