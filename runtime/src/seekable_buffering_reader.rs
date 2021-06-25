@@ -98,6 +98,7 @@ impl SeekableBufferingReader {
             time_notify.stop();
             time_notify.as_us()
         };
+        error!("{}, {}", file!(), line!());
 
         let (sender, receiver) = unbounded();
 
@@ -107,6 +108,7 @@ impl SeekableBufferingReader {
         let handle = Builder::new()
             .name("solana-buf_allocator".to_string())
             .spawn(move || {
+                error!("{}, {}", file!(), line!());
                 'outer: loop {
                     let max_bins = 100;
                     for _b in 0..max_bins {
@@ -136,6 +138,7 @@ impl SeekableBufferingReader {
 
         let mut chunk_index = 0;
         let mut total_len = 0;
+        error!("{}, {}", file!(), line!());
         'outer: loop {
             if self.instance.stop.load(Ordering::Relaxed) {
                 self.set_error(std::io::Error::from(std::io::ErrorKind::TimedOut));
@@ -147,6 +150,7 @@ impl SeekableBufferingReader {
             let mut timeout_us = 0;
             let mut attempts = 0;
             let mut m = Measure::start("");
+            error!("{}, {}", file!(), line!());
             loop {
                 let data = receiver.recv_timeout(std::time::Duration::from_micros(timeout_us));
                 match data {
@@ -194,6 +198,7 @@ impl SeekableBufferingReader {
                 }
             }
         }
+        error!("{}, {}", file!(), line!());
         time.stop();
         {
             *request.0.lock().unwrap() = true;
@@ -252,6 +257,7 @@ impl SeekableBufferingReader {
 
 impl Read for SeekableBufferingReader {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        error!("{}, {}", file!(), line!());
         let request_len = buf.len();
 
         let mut remaining_request = request_len;
@@ -265,6 +271,7 @@ impl Read for SeekableBufferingReader {
                     let mut stored_error = Ok(0);
                     std::mem::swap(&mut *error, &mut stored_error);
                     drop(error);
+                    error!("got error");
                     return stored_error;
                 }
             }
@@ -308,6 +315,7 @@ impl Read for SeekableBufferingReader {
                 remaining_request -= bytes_to_transfer;
             }
         }
+        error!("{}, {}", file!(), line!());
 
         self.instance.calls.fetch_add(1, Ordering::Relaxed);
         Ok(offset_in_dest)
