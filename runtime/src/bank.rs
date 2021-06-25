@@ -5666,13 +5666,12 @@ pub(crate) mod tests {
         .name("solana-compressed_file_reader".to_string())
         .spawn(move || {
             let mut m = Measure::start("");
-            for i in 0..forty {
-                let mut t = vec![];
-                std::mem::swap(&mut t, &mut f3[i]);
+            let mut t = vec![0u8; size];
+            for i in 1..forty {
                 for k in 0..size {
                     t[k] = (k % 256) as u8;
                 }
-                std::mem::swap(&mut t, &mut f3[i]);
+                f3[i][..].copy_from_slice(&t[..]);
             }
             m.stop();
             error!("m3: {}", m);
@@ -5682,13 +5681,12 @@ pub(crate) mod tests {
         .name("solana-compressed_file_reader".to_string())
         .spawn(move || {
             let mut m = Measure::start("");
-            for i in 0..forty {
-                let mut t = vec![];
-                std::mem::swap(&mut t, &mut f2[i]);
+            let mut t = vec![0u8; size];
+            for i in 1..forty {
                 for k in 0..size {
                     t[k] = (k % 256) as u8;
                 }
-                std::mem::swap(&mut t, &mut f2[i]);
+                f2[i][..].copy_from_slice(&t[..]);
             }
             m.stop();
             error!("m2: {}", m);
@@ -5696,13 +5694,12 @@ pub(crate) mod tests {
         });
        
         let mut m = Measure::start("");
-        for i in 0..forty {
-            let mut t = vec![];
-            std::mem::swap(&mut t, &mut f[i]);
+        let mut t = vec![0u8; size];
+        for i in 1..forty {
             for k in 0..size {
                 t[k] = (k % 256) as u8;
             }
-            std::mem::swap(&mut t, &mut f[i]);
+            f[i][..].copy_from_slice(&t[..]);
         }
         m.stop();
         error!("m: {}", m);
