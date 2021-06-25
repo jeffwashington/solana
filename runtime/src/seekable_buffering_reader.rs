@@ -176,9 +176,9 @@ impl SeekableBufferingReader {
             let mut read_this_time = 0;
             let mut end = false;
             let mut static_data = vec![0; MAX_READ_SIZE];
-            let mut other_static_data = vec![0; MAX_READ_SIZE];
+            //let mut other_static_data = vec![0; MAX_READ_SIZE];
             loop {
-                std::mem::swap(&mut static_data, &mut other_static_data);
+                //std::mem::swap(&mut static_data, &mut other_static_data);
                 let read_start = read_this_time;
                 let read_end = std::cmp::min(read_start + MAX_READ_SIZE, dest_data.len());
                 if read_end == read_start {

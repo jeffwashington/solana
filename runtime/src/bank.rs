@@ -5621,6 +5621,28 @@ pub(crate) mod tests {
         );
     }
 
+
+    #[test]
+    fn test_big_mem() {
+        solana_logger::setup();
+        let mut f = vec![];
+        let size = 1_000_000_000;
+        for i in 0..40 {
+            f.push(vec![0u8; size]);
+        }
+        let mut m = Measure::start("");
+        for i in 0..40 {
+            let mut t = vec![];
+            std::mem::swap(&mut t, &mut f[i]);
+            for k in 0..size {
+                t[k] = (k % 256) as u8;
+            }
+            std::mem::swap(&mut t, &mut f[i]);
+        }
+        m.stop();
+        error!("m: {}", m);
+    }
+
     #[test]
     fn test_credit_debit_rent_no_side_effect_on_hash() {
         solana_logger::setup();
