@@ -315,7 +315,7 @@ impl Read for SeekableBufferingReader {
                 remaining_request -= bytes_to_transfer;
             }
         }
-        error!("{}, {}", file!(), line!());
+        error!("{}, {}, {}", file!(), line!(), offset_in_dest);
 
         self.instance.calls.fetch_add(1, Ordering::Relaxed);
         Ok(offset_in_dest)
