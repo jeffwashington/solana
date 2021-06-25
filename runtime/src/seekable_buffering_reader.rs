@@ -256,7 +256,7 @@ impl SeekableBufferingReader {
 
 impl Read for SeekableBufferingReader {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        error!("{}, {}", file!(), line!());
+        error!("{}, {}, {}", file!(), line!(), buf.len());
         let request_len = buf.len();
 
         let mut remaining_request = request_len;
