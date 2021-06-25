@@ -184,6 +184,7 @@ impl SeekableBufferingReader {
                         notify += notify_all(); // notify after read complete is set
                         break;
                     }
+                    self.instance.len.fetch_add(size, Ordering::Relaxed);
                     total_len += size;
                     self.instance.new_data.write().unwrap().push(dest_data);
                     chunk_index += 1;
@@ -206,7 +207,7 @@ impl SeekableBufferingReader {
 
         error!("waiting to join allocator");
         let _ = handle.unwrap().join();
-        self.instance.len.fetch_add(total_len, Ordering::Relaxed);
+        //self.instance.len.fetch_add(total_len, Ordering::Relaxed);
         error!(
             "reading entire decompressed file took: {} us, bytes: {}, read_us: {}, notify_us: {}, allocate_us: {}, chunks: {}",
             time.as_us(),
