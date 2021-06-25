@@ -5647,7 +5647,7 @@ pub(crate) mod tests {
         solana_logger::setup();
         let mut f = vec![];
         let size = 1_000_000_000;
-        let forty = 40;
+        let forty = 30;
         for i in 0..forty {
             f.push(vec![0u8; size]);
         }
