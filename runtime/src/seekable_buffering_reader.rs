@@ -191,7 +191,6 @@ impl SeekableBufferingReader {
                             end = true;
                             break;
                         }
-                        error!("read: {}", size);
                         // read some more
                         largest = std::cmp::max(largest, size);
                         read_this_time += size;
