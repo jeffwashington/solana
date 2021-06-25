@@ -175,6 +175,7 @@ impl SeekableBufferingReader {
 
             let mut read_this_time = 0;
             let mut end = false;
+            let mut static_data = vec![0; MAX_READ_SIZE];
             loop {
                 let read_start = read_this_time;
                 let read_end = std::cmp::min(read_start + MAX_READ_SIZE, dest_data.len());
@@ -182,7 +183,7 @@ impl SeekableBufferingReader {
                     break;
                 }
                 let mut time_read = Measure::start("read");
-                let result = reader.read(&mut dest_data[read_start..read_end]);
+                let result = reader.read(&mut static_data[..]);
                 time_read.stop();
                 read += time_read.as_us();
                 match result {
@@ -191,6 +192,8 @@ impl SeekableBufferingReader {
                             end = true;
                             break;
                         }
+
+                        dest_data[read_start..(read_start + size)].copy_from_slice(&static_data[0..size]);
                         // read some more
                         largest = std::cmp::max(largest, size);
                         read_this_time += size;
