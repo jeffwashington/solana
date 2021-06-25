@@ -87,7 +87,7 @@ impl SeekableBufferingReader {
     }
     fn read_entire_file_in_bg<T: 'static + Read + std::marker::Send>(&self, mut reader: T) {
         let mut time = Measure::start("");
-        const CHUNK_SIZE: usize = 10_000_000;//65536 * 2;
+        const CHUNK_SIZE: usize = 65536 * 2;
         let (_lock, cvar) = &self.instance.new_data_signal;
         let mut notify = 0;
         let mut read = 0;
@@ -110,7 +110,7 @@ impl SeekableBufferingReader {
                 'outer: loop {
                     let max_bins = 100;
                     for _b in 0..max_bins {
-                        let mut v = if false {
+                        let mut v = if true {
                             let mut v = Vec::with_capacity(CHUNK_SIZE);
                             unsafe {
                                 v.set_len(CHUNK_SIZE);
