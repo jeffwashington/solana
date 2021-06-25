@@ -1018,18 +1018,18 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
 
     fn insert_new_entry_if_missing(
         &self,
-        pubkey: &Pubkey,
+        pubkey: Pubkey,
         slot: Slot,
         info: T,
         w_account_maps: Option<&mut AccountMapsWriteLock<T>>,
-    ) -> Option<(WriteAccountMapEntry<T>, T)> {
+    ) -> Option<(WriteAccountMapEntry<T>, T, Pubkey)> {
         let new_entry = WriteAccountMapEntry::new_entry_after_update(slot, info);
         match w_account_maps {
             Some(w_account_maps) => {
                 self.insert_new_entry_if_missing_with_lock(pubkey, w_account_maps, new_entry)
             }
             None => {
-                let mut w_account_maps = self.get_account_maps_write_lock(pubkey);
+                let mut w_account_maps = self.get_account_maps_write_lock(&pubkey);
                 self.insert_new_entry_if_missing_with_lock(pubkey, &mut w_account_maps, new_entry)
             }
         }
@@ -1039,16 +1039,17 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
     // if entry for pubkey already existed, return Some(entry). Caller needs to call entry.update.
     fn insert_new_entry_if_missing_with_lock(
         &self,
-        pubkey: &Pubkey,
+        pubkey: Pubkey,
         w_account_maps: &mut AccountMapsWriteLock<T>,
         new_entry: AccountMapEntry<T>,
-    ) -> Option<(WriteAccountMapEntry<T>, T)> {
-        let account_entry = w_account_maps.entry(*pubkey);
+    ) -> Option<(WriteAccountMapEntry<T>, T, Pubkey)> {
+        let account_entry = w_account_maps.entry(pubkey);
         match account_entry {
             Entry::Occupied(account_entry) => Some((
                 WriteAccountMapEntry::from_account_map_entry(account_entry.get().clone()),
                 // extract the new account_info from the unused 'new_entry'
                 new_entry.slot_list.write().unwrap().remove(0).1,
+                *account_entry.key(),
             )),
             Entry::Vacant(account_entry) => {
                 account_entry.insert(new_entry);
@@ -1059,13 +1060,16 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
 
     fn get_account_write_entry_else_create(
         &self,
-        pubkey: &Pubkey,
+        pubkey: Pubkey,
         slot: Slot,
         info: T,
     ) -> Option<(WriteAccountMapEntry<T>, T)> {
-        match self.get_account_write_entry(pubkey) {
+        match self.get_account_write_entry(&pubkey) {
             Some(w_account_entry) => Some((w_account_entry, info)),
-            None => self.insert_new_entry_if_missing(pubkey, slot, info, None),
+            None => {
+                let result = self.insert_new_entry_if_missing(pubkey, slot, info, None);
+                result.map(|result| (result.0, result.1))
+            }
         }
     }
 
@@ -1378,7 +1382,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
         &'a self,
         items: impl Iterator<Item = (Slot, usize, impl Iterator<Item = (Pubkey, T)>)>,
     ) -> (Vec<Pubkey>, u64) {
-        let expected_items_per_bin = 0;//item_len * 2 / BINS; // estimate
+        let expected_items_per_bin = 0; //item_len * 2 / BINS; // estimate
         let expected_duplicates_per_bin = expected_items_per_bin / 100; // estimate
         let bins_per_chunk = 64;
         let mut binned = vec![vec![]; std::cmp::max(1, BINS / bins_per_chunk)];
@@ -1391,14 +1395,18 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
             assert_eq!(bin_index_within_chunk, bin.len());
             bin.push((bin_index, Vec::with_capacity(expected_items_per_bin)));
         });
-        items.for_each(|(slot, _len, items)| items.for_each(|(pubkey, account_info)| {
-            // this value is equivalent to what update() below would have created if we inserted a new item
-            let info = WriteAccountMapEntry::new_entry_after_update(slot, account_info);
-            let bin_index = get_bin_pubkey(&pubkey);
-            let chunk_index = get_chunk_index_from_bin_index(bin_index);
-            let bin_index_within_chunk = get_bin_index_within_chunk(bin_index);
-            binned[chunk_index][bin_index_within_chunk].1.push((pubkey, info, slot));
-        }));
+        items.for_each(|(slot, _len, items)| {
+            items.for_each(|(pubkey, account_info)| {
+                // this value is equivalent to what update() below would have created if we inserted a new item
+                let info = WriteAccountMapEntry::new_entry_after_update(slot, account_info);
+                let bin_index = get_bin_pubkey(&pubkey);
+                let chunk_index = get_chunk_index_from_bin_index(bin_index);
+                let bin_index_within_chunk = get_bin_index_within_chunk(bin_index);
+                binned[chunk_index][bin_index_within_chunk]
+                    .1
+                    .push((pubkey, info, slot));
+            })
+        });
 
         let insertion_time = AtomicU64::new(0);
 
@@ -1417,11 +1425,11 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
                     let mut insert_time = Measure::start("insert_into_primary_index"); // really should be in each loop
                     items.into_iter().for_each(|(pubkey, new_item, slot)| {
                         let already_exists = self.insert_new_entry_if_missing_with_lock(
-                            &pubkey,
+                            pubkey,
                             &mut w_account_maps,
                             new_item,
                         );
-                        if let Some((mut w_account_entry, account_info)) = already_exists {
+                        if let Some((mut w_account_entry, account_info, pubkey)) = already_exists {
                             w_account_entry.update(slot, account_info, &mut _reclaims);
                             duplicate_keys.push(pubkey);
                         }
@@ -1463,7 +1471,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
             //  So, what the accounts_index sees alone is sufficient as a source of truth for other non-scan
             //  account operations.
             if let Some((mut w_account_entry, account_info)) =
-                self.get_account_write_entry_else_create(pubkey, slot, account_info)
+                self.get_account_write_entry_else_create(*pubkey, slot, account_info)
             {
                 w_account_entry.update(slot, account_info, reclaims);
                 false
