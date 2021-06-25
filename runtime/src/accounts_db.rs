@@ -5827,9 +5827,9 @@ impl AccountsDb {
         (result, slots)
     }
 
-    fn process_storage_slot(
-        storage_maps: &[Arc<AccountStorageEntry>],
-    ) -> GenerateIndexAccountsMap<'_> {
+    fn process_storage_slot<'a>(
+        storage_maps: &'a [Arc<AccountStorageEntry>],
+    ) -> GenerateIndexAccountsMap<'a> {
         let num_accounts = storage_maps
             .iter()
             .map(|storage| storage.approx_stored_count())
@@ -5857,21 +5857,18 @@ impl AccountsDb {
         accounts_map
     }
 
-    fn generate_index_for_slot<'a>(
-        &self,
-        accounts_map: GenerateIndexAccountsMap<'a>,
-        slot: &Slot,
-    ) -> u64 {
-        if accounts_map.is_empty() {
-            return 0;
-        }
 
+    fn prepare_generate_primary_index_for_slot<'a>(
+        &'a self,
+        accounts_map: &'a GenerateIndexAccountsMap<'a>,
+        slot: &'a Slot,
+    ) -> (Slot, usize, Vec<(Pubkey, AccountInfo)>) {
         let len = accounts_map.len();
         let items = accounts_map
             .iter()
             .map(|(pubkey, (_, store_id, stored_account))| {
                 (
-                    *pubkey,
+                    **pubkey,
                     AccountInfo {
                         store_id: *store_id,
                         offset: stored_account.offset,
@@ -5879,30 +5876,46 @@ impl AccountsDb {
                         lamports: stored_account.account_meta.lamports,
                     },
                 )
-            });
+            }).collect::<Vec<_>>();
 
-        let (dirty_pubkeys, insert_us) = self
+        (*slot, len, items)
+    }
+
+    fn generate_primary_index_for_slot<'a>(
+        &'a self,
+        items: impl Iterator<Item = (Slot, usize, impl Iterator<Item = (Pubkey, AccountInfo)>)>,
+    ) -> u64 {
+        let (_dirty_pubkeys, insert_us) = self
             .accounts_index
-            .insert_new_if_missing_into_primary_index(*slot, len, items);
+            .insert_new_if_missing_into_primary_index(items);
 
         // dirty_pubkeys will contain a pubkey if an item has multiple rooted entries for
         // a given pubkey. If there is just a single item, there is no cleaning to
         // be done on that pubkey. Use only those pubkeys with multiple updates.
+        /*
         if !dirty_pubkeys.is_empty() {
             self.uncleaned_pubkeys.insert(*slot, dirty_pubkeys);
         }
-
-        if !self.account_indexes.is_empty() {
-            for (pubkey, (_, _store_id, stored_account)) in accounts_map.iter() {
-                self.accounts_index.update_secondary_indexes(
-                    pubkey,
-                    &stored_account.account_meta.owner,
-                    stored_account.data,
-                    &self.account_indexes,
-                );
-            }
-        }
+        */
         insert_us
+    }
+
+    fn generate_secondary_index_for_slot<'a>(
+        &self,
+        accounts_map: &GenerateIndexAccountsMap<'a>,
+    ) {
+        if accounts_map.is_empty() || self.account_indexes.is_empty() {
+            return;
+        }
+
+        for (pubkey, (_, _store_id, stored_account)) in accounts_map.iter() {
+            self.accounts_index.update_secondary_indexes(
+                pubkey,
+                &stored_account.account_meta.owner,
+                stored_account.data,
+                &self.account_indexes,
+            );
+        }
     }
 
     #[allow(clippy::needless_collect)]
@@ -5927,6 +5940,7 @@ impl AccountsDb {
                     outer_slots_len as u64,
                 );
                 let mut scan_time_sum = 0;
+                let mut all = vec![];
                 for (index, slot) in slots.iter().enumerate() {
                     let mut scan_time = Measure::start("scan");
                     log_status.report(index as u64);
@@ -5938,9 +5952,14 @@ impl AccountsDb {
                     scan_time.stop();
                     scan_time_sum += scan_time.as_us();
 
-                    let insert_us = self.generate_index_for_slot(accounts_map, slot);
-                    insertion_time_us.fetch_add(insert_us, Ordering::Relaxed);
+                    let data = self.prepare_generate_primary_index_for_slot(&accounts_map, slot);
+                    all.push(data);
+                    self.generate_secondary_index_for_slot(&accounts_map);
                 }
+                let iter = all.into_iter().map(|(a,b,c)| (a,b,c.into_iter()));
+                let insert_us = self.generate_primary_index_for_slot(iter);
+                insertion_time_us.fetch_add(insert_us, Ordering::Relaxed);
+
                 scan_time_sum
             })
             .sum();

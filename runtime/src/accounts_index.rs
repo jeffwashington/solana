@@ -1376,11 +1376,9 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
     #[allow(clippy::needless_collect)]
     pub(crate) fn insert_new_if_missing_into_primary_index<'a>(
         &'a self,
-        slot: Slot,
-        item_len: usize,
-        items: impl Iterator<Item = (&'a Pubkey, T)>,
+        items: impl Iterator<Item = (Slot, usize, impl Iterator<Item = (Pubkey, T)>)>,
     ) -> (Vec<Pubkey>, u64) {
-        let expected_items_per_bin = item_len * 2 / BINS; // estimate
+        let expected_items_per_bin = 0;//item_len * 2 / BINS; // estimate
         let expected_duplicates_per_bin = expected_items_per_bin / 100; // estimate
         let bins_per_chunk = 128;
         let mut binned = vec![vec![]; bins_per_chunk];
@@ -1393,14 +1391,14 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
             assert_eq!(bin_index_within_chunk, bin.len());
             bin.push((bin_index, Vec::with_capacity(expected_items_per_bin)));
         });
-        items.for_each(|(pubkey, account_info)| {
+        items.for_each(|(slot, _len, items)| items.for_each(|(pubkey, account_info)| {
             // this value is equivalent to what update() below would have created if we inserted a new item
             let info = WriteAccountMapEntry::new_entry_after_update(slot, account_info);
-            let bin_index = get_bin_pubkey(pubkey);
+            let bin_index = get_bin_pubkey(&pubkey);
             let chunk_index = get_chunk_index_from_bin_index(bin_index);
             let bin_index_within_chunk = get_bin_index_within_chunk(bin_index);
-            binned[chunk_index][bin_index_within_chunk].1.push((pubkey, info));
-        });
+            binned[chunk_index][bin_index_within_chunk].1.push((pubkey, info, slot));
+        }));
 
         let insertion_time = AtomicU64::new(0);
 
@@ -1417,15 +1415,15 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
                     }
                     let mut w_account_maps = self.account_maps[pubkey_bin].write().unwrap();
                     let mut insert_time = Measure::start("insert_into_primary_index"); // really should be in each loop
-                    items.into_iter().for_each(|(pubkey, new_item)| {
+                    items.into_iter().for_each(|(pubkey, new_item, slot)| {
                         let already_exists = self.insert_new_entry_if_missing_with_lock(
-                            pubkey,
+                            &pubkey,
                             &mut w_account_maps,
                             new_item,
                         );
                         if let Some((mut w_account_entry, account_info)) = already_exists {
                             w_account_entry.update(slot, account_info, &mut _reclaims);
-                            duplicate_keys.push(*pubkey);
+                            duplicate_keys.push(pubkey);
                         }
                     });
                     insert_time.stop();
