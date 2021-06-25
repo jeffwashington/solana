@@ -87,7 +87,7 @@ impl SeekableBufferingReader {
     }
     fn read_entire_file_in_bg<T: 'static + Read + std::marker::Send>(&self, mut reader: T) {
         let mut time = Measure::start("");
-        const CHUNK_SIZE: usize = 65536 * 2;
+        const CHUNK_SIZE: usize = 10_000_000;
         let (_lock, cvar) = &self.instance.new_data_signal;
         let mut notify = 0;
         let mut read = 0;
@@ -169,6 +169,7 @@ impl SeekableBufferingReader {
             allocate += m.as_us();
 
             let mut time_read = Measure::start("read");
+            error!("reading: {} bytes", dest_data.len());
             let result = reader.read(&mut dest_data[..]);
             time_read.stop();
             read += time_read.as_us();
