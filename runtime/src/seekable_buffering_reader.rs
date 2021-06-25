@@ -137,6 +137,7 @@ impl SeekableBufferingReader {
                 error!("done making vecs");
             });
 
+            let mut largest = 0;
         let mut chunk_index = 0;
         let mut total_len = 0;
         error!("{}, {}", file!(), line!());
@@ -192,6 +193,7 @@ impl SeekableBufferingReader {
                         }
                         error!("read: {}", size);
                         // read some more
+                        largest = std::cmp::max(largest, size);
                         read_this_time += size;
                     }
                     Err(err) => {
@@ -217,7 +219,6 @@ impl SeekableBufferingReader {
                 notify += notify_all(); // notify after read complete is set
             }
         }
-        error!("{}, {}", file!(), line!());
         time.stop();
         {
             *request.0.lock().unwrap() = true;
@@ -228,13 +229,14 @@ impl SeekableBufferingReader {
         let _ = handle.unwrap().join();
         //self.instance.len.fetch_add(total_len, Ordering::Relaxed);
         error!(
-            "reading entire decompressed file took: {} us, bytes: {}, read_us: {}, notify_us: {}, allocate_us: {}, chunks: {}",
+            "reading entire decompressed file took: {} us, bytes: {}, read_us: {}, notify_us: {}, allocate_us: {}, chunks: {}, largest fetch: {}",
             time.as_us(),
             self.instance.len.load(Ordering::Relaxed),
             read,
             notify,
             allocate,
             chunk_index,
+            largest,
         );
     }
     fn set_error(&self, error: std::io::Error) {
