@@ -169,7 +169,6 @@ impl SeekableBufferingReader {
             allocate += m.as_us();
 
             let mut time_read = Measure::start("read");
-            error!("reading: {} bytes", dest_data.len());
             let result = reader.read(&mut dest_data[..]);
             time_read.stop();
             read += time_read.as_us();
@@ -276,6 +275,7 @@ impl Read for SeekableBufferingReader {
                     continue;
                 }
                 if self.instance.file_read_complete.load(Ordering::Relaxed) {
+                    error!("eof reached");
                     break; // eof reached
                 }
                 // no data to transfer, and file not finished, so wait:
