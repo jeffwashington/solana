@@ -118,8 +118,6 @@ impl SeekableBufferingReader {
                         }
                         let _ = sender.send(v);
                     }
-                    error!("sent {} vecs", max_bins);
-
                     loop {
                         // wait for a request for more
                         let lock = request_.0.lock().unwrap();
