@@ -1,7 +1,5 @@
 use {
-    crossbeam_channel::{
-        unbounded, RecvTimeoutError,
-    },
+    crossbeam_channel::{unbounded, RecvTimeoutError},
     log::*,
     solana_measure::measure::Measure,
     std::{
@@ -112,10 +110,15 @@ impl SeekableBufferingReader {
                 'outer: loop {
                     let max_bins = 100;
                     for _b in 0..max_bins {
-                        let mut v = Vec::with_capacity(CHUNK_SIZE);
-                        unsafe {
-                            v.set_len(CHUNK_SIZE);
-                        }
+                        let mut v = if false {
+                            let mut v = Vec::with_capacity(CHUNK_SIZE);
+                            unsafe {
+                                v.set_len(CHUNK_SIZE);
+                            }
+                            v
+                        } else {
+                            vec![0u8; CHUNK_SIZE];
+                        };
                         let _ = sender.send(v);
                     }
                     loop {
