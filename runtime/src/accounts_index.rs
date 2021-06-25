@@ -1412,6 +1412,9 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
                 let mut duplicate_keys = Vec::with_capacity(expected_duplicates_per_bin);
                 chunk.into_iter().for_each(|bin_data| {
                     let (pubkey_bin, items): (usize, Vec<_>) = bin_data;
+                    if items.is_empty() {
+                        return;
+                    }
                     let mut w_account_maps = self.account_maps[pubkey_bin].write().unwrap();
                     let mut insert_time = Measure::start("insert_into_primary_index"); // really should be in each loop
                     items.into_iter().for_each(|(pubkey, new_item)| {
