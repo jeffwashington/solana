@@ -150,7 +150,6 @@ impl SeekableBufferingReader {
             let mut timeout_us = 0;
             let mut attempts = 0;
             let mut m = Measure::start("");
-            error!("{}, {}", file!(), line!());
             loop {
                 let data = receiver.recv_timeout(std::time::Duration::from_micros(timeout_us));
                 match data {
