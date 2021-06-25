@@ -87,7 +87,8 @@ impl SeekableBufferingReader {
     }
     fn read_entire_file_in_bg<T: 'static + Read + std::marker::Send>(&self, mut reader: T) {
         let mut time = Measure::start("");
-        const CHUNK_SIZE: usize = 65536*2;
+        const CHUNK_SIZE: usize = 10_000_000;
+        const MAX_READ_SIZE: usize = 10_000_000;//65536*2;
         let (_lock, cvar) = &self.instance.new_data_signal;
         let mut notify = 0;
         let mut read = 0;
@@ -112,7 +113,7 @@ impl SeekableBufferingReader {
                 'outer: loop {
                     let max_bins = 100;
                     for _b in 0..max_bins {
-                        let mut v = if true {
+                        let v = if true {
                             let mut v = Vec::with_capacity(CHUNK_SIZE);
                             unsafe {
                                 v.set_len(CHUNK_SIZE);
@@ -171,31 +172,49 @@ impl SeekableBufferingReader {
             m.stop();
             allocate += m.as_us();
 
-            let mut time_read = Measure::start("read");
-            let result = reader.read(&mut dest_data[..]);
-            time_read.stop();
-            read += time_read.as_us();
-            match result {
-                Ok(size) => {
-                    if size == 0 {
-                        self.instance
-                            .file_read_complete
-                            .store(true, Ordering::Relaxed);
-                        notify += notify_all(); // notify after read complete is set
-                        break;
-                    }
-                    self.instance.len.fetch_add(size, Ordering::Relaxed);
-                    total_len += size;
-                    self.instance.new_data.write().unwrap().push(dest_data);
-                    chunk_index += 1;
-                    //
-
-                    notify += notify_all(); // notify after data added
-                }
-                Err(err) => {
-                    self.set_error(err);
+            let mut read_this_time = 0;
+            let mut end = false;
+            loop {
+                let read_start = read_this_time;
+                let read_end = std::cmp::min(read_start + MAX_READ_SIZE, dest_data.len());
+                if read_end == read_start {
                     break;
                 }
+                let mut time_read = Measure::start("read");
+                let result = reader.read(&mut dest_data[read_start..read_end]);
+                time_read.stop();
+                read += time_read.as_us();
+                match result {
+                    Ok(size) => {
+                        if size == 0 {
+                            end = true;
+                            break;
+                        }
+                        error!("read: {}", size);
+                        // read some more
+                        read_this_time += size;
+                    }
+                    Err(err) => {
+                        self.set_error(err);
+                        break 'outer;
+                    }
+                }
+            }
+            if read_this_time > 0 {
+                self.instance.len.fetch_add(read_this_time, Ordering::Relaxed);
+                total_len += read_this_time;
+                dest_data.truncate(read_this_time);
+                self.instance.new_data.write().unwrap().push(dest_data);
+                chunk_index += 1;
+
+                notify += notify_all(); // notify after data added
+            }
+
+            if end {
+                self.instance
+                    .file_read_complete
+                    .store(true, Ordering::Relaxed);
+                notify += notify_all(); // notify after read complete is set
             }
         }
         error!("{}, {}", file!(), line!());
