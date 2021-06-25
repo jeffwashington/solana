@@ -1381,7 +1381,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
         let expected_items_per_bin = 0;//item_len * 2 / BINS; // estimate
         let expected_duplicates_per_bin = expected_items_per_bin / 100; // estimate
         let bins_per_chunk = 1;
-        let mut binned = vec![vec![]; bins_per_chunk];
+        let mut binned = vec![vec![]; BINS / bins_per_chunk];
         let get_chunk_index_from_bin_index = |bin_index| bin_index / bins_per_chunk;
         let get_bin_index_within_chunk = |bin_index| bin_index % bins_per_chunk;
         (0..BINS).into_iter().for_each(|bin_index| {
