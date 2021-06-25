@@ -117,7 +117,7 @@ impl SeekableBufferingReader {
                             }
                             v
                         } else {
-                            vec![0u8; CHUNK_SIZE];
+                            vec![0u8; CHUNK_SIZE]
                         };
                         let _ = sender.send(v);
                     }
