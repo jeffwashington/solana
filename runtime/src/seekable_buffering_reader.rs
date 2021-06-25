@@ -1,4 +1,7 @@
 use {
+    crossbeam_channel::{
+        unbounded, RecvTimeoutError,
+    },
     log::*,
     solana_measure::measure::Measure,
     std::{
@@ -87,7 +90,6 @@ impl SeekableBufferingReader {
     fn read_entire_file_in_bg<T: 'static + Read + std::marker::Send>(&self, mut reader: T) {
         let mut time = Measure::start("");
         const CHUNK_SIZE: usize = 65536 * 2;
-        let mut data = [0u8; CHUNK_SIZE];
         let (_lock, cvar) = &self.instance.new_data_signal;
         let mut notify = 0;
         let mut read = 0;
@@ -99,16 +101,63 @@ impl SeekableBufferingReader {
             time_notify.as_us()
         };
 
+        let (sender, receiver) = unbounded();
+
+        let request = Arc::new((Mutex::new(false), Condvar::new()));
+        let request_ = request.clone();
+
+        let handle = Builder::new()
+            .name("solana-buf_allocator".to_string())
+            .spawn(move || {
+                'outer: loop {
+                    let max_bins = 100;
+                    for _b in 0..max_bins {
+                        let mut v = Vec::with_capacity(CHUNK_SIZE);
+                        unsafe {
+                            v.set_len(CHUNK_SIZE);
+                        }
+                        let _ = sender.send(v);
+                    }
+
+                    loop {
+                        // wait for a request for more
+                        let lock = request_.0.lock().unwrap();
+                        let lock = request_.1.wait(lock).unwrap();
+                        if *lock {
+                            break 'outer;
+                        }
+                    }
+                }
+            });
+
         let mut chunk_index = 0;
         let mut total_len = 0;
-        loop {
+        'outer: loop {
             if self.instance.stop.load(Ordering::Relaxed) {
                 self.set_error(std::io::Error::from(std::io::ErrorKind::TimedOut));
                 info!("stopped before file reading was finished");
                 break;
             }
+
+            let mut dest_data;
+            let mut timeout_us = 0;
+            loop {
+                let data = receiver.recv_timeout(std::time::Duration::from_micros(timeout_us));
+                match data {
+                    Err(RecvTimeoutError::Disconnected) => break 'outer,
+                    Err(RecvTimeoutError::Timeout) => {
+                        request.1.notify_one();
+                        timeout_us = 100; // we can wait longer now that we requested
+                    }
+                    Ok(new_buffer) => {
+                        dest_data = new_buffer;
+                        break;
+                    }
+                }
+            }
+
             let mut time_read = Measure::start("read");
-            let result = reader.read(&mut data);
+            let result = reader.read(&mut dest_data[..]);
             time_read.stop();
             read += time_read.as_us();
             match result {
@@ -122,14 +171,9 @@ impl SeekableBufferingReader {
                     }
                     total_len += size;
                     let mut m = Measure::start("");
-                    let new_data = data[0..size].to_vec();
                     m.stop();
                     allocate += m.as_us();
-                    self.instance
-                        .new_data
-                        .write()
-                        .unwrap()
-                        .push(new_data);
+                    self.instance.new_data.write().unwrap().push(dest_data);
                     chunk_index += 1;
                     //
 
@@ -142,7 +186,8 @@ impl SeekableBufferingReader {
             }
         }
         time.stop();
-        self.instance.len.fetch_add(total_len, Ordering::Relaxed);        
+        let _ = handle.unwrap().join();
+        self.instance.len.fetch_add(total_len, Ordering::Relaxed);
         error!(
             "reading entire decompressed file took: {} us, bytes: {}, read_us: {}, notify_us: {}, allocate_us: {}, chunks: {}",
             time.as_us(),
