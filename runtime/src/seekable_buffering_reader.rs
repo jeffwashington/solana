@@ -216,6 +216,7 @@ impl SeekableBufferingReader {
                     .file_read_complete
                     .store(true, Ordering::Relaxed);
                 notify += notify_all(); // notify after read complete is set
+                break 'outer;
             }
         }
         time.stop();
