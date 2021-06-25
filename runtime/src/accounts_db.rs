@@ -5931,9 +5931,11 @@ impl AccountsDb {
         let chunk_size = outer_slots_len;//(outer_slots_len / 7) + 1; // approximately 400k slots in a snapshot
         let mut index_time = Measure::start("index");
         let insertion_time_us = AtomicU64::new(0);
+        error!("scan start");
         let scan_time: u64 = slots
             .par_chunks(chunk_size)
             .map(|slots| {
+                error!("chunk start");
                 let mut log_status = MultiThreadProgress::new(
                     &total_processed_slots_across_all_threads,
                     2,
@@ -5959,7 +5961,7 @@ impl AccountsDb {
                 let iter = all.into_iter().map(|(a,b,c)| (a,b,c.into_iter()));
                 let insert_us = self.generate_primary_index_for_slot(iter);
                 insertion_time_us.fetch_add(insert_us, Ordering::Relaxed);
-
+                error!("chunk done");
                 scan_time_sum
             })
             .sum();
