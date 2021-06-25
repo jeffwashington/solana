@@ -5629,17 +5629,35 @@ pub(crate) mod tests {
         for i in 0..40 {
             f.push(vec![0u8; size]);
         }
+        let mut t = vec![0u8; size];
         let mut m = Measure::start("");
-        for i in 0..40 {
-            let mut t = vec![];
-            std::mem::swap(&mut t, &mut f[i]);
+        for i in 0..forty {
             for k in 0..size {
                 t[k] = (k % 256) as u8;
             }
-            std::mem::swap(&mut t, &mut f[i]);
+            f[i][..].copy_from_slice(&t[..]);
         }
         m.stop();
         error!("maa: {}", m);
+    }
+
+    #[test]
+    fn test_big_mem3() {
+        solana_logger::setup();
+        let mut f = vec![];
+        let size = 1_000_000_000;
+        for i in 0..40 {
+            f.push(vec![0u8; size]);
+        }
+        let mut t = vec![0u8; size];
+        let mut m = Measure::start("");
+        for i in 0..forty {
+            for k in 0..size {
+                t[k] = (k % 256) as u8;
+            }
+        }
+        m.stop();
+        error!("maa3: {}", m);
     }
 
     #[test]
@@ -5665,9 +5683,9 @@ pub(crate) mod tests {
         let handle = Builder::new()
         .name("solana-compressed_file_reader".to_string())
         .spawn(move || {
-            let mut m = Measure::start("");
             let mut t = vec![0u8; size];
-            for i in 1..forty {
+            let mut m = Measure::start("");
+            for i in 0..forty {
                 for k in 0..size {
                     t[k] = (k % 256) as u8;
                 }
@@ -5680,9 +5698,9 @@ pub(crate) mod tests {
         let handle2 = Builder::new()
         .name("solana-compressed_file_reader".to_string())
         .spawn(move || {
-            let mut m = Measure::start("");
             let mut t = vec![0u8; size];
-            for i in 1..forty {
+            let mut m = Measure::start("");
+            for i in 0..forty {
                 for k in 0..size {
                     t[k] = (k % 256) as u8;
                 }
@@ -5693,9 +5711,9 @@ pub(crate) mod tests {
     
         });
        
-        let mut m = Measure::start("");
         let mut t = vec![0u8; size];
-        for i in 1..forty {
+        let mut m = Measure::start("");
+        for i in 0..forty {
             for k in 0..size {
                 t[k] = (k % 256) as u8;
             }
