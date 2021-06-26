@@ -1,0 +1,2919 @@
+    * Add configurable confirm_transaction_initial_timeout
+    
+    * Use default 5s timeout for initial tx confirmation
+
+commit ce53b84cdc42ec1ac7cfecb7b32fd6d96af751b2
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Jun 29 18:26:15 2021 -0500
+
+    refactor untar_snapshot_in to push parallelism deeper for further refactoring (#18310)
+--
+--
+Date:   Mon Jun 28 15:15:21 2021 -0600
+
+    Ignore flaky tests (#18278)
+
+commit afd64d27c9739d8db25a3686e45e63eb59fc9b5e
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon Jun 28 15:03:57 2021 -0500
+
+    bin accounts index (#18111)
+--
+--
+    
+    Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+    Co-authored-by: Tyera Eulberg <tyera@solana.com>
+
+commit 1f1e54b9d8ee8639c9f55df5008b1a6f2e25d8df
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon Jun 28 12:04:29 2021 -0500
+
+    reduce pubkey copies on insert path (#18240)
+--
+--
+Date:   Fri Jun 25 13:02:26 2021 -0700
+
+    Added notes to running validator documentation to ensure that 'exec' is used from scripts when starting the validator to prevent logrotate signals from killing the validator. (#18234)
+
+commit e06376664bc2a1b384675da0195724463843ee12
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Jun 25 14:31:55 2021 -0500
+
+    replace account index bulk insert with iterator (#18198)
+--
+--
+    
+    Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+    Co-authored-by: dependabot-buildkite <dependabot-buildkite@noreply.solana.com>
+
+commit f2a25812596bdee6cfa170e7651f6b247c40383e
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Jun 25 08:36:55 2021 -0500
+
+    metric for accounts index insertion time (#18202)
+--
+--
+    Revert "Clean up build warning"
+    
+    This reverts commit 17a173ebb5cb87271069abdaa0fb9c01d4c8d9d4.
+
+commit f9fccdee8552b011aaf1159379e9d4b754e8de95
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu Jun 24 17:56:25 2021 -0500
+
+    remove unnecessary copies from accounts index code paths (#18196)
+--
+--
+Date:   Thu Jun 24 17:56:25 2021 -0500
+
+    remove unnecessary copies from accounts index code paths (#18196)
+
+commit 31ec986ea141bdc9bc0448a5c049935fda1bc0f0
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu Jun 24 17:29:49 2021 -0500
+
+    untar in parallel (#18184)
+--
+--
+Date:   Thu Jun 24 15:12:47 2021 -0700
+
+    feat: additional serum instructions (#18209)
+
+commit 4b314be5bd4ba343702437d88a38a1516bf9c544
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu Jun 24 14:52:11 2021 -0500
+
+    rework dirty_pubkeys from insert_new_if_missing_into_primary_index (#18200)
+--
+--
+    * feat: add lowest available epochs for rewards
+    
+    * feat: make sure current epoch is not fetched
+
+commit 77c3ffe4cff950783eddd8bfcb006047b63ef4ee
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Jun 23 12:57:05 2021 -0500
+
+    add min/max bin size metrics to hash calculation (#18155)
+--
+--
+    Removed unused purged_slots in purge_older_root_entries (#18102)
+    
+    Removed unused purged_slots in purge_older_root_entries
+
+commit d3ee73e151dfe445dbad601cf2a139d64b269392
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Jun 22 16:02:21 2021 -0500
+
+    capture sort time in hash calculation (#18118)
+--
+--
+Date:   Tue Jun 22 16:02:21 2021 -0500
+
+    capture sort time in hash calculation (#18118)
+
+commit fbc94d84c8710347a67300d832fb7af108e2ceb6
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Jun 22 14:21:49 2021 -0500
+
+    apply 'debug_do_not_add_builtins' to feature activations (#18110)
+--
+--
+    
+    Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+    Co-authored-by: dependabot-buildkite <dependabot-buildkite@noreply.solana.com>
+
+commit d5f9f3b7cef5553940cd66a5762faf766db17dd6
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Jun 22 11:36:43 2021 -0500
+
+    correctly calculate hash_total for hash/lamport calculation (#18144)
+--
+--
+    * Less public
+    
+    * Remove unused enum
+
+commit 2087f5da942bcf16800042f56d59acc1c2357611
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon Jun 21 15:32:50 2021 -0500
+
+    refactor generate_index_for_slot (#17984)
+--
+--
+Date:   Mon Jun 21 15:32:50 2021 -0500
+
+    refactor generate_index_for_slot (#17984)
+
+commit bf97627021331913ca7c26c5e1465c94799becd8
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon Jun 21 15:32:03 2021 -0500
+
+    eliminate flatten and sort in hash calculation (#17802)
+--
+--
+    
+    Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+    Co-authored-by: dependabot-buildkite <dependabot-buildkite@noreply.solana.com>
+
+commit ae82e4e25bcbfb14f2f7013129f7a3a814d4ff09
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon Jun 21 10:47:58 2021 -0500
+
+    refactor reconstruct_accountsdb_from_fields (#17987)
+--
+--
+    Signed-off-by: dependabot[bot] <support@github.com>
+    
+    Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+
+commit ec2f93047501995a389a256fb0ebbb2302d67d75
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon Jun 21 10:20:27 2021 -0500
+
+    user process.accounts_db_test_hash_calculation for debug_verify hash (#18053)
+--
+--
+    * Fix flaky optimistic violation detection cluster test
+    
+    * Add small sleep to avoid tight loop
+
+commit 0a81c37fce73749e6096ba7e2dadacff606e221d
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu Jun 17 14:41:52 2021 -0500
+
+    introduce LockMapType for accounts_index (#18021)
+--
+--
+Date:   Thu Jun 17 14:41:52 2021 -0500
+
+    introduce LockMapType for accounts_index (#18021)
+
+commit bab96e878e26b1f91ce662131940a2761dd474ef
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu Jun 17 14:04:59 2021 -0500
+
+    Revert "chore: bump trees from 0.2.1 to 0.4.2 (#18041)" (#18045)
+--
+--
+    Revert "chore: bump trees from 0.2.1 to 0.4.2 (#18041)" (#18045)
+    
+    This reverts commit f2a7152c0c3882a51726c22cb7081671216267b5.
+
+commit 1feaaf009d8f11303c1a8f73cf963be5ffedb420
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu Jun 17 13:35:25 2021 -0500
+
+    generate_index timings (#17983)
+--
+--
+Date:   Thu Jun 17 13:35:25 2021 -0500
+
+    generate_index timings (#17983)
+
+commit 20e714b3d0dd6488f259f688b8d4ce96ab6e6b8f
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu Jun 17 13:30:46 2021 -0500
+
+    remove unused code (#17981)
+--
+--
+    
+    Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+    Co-authored-by: Tyera Eulberg <tyera@solana.com>
+
+commit 71796f4951ffd20e5ea1e83f5ccba298ce185485
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Jun 16 12:09:17 2021 -0500
+
+    break out generate index reporting (#17980)
+--
+--
+Date:   Wed Jun 16 12:09:17 2021 -0500
+
+    break out generate index reporting (#17980)
+
+commit 7ca04d6a8648bba417ab1a06d0f1ae526ed63932
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Jun 16 11:02:34 2021 -0500
+
+    refactor generate_index process_storage_slot (#17982)
+--
+--
+Date:   Wed Jun 16 11:02:34 2021 -0500
+
+    refactor generate_index process_storage_slot (#17982)
+
+commit bb7413c9f941fd383c284b72598fff68c3a75ead
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Jun 16 11:01:52 2021 -0500
+
+    refactor rebuild_bank_from_snapshots (#17988)
+--
+--
+    Signed-off-by: dependabot[bot] <support@github.com>
+    
+    Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+
+commit eee5414c64fcd93a5642c9c0e6f03f5c8bdd076f
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Jun 16 09:24:59 2021 -0500
+
+    avoid unnecessary empty arrays when binning (#17944)
+--
+--
+Date:   Wed Jun 16 09:24:59 2021 -0500
+
+    avoid unnecessary empty arrays when binning (#17944)
+
+commit adc683956f86e250ce36e6ca18e7787792614af0
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Jun 16 09:10:38 2021 -0500
+
+    do not use index for verify_bank_hash_and_lamports (#17812)
+--
+--
+Date:   Wed Jun 16 09:10:38 2021 -0500
+
+    do not use index for verify_bank_hash_and_lamports (#17812)
+
+commit 55ee3b5f2fd02022c23b745de2af3f71a64750b5
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Jun 16 09:09:55 2021 -0500
+
+    set hash bins to 65k (#17912)
+--
+--
+Date:   Wed Jun 16 09:09:55 2021 -0500
+
+    set hash bins to 65k (#17912)
+
+commit 7de79425ce74b5f736098b30778a61639bfd7183
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Jun 16 08:48:24 2021 -0500
+
+    parallel storage -> accounts folder (#17955)
+--
+--
+    * Default block_height on eof
+    
+    * Add comment to prevent future errors
+
+commit dbd4dc04b0349cd7235a65e9effa920f8c0c30b7
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Jun 15 15:39:22 2021 -0500
+
+    ledger tool limit_load_slot_count_from_snapshot avoids assert failures (#17974)
+--
+--
+    Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+    Co-authored-by: dependabot-buildkite <dependabot-buildkite@noreply.solana.com>
+    Co-authored-by: Tyera Eulberg <tyera@solana.com>
+
+commit f558b9b6bf88c1fc56dcf93a6c12231cb8eef66d
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Jun 15 11:52:12 2021 -0500
+
+    verify bank hash on startup with ledger tool option (#17939)
+--
+--
+    
+    Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+    Co-authored-by: dependabot-buildkite <dependabot-buildkite@noreply.solana.com>
+
+commit 5ecb30ff58c421dee479f06d644ccd8ac953997e
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Jun 15 09:01:11 2021 -0500
+
+    nit: rename measure (#17946)
+--
+--
+Date:   Tue Jun 15 09:01:11 2021 -0500
+
+    nit: rename measure (#17946)
+
+commit 4d8ffdcc11b9fee13685a1f64d6b6663e9b061f4
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Jun 15 09:00:43 2021 -0500
+
+    remove unused parameters from CalculateHashIntermediate (#17949)
+--
+--
+Date:   Mon Jun 14 21:04:01 2021 -0700
+
+    Handle removing slots during account scans (#17471)
+
+commit 471b34132ed70e938dce39b8de26ef22675ba17f
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon Jun 14 17:46:49 2021 -0500
+
+    add metrics for startup (#17913)
+--
+--
+    * fix test
+    
+    * fix duplicate
+
+commit 7fde9b6ff03b8763ad4c84f5fce2670e736bb199
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon Jun 14 16:21:48 2021 -0500
+
+    name arguments to help with confusion (#17942)
+--
+--
+Date:   Mon Jun 14 16:21:48 2021 -0500
+
+    name arguments to help with confusion (#17942)
+
+commit 62e1b20e566754161103f16f238424625eaf797a
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon Jun 14 16:20:03 2021 -0500
+
+    refactor so hash verify can be done by more callers (#17941)
+--
+--
+Date:   Mon Jun 14 16:20:03 2021 -0500
+
+    refactor so hash verify can be done by more callers (#17941)
+
+commit e6bbd4b3f06e2e52a7c0c9658669cba4ef2f46f7
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon Jun 14 15:46:19 2021 -0500
+
+    add metrics to handle_snapshot_requests (#17937)
+--
+--
+    Reports of excessive GPU memory usage and errors
+    from cudaHostRegister. There are some cases where pinning is
+    not required.
+
+commit d4cc975fe90ef93a15d477318dd6e21b526c7e37
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon Jun 14 08:53:07 2021 -0500
+
+    calculate_capitalization uses hash calculation (#17443)
+--
+--
+    * feedback
+    
+    * remove debugging code, clean up slot math
+
+commit 2dc69698581a55970e6c679af7a94600ee091fa9
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon Jun 14 08:43:59 2021 -0500
+
+    use trait to simplify and consolidate cumulative code (#17852)
+--
+--
+Date:   Tue Jun 8 13:55:33 2021 -0700
+
+    Print commands output in cargo-build-bpf if verbose option is set (#17845)
+
+commit 576e3d95f74d68784390592b2754d66e0e677a14
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Jun 8 14:49:08 2021 -0600
+
+    refactor: create type (#17818)
+--
+--
+Date:   Tue Jun 8 14:49:08 2021 -0600
+
+    refactor: create type (#17818)
+
+commit 2a9b1270299ff5bac7d3c49da17594f4642391c5
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Jun 8 13:59:50 2021 -0600
+
+    Pass iterator for SortedStorages::new_with_slots (#17811)
+--
+--
+    Pass iterator for SortedStorages::new_with_slots (#17811)
+    
+    Co-authored-by: Carl Lin <carl@solana.com>
+
+commit 01ef2a5c4a8ff0d6b1481596e47b1da479f25a26
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Jun 8 13:54:10 2021 -0600
+
+    test: simple CalculateHashIntermediate refactoring (#17813)
+--
+--
+    
+    Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+    Co-authored-by: dependabot-buildkite <dependabot-buildkite@noreply.solana.com>
+
+commit 58fe1d076402d7d6dd0f6fe17177ea6fe4f319bd
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Jun 8 08:32:16 2021 -0600
+
+    add min to roots_tracker (#17806)
+--
+--
+    * Update error text
+    
+    * gitignore for rpc
+
+commit 817d48be21e48bb9977734228632e13562ee5221
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon Jun 7 12:09:17 2021 -0500
+
+    binary search in slices for hashing (#17755)
+--
+--
+    
+    Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+    Co-authored-by: dependabot-buildkite <dependabot-buildkite@noreply.solana.com>
+
+commit b5bb91b50f33c5c0fca0b7aae43672c0852dbf47
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon Jun 7 09:01:16 2021 -0500
+
+    rework hash calculation to not keep slot and write version (#17685)
+--
+--
+Date:   Fri Jun 4 17:40:27 2021 -0500
+
+    Combine repeated logic for checking if slot has been cleaned up (#17713)
+
+commit 00ee84af37db20ce9df575e339e8683aad598744
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Jun 4 14:54:06 2021 -0500
+
+    break out hash time in metric (#17721)
+--
+--
+    Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+    Co-authored-by: dependabot-buildkite <dependabot-buildkite@noreply.solana.com>
+    Co-authored-by: Tyera Eulberg <tyera@solana.com>
+
+commit f6fb8906c7932c9941a6936522168929ff4ba0a7
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Jun 4 13:54:39 2021 -0500
+
+    add data point for cap mismatch (#17746)
+--
+--
+    Signed-off-by: dependabot[bot] <support@github.com>
+    
+    Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+
+commit 5197454fea67804769a227cdb626b627fb75438b
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Jun 4 10:53:13 2021 -0500
+
+    increase bin count for hash scan (#17562)
+--
+--
+    
+    Disables auto-retrying when rate limited from HTTP 429 response.
+    The default behavior, auto-retrying, is unchanged.
+
+commit 81bafd9daf3da761ba0a40f6bc796a8711725344
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu Jun 3 22:22:12 2021 -0500
+
+    add info for vm.max_map_count incorrectly set. (#17727)
+--
+--
+Date:   Wed Jun 2 17:20:00 2021 -0700
+
+    Switch EpochSlots to be frozen slots, not completed slots (#17168)
+
+commit 9388aaca1539a518c52c7c6d9cd9b99fd044ef21
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Jun 2 18:24:55 2021 -0500
+
+    use slots returned from get_snapshot_storages to sort (#17638)
+--
+--
+    * use slots returned from get_snapshot_storages to sort
+    
+    * add tests
+
+commit 4bd32d891ffb19e7aaff93f327eff268f323cbea
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Jun 2 17:56:19 2021 -0500
+
+    remove slot lookup (#17691)
+--
+--
+Date:   Wed Jun 2 17:56:19 2021 -0500
+
+    remove slot lookup (#17691)
+
+commit 83ceedc091f3a26daf133eac54bad37e8fab76a6
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Jun 2 17:32:31 2021 -0500
+
+    simplify test construction (#17686)
+--
+--
+Date:   Wed Jun 2 17:32:31 2021 -0500
+
+    simplify test construction (#17686)
+
+commit db8811eacda5332ed663f7842faa3bea5cd49a0d
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Jun 2 17:31:15 2021 -0500
+
+    support bin divisions up to 65536 (#17563)
+--
+--
+    
+    Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+    Co-authored-by: dependabot-buildkite <you@example.com>
+
+commit d802eb303cdebd4a08130bd72e9c9d94cc3371e9
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Jun 2 14:03:02 2021 -0500
+
+    reduce copy (#17672)
+--
+--
+    Signed-off-by: dependabot[bot] <support@github.com>
+    
+    Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+
+commit 07bac27ac7d11dfc423c0700b63f9107d9d1e4ab
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Jun 2 09:47:26 2021 -0500
+
+    remove antiquated assert (#17643)
+--
+--
+Date:   Wed Jun 2 09:47:26 2021 -0500
+
+    remove antiquated assert (#17643)
+
+commit eec996ba41395e28815daa628f6e7d6686f169a9
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Jun 2 09:32:32 2021 -0500
+
+    implement ancestors as rolling bit field (#17482)
+--
+--
+Date:   Wed Jun 2 09:32:32 2021 -0500
+
+    implement ancestors as rolling bit field (#17482)
+
+commit 107af52debb85ff50dcd33329cd503d37bf071ad
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Jun 2 08:35:10 2021 -0500
+
+    minor test code cleanup (#17645)
+--
+--
+Date:   Tue Jun 1 23:22:01 2021 -0600
+
+    Cli: Decode known program custom errors returned from simulation (#17652)
+
+commit 738cc9549fad2e6a8e7138c77a9c77c6238b6ccd
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Jun 1 19:33:12 2021 -0500
+
+    parallel get_snapshot_storages (#17589)
+--
+--
+    * Purge expired BlockHeight data from blockstore
+    
+    * Also call compact_storage and add comment....
+
+commit c8fdf0762c315052798ab17ecbfbb99b867350ea
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Jun 1 15:14:35 2021 -0500
+
+    add Ancestors to get_snapshot_storages to prepare for the future (#17591)
+--
+--
+Date:   Tue Jun 1 15:14:35 2021 -0500
+
+    add Ancestors to get_snapshot_storages to prepare for the future (#17591)
+
+commit ef5169ff2486211fe40089808dfaa500b9c86514
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Jun 1 15:07:46 2021 -0500
+
+    sort storages by slot before scan (#17411)
+--
+--
+    * sort storages by slot before scan
+    
+    * fix return value
+
+commit 72bb271a944f9b5de232464c7ea10033f65ec890
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Jun 1 13:17:49 2021 -0500
+
+    add metric for collecting storages (#17527)
+--
+--
+    Signed-off-by: dependabot[bot] <support@github.com>
+    
+    Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+
+commit 886898eabfbc8dca1519e4a40e500121ba3f0cf0
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon May 31 22:49:17 2021 -0500
+
+    rework test for flexibility (#17592)
+--
+--
+    Signed-off-by: dependabot[bot] <support@github.com>
+    
+    Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+
+commit 654918ab27000b71e8af024f374e5d6e3e00cce0
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri May 28 13:54:53 2021 -0500
+
+    refactor SnapshotStorage helpers to prepare for later changes (#17560)
+--
+--
+Date:   Fri May 28 09:50:25 2021 -0700
+
+    Always bail if program modifies a ro account (#17569)
+
+commit 8924fbf6a03158c894be2725327ed6ca9800ee8e
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri May 28 11:33:07 2021 -0500
+
+    RollingBitField: bug fixes and add tests (#17525)
+--
+--
+Date:   Fri May 28 00:27:59 2021 -0600
+
+    test-validator: add an arg to control faucet genesis balance
+
+commit 1d02dba06f81db99e2735a1438229581ccdaabed
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri May 28 10:30:01 2021 -0500
+
+    remove unnecessary clone (#17559)
+--
+--
+Date:   Fri May 28 10:30:01 2021 -0500
+
+    remove unnecessary clone (#17559)
+
+commit 55c22d3b76972ecf336bac9cc4aa302fb30ce2f3
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri May 28 10:24:40 2021 -0500
+
+    add check_hash to non-index hash calculation (#17558)
+--
+--
+Date:   Thu May 27 16:31:24 2021 +0200
+
+    Only add keys with multiple index entries to the clean set (#17473)
+
+commit 3973bf08f1023a8b18a7235d3a83e37f59bc28b8
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu May 27 08:53:11 2021 -0500
+
+    move local out of call (#17519)
+--
+--
+Date:   Wed May 26 19:27:18 2021 +0200
+
+    Remove copied shrink code (#17385)
+
+commit 6b9d8d41a3fd32a069812bf0ec7d6a392414d874
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed May 26 10:36:12 2021 -0500
+
+    add --limit_load_slot_count_from_snapshot to ledger-tool (#17417)
+--
+--
+    2.4 We do this abort/retry logic only at the first notification to avoid wasting download efforts -- the reasoning is being opportunistic and too greedy may not achieve overall shorter download time.
+    
+    3. The download_snapshot and download_file is modified with the option allowing caller to notified of download progress via a callback. This allows the business logic of retrying to the place it belongs.
+
+commit 98f1b11edd0e4cd2a6b50a45f1636344c393ba4b
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue May 25 11:01:11 2021 -0500
+
+    Ancestors to HashSet: From(Vec) (#17447)
+--
+--
+    * ancestors.large_range_slots becomes HashSet
+    
+    * Ancestors to HashSet: From(Vec)
+
+commit d39a327138a7ca519092b4e219c3a32a1b336c28
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue May 25 11:00:50 2021 -0500
+
+    ancestors.large_range_slots becomes HashSet (#17446)
+--
+--
+Date:   Tue May 25 09:00:24 2021 -0600
+
+    docs: budget program is gone, link to SPL Token multisig
+
+commit 40bb6577fc955d8ffb60e4b2fd35fab4530b5f68
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue May 25 09:24:38 2021 -0500
+
+    initialize purge stats (#17345)
+--
+--
+    Signed-off-by: dependabot[bot] <support@github.com>
+    
+    Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+
+commit 99313a4ba2d671ec228cc394277c9056f691fc90
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon May 24 18:15:57 2021 -0500
+
+    add ledger-tool verify option to verify hash calculation (#17412)
+--
+--
+Date:   Mon May 24 18:15:57 2021 -0500
+
+    add ledger-tool verify option to verify hash calculation (#17412)
+
+commit d4fc9e7ed47778b058e319ab8ef820210184eb34
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon May 24 18:14:52 2021 -0500
+
+    ad metric for collect (#17418)
+--
+--
+Date:   Mon May 24 18:14:52 2021 -0500
+
+    ad metric for collect (#17418)
+
+commit dd22ae047b55ac66a0056205ab811606cd586d96
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon May 24 17:01:02 2021 -0500
+
+    ancestors is set instead of map (#17363)
+--
+--
+Date:   Fri May 21 21:09:22 2021 +0200
+
+    Remove const qualifier from syscall out-parameters (#17382)
+
+commit 3f3324231de795550208dcc281a085b97b671983
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri May 21 13:59:32 2021 -0500
+
+    Hold read lock during startup shrink (#17309)
+--
+--
+    load when they are obtained again from gossip. In particular, this slows
+    down validator start where almost all values obtained from entrypoint
+    are immediately discarded.
+
+commit 44831c18d29f5c43feb0ffdb0abe258be34d4a99
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri May 21 10:07:04 2021 -0500
+
+    reuse work in is_non_loader_key (#16521)
+--
+--
+Date:   Fri May 21 10:07:04 2021 -0500
+
+    reuse work in is_non_loader_key (#16521)
+
+commit 8143ee5502571f3ea0c7f13c5454df70948b6c69
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri May 21 10:02:14 2021 -0500
+
+    add AccountsIndex AccountMapsReadLock type (#17365)
+--
+--
+Date:   Fri May 21 10:02:14 2021 -0500
+
+    add AccountsIndex AccountMapsReadLock type (#17365)
+
+commit 2f55547d37b7dd5389035119c7bf2c900e318f92
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri May 21 09:26:46 2021 -0500
+
+    remove flatten in storage scan (#17354)
+--
+--
+Date:   Thu May 20 14:00:50 2021 -0700
+
+    Add get_sysvar() helper to sdk
+
+commit 45552d271ac70ab4aad07b1ca04eabe5da73a43b
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu May 20 19:50:58 2021 -0500
+
+    take mutex once in process_dead_slots (#17357)
+--
+--
+    * fix: autocomplete error
+    
+    * fix: load one page at a time
+
+commit 0486df02ba23b2dcccae8aaa67fab0b318b18570
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu May 20 14:36:35 2021 -0500
+
+    don't limit to thread pool when cleaning on startup (#17317)
+--
+--
+Date:   Thu May 20 10:33:19 2021 -0500
+
+    restore Serum in CI downstream job (#17346)
+
+commit 33ab9c4e8ded94444e4b7010cc89dee23aa66a77
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu May 20 10:29:13 2021 -0500
+
+    batch insert account_index items in generate_index (#17290)
+--
+--
+Date:   Thu May 20 10:29:13 2021 -0500
+
+    batch insert account_index items in generate_index (#17290)
+
+commit 9b74988fc69c1b886ef8653ac8989a409ade425c
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu May 20 10:25:54 2021 -0500
+
+    calculate_accounts_hash does not throttle threads on startup (#17338)
+--
+--
+Date:   Thu May 20 10:25:54 2021 -0500
+
+    calculate_accounts_hash does not throttle threads on startup (#17338)
+
+commit a9aa533684e09a47532b10e123a52a6aa816c18f
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu May 20 10:11:56 2021 -0500
+
+    replace Ancestors HashMap for performance (#16477)
+--
+--
+    Bump bpf-tools version to 1.9
+    
+    - upgrade rustc to 1.52.1 and clang to 12.0
+
+commit a544010b03d2aa69a953c957b68837b32fa6a5da
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed May 19 19:15:35 2021 -0500
+
+    don't log shrink metrics on first call (#17328)
+--
+--
+    * don't log shrink metrics on first call
+    
+    * simplify logic
+
+commit 32ec8341f9fe1328a1ca4de518bde1c11a379656
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed May 19 16:21:24 2021 -0500
+
+    generate_index inserts ideal initial data (#17247)
+--
+--
+Date:   Wed May 19 19:25:21 2021 +0000
+
+    adds gossip metrics for number of staked nodes (#17330)
+
+commit b5302e76198b951e7d4f96fbf5f17e273f209dcd
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed May 19 12:29:41 2021 -0500
+
+    add calc_stored_meta_us metric (#17318)
+--
+--
+Date:   Wed May 19 19:24:08 2021 +0200
+
+    Fix typo (#17326)
+
+commit c20b27bc8f44f1414712867b37965996f22e71ca
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed May 19 12:15:24 2021 -0500
+
+    shink all in parallel on startup (#17308)
+--
+--
+Date:   Wed May 19 12:15:24 2021 -0500
+
+    shink all in parallel on startup (#17308)
+
+commit ed9cbd50f039afa9fbe9865a7099fefc03a778fd
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed May 19 11:50:34 2021 -0500
+
+    move Ancestors to its own module (#17316)
+--
+--
+    * upgrade to Rust 1.52.1
+    
+    * disabling Serum from downstream projects until it is upgraded to Rust 1.52.1
+
+commit 478897651730297c12eefa25a55d2223c4ad84c9
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed May 19 08:48:46 2021 -0500
+
+    rework slot list update (#17232)
+--
+--
+Date:   Wed May 19 08:48:46 2021 -0500
+
+    rework slot list update (#17232)
+
+commit 7fe24c455c2ac0033dd5f4c7b08f714c61d11774
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed May 19 08:11:41 2021 -0500
+
+    simplify generate_index (#17292)
+--
+--
+    * Move subscriptions to solana-rpc
+    
+    * Single use statements
+
+commit a3c0833a1cb52236340fd04984fea3e08d8aa9ba
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue May 18 18:08:37 2021 -0500
+
+    tests: cleanup test (#17305)
+--
+--
+    * fix: make bn internal for flow
+    
+    * fix: add Buffer import in borsh file
+
+commit 75335b4f58d69616833d6b50a2cd8c5672c502a4
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue May 18 12:14:43 2021 -0500
+
+    datapoint for verify_snapshot_bank (#17306)
+--
+--
+Date:   Tue May 18 13:39:35 2021 +0000
+
+    patches flaky test_new_mark_creation_time (#17288)
+
+commit 2175fc062568d9e871f2ffbebbf6af5abff59e43
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue May 18 08:06:19 2021 -0500
+
+    calculate account infos before lock (#17245)
+--
+--
+    Add Contextual Search (#17299)
+    
+    * this should prevent other language results appearing in the search area
+
+commit 3a56a56d69312a8f97e0b3f150c526f96e844a90
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon May 17 18:58:36 2021 -0500
+
+    StoredMetaWriteVersion (#17293)
+--
+--
+Date:   Tue May 18 07:22:43 2021 +0900
+
+    Minor test cleanup and comments (#17283)
+
+commit d461aba6a4356f13832eda373cb1b3c52a9f5d83
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon May 17 17:21:15 2021 -0500
+
+    don't try to build secondary indexes if we don't need them (#17246)
+--
+--
+    * feat: add coingecko prices to tokens with associated coingeckoId
+    
+    * feat: useCoingecko util
+
+commit 9d6837c9042e413de1d2b3c6f6e96936672f77ee
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon May 17 14:06:25 2021 -0500
+
+    fix comment (#17286)
+--
+--
+Date:   Mon May 17 14:06:25 2021 -0500
+
+    fix comment (#17286)
+
+commit d1db5448b9c3c4f00301163196394e6bb9914a1d
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon May 17 11:58:33 2021 -0500
+
+    hold lock to speed up insert (#17194)
+--
+--
+Date:   Fri May 14 13:55:27 2021 -0700
+
+    Add NEW labels for RPC methods introduced in v1.7
+
+commit 0c07f1ffe42f0d6d5ba1868847c36c93604b46c8
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri May 14 15:58:31 2021 -0500
+
+    add data point for ledger processing (#17210)
+--
+--
+Date:   Fri May 14 15:58:31 2021 -0500
+
+    add data point for ledger processing (#17210)
+
+commit 3745e0babcdbdd38f6bbae412b86e24f03adbef8
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri May 14 15:27:10 2021 -0500
+
+    minor refactoring of AccountsIndex in preparation of bigger things (#17237)
+--
+--
+Date:   Fri May 14 15:27:10 2021 -0500
+
+    minor refactoring of AccountsIndex in preparation of bigger things (#17237)
+
+commit fd88db73398a5e7abe4eb47faef3859163ebc11b
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri May 14 15:20:59 2021 -0500
+
+    ancestors::new -> default (#17195)
+--
+--
+Date:   Fri May 14 18:27:58 2021 +0300
+
+    docs: remove missig link (#17212)
+
+commit c6f7867aa1be93c4171be827bf03cd5ccf58e582
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri May 14 09:50:11 2021 -0500
+
+    log mismatch (#17209)
+--
+--
+    * Check secondary-index key inclusion in rpc
+    
+    * Clone complete AccountSecondaryIndexes into rpc to avoid bank query
+
+commit 3dbc7744ab0c3fd89a42414224ab314f59f70d8f
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu May 13 14:32:19 2021 -0500
+
+    metrics for generating index time (#17192)
+--
+--
+    Signed-off-by: dependabot[bot] <support@github.com>
+    
+    Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+
+commit 7d96f78821a27e0d816a85265fb700eaf3f87b2b
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue May 11 17:06:22 2021 -0500
+
+    include/exclude keys on account secondary index (#17110)
+--
+--
+    * Remove unnecessary slot-existence check before caching block time altogether
+    
+    * Move block-time existence check into Blockstore::cache_block_time, Blockstore no longer needed in blockstore_processor helper
+
+commit f39dda00e09d488279209ef5d473c1e18cf44615
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon May 10 09:22:48 2021 -0500
+
+    type AccountSecondaryIndexes = HashSet (#17108)
+--
+--
+Date:   Mon May 10 09:22:48 2021 -0500
+
+    type AccountSecondaryIndexes = HashSet (#17108)
+
+commit a6a1355b8035697d83ec836a33c7c828f6e86552
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon May 10 08:54:30 2021 -0500
+
+    fix secondary index test (#17111)
+--
+--
+Date:   Thu May 6 21:52:39 2021 -0500
+
+    Add pubkey for stevecz (#17094)
+
+commit 225ec00ec466c747db22aaf9b013ad0630f565c2
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu May 6 15:17:41 2021 -0500
+
+    add comment (#17059)
+--
+--
+    * Print successful repair data, and repair in chunks
+    
+    * Add parameter to limit num slots checked for root repair
+
+commit dc0429f5e6de0bebf9a166889616b4a291356351
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu May 6 15:04:13 2021 -0500
+
+    add metric for assumption (#17061)
+--
+--
+Date:   Wed May 5 18:11:20 2021 -0500
+
+    Add Brooks's pubkey to authorized keys (#17063)
+
+commit ffbe8906ed6f88583862559a58e6a0a47a8f6545
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed May 5 15:17:45 2021 -0500
+
+    get root lock once (#16829)
+--
+--
+Date:   Wed May 5 11:49:05 2021 -0700
+
+    feat: associated token program card (#17043)
+
+commit ab7c96aa8179b9b0bd344634e9d43fe51ab7f830
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed May 5 12:08:45 2021 -0500
+
+    insert accounts in parallel when building initial index (#17040)
+--
+--
+Date:   Wed May 5 11:25:41 2021 +0000
+
+    Don't recognize temp snapshots as possible snapshots to open
+
+commit 5786be13a46afd8450e135321cf70a2d90215fa2
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed May 5 09:07:05 2021 -0500
+
+    flatten_hash_intermediate sets capacity first (#17013)
+--
+--
+Date:   Mon May 3 19:37:18 2021 +0200
+
+    More docs for bank.rs (#17006)
+
+commit 92b8b20ca5796b78a7b61a3f0a4135959af74356
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon May 3 12:25:31 2021 -0500
+
+    AccountSharedData.lamports private (#16985)
+--
+--
+    
+    Both above bugs cause redundant traffic and bandwidth waste in gossip
+    pull-responses.
+
+commit 541aa5ad850323d8752522d02ba962d2ed993195
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon May 3 10:45:54 2021 -0500
+
+    tests: lamports -> lamports() (#16982)
+--
+--
+Date:   Mon May 3 10:45:54 2021 -0500
+
+    tests: lamports -> lamports() (#16982)
+
+commit 744ac1535fe8ef9540d93a73e907f24126107495
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon May 3 10:45:15 2021 -0500
+
+    tests: lamports -> ReadableAccount (#16983)
+--
+--
+    Signed-off-by: dependabot[bot] <support@github.com>
+    
+    Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+
+commit 1fe131a5bb4eca7a7a0fb83dbeaacdf1f640ca60
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Apr 30 16:25:02 2021 -0500
+
+    Readable account trait for stored account meta (#16690)
+--
+--
+    * ReadableAccount for StoredAccountMeta
+    
+    * add test
+
+commit 1a9954f85bd6a68ae1a67417fd04c560b1e08d87
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Apr 30 16:22:17 2021 -0500
+
+    bank deposit checked_add error (#16917)
+--
+--
+    * rename variables
+    
+    * rename error and metric
+
+commit 01308cd890701131d87116385405dc5a8db41bfb
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Apr 30 16:19:20 2021 -0500
+
+    distribute_rent_to_validators checked_add_lamports unwrap (#16847)
+--
+--
+    * don't store account that we failed to transfer to
+    
+    * format
+
+commit 763c04adf3ca378ffa2ae23fe8b8dc742f8681ef
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Apr 30 16:17:05 2021 -0500
+
+    lamports = -> .set_lamports() (#16980)
+--
+--
+Date:   Fri Apr 30 16:17:05 2021 -0500
+
+    lamports = -> .set_lamports() (#16980)
+
+commit 5e74cede4ec8ae60aabf31e660695e150209916b
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Apr 30 16:03:08 2021 -0500
+
+    lamports -> lamports() (#16979)
+--
+--
+Date:   Fri Apr 30 13:21:47 2021 -0700
+
+    fix: change unlisted to unknown for unknown token accounts (#16981)
+
+commit 6f88aeac563947bc4ab795ea04f5bed56da14669
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Apr 30 13:44:15 2021 -0500
+
+    tests: .lamports= -> .set_lamports() (#16977)
+--
+--
+    * fix
+    
+    * another
+
+commit 0af84bb91e0dbd52387df2d6a9aa62308f4a6a1a
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Apr 30 13:20:54 2021 -0500
+
+    lamports= -> .set_lamports() (#16978)
+--
+--
+Date:   Fri Apr 30 13:20:54 2021 -0500
+
+    lamports= -> .set_lamports() (#16978)
+
+commit ac87bc40ca2e0f3f25095ae5414a570869c07e7b
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Apr 30 13:16:58 2021 -0500
+
+    tests: .lamports -> .lamports() (#16976)
+--
+--
+Date:   Fri Apr 30 13:16:58 2021 -0500
+
+    tests: .lamports -> .lamports() (#16976)
+
+commit 3f982fcf656033db99882e10f7ea2f10cc84ecc8
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Apr 30 12:16:44 2021 -0500
+
+    account.rent_epoch private (#16974)
+--
+--
+    * Add test to ensure data shreds with empty data would be inserted
+    
+    * Add error log statements for malformed shreds
+
+commit c4943f3cb092835f6673f99c60a4c9fbffd637f8
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Apr 30 09:56:34 2021 -0500
+
+    checked_sub_lamports (#16932)
+--
+--
+Date:   Thu Apr 29 14:43:28 2021 -0700
+
+    Distinguish max replayed and max observed vote (#16936)
+
+commit 94edd6140c9e151f267e516b6f79e323cc9b8de1
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu Apr 29 16:34:44 2021 -0500
+
+    checked_sub_lamports (#16918)
+--
+--
+Date:   Thu Apr 29 16:34:44 2021 -0500
+
+    checked_sub_lamports (#16918)
+
+commit 63c56b57a9669a147c2e32c0a6990c4dbe5cdd9e
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu Apr 29 15:04:28 2021 -0500
+
+    checked_sub_lamports with unwrap (#16922)
+--
+--
+    Change positioning (#16951)
+    
+    * oops!
+
+commit c9c94a7ef26f7248e72fdc72c2513d4e24ef6446
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu Apr 29 12:38:21 2021 -0500
+
+    checked_sub_lamports (#16923)
+--
+--
+Date:   Thu Apr 29 12:38:21 2021 -0500
+
+    checked_sub_lamports (#16923)
+
+commit ca7b36ad8f2af601c82a5c3b3b20009d2137d154
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu Apr 29 10:44:46 2021 -0500
+
+    lamports -> lamports() (#16920)
+--
+--
+Date:   Thu Apr 29 10:44:46 2021 -0500
+
+    lamports -> lamports() (#16920)
+
+commit 59e19828eafe573cc266484486dbd76ca5e4b449
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu Apr 29 10:43:26 2021 -0500
+
+    set_lamports() (#16914)
+--
+--
+Date:   Thu Apr 29 10:43:26 2021 -0500
+
+    set_lamports() (#16914)
+
+commit 23d67e4ac70d42c0e88956bb71378af89143a9ef
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu Apr 29 09:11:28 2021 -0500
+
+    stretchy roots tracker (#16830)
+--
+--
+Date:   Tue Apr 27 23:46:13 2021 -0600
+
+    SDK: Factor out pubkey on-curve test to a helper
+
+commit a7070a5ca70da941800e44cf6a81a013b8bce159
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Apr 28 16:30:06 2021 -0500
+
+    set_lamports() (#16921)
+--
+--
+Date:   Wed Apr 28 16:30:06 2021 -0500
+
+    set_lamports() (#16921)
+
+commit 8dc15f727c0de5593a66de70e32d5289444e76ef
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Apr 28 15:47:59 2021 -0500
+
+    account.lamports -= (#16913)
+--
+--
+Date:   Wed Apr 28 15:47:59 2021 -0500
+
+    account.lamports -= (#16913)
+
+commit 21c75d9d293e83d8284326a257058b94e1389892
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Apr 28 15:39:54 2021 -0500
+
+    lamports = -> set_lamports (#16919)
+--
+--
+Date:   Wed Apr 28 15:39:54 2021 -0500
+
+    lamports = -> set_lamports (#16919)
+
+commit f533d3be77ff7a907036188f8da8a2905085bb82
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Apr 28 15:29:22 2021 -0500
+
+    Write account path impl ReadableAccount (#16779)
+--
+--
+Date:   Wed Apr 28 14:13:58 2021 -0600
+
+    Fixup rpc-endpoints (#16924)
+
+commit 82e11588a58471783487c803e63b7f8bf80fef36
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Apr 28 14:55:55 2021 -0500
+
+    lamports -> lamports() (#16915)
+--
+--
+Date:   Wed Apr 28 11:46:16 2021 -0700
+
+    Retry latest vote if expired (#16735)
+
+commit 9070191b8bf290c70613d1dfaca3ef5f8b009f88
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Apr 28 13:24:01 2021 -0500
+
+    stats on clean for removing roots (#16849)
+--
+--
+    * rename
+    
+    * accumulate and swap metrics
+
+commit 9218b51de705fb75fc0146670a5911e32d68119c
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Apr 28 12:01:31 2021 -0500
+
+    accountshareddata.executable is private (#16882)
+--
+--
+Date:   Wed Apr 28 21:01:54 2021 +0530
+
+    Update rpc-endpoints.md (#16910)
+
+commit f35453f83814e5ac52ce0417fac1a02a018fd3ae
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Apr 28 10:25:58 2021 -0500
+
+    AccountSharedData.set_executable() (#16876)
+--
+--
+Date:   Wed Apr 28 08:14:25 2021 -0600
+
+    Add banner to page (#16908)
+
+commit a7a671b3aaab3a5e907f0b4e146a7da545a5b3ba
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Apr 28 09:07:43 2021 -0500
+
+    AccountSharedData.set_executable() (#16881)
+--
+--
+Date:   Wed Apr 28 09:07:43 2021 -0500
+
+    AccountSharedData.set_executable() (#16881)
+
+commit 2021255f914604e9af9301d591f9a3f47d61d08c
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Apr 28 08:53:54 2021 -0500
+
+    executable() (#16880)
+--
+--
+Date:   Wed Apr 28 08:53:54 2021 -0500
+
+    executable() (#16880)
+
+commit 30e83a4a3ce39c6018abd365b40577cd476cbbab
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Apr 28 08:53:21 2021 -0500
+
+    private AccountSharedData.rent_epoch (#16878)
+--
+--
+Date:   Wed Apr 28 08:53:21 2021 -0500
+
+    private AccountSharedData.rent_epoch (#16878)
+
+commit da3342759b33266702fb11ebb1a9d6a72e1c25d2
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Apr 28 08:52:20 2021 -0500
+
+    private AccountSharedData.rent_epoch (#16877)
+--
+--
+Date:   Wed Apr 28 08:52:20 2021 -0500
+
+    private AccountSharedData.rent_epoch (#16877)
+
+commit 6381ee38eb9dac7f5fb243f3725262d7f74e0c23
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Apr 28 08:50:38 2021 -0500
+
+    reclaims unref accounts from index (#16838)
+--
+--
+Date:   Wed Apr 28 08:50:38 2021 -0500
+
+    reclaims unref accounts from index (#16838)
+
+commit 1864bc2080287e61fbd7e8c20358d1ac11b0f7f9
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Apr 28 08:47:26 2021 -0500
+
+    write Option<AccountSharedData> (#16874)
+--
+--
+Date:   Tue Apr 27 13:36:42 2021 -0700
+
+    Retain alloc'd and updated data in cpi (#16850)
+
+commit 1bd623cd15f1a34f50919923e6344df08b868fc7
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Apr 27 13:51:13 2021 -0500
+
+    private AccountSharedData.rent_epoch (#16844)
+--
+--
+Date:   Tue Apr 27 13:51:13 2021 -0500
+
+    private AccountSharedData.rent_epoch (#16844)
+
+commit 2f5102587c41cb8426816aa6bec2bf621315f4f8
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Apr 27 12:57:47 2021 -0500
+
+    owner() lifetime issue (#16875)
+--
+--
+Date:   Tue Apr 27 12:57:47 2021 -0500
+
+    owner() lifetime issue (#16875)
+
+commit 8f56c116d71e5349b8a63e5d478c37033cfbdc2c
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Apr 27 10:23:07 2021 -0500
+
+    tests: lamports += to checked_add (#16842)
+--
+--
+Date:   Tue Apr 27 10:23:07 2021 -0500
+
+    tests: lamports += to checked_add (#16842)
+
+commit d533f7730176fe2ab26b25da7c4f611763d6ef0a
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Apr 27 09:58:41 2021 -0500
+
+    bank.withdraw uses checked_sub_lamports (#16848)
+--
+--
+    * retain previous codepath for error
+    
+    * map_err from clippy
+
+commit 69bfbf9e9880cd1298f58771e8cd05fd302760bf
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Apr 27 09:56:50 2021 -0500
+
+    AccountSharedData.set_executable (#16836)
+--
+--
+Date:   Tue Apr 27 09:56:50 2021 -0500
+
+    AccountSharedData.set_executable (#16836)
+
+commit 3887169db0c53c0deaeac5ae00b5a79de87473ea
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Apr 27 09:56:18 2021 -0500
+
+    lamports += to checked_add (#16841)
+--
+--
+Date:   Tue Apr 27 09:56:18 2021 -0500
+
+    lamports += to checked_add (#16841)
+
+commit 47ca7063f2b2ead93ce89e770703057e65fe6940
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Apr 27 09:15:44 2021 -0500
+
+    rootstracker.remove returns previous state (#16831)
+--
+--
+Date:   Tue Apr 27 09:15:44 2021 -0500
+
+    rootstracker.remove returns previous state (#16831)
+
+commit 3fdbaefaa6fcedb426c0f27e5abdfd49ec40cc0d
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Apr 27 09:12:48 2021 -0500
+
+    tests: lamports -= to checked_sub (#16843)
+--
+--
+Date:   Tue Apr 27 09:12:48 2021 -0500
+
+    tests: lamports -= to checked_sub (#16843)
+
+commit 998cba74b5903334fd350850aaae97f69601b256
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Apr 27 09:12:17 2021 -0500
+
+    AccountSharedData.executable() (#16835)
+--
+--
+Date:   Tue Apr 27 09:12:17 2021 -0500
+
+    AccountSharedData.executable() (#16835)
+
+commit 4e7e675c0756a5479f4cdff2510f55240ccf2f6c
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Apr 27 09:11:35 2021 -0500
+
+    lamports += -> checked_add_lamports (#16791)
+--
+--
+Date:   Tue Apr 27 09:11:35 2021 -0500
+
+    lamports += -> checked_add_lamports (#16791)
+
+commit 81402ee7f53f0405529f112a49a57ca74ca52579
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Apr 27 09:10:06 2021 -0500
+
+    pass &Pubkey through account storage, slot clean code to reduce copies (#16778)
+--
+--
+    * Update bpf loader info on native-programs docs
+    
+    * Link to program deployment docs
+
+commit 603872685df07cd6cfaaa9f7848cab9bf8a00690
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon Apr 26 14:59:17 2021 -0500
+
+    private AccountSharedData.owner (#16760)
+--
+--
+Date:   Mon Apr 26 17:12:02 2021 +0000
+
+    removes old runtime feature gates in gossip and turbine (#16633)
+
+commit f2ab0384e43538b3995c763ad38b58500f41e7e1
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon Apr 26 12:06:40 2021 -0500
+
+     owner -> owner() (#16783)
+--
+--
+Date:   Mon Apr 26 12:06:40 2021 -0500
+
+     owner -> owner() (#16783)
+
+commit aeff911c936d5e6c76ab249521eda2781eca626c
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon Apr 26 10:40:11 2021 -0500
+
+    owner -> owner() (#16784)
+--
+--
+    * feat: introduce support for custom http headers
+    
+    * feat: add fetch middleware
+
+commit 6d160768d74d5b01c054b6fdeb1f6351cf354df6
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon Apr 26 08:50:46 2021 -0500
+
+    delete vest program (#16795)
+--
+--
+Date:   Fri Apr 23 14:53:13 2021 -0700
+
+    Ignore racy test_load_account_and_purge_race_without_retry
+
+commit ca14c189984bb25d992f04f224d1ae764ce2a33d
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Apr 23 17:49:47 2021 -0500
+
+    owner -> owner() (#16782)
+--
+--
+Date:   Fri Apr 23 17:49:47 2021 -0500
+
+    owner -> owner() (#16782)
+
+commit 1a4a7059af4780936e647d644f98541142f3e453
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Apr 23 15:59:13 2021 -0500
+
+    owner -> owner() (#16785)
+--
+--
+Date:   Fri Apr 23 11:26:26 2021 -0700
+
+    get_packed_len() now correctly handles u32/i32 types
+
+commit 48c07d32f0225b0246f9120a460127e4ad6d66b4
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Apr 23 15:20:48 2021 -0500
+
+    WritableAccount.add/subtract_lamports (#16750)
+--
+--
+Date:   Fri Apr 23 02:38:54 2021 -0600
+
+    runtime: checked math for Bank::withdraw
+
+commit dcf2d84b24ccf3dfefcfca6de303185f8937232e
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Apr 23 13:36:49 2021 -0500
+
+    refactor complicated 'len' (#16777)
+--
+--
+Date:   Fri Apr 23 13:36:49 2021 -0500
+
+    refactor complicated 'len' (#16777)
+
+commit 04e6aebf3516e24a7c1a43c08245fb27b889c421
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Apr 23 13:26:33 2021 -0500
+
+    .owner = X -> .set_owner(X) (#16759)
+--
+--
+Date:   Fri Apr 23 13:26:33 2021 -0500
+
+    .owner = X -> .set_owner(X) (#16759)
+
+commit fb0b76c1f3d31ac0b5fe0d62bc668edd1bf56c22
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Apr 23 12:34:22 2021 -0500
+
+    account.owner = X -> account.set_owner(X) (#16754)
+--
+--
+Date:   Fri Apr 23 11:03:21 2021 -0600
+
+    Restore text wrapping (#16776)
+
+commit 7602911f9a39905ecf54fef6a0416bb7d0b0962c
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Apr 23 12:00:17 2021 -0500
+
+    read_only_cache remove updates cache size (#16742)
+--
+--
+Date:   Fri Apr 23 12:00:17 2021 -0500
+
+    read_only_cache remove updates cache size (#16742)
+
+commit 1cc9a1c0ebd4715e680244040aae2c6ab8986465
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Apr 23 11:09:39 2021 -0500
+
+    log roots range metric (#16636)
+--
+--
+    Signed-off-by: dependabot[bot] <support@github.com>
+    
+    Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+
+commit 96d21335e1b346d1d14e5f1e769eb2f2c88c6648
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Apr 23 09:35:55 2021 -0500
+
+    .owner -> .owner() (#16758)
+--
+--
+Date:   Fri Apr 23 09:35:55 2021 -0500
+
+    .owner -> .owner() (#16758)
+
+commit 5591cd6ef3183fd58872e71d876103a217d3aeb9
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Apr 23 09:35:09 2021 -0500
+
+    .owner -> .owner() (#16757)
+--
+--
+    * .owner -> .get_owner()
+    
+    * use
+
+commit 6c5b7ecf909cdc4a9805c0a9fdf6eea803f27adf
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Apr 23 09:34:28 2021 -0500
+
+    account.owner = X -> account.set_owner(X) (#16756)
+--
+--
+Date:   Fri Apr 23 09:34:28 2021 -0500
+
+    account.owner = X -> account.set_owner(X) (#16756)
+
+commit 87e2e07d344990a161789946148e3f0837ae620a
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Apr 23 09:34:08 2021 -0500
+
+    AccountSharedData.copy_into_owner_from_slice (#16755)
+--
+--
+Date:   Fri Apr 23 09:34:08 2021 -0500
+
+    AccountSharedData.copy_into_owner_from_slice (#16755)
+
+commit 91be2903da45d98819fac439b1c95d66d5159932
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Apr 23 09:33:14 2021 -0500
+
+    Reduce account index lookups during clean (#16689)
+--
+--
+    * Add TPU client for sending txs to the current leader tpu port
+    
+    * Update tpu_client.rs
+
+commit fc12841d951919d7620db1fd5d67feb94022f3b3
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu Apr 22 15:04:55 2021 -0500
+
+    Readonlyaccounts (#16743)
+--
+--
+    Signed-off-by: dependabot[bot] <support@github.com>
+    
+    Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+
+commit 739f0698abb347421d8198d47c7c771c57923972
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu Apr 22 13:59:58 2021 -0500
+
+    clean read_only_cache in the bg (#16722)
+--
+--
+    * reuse existing lru vec
+    
+    * simplify reserve logic
+
+commit 333998d0086d593e0e45d271ff714aafc0ac8b3e
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu Apr 22 13:56:47 2021 -0500
+
+    .lamports = <number> -> .set_lamports(<number>) (#16746)
+--
+--
+Date:   Thu Apr 22 13:56:47 2021 -0500
+
+    .lamports = <number> -> .set_lamports(<number>) (#16746)
+
+commit 8a6b80095e05b8173a915e6eb9b4f39232eaf810
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu Apr 22 13:53:06 2021 -0500
+
+    Set lamports (#16747)
+--
+--
+    * lamports = -> set_lamports()
+    
+    * .lamports = X -> .set_lamports(X)
+
+commit 8d9d6b62d95419c935481f6c2c3d52729eac50f5
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu Apr 22 12:54:08 2021 -0500
+
+    use cheaper account get (#16682)
+--
+--
+Date:   Wed Apr 21 15:52:32 2021 -0700
+
+    Clean up "APR" language around inflation rewards
+
+commit 123e0bdba7676e8de70f684d9a7d4953fbd04e2b
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Apr 21 20:38:48 2021 -0500
+
+    don't iterate slot_list if zero-lamport (#16678)
+--
+--
+Date:   Wed Apr 21 11:59:49 2021 -0700
+
+    Ignore flaky test_pull_request_time_pruning
+
+commit 69cbad086927573e77cf2530f21dbed743427fe5
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Apr 21 12:20:37 2021 -0500
+
+    some ReadableAccount changes (#16688)
+--
+--
+    * some ReadableAccount changes
+    
+    * deref
+
+commit 189d2121e6bf6252e51daa6862b7acacf0d5a1c7
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Apr 21 11:17:38 2021 -0500
+
+    simplify do_shrink_slot_stores, delay/reduce account clone (#16691)
+--
+--
+Date:   Tue Apr 20 20:40:52 2021 -0600
+
+    Add port and gossip options to solana-test-validator (#16696)
+
+commit 9852572eb9fb4ba38a8561fa45cb7969b09bd9dc
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Apr 20 21:18:15 2021 -0500
+
+    increase rolling slot width to 4M (#16583)
+--
+--
+Date:   Tue Apr 20 00:31:38 2021 -0700
+
+    getVoteAccounts: Limit the length of the `epoch_credits` array
+
+commit 03f7b251b88a9e2d734d11a25e42f3735ecf909e
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Apr 20 16:41:16 2021 -0500
+
+    ReadableAccount.data returns slice (#16686)
+--
+--
+    * Rework outstanding requests to use lru cache and randomize nonces
+    
+    Co-authored-by: Carl <carl@solana.com>
+
+commit 36e11998c743590035d1860479c12a3a6259698b
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Apr 20 09:58:01 2021 -0500
+
+    read only accounts cache uses accurate size representation (#16610)
+--
+--
+Date:   Mon Apr 19 08:18:18 2021 -0700
+
+    `solana validators` now shows current epoch credits instead of lifetime credits
+
+commit 4aa753ff015bc2674aa6ba00565a1bf2682a5c6c
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon Apr 19 12:16:58 2021 -0500
+
+    rename threads: 15 char limit (#16625)
+--
+--
+    Refactoring: Move KeyedAccounts to InvokeContext (#15410)
+    
+    Collects all parametric occurrences and the construction of keyed_accounts and puts them into InvokeContext.
+
+commit 015bc034a5fe556471d50f2b11d074715a4b56f4
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon Apr 19 08:55:01 2021 -0500
+
+    improve failing assert (#16581)
+--
+--
+    * feat: add identicon to smaller icons and change dependency to current package
+    
+    * fix: add proper library
+
+commit 105a6bfb469e2d91486173e7e3ccecd8a678f407
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon Apr 12 11:11:33 2021 -0600
+
+    Replace RootsTracker HashSet (#16310)
+--
+--
+Date:   Fri Apr 9 11:44:19 2021 +0200
+
+    Augment BPF binary dumps to resolve call instruction targets
+
+commit 7ba3e710d396bc5e6cd5df58a255c46be78112bd
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon Apr 12 09:52:24 2021 -0600
+
+    latest_slot uses > current_max (#16374)
+--
+--
+Date:   Mon Apr 12 09:52:24 2021 -0600
+
+    latest_slot uses > current_max (#16374)
+
+commit 6930a77a0fa401beb45667b031447bf62ae1eeed
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon Apr 12 09:51:57 2021 -0600
+
+    prepare replace Ancestors HashMap for performance (#16476)
+--
+--
+Date:   Mon Apr 5 08:55:57 2021 -0700
+
+    Adjust tokio version to just "1"
+
+commit 95dc7b5449457d1d5e9d059a6019367052156ea8
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon Apr 5 11:35:14 2021 -0500
+
+    reduce lock contention on latest_root (#16306)
+--
+--
+Date:   Mon Apr 5 11:35:14 2021 -0500
+
+    reduce lock contention on latest_root (#16306)
+
+commit 7a997759fa374a0d78fd3f4f6e8a20454990ee09
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon Apr 5 11:26:53 2021 -0500
+
+    reduce locking on get_rooted_entries (#16304)
+--
+--
+Date:   Thu Apr 1 16:54:45 2021 +0000
+
+    Merge pull request from GHSA-qgrq-w56v-hr62
+
+commit 3996b699dc485e3110ad9aa64667b88b2f3cb658
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu Apr 1 07:16:34 2021 -0500
+
+    read only account cache for executable accounts - improve replay (#16150)
+--
+--
+Date:   Wed Mar 31 16:52:58 2021 -0700
+
+    Use more performant copy (#16282)
+
+commit 416312b30bbffa3b97ac2248134cefb8b8848095
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Mar 31 18:02:59 2021 -0500
+
+    update timings only on outer call (#16275)
+--
+--
+    Update overview.md
+    
+    fix link which was broken/wrong
+
+commit f374b35944df8e4076ec00200ba8ca633bb630e7
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Mar 31 15:39:34 2021 -0500
+
+    Hash stored accounts in bg (#16157)
+--
+--
+    Signed-off-by: dependabot[bot] <support@github.com>
+    
+    Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+
+commit a5dcee254dd95970e69c5cea0fed4916c111ca25
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Mar 31 09:11:39 2021 -0500
+
+    get rid of unnecessary data copy (#16214)
+--
+--
+Date:   Mon Mar 29 22:44:51 2021 -0700
+
+    Add channel version check
+
+commit 414c7070cbadc8f09bef02ef4c96655ba985d350
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Mar 30 10:34:21 2021 -0500
+
+    poll checking for new record in poh service after every batch of hashes instead of busy waiting (#16167)
+--
+--
+    * poll waiting in poh service after every batch of hashes
+    
+    * clippy
+
+commit f4f2e781ff09ebdab9c6c271a8a13bbe74b95b4e
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Mar 30 10:33:46 2021 -0500
+
+    get rid of data copy (#16210)
+--
+--
+    Signed-off-by: dependabot[bot] <support@github.com>
+    
+    Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+
+commit 5eff23db0c01e6c976bc732510771865747bd17b
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Mar 30 00:51:35 2021 -0500
+
+    TransactionRecorder uses unique channel so we can use Recv instead of RecvTimeout (#16195)
+--
+--
+Date:   Fri Mar 26 20:21:41 2021 +0100
+
+    Bump bpf-tools to version v1.4 (#16152)
+
+commit 4f4cffbd03c4aeee32b35f52da35872232f6f357
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Mar 26 13:54:16 2021 -0500
+
+    Throttle PoH ticks by cumulative slot time (#16139)
+--
+--
+    Signed-off-by: dependabot[bot] <support@github.com>
+    
+    Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+
+commit 06ac0fe9a38461182e3ab678d604642bd031c7e7
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu Mar 25 21:31:07 2021 -0500
+
+    increase timeout in TransactionRecorder.record (#16133)
+--
+--
+    * feat: introduce circulating supply, active stake, and price on cluster stats page
+    
+    * feat: add an error state for coingecko
+
+commit 66c42f62d8acf5045609558372d2a015567aa133
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu Mar 25 11:04:20 2021 -0500
+
+    make AccountSharedData.data private to abstract storage (#16091)
+--
+--
+    
+    Tests are timing out because the bank hit the MaxTickHeight and
+    will not process the transactions.
+
+commit db3eecf1e95742d36a561f1658690b8f3c389d69
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Mar 24 14:48:38 2021 -0500
+
+    set target hash/sec to half of capability for auto (#16096)
+--
+--
+Date:   Wed Mar 24 14:48:38 2021 -0500
+
+    set target hash/sec to half of capability for auto (#16096)
+
+commit f68860a643288a33094dfc632a3164f5630f0a2d
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Mar 24 14:48:32 2021 -0500
+
+    poh record metrics (#16092)
+--
+--
+Date:   Tue Mar 23 15:22:47 2021 -0700
+
+    use certbot from apt not snap (#16081)
+
+commit 2d24d1304668f34ce555762fe11cd8c7ecb7a30a
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Mar 23 15:19:31 2021 -0500
+
+    AccountsSharedData: data copy on write (#15800)
+--
+--
+    * remove intos
+    
+    * remove left over file
+
+commit 6f5d8d18e9adec87479a89dfdca2007a1e6583e5
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Mar 23 14:52:59 2021 -0500
+
+    remove new alloc on deserialization (#15636)
+--
+--
+    This commit broadcasts data shreds immediately, but also buffers them
+    until it has a batch of 32 data shreds, at which point 32 coding shreds
+    are generated and broadcasted.
+
+commit 57ba86c8215b256b2e5243f1b602718b0e1ea2d9
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Mar 23 09:10:04 2021 -0500
+
+    eliminate lock on record (#15929)
+--
+--
+Date:   Mon Mar 22 16:18:22 2021 -0700
+
+    Handle blockstore insert dup checks (#16051)
+
+commit fde43a906df70ff5613fe47174acb50d72536e59
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon Mar 22 17:48:09 2021 -0500
+
+    revert test to use Account for serialization (#16063)
+--
+--
+Date:   Mon Mar 22 17:48:09 2021 -0500
+
+    revert test to use Account for serialization (#16063)
+
+commit 2fc609a294b89d6c7436146dfbf588cce3de71a9
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon Mar 22 15:35:06 2021 -0500
+
+    add metric for ticks from poh_recorder.record (#16047)
+--
+--
+Date:   Fri Mar 19 14:54:56 2021 -0600
+
+    Make getStakeActivation response consistent for undelegated accounts (#16038)
+
+commit 64429104b140a178633ee15e6cf16044e38b8a84
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Mar 19 15:13:20 2021 -0500
+
+    account data.fill replacement (#16037)
+--
+--
+    fix: logo rendering (#16005)
+    
+    fix: logo rendering
+
+commit ddc758439ea9651331b7d60d9c445b62cd0ed0d6
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Mar 19 09:48:55 2021 -0500
+
+    metrics for poh_recorder.record (#15998)
+--
+--
+    * Update docs
+    
+    * Apply review suggestions
+
+commit 9760fded2dc25bcdb92d053cd19677614303cbb2
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu Mar 18 12:51:49 2021 -0500
+
+    remove old code (#15988)
+--
+--
+Date:   Thu Mar 18 12:51:49 2021 -0500
+
+    remove old code (#15988)
+
+commit 4beb39f7a192b85e88d7080699f59364f1cd6235
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu Mar 18 10:32:07 2021 -0500
+
+    multi-pass bin scanning (#15377)
+--
+--
+Date:   Mon Mar 15 20:31:29 2021 -0700
+
+    Build full SPL in CI
+
+commit d30c9ef3510e3a95063afab4b1dad325b4008c4c
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Mar 17 15:09:26 2021 -0500
+
+    refactor test truncate data (#15851)
+--
+--
+    * feat: add asset contract
+    
+    * chore: format
+
+commit 40997d0aefae9a2a81cafe72036bee58dfa9e7e4
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Mar 17 10:38:26 2021 -0500
+
+    add metrics for tick producer and poh_recorder (#15931)
+--
+--
+Date:   Wed Mar 17 10:38:26 2021 -0500
+
+    add metrics for tick producer and poh_recorder (#15931)
+
+commit 5460fb10a262f9ff9f4dc563a667e3a8b76fe0f4
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Mar 17 10:37:20 2021 -0500
+
+    drop poh lock after record (#15930)
+--
+--
+Date:   Mon Mar 15 10:16:45 2021 +0800
+
+    feat: require programId and keys for TransactionInstruction
+
+commit 806bfdd67bcb0ac1257fc2b2914b09f13806b456
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Mar 16 16:56:26 2021 -0500
+
+    set_data_from_slice (#15854)
+--
+--
+Date:   Mon Mar 15 16:26:24 2021 -0700
+
+    Export tokio for program-test clients
+
+commit efee8b62d75390e210f8f02c9a0255fb81d7bb55
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon Mar 15 21:57:23 2021 -0500
+
+    a few missed set_data calls (#15846)
+--
+--
+    * a few missed set_data calls
+    
+    * another set data call
+
+commit e50f284658b49d561261f2a7063b5bfa3f2dcb4a
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon Mar 15 21:56:48 2021 -0500
+
+    use Account for test since it borrows mut ref to data (#15852)
+--
+--
+Date:   Mon Mar 15 21:56:48 2021 -0500
+
+    use Account for test since it borrows mut ref to data (#15852)
+
+commit e35d73890697eef32a23f1dd6e8c5cb15c94b083
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon Mar 15 19:27:53 2021 -0500
+
+    rework BankClient.get_account_data (#15853)
+--
+--
+Date:   Mon Mar 15 19:27:53 2021 -0500
+
+    rework BankClient.get_account_data (#15853)
+
+commit c09ea2c314b83a42eff304f0d2f674f1c5577ed4
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon Mar 15 19:27:17 2021 -0500
+
+    More AccountSharedData construction (#15844)
+--
+--
+Date:   Thu Mar 11 18:34:44 2021 -0700
+
+    sec: Create private repo as part of new advisory step
+
+commit 952c3bcbb79c4681dc939534235477931abd2877
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu Mar 11 18:09:04 2021 -0600
+
+    AccountSharedData construction (#15790)
+--
+--
+Date:   Thu Mar 11 18:09:04 2021 -0600
+
+    AccountSharedData construction (#15790)
+
+commit 3419a5446e7a62935e99fedf6fdda0bc84b8f8ac
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu Mar 11 16:40:45 2021 -0600
+
+    AccountSharedData.set_data (#15781)
+--
+--
+Date:   Wed Mar 10 11:26:37 2021 -0800
+
+    AppendVec cleanup: remove dead code, rename non-idiomatic "new" function
+
+commit 1135ffd595cce2f700db5d0c7cbc96f1e5a7224e
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Mar 10 15:28:03 2021 -0600
+
+    mut data refs as slice (#15782)
+--
+--
+Date:   Tue Mar 9 17:23:41 2021 -0700
+
+    Improve load_largest_accounts and add Bank test (#15775)
+
+commit 52e54e11002a7cb4f5df44649268084b55383e22
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Mar 9 16:31:33 2021 -0600
+
+    account.data -> data() (#15778)
+--
+--
+Date:   Tue Mar 9 16:31:33 2021 -0600
+
+    account.data -> data() (#15778)
+
+commit 8a3135d17bbc5ca901c0b401fdfbb453eb07a7d3
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Mar 9 15:06:07 2021 -0600
+
+    Account->AccountSharedData (#15691)
+--
+--
+    - [Commits](https://github.com/env-logger-rs/env_logger/compare/v0.8.2...v0.8.3)
+    
+    Signed-off-by: dependabot[bot] <support@github.com>
+
+commit 13b9bb6790c103eff5b9d629808543a2d54c0706
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Mar 5 11:02:35 2021 -0600
+
+    refactor function to store into account after data is finished (#15710)
+--
+--
+Date:   Fri Mar 5 11:02:35 2021 -0600
+
+    refactor function to store into account after data is finished (#15710)
+
+commit 9448540ea6509f0fc7000b7319fc6f61eb8c674f
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Mar 5 11:01:52 2021 -0600
+
+    log timing after ledger process (#15716)
+--
+--
+Date:   Thu Mar 4 11:42:15 2021 -0800
+
+    cli: add program show for non-upgradeable programs (#15707)
+
+commit 34bebb7d09b32d1f69f57408981bbd90dc86be57
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu Mar 4 11:38:12 2021 -0600
+
+    report execution details in replay time (#15693)
+--
+--
+Date:   Wed Mar 3 15:09:50 2021 -0700
+
+    SoM: Plumb Config through `classify_producers()`
+
+commit 22d2bb9a9c08198901a39de7c8b78107355809c3
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Mar 3 18:12:18 2021 -0600
+
+    invert default behavior of index hashing (#15689)
+--
+--
+Date:   Wed Mar 3 18:12:18 2021 -0600
+
+    invert default behavior of index hashing (#15689)
+
+commit be35c1c1b7ce8e0b93d0b2d60a7b6a4eb77cf461
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Mar 3 17:07:45 2021 -0600
+
+    add execute detail timings (#15638)
+--
+--
+Date:   Wed Mar 3 01:28:15 2021 +0000
+
+    adds more metrics for tx counts and batch sizes (#15642)
+
+commit a2c47db9209e0f0a4e4404019fbbbc152b04f377
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Mar 2 13:55:34 2021 -0600
+
+    extract expected cluster type (#15615)
+--
+--
+Date:   Tue Mar 2 08:58:14 2021 -0800
+
+    Fix clippy warnings (#15632)
+
+commit da47ab7e5099bd95187018be1dc3459a48777175
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Mar 2 10:46:00 2021 -0600
+
+    fix indentation format problem (#15618)
+--
+--
+    Signed-off-by: dependabot[bot] <support@github.com>
+    
+    Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+
+commit e3006e3b46bdcf7a642257e75368047fde4e45d3
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu Feb 18 09:37:24 2021 -0600
+
+    correctly reserve space for pre_accounts vector (#15378)
+--
+--
+    * Speed up deploys
+    
+    * fix test
+
+commit 7fee0bc69cb3af4870e3fdd29ce5d762ab1bd7c8
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Feb 16 18:29:50 2021 -0600
+
+    move hashing functionality to accounts_hash (#15353)
+--
+--
+Date:   Tue Feb 16 18:29:50 2021 -0600
+
+    move hashing functionality to accounts_hash (#15353)
+
+commit 8367740ff91403bdf7236a1a08b42c40b0548169
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Feb 16 17:03:35 2021 -0600
+
+    compute merkle root on chunks of fanout^3 (#15344)
+--
+--
+    * compute merkle root on chunks of fanout^3
+    
+    * improve test_accountsdb_compute_merkle_root_large
+
+commit ba02452d7556306fd46e6d37f1d9eb36b93ac7ef
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Feb 16 15:13:48 2021 -0600
+
+    add validator flag no-accounts-db-index-hashing (#15350)
+--
+--
+Date:   Tue Feb 16 21:06:18 2021 +0000
+
+    checks that prune-messages have the same inner/outer pubkey (#15352)
+
+commit d83aeebcca399871bb8e9348b0ebf05bfe024e44
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Feb 16 14:24:45 2021 -0600
+
+    change 2d cumulative calculation (#15346)
+--
+--
+Date:   Tue Feb 16 14:24:45 2021 -0600
+
+    change 2d cumulative calculation (#15346)
+
+commit 708b8380b7faa335380fad2dc6e126633b1debc1
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Feb 16 12:12:59 2021 -0600
+
+    assert 2 items in stores don't have same slot and version with different values (#15250)
+--
+--
+Date:   Tue Feb 16 18:30:02 2021 +0800
+
+    explorer: Display upgradeable program details (#15348)
+
+commit 53959b4bbc0bbe8845646d41ca74c687dbc8141d
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon Feb 15 21:27:39 2021 -0600
+
+     divide account scan into bins for more efficient downstream processing (#15303)
+--
+--
+Date:   Mon Feb 15 21:27:39 2021 -0600
+
+     divide account scan into bins for more efficient downstream processing (#15303)
+
+commit 78a176fc00f227ee24e3ef5c79bc742a8a294039
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon Feb 15 20:57:05 2021 -0600
+
+    rename CumulativeOffset in preparation of 2d support (#15338)
+--
+--
+Date:   Fri Feb 12 17:24:43 2021 -0800
+
+    Stake program update (#15307)
+
+commit 866ce236b147b397b135bead72ee6974287d41f3
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Feb 12 18:35:11 2021 -0600
+
+    add another hash check (#15278)
+--
+--
+    * add another hash check
+    
+    * update comment
+
+commit b8448f4189bba0722d0a3769fd5a3c856c062652
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Feb 12 17:30:14 2021 -0600
+
+    merkle root code no longer adds lamports (#15298)
+--
+--
+Date:   Fri Feb 12 12:36:27 2021 -0800
+
+    Upgrade to SPL Token 3.1.0 program binary
+
+commit 8944efddf7f80e1bf7cb52f9f00d07a9a8378729
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Feb 12 11:35:54 2021 -0600
+
+    combine flatten and hash (#15269)
+--
+--
+Date:   Fri Feb 12 10:16:55 2021 +0800
+
+    fix: move flow imports inside module declaration
+
+commit eced3776b044f8be3a32dd6743aaa3187b305a25
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu Feb 11 20:06:04 2021 -0600
+
+    add metrics to hash calculation and consolidate (#15165)
+--
+--
+    * create HashStats struct to consolidate hash timing
+    
+    * formatting
+
+commit eb54e544c28516f275a6255afe7a4e9d02e4bc9a
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu Feb 11 20:05:41 2021 -0600
+
+    add div_ceil (#15267)
+--
+--
+Date:   Thu Feb 11 20:05:41 2021 -0600
+
+    add div_ceil (#15267)
+
+commit 59e55f0371ecaaa5bc2ec26b0a386e4f14613516
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu Feb 11 20:05:22 2021 -0600
+
+    remove hash accumulation with lamports (#15275)
+--
+--
+Date:   Thu Feb 11 16:55:17 2021 -0800
+
+    Add per-byte logging cost (#15279)
+
+commit 6425a748f7be6ea693bf26706d55e063d0ef822c
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu Feb 11 18:55:14 2021 -0600
+
+--
+Date:   Thu Feb 11 18:55:14 2021 -0600
+
+    add jwash authorized key (#15280)
+
+commit 45c92b787ea5ca79f8c1b62fd9e9c5343c2e6c19
+Author: Dan Albert <dan@solana.com>
+--
+--
+Date:   Wed Feb 10 16:48:19 2021 -0800
+
+    Match BPF instruction reporting to dump file (#15254)
+
+commit e59a24d9f9925c4fe7ca70cdbc732e4a967475a1
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Feb 10 14:38:00 2021 -0600
+
+    pass expected capitalization to hash calculation to improve assert msg (#15191)
+--
+--
+Date:   Tue Feb 9 11:02:04 2021 -0800
+
+    solana-test-validator now uses the BPF JIT by default, `--no-bpf-jit` to disable
+
+commit 8424fe2c12875612e5bd22a1c238b07b753aac7d
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Feb 9 10:37:50 2021 -0600
+
+    use index version of calculating hash (#15189)
+--
+--
+Date:   Sat Feb 6 01:37:34 2021 -0500
+
+    Update solana-user-authorized_keys.sh (#15059)
+
+commit 600cea274db36274361b5d7b92c9ad4f45039a31
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Feb 5 21:16:30 2021 -0600
+
+    change store account scan to not use dashmap (#15104)
+--
+--
+    * comment
+    
+    * use partial_cmp
+
+commit fbf9dc47e9907f6cd688ebb49f85362c75c1254e
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Feb 5 18:48:16 2021 -0600
+
+    Threadpool2 (#15151)
+--
+--
+    * Make genesis_config private
+    
+    Co-authored-by: Michael Vines <mvines@gmail.com>
+
+commit fabecdc86cc9ef6365d5cb550b4a8a411c15eb90
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Feb 5 13:48:55 2021 -0600
+
+    use thread pool for non-index hash calculations (#15149)
+--
+--
+Date:   Fri Feb 5 09:57:44 2021 -0800
+
+    Add cli deploy tests (#15116)
+
+commit f85be6259ba2608bcf0873409ebf9c4b4a8683c0
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Feb 5 11:23:48 2021 -0600
+
+    sentinel value for zero lamport accounts in hash scanning (#15097)
+--
+--
+    * nit: cleanup feature status display
+    
+    * nudge
+
+commit 7d9f5ad5258496bcf5011190c6c10b82e5d84ba0
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu Feb 4 20:46:30 2021 -0600
+
+    remove unused arg from function (#15096)
+--
+--
+Date:   Thu Feb 4 20:46:30 2021 -0600
+
+    remove unused arg from function (#15096)
+
+commit f0d58f5549de24c8239f63112c217d65ba75f663
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu Feb 4 20:43:23 2021 -0600
+
+    move timer end outside if (#15087)
+--
+--
+Date:   Fri Feb 5 02:39:33 2021 +0800
+
+    Enable inflation candidate for RockX (#15099)
+
+commit f49a70e626fe718af5802c77430e8456c8ec33bb
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu Feb 4 11:29:03 2021 -0600
+
+    borrow storages (#15088)
+--
+--
+Date:   Thu Feb 4 19:40:14 2021 +0300
+
+    Nomination candidate for p2pvalidator (#15079)
+
+commit e7f53182e223bb24bc89432e22f3d8ad64ac58ef
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu Feb 4 09:20:50 2021 -0600
+
+    fix merge conflict (#15085)
+--
+--
+Date:   Thu Feb 4 09:20:50 2021 -0600
+
+    fix merge conflict (#15085)
+
+commit 600ff0d915e2dda027cae1a0d9c780a10876f175
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu Feb 4 09:00:33 2021 -0600
+
+    calculate hash from store instead of index (#15034)
+--
+--
+Date:   Sun Jan 31 23:39:26 2021 -0700
+
+    cli-output: Add option sigverify status to `println_transaction()` output
+
+commit 22800054e651ff6690596e561a7b2c4022f7f53f
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Feb 2 10:58:19 2021 -0600
+
+    streamline calculate_accounts_hash (#14980)
+--
+--
+Date:   Tue Jan 26 09:40:41 2021 -0800
+
+    fix: add custodian key support to stake instructions
+
+commit 1d6e9335ff6a277d63967690e00ad6b3ae2c7553
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Tue Jan 26 09:07:38 2021 -0600
+
+    rent text cleanup (#14837)
+--
+--
+Date:   Mon Jan 25 15:34:45 2021 -0800
+
+    Rotate feature key: use loaded executable accounts (#14838)
+
+commit 1b85114a9cf461e9280587ef212a9ceb70e441c4
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon Jan 25 15:26:08 2021 -0600
+
+    remove legacy merkle root (#14772)
+--
+--
+Date:   Fri Jan 22 11:56:51 2021 -0800
+
+    Add ability to force feature activation without code modification
+
+commit 802fd49905e8f7fe493701f4991cbf1ff9cd20e8
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Jan 22 13:36:26 2021 -0600
+
+    typo (#14774)
+--
+--
+Date:   Thu Jan 21 23:31:33 2021 -0700
+
+    CLI: Strive for at least one signer
+
+commit 18bd0c9a5bfec565844f18dc79849b2f7b36add6
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Fri Jan 22 09:21:50 2021 -0600
+
+    speed up merkle calculation (#14710)
+--
+--
+Date:   Wed Jan 13 16:26:17 2021 +0000
+
+    adds pubkey for behzad@solana.com (#14558)
+
+commit 935dfdf0f65b500374dc51c5387708760df60c62
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Jan 13 10:08:53 2021 -0600
+
+    fill in timing gaps in replay_stage (#14550)
+--
+--
+    Remove unlock banner (#14477)
+    
+    Co-authored-by: Ryan Shea <rmshea@users.noreply.github.com>
+
+commit 773b21b34e155e59e05548ecaa90193e67b9f34b
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu Jan 7 09:49:42 2021 -0600
+
+    consolidate DEFAULT_HASHES_PER_TICK (#14463)
+--
+--
+Date:   Thu Jan 7 09:49:42 2021 -0600
+
+    consolidate DEFAULT_HASHES_PER_TICK (#14463)
+
+commit 938d48213571239c5e066093065d8f50bc71bc0e
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Thu Jan 7 09:49:24 2021 -0600
+
+    consolidate constants related to time for future refactoring (#14440)
+--
+--
+Date:   Wed Dec 30 12:02:29 2020 -0800
+
+    nit: clarify loader id (#14355)
+
+commit b36ad917927c758e6ef0f19784d9351186767f3a
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Wed Dec 30 12:47:48 2020 -0600
+
+    read hash mismatch errors from influx and error if > 0 (#14240)
+--
+--
+Date:   Wed Dec 16 10:29:23 2020 -0800
+
+    Use AsRef
+
+commit 41a93ced23c45911f2c2a407c654808fe1f9dac3
+Author: Jeff Washington (jwash) <wash678@gmail.com>
+Date:   Tue Dec 15 10:10:51 2020 -0600
+
+    fix formatting error in docs
+--
+--
+Date:   Mon Dec 14 12:55:34 2020 -0800
+
+    clippy
+
+commit 42be09afb66c405b42ab66c3f1724b94614d79a1
+Author: Jeff Washington (jwash) <75863576+jeffwashington@users.noreply.github.com>
+Date:   Mon Dec 14 15:04:26 2020 -0600
+
+    Terminology fixes (#14112)
