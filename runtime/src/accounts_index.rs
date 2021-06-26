@@ -8,6 +8,7 @@ use bv::BitVec;
 use log::*;
 use ouroboros::self_referencing;
 use rayon::prelude::*;
+use solana_bucket_map::bucket_map::BucketMap;
 use solana_measure::measure::Measure;
 use solana_sdk::{
     clock::{BankId, Slot},
@@ -18,6 +19,8 @@ use std::{
         btree_map::{self, BTreeMap, Entry},
         HashSet,
     },
+    collections::HashSet,
+    collections::BTreeMap,
     ops::{
         Bound,
         Bound::{Excluded, Included, Unbounded},
@@ -36,7 +39,7 @@ pub type ScanResult<T> = Result<T, ScanError>;
 pub type SlotList<T> = Vec<(Slot, T)>;
 pub type SlotSlice<'s, T> = &'s [(Slot, T)];
 pub type RefCount = u64;
-pub type AccountMap<K, V> = BTreeMap<K, V>;
+pub type AccountMap<V> = BucketMap<V>;
 
 type AccountMapEntry<T> = Arc<AccountMapEntryInner<T>>;
 
@@ -120,10 +123,10 @@ impl<T> AccountMapEntryInner<T> {
     }
 }
 
-pub enum AccountIndexGetResult<'a, T: 'static> {
+pub enum AccountIndexGetResult<T: 'static> {
     Found(ReadAccountMapEntry<T>, usize),
     NotFoundOnFork,
-    Missing(AccountMapsReadLock<'a, T>),
+    Missing(AccountMapsReadLock<T>),
 }
 
 #[self_referencing]
@@ -600,27 +603,12 @@ fn get_bin_pubkey(pubkey: &Pubkey) -> usize {
     (pubkey.as_ref()[byte_of_pubkey_to_bin] as usize) * BINS / ((u8::MAX as usize) + 1)
 }
 
-type MapType<T> = AccountMap<Pubkey, AccountMapEntry<T>>;
+
+type MapType<T> = AccountMap<AccountMapEntry<T>>;
 type LockMapType<T> = Vec<RwLock<MapType<T>>>;
 type LockMapTypeSlice<T> = [RwLock<MapType<T>>];
-type AccountMapsWriteLock<'a, T> = RwLockWriteGuard<'a, MapType<T>>;
-type AccountMapsReadLock<'a, T> = RwLockReadGuard<'a, MapType<T>>;
-
-#[derive(Debug, Default)]
-pub struct ScanSlotTracker {
-    is_removed: bool,
-    ref_count: u64,
-}
-
-impl ScanSlotTracker {
-    pub fn is_removed(&self) -> bool {
-        self.is_removed
-    }
-
-    pub fn mark_removed(&mut self) {
-        self.is_removed = true;
-    }
-}
+type AccountMapsWriteLock<T> = AccountMap<AccountMapEntry<T>>;
+type AccountMapsReadLock<T> = AccountMap<AccountMapEntry<T>>;
 
 #[derive(Debug)]
 pub struct AccountsIndex<T> {
@@ -646,10 +634,7 @@ pub struct AccountsIndex<T> {
 impl<T> Default for AccountsIndex<T> {
     fn default() -> Self {
         Self {
-            account_maps: (0..BINS)
-                .into_iter()
-                .map(|_| RwLock::new(AccountMap::<Pubkey, AccountMapEntry<T>>::default()))
-                .collect::<Vec<_>>(),
+            account_maps: AccountMap::<AccountMapEntry<T>>::default(),
             program_id_index: SecondaryIndex::<DashMapSecondaryIndexEntry>::new(
                 "program_id_index_stats",
             ),
@@ -1000,7 +985,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
     pub fn get_account_read_entry_with_lock(
         &self,
         pubkey: &Pubkey,
-        lock: &AccountMapsReadLock<'_, T>,
+        lock: &AccountMapsReadLock<T>,
     ) -> Option<ReadAccountMapEntry<T>> {
         lock.get(pubkey)
             .cloned()
@@ -1078,17 +1063,20 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
     ) {
         if !dead_keys.is_empty() {
             for key in dead_keys.iter() {
-                let mut w_index = self.get_account_maps_write_lock(key);
-                if let btree_map::Entry::Occupied(index_entry) = w_index.entry(**key) {
-                    if index_entry.get().slot_list.read().unwrap().is_empty() {
-                        index_entry.remove();
-
-                        // Note it's only safe to remove all the entries for this key
-                        // because we have the lock for this key's entry in the AccountsIndex,
-                        // so no other thread is also updating the index
-                        self.purge_secondary_indexes_by_inner_key(key, account_indexes);
+                let w_index = self.get_account_maps_write_lock();
+                w_index.update(**key, |val| {
+                    if let Some(slot_list) = val {
+                        if slot_list.is_empty() {
+                            // Note it's only safe to remove all the entries for this key
+                            // because we have the lock for this key's entry in the AccountsIndex,
+                            // so no other thread is also updating the index
+                            self.purge_secondary_indexes_by_inner_key(key, account_indexes);
+                            return None;
+                        }
+                    } else {
+                        return Some(val);
                     }
-                }
+                });
             }
         }
     }
@@ -1266,8 +1254,8 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
         pubkey: &Pubkey,
         ancestors: Option<&Ancestors>,
         max_root: Option<Slot>,
-    ) -> AccountIndexGetResult<'_, T> {
-        let read_lock = self.account_maps[get_bin_pubkey(pubkey)].read().unwrap();
+    ) -> AccountIndexGetResult<T> {
+        let read_lock = self.account_maps.read().unwrap();
         let account = read_lock
             .get(pubkey)
             .cloned()
@@ -1361,12 +1349,12 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
         }
     }
 
-    fn get_account_maps_write_lock(&self, pubkey: &Pubkey) -> AccountMapsWriteLock<T> {
-        self.account_maps[get_bin_pubkey(pubkey)].write().unwrap()
+    fn get_account_maps_write_lock(&self) -> &AccountMapsWriteLock<T> {
+        &self.account_maps
     }
 
-    pub(crate) fn get_account_maps_read_lock(&self, pubkey: &Pubkey) -> AccountMapsReadLock<T> {
-        self.account_maps[get_bin_pubkey(pubkey)].read().unwrap()
+    pub(crate) fn get_account_maps_read_lock(&self) -> &AccountMapsReadLock<T> {
+        &self.account_maps
     }
 
     // Same functionally to upsert, but:
@@ -1756,7 +1744,7 @@ pub mod tests {
         }
     }
 
-    impl<'a, T: 'static> AccountIndexGetResult<'a, T> {
+    impl<T: 'static> AccountIndexGetResult<T> {
         pub fn unwrap(self) -> (ReadAccountMapEntry<T>, usize) {
             match self {
                 AccountIndexGetResult::Found(lock, size) => (lock, size),
