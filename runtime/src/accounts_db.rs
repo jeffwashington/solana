@@ -4441,14 +4441,6 @@ impl AccountsDb {
     ) -> Result<(Hash, u64), BankHashVerificationError> {
         use BankHashVerificationError::*;
         let mut collect = Measure::start("collect");
-        let keys: Vec<_> = self
-            .accounts_index
-            .account_maps
-            .iter()
-            .map(|btree| btree.read().unwrap().keys().cloned().collect::<Vec<_>>())
-            .flatten()
-            .collect();
-        collect.stop();
 
         let mut scan = Measure::start("scan");
         let mismatch_found = AtomicU64::new(0);
@@ -4461,11 +4453,11 @@ impl AccountsDb {
             for ix in 0..self.accounts_index.account_maps.num_buckets() {
                 let keys = self.accounts_index.account_maps.keys(ix);
                 if keys.is_none() {
-                    continue();
+                    continue;
                 }
                 let mut keys = keys.unwrap();
                 keys.par_sort_unstable();
-                let new_hashes = keys.par_chunks(chunks)
+                let new_hashes: Vec<_> = keys.par_chunks(chunks)
                 .map(|pubkeys| {
                     let mut sum = 0u128;
                     let result: Vec<Hash> = pubkeys
@@ -4523,9 +4515,10 @@ impl AccountsDb {
                     *total =
                         AccountsHash::checked_cast_for_capitalization(*total as u128 + sum);
                     result
-                });
-                hashes.extend(new_hashes);
+                }).collect();
+                hashes.extend(new_hashes.into_iter());
             }
+            hashes
         };
 
         let hashes: Vec<Vec<Hash>> = if check_hash {
