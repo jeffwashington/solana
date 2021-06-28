@@ -201,10 +201,12 @@ impl SeekableBufferingReader {
                     drop(buffers);
                     match buffer {
                         Some(buffer) => {
+                            error!("got buffer");
                             dest_data = buffer;
                             break;
                         }
                         None => {
+                            error!("wait for new buffer");
                             // none available, so wait
                             self.wait_for_new_buffer();
                         }
