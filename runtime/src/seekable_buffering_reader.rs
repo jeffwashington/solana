@@ -80,10 +80,10 @@ impl SeekableBufferingReader {
         let handle = Builder::new()
         .name("solana-compressed_file_reader".to_string())
         .spawn(move || {
-        par.into_par_iter().for_each(|(i, reader, result)|
+        par.into_par_iter().for_each(|(i, reader, result)|{
         error!("starting: {}", i);
-                result.read_entire_file_in_bg(reader, i, divisions)
-            );});
+                result.read_entire_file_in_bg(reader, i, divisions);
+        });});
         *result.instance.bg_reader.lock().unwrap() = Some(handle.unwrap()); // TODO - unwrap here - do we expect to fail creating a thread? If we do, probably a fatal error anyway.
         std::thread::sleep(std::time::Duration::from_millis(200)); // hack: give time for file to be read a little bit
         result
