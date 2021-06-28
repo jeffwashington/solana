@@ -369,6 +369,7 @@ impl SeekableBufferingReader {
             new_min = self.instance.data.read().unwrap().len(); // we are done, we can drop all the rest
             error!("moved: {}, new min is: {}", self.my_client_index, new_min);
         }
+        error!("update_client_index: {}, new min is: {}", self.my_client_index, new_min);
         drop(indices);
         for recycle in (previous_last_buffer_index..new_min) {
             error!("recycling: {}", recycle);
