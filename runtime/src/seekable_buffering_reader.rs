@@ -236,6 +236,9 @@ impl SeekableBufferingReader {
                         self.wait_for_new_data();
                     }
                 }
+                else {
+                    error!("skipping this chunk: {} out of {}, division_index: {}, chunk_index: {}", division, divisions, division_index, chunk_index);
+                }
                 division_index += 1;
                 chunk_index += 1;
             }
