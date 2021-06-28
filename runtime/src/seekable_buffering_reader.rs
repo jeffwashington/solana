@@ -101,7 +101,11 @@ impl SeekableBufferingReader {
         let par = reader
             .into_iter()
             .enumerate()
-            .map(|(i, reader)| (i, reader, result.clone()))
+            .map(|(i, reader)| {
+                let mut r = result.clone();
+                r.no_more_reading();
+                (i, reader, r)
+            })
             .collect::<Vec<_>>();
         let handle = Builder::new()
             .name("solana-compressed_file_reader".to_string())
@@ -112,7 +116,6 @@ impl SeekableBufferingReader {
                 });
             });
         *result.instance.bg_reader.lock().unwrap() = Some(handle.unwrap()); // TODO - unwrap here - do we expect to fail creating a thread? If we do, probably a fatal error anyway.
-        std::thread::sleep(std::time::Duration::from_millis(200)); // hack: give time for file to be read a little bit
         result
     }
     fn alloc_initial_vectors() -> Vec<ABuffer> {
