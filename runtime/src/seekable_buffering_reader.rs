@@ -217,14 +217,24 @@ impl SeekableBufferingReader {
                     }
                 }
             }
-            if use_this_division && read_this_time > 0 {
-                self.instance.len.fetch_add(read_this_time, Ordering::Relaxed);
-                total_len += read_this_time;
-                dest_data.truncate(read_this_time);
-                self.instance.new_data.write().unwrap().push(dest_data);
+            if read_this_time > 0 {
+                if use_this_division {
+                    self.instance.len.fetch_add(read_this_time, Ordering::Relaxed);
+                    total_len += read_this_time;
+                    loop {
+                        let mut data = self.instance.new_data.write().unwrap();
+                        if chunk_index == data.len() {
+                            dest_data.truncate(read_this_time);
+                            data.push(dest_data);
+                            notify += notify_all(); // notify after data added
+                            break;
+                        }
+                        drop(data);
+                        // we are ready with the next section, but the previous section hasn't written to the final output buffer yet, so we have to wait until it writes
+                        self.wait_for_new_data();
+                    }
+                }
                 chunk_index += 1;
-
-                notify += notify_all(); // notify after data added
             }
 
             if end {
