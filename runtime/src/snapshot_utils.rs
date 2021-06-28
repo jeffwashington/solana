@@ -781,7 +781,7 @@ fn unpack_snapshot_local<T: 'static + Read + std::marker::Send, F: Fn() -> T>(
 ) -> Result<UnpackedAppendVecMap> {
     assert!(parallel_divisions > 0);
     let readers = (0..parallel_divisions).into_iter().map(|_| reader()).collect();
-    let buf = SeekableBufferingReader::new(readers);
+    let mut buf = SeekableBufferingReader::new(readers);
     buf.no_more_reading();
 
     parallel_divisions = 1;
