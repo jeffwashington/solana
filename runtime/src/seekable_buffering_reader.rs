@@ -248,7 +248,7 @@ impl SeekableBufferingReader {
                         .fetch_add(read_this_time, Ordering::Relaxed);
                     total_len += read_this_time;
                     loop {
-                        let chunks_written = self.data_written.load(Ordering::Relaxed);
+                        let chunks_written = self.instance.data_written.load(Ordering::Relaxed);
                         if chunks_written == division_index {
                             let mut data = self.instance.new_data.write().unwrap();
                             let len = data.len();
