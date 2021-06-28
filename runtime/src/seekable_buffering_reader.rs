@@ -144,7 +144,7 @@ impl SeekableBufferingReader {
         let mut chunk_index = 0;
         let mut total_len = 0;
         error!("{}, {}", file!(), line!());
-        let division_index = 0;
+        let mut division_index = 0;
         let dummy = vec![];
         'outer: loop {
             if self.instance.stop.load(Ordering::Relaxed) {
