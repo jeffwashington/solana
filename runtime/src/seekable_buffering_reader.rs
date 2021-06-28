@@ -116,8 +116,10 @@ impl SeekableBufferingReader {
     }
     fn alloc_initial_vectors() -> Vec<ABuffer> {
         let initial_vector_count = 20;
-        (0..initial_vector_count).into_iter().map(|_|
-            vec![0u8; CHUNK_SIZE]).collect()
+        (0..initial_vector_count)
+            .into_iter()
+            .map(|_| vec![0u8; CHUNK_SIZE])
+            .collect()
     }
     fn read_entire_file_in_bg<T: 'static + Read + std::marker::Send>(
         &self,
@@ -138,9 +140,8 @@ impl SeekableBufferingReader {
         };
         error!("{}, {}", file!(), line!());
 
-
         let request = Arc::new((Mutex::new(false), Condvar::new()));
-/*
+        /*
         let (sender, receiver) = unbounded();
         let request_ = request.clone();
         let handle = Builder::new()
@@ -351,7 +352,7 @@ impl SeekableBufferingReader {
         }
         return false;
     }
-    fn update_client_index(&mut self,last_buffer_index: usize) {
+    fn update_client_index(&mut self, last_buffer_index: usize) {
         let previous_last_buffer_index = self.last_buffer_index;
         self.last_buffer_index = last_buffer_index;
         let client_index = self.my_client_index;
@@ -360,8 +361,13 @@ impl SeekableBufferingReader {
         drop(indices);
         let indices = self.instance.clients.read().unwrap();
         let new_min = *indices.iter().min().unwrap();
+        if new_min == usize::MAX {
+            new_min = self.instance.data.read().unwrap().len(); // we are done, we can drop all the rest
+            error!("moved: {}, new min is: {}", self.my_client_index, new_min);
+        }
         drop(indices);
         for recycle in (previous_last_buffer_index..new_min) {
+            error!("recycling: {}", recycle);
             let mut remove = vec![];
             let mut data = self.instance.data.write().unwrap();
             std::mem::swap(&mut remove, &mut data[recycle]);
@@ -371,7 +377,6 @@ impl SeekableBufferingReader {
             cvar.notify_all(); // new buffer available
         }
     }
-
 }
 
 impl Read for SeekableBufferingReader {
