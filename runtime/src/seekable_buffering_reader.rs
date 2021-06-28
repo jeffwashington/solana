@@ -47,6 +47,7 @@ impl Clone for SeekableBufferingReader {
         let instance = Arc::clone(&self.instance);
         let mut list = instance.clients.write().unwrap();
         let my_client_index = list.len();
+        error!("adding client: {}", my_client_index);
         list.push(0);
         drop(list);
         Self {
@@ -197,11 +198,12 @@ impl SeekableBufferingReader {
             if use_this_division {
                 loop {
                     let mut buffers = self.instance.buffers.write().unwrap();
+                    let remaining = buffers.len();
                     let buffer = buffers.pop();
                     drop(buffers);
                     match buffer {
                         Some(buffer) => {
-                            error!("got buffer");
+                            error!("got buffer: idx: {}, remainng: {}", division_index, remaining);
                             dest_data = buffer;
                             break;
                         }
@@ -450,6 +452,7 @@ impl Read for SeekableBufferingReader {
 
 impl Drop for SeekableBufferingReader {
     fn drop(&mut self) {
+        error!("dropping client: {}", self.my_client_index);
         self.update_client_index(usize::MAX); // this one is done reading
     }
 }
