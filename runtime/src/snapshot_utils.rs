@@ -622,7 +622,7 @@ pub fn bank_from_archive<P: AsRef<Path> + std::marker::Sync>(
 
     let mut untar = Measure::start("snapshot untar");
     // From testing, 4 seems to be a sweet spot for ranges of 60M-360M accounts and 16-64 cores. This may need to be tuned later.
-    let divisions = 5;//std::cmp::min(4, std::cmp::max(1, num_cpus::get() / 4));
+    let divisions = 7;//std::cmp::min(4, std::cmp::max(1, num_cpus::get() / 4));
     let unpacked_append_vec_map = untar_snapshot_in(
         &snapshot_tar,
         unpack_dir.as_ref(),
