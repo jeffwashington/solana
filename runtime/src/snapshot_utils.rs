@@ -43,7 +43,7 @@ use {
 pub const SNAPSHOT_STATUS_CACHE_FILE_NAME: &str = "status_cache";
 
 pub const READERS: usize = 1;
-pub const ARCHIVERS: usize = 4;
+pub const ARCHIVERS: usize = 8;
 
 pub const MAX_SNAPSHOTS: usize = 8; // Save some snapshots but not too many
 const MAX_SNAPSHOT_DATA_FILE_SIZE: u64 = 32 * 1024 * 1024 * 1024; // 32 GiB
