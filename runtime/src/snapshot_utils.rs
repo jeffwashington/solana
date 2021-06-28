@@ -794,6 +794,7 @@ fn unpack_snapshot_local<T: 'static + Read + std::marker::Send, F: Fn() -> T>(
                 divisions: parallel_divisions,
             });
             let mut buf = buf.clone();
+            buf.no_more_reading();
             let mut archive = Archive::new(buf.clone());
             unpack_snapshot(
                 Some(&mut buf),
