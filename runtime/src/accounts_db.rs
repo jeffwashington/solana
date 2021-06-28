@@ -185,18 +185,18 @@ impl GenerateIndexTimings {
 #[derive(Default, Debug, PartialEq, Clone)]
 pub struct AccountInfo {
     /// index identifying the append storage
-    store_id: AppendVecId,
+    pub store_id: AppendVecId,
 
     /// offset into the storage
-    offset: usize,
+    pub offset: usize,
 
     /// needed to track shrink candidacy in bytes. Used to update the number
     /// of alive bytes in an AppendVec as newer slots purge outdated entries
-    stored_size: usize,
+    pub stored_size: usize,
 
     /// lamports in the account used when squashing kept for optimization
     /// purposes to remove accounts with zero balance.
-    lamports: u64,
+    pub lamports: u64,
 }
 impl IsCached for AccountInfo {
     fn is_cached(&self) -> bool {
@@ -11726,4 +11726,5 @@ pub mod tests {
         accounts.shrink_ratio = AccountShrinkThreshold::IndividalStore { shrink_ratio: 0.3 };
         assert!(!accounts.is_candidate_for_shrink(&entry));
     }
+   
 }

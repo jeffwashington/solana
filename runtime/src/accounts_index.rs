@@ -31,7 +31,6 @@ use std::{
 use thiserror::Error;
 
 pub const ITER_BATCH_SIZE: usize = 1000;
-const BINS: usize = 1;
 pub type ScanResult<T> = Result<T, ScanError>;
 pub type SlotList<T> = Vec<(Slot, T)>;
 pub type SlotSlice<'s, T> = &'s [(Slot, T)];
@@ -595,7 +594,7 @@ pub trait ZeroLamport {
     fn is_zero_lamport(&self) -> bool;
 }
 
-fn get_bin_pubkey(pubkey: &Pubkey) -> usize {
+fn get_bin_pubkey(pubkey: &Pubkey, BINS: usize) -> usize {
     let byte_of_pubkey_to_bin = 0; // TODO: this should not be 0. For now it needs to be due to requests for in-order pubkeys
     (pubkey.as_ref()[byte_of_pubkey_to_bin] as usize) * BINS / ((u8::MAX as usize) + 1)
 }
@@ -625,6 +624,7 @@ impl ScanSlotTracker {
 #[derive(Debug)]
 pub struct AccountsIndex<T> {
     pub account_maps: LockMapType<T>,
+    pub BINS: usize,
     program_id_index: SecondaryIndex<DashMapSecondaryIndexEntry>,
     spl_token_mint_index: SecondaryIndex<DashMapSecondaryIndexEntry>,
     spl_token_owner_index: SecondaryIndex<RwLockSecondaryIndexEntry>,
@@ -643,9 +643,10 @@ pub struct AccountsIndex<T> {
     pub removed_bank_ids: Mutex<HashSet<BankId>>,
 }
 
-impl<T> Default for AccountsIndex<T> {
-    fn default() -> Self {
+impl<T> AccountsIndex<T> {
+    pub fn new(BINS: usize) -> Self {
         Self {
+            BINS,
             account_maps: (0..BINS)
                 .into_iter()
                 .map(|_| RwLock::new(AccountMap::<Pubkey, AccountMapEntry<T>>::default()))
@@ -663,6 +664,12 @@ impl<T> Default for AccountsIndex<T> {
             ongoing_scan_roots: RwLock::<BTreeMap<Slot, u64>>::default(),
             removed_bank_ids: Mutex::<HashSet<BankId>>::default(),
         }
+    }
+}
+
+impl<T> Default for AccountsIndex<T> {
+    fn default() -> Self {
+        Self::new(1)
     }
 }
 
@@ -1008,7 +1015,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
     }
 
     fn get_account_write_entry(&self, pubkey: &Pubkey) -> Option<WriteAccountMapEntry<T>> {
-        self.account_maps[get_bin_pubkey(pubkey)]
+        self.account_maps[get_bin_pubkey(pubkey, self.BINS)]
             .read()
             .unwrap()
             .get(pubkey)
@@ -1269,7 +1276,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
         ancestors: Option<&Ancestors>,
         max_root: Option<Slot>,
     ) -> AccountIndexGetResult<'_, T> {
-        let read_lock = self.account_maps[get_bin_pubkey(pubkey)].read().unwrap();
+        let read_lock = self.account_maps[get_bin_pubkey(pubkey, self.BINS)].read().unwrap();
         let account = read_lock
             .get(pubkey)
             .cloned()
@@ -1364,11 +1371,11 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
     }
 
     fn get_account_maps_write_lock(&self, pubkey: &Pubkey) -> AccountMapsWriteLock<T> {
-        self.account_maps[get_bin_pubkey(pubkey)].write().unwrap()
+        self.account_maps[get_bin_pubkey(pubkey, self.BINS)].write().unwrap()
     }
 
     pub(crate) fn get_account_maps_read_lock(&self, pubkey: &Pubkey) -> AccountMapsReadLock<T> {
-        self.account_maps[get_bin_pubkey(pubkey)].read().unwrap()
+        self.account_maps[get_bin_pubkey(pubkey, self.BINS)].read().unwrap()
     }
 
     // Same functionally to upsert, but:
@@ -1385,10 +1392,10 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
         let expected_items_per_bin = 0; //item_len * 2 / BINS; // estimate
         let expected_duplicates_per_bin = expected_items_per_bin / 100; // estimate
         let bins_per_chunk = 1;
-        let mut binned = vec![vec![]; std::cmp::max(1, BINS / bins_per_chunk)];
+        let mut binned = vec![vec![]; std::cmp::max(1, self.BINS / bins_per_chunk)];
         let get_chunk_index_from_bin_index = |bin_index| bin_index / bins_per_chunk;
         let get_bin_index_within_chunk = |bin_index| bin_index % bins_per_chunk;
-        (0..BINS).into_iter().for_each(|bin_index| {
+        (0..self.BINS).into_iter().for_each(|bin_index| {
             let chunk_index = get_chunk_index_from_bin_index(bin_index);
             let bin = &mut binned[chunk_index];
             let bin_index_within_chunk = get_bin_index_within_chunk(bin_index);
@@ -1399,7 +1406,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
             items.for_each(|(pubkey, account_info)| {
                 // this value is equivalent to what update() below would have created if we inserted a new item
                 let info = WriteAccountMapEntry::new_entry_after_update(slot, account_info);
-                let bin_index = get_bin_pubkey(&pubkey);
+                let bin_index = get_bin_pubkey(&pubkey, self.BINS);
                 let chunk_index = get_chunk_index_from_bin_index(bin_index);
                 let bin_index_within_chunk = get_bin_index_within_chunk(bin_index);
                 binned[chunk_index][bin_index_within_chunk]
@@ -2580,49 +2587,7 @@ pub mod tests {
             true
         }
     }
-    #[test]
-    fn test_insert_new_with_lock_no_ancestors() {
-        let key = Keypair::new();
-        let pubkey = &key.pubkey();
-        let slot = 0;
 
-        let index = AccountsIndex::<bool>::default();
-        let account_info = true;
-        let items = vec![(pubkey, account_info)];
-        index.insert_new_if_missing_into_primary_index(slot, items.len(), items.into_iter());
-
-        let mut ancestors = Ancestors::default();
-        assert!(index.get(pubkey, Some(&ancestors), None).is_none());
-        assert!(index.get(pubkey, None, None).is_none());
-
-        let mut num = 0;
-        index.unchecked_scan_accounts("", &ancestors, |_pubkey, _index| num += 1);
-        assert_eq!(num, 0);
-        ancestors.insert(slot, 0);
-        assert!(index.get(pubkey, Some(&ancestors), None).is_some());
-        assert_eq!(index.ref_count_from_storage(pubkey), 1);
-        index.unchecked_scan_accounts("", &ancestors, |_pubkey, _index| num += 1);
-        assert_eq!(num, 1);
-
-        // not zero lamports
-        let index = AccountsIndex::<AccountInfoTest>::default();
-        let account_info: AccountInfoTest = 0 as AccountInfoTest;
-        let items = vec![(pubkey, account_info)];
-        index.insert_new_if_missing_into_primary_index(slot, items.len(), items.into_iter());
-
-        let mut ancestors = Ancestors::default();
-        assert!(index.get(pubkey, Some(&ancestors), None).is_none());
-        assert!(index.get(pubkey, None, None).is_none());
-
-        let mut num = 0;
-        index.unchecked_scan_accounts("", &ancestors, |_pubkey, _index| num += 1);
-        assert_eq!(num, 0);
-        ancestors.insert(slot, 0);
-        assert!(index.get(pubkey, Some(&ancestors), None).is_some());
-        assert_eq!(index.ref_count_from_storage(pubkey), 0); // cached, so 0
-        index.unchecked_scan_accounts("", &ancestors, |_pubkey, _index| num += 1);
-        assert_eq!(num, 1);
-    }
 
     #[test]
     fn test_new_entry() {
@@ -2650,24 +2615,7 @@ pub mod tests {
         );
     }
 
-    #[test]
-    fn test_batch_insert() {
-        let slot0 = 0;
-        let key0 = Keypair::new().pubkey();
-        let key1 = Keypair::new().pubkey();
 
-        let index = AccountsIndex::<bool>::default();
-        let account_infos = [true, false];
-
-        let items = vec![(&key0, account_infos[0]), (&key1, account_infos[1])];
-        index.insert_new_if_missing_into_primary_index(slot0, items.len(), items.into_iter());
-
-        for (i, key) in [key0, key1].iter().enumerate() {
-            let entry = index.get_account_read_entry(key).unwrap();
-            assert_eq!(entry.ref_count().load(Ordering::Relaxed), 1);
-            assert_eq!(entry.slot_list().to_vec(), vec![(slot0, account_infos[i]),]);
-        }
-    }
 
     fn test_new_entry_code_paths_helper<
         T: 'static
@@ -2703,7 +2651,7 @@ pub mod tests {
             );
         } else {
             let items = vec![(&key, account_infos[0].clone())];
-            index.insert_new_if_missing_into_primary_index(slot0, items.len(), items.into_iter());
+            //index.insert_new_if_missing_into_primary_index(slot0, items.len(), items.into_iter());
         }
         assert!(gc.is_empty());
 
@@ -2737,7 +2685,7 @@ pub mod tests {
             );
         } else {
             let items = vec![(&key, account_infos[1].clone())];
-            index.insert_new_if_missing_into_primary_index(slot1, items.len(), items.into_iter());
+            //index.insert_new_if_missing_into_primary_index(slot1, items.len(), items.into_iter());
         }
         assert!(gc.is_empty());
 
@@ -2795,7 +2743,7 @@ pub mod tests {
         let new_entry = WriteAccountMapEntry::new_entry_after_update(slot, account_info);
         let mut w_account_maps = index.get_account_maps_write_lock(&key.pubkey());
         let write = index.insert_new_entry_if_missing_with_lock(
-            &key.pubkey(),
+            key.pubkey(),
             &mut w_account_maps,
             new_entry,
         );
@@ -3817,4 +3765,47 @@ pub mod tests {
             false
         }
     }
+
+
+    #[test]
+    fn test_profile_batch_insert() {
+        let slot0 = 0;
+        let key0 = Keypair::new().pubkey();
+        let key1 = Keypair::new().pubkey();
+
+        let max = 60_000_000;
+
+        error!("test_profile_batch_insert bins chunks sz insert_us");
+        for bins in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512] {
+            for chunks in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512] {
+                if chunks > bins {
+                    continue;
+                }
+                for sz in 8..30 {
+                    let sz = 2usize.pow(sz as u32);
+                    if sz > max {
+                        continue;
+                    }
+                    let mut index = AccountsIndex::new(bins);
+                    let mut items = Vec::with_capacity(sz);
+                    for key in 0..sz {
+                        let mut ai = crate::accounts_db::AccountInfo {
+                            store_id: 0,
+                            offset: 0,
+                            stored_size: 0,
+                            lamports: 0,
+                        };
+                        items.push((Pubkey::new_rand(), ai))
+                    }
+                    let mut m = Measure::start("");
+                    let items = vec![(slot0, items.len(), items.into_iter())];
+
+                    index.insert_new_if_missing_into_primary_index(items.into_iter());
+                    m.stop();
+                    error!("test_profile_batch_insert {} {} {} {}", bins, chunks, sz, m.as_us());
+                }
+            }
+        }
+    }
+
 }
