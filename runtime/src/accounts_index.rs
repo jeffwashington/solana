@@ -1384,7 +1384,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
     ) -> (Vec<Pubkey>, u64, u64) {
         let expected_items_per_bin = 0; //item_len * 2 / BINS; // estimate
         let expected_duplicates_per_bin = expected_items_per_bin / 100; // estimate
-        let bins_per_chunk = 64;
+        let bins_per_chunk = 32;
         let mut binned = vec![vec![]; std::cmp::max(1, BINS / bins_per_chunk)];
         let get_chunk_index_from_bin_index = |bin_index| bin_index / bins_per_chunk;
         let get_bin_index_within_chunk = |bin_index| bin_index % bins_per_chunk;
