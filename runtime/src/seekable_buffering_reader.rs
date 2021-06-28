@@ -229,6 +229,7 @@ impl SeekableBufferingReader {
                             notify += notify_all(); // notify after data added
                             break;
                         }
+                        error!("this chunk is ready, but waiting for previous to write: {} out of {}, chunk_index: {}", division, divisions, chunk_index);
                         drop(data);
                         // we are ready with the next section, but the previous section hasn't written to the final output buffer yet, so we have to wait until it writes
                         self.wait_for_new_data();
