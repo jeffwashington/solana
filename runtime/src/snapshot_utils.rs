@@ -777,12 +777,13 @@ fn unpack_snapshot_local<T: 'static + Read + std::marker::Send, F: Fn() -> T>(
     reader: F,
     ledger_dir: &Path,
     account_paths: &[PathBuf],
-    parallel_divisions: usize,
+    mut parallel_divisions: usize,
 ) -> Result<UnpackedAppendVecMap> {
     assert!(parallel_divisions > 0);
     let readers = (0..parallel_divisions).into_iter().map(|_| reader()).collect();
     let buf = SeekableBufferingReader::new(readers);
 
+    parallel_divisions = 1;
     // create 'divisions' # of parallel workers, each responsible for 1/divisions of all the files to extract.
     let all_unpacked_append_vec_map = (0..parallel_divisions)
         .into_par_iter()
