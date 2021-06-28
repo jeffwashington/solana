@@ -1409,6 +1409,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
         });
 
         let insertion_time = AtomicU64::new(0);
+        error!("bins: {}", binned.len());
 
         let duplicate_keys = binned
             .into_par_iter()
@@ -1416,6 +1417,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
                 let mut _reclaims = SlotList::new();
                 let expected_duplicates_per_bin = expected_duplicates_per_bin * bins_per_chunk;
                 let mut duplicate_keys = Vec::with_capacity(expected_duplicates_per_bin);
+                let mut insertion_time_total = 0;
                 chunk.into_iter().for_each(|bin_data| {
                     let (pubkey_bin, items): (usize, Vec<_>) = bin_data;
                     if items.is_empty() {
@@ -1436,13 +1438,27 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
                     });
                     insert_time.stop();
                     insertion_time.fetch_add(insert_time.as_us(), Ordering::Relaxed);
+                    insertion_time_total += insert_time.as_us();
                 });
-                duplicate_keys
+                //duplicate_keys
+                vec![insertion_time_total]
             })
             .flatten()
             .collect::<Vec<_>>();
 
-        (duplicate_keys, insertion_time.load(Ordering::Relaxed))
+        let lens = self
+            .account_maps
+            .iter()
+            .map(|btree| btree.read().unwrap().len())
+            .collect::<Vec<_>>();
+
+        error!(
+            "times: {:?}, sizes: {:?}, {}",
+            duplicate_keys,
+            lens,
+            lens.iter().sum::<usize>()
+        );
+        (vec![], insertion_time.load(Ordering::Relaxed))
     }
 
     // Updates the given pubkey at the given slot with the new account information.
