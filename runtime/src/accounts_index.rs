@@ -1276,7 +1276,9 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
         ancestors: Option<&Ancestors>,
         max_root: Option<Slot>,
     ) -> AccountIndexGetResult<'_, T> {
-        let read_lock = self.account_maps[get_bin_pubkey(pubkey, self.BINS)].read().unwrap();
+        let read_lock = self.account_maps[get_bin_pubkey(pubkey, self.BINS)]
+            .read()
+            .unwrap();
         let account = read_lock
             .get(pubkey)
             .cloned()
@@ -1371,11 +1373,15 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
     }
 
     fn get_account_maps_write_lock(&self, pubkey: &Pubkey) -> AccountMapsWriteLock<T> {
-        self.account_maps[get_bin_pubkey(pubkey, self.BINS)].write().unwrap()
+        self.account_maps[get_bin_pubkey(pubkey, self.BINS)]
+            .write()
+            .unwrap()
     }
 
     pub(crate) fn get_account_maps_read_lock(&self, pubkey: &Pubkey) -> AccountMapsReadLock<T> {
-        self.account_maps[get_bin_pubkey(pubkey, self.BINS)].read().unwrap()
+        self.account_maps[get_bin_pubkey(pubkey, self.BINS)]
+            .read()
+            .unwrap()
     }
 
     // Same functionally to upsert, but:
@@ -1454,7 +1460,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
             })
             .flatten()
             .collect::<Vec<_>>();
-            it.stop();
+        it.stop();
         let lens = self
             .account_maps
             .iter()
@@ -2588,7 +2594,6 @@ pub mod tests {
         }
     }
 
-
     #[test]
     fn test_new_entry() {
         let slot = 0;
@@ -2614,8 +2619,6 @@ pub mod tests {
             vec![(slot, account_info)]
         );
     }
-
-
 
     fn test_new_entry_code_paths_helper<
         T: 'static
@@ -3766,7 +3769,6 @@ pub mod tests {
         }
     }
 
-
     #[test]
     fn test_profile_batch_insert() {
         solana_logger::setup();
@@ -3777,13 +3779,13 @@ pub mod tests {
         let max = 60_000_000;
 
         error!("test_profile_batch_insert bins chunks sz insert_us");
-        for bins in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512] {
-            for chunks in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512] {
-                if chunks > bins {
-                    continue;
-                }
-                for sz in 8..30 {
-                    let sz = 2usize.pow(sz as u32);
+        for sz in 8..30 {
+            let sz = 2usize.pow(sz as u32);
+            for bins in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512] {
+                for chunks in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512] {
+                    if chunks > bins {
+                        continue;
+                    }
                     if sz > max {
                         continue;
                     }
@@ -3803,10 +3805,15 @@ pub mod tests {
 
                     index.insert_new_if_missing_into_primary_index(items.into_iter());
                     m.stop();
-                    error!("test_profile_batch_insert {} {} {} {}", bins, chunks, sz, m.as_us());
+                    error!(
+                        "test_profile_batch_insert {} {} {} {}",
+                        bins,
+                        chunks,
+                        sz,
+                        m.as_us()
+                    );
                 }
             }
         }
     }
-
 }
