@@ -22,6 +22,7 @@ pub struct SeekableBufferingReaderInner {
     pub len: AtomicUsize,
     pub calls: AtomicUsize,
     pub error: RwLock<std::io::Result<usize>>,
+    pub data_written: AtomicUSize,
     pub bg_reader: Mutex<Option<JoinHandle<()>>>,
     pub file_read_complete: AtomicBool,
     pub stop: AtomicBool,
@@ -63,6 +64,7 @@ impl SeekableBufferingReader {
             len: AtomicUsize::new(0),
             calls: AtomicUsize::new(0),
             error: RwLock::new(Ok(0)),
+            data_written: AtomicUsize::new(0),
             bg_reader: Mutex::new(None),
             file_read_complete: AtomicBool::new(false),
             stop: AtomicBool::new(false),
@@ -168,7 +170,10 @@ impl SeekableBufferingReader {
             let mut attempts = 0;
             let mut m = Measure::start("");
             let use_this_division = division_index % divisions == division;
-            error!("use this division: {}, {}, {}, {}", division_index, divisions, division, use_this_division);
+            error!(
+                "use this division: {}, {}, {}, {}",
+                division_index, divisions, division, use_this_division
+            );
             if use_this_division {
                 loop {
                     let data = receiver.recv_timeout(std::time::Duration::from_micros(timeout_us));
@@ -201,7 +206,7 @@ impl SeekableBufferingReader {
             loop {
                 //std::mem::swap(&mut static_data, &mut other_static_data);
                 let read_start = read_this_time;
-                let read_end = std::cmp::min(read_start + MAX_READ_SIZE,CHUNK_SIZE);// TODO this should be: dest_data.len());
+                let read_end = std::cmp::min(read_start + MAX_READ_SIZE, CHUNK_SIZE); // TODO this should be: dest_data.len());
                 if read_end == read_start {
                     error!("done reading chunk");
                     break;
@@ -231,7 +236,10 @@ impl SeekableBufferingReader {
                     }
                 }
             }
-            error!("done reading chunk, read_this_time: {}, use_this_division: {}, division_index: {}", read_this_time, use_this_division, division_index);
+            error!(
+                "done reading chunk, read_this_time: {}, use_this_division: {}, division_index: {}",
+                read_this_time, use_this_division, division_index
+            );
 
             if read_this_time > 0 {
                 if use_this_division {
@@ -240,17 +248,18 @@ impl SeekableBufferingReader {
                         .fetch_add(read_this_time, Ordering::Relaxed);
                     total_len += read_this_time;
                     loop {
-                        let mut data = self.instance.new_data.write().unwrap();
-                        let len = data.len();
-                        if chunk_index == len {
+                        let chunks_written = self.data_written.load(Ordering::Relaxed);
+                        if chunks_written == division_index {
+                            let mut data = self.instance.new_data.write().unwrap();
+                            let len = data.len();
                             dest_data.truncate(read_this_time);
                             data.push(dest_data);
+                            self.instance.data_written.fetch_add(1, Ordering::Relaxed);
                             error!("this chunk is ready, wrote it: {} out of {}, division_index: {}, chunk_index: {}, len: {}", division, divisions, division_index, chunk_index, len);
                             notify += notify_all(); // notify after data added
                             break;
                         }
                         error!("this chunk is ready, but waiting for previous to write: {} out of {}, division_index: {}, chunk_index: {}, len: {}", division, divisions, division_index, chunk_index, len);
-                        drop(data);
                         // we are ready with the next section, but the previous section hasn't written to the final output buffer yet, so we have to wait until it writes
                         self.wait_for_new_data();
                     }
