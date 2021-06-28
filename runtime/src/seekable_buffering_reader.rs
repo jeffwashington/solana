@@ -1,6 +1,7 @@
 use {
     crossbeam_channel::{unbounded, RecvTimeoutError},
     log::*,
+    rayon::{prelude::*, ThreadPool},
     solana_measure::measure::Measure,
     std::{
         io::*,
@@ -55,7 +56,7 @@ impl Drop for SeekableBufferingReaderInner {
 }
 
 impl SeekableBufferingReader {
-    pub fn new<T: 'static + Read + std::marker::Send>(reader: T) -> Self {
+    pub fn new<T: 'static + Read + std::marker::Send>(reader: Vec<T>) -> Self {
         let inner = SeekableBufferingReaderInner {
             new_data: RwLock::new(vec![]),
             data: RwLock::new(vec![]),
@@ -74,18 +75,19 @@ impl SeekableBufferingReader {
             next_index_within_last_buffer: 0,
         };
 
-        let result_ = result.clone();
-
+        let divisions = reader.len();
+        let par = reader.into_iter().enumerate().map(|(i, reader)| (i, reader, result.clone())).collect::<Vec<_>>();
         let handle = Builder::new()
-            .name("solana-compressed_file_reader".to_string())
-            .spawn(move || {
-                result_.read_entire_file_in_bg(reader);
-            });
+        .name("solana-compressed_file_reader".to_string())
+        .spawn(move || {
+        par.into_par_iter().for_each(|(i, reader, result)|
+                result.read_entire_file_in_bg(reader, i, divisions)
+            );});
         *result.instance.bg_reader.lock().unwrap() = Some(handle.unwrap()); // TODO - unwrap here - do we expect to fail creating a thread? If we do, probably a fatal error anyway.
         std::thread::sleep(std::time::Duration::from_millis(200)); // hack: give time for file to be read a little bit
         result
     }
-    fn read_entire_file_in_bg<T: 'static + Read + std::marker::Send>(&self, mut reader: T) {
+    fn read_entire_file_in_bg<T: 'static + Read + std::marker::Send>(&self, mut reader: T, division: usize, divisions: usize) {
         let mut time = Measure::start("");
         const CHUNK_SIZE: usize = 10_000_000;
         const MAX_READ_SIZE: usize = 10_000_000;//65536*2;
@@ -141,6 +143,8 @@ impl SeekableBufferingReader {
         let mut chunk_index = 0;
         let mut total_len = 0;
         error!("{}, {}", file!(), line!());
+        let division_index = 0;
+        let dummy = vec![];
         'outer: loop {
             if self.instance.stop.load(Ordering::Relaxed) {
                 self.set_error(std::io::Error::from(std::io::ErrorKind::TimedOut));
@@ -152,6 +156,8 @@ impl SeekableBufferingReader {
             let mut timeout_us = 0;
             let mut attempts = 0;
             let mut m = Measure::start("");
+            let use_this_division = division_index % divisions == division;
+            if use_this_division {
             loop {
                 let data = receiver.recv_timeout(std::time::Duration::from_micros(timeout_us));
                 match data {
@@ -170,6 +176,9 @@ impl SeekableBufferingReader {
                     }
                 }
             }
+        } else {
+            dest_data = dummy.clone();
+        }
             m.stop();
             allocate += m.as_us();
 
@@ -195,8 +204,10 @@ impl SeekableBufferingReader {
                             break;
                         }
 
-                        dest_data[read_start..(read_start + size)].copy_from_slice(&static_data[0..size]);
-                        // read some more
+                        if use_this_division {
+                            dest_data[read_start..(read_start + size)].copy_from_slice(&static_data[0..size]);
+                        }
+                        // loop to read some more
                         largest = std::cmp::max(largest, size);
                         read_this_time += size;
                     }
@@ -206,7 +217,7 @@ impl SeekableBufferingReader {
                     }
                 }
             }
-            if read_this_time > 0 {
+            if use_this_division && read_this_time > 0 {
                 self.instance.len.fetch_add(read_this_time, Ordering::Relaxed);
                 total_len += read_this_time;
                 dest_data.truncate(read_this_time);

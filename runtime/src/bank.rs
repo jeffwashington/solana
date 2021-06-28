@@ -5633,9 +5633,6 @@ pub(crate) mod tests {
         let mut t = vec![0u8; size];
         let mut m = Measure::start("");
         for i in 0..forty {
-            for k in 0..size {
-                t[k] = (k % 256) as u8;
-            }
             f[i][..].copy_from_slice(&t[..]);
         }
         m.stop();

@@ -773,14 +773,15 @@ pub fn purge_old_snapshot_archives<P: AsRef<Path>>(
     }
 }
 
-fn unpack_snapshot_local<T: 'static + Read + std::marker::Send>(
-    reader: T,
+fn unpack_snapshot_local<T: 'static + Read + std::marker::Send, F: Fn() -> T>(
+    reader: F,
     ledger_dir: &Path,
     account_paths: &[PathBuf],
     parallel_divisions: usize,
 ) -> Result<UnpackedAppendVecMap> {
     assert!(parallel_divisions > 0);
-    let buf = SeekableBufferingReader::new(reader);
+    let readers = (0..parallel_divisions).into_iter().map(|_| reader()).collect();
+    let buf = SeekableBufferingReader::new(readers);
 
     // create 'divisions' # of parallel workers, each responsible for 1/divisions of all the files to extract.
     let all_unpacked_append_vec_map = (0..parallel_divisions)
@@ -816,23 +817,20 @@ fn untar_snapshot_in<P: AsRef<Path>>(
     archive_format: ArchiveFormat,
     parallel_divisions: usize,
 ) -> Result<UnpackedAppendVecMap> {
-    let tar_name = File::open(&snapshot_tar)?;
+    error!("divisions: {}", parallel_divisions);
+    let open_file = || File::open(&snapshot_tar).unwrap();
     let account_paths_map = match archive_format {
         ArchiveFormat::TarBzip2 => {
-            let tar = BzDecoder::new(BufReader::new(tar_name));
-            unpack_snapshot_local(tar, unpack_dir, account_paths, parallel_divisions)?
+            unpack_snapshot_local(|| BzDecoder::new(BufReader::new(open_file())), unpack_dir, account_paths, parallel_divisions)?
         }
         ArchiveFormat::TarGzip => {
-            let tar = GzDecoder::new(BufReader::new(tar_name));
-            unpack_snapshot_local(tar, unpack_dir, account_paths, parallel_divisions)?
+            unpack_snapshot_local(|| GzDecoder::new(BufReader::new(open_file())), unpack_dir, account_paths, parallel_divisions)?
         }
         ArchiveFormat::TarZstd => {
-            let tar = zstd::stream::read::Decoder::new(BufReader::new(tar_name))?;
-            unpack_snapshot_local(tar, unpack_dir, account_paths, parallel_divisions)?
+            unpack_snapshot_local(|| zstd::stream::read::Decoder::new(BufReader::new(open_file())).unwrap(), unpack_dir, account_paths, parallel_divisions)?
         }
         ArchiveFormat::Tar => {
-            let tar = BufReader::new(tar_name);
-            unpack_snapshot_local(tar, unpack_dir, account_paths, parallel_divisions)?
+            unpack_snapshot_local(|| BufReader::new(open_file()), unpack_dir, account_paths, parallel_divisions)?
         }
     };
     Ok(account_paths_map)
