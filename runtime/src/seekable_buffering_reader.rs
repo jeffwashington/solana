@@ -193,7 +193,7 @@ impl SeekableBufferingReader {
                 break;
             }
 
-            let mut dest_data;
+            let mut dest_data = dummy.clone();
             let mut timeout_us = 0;
             let mut attempts = 0;
             let mut m = Measure::start("");
@@ -206,12 +206,12 @@ impl SeekableBufferingReader {
                     drop(buffers);
                     match buffer {
                         Some(buffer) => {
-                            error!("got buffer: idx: {}, remainng: {}", division_index, remaining);
+                            //error!("got buffer: idx: {}, remainng: {}", division_index, remaining);
                             dest_data = buffer;
                             break;
                         }
                         None => {
-                            error!("wait for new buffer");
+                            //error!("wait for new buffer");
                             // none available, so wait
                             self.wait_for_new_buffer();
                         }
@@ -373,12 +373,12 @@ impl SeekableBufferingReader {
         let mut new_min = *indices.iter().min().unwrap();
         if new_min == usize::MAX {
             new_min = self.instance.data.read().unwrap().len(); // we are done, we can drop all the rest
-            error!("moved: {}, new min is: {}", self.my_client_index, new_min);
+            //error!("moved: {}, new min is: {}", self.my_client_index, new_min);
         }
-        error!("update_client_index: {}, {}, new min is: {}, sizes: {:?}", self.my_client_index, last_buffer_index, new_min, *self.instance.clients.read().unwrap());
+        //error!("update_client_index: {}, {}, new min is: {}, sizes: {:?}", self.my_client_index, last_buffer_index, new_min, *self.instance.clients.read().unwrap());
         drop(indices);
         for recycle in (previous_last_buffer_index..new_min) {
-            error!("recycling: {}", recycle);
+            //error!("recycling: {}", recycle);
             let mut remove = vec![];
             let mut data = self.instance.data.write().unwrap();
             std::mem::swap(&mut remove, &mut data[recycle]);
