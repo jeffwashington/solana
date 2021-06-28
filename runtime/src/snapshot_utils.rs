@@ -42,6 +42,9 @@ use {
 
 pub const SNAPSHOT_STATUS_CACHE_FILE_NAME: &str = "status_cache";
 
+pub const READERS: usize = 4;
+pub const ARCHIVERS: usize = 4;
+
 pub const MAX_SNAPSHOTS: usize = 8; // Save some snapshots but not too many
 const MAX_SNAPSHOT_DATA_FILE_SIZE: u64 = 32 * 1024 * 1024 * 1024; // 32 GiB
 const VERSION_STRING_V1_2_0: &str = "1.2.0";
@@ -622,7 +625,7 @@ pub fn bank_from_archive<P: AsRef<Path> + std::marker::Sync>(
 
     let mut untar = Measure::start("snapshot untar");
     // From testing, 4 seems to be a sweet spot for ranges of 60M-360M accounts and 16-64 cores. This may need to be tuned later.
-    let divisions = 4;//std::cmp::min(4, std::cmp::max(1, num_cpus::get() / 4));
+    let divisions = READERS;//std::cmp::min(4, std::cmp::max(1, num_cpus::get() / 4));
     let unpacked_append_vec_map = untar_snapshot_in(
         &snapshot_tar,
         unpack_dir.as_ref(),
@@ -784,7 +787,7 @@ fn unpack_snapshot_local<T: 'static + Read + std::marker::Send, F: Fn() -> T>(
     let mut buf = SeekableBufferingReader::new(readers);
     buf.no_more_reading();
 
-    parallel_divisions = 1;
+    parallel_divisions = ARCHIVERS;
     // create 'divisions' # of parallel workers, each responsible for 1/divisions of all the files to extract.
     let all_unpacked_append_vec_map = (0..parallel_divisions)
         .into_par_iter()
