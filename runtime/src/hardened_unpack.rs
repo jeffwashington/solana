@@ -234,7 +234,8 @@ pub fn unpack_snapshot<A: Read>(
                 i += 1;
                 match &parallel_selector {
                     Some(parallel_selector) => {
-                        if !parallel_selector.select_index(i - 1) {
+                        // do 'divisions' items in a row instead of every 'divisions' item. Take advantage of consecutive memory maybe?
+                        if !parallel_selector.select_index((i - 1) / parallel_selector.divisions) {
                             return UnpackPath::Ignore;
                         }
                     }
