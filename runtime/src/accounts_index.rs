@@ -3769,6 +3769,7 @@ pub mod tests {
 
     #[test]
     fn test_profile_batch_insert() {
+        solana_logger::setup();
         let slot0 = 0;
         let key0 = Keypair::new().pubkey();
         let key1 = Keypair::new().pubkey();
