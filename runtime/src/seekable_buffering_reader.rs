@@ -356,6 +356,9 @@ impl SeekableBufferingReader {
         }
         return false;
     }
+    pub fn no_more_reading(&mut self) {
+        self.update_client_index(usize::MAX);
+    }
     fn update_client_index(&mut self, last_buffer_index: usize) {
         let previous_last_buffer_index = self.last_buffer_index;
         self.last_buffer_index = last_buffer_index;
@@ -367,9 +370,9 @@ impl SeekableBufferingReader {
         let mut new_min = *indices.iter().min().unwrap();
         if new_min == usize::MAX {
             new_min = self.instance.data.read().unwrap().len(); // we are done, we can drop all the rest
-            error!("moved: {}, new min is: {}", self.my_client_index, new_min);
+            error!("moved: {}, new min is: {}", self.my_client_index, last_buffer_index, new_min);
         }
-        error!("update_client_index: {}, new min is: {}", self.my_client_index, new_min);
+        error!("update_client_index: {}, {}, new min is: {}", self.my_client_index, new_min);
         drop(indices);
         for recycle in (previous_last_buffer_index..new_min) {
             error!("recycling: {}", recycle);

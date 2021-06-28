@@ -782,6 +782,7 @@ fn unpack_snapshot_local<T: 'static + Read + std::marker::Send, F: Fn() -> T>(
     assert!(parallel_divisions > 0);
     let readers = (0..parallel_divisions).into_iter().map(|_| reader()).collect();
     let buf = SeekableBufferingReader::new(readers);
+    buf.no_more_reading();
 
     parallel_divisions = 1;
     // create 'divisions' # of parallel workers, each responsible for 1/divisions of all the files to extract.
