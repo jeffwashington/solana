@@ -102,8 +102,8 @@ impl SeekableBufferingReader {
         divisions: usize,
     ) {
         let mut time = Measure::start("");
-        const CHUNK_SIZE: usize = 1_000_000_000;
-        const MAX_READ_SIZE: usize = 1_000_000_000; //65536*2;
+        const CHUNK_SIZE: usize = 2_000_000_000;
+        const MAX_READ_SIZE: usize = 2_000_000_000; //65536*2;
         let (_lock, cvar) = &self.instance.new_data_signal;
         let mut notify = 0;
         let mut read = 0;
