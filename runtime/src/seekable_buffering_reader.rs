@@ -22,7 +22,7 @@ pub struct SeekableBufferingReaderInner {
     pub len: AtomicUsize,
     pub calls: AtomicUsize,
     pub error: RwLock<std::io::Result<usize>>,
-    pub data_written: AtomicUSize,
+    pub data_written: AtomicUsize,
     pub bg_reader: Mutex<Option<JoinHandle<()>>>,
     pub file_read_complete: AtomicBool,
     pub stop: AtomicBool,
@@ -255,11 +255,11 @@ impl SeekableBufferingReader {
                             dest_data.truncate(read_this_time);
                             data.push(dest_data);
                             self.instance.data_written.fetch_add(1, Ordering::Relaxed);
-                            error!("this chunk is ready, wrote it: {} out of {}, division_index: {}, chunk_index: {}, len: {}", division, divisions, division_index, chunk_index, len);
+                            error!("this chunk is ready, wrote it: {} out of {}, division_index: {}, chunk_index: {}, len: {}", division, divisions, division_index, chunk_index, chunks_written);
                             notify += notify_all(); // notify after data added
                             break;
                         }
-                        error!("this chunk is ready, but waiting for previous to write: {} out of {}, division_index: {}, chunk_index: {}, len: {}", division, divisions, division_index, chunk_index, len);
+                        error!("this chunk is ready, but waiting for previous to write: {} out of {}, division_index: {}, chunk_index: {}, len: {}", division, divisions, division_index, chunk_index, chunks_written);
                         // we are ready with the next section, but the previous section hasn't written to the final output buffer yet, so we have to wait until it writes
                         self.wait_for_new_data();
                     }
