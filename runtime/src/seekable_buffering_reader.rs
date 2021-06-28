@@ -241,13 +241,15 @@ impl SeekableBufferingReader {
                     total_len += read_this_time;
                     loop {
                         let mut data = self.instance.new_data.write().unwrap();
-                        if chunk_index == data.len() {
+                        let len = data.len();
+                        if chunk_index == len {
                             dest_data.truncate(read_this_time);
                             data.push(dest_data);
+                            error!("this chunk is ready, wrote it: {} out of {}, division_index: {}, chunk_index: {}, len", division, divisions, division_index, chunk_index, len);
                             notify += notify_all(); // notify after data added
                             break;
                         }
-                        error!("this chunk is ready, but waiting for previous to write: {} out of {}, division_index: {}, chunk_index: {}", division, divisions, division_index, chunk_index);
+                        error!("this chunk is ready, but waiting for previous to write: {} out of {}, division_index: {}, chunk_index: {}, len", division, divisions, division_index, chunk_index, len);
                         drop(data);
                         // we are ready with the next section, but the previous section hasn't written to the final output buffer yet, so we have to wait until it writes
                         self.wait_for_new_data();
