@@ -76,22 +76,32 @@ impl SeekableBufferingReader {
         };
 
         let divisions = reader.len();
-        let par = reader.into_iter().enumerate().map(|(i, reader)| (i, reader, result.clone())).collect::<Vec<_>>();
+        let par = reader
+            .into_iter()
+            .enumerate()
+            .map(|(i, reader)| (i, reader, result.clone()))
+            .collect::<Vec<_>>();
         let handle = Builder::new()
-        .name("solana-compressed_file_reader".to_string())
-        .spawn(move || {
-        par.into_par_iter().for_each(|(i, reader, result)|{
-        error!("starting: {}", i);
-                result.read_entire_file_in_bg(reader, i, divisions);
-        });});
+            .name("solana-compressed_file_reader".to_string())
+            .spawn(move || {
+                par.into_par_iter().for_each(|(i, reader, result)| {
+                    error!("starting: {}", i);
+                    result.read_entire_file_in_bg(reader, i, divisions);
+                });
+            });
         *result.instance.bg_reader.lock().unwrap() = Some(handle.unwrap()); // TODO - unwrap here - do we expect to fail creating a thread? If we do, probably a fatal error anyway.
         std::thread::sleep(std::time::Duration::from_millis(200)); // hack: give time for file to be read a little bit
         result
     }
-    fn read_entire_file_in_bg<T: 'static + Read + std::marker::Send>(&self, mut reader: T, division: usize, divisions: usize) {
+    fn read_entire_file_in_bg<T: 'static + Read + std::marker::Send>(
+        &self,
+        mut reader: T,
+        division: usize,
+        divisions: usize,
+    ) {
         let mut time = Measure::start("");
         const CHUNK_SIZE: usize = 10_000_000;
-        const MAX_READ_SIZE: usize = 10_000_000;//65536*2;
+        const MAX_READ_SIZE: usize = 10_000_000; //65536*2;
         let (_lock, cvar) = &self.instance.new_data_signal;
         let mut notify = 0;
         let mut read = 0;
@@ -140,7 +150,7 @@ impl SeekableBufferingReader {
                 error!("done making vecs");
             });
 
-            let mut largest = 0;
+        let mut largest = 0;
         let mut chunk_index = 0;
         let mut total_len = 0;
         error!("{}, {}", file!(), line!());
@@ -159,27 +169,27 @@ impl SeekableBufferingReader {
             let mut m = Measure::start("");
             let use_this_division = division_index % divisions == division;
             if use_this_division {
-            loop {
-                let data = receiver.recv_timeout(std::time::Duration::from_micros(timeout_us));
-                match data {
-                    Err(RecvTimeoutError::Disconnected) => break 'outer,
-                    Err(RecvTimeoutError::Timeout) => {
-                        request.1.notify_one();
-                        attempts += 1;
-                        timeout_us = 100; // we can wait longer now that we requested
-                        if attempts % 1000 == 0 {
-                            error!("attempts to get new vecs: {}", attempts);
+                loop {
+                    let data = receiver.recv_timeout(std::time::Duration::from_micros(timeout_us));
+                    match data {
+                        Err(RecvTimeoutError::Disconnected) => break 'outer,
+                        Err(RecvTimeoutError::Timeout) => {
+                            request.1.notify_one();
+                            attempts += 1;
+                            timeout_us = 100; // we can wait longer now that we requested
+                            if attempts % 1000 == 0 {
+                                error!("attempts to get new vecs: {}", attempts);
+                            }
+                        }
+                        Ok(new_buffer) => {
+                            dest_data = new_buffer;
+                            break;
                         }
                     }
-                    Ok(new_buffer) => {
-                        dest_data = new_buffer;
-                        break;
-                    }
                 }
+            } else {
+                dest_data = dummy.clone();
             }
-        } else {
-            dest_data = dummy.clone();
-        }
             m.stop();
             allocate += m.as_us();
 
@@ -192,10 +202,11 @@ impl SeekableBufferingReader {
                 let read_start = read_this_time;
                 let read_end = std::cmp::min(read_start + MAX_READ_SIZE, dest_data.len());
                 if read_end == read_start {
+                    error!("done reading chunk");
                     break;
                 }
                 let mut time_read = Measure::start("read");
-                let result = reader.read(&mut static_data[0..(read_end-read_start)]);
+                let result = reader.read(&mut static_data[0..(read_end - read_start)]);
                 time_read.stop();
                 read += time_read.as_us();
                 match result {
@@ -206,7 +217,8 @@ impl SeekableBufferingReader {
                         }
 
                         if use_this_division {
-                            dest_data[read_start..(read_start + size)].copy_from_slice(&static_data[0..size]);
+                            dest_data[read_start..(read_start + size)]
+                                .copy_from_slice(&static_data[0..size]);
                         }
                         // loop to read some more
                         largest = std::cmp::max(largest, size);
@@ -218,9 +230,13 @@ impl SeekableBufferingReader {
                     }
                 }
             }
+            error!("done reading chunk, read_this_time: {}, use_this_division: {}, division_index: {}", read_this_time, use_this_division, division_index);
+
             if read_this_time > 0 {
                 if use_this_division {
-                    self.instance.len.fetch_add(read_this_time, Ordering::Relaxed);
+                    self.instance
+                        .len
+                        .fetch_add(read_this_time, Ordering::Relaxed);
                     total_len += read_this_time;
                     loop {
                         let mut data = self.instance.new_data.write().unwrap();
@@ -235,9 +251,11 @@ impl SeekableBufferingReader {
                         // we are ready with the next section, but the previous section hasn't written to the final output buffer yet, so we have to wait until it writes
                         self.wait_for_new_data();
                     }
-                }
-                else {
-                    error!("skipping this chunk: {} out of {}, division_index: {}, chunk_index: {}", division, divisions, division_index, chunk_index);
+                } else {
+                    error!(
+                        "skipping this chunk: {} out of {}, division_index: {}, chunk_index: {}",
+                        division, divisions, division_index, chunk_index
+                    );
                 }
                 division_index += 1;
                 chunk_index += 1;
