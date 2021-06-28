@@ -166,6 +166,7 @@ struct GenerateIndexTimings {
     pub index_time: u64,
     pub scan_time: u64,
     pub insertion_time_us: u64,
+    pub insertion_time_total_us: u64,
 }
 
 impl GenerateIndexTimings {
@@ -176,6 +177,7 @@ impl GenerateIndexTimings {
             ("total_us", self.index_time, i64),
             ("scan_stores_us", self.scan_time, i64),
             ("insertion_time_us", self.insertion_time_us, i64),
+            ("insertion_time_total_us", self.insertion_time_total_us, i64),
         );
     }
 }
@@ -5884,8 +5886,8 @@ impl AccountsDb {
     fn generate_primary_index_for_slot<'a>(
         &'a self,
         items: impl Iterator<Item = (Slot, usize, impl Iterator<Item = (Pubkey, AccountInfo)>)>,
-    ) -> u64 {
-        let (_dirty_pubkeys, insert_us) = self
+    ) -> (u64, u64) {
+        let (_dirty_pubkeys, insert_us, total_insert_us) = self
             .accounts_index
             .insert_new_if_missing_into_primary_index(items);
 
@@ -5897,7 +5899,7 @@ impl AccountsDb {
             self.uncleaned_pubkeys.insert(*slot, dirty_pubkeys);
         }
         */
-        insert_us
+        (insert_us, total_insert_us)
     }
 
     fn generate_secondary_index_for_slot<'a>(
@@ -5931,6 +5933,7 @@ impl AccountsDb {
         let chunk_size = outer_slots_len;//(outer_slots_len / 7) + 1; // approximately 400k slots in a snapshot
         let mut index_time = Measure::start("index");
         let insertion_time_us = AtomicU64::new(0);
+        let insertion_time_total_us = AtomicU64::new(0);
         error!("scan start");
         let scan_time: u64 = slots
             .par_chunks(chunk_size)
@@ -5960,8 +5963,9 @@ impl AccountsDb {
                 }
                 let iter = all.into_iter().map(|(a,b,c)| (a,b,c.into_iter()));
                 let mut scan_time = Measure::start("batch insert");
-                let insert_us = self.generate_primary_index_for_slot(iter);
+                let (insert_us, insert_total_us) = self.generate_primary_index_for_slot(iter);
                 insertion_time_us.fetch_add(insert_us, Ordering::Relaxed);
+                insertion_time_total_us.fetch_add(insert_total_us, Ordering::Relaxed);
                 error!("chunk done");
                 scan_time_sum
             })
@@ -5971,6 +5975,7 @@ impl AccountsDb {
             scan_time,
             index_time: index_time.as_us(),
             insertion_time_us: insertion_time_us.load(Ordering::Relaxed),
+            insertion_time_total_us: insertion_time_total_us.load(Ordering::Relaxed),
         };
         timings.report();
         panic!("done");

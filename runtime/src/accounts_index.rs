@@ -1381,7 +1381,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
     pub(crate) fn insert_new_if_missing_into_primary_index<'a>(
         &'a self,
         items: impl Iterator<Item = (Slot, usize, impl Iterator<Item = (Pubkey, T)>)>,
-    ) -> (Vec<Pubkey>, u64) {
+    ) -> (Vec<Pubkey>, u64, u64) {
         let expected_items_per_bin = 0; //item_len * 2 / BINS; // estimate
         let expected_duplicates_per_bin = expected_items_per_bin / 100; // estimate
         let bins_per_chunk = 64;
@@ -1411,6 +1411,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
         let insertion_time = AtomicU64::new(0);
         error!("bins: {}", binned.len());
 
+        let mut it = Measure::start("total insertion time");
         let duplicate_keys = binned
             .into_par_iter()
             .map(|chunk| {
@@ -1446,7 +1447,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
             })
             .flatten()
             .collect::<Vec<_>>();
-
+            it.stop();
         let lens = self
             .account_maps
             .iter()
@@ -1459,7 +1460,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
             lens,
             lens.iter().sum::<usize>()
         );
-        (vec![], insertion_time.load(Ordering::Relaxed))
+        (vec![], insertion_time.load(Ordering::Relaxed), it.as_us())
     }
 
     // Updates the given pubkey at the given slot with the new account information.
