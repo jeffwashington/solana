@@ -81,6 +81,7 @@ impl SeekableBufferingReader {
         .name("solana-compressed_file_reader".to_string())
         .spawn(move || {
         par.into_par_iter().for_each(|(i, reader, result)|
+        error!("starting: {}", i);
                 result.read_entire_file_in_bg(reader, i, divisions)
             );});
         *result.instance.bg_reader.lock().unwrap() = Some(handle.unwrap()); // TODO - unwrap here - do we expect to fail creating a thread? If we do, probably a fatal error anyway.
@@ -229,12 +230,13 @@ impl SeekableBufferingReader {
                             notify += notify_all(); // notify after data added
                             break;
                         }
-                        error!("this chunk is ready, but waiting for previous to write: {} out of {}, chunk_index: {}", division, divisions, chunk_index);
+                        error!("this chunk is ready, but waiting for previous to write: {} out of {}, division_index: {}, chunk_index: {}", division, divisions, division_index, chunk_index);
                         drop(data);
                         // we are ready with the next section, but the previous section hasn't written to the final output buffer yet, so we have to wait until it writes
                         self.wait_for_new_data();
                     }
                 }
+                division_index += 1;
                 chunk_index += 1;
             }
 
