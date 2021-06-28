@@ -13,12 +13,14 @@ use {
     },
 };
 
+type ABuffer = Vec<u8>;
+
 pub struct SeekableBufferingReaderInner {
     // unpacking callers read from 'data'. Data is transferred when 'data' is exhausted.
     // This minimizes lock contention since bg file reader has to have almost constant write access.
-    pub data: RwLock<Vec<Vec<u8>>>,
+    pub data: RwLock<Vec<ABuffer>>,
     // bg thread reads to 'new_data'
-    pub new_data: RwLock<Vec<Vec<u8>>>,
+    pub new_data: RwLock<Vec<ABuffer>>,
     pub len: AtomicUsize,
     pub calls: AtomicUsize,
     pub error: RwLock<std::io::Result<usize>>,
@@ -27,6 +29,9 @@ pub struct SeekableBufferingReaderInner {
     pub file_read_complete: AtomicBool,
     pub stop: AtomicBool,
     pub new_data_signal: (Mutex<bool>, Condvar),
+    pub new_buffer_signal: (Mutex<bool>, Condvar),
+    pub clients: RwLock<Vec<usize>>, // keep track of the next read location per outstanding client
+    pub buffers: RwLock<Vec<ABuffer>>,
 }
 
 pub struct SeekableBufferingReader {
@@ -34,15 +39,22 @@ pub struct SeekableBufferingReader {
     pub pos: usize,
     pub last_buffer_index: usize,
     pub next_index_within_last_buffer: usize,
+    pub my_client_index: usize,
 }
 
 impl Clone for SeekableBufferingReader {
     fn clone(&self) -> Self {
+        let instance = Arc::clone(&self.instance);
+        let mut list = instance.clients.write().unwrap();
+        let my_client_index = list.len();
+        list.push(0);
+        drop(list);
         Self {
-            instance: Arc::clone(&self.instance),
+            instance,
             pos: 0,
             last_buffer_index: 0,
             next_index_within_last_buffer: 0,
+            my_client_index,
         }
     }
 }
@@ -55,6 +67,9 @@ impl Drop for SeekableBufferingReaderInner {
         }
     }
 }
+
+const CHUNK_SIZE: usize = 100_000_000;
+const MAX_READ_SIZE: usize = 100_000_000; //65536*2;
 
 impl SeekableBufferingReader {
     pub fn new<T: 'static + Read + std::marker::Send>(reader: Vec<T>) -> Self {
@@ -69,12 +84,16 @@ impl SeekableBufferingReader {
             file_read_complete: AtomicBool::new(false),
             stop: AtomicBool::new(false),
             new_data_signal: (Mutex::new(false), Condvar::new()),
+            new_buffer_signal: (Mutex::new(false), Condvar::new()),
+            clients: RwLock::new(vec![0]),
+            buffers: RwLock::new(Self::alloc_initial_vectors()),
         };
         let result = Self {
             instance: Arc::new(inner),
             pos: 0,
             last_buffer_index: 0,
             next_index_within_last_buffer: 0,
+            my_client_index: 0,
         };
 
         let divisions = reader.len();
@@ -95,6 +114,11 @@ impl SeekableBufferingReader {
         std::thread::sleep(std::time::Duration::from_millis(200)); // hack: give time for file to be read a little bit
         result
     }
+    fn alloc_initial_vectors() -> Vec<ABuffer> {
+        let initial_vector_count = 20;
+        (0..initial_vector_count).into_iter().map(|_|
+            vec![0u8; CHUNK_SIZE]).collect()
+    }
     fn read_entire_file_in_bg<T: 'static + Read + std::marker::Send>(
         &self,
         mut reader: T,
@@ -102,8 +126,6 @@ impl SeekableBufferingReader {
         divisions: usize,
     ) {
         let mut time = Measure::start("");
-        const CHUNK_SIZE: usize = 50_000_000;
-        const MAX_READ_SIZE: usize = 50_000_000; //65536*2;
         let (_lock, cvar) = &self.instance.new_data_signal;
         let mut notify = 0;
         let mut read = 0;
@@ -116,11 +138,11 @@ impl SeekableBufferingReader {
         };
         error!("{}, {}", file!(), line!());
 
-        let (sender, receiver) = unbounded();
 
         let request = Arc::new((Mutex::new(false), Condvar::new()));
+/*
+        let (sender, receiver) = unbounded();
         let request_ = request.clone();
-
         let handle = Builder::new()
             .name("solana-buf_allocator".to_string())
             .spawn(move || {
@@ -151,6 +173,7 @@ impl SeekableBufferingReader {
                 }
                 error!("done making vecs");
             });
+            */
 
         let mut largest = 0;
         let mut chunk_index = 0;
@@ -172,20 +195,17 @@ impl SeekableBufferingReader {
             let use_this_division = division_index % divisions == division;
             if use_this_division {
                 loop {
-                    let data = receiver.recv_timeout(std::time::Duration::from_micros(timeout_us));
-                    match data {
-                        Err(RecvTimeoutError::Disconnected) => break 'outer,
-                        Err(RecvTimeoutError::Timeout) => {
-                            request.1.notify_one();
-                            attempts += 1;
-                            timeout_us = 100; // we can wait longer now that we requested
-                            if attempts % 1000 == 0 {
-                                error!("attempts to get new vecs: {}", attempts);
-                            }
-                        }
-                        Ok(new_buffer) => {
-                            dest_data = new_buffer;
+                    let mut buffers = self.instance.buffers.write().unwrap();
+                    let buffer = buffers.pop();
+                    drop(buffers);
+                    match buffer {
+                        Some(buffer) => {
+                            dest_data = buffer;
                             break;
+                        }
+                        None => {
+                            // none available, so wait
+                            self.wait_for_new_buffer();
                         }
                     }
                 }
@@ -272,7 +292,7 @@ impl SeekableBufferingReader {
         }
 
         error!("waiting to join allocator");
-        let _ = handle.unwrap().join();
+        //let _ = handle.unwrap().join();
         //self.instance.len.fetch_add(total_len, Ordering::Relaxed);
         error!(
             "reading entire decompressed file took: {} us, bytes: {}, read_us: {}, notify_us: {}, allocate_us: {}, chunks: {}, largest fetch: {}",
@@ -296,7 +316,7 @@ impl SeekableBufferingReader {
         if from_lock.is_empty() {
             return false;
         }
-        let mut new_data: Vec<Vec<u8>> = vec![];
+        let mut new_data: Vec<ABuffer> = vec![];
         std::mem::swap(&mut *from_lock, &mut new_data);
         drop(from_lock);
         let mut to_lock = self.instance.data.write().unwrap();
@@ -320,6 +340,38 @@ impl SeekableBufferingReader {
         }
         return false;
     }
+    fn wait_for_new_buffer(&self) -> bool {
+        let (lock, cvar) = &self.instance.new_buffer_signal;
+        let data = lock.lock().unwrap();
+        let res = cvar
+            .wait_timeout(data, std::time::Duration::from_millis(1000))
+            .unwrap();
+        if res.1.timed_out() {
+            return true;
+        }
+        return false;
+    }
+    fn update_client_index(&mut self,last_buffer_index: usize) {
+        let previous_last_buffer_index = self.last_buffer_index;
+        self.last_buffer_index = last_buffer_index;
+        let client_index = self.my_client_index;
+        let mut indices = self.instance.clients.write().unwrap();
+        indices[client_index] = last_buffer_index;
+        drop(indices);
+        let indices = self.instance.clients.read().unwrap();
+        let new_min = *indices.iter().min().unwrap();
+        drop(indices);
+        for recycle in (previous_last_buffer_index..new_min) {
+            let mut remove = vec![];
+            let mut data = self.instance.data.write().unwrap();
+            std::mem::swap(&mut remove, &mut data[recycle]);
+            drop(data);
+            self.instance.buffers.write().unwrap().push(remove);
+            let (_lock, cvar) = &self.instance.new_buffer_signal;
+            cvar.notify_all(); // new buffer available
+        }
+    }
+
 }
 
 impl Read for SeekableBufferingReader {
@@ -366,6 +418,7 @@ impl Read for SeekableBufferingReader {
                     &source[self.next_index_within_last_buffer
                         ..(self.next_index_within_last_buffer + bytes_to_transfer)],
                 );
+                drop(lock);
                 self.next_index_within_last_buffer += bytes_to_transfer;
                 offset_in_dest += bytes_to_transfer;
                 remaining_request -= bytes_to_transfer;
@@ -375,14 +428,21 @@ impl Read for SeekableBufferingReader {
                     &source[self.next_index_within_last_buffer
                         ..(self.next_index_within_last_buffer + bytes_to_transfer)],
                 );
+                drop(lock);
                 offset_in_dest += bytes_to_transfer;
                 self.next_index_within_last_buffer = 0;
-                self.last_buffer_index += 1;
+                self.update_client_index(self.last_buffer_index + 1);
                 remaining_request -= bytes_to_transfer;
             }
         }
 
         self.instance.calls.fetch_add(1, Ordering::Relaxed);
         Ok(offset_in_dest)
+    }
+}
+
+impl Drop for SeekableBufferingReader {
+    fn drop(&mut self) {
+        self.update_client_index(usize::MAX); // this one is done reading
     }
 }
