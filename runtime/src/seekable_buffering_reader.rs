@@ -457,7 +457,8 @@ impl SeekableBufferingReader {
                 }
 
                 if !eof {
-                    // just destroy buffers once we hit eof and they aren't needed for reading anymore
+                    // if !eof, recycle this buffer and notify waiting reader(s)
+                    // if eof, just drop buffer this buffer since it isn't needed for reading anymore
                     self.instance.buffers.write().unwrap().push(remove);
                     let (_lock, cvar) = &self.instance.new_buffer_signal;
                     cvar.notify_all(); // new buffer available
@@ -519,7 +520,6 @@ impl Read for SeekableBufferingReader {
             self.current_data = self.empty_buffer.clone(); // we have exhausted this buffer, unref it so it can be recycled without copy
             self.next_index_within_last_buffer = 0;
             let mut m = Measure::start("");
-            error!("exhausted, looking at: {}", self.last_buffer_index);
             self.update_client_index(self.last_buffer_index + 1);
             m.stop();
             self.update_client_index += m.as_us();
