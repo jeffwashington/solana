@@ -22,7 +22,6 @@ pub struct SeekableBufferingReaderInner {
     // bg thread reads to 'new_data'
     pub new_data: RwLock<Vec<ABuffer>>,
     pub len: AtomicUsize,
-    pub calls: AtomicUsize,
     pub error: RwLock<std::io::Result<usize>>,
     pub data_written: AtomicUsize,
     pub bg_reader: Mutex<Option<JoinHandle<()>>>,
@@ -48,6 +47,7 @@ pub struct SeekableBufferingReader {
     pub transfer_data: u64,
     pub lock_data: u64,
     pub current_data: Option<ABuffer>,
+    pub calls: usize,
 }
 /*
 impl Clone for SeekableBufferingReader {
@@ -96,6 +96,7 @@ impl SeekableBufferingReader {
             transfer_data: 0,
             lock_data: 0,
             current_data: None,
+            calls: 0,
         }
     }
     pub fn clone_reader(&self) -> Self {
@@ -115,7 +116,6 @@ impl SeekableBufferingReader {
             new_data: RwLock::new(vec![]),
             data: RwLock::new(vec![]),
             len: AtomicUsize::new(0),
-            calls: AtomicUsize::new(0),
             error: RwLock::new(Ok(0)),
             data_written: AtomicUsize::new(0),
             bg_reader: Mutex::new(None),
@@ -398,9 +398,6 @@ impl SeekableBufferingReader {
         to_lock.append(&mut new_data);
         true
     }
-    pub fn calls(&self) -> usize {
-        self.instance.calls.load(Ordering::Relaxed)
-    }
     pub fn len(&self) -> usize {
         self.instance.len.load(Ordering::Relaxed)
     }
@@ -479,9 +476,8 @@ impl SeekableBufferingReader {
 
 impl Read for SeekableBufferingReader {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        let now = std::time::Instant::now();
         let request_len = buf.len();
-        let mut instance = &*self.instance;
+        let now = std::time::Instant::now();
 
         let mut remaining_request = request_len;
         let mut offset_in_dest = 0;
@@ -512,10 +508,8 @@ impl Read for SeekableBufferingReader {
                     self.current_data = None; // we have exhausted this buffer, unref it so it can be recycled without copy
                     self.next_index_within_last_buffer = 0;
                     let mut m = Measure::start("");
-                    drop(instance);
                     self.update_client_index(self.last_buffer_index + 1);
                     m.stop();
-                    instance = &*self.instance;
                     self.update_client_index += m.as_us();
                 }
                 None => {
@@ -525,6 +519,7 @@ impl Read for SeekableBufferingReader {
 
 
             let mut m = Measure::start("");
+            let mut instance = &*self.instance;
             let lock = instance.data.read().unwrap();
             m.stop();
             self.lock_data += m.as_us();
@@ -589,7 +584,7 @@ impl Read for SeekableBufferingReader {
         }
 
         self.in_read += now.elapsed().as_micros() as u64;
-        instance.calls.fetch_add(1, Ordering::Relaxed);
+        self.calls += 1;
         Ok(offset_in_dest)
     }
 }
@@ -597,8 +592,8 @@ impl Read for SeekableBufferingReader {
 impl Drop for SeekableBufferingReader {
     fn drop(&mut self) {
         if self.my_client_index != usize::MAX {
-            error!("dropping client: {}, waiting: {} us, in_read: {} us, copy_data: {} us, recycler: {} us, transfer: {} us, lock: {} us, left over: {} us", self.my_client_index, self.time_spent_waiting, self.in_read, self.copy_data, self.update_client_index, self.transfer_data, self.lock_data,
-            self.in_read - (self.copy_data+ self.update_client_index + self.transfer_data + self.lock_data));
+            error!("dropping client: {}, waiting: {} us, in_read: {} us, copy_data: {} us, recycler: {} us, transfer: {} us, lock: {} us, left over: {} us, calls: {}", self.my_client_index, self.time_spent_waiting, self.in_read, self.copy_data, self.update_client_index, self.transfer_data, self.lock_data,
+            self.in_read - (self.copy_data+ self.update_client_index + self.transfer_data + self.lock_data), self.calls);
             self.update_client_index(usize::MAX); // this one is done reading
         }
     }

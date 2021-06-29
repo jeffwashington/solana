@@ -183,13 +183,10 @@ where
     }
     if let Some(buf) = buf {
         let len = buf.len();
-        let calls = std::cmp::max(1, buf.calls());
         info!(
-            "unpacked {} entries total, raw bytes: {}, calls: {}, bytes/call: {}",
+            "unpacked {} entries total, raw bytes: {}",
             total_entries,
             len,
-            calls,
-            len / calls
         );
     }
 
