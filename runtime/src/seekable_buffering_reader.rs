@@ -95,7 +95,7 @@ impl SeekableBufferingReader {
             pos: 0,
             last_buffer_index: 0,
             next_index_within_last_buffer: 0,
-            my_client_index: usize::MAX,
+            my_client_index: 0,//usize::MAX,
         };
 
         let divisions = reader.len();
