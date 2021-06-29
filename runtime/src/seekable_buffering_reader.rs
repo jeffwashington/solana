@@ -43,6 +43,7 @@ pub struct SeekableBufferingReader {
     pub time_spent_waiting: u64,
     pub in_read: u64,
     pub copy_data: u64,
+    pub update_client_index: u64,
 }
 /*
 impl Clone for SeekableBufferingReader {
@@ -87,6 +88,7 @@ impl SeekableBufferingReader {
             in_read: 0,
             time_spent_waiting: 0,
             copy_data: 0,
+            update_client_index: 0,
         }
     }
     pub fn clone_reader(&self) -> Self {
@@ -508,6 +510,9 @@ impl Read for SeekableBufferingReader {
                 if self.last_buffer_index == 0 {
                     info!("Waited on new data, timed out: {}, us: {}", timed_out, m.as_us());
                 }
+                if timed_out {
+                    error!("timed out waiting for new data");
+                }
                 self.time_spent_waiting += m.as_us();
                 continue;
             }
@@ -521,9 +526,9 @@ impl Read for SeekableBufferingReader {
                     &source[self.next_index_within_last_buffer
                         ..(self.next_index_within_last_buffer + bytes_to_transfer)],
                 );
+                drop(lock);
                 m.stop();
                 self.copy_data += m.as_us();
-                drop(lock);
                 self.next_index_within_last_buffer += bytes_to_transfer;
                 offset_in_dest += bytes_to_transfer;
                 remaining_request -= bytes_to_transfer;
@@ -534,12 +539,15 @@ impl Read for SeekableBufferingReader {
                     &source[self.next_index_within_last_buffer
                         ..(self.next_index_within_last_buffer + bytes_to_transfer)],
                 );
+                drop(lock);
                 m.stop();
                 self.copy_data += m.as_us();
-                drop(lock);
                 offset_in_dest += bytes_to_transfer;
                 self.next_index_within_last_buffer = 0;
+                let mut m = Measure::start("");
                 self.update_client_index(self.last_buffer_index + 1);
+                m.stop();
+                self.update_client_index += m.as_us();
                 remaining_request -= bytes_to_transfer;
             }
         }
@@ -553,7 +561,7 @@ impl Read for SeekableBufferingReader {
 impl Drop for SeekableBufferingReader {
     fn drop(&mut self) {
         if self.my_client_index != usize::MAX {
-            error!("dropping client: {}, waiting: {} us, in_read: {} us, copy_data: {} us", self.my_client_index, self.time_spent_waiting, self.in_read, self.copy_data);
+            error!("dropping client: {}, waiting: {} us, in_read: {} us, copy_data: {} us, recylcler: {} us", self.my_client_index, self.time_spent_waiting, self.in_read, self.copy_data, self.update_client_index);
             self.update_client_index(usize::MAX); // this one is done reading
         }
     }
