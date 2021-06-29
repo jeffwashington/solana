@@ -46,6 +46,7 @@ pub struct SeekableBufferingReader {
     pub copy_data: u64,
     pub update_client_index: u64,
     pub transfer_data: u64,
+    pub lock_data: u64,
     pub current_data: Option<ABuffer>,
 }
 /*
@@ -93,6 +94,7 @@ impl SeekableBufferingReader {
             copy_data: 0,
             update_client_index: 0,
             transfer_data: 0,
+            lock_data: 0,
             current_data: None,
         }
     }
@@ -518,7 +520,12 @@ impl Read for SeekableBufferingReader {
                 }
             }
 
+
+            let mut m = Measure::start("");
             let lock = self.instance.data.read().unwrap();
+            m.stop();
+            self.lock_data += lock.as_us();
+
             if self.last_buffer_index >= lock.len() {
                 drop(lock);
 
@@ -587,8 +594,8 @@ impl Read for SeekableBufferingReader {
 impl Drop for SeekableBufferingReader {
     fn drop(&mut self) {
         if self.my_client_index != usize::MAX {
-            error!("dropping client: {}, waiting: {} us, in_read: {} us, copy_data: {} us, recycler: {} us, transfer: {} us, left over: {} us", self.my_client_index, self.time_spent_waiting, self.in_read, self.copy_data, self.update_client_index, self.transfer_data,
-            self.in_read - (self.copy_data+ self.update_client_index + self.transfer_data));
+            error!("dropping client: {}, waiting: {} us, in_read: {} us, copy_data: {} us, recycler: {} us, transfer: {} us, lock: {} us, left over: {} us", self.my_client_index, self.time_spent_waiting, self.in_read, self.copy_data, self.update_client_index, self.transfer_data, self.lock,
+            self.in_read - (self.copy_data+ self.update_client_index + self.transfer_data + self.lock_data));
             self.update_client_index(usize::MAX); // this one is done reading
         }
     }
