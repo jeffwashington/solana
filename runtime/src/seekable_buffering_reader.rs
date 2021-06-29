@@ -254,7 +254,7 @@ impl SeekableBufferingReader {
                     drop(buffers);
                     match buffer {
                         Some(buffer) => {
-                            error!("got buffer: idx: {}, remainng: {}", division_index, remaining);
+                            //error!("got buffer: idx: {}, remainng: {}", division_index, remaining);
                             dest_data = buffer;
                             read_this_much = dest_data.len();
                             assert_eq!(Arc::strong_count(&dest_data), 1);
@@ -441,13 +441,13 @@ impl SeekableBufferingReader {
         let indices = self.instance.clients.read().unwrap();
         let mut new_min = *indices.iter().min().unwrap();
         new_min = std::cmp::min(new_min, self.instance.data.read().unwrap().len());
-        error!("update_client_index: {}, {}, new min is: {}, sizes: {:?}", self.my_client_index, last_buffer_index, new_min, *self.instance.clients.read().unwrap());
+        //error!("update_client_index: {}, {}, new min is: {}, sizes: {:?}", self.my_client_index, last_buffer_index, new_min, *self.instance.clients.read().unwrap());
         drop(indices);
         if new_min > previous_last_buffer_index {
             let eof = self.reached_eof();
 
             for recycle in (previous_last_buffer_index..new_min) {
-                error!("recycling: {}", recycle);
+                //error!("recycling: {}", recycle);
                 let mut remove = self.empty_buffer.clone();
                 let mut data = self.instance.data.write().unwrap();
                 std::mem::swap(&mut remove, &mut data[recycle]);
