@@ -498,6 +498,7 @@ impl Read for SeekableBufferingReader {
         let mut eof_seen = false;
         while remaining_request > 0 {
             let mut source = &*self.current_data;
+            let mut good = true;
             if source.is_empty() {
                 let mut m = Measure::start("");
                 let mut instance = &*self.instance;
@@ -510,35 +511,38 @@ impl Read for SeekableBufferingReader {
                     source = &*self.current_data;
                 }
                 else {
-                    error!("could not update data")
+                    good = false;
+                    error!("could not update data: {}", self.last_buffer_index);
                 }
             }
-            let full_len = source.len();
-            let remaining_len = full_len - self.next_index_within_last_buffer;
+            if good {
+                let full_len = source.len();
+                let remaining_len = full_len - self.next_index_within_last_buffer;
 
-            let bytes_to_transfer = std::cmp::min(remaining_request, remaining_len);
+                let bytes_to_transfer = std::cmp::min(remaining_request, remaining_len);
 
-            // copy what we can
-            let mut m = Measure::start("");
-            buf[offset_in_dest..(offset_in_dest + bytes_to_transfer)].copy_from_slice(
-                &source[self.next_index_within_last_buffer
-                    ..(self.next_index_within_last_buffer + bytes_to_transfer)],
-            );
-            m.stop();
-            self.copy_data += m.as_us();
-            self.next_index_within_last_buffer += bytes_to_transfer;
-            offset_in_dest += bytes_to_transfer;
-            remaining_request -= bytes_to_transfer;
+                // copy what we can
+                let mut m = Measure::start("");
+                buf[offset_in_dest..(offset_in_dest + bytes_to_transfer)].copy_from_slice(
+                    &source[self.next_index_within_last_buffer
+                        ..(self.next_index_within_last_buffer + bytes_to_transfer)],
+                );
+                m.stop();
+                self.copy_data += m.as_us();
+                self.next_index_within_last_buffer += bytes_to_transfer;
+                offset_in_dest += bytes_to_transfer;
+                remaining_request -= bytes_to_transfer;
 
-            if remaining_request == 0 {
-                break;
+                if remaining_request == 0 {
+                    break;
+                }
+                self.current_data = self.empty_buffer.clone(); // we have exhausted this buffer, unref it so it can be recycled without copy
+                self.next_index_within_last_buffer = 0;
+                let mut m = Measure::start("");
+                self.update_client_index(self.last_buffer_index + 1);
+                m.stop();
+                self.update_client_index += m.as_us();
             }
-            self.current_data = self.empty_buffer.clone(); // we have exhausted this buffer, unref it so it can be recycled without copy
-            self.next_index_within_last_buffer = 0;
-            let mut m = Measure::start("");
-            self.update_client_index(self.last_buffer_index + 1);
-            m.stop();
-            self.update_client_index += m.as_us();
 
             let mut m = Measure::start("");
             let mut instance = &*self.instance;
