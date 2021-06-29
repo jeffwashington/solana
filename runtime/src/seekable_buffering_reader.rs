@@ -13,7 +13,7 @@ use {
     },
 };
 
-type ABuffer = Vec<u8>;
+type ABuffer = Arc<Vec<u8>>;
 
 pub struct SeekableBufferingReaderInner {
     // unpacking callers read from 'data'. Data is transferred when 'data' is exhausted.
@@ -32,6 +32,7 @@ pub struct SeekableBufferingReaderInner {
     pub new_buffer_signal: (Mutex<bool>, Condvar),
     pub clients: RwLock<Vec<usize>>, // keep track of the next read location per outstanding client
     pub buffers: RwLock<Vec<ABuffer>>,
+    pub empty_buffer: ABuffer,
 }
 
 pub struct SeekableBufferingReader {
@@ -44,6 +45,7 @@ pub struct SeekableBufferingReader {
     pub in_read: u64,
     pub copy_data: u64,
     pub update_client_index: u64,
+    pub current_data: Option<ABuffer>,
 }
 /*
 impl Clone for SeekableBufferingReader {
@@ -89,6 +91,7 @@ impl SeekableBufferingReader {
             time_spent_waiting: 0,
             copy_data: 0,
             update_client_index: 0,
+            current_data: None,
         }
     }
     pub fn clone_reader(&self) -> Self {
@@ -118,6 +121,7 @@ impl SeekableBufferingReader {
             new_buffer_signal: (Mutex::new(false), Condvar::new()),
             clients: RwLock::new(vec![]),
             buffers: RwLock::new(Self::alloc_initial_vectors()),
+            empty_buffer: ABuffer::default(),
         };
         let result = Self::new_with_instance(&Arc::new(inner));
 
@@ -153,11 +157,10 @@ impl SeekableBufferingReader {
                 let size = if i >= buffer_count {
                     // a few smaller sizes to get us initial data quicker to prevent readers from waiting
                     CHUNK_SIZE / 10
-                } 
-                else {
+                } else {
                     CHUNK_SIZE
                 };
-                vec![0u8; size]
+                Arc::new(vec![0u8; size])
             })
             .collect()
     }
@@ -222,7 +225,7 @@ impl SeekableBufferingReader {
         let mut total_len = 0;
         error!("{}, {}", file!(), line!());
         let mut division_index = 0;
-        let dummy = vec![];
+        let dummy = self.instance.empty_buffer.clone();
         'outer: loop {
             if self.instance.stop.load(Ordering::Relaxed) {
                 self.set_error(std::io::Error::from(std::io::ErrorKind::TimedOut));
@@ -285,10 +288,15 @@ impl SeekableBufferingReader {
                         }
 
                         if use_this_division {
-                            if division_index < 3 && read_start == 0{
-                                error!("division_index: {} block read: {} bytes, {} us", division_index, size, now.elapsed().as_micros());
+                            if division_index < 3 && read_start == 0 {
+                                error!(
+                                    "division_index: {} block read: {} bytes, {} us",
+                                    division_index,
+                                    size,
+                                    now.elapsed().as_micros()
+                                );
                             }
-                            dest_data[read_start..(read_start + size)]
+                            Arc::make_mut(&mut dest_data)[read_start..(read_start + size)]
                                 .copy_from_slice(&static_data[0..size]);
                         }
                         // loop to read some more
@@ -309,14 +317,19 @@ impl SeekableBufferingReader {
                         .fetch_add(read_this_time, Ordering::Relaxed);
                     total_len += read_this_time;
                     if division_index < 3 {
-                        error!("final: division_index: {} block read: {} bytes, {} us", division_index, read_this_time, now.elapsed().as_micros());
+                        error!(
+                            "final: division_index: {} block read: {} bytes, {} us",
+                            division_index,
+                            read_this_time,
+                            now.elapsed().as_micros()
+                        );
                     }
 
                     loop {
                         let chunks_written = self.instance.data_written.load(Ordering::Relaxed);
                         if chunks_written == division_index {
                             if read_this_time != CHUNK_SIZE {
-                                dest_data.truncate(read_this_time);
+                                Arc::make_mut(&mut dest_data).truncate(read_this_time);
                                 error!("truncating buffer to: {}", read_this_time);
                             }
                             let mut data = self.instance.new_data.write().unwrap();
@@ -427,7 +440,7 @@ impl SeekableBufferingReader {
         let mut new_min = *indices.iter().min().unwrap();
         if new_min == usize::MAX {
             new_min = self.instance.data.read().unwrap().len(); // we are done, we can drop all the rest
-            //error!("moved: {}, new min is: {}", self.my_client_index, new_min);
+                                                                //error!("moved: {}, new min is: {}", self.my_client_index, new_min);
         }
         //error!("update_client_index: {}, {}, new min is: {}, sizes: {:?}", self.my_client_index, last_buffer_index, new_min, *self.instance.clients.read().unwrap());
         drop(indices);
@@ -436,7 +449,7 @@ impl SeekableBufferingReader {
 
             for recycle in (previous_last_buffer_index..new_min) {
                 //error!("recycling: {}", recycle);
-                let mut remove = vec![];
+                let mut remove = self.instance.empty_buffer.clone();
                 let mut data = self.instance.data.write().unwrap();
                 std::mem::swap(&mut remove, &mut data[recycle]);
                 drop(data);
@@ -445,7 +458,8 @@ impl SeekableBufferingReader {
                     continue; // another thread beat us or we have initial small buffers, so ignore these
                 }
 
-                if !eof { // just destroy buffers once we hit eof and they aren't needed for reading anymore
+                if !eof {
+                    // just destroy buffers once we hit eof and they aren't needed for reading anymore
                     self.instance.buffers.write().unwrap().push(remove);
                     let (_lock, cvar) = &self.instance.new_buffer_signal;
                     cvar.notify_all(); // new buffer available
@@ -454,7 +468,7 @@ impl SeekableBufferingReader {
         }
     }
     fn reached_eof(&self) -> bool {
-        self.instance.file_read_complete.load(Ordering::Relaxed)        
+        self.instance.file_read_complete.load(Ordering::Relaxed)
     }
 }
 
@@ -467,6 +481,44 @@ impl Read for SeekableBufferingReader {
         let mut offset_in_dest = 0;
         let mut eof_seen = false;
         while remaining_request > 0 {
+            match &self.current_data {
+                Some(source) => {
+                    let full_len = source.len();
+                    let remaining_len = full_len - self.next_index_within_last_buffer;
+
+                    let bytes_to_transfer = if remaining_len >= remaining_request {
+                        remaining_request
+                    } else {
+                        remaining_len
+                    };
+
+                    // copy what we can
+                    let mut m = Measure::start("");
+                    buf[offset_in_dest..(offset_in_dest + bytes_to_transfer)].copy_from_slice(
+                        &source[self.next_index_within_last_buffer
+                            ..(self.next_index_within_last_buffer + bytes_to_transfer)],
+                    );
+                    m.stop();
+                    self.copy_data += m.as_us();
+                    self.next_index_within_last_buffer += bytes_to_transfer;
+                    offset_in_dest += bytes_to_transfer;
+                    remaining_request -= bytes_to_transfer;
+
+                    if remaining_len >= remaining_request {
+                        continue;
+                    }
+                    self.current_data = None; // we have exhausted this buffer, unref it so it can be recycled without copy
+                    self.next_index_within_last_buffer = 0;
+                    let mut m = Measure::start("");
+                    self.update_client_index(self.last_buffer_index + 1);
+                    m.stop();
+                    self.update_client_index += m.as_us();
+                }
+                None => {
+                    // fall through and get us a local buffer
+                }
+            }
+
             let lock = self.instance.data.read().unwrap();
             if self.last_buffer_index >= lock.len() {
                 drop(lock);
@@ -501,14 +553,17 @@ impl Read for SeekableBufferingReader {
                         return stored_error;
                     }
                 }
-    
                 // no data to transfer, and file not finished, so wait:
                 //std::thread::sleep(std::time::Duration::from_millis(1000));
                 let mut m = Measure::start("");
                 let timed_out = self.wait_for_new_data();
                 m.stop();
                 if self.last_buffer_index == 0 {
-                    info!("Waited on new data, timed out: {}, us: {}", timed_out, m.as_us());
+                    info!(
+                        "Waited on new data, timed out: {}, us: {}",
+                        timed_out,
+                        m.as_us()
+                    );
                 }
                 if timed_out {
                     error!("timed out waiting for new data");
@@ -516,40 +571,7 @@ impl Read for SeekableBufferingReader {
                 self.time_spent_waiting += m.as_us();
                 continue;
             }
-            let source = &lock[self.last_buffer_index];
-            let full_len = source.len();
-            let remaining_len = full_len - self.next_index_within_last_buffer;
-            if remaining_len >= remaining_request {
-                let bytes_to_transfer = remaining_request;
-                let mut m = Measure::start("");
-                buf[offset_in_dest..(offset_in_dest + bytes_to_transfer)].copy_from_slice(
-                    &source[self.next_index_within_last_buffer
-                        ..(self.next_index_within_last_buffer + bytes_to_transfer)],
-                );
-                drop(lock);
-                m.stop();
-                self.copy_data += m.as_us();
-                self.next_index_within_last_buffer += bytes_to_transfer;
-                offset_in_dest += bytes_to_transfer;
-                remaining_request -= bytes_to_transfer;
-            } else {
-                let bytes_to_transfer = remaining_len;
-                let mut m = Measure::start("");
-                buf[offset_in_dest..(offset_in_dest + bytes_to_transfer)].copy_from_slice(
-                    &source[self.next_index_within_last_buffer
-                        ..(self.next_index_within_last_buffer + bytes_to_transfer)],
-                );
-                drop(lock);
-                m.stop();
-                self.copy_data += m.as_us();
-                offset_in_dest += bytes_to_transfer;
-                self.next_index_within_last_buffer = 0;
-                let mut m = Measure::start("");
-                self.update_client_index(self.last_buffer_index + 1);
-                m.stop();
-                self.update_client_index += m.as_us();
-                remaining_request -= bytes_to_transfer;
-            }
+            self.current_data = Some(lock[self.last_buffer_index].clone());
         }
 
         self.instance.calls.fetch_add(1, Ordering::Relaxed);
