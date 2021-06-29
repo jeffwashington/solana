@@ -486,11 +486,7 @@ impl Read for SeekableBufferingReader {
                     let full_len = source.len();
                     let remaining_len = full_len - self.next_index_within_last_buffer;
 
-                    let bytes_to_transfer = if remaining_len >= remaining_request {
-                        remaining_request
-                    } else {
-                        remaining_len
-                    };
+                    let bytes_to_transfer = std::cmp::min(remaining_request, remaining_len);
 
                     // copy what we can
                     let mut m = Measure::start("");
@@ -504,8 +500,8 @@ impl Read for SeekableBufferingReader {
                     offset_in_dest += bytes_to_transfer;
                     remaining_request -= bytes_to_transfer;
 
-                    if remaining_len >= remaining_request {
-                        continue;
+                    if remaining_request == 0 {
+                        break;
                     }
                     self.current_data = None; // we have exhausted this buffer, unref it so it can be recycled without copy
                     self.next_index_within_last_buffer = 0;
