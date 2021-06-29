@@ -421,6 +421,9 @@ impl SeekableBufferingReader {
             //error!("recycling: {}", recycle);
             let mut remove = vec![];
             let mut data = self.instance.data.write().unwrap();
+            if data[recycle].len() == 0 {
+                continue; // another thread beat us
+            }
             std::mem::swap(&mut remove, &mut data[recycle]);
             if data[recycle].len() > 0 {
                 panic!("recylce didn't swap");
