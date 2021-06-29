@@ -69,7 +69,7 @@ impl Drop for SeekableBufferingReaderInner {
     }
 }
 
-const TOTAL_BUFFER_BUDGET: usize = 2_000_000_000;
+const TOTAL_BUFFER_BUDGET: usize = 3_000_000_000;
 const CHUNK_SIZE: usize = 5_000_000;
 const MAX_READ_SIZE: usize = 5_000_000; //65536*2;
 
