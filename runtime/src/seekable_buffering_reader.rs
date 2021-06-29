@@ -475,10 +475,10 @@ impl SeekableBufferingReader {
 impl Read for SeekableBufferingReader {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         let request_len = buf.len();
+        let source = &*self.current_data;
         let now = std::time::Instant::now();
         let mut remaining_request = request_len;
         let mut offset_in_dest = 0;
-        let source = &*self.current_data;
         let full_len = source.len();
         let remaining_len = full_len - self.next_index_within_last_buffer;
         let bytes_to_transfer = std::cmp::min(remaining_len, request_len);
