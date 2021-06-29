@@ -254,7 +254,7 @@ impl SeekableBufferingReader {
                     drop(buffers);
                     match buffer {
                         Some(buffer) => {
-                            error!("got buffer: idx: {}, remainng: {}", division_index, remaining);
+                            //error!("got buffer: idx: {}, remainng: {}", division_index, remaining);
                             dest_data = buffer;
                             read_this_much = dest_data.len();
                             assert_eq!(Arc::strong_count(&dest_data), 1);
