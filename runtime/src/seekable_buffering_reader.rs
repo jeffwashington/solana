@@ -303,6 +303,7 @@ impl SeekableBufferingReader {
                             let mut data = self.instance.new_data.write().unwrap();
                             let len = data.len();
                             dest_data.truncate(read_this_time);
+                            error!("truncating buffer to: {}", read_this_time);
                             data.push(dest_data);
                             self.instance.data_written.fetch_add(1, Ordering::Relaxed);
                             notify += notify_all(); // notify after data added
@@ -418,6 +419,9 @@ impl SeekableBufferingReader {
             let mut remove = vec![];
             let mut data = self.instance.data.write().unwrap();
             std::mem::swap(&mut remove, &mut data[recycle]);
+            if data[recycle].len() > 0 {
+                panic!("recylce didn't swap");
+            }
             drop(data);
             if remove.len() == CHUNK_SIZE {
 
