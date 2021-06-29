@@ -432,9 +432,15 @@ impl SeekableBufferingReader {
             let mut data = self.instance.data.write().unwrap();
             std::mem::swap(&mut remove, &mut data[recycle]);
             drop(data);
+            if remove.len() == CHUNK_SIZE {
+
             self.instance.buffers.write().unwrap().push(remove);
             let (_lock, cvar) = &self.instance.new_buffer_signal;
             cvar.notify_all(); // new buffer available
+            }
+            else {
+                error!("destorying buffer of size: {}", remove.len());
+            }
         }
     }
 }
