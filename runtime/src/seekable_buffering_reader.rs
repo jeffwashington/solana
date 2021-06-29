@@ -422,8 +422,10 @@ impl Read for SeekableBufferingReader {
                 }
                 // no data to transfer, and file not finished, so wait:
                 //std::thread::sleep(std::time::Duration::from_millis(1000));
-                info!("Waiting on new data, timed out: {}", timed_out);
+                let mut m = Measure::start("");
                 let timed_out = self.wait_for_new_data();
+                m.stop();
+                info!("Waited on new data, timed out: {}, us: {}", timed_out, m.as_us());
                 continue;
             }
             let source = &lock[self.last_buffer_index];
