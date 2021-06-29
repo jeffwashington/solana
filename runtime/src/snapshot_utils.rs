@@ -7,6 +7,7 @@ use {
         serde_snapshot::{
             bank_from_stream, bank_to_stream, SerdeStyle, SnapshotStorage, SnapshotStorages,
         },
+        shared_buffer_reader::{SharedBuffer, SharedBufferReader},
         snapshot_package::{
             AccountsPackage, AccountsPackagePre, AccountsPackageSendError, AccountsPackageSender,
         },
@@ -608,7 +609,7 @@ pub struct BankFromArchiveTimings {
 }
 
 // From testing, 4 seems to be a sweet spot for ranges of 60M-360M accounts and 16-64 cores. This may need to be tuned later.
-pub const PARALLEL_UNTAR_READERS_DEFAULT: usize = 4;
+const PARALLEL_UNTAR_READERS_DEFAULT: usize = 4;
 
 #[allow(clippy::too_many_arguments)]
 pub fn bank_from_archive<P: AsRef<Path> + std::marker::Sync>(
@@ -792,21 +793,18 @@ fn unpack_snapshot_local<T: 'static + Read + std::marker::Send, F: Fn() -> T>(
     parallel_archivers: usize,
 ) -> Result<UnpackedAppendVecMap> {
     assert!(parallel_archivers > 0);
-    let readers = (0..parallel_archivers)
-        .into_iter()
-        .map(|_| reader())
-        .collect::<Vec<_>>();
+    // a shared 'reader' that reads the decompressed stream once, keeps some history, and acts as a reader for multiple parallel archive readers
+    let shared_buffer = SharedBuffer::new(reader());
 
-    // create 'parallel_archivers' # of parallel workers, each responsible for 1/parallel_archivers of all the files to extract.
-    let all_unpacked_append_vec_map = readers
+    // create 'divisions' # of parallel workers, each responsible for 1/divisions of all the files to extract.
+    let all_unpacked_append_vec_map = (0..parallel_archivers)
         .into_par_iter()
-        .enumerate()
-        .map(|(index, reader)| {
+        .map(|index| {
             let parallel_selector = Some(ParallelSelector {
                 index,
                 divisions: parallel_archivers,
             });
-            let mut archive = Archive::new(reader);
+            let mut archive = Archive::new(SharedBufferReader::new(&shared_buffer));
             unpack_snapshot(&mut archive, ledger_dir, account_paths, parallel_selector)
         })
         .collect::<Vec<_>>();
