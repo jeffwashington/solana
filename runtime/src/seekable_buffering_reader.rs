@@ -254,7 +254,7 @@ impl SeekableBufferingReader {
                     drop(buffers);
                     match buffer {
                         Some(buffer) => {
-                            //error!("got buffer: idx: {}, remainng: {}", division_index, remaining);
+                            error!("got buffer: idx: {}, remainng: {}", division_index, remaining);
                             dest_data = buffer;
                             read_this_much = dest_data.len();
                             assert_eq!(Arc::strong_count(&dest_data), 1);
@@ -441,13 +441,13 @@ impl SeekableBufferingReader {
         let indices = self.instance.clients.read().unwrap();
         let mut new_min = *indices.iter().min().unwrap();
         new_min = std::cmp::min(new_min, self.instance.data.read().unwrap().len());
-        //error!("update_client_index: {}, {}, new min is: {}, sizes: {:?}", self.my_client_index, last_buffer_index, new_min, *self.instance.clients.read().unwrap());
+        error!("update_client_index: {}, {}, new min is: {}, sizes: {:?}", self.my_client_index, last_buffer_index, new_min, *self.instance.clients.read().unwrap());
         drop(indices);
         if new_min > previous_last_buffer_index {
             let eof = self.reached_eof();
 
             for recycle in (previous_last_buffer_index..new_min) {
-                //error!("recycling: {}", recycle);
+                error!("recycling: {}", recycle);
                 let mut remove = self.empty_buffer.clone();
                 let mut data = self.instance.data.write().unwrap();
                 std::mem::swap(&mut remove, &mut data[recycle]);
@@ -505,8 +505,12 @@ impl Read for SeekableBufferingReader {
                 m.stop();
                 self.lock_data += m.as_us();
                 if self.last_buffer_index < lock.len() {
+                    error!("updating data")
                     self.current_data = Arc::clone(&lock[self.last_buffer_index]);
                     source = &*self.current_data;
+                }
+                else {
+                    error!("could not update data")
                 }
             }
             let full_len = source.len();
