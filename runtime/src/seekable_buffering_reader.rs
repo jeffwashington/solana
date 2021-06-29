@@ -535,11 +535,13 @@ impl Read for SeekableBufferingReader {
                 if remaining_request == 0 {
                     break;
                 }
+                drop(source);
                 self.current_data = self.empty_buffer.clone(); // we have exhausted this buffer, unref it so it can be recycled without copy
                 self.next_index_within_last_buffer = 0;
                 let mut m = Measure::start("");
                 self.update_client_index(self.last_buffer_index + 1);
                 m.stop();
+                source = &*self.empty_buffer;
                 self.update_client_index += m.as_us();
             }
 
