@@ -481,6 +481,7 @@ impl Read for SeekableBufferingReader {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         let now = std::time::Instant::now();
         let request_len = buf.len();
+        let mut instance = &*self.instance;
 
         let mut remaining_request = request_len;
         let mut offset_in_dest = 0;
@@ -511,8 +512,10 @@ impl Read for SeekableBufferingReader {
                     self.current_data = None; // we have exhausted this buffer, unref it so it can be recycled without copy
                     self.next_index_within_last_buffer = 0;
                     let mut m = Measure::start("");
+                    drop(instance);
                     self.update_client_index(self.last_buffer_index + 1);
                     m.stop();
+                    instance = &*self.instance;
                     self.update_client_index += m.as_us();
                 }
                 None => {
@@ -522,7 +525,7 @@ impl Read for SeekableBufferingReader {
 
 
             let mut m = Measure::start("");
-            let lock = self.instance.data.read().unwrap();
+            let lock = instance.data.read().unwrap();
             m.stop();
             self.lock_data += m.as_us();
 
@@ -536,7 +539,7 @@ impl Read for SeekableBufferingReader {
                 if r {
                     continue;
                 }
-                if self.last_buffer_index >= self.instance.data.read().unwrap().len() {
+                if self.last_buffer_index >= instance.data.read().unwrap().len() {
                     continue;
                 }
 
@@ -554,10 +557,10 @@ impl Read for SeekableBufferingReader {
                 }
 
                 {
-                    let error = self.instance.error.read().unwrap();
+                    let error = instance.error.read().unwrap();
                     if error.is_err() {
                         drop(error);
-                        let mut error = self.instance.error.write().unwrap();
+                        let mut error = instance.error.write().unwrap();
                         let mut stored_error = Ok(0);
                         std::mem::swap(&mut *error, &mut stored_error);
                         drop(error);
@@ -585,8 +588,8 @@ impl Read for SeekableBufferingReader {
             self.current_data = Some(lock[self.last_buffer_index].clone());
         }
 
-        self.instance.calls.fetch_add(1, Ordering::Relaxed);
         self.in_read += now.elapsed().as_micros() as u64;
+        instance.calls.fetch_add(1, Ordering::Relaxed);
         Ok(offset_in_dest)
     }
 }
