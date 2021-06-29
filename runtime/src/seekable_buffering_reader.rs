@@ -465,18 +465,6 @@ impl Read for SeekableBufferingReader {
         let mut offset_in_dest = 0;
         let mut eof_seen = false;
         while remaining_request > 0 {
-            {
-                let error = self.instance.error.read().unwrap();
-                if error.is_err() {
-                    drop(error);
-                    let mut error = self.instance.error.write().unwrap();
-                    let mut stored_error = Ok(0);
-                    std::mem::swap(&mut *error, &mut stored_error);
-                    drop(error);
-                    error!("got error");
-                    return stored_error;
-                }
-            }
             let lock = self.instance.data.read().unwrap();
             if self.last_buffer_index >= lock.len() {
                 drop(lock);
@@ -499,6 +487,19 @@ impl Read for SeekableBufferingReader {
                     continue;
                 }
 
+                {
+                    let error = self.instance.error.read().unwrap();
+                    if error.is_err() {
+                        drop(error);
+                        let mut error = self.instance.error.write().unwrap();
+                        let mut stored_error = Ok(0);
+                        std::mem::swap(&mut *error, &mut stored_error);
+                        drop(error);
+                        error!("got error");
+                        return stored_error;
+                    }
+                }
+    
                 // no data to transfer, and file not finished, so wait:
                 //std::thread::sleep(std::time::Duration::from_millis(1000));
                 let mut m = Measure::start("");
