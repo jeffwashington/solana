@@ -421,9 +421,9 @@ impl Read for SeekableBufferingReader {
                     break; // eof reached
                 }
                 // no data to transfer, and file not finished, so wait:
-                let timed_out = self.wait_for_new_data();
-                std::thread::sleep(std::time::Duration::from_millis(1000));
+                //std::thread::sleep(std::time::Duration::from_millis(1000));
                 info!("Waiting on new data, timed out: {}", timed_out);
+                let timed_out = self.wait_for_new_data();
                 continue;
             }
             let source = &lock[self.last_buffer_index];
