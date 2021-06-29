@@ -159,7 +159,7 @@ impl SeekableBufferingReader {
     }
     fn alloc_initial_vectors() -> Vec<ABuffer> {
         let buffer_count = TOTAL_BUFFER_BUDGET / CHUNK_SIZE;
-        let initial_smaller_buffers_for_startup = 10;
+        let initial_smaller_buffers_for_startup = 50;
         let initial_vector_count = buffer_count + initial_smaller_buffers_for_startup;
         error!("{} initial vectors", initial_vector_count);
         (0..initial_vector_count)
