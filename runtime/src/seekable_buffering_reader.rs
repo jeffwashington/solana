@@ -81,8 +81,8 @@ impl Drop for SeekableBufferingReaderInner {
 }
 
 const TOTAL_BUFFER_BUDGET: usize = 2_000_000_000;
-const CHUNK_SIZE: usize = 10_000_000;
-const MAX_READ_SIZE: usize = 10_000_000; //65536*2;
+const CHUNK_SIZE: usize = 100_000_000;
+const MAX_READ_SIZE: usize = 100_000_000; //65536*2;
 
 impl SeekableBufferingReader {
     fn new_with_instance(instance: &Arc<SeekableBufferingReaderInner>) -> Self {
@@ -159,7 +159,7 @@ impl SeekableBufferingReader {
     }
     fn alloc_initial_vectors() -> Vec<ABuffer> {
         let buffer_count = TOTAL_BUFFER_BUDGET / CHUNK_SIZE;
-        let initial_smaller_buffers_for_startup = 50;
+        let initial_smaller_buffers_for_startup = 0;
         let initial_vector_count = buffer_count + initial_smaller_buffers_for_startup;
         error!("{} initial vectors", initial_vector_count);
         (0..initial_vector_count)
