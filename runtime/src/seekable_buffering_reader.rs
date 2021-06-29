@@ -72,7 +72,7 @@ impl Drop for SeekableBufferingReaderInner {
     }
 }
 
-const TOTAL_BUFFER_BUDGET: usize = 2_000_000_000;
+const TOTAL_BUFFER_BUDGET: usize = 3_000_000_000;
 const CHUNK_SIZE: usize = 100_000_000;
 const MAX_READ_SIZE: usize = 100_000_000; //65536*2;
 
@@ -141,11 +141,22 @@ impl SeekableBufferingReader {
         result
     }
     fn alloc_initial_vectors() -> Vec<ABuffer> {
-        let initial_vector_count = TOTAL_BUFFER_BUDGET / CHUNK_SIZE;
+        let buffer_count = TOTAL_BUFFER_BUDGET / CHUNK_SIZE;
+        let initial_smaller_buffers_for_startup = 10;
+        let initial_vector_count = buffer_count + initial_smaller_buffers_for_startup;
         error!("{} initial vectors", initial_vector_count);
         (0..initial_vector_count)
             .into_iter()
-            .map(|_| vec![0u8; CHUNK_SIZE])
+            .map(|i| {
+                let size = if i >= buffer_count {
+                    // a few smaller sizes to get us initial data quicker to prevent readers from waiting
+                    CHUNK_SIZE / 10
+                } 
+                else {
+                    CHUNK_SIZE
+                };
+                vec![0u8; size]
+            })
             .collect()
     }
     fn read_entire_file_in_bg<T: 'static + Read + std::marker::Send>(
@@ -417,28 +428,30 @@ impl SeekableBufferingReader {
         }
         //error!("update_client_index: {}, {}, new min is: {}, sizes: {:?}", self.my_client_index, last_buffer_index, new_min, *self.instance.clients.read().unwrap());
         drop(indices);
-        for recycle in (previous_last_buffer_index..new_min) {
-            //error!("recycling: {}", recycle);
-            let mut remove = vec![];
-            let mut data = self.instance.data.write().unwrap();
-            if data[recycle].len() == 0 {
-                continue; // another thread beat us
-            }
-            std::mem::swap(&mut remove, &mut data[recycle]);
-            if data[recycle].len() > 0 {
-                panic!("recylce didn't swap");
-            }
-            drop(data);
-            if remove.len() == CHUNK_SIZE {
+        if new_min > previous_last_buffer_index {
+            let eof = self.reached_eof();
 
-            self.instance.buffers.write().unwrap().push(remove);
-            let (_lock, cvar) = &self.instance.new_buffer_signal;
-            cvar.notify_all(); // new buffer available
-            }
-            else {
-                error!("destorying buffer of size: {}", remove.len());
+            for recycle in (previous_last_buffer_index..new_min) {
+                //error!("recycling: {}", recycle);
+                let mut remove = vec![];
+                let mut data = self.instance.data.write().unwrap();
+                std::mem::swap(&mut remove, &mut data[recycle]);
+                drop(data);
+                if remove.len() < CHUNK_SIZE {
+                    // swapped out buffer will be destroyed
+                    continue; // another thread beat us or we have initial small buffers, so ignore these
+                }
+
+                if !eof { // just destroy buffers once we hit eof and they aren't needed for reading anymore
+                    self.instance.buffers.write().unwrap().push(remove);
+                    let (_lock, cvar) = &self.instance.new_buffer_signal;
+                    cvar.notify_all(); // new buffer available
+                }
             }
         }
+    }
+    fn reached_eof(&self) -> bool {
+        self.instance.file_read_complete.load(Ordering::Relaxed)        
     }
 }
 
@@ -480,7 +493,7 @@ impl Read for SeekableBufferingReader {
 
                 // no data, we could not transfer, and still no data, so check for eof.
                 // If we got an eof, then we have to check again to make sure there isn't data now that we may have to transfer or not.
-                if self.instance.file_read_complete.load(Ordering::Relaxed) {
+                if self.reached_eof() {
                     eof_seen = true;
                     continue;
                 }
