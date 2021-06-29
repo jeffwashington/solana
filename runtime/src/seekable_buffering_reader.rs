@@ -580,7 +580,7 @@ impl Read for SeekableBufferingReader {
 impl Drop for SeekableBufferingReader {
     fn drop(&mut self) {
         if self.my_client_index != usize::MAX {
-            error!("dropping client: {}, waiting: {} us, in_read: {} us, copy_data: {} us, recylcler: {} us, left over: {} us", self.my_client_index, self.time_spent_waiting, self.in_read, self.copy_data, self.update_client_index,
+            error!("dropping client: {}, waiting: {} us, in_read: {} us, copy_data: {} us, recycler: {} us, left over: {} us", self.my_client_index, self.time_spent_waiting, self.in_read, self.copy_data, self.update_client_index,
             self.in_read - (self.in_read+ self.copy_data+ self.update_client_index));
             self.update_client_index(usize::MAX); // this one is done reading
         }
