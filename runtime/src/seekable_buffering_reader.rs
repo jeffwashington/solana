@@ -275,7 +275,7 @@ impl SeekableBufferingReader {
                         }
 
                         if use_this_division {
-                            if division_index < 3 {
+                            if division_index < 3 && read_start == 0{
                                 error!("division_index: {} block read: {} bytes, {} us", division_index, size, now.elapsed().as_micros());
                             }
                             dest_data[read_start..(read_start + size)]
