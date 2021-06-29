@@ -232,6 +232,7 @@ impl SeekableBufferingReader {
             */
 
         let mut largest = 0;
+        let mut wait = 0;
         let mut chunk_index = 0;
         let mut total_len = 0;
         error!("{}, {}", file!(), line!());
@@ -265,9 +266,12 @@ impl SeekableBufferingReader {
                             break;
                         }
                         None => {
+                            let mut m = Measure::start("");
                             //error!("wait for new buffer");
                             // none available, so wait
                             self.wait_for_new_buffer();
+                            m.stop();
+                            wait += m.as_us();
                         }
                     }
                 }
@@ -373,7 +377,7 @@ impl SeekableBufferingReader {
         //let _ = handle.unwrap().join();
         //self.instance.len.fetch_add(total_len, Ordering::Relaxed);
         error!(
-            "reading entire decompressed file took: {} us, bytes: {}, read_us: {}, notify_us: {}, allocate_us: {}, chunks: {}, largest fetch: {}",
+            "reading entire decompressed file took: {} us, bytes: {}, read_us: {}, notify_us: {}, allocate_us: {}, chunks: {}, largest fetch: {}, waiting for buffer: {}",
             time.as_us(),
             self.instance.len.load(Ordering::Relaxed),
             read,
@@ -381,6 +385,7 @@ impl SeekableBufferingReader {
             allocate,
             chunk_index,
             largest,
+            wait,
         );
     }
     fn set_error(&self, error: std::io::Error) {
