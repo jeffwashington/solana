@@ -70,8 +70,8 @@ impl Drop for SeekableBufferingReaderInner {
 }
 
 const TOTAL_BUFFER_BUDGET: usize = 2_000_000_000;
-const CHUNK_SIZE: usize = 10_000_000;
-const MAX_READ_SIZE: usize = 10_000_000; //65536*2;
+const CHUNK_SIZE: usize = 5_000_000;
+const MAX_READ_SIZE: usize = 5_000_000; //65536*2;
 
 impl SeekableBufferingReader {
     pub fn new<T: 'static + Read + std::marker::Send>(reader: Vec<T>) -> Self {
@@ -87,7 +87,7 @@ impl SeekableBufferingReader {
             stop: AtomicBool::new(false),
             new_data_signal: (Mutex::new(false), Condvar::new()),
             new_buffer_signal: (Mutex::new(false), Condvar::new()),
-            clients: RwLock::new(vec![0]),
+            clients: RwLock::new(vec![]),
             buffers: RwLock::new(Self::alloc_initial_vectors()),
         };
         let result = Self {
@@ -95,7 +95,7 @@ impl SeekableBufferingReader {
             pos: 0,
             last_buffer_index: 0,
             next_index_within_last_buffer: 0,
-            my_client_index: 0,
+            my_client_index: usize::MAX,
         };
 
         let divisions = reader.len();
