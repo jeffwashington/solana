@@ -399,6 +399,9 @@ impl SeekableBufferingReader {
         self.update_client_index(usize::MAX);
     }
     fn update_client_index(&mut self, last_buffer_index: usize) {
+        if self.my_client_index == usize::MAX {
+            panic!("illegal");
+        }
         let previous_last_buffer_index = self.last_buffer_index;
         self.last_buffer_index = last_buffer_index;
         let client_index = self.my_client_index;
