@@ -479,7 +479,6 @@ impl SeekableBufferingReader {
 impl Read for SeekableBufferingReader {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         let request_len = buf.len();
-        let now = std::time::Instant::now();
         let mut remaining_request = request_len;
         let mut offset_in_dest = 0;
         let mut source = &*self.current_data;
@@ -488,20 +487,15 @@ impl Read for SeekableBufferingReader {
         let bytes_to_transfer = std::cmp::min(remaining_len, request_len);
 
         // copy what we can
-        let mut m = Measure::start("");
         buf[offset_in_dest..(offset_in_dest + bytes_to_transfer)].copy_from_slice(
             &source[self.next_index_within_last_buffer
                 ..(self.next_index_within_last_buffer + bytes_to_transfer)],
         );
-        m.stop();
-        self.copy_data += m.as_us();
         self.next_index_within_last_buffer += bytes_to_transfer;
         offset_in_dest += bytes_to_transfer;
         remaining_request -= bytes_to_transfer;
 
         let mut eof_seen = false;
-        let e1 = now.elapsed().as_micros() as u64;
-        self.in_read_part1 += e1;
         while remaining_request > 0 {
             let mut good = true;
             if source.is_empty() {
@@ -614,12 +608,6 @@ impl Read for SeekableBufferingReader {
                 continue;
             }
         }
-        let e2 = now.elapsed().as_micros() as u64;
-        self.in_read_part2 += e2 - e1;
-
-
-        self.in_read += now.elapsed().as_micros() as u64;
-        self.calls += 1;
         Ok(offset_in_dest)
     }
 }
