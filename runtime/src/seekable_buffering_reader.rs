@@ -96,7 +96,8 @@ impl SeekableBufferingReader {
             update_client_index: 0,
             transfer_data: 0,
             lock_data: 0,
-            current_data: instance.data[0], // will always exist
+            // data[0] will always exist. may be empty, But that is ok. Corresponds to last_buffer_index initial value of 0
+            current_data: instance.data.read().unwrap()[0].clone(),
             calls: 0,
             empty_buffer: instance.empty_buffer.clone(),
         }
