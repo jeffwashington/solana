@@ -497,7 +497,18 @@ impl Read for SeekableBufferingReader {
 
         let mut eof_seen = false;
         while remaining_request > 0 {
-            let source = &*self.current_data;
+            let mut source = &*self.current_data;
+            if source.is_empty() {
+                let mut m = Measure::start("");
+                let mut instance = &*self.instance;
+                let lock = instance.data.read().unwrap();
+                m.stop();
+                self.lock_data += m.as_us();
+                if self.last_buffer_index < lock.len() {
+                    self.current_data = Arc::clone(&lock[self.last_buffer_index]);
+                    source = &*self.current_data;
+                }
+            }
             let full_len = source.len();
             let remaining_len = full_len - self.next_index_within_last_buffer;
 
@@ -587,7 +598,6 @@ impl Read for SeekableBufferingReader {
                 self.time_spent_waiting += m.as_us();
                 continue;
             }
-            self.current_data = Arc::clone(&lock[self.last_buffer_index]);
         }
 
         self.in_read += now.elapsed().as_micros() as u64;
