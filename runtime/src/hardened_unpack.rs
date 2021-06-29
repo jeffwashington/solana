@@ -107,7 +107,8 @@ where
     let mut total_count: u64 = 0;
 
     let mut total_entries = 0;
-    let mut last_log_update = Instant::now();
+    let start_time = Instant::now();
+    let mut last_log_update = start_time;
     for entry in archive.entries()? {
         let mut entry = entry?;
         let path = entry.path()?;
@@ -184,9 +185,10 @@ where
     if let Some(buf) = buf {
         let len = buf.len();
         info!(
-            "unpacked {} entries total, raw bytes: {}",
+            "unpacked {} entries total, raw bytes: {}, time: {} ms",
             total_entries,
             len,
+            start_time.elapsed().as_millis(),
         );
     }
 
