@@ -131,6 +131,7 @@ impl SeekableBufferingReader {
         division: usize,
         divisions: usize,
     ) {
+        let now = std::time::Instant::now();
         let mut time = Measure::start("");
         let (_lock, cvar) = &self.instance.new_data_signal;
         let mut notify = 0;
@@ -247,6 +248,9 @@ impl SeekableBufferingReader {
                         }
 
                         if use_this_division {
+                            if division_index < 3 {
+                                error!("division_index: {} block read: {} bytes, {} us", division_index, size, now.elapsed().as_micros());
+                            }
                             dest_data[read_start..(read_start + size)]
                                 .copy_from_slice(&static_data[0..size]);
                         }
@@ -267,6 +271,10 @@ impl SeekableBufferingReader {
                         .len
                         .fetch_add(read_this_time, Ordering::Relaxed);
                     total_len += read_this_time;
+                    if division_index < 3 {
+                        error!("final: division_index: {} block read: {} bytes, {} us", division_index, read_this_time, now.elapsed().as_micros());
+                    }
+
                     loop {
                         let chunks_written = self.instance.data_written.load(Ordering::Relaxed);
                         if chunks_written == division_index {
