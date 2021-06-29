@@ -142,6 +142,7 @@ impl SeekableBufferingReader {
     }
     fn alloc_initial_vectors() -> Vec<ABuffer> {
         let initial_vector_count = TOTAL_BUFFER_BUDGET / CHUNK_SIZE;
+        error!("{} initial vectors", initial_vector_count);
         (0..initial_vector_count)
             .into_iter()
             .map(|_| vec![0u8; CHUNK_SIZE])
@@ -300,13 +301,16 @@ impl SeekableBufferingReader {
                     loop {
                         let chunks_written = self.instance.data_written.load(Ordering::Relaxed);
                         if chunks_written == division_index {
-                            let mut data = self.instance.new_data.write().unwrap();
                             let len = data.len();
-                            dest_data.truncate(read_this_time);
-                            error!("truncating buffer to: {}", read_this_time);
+                            if read_this_time != CHUNK_SIZE {
+                                dest_data.truncate(read_this_time);
+                                error!("truncating buffer to: {}", read_this_time);
+                            }
+                            let mut data = self.instance.new_data.write().unwrap();
                             data.push(dest_data);
-                            self.instance.data_written.fetch_add(1, Ordering::Relaxed);
+                            drop(data);
                             notify += notify_all(); // notify after data added
+                            self.instance.data_written.fetch_add(1, Ordering::Relaxed);
                             break;
                         }
                         // we are ready with the next section, but the previous section hasn't written to the final output buffer yet, so we have to wait until it writes
