@@ -207,6 +207,7 @@ impl SeekableBufferingReader {
                     match buffer {
                         Some(buffer) => {
                             //error!("got buffer: idx: {}, remainng: {}", division_index, remaining);
+                            assert_eq!(buffer.len(),CHUNK_SIZE);
                             dest_data = buffer;
                             break;
                         }
