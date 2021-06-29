@@ -45,6 +45,7 @@ pub struct SeekableBufferingReader {
     pub in_read: u64,
     pub copy_data: u64,
     pub update_client_index: u64,
+    pub transfer_data: u64,
     pub current_data: Option<ABuffer>,
 }
 /*
@@ -91,6 +92,7 @@ impl SeekableBufferingReader {
             time_spent_waiting: 0,
             copy_data: 0,
             update_client_index: 0,
+            transfer_data: 0,
             current_data: None,
         }
     }
@@ -519,7 +521,12 @@ impl Read for SeekableBufferingReader {
             let lock = self.instance.data.read().unwrap();
             if self.last_buffer_index >= lock.len() {
                 drop(lock);
-                if self.transfer_data() {
+
+                let mut m = Measure::start("");
+                let r = self.transfer_data();
+                m.stop();
+                self.transfer_data += m.as_us();
+                if r {
                     continue;
                 }
                 if self.last_buffer_index >= self.instance.data.read().unwrap().len() {
@@ -531,6 +538,7 @@ impl Read for SeekableBufferingReader {
                     break; // eof reached
                 }
 
+                let mut m = Measure::start("");
                 // no data, we could not transfer, and still no data, so check for eof.
                 // If we got an eof, then we have to check again to make sure there isn't data now that we may have to transfer or not.
                 if self.reached_eof() {
@@ -552,7 +560,6 @@ impl Read for SeekableBufferingReader {
                 }
                 // no data to transfer, and file not finished, so wait:
                 //std::thread::sleep(std::time::Duration::from_millis(1000));
-                let mut m = Measure::start("");
                 let timed_out = self.wait_for_new_data();
                 m.stop();
                 if self.last_buffer_index == 0 {
@@ -580,8 +587,8 @@ impl Read for SeekableBufferingReader {
 impl Drop for SeekableBufferingReader {
     fn drop(&mut self) {
         if self.my_client_index != usize::MAX {
-            error!("dropping client: {}, waiting: {} us, in_read: {} us, copy_data: {} us, recycler: {} us, left over: {} us", self.my_client_index, self.time_spent_waiting, self.in_read, self.copy_data, self.update_client_index,
-            self.in_read - (self.copy_data+ self.update_client_index));
+            error!("dropping client: {}, waiting: {} us, in_read: {} us, copy_data: {} us, recycler: {} us, transfer: {} us, left over: {} us", self.my_client_index, self.time_spent_waiting, self.in_read, self.copy_data, self.update_client_index, self.transfer_data,
+            self.in_read - (self.copy_data+ self.update_client_index + self.transfer_data));
             self.update_client_index(usize::MAX); // this one is done reading
         }
     }
