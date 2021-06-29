@@ -505,7 +505,7 @@ impl Read for SeekableBufferingReader {
                 m.stop();
                 self.lock_data += m.as_us();
                 if self.last_buffer_index < lock.len() {
-                    error!("updating data")
+                    error!("updating data");
                     self.current_data = Arc::clone(&lock[self.last_buffer_index]);
                     source = &*self.current_data;
                 }
