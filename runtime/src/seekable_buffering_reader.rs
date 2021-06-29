@@ -42,6 +42,7 @@ pub struct SeekableBufferingReader {
     pub my_client_index: usize,
     pub time_spent_waiting: u64,
     pub in_read: u64,
+    pub copy_data: u64,
 }
 /*
 impl Clone for SeekableBufferingReader {
@@ -76,35 +77,29 @@ const CHUNK_SIZE: usize = 10_000_000;
 const MAX_READ_SIZE: usize = 10_000_000; //65536*2;
 
 impl SeekableBufferingReader {
-    pub fn clone_reader(&self) -> Self {
-        let instance = Arc::clone(&self.instance);
-        let mut list = instance.clients.write().unwrap();
-        let my_client_index = list.len();
-        error!("adding client: {}", my_client_index);
-        list.push(0);
-        drop(list);
+    fn new_with_instance(instance: &Arc<SeekableBufferingReaderInner>) -> Self {
         Self {
-            instance,
+            instance: Arc::clone(instance),
             pos: 0,
             last_buffer_index: 0,
             next_index_within_last_buffer: 0,
-            my_client_index,
+            my_client_index: usize::MAX,
             in_read: 0,
             time_spent_waiting: 0,
+            copy_data: 0,
         }
     }
+    pub fn clone_reader(&self) -> Self {
+        let mut result = Self::new_with_instance(&self.instance);
+        let mut list = self.instance.clients.write().unwrap();
+        result.my_client_index = list.len();
+        error!("adding client: {}", result.my_client_index);
+        list.push(0);
+        drop(list);
+        result
+    }
     pub fn clone_internal(&self) -> Self {
-        let instance = Arc::clone(&self.instance);
-        let my_client_index = usize::MAX;
-        Self {
-            instance,
-            pos: 0,
-            last_buffer_index: 0,
-            next_index_within_last_buffer: 0,
-            my_client_index,
-            in_read: 0,
-            time_spent_waiting: 0,
-        }
+        Self::new_with_instance(&self.instance)
     }
     pub fn new<T: 'static + Read + std::marker::Send>(reader: Vec<T>) -> Self {
         let inner = SeekableBufferingReaderInner {
@@ -122,15 +117,7 @@ impl SeekableBufferingReader {
             clients: RwLock::new(vec![]),
             buffers: RwLock::new(Self::alloc_initial_vectors()),
         };
-        let result = Self {
-            instance: Arc::new(inner),
-            pos: 0,
-            last_buffer_index: 0,
-            next_index_within_last_buffer: 0,
-            my_client_index: usize::MAX,
-            time_spent_waiting: 0,
-            in_read: 0,
-        };
+        let result = Self::new_with_instance(&Arc::new(inner));
 
         let divisions = reader.len();
         let par = reader
