@@ -40,6 +40,8 @@ pub struct SeekableBufferingReader {
     pub last_buffer_index: usize,
     pub next_index_within_last_buffer: usize,
     pub my_client_index: usize,
+    pub time_spent_waiting: u64,
+    pub in_read: u64,
 }
 /*
 impl Clone for SeekableBufferingReader {
@@ -87,6 +89,8 @@ impl SeekableBufferingReader {
             last_buffer_index: 0,
             next_index_within_last_buffer: 0,
             my_client_index,
+            in_read: 0,
+            time_spent_waiting: 0,
         }
     }
     pub fn clone_internal(&self) -> Self {
@@ -98,6 +102,8 @@ impl SeekableBufferingReader {
             last_buffer_index: 0,
             next_index_within_last_buffer: 0,
             my_client_index,
+            in_read: 0,
+            time_spent_waiting: 0,
         }
     }
     pub fn new<T: 'static + Read + std::marker::Send>(reader: Vec<T>) -> Self {
@@ -122,6 +128,8 @@ impl SeekableBufferingReader {
             last_buffer_index: 0,
             next_index_within_last_buffer: 0,
             my_client_index: usize::MAX,
+            time_spent_waiting: 0,
+            in_read: 0,
         };
 
         let divisions = reader.len();
@@ -433,6 +441,7 @@ impl SeekableBufferingReader {
 
 impl Read for SeekableBufferingReader {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let now = std::time::Instant::now();
         let request_len = buf.len();
 
         let mut remaining_request = request_len;
@@ -478,7 +487,10 @@ impl Read for SeekableBufferingReader {
                 let mut m = Measure::start("");
                 let timed_out = self.wait_for_new_data();
                 m.stop();
-                info!("Waited on new data, timed out: {}, us: {}", timed_out, m.as_us());
+                if self.last_buffer_index == 0 {
+                    info!("Waited on new data, timed out: {}, us: {}", timed_out, m.as_us());
+                }
+                self.time_spent_waiting += m.as_us();
                 continue;
             }
             let source = &lock[self.last_buffer_index];
@@ -509,6 +521,7 @@ impl Read for SeekableBufferingReader {
         }
 
         self.instance.calls.fetch_add(1, Ordering::Relaxed);
+        self.in_read += now.elapsed().as_micros() as u64;
         Ok(offset_in_dest)
     }
 }
@@ -516,7 +529,7 @@ impl Read for SeekableBufferingReader {
 impl Drop for SeekableBufferingReader {
     fn drop(&mut self) {
         if self.my_client_index != usize::MAX {
-            error!("dropping client: {}", self.my_client_index);
+            error!("dropping client: {}, waiting: {} us, in_read: {} us", self.my_client_index, self.time_spent_waiting, self.in_read);
             self.update_client_index(usize::MAX); // this one is done reading
         }
     }
