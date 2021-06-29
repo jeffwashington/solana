@@ -443,7 +443,7 @@ impl SeekableBufferingReader {
             new_min = self.instance.data.read().unwrap().len(); // we are done, we can drop all the rest
                                                                 //error!("moved: {}, new min is: {}", self.my_client_index, new_min);
         }
-        //error!("update_client_index: {}, {}, new min is: {}, sizes: {:?}", self.my_client_index, last_buffer_index, new_min, *self.instance.clients.read().unwrap());
+        error!("update_client_index: {}, {}, new min is: {}, sizes: {:?}", self.my_client_index, last_buffer_index, new_min, *self.instance.clients.read().unwrap());
         drop(indices);
         if new_min > previous_last_buffer_index {
             let eof = self.reached_eof();
@@ -522,6 +522,7 @@ impl Read for SeekableBufferingReader {
             self.current_data = self.empty_buffer.clone(); // we have exhausted this buffer, unref it so it can be recycled without copy
             self.next_index_within_last_buffer = 0;
             let mut m = Measure::start("");
+            error!("exhausted, looking at: {}", self.last_buffer_index);
             self.update_client_index(self.last_buffer_index + 1);
             m.stop();
             self.update_client_index += m.as_us();
