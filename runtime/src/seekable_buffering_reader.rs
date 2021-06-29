@@ -575,7 +575,6 @@ impl Read for SeekableBufferingReader {
                     break; // eof reached
                 }
 
-                let mut m = Measure::start("");
                 // no data, we could not transfer, and still no data, so check for eof.
                 // If we got an eof, then we have to check again to make sure there isn't data now that we may have to transfer or not.
                 if self.reached_eof() {
@@ -595,6 +594,7 @@ impl Read for SeekableBufferingReader {
                         return stored_error;
                     }
                 }
+                let mut m = Measure::start("");
                 // no data to transfer, and file not finished, so wait:
                 //std::thread::sleep(std::time::Duration::from_millis(1000));
                 let timed_out = self.wait_for_new_data();
