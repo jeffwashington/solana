@@ -96,7 +96,7 @@ impl SeekableBufferingReader {
             update_client_index: 0,
             transfer_data: 0,
             lock_data: 0,
-            current_data: instance.empty_buffer.clone(),
+            current_data: instance.data[0], // will always exist
             calls: 0,
             empty_buffer: instance.empty_buffer.clone(),
         }
@@ -116,7 +116,7 @@ impl SeekableBufferingReader {
     pub fn new<T: 'static + Read + std::marker::Send>(reader: Vec<T>) -> Self {
         let inner = SeekableBufferingReaderInner {
             new_data: RwLock::new(vec![]),
-            data: RwLock::new(vec![]),
+            data: RwLock::new(vec![ABuffer::default()]), // initialize with 1 vector of empty data
             len: AtomicUsize::new(0),
             error: RwLock::new(Ok(0)),
             data_written: AtomicUsize::new(0),
@@ -335,10 +335,6 @@ impl SeekableBufferingReader {
                     loop {
                         let chunks_written = self.instance.data_written.load(Ordering::Relaxed);
                         if chunks_written == division_index {
-                            if read_this_time != CHUNK_SIZE {
-                                Arc::make_mut(&mut dest_data).truncate(read_this_time);
-                                error!("truncating buffer to: {}", read_this_time);
-                            }
                             let mut data = self.instance.new_data.write().unwrap();
                             data.push(dest_data);
                             drop(data);
