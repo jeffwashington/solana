@@ -42,6 +42,8 @@ pub struct SeekableBufferingReader {
     pub my_client_index: usize,
     pub time_spent_waiting: u64,
     pub in_read: u64,
+    pub in_read_part1: u64,
+    pub in_read_part2: u64,
     pub copy_data: u64,
     pub update_client_index: u64,
     pub transfer_data: u64,
@@ -91,6 +93,8 @@ impl SeekableBufferingReader {
             next_index_within_last_buffer: 0,
             my_client_index: usize::MAX,
             in_read: 0,
+            in_read_part1: 0,
+            in_read_part2: 0,
             time_spent_waiting: 0,
             copy_data: 0,
             update_client_index: 0,
@@ -496,6 +500,8 @@ impl Read for SeekableBufferingReader {
         remaining_request -= bytes_to_transfer;
 
         let mut eof_seen = false;
+        let e1 = now.elapsed().as_micros() as u64;
+        self.in_read_part1 += e1;
         while remaining_request > 0 {
             let mut good = true;
             if source.is_empty() {
@@ -608,6 +614,9 @@ impl Read for SeekableBufferingReader {
                 continue;
             }
         }
+        let e2 = now.elapsed().as_micros() as u64;
+        self.in_read_part2 += e2 - e1;
+
 
         self.in_read += now.elapsed().as_micros() as u64;
         self.calls += 1;
@@ -618,8 +627,8 @@ impl Read for SeekableBufferingReader {
 impl Drop for SeekableBufferingReader {
     fn drop(&mut self) {
         if self.my_client_index != usize::MAX {
-            error!("dropping client: {}, waiting: {} us, in_read: {} us, copy_data: {} us, recycler: {} us, transfer: {} us, lock: {} us, left over: {} us, calls: {}", self.my_client_index, self.time_spent_waiting, self.in_read, self.copy_data, self.update_client_index, self.transfer_data, self.lock_data,
-            self.in_read - (self.copy_data+ self.update_client_index + self.transfer_data + self.lock_data), self.calls);
+            error!("dropping client: {}, waiting: {} us, in_read: {} us, copy_data: {} us, recycler: {} us, transfer: {} us, lock: {} us, left over: {} us, calls: {}, parts 1/2: {}, {}", self.my_client_index, self.time_spent_waiting, self.in_read, self.copy_data, self.update_client_index, self.transfer_data, self.lock_data,
+            self.in_read - (self.copy_data+ self.update_client_index + self.transfer_data + self.lock_data), self.calls, self.in_read_part1, self.in_read_part2);
             self.update_client_index(usize::MAX); // this one is done reading
         }
     }
