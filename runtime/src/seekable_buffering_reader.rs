@@ -41,7 +41,7 @@ pub struct SeekableBufferingReader {
     pub next_index_within_last_buffer: usize,
     pub my_client_index: usize,
 }
-
+/*
 impl Clone for SeekableBufferingReader {
     fn clone(&self) -> Self {
         let instance = Arc::clone(&self.instance);
@@ -59,7 +59,7 @@ impl Clone for SeekableBufferingReader {
         }
     }
 }
-
+*/
 impl Drop for SeekableBufferingReaderInner {
     fn drop(&mut self) {
         if let Some(handle) = self.bg_reader.lock().unwrap().take() {
@@ -74,6 +74,32 @@ const CHUNK_SIZE: usize = 5_000_000;
 const MAX_READ_SIZE: usize = 5_000_000; //65536*2;
 
 impl SeekableBufferingReader {
+    pub fn clone_reader(&self) -> Self {
+        let instance = Arc::clone(&self.instance);
+        let mut list = instance.clients.write().unwrap();
+        let my_client_index = list.len();
+        error!("adding client: {}", my_client_index);
+        list.push(0);
+        drop(list);
+        Self {
+            instance,
+            pos: 0,
+            last_buffer_index: 0,
+            next_index_within_last_buffer: 0,
+            my_client_index,
+        }
+    }
+    pub fn clone_internal(&self) -> Self {
+        let instance = Arc::clone(&self.instance);
+        let my_client_index = usize::MAX;
+        Self {
+            instance,
+            pos: 0,
+            last_buffer_index: 0,
+            next_index_within_last_buffer: 0,
+            my_client_index,
+        }
+    }
     pub fn new<T: 'static + Read + std::marker::Send>(reader: Vec<T>) -> Self {
         let inner = SeekableBufferingReaderInner {
             new_data: RwLock::new(vec![]),
@@ -95,7 +121,7 @@ impl SeekableBufferingReader {
             pos: 0,
             last_buffer_index: 0,
             next_index_within_last_buffer: 0,
-            my_client_index: 0,//usize::MAX,
+            my_client_index: usize::MAX,
         };
 
         let divisions = reader.len();
@@ -103,7 +129,7 @@ impl SeekableBufferingReader {
             .into_iter()
             .enumerate()
             .map(|(i, reader)| {
-                let mut r = result.clone();
+                let mut r = result.clone_internal();
                 r.no_more_reading();
                 (i, reader, r)
             })
@@ -406,6 +432,7 @@ impl Read for SeekableBufferingReader {
 
         let mut remaining_request = request_len;
         let mut offset_in_dest = 0;
+        let mut eof_seen = false;
         while remaining_request > 0 {
             {
                 let error = self.instance.error.read().unwrap();
@@ -425,10 +452,22 @@ impl Read for SeekableBufferingReader {
                 if self.transfer_data() {
                     continue;
                 }
-                if self.instance.file_read_complete.load(Ordering::Relaxed) {
+                if self.last_buffer_index >= self.instance.data.read().unwrap().len() {
+                    continue;
+                }
+
+                if eof_seen {
                     error!("eof reached");
                     break; // eof reached
                 }
+
+                // no data, we could not transfer, and still no data, so check for eof.
+                // If we got an eof, then we have to check again to make sure there isn't data now that we may have to transfer or not.
+                if self.instance.file_read_complete.load(Ordering::Relaxed) {
+                    eof_seen = true;
+                    continue;
+                }
+
                 // no data to transfer, and file not finished, so wait:
                 //std::thread::sleep(std::time::Duration::from_millis(1000));
                 let mut m = Measure::start("");
@@ -471,7 +510,9 @@ impl Read for SeekableBufferingReader {
 
 impl Drop for SeekableBufferingReader {
     fn drop(&mut self) {
-        error!("dropping client: {}", self.my_client_index);
-        self.update_client_index(usize::MAX); // this one is done reading
+        if self.my_client_index != usize::MAX {
+            error!("dropping client: {}", self.my_client_index);
+            self.update_client_index(usize::MAX); // this one is done reading
+        }
     }
 }
