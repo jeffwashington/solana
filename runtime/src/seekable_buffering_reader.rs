@@ -301,7 +301,6 @@ impl SeekableBufferingReader {
                     loop {
                         let chunks_written = self.instance.data_written.load(Ordering::Relaxed);
                         if chunks_written == division_index {
-                            let len = data.len();
                             if read_this_time != CHUNK_SIZE {
                                 dest_data.truncate(read_this_time);
                                 error!("truncating buffer to: {}", read_this_time);
