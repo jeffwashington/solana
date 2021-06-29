@@ -233,7 +233,7 @@ impl SeekableBufferingReader {
             let mut attempts = 0;
             let mut m = Measure::start("");
             let use_this_division = division_index % divisions == division;
-            let read_this_much = CHUNK_SIZE;
+            let mut read_this_much = CHUNK_SIZE;
             if use_this_division {
                 loop {
                     let mut buffers = self.instance.buffers.write().unwrap();
