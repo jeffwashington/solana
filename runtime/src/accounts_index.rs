@@ -16,9 +16,7 @@ use solana_sdk::{
 use std::{
     collections::BTreeMap,
     collections::HashSet,
-    ops::{
-        Range, RangeBounds,
-    },
+    ops::{Range, RangeBounds},
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc, RwLock, RwLockWriteGuard,
@@ -120,7 +118,7 @@ pub struct AtomicFaker {
     pub val: u64,
 }
 impl AtomicFaker {
-    pub fn load(&self, ordering: Ordering) -> u64{
+    pub fn load(&self, ordering: Ordering) -> u64 {
         self.val
     }
 }
@@ -131,10 +129,12 @@ pub struct ReadAccountMapEntry<T: 'static> {
 }
 
 impl<T: Clone> ReadAccountMapEntry<T> {
-    pub fn from_account_map_entry(args: (u64, SlotList<T>)/*ref_count: u64, slot_list: SlotList<T>*/) -> Self {
+    pub fn from_account_map_entry(
+        args: (u64, SlotList<T>), /*ref_count: u64, slot_list: SlotList<T>*/
+    ) -> Self {
         Self {
-            ref_count:AtomicFaker {val: args.0},
-            slot_list:args.1,
+            ref_count: AtomicFaker { val: args.0 },
+            slot_list: args.1,
         }
     }
 
@@ -611,15 +611,15 @@ impl<T: std::fmt::Debug + Clone> Default for AccountsIndex<T> {
     }
 }
 impl<T: 'static + Clone + IsCached + ZeroLamport + std::fmt::Debug> AccountsIndex<T> {
-/*
-TODO
-    fn iter<R>(&self, range: Option<R>) -> AccountsIndexIterator<T>
-    where
-        R: RangeBounds<Pubkey>,
-    {
-        AccountsIndexIterator::new(&self.account_maps, range)
-    }
-*/
+    /*
+    TODO
+        fn iter<R>(&self, range: Option<R>) -> AccountsIndexIterator<T>
+        where
+            R: RangeBounds<Pubkey>,
+        {
+            AccountsIndexIterator::new(&self.account_maps, range)
+        }
+    */
     fn do_checked_scan_accounts<F, R>(
         &self,
         metric_name: &'static str,
@@ -921,7 +921,9 @@ TODO
         lock: &AccountMapsReadLock<T>,
     ) -> Option<ReadAccountMapEntry<T>> {
         lock.get(pubkey)
-            .map(|(refcount, slotlist): (u64, SlotList<T>)| ReadAccountMapEntry::from_account_map_entry((refcount, slotlist)))
+            .map(|(refcount, slotlist): (u64, SlotList<T>)| {
+                ReadAccountMapEntry::from_account_map_entry((refcount, slotlist))
+            })
     }
 
     fn get_account_write_entry(&self, pubkey: &Pubkey) -> Option<WriteAccountMapEntry2<T>> {
@@ -960,12 +962,17 @@ TODO
         w_account_maps: &AccountMapsWriteLock<T>,
         new_entry: AccountMapEntry<T>,
     ) -> Option<WriteAccountMapEntry2<T>> {
-        w_account_maps.update(pubkey, |previous|{
-            assert!(!previous.is_some(), "TODO: {:?}", previous);
-            Some(new_entry.slot_list.read().unwrap().clone()) //TODO
-        }
-        );
-        None//wrong
+        w_account_maps.update(pubkey, |previous| {
+            let mut new_one = SlotList::<T>::default();
+            std::mem::swap(&mut new_one, &mut *new_entry.slot_list.write().unwrap());
+            if let Some(previous) = previous {
+                previous.into_iter().for_each(|x| {
+                    new_one.push(x.clone());
+                });
+            }
+            Some(new_one)
+        });
+        None
     }
 
     fn get_account_write_entry_else_create(
@@ -988,7 +995,7 @@ TODO
                 let w_index = self.get_account_maps_write_lock();
                 w_index.update(*key, |val| {
                     panic!("todo");
-                        /*
+                    /*
                     if let Some(slot_list) = val {
                         if slot_list.is_empty() {
                             // Note it's only safe to remove all the entries for this key
