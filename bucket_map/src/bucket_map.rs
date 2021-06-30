@@ -71,6 +71,10 @@ impl<T: Clone + std::fmt::Debug> BucketMap<T> {
         Some(self)
     }
 
+    pub fn write(&self) -> Option<&Self>{
+        Some(self)
+    }
+
     pub fn get(&self, key: &Pubkey) -> Option<(u64, Vec<T>)> {
         let ix = self.bucket_ix(key);
         self.buckets[ix].read().unwrap().as_ref().and_then(|bucket| {

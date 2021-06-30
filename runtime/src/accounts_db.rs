@@ -6017,6 +6017,8 @@ impl AccountsDb {
         #[allow(clippy::stable_sort_primitive)]
         roots.sort();
         info!("{}: accounts_index roots: {:?}", label, roots,);
+        panic!("todo");
+        /*
         for (pubkey, account_entry) in self.accounts_index.account_maps.read().unwrap().iter() {
             info!("  key: {} ref_count: {}", pubkey, account_entry.ref_count(),);
             info!(
@@ -6024,6 +6026,7 @@ impl AccountsDb {
                 *account_entry.slot_list.read().unwrap()
             );
         }
+        */
     }
 
     fn print_count_and_status(&self, label: &str) {

@@ -9,27 +9,23 @@ use log::*;
 use ouroboros::self_referencing;
 use rayon::prelude::*;
 use solana_bucket_map::bucket_map::BucketMap;
+use solana_measure::measure::Measure;
 use solana_sdk::{
     clock::{BankId, Slot},
     pubkey::{Pubkey, PUBKEY_BYTES},
 };
 use std::{
-    collections::{
-        btree_map::{self, BTreeMap, Entry},
-        HashSet,
-    },
-    collections::HashSet,
-    collections::BTreeMap,
-    collections::HashSet,
+    collections::{btree_map::BTreeMap, HashSet},
     ops::{Range, RangeBounds},
     sync::{
         atomic::{AtomicU64, Ordering},
-        Arc, RwLock, RwLockWriteGuard,
+        Arc, Mutex, RwLock, RwLockWriteGuard,
     },
 };
 use thiserror::Error;
 
 pub const ITER_BATCH_SIZE: usize = 1000;
+const BINS: usize = 1;
 
 pub type ScanResult<T> = Result<T, ScanError>;
 pub type SlotT<T> = (Slot, T);
@@ -617,8 +613,7 @@ pub trait ZeroLamport {
 }
 
 fn get_bin_pubkey(pubkey: &Pubkey) -> usize {
-    let byte_of_pubkey_to_bin = 0; // TODO: this should not be 0. For now it needs to be due to requests for in-order pubkeys
-    (pubkey.as_ref()[byte_of_pubkey_to_bin] as usize) * BINS / ((u8::MAX as usize) + 1)
+    0
 }
 
 type MapType<T> = AccountMap<SlotT<T>>;
@@ -667,18 +662,25 @@ impl<T: std::fmt::Debug + Clone> Default for AccountsIndex<T> {
         }
     }
 }
-impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::marker::Send + std::fmt::Debug>
-    AccountsIndex<T>
+impl<
+        T: 'static
+            + Clone
+            + IsCached
+            + ZeroLamport
+            + std::marker::Sync
+            + std::marker::Send
+            + std::fmt::Debug,
+    > AccountsIndex<T>
 {
-/*
-TODO
-    fn iter<R>(&self, range: Option<R>) -> AccountsIndexIterator<T>
-    where
-        R: RangeBounds<Pubkey>,
-    {
-        AccountsIndexIterator::new(&self.account_maps, range)
-    }
-*/
+    /*
+    TODO
+        fn iter<R>(&self, range: Option<R>) -> AccountsIndexIterator<T>
+        where
+            R: RangeBounds<Pubkey>,
+        {
+            AccountsIndexIterator::new(&self.account_maps, range)
+        }
+    */
     fn do_checked_scan_accounts<F, R>(
         &self,
         metric_name: &'static str,
@@ -1025,7 +1027,7 @@ TODO
 
     fn insert_new_entry_if_missing(
         &self,
-        pubkey: &Pubkey,
+        pubkey: Pubkey,
         slot: Slot,
         info: T,
         w_account_maps: Option<&mut AccountMapsWriteLock<T>>,
@@ -1033,25 +1035,25 @@ TODO
         let new_entry = WriteAccountMapEntry::new_entry_after_update(slot, info);
         match w_account_maps {
             Some(w_account_maps) => {
-                self.insert_new_entry_if_missing_with_lock(*pubkey, w_account_maps, new_entry)
+                self.insert_new_entry_if_missing_with_lock(pubkey, w_account_maps, new_entry)
             }
             None => {
-                let mut w_account_maps = self.get_account_maps_write_lock();
+                let mut w_account_maps = self.get_account_maps_write_lock2();
                 self.insert_new_entry_if_missing_with_lock(pubkey, w_account_maps, new_entry)
             }
         }
-        .map(|x| (x.0, x.1))
+        .map(|x| x)
     }
 
     // return None if item was created new
     // if entry for pubkey already existed, return Some(entry). Caller needs to call entry.update.
     fn insert_new_entry_if_missing_with_lock(
         &self,
-        pubkey: &Pubkey,
+        pubkey: Pubkey,
         w_account_maps: &AccountMapsWriteLock<T>,
         new_entry: AccountMapEntry<T>,
     ) -> Option<WriteAccountMapEntry2<T>> {
-        w_account_maps.update(pubkey, |previous| {
+        w_account_maps.update(&pubkey, |previous| {//TODO probably take pubkey by value
             let mut new_one = SlotList::<T>::default();
             std::mem::swap(&mut new_one, &mut *new_entry.slot_list.write().unwrap());
             if let Some(previous) = previous {
@@ -1071,7 +1073,7 @@ TODO
         info: &T,
     ) -> Option<WriteAccountMapEntry2<T>> {
         let w_account_entry = self.get_account_write_entry(pubkey);
-        w_account_entry.or_else(|| self.insert_new_entry_if_missing(pubkey, slot, info, None))
+        w_account_entry.or_else(|| self.insert_new_entry_if_missing(*pubkey, slot, info.clone(), None))
     }
 
     pub fn handle_dead_keys(
@@ -1081,7 +1083,7 @@ TODO
     ) {
         if !dead_keys.is_empty() {
             for key in dead_keys.iter() {
-                let w_index = self.get_account_maps_write_lock();
+                let w_index = self.get_account_maps_write_lock2();
                 w_index.update(*key, |val| {
                     panic!("todo");
                     /*
@@ -1373,11 +1375,19 @@ TODO
         }
     }
 
-    fn get_account_maps_write_lock(&self) -> &AccountMapsWriteLock<T> {
+    fn get_account_maps_write_lock(&self, pubkey: &Pubkey) -> &AccountMapsWriteLock<T> {
         &self.account_maps
     }
 
-    pub(crate) fn get_account_maps_read_lock(&self) -> &AccountMapsReadLock<T> {
+    fn get_account_maps_write_lock2(&self) -> &AccountMapsWriteLock<T> {
+        &self.account_maps
+    }
+
+    pub(crate) fn get_account_maps_read_lock(&self, pubkey: &Pubkey) -> &AccountMapsReadLock<T> {
+        &self.account_maps
+    }
+
+    pub(crate) fn get_account_maps_read_lock2(&self) -> &AccountMapsReadLock<T> {
         &self.account_maps
     }
 
@@ -1412,8 +1422,8 @@ TODO
         let duplicate_keys = binned
             .into_par_iter()
             .map(|(pubkey_bin, items)| {
-                let mut _reclaims = SlotList::new();
-                let mut w_account_maps = self.account_maps[pubkey_bin].write().unwrap();
+                //let mut _reclaims = SlotList::new();
+                let mut w_account_maps = self.account_maps.write().unwrap();
                 let mut insert_time = Measure::start("insert_into_primary_index"); // really should be in each loop
                 let mut duplicate_keys = Vec::with_capacity(items.len());
                 items.into_iter().for_each(|(pubkey, new_item)| {
@@ -1422,10 +1432,13 @@ TODO
                         &mut w_account_maps,
                         new_item,
                     );
-                    if let Some((mut w_account_entry, account_info, pubkey)) = already_exists {
+                    // TODO: update and duplicate_keys
+                    /*
+                    if let Some(mut w_account_entry, account_info, pubkey)) = already_exists {
                         w_account_entry.update(slot, account_info, &mut _reclaims);
                         duplicate_keys.push(pubkey);
                     }
+                    */
                 });
                 insert_time.stop();
                 insertion_time.fetch_add(insert_time.as_us(), Ordering::Relaxed);
@@ -1462,8 +1475,8 @@ TODO
             //  - The secondary index is never consulted as primary source of truth for gets/stores.
             //  So, what the accounts_index sees alone is sufficient as a source of truth for other non-scan
             //  account operations.
-            if let Some((mut w_account_entry, account_info)) =
-                self.get_account_write_entry_else_create(pubkey, slot, account_info)
+            if let Some(mut w_account_entry) =
+                self.get_account_write_entry_else_create(pubkey, slot, &account_info)
             {
                 w_account_entry.update(slot, account_info, reclaims);
                 false
