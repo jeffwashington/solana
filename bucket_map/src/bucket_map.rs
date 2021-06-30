@@ -31,21 +31,14 @@ pub enum BucketMapError {
     DataNoSpace((u64, u8)),
     IndexNoSpace(u8),
 }
-
+/*
 impl<T: Clone + std::fmt::Debug> Default for BucketMap<T>  {
     fn default() -> Self {
-        let tmpdir2 = PathBuf::from("accounts_index_buckets");
-        let paths: Vec<PathBuf> = [tmpdir2]
-            .iter()
-            .filter(|x| std::fs::create_dir_all(x).is_ok())
-            .cloned()
-            .collect();
-        assert!(!paths.is_empty());
-        let drives = Arc::new(paths);
     
-        Self::new(1, drives.clone())
+        Self::new(1, Self::default_drives())
     }
 }
+*/
 
 impl<T: Clone + std::fmt::Debug> BucketMap<T> {
     pub fn new(num_buckets_pow2: u8, drives: Arc<Vec<PathBuf>>) -> Self {
@@ -56,6 +49,19 @@ impl<T: Clone + std::fmt::Debug> BucketMap<T> {
             drives,
             bits: num_buckets_pow2,
         }
+    }
+    fn default_drives() -> Arc<Vec<PathBuf>> {
+        let tmpdir2 = PathBuf::from("accounts_index_buckets");
+        let paths: Vec<PathBuf> = [tmpdir2]
+            .iter()
+            .filter(|x| std::fs::create_dir_all(x).is_ok())
+            .cloned()
+            .collect();
+        assert!(!paths.is_empty());
+        Arc::new(paths)
+    }
+    pub fn new_buckets(num_buckets_pow2: u8) -> Self {
+        Self::new(num_buckets_pow2, Self::default_drives())
     }
     pub fn num_buckets(&self) -> usize {
         self.buckets.len()
