@@ -171,7 +171,6 @@ impl SharedBufferInternal {
                 self.set_error(std::io::Error::from(std::io::ErrorKind::TimedOut));
                 break;
             }
-            
             let mut buffers = self.buffers.write().unwrap();
             let buffer = buffers.pop();
             drop(buffers);
@@ -180,8 +179,7 @@ impl SharedBufferInternal {
                 // These are internal buffers and should not be held by anyone else.
                 assert_eq!(Arc::strong_count(&dest_data), 1);
                 (dest_data.len(), dest_data)
-            }
-            else {
+            } else {
                 // nowhere to write, so wait for a buffer to become available
                 let mut wait_for_new_buffer = Measure::start("wait_for_new_buffer");
                 self.wait_for_new_buffer();
