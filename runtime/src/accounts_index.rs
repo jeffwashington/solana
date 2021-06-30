@@ -9,7 +9,6 @@ use dashmap::DashSet;
 use log::*;
 use ouroboros::self_referencing;
 use solana_bucket_map::bucket_map::BucketMap;
-use solana_measure::measure::Measure;
 use solana_sdk::{
     clock::Slot,
     pubkey::{Pubkey, PUBKEY_BYTES},
@@ -18,20 +17,19 @@ use std::{
     collections::BTreeMap,
     collections::HashSet,
     ops::{
-        Bound,
-        Bound::{Excluded, Included, Unbounded},
         Range, RangeBounds,
     },
     sync::{
         atomic::{AtomicU64, Ordering},
-        Arc, RwLock, RwLockReadGuard, RwLockWriteGuard,
+        Arc, RwLock, RwLockWriteGuard,
     },
 };
 
 pub const ITER_BATCH_SIZE: usize = 1000;
 
-pub type SlotList<T> = Vec<(Slot, T)>;
-pub type SlotSlice<'s, T> = &'s [(Slot, T)];
+pub type SlotT<T> = (Slot, T);
+pub type SlotList<T> = Vec<SlotT<T>>;
+pub type SlotSlice<'s, T> = &'s [SlotT<T>];
 
 pub type RefCount = u64;
 pub type AccountMap<V> = BucketMap<V>;
@@ -118,38 +116,58 @@ pub enum AccountIndexGetResult<T: 'static> {
     Missing(AccountMapsReadLock<T>),
 }
 
-#[self_referencing]
+pub struct AtomicFaker {
+    pub val: u64,
+}
+impl AtomicFaker {
+    pub fn load(&self, ordering: Ordering) -> u64{
+        self.val
+    }
+}
+
 pub struct ReadAccountMapEntry<T: 'static> {
-    owned_entry: AccountMapEntry<T>,
-    #[borrows(owned_entry)]
-    slot_list_guard: RwLockReadGuard<'this, SlotList<T>>,
+    pub ref_count: AtomicFaker,
+    pub slot_list: SlotList<T>,
 }
 
 impl<T: Clone> ReadAccountMapEntry<T> {
-    pub fn from_account_map_entry(account_map_entry: AccountMapEntry<T>) -> Self {
-        ReadAccountMapEntryBuilder {
-            owned_entry: account_map_entry,
-            slot_list_guard_builder: |lock| lock.slot_list.read().unwrap(),
+    pub fn from_account_map_entry(args: (u64, SlotList<T>)/*ref_count: u64, slot_list: SlotList<T>*/) -> Self {
+        Self {
+            ref_count:AtomicFaker {val: args.0},
+            slot_list:args.1,
         }
-        .build()
     }
 
     pub fn slot_list(&self) -> &SlotList<T> {
-        &*self.borrow_slot_list_guard()
+        &self.slot_list
     }
 
-    pub fn ref_count(&self) -> &AtomicU64 {
-        &self.borrow_owned_entry_contents().ref_count
+    pub fn ref_count(&self) -> &AtomicFaker {
+        &self.ref_count
     }
 
     pub fn unref(&self) {
-        self.ref_count().fetch_sub(1, Ordering::Relaxed);
+        panic!("todo");
+        //self.ref_count().fetch_sub(1, Ordering::Relaxed);
     }
 
     pub fn addref(&self) {
-        self.ref_count().fetch_add(1, Ordering::Relaxed);
+        panic!("todo");
+        //self.ref_count().fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub fn slot_list_mut<RT>(
+        &mut self,
+        user: impl for<'this> FnOnce(&mut RwLockWriteGuard<'this, SlotList<T>>) -> RT,
+    ) -> RT {
+        panic!("todo");
+    }
+    pub fn update(&mut self, slot: Slot, account_info: T, reclaims: &mut SlotList<T>) {
+        panic!("todo");
     }
 }
+
+type WriteAccountMapEntry2<T> = ReadAccountMapEntry<T>; // todo
 
 #[self_referencing]
 pub struct WriteAccountMapEntry<T: 'static> {
@@ -488,7 +506,8 @@ pub struct AccountsIndexRootsStats {
     pub rooted_cleaned_count: usize,
     pub unrooted_cleaned_count: usize,
 }
-
+/*
+TODO
 pub struct AccountsIndexIterator<'a, T> {
     account_maps: &'a AccountMap<AccountMapEntry<T>>,
     start_bound: Bound<Pubkey>,
@@ -531,10 +550,12 @@ impl<'a, T: 'static + Clone> Iterator for AccountsIndexIterator<'a, T> {
             return None;
         }
 
+        panic!("not implemented");
+        /*
         let chunk: Vec<(Pubkey, AccountMapEntry<T>)> = self
             .account_maps
-            .read()
-            .unwrap()
+            //.read()
+            //.unwrap()
             .range((self.start_bound, self.end_bound))
             .map(|(pubkey, account_map_entry)| (*pubkey, account_map_entry.clone()))
             .take(ITER_BATCH_SIZE)
@@ -547,16 +568,17 @@ impl<'a, T: 'static + Clone> Iterator for AccountsIndexIterator<'a, T> {
 
         self.start_bound = Excluded(chunk.last().unwrap().0);
         Some(chunk)
+        */
     }
 }
-
+*/
 pub trait ZeroLamport {
     fn is_zero_lamport(&self) -> bool;
 }
 
-type MapType<T> = AccountMap<AccountMapEntry<T>>;
-type AccountMapsWriteLock<T> = AccountMap<AccountMapEntry<T>>;
-type AccountMapsReadLock<T> = AccountMap<AccountMapEntry<T>>;
+type MapType<T> = AccountMap<SlotT<T>>;
+type AccountMapsWriteLock<T> = MapType<T>;
+type AccountMapsReadLock<T> = MapType<T>;
 
 #[derive(Debug)]
 pub struct AccountsIndex<T> {
@@ -569,10 +591,10 @@ pub struct AccountsIndex<T> {
     zero_lamport_pubkeys: DashSet<Pubkey>,
 }
 
-impl<T> Default for AccountsIndex<T> {
+impl<T: std::fmt::Debug + Clone> Default for AccountsIndex<T> {
     fn default() -> Self {
         Self {
-            account_maps: AccountMap::<AccountMapEntry<T>>::default(),
+            account_maps: AccountMap::default(),
             program_id_index: SecondaryIndex::<DashMapSecondaryIndexEntry>::new(
                 "program_id_index_stats",
             ),
@@ -588,15 +610,16 @@ impl<T> Default for AccountsIndex<T> {
         }
     }
 }
-
-impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
+impl<T: 'static + Clone + IsCached + ZeroLamport + std::fmt::Debug> AccountsIndex<T> {
+/*
+TODO
     fn iter<R>(&self, range: Option<R>) -> AccountsIndexIterator<T>
     where
         R: RangeBounds<Pubkey>,
     {
         AccountsIndexIterator::new(&self.account_maps, range)
     }
-
+*/
     fn do_checked_scan_accounts<F, R>(
         &self,
         metric_name: &'static str,
@@ -812,6 +835,8 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
         F: FnMut(&Pubkey, (&T, Slot)),
         R: RangeBounds<Pubkey>,
     {
+        panic!("todo");
+        /*
         // TODO: expand to use mint index to find the `pubkey_list` below more efficiently
         // instead of scanning the entire range
         let mut total_elapsed_timer = Measure::start("total");
@@ -855,6 +880,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
                 ("num_keys_iterated", num_keys_iterated, i64),
             )
         }
+        */
     }
 
     fn do_scan_secondary_index<
@@ -895,17 +921,16 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
         lock: &AccountMapsReadLock<T>,
     ) -> Option<ReadAccountMapEntry<T>> {
         lock.get(pubkey)
-            .cloned()
-            .map(ReadAccountMapEntry::from_account_map_entry)
+            .map(|(refcount, slotlist): (u64, SlotList<T>)| ReadAccountMapEntry::from_account_map_entry((refcount, slotlist)))
     }
 
-    fn get_account_write_entry(&self, pubkey: &Pubkey) -> Option<WriteAccountMapEntry<T>> {
+    fn get_account_write_entry(&self, pubkey: &Pubkey) -> Option<WriteAccountMapEntry2<T>> {
         self.account_maps
             .read()
             .unwrap()
             .get(pubkey)
-            .cloned()
-            .map(WriteAccountMapEntry::from_account_map_entry)
+            //.cloned()
+            .map(WriteAccountMapEntry2::from_account_map_entry)
     }
 
     fn insert_new_entry_if_missing(
@@ -914,7 +939,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
         slot: Slot,
         info: &T,
         w_account_maps: Option<&mut AccountMapsWriteLock<T>>,
-    ) -> Option<WriteAccountMapEntry<T>> {
+    ) -> Option<WriteAccountMapEntry2<T>> {
         let new_entry = WriteAccountMapEntry::new_entry_after_update(slot, info);
         match w_account_maps {
             Some(w_account_maps) => {
@@ -922,7 +947,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
             }
             None => {
                 let mut w_account_maps = self.get_account_maps_write_lock();
-                self.insert_new_entry_if_missing_with_lock(pubkey, &mut w_account_maps, new_entry)
+                self.insert_new_entry_if_missing_with_lock(pubkey, w_account_maps, new_entry)
             }
         }
     }
@@ -932,21 +957,15 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
     fn insert_new_entry_if_missing_with_lock(
         &self,
         pubkey: &Pubkey,
-        w_account_maps: &mut AccountMapsWriteLock<T>,
+        w_account_maps: &AccountMapsWriteLock<T>,
         new_entry: AccountMapEntry<T>,
-    ) -> Option<WriteAccountMapEntry<T>> {
-        let mut is_newly_inserted = false;
-        let account_entry = w_account_maps.entry(*pubkey).or_insert_with(|| {
-            is_newly_inserted = true;
-            new_entry
-        });
-        if is_newly_inserted {
-            None
-        } else {
-            Some(WriteAccountMapEntry::from_account_map_entry(
-                account_entry.clone(),
-            ))
+    ) -> Option<WriteAccountMapEntry2<T>> {
+        w_account_maps.update(pubkey, |previous|{
+            assert!(!previous.is_some(), "TODO");
+            Some(new_entry.slot_list.read().unwrap().clone()) //TODO
         }
+        );
+        None//wrong
     }
 
     fn get_account_write_entry_else_create(
@@ -954,7 +973,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
         pubkey: &Pubkey,
         slot: Slot,
         info: &T,
-    ) -> Option<WriteAccountMapEntry<T>> {
+    ) -> Option<WriteAccountMapEntry2<T>> {
         let w_account_entry = self.get_account_write_entry(pubkey);
         w_account_entry.or_else(|| self.insert_new_entry_if_missing(pubkey, slot, info, None))
     }
@@ -967,7 +986,9 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
         if !dead_keys.is_empty() {
             for key in dead_keys.iter() {
                 let w_index = self.get_account_maps_write_lock();
-                w_index.update(**key, |val| {
+                w_index.update(*key, |val| {
+                    panic!("todo");
+                        /*
                     if let Some(slot_list) = val {
                         if slot_list.is_empty() {
                             // Note it's only safe to remove all the entries for this key
@@ -979,6 +1000,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
                     } else {
                         return Some(val);
                     }
+                    */
                 });
             }
         }
@@ -1145,7 +1167,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
         let read_lock = self.account_maps.read().unwrap();
         let account = read_lock
             .get(pubkey)
-            .cloned()
+            //.cloned()
             .map(ReadAccountMapEntry::from_account_map_entry);
 
         match account {
@@ -1158,7 +1180,10 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
                     None => AccountIndexGetResult::NotFoundOnFork,
                 }
             }
-            None => AccountIndexGetResult::Missing(read_lock),
+            None => {
+                panic!("todo");
+                //AccountIndexGetResult::Missing(read_lock)
+            }
         }
     }
 
@@ -1415,9 +1440,12 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
         if is_slot_list_empty {
             let mut w_maps = self.get_account_maps_write_lock();
             if let Some(x) = w_maps.get(pubkey) {
+                panic!("todo");
+                /*
                 if x.slot_list.read().unwrap().is_empty() {
                     w_maps.remove(pubkey);
                 }
+                */
             }
         }
     }

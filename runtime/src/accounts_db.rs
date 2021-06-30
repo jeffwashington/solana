@@ -5549,15 +5549,19 @@ impl AccountsDb {
             self.accounts_index.add_root(slot, false);
         }
 
+        panic!("todo");
+        /*
         let mut stored_sizes_and_counts = HashMap::new();
         for i in 0..self.accounts_index.account_maps.num_buckets() {
             for slot_list in self.accounts_index.account_maps.values(i).into_iter() {
-                for (_slot, account_entry) in slot_list.into_iter() {
-                    let storage_entry_meta = stored_sizes_and_counts
-                        .entry(account_entry.store_id)
-                        .or_insert((0, 0));
-                    storage_entry_meta.0 += account_entry.stored_size;
-                    storage_entry_meta.1 += 1;
+                for slot_list in slot_list.into_iter() {
+                    for (_slot, account_entry) in slot_list.into_iter() {
+                        let storage_entry_meta = stored_sizes_and_counts
+                            .entry(account_entry.store_id)
+                            .or_insert((0, 0));
+                        storage_entry_meta.0 += account_entry.stored_size;
+                        storage_entry_meta.1 += 1;
+                    }
                 }
             }
         }
@@ -5575,6 +5579,7 @@ impl AccountsDb {
                 }
             }
         }
+        */
     }
 
     pub(crate) fn print_accounts_stats(&self, label: &str) {
@@ -5601,6 +5606,7 @@ impl AccountsDb {
         #[allow(clippy::stable_sort_primitive)]
         roots.sort();
         info!("{}: accounts_index roots: {:?}", label, roots,);
+        /*
         for (pubkey, account_entry) in self.accounts_index.account_maps.read().unwrap().iter() {
             info!("  key: {} ref_count: {}", pubkey, account_entry.ref_count(),);
             info!(
@@ -5608,6 +5614,7 @@ impl AccountsDb {
                 *account_entry.slot_list.read().unwrap()
             );
         }
+        */
     }
 
     fn print_count_and_status(&self, label: &str) {
