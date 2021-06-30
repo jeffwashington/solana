@@ -1050,7 +1050,7 @@ TODO
         new_entry: AccountMapEntry<T>,
     ) -> Option<WriteAccountMapEntry2<T>> {
         w_account_maps.update(pubkey, |previous|{
-            assert!(!previous.is_some(), "TODO");
+            assert!(!previous.is_some(), "TODO: {:?}", previous);
             Some(new_entry.slot_list.read().unwrap().clone()) //TODO
         }
         );
