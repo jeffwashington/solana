@@ -19,13 +19,36 @@ pub struct BucketMap<T> {
     bits: u8,
 }
 
+impl<T> std::fmt::Debug for BucketMap<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "BucketMap TODO")?;
+        Ok(())
+    }
+}
+
 #[derive(Debug)]
 pub enum BucketMapError {
     DataNoSpace((u64, u8)),
     IndexNoSpace(u8),
 }
 
-impl<T: Clone> BucketMap<T> {
+impl<T: Clone + std::fmt::Debug> Default for BucketMap<T>  {
+    fn default() -> Self {
+        let tmpdir1 = std::env::temp_dir().join("bucket_map_test_mt");
+        let tmpdir2 = PathBuf::from("/mnt/data/aeyakovenko").join("bucket_map_test_mt");
+        let paths: Vec<PathBuf> = [tmpdir1, tmpdir2]
+            .iter()
+            .filter(|x| std::fs::create_dir_all(x).is_ok())
+            .cloned()
+            .collect();
+        assert!(!paths.is_empty());
+        let drives = Arc::new(paths);
+    
+        Self::new(1, drives.clone())
+    }
+}
+
+impl<T: Clone + std::fmt::Debug> BucketMap<T> {
     pub fn new(num_buckets_pow2: u8, drives: Arc<Vec<PathBuf>>) -> Self {
         let mut buckets = Vec::with_capacity(1 << num_buckets_pow2);
         buckets.resize_with(1 << num_buckets_pow2, || RwLock::new(None));
@@ -44,6 +67,22 @@ impl<T: Clone> BucketMap<T> {
     pub fn values(&self, ix: usize) -> Option<Vec<Vec<T>>> {
         Some(self.buckets[ix].read().unwrap().as_ref()?.values())
     }
+
+    pub fn read(&self) -> Option<&Self>{
+        Some(self)
+    }
+
+    pub fn get(&self, key: &Pubkey) -> Option<(u64, Vec<T>)> {
+        let ix = self.bucket_ix(key);
+        self.buckets[ix].read().unwrap().as_ref().and_then(|bucket| {
+            bucket.find_entry(key).and_then(|(elem, _)| {
+                elem.read_value(bucket).and_then(|slice| {
+                    Some((elem.ref_count, slice.to_vec()))
+                })
+            })
+        })
+    }
+
     pub fn read_value(&self, key: &Pubkey) -> Option<Vec<T>> {
         let ix = self.bucket_ix(key);
         self.buckets[ix].read().unwrap().as_ref().and_then(|x| {
@@ -60,7 +99,7 @@ impl<T: Clone> BucketMap<T> {
         }
     }
 
-    pub fn update<F>(&self, key: &Pubkey, updatefn: F) -> ()
+    pub fn update<F>(&self, key: &Pubkey, updatefn: F)
     where
         F: Fn(Option<&[T]>) -> Option<Vec<T>>,
     {
@@ -132,13 +171,13 @@ struct Bucket<T> {
 #[repr(C)]
 #[derive(Debug, Copy, Clone, PartialEq)]
 struct IndexEntry {
-    key: Pubkey,
-    ref_count: u64,
-    data_bucket: u64,
-    data_location: u64,
+    key: Pubkey, // can this be smaller if we have reduced the keys into buckets already?
+    ref_count: u64, // can this be smaller? Do we ever need more than 4B refcounts?
+    data_bucket: u64, // usize? or smaller. do we ever expect more than 4B buckets?
+    data_location: u64, // smaller? since these are variably sized, this could get tricky. well, actually accountinfo is not variable sized...
     //if the bucket doubled, the index can be recomputed
-    create_bucket_capacity: u8,
-    num_slots: u64,
+    create_bucket_capacity: u8, // TODO: what does this mean?
+    num_slots: u64, // can this be smaller? epoch size should be the max len
 }
 
 impl IndexEntry {
