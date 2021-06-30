@@ -391,7 +391,7 @@ impl Read for SharedBufferReader {
             // hang out in this loop until the buffer we need is available
             loop {
                 lock = instance.data.read().unwrap();
-                if self.current_buffer_index >= lock.len() {
+                if self.current_buffer_index < lock.len() {
                     break;
                 }
                 drop(lock);
@@ -402,7 +402,7 @@ impl Read for SharedBufferReader {
 
                 // another thread may have transferred data, so check again to see if we have data now
                 lock = instance.data.read().unwrap();
-                if self.current_buffer_index >= lock.len() {
+                if self.current_buffer_index < lock.len() {
                     break;
                 }
                 drop(lock);
