@@ -379,7 +379,6 @@ impl Read for SharedBufferReader {
 
             // we exhausted the current buffer
             // increment current_buffer_index get the next buffer to continue reading
-            drop(source);
             self.current_data = self.empty_buffer.clone(); // unref it so it can be recycled without copy
             self.index_in_current_data = 0;
             self.update_client_index(self.current_buffer_index + 1);
