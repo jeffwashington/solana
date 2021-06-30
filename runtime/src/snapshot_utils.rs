@@ -797,9 +797,12 @@ fn unpack_snapshot_local<T: 'static + Read + std::marker::Send, F: Fn() -> T>(
     let shared_buffer = SharedBuffer::new(reader());
 
     // allocate all readers before any readers start reading
-    let readers = (0..parallel_archivers).into_iter().map(|_| SharedBufferReader::new(&shared_buffer)).collect::<Vec<_>>();
+    let readers = (0..parallel_archivers)
+        .into_iter()
+        .map(|_| SharedBufferReader::new(&shared_buffer))
+        .collect::<Vec<_>>();
 
-    // create 'divisions' # of parallel workers, each responsible for 1/divisions of all the files to extract.
+    // create 'parallel_archivers' # of parallel workers, each responsible for 1/parallel_archivers of all the files to extract.
     let all_unpacked_append_vec_map = readers
         .into_par_iter()
         .enumerate()
