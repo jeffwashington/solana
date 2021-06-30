@@ -34,9 +34,8 @@ pub enum BucketMapError {
 
 impl<T: Clone + std::fmt::Debug> Default for BucketMap<T>  {
     fn default() -> Self {
-        let tmpdir1 = std::env::temp_dir().join("bucket_map_test_mt");
-        let tmpdir2 = PathBuf::from("/mnt/data/aeyakovenko").join("bucket_map_test_mt");
-        let paths: Vec<PathBuf> = [tmpdir1, tmpdir2]
+        let tmpdir2 = PathBuf::from("accounts_index_buckets");
+        let paths: Vec<PathBuf> = [tmpdir2]
             .iter()
             .filter(|x| std::fs::create_dir_all(x).is_ok())
             .cloned()
