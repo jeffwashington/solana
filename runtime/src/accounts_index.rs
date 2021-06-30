@@ -646,7 +646,7 @@ pub struct AccountsIndex<T> {
 impl<T: std::fmt::Debug + Clone> Default for AccountsIndex<T> {
     fn default() -> Self {
         Self {
-            account_maps: AccountMap::new_buckets(16),
+            account_maps: AccountMap::new_buckets(12),
             program_id_index: SecondaryIndex::<DashMapSecondaryIndexEntry>::new(
                 "program_id_index_stats",
             ),
