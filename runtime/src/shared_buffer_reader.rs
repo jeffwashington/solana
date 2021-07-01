@@ -700,6 +700,12 @@ pub mod tests {
                         break; // done reading
                     }
                     buffer.truncate(len);
+                    if data.len() > 0 {
+                        if data.last().unwrap() +1 != buffer[0] {
+                            error!("discontinuous: {}, {}, {:?}", data.len(), len, buffer);
+                            panic!("failure");
+                        }
+                    }
                     data.append(&mut buffer);
                 }
             }
