@@ -6,45 +6,25 @@
 //! A primary use case is the underlying reader being decompressing a file, which can be computationally expensive.
 //! The clients of SharedBufferReaders could be parallel instances which need access to the decompressed data.
 use {
+    crate::waitable_condvar::WaitableCondvar,
     log::*,
     solana_measure::measure::Measure,
     std::{
         io::*,
         sync::{
             atomic::{AtomicBool, Ordering},
-            Arc, Condvar, Mutex, RwLock,
+            Arc, Mutex, RwLock,
         },
         thread::{Builder, JoinHandle},
         time::Duration,
     },
 };
 
-// encapsulate complications of 'unneeded' mutex and Condvar
-#[derive(Default, Debug)]
-struct WaitableCondvar {
-    pub mutex: Mutex<u8>,
-    pub event: Condvar,
-}
-
-impl WaitableCondvar {
-    pub fn notify_all(&self) {
-        self.event.notify_all();
-    }
-    pub fn wait_timeout(&self, timeout: Duration) -> bool {
-        let lock = self.mutex.lock().unwrap();
-        let res = self.event.wait_timeout(lock, timeout).unwrap();
-        if res.1.timed_out() {
-            return true;
-        }
-        false
-    }
-}
-
 // tunable parameters:
 // # bytes allocated and populated by reading ahead
-const TOTAL_BUFFER_BUDGET: usize = 2_000_000_000;
+const TOTAL_BUFFER_BUDGET_DEFAULT: usize = 2_000_000_000;
 // data is read-ahead and saved in chunks of this many bytes
-const CHUNK_SIZE: usize = 100_000_000;
+const CHUNK_SIZE_DEFAULT: usize = 100_000_000;
 
 type OneSharedBuffer = Arc<Vec<u8>>;
 
@@ -86,9 +66,16 @@ pub struct SharedBuffer {
 
 impl SharedBuffer {
     pub fn new<T: 'static + Read + std::marker::Send>(reader: T) -> Self {
-        let inner = SharedBufferInternal {
-            buffers: RwLock::new(Self::alloc_initial_vectors()),
-            data: RwLock::new(vec![OneSharedBuffer::default()]), // initialize with 1 vector of empty data
+        Self::new_with_inner(Self::new_default_inner(), reader)
+    }
+    // allows for testing
+    fn new_default_inner() -> SharedBufferInternal {
+        SharedBufferInternal {
+            buffers: RwLock::new(Self::alloc_buffers(
+                TOTAL_BUFFER_BUDGET_DEFAULT,
+                CHUNK_SIZE_DEFAULT,
+            )),
+            data: RwLock::new(vec![OneSharedBuffer::default()]), // initialize with 1 vector of empty data at data[0]
             error: RwLock::new(Ok(0)),
 
             // default values
@@ -100,7 +87,13 @@ impl SharedBuffer {
             new_buffer_signal: WaitableCondvar::default(),
             clients: RwLock::default(),
             empty_buffer: OneSharedBuffer::default(),
-        };
+        }
+    }
+    // allows for testing
+    fn new_with_inner<T: 'static + Read + std::marker::Send>(
+        inner: SharedBufferInternal,
+        reader: T,
+    ) -> Self {
         let instance = Arc::new(inner);
         let instance_ = instance.clone();
 
@@ -112,11 +105,11 @@ impl SharedBuffer {
         *instance.bg_reader.lock().unwrap() = Some(handle.unwrap());
         Self { instance }
     }
-    fn alloc_initial_vectors() -> Vec<OneSharedBuffer> {
-        let initial_vector_count = TOTAL_BUFFER_BUDGET / CHUNK_SIZE;
+    fn alloc_buffers(total_buffer_budget: usize, chunk_size: usize) -> Vec<OneSharedBuffer> {
+        let initial_vector_count = total_buffer_budget / chunk_size;
         (0..initial_vector_count)
             .into_iter()
-            .map(|_| Arc::new(vec![0u8; CHUNK_SIZE]))
+            .map(|_| Arc::new(vec![0u8; chunk_size]))
             .collect()
     }
 }
@@ -154,9 +147,9 @@ impl Drop for SharedBufferReader {
 impl SharedBufferInternal {
     // read ahead the entire file.
     // This is goverend by the supply of buffers.
-    // Buffers are likely limited.
+    // Buffers are likely limited to cap memory usage.
     // A buffer is recycled after the last client finishes reading from it.
-    // When a buffer is available, this code wakes up and reads into that buffer.
+    // When a buffer is available (initially or recycled), this code wakes up and reads into that buffer.
     fn read_entire_file_in_bg<T: 'static + Read + std::marker::Send>(&self, mut reader: T) {
         let now = std::time::Instant::now();
         let mut read_us = 0;
@@ -164,7 +157,7 @@ impl SharedBufferInternal {
         let mut max_bytes_read = 0;
         let mut wait_us = 0;
         let mut total_bytes = 0;
-        'outer: loop {
+        loop {
             if self.stop.load(Ordering::Relaxed) {
                 // unsure what error is most appropriate here.
                 // bg reader was told to stop. All clients need to see that as an error if they try to read.
@@ -190,6 +183,7 @@ impl SharedBufferInternal {
 
             let mut bytes_read = 0;
             let mut eof = false;
+            let mut error_received = false;
             let target = Arc::make_mut(&mut dest_data);
 
             while bytes_read < dest_size {
@@ -212,14 +206,16 @@ impl SharedBufferInternal {
                         // loop to read some more. Underlying reader does not usually read all we ask for.
                     }
                     Err(err) => {
+                        error_received = true;
                         self.set_error(err);
-                        break 'outer;
+                        break;
                     }
                 }
             }
 
             if bytes_read > 0 {
                 // store this buffer in the bg data list
+                target.truncate(bytes_read);
                 let mut data = self.newly_read_data.write().unwrap();
                 data.push(dest_data);
                 drop(data);
@@ -229,7 +225,12 @@ impl SharedBufferInternal {
             if eof {
                 self.bg_eof_reached.store(true, Ordering::Relaxed);
                 self.newly_read_data_signal.notify_all(); // anyone waiting for new data needs to know that we reached eof
-                break 'outer;
+                break;
+            }
+
+            if error_received {
+                // do not ask for more data from 'reader'. We got an error and saved all the data we got before the error.
+                break;
             }
         }
 
@@ -248,7 +249,7 @@ impl SharedBufferInternal {
         self.newly_read_data_signal.notify_all(); // any client waiting for new data needs to wake up and check for errors
     }
     fn default_wait_timeout() -> Duration {
-        Duration::from_millis(100)
+        Duration::from_millis(100) // short enough to be unnoticable in case of trouble, long enough for efficient waiting
     }
     fn wait_for_new_buffer(&self) -> bool {
         self.new_buffer_signal
@@ -260,7 +261,8 @@ impl SharedBufferInternal {
     }
     // bg reader uses write lock on 'newly_read_data' each time a buffer is read or recycled
     // client readers read from 'data' using read locks
-    // when all of 'data' has been exhausted, 1 client needs to transfer from 'newly_read_data' to 'data' once.
+    // when all of 'data' has been exhausted by clients, 1 client needs to transfer from 'newly_read_data' to 'data' one time.
+    // returns true if any data was added to 'data'
     fn transfer_data_from_bg(&self) -> bool {
         let mut bg_lock = self.newly_read_data.write().unwrap();
         if bg_lock.is_empty() {
@@ -274,7 +276,7 @@ impl SharedBufferInternal {
         // append all data to fg
         let mut to_lock = self.data.write().unwrap();
         to_lock.append(&mut newly_read_data);
-        true
+        true // data was transferred
     }
     fn has_reached_eof(&self) -> bool {
         self.bg_eof_reached.load(Ordering::Relaxed)
@@ -308,6 +310,10 @@ impl SharedBufferReader {
             empty_buffer: original_instance.empty_buffer.clone(),
         }
     }
+    fn default_error() -> std::io::Error {
+        // AN error
+        std::io::Error::from(std::io::ErrorKind::TimedOut)
+    }
     fn client_done_reading(&mut self) {
         // has the effect of causing nobody to ever again wait on this reader's progress
         self.update_client_index(usize::MAX);
@@ -336,7 +342,7 @@ impl SharedBufferReader {
                 let mut data = self.instance.data.write().unwrap();
                 std::mem::swap(&mut remove, &mut data[recycle]);
                 drop(data);
-                if remove.len() < CHUNK_SIZE {
+                if remove.is_empty() {
                     continue; // another thread beat us swapping out this buffer, so nothing to recycle here
                 }
 
@@ -423,8 +429,7 @@ impl Read for SharedBufferReader {
                     let mut error = instance.error.write().unwrap();
                     if error.is_err() {
                         // replace the current error (with AN error instead of ok)
-                        let mut stored_error =
-                            Err(std::io::Error::from(std::io::ErrorKind::TimedOut));
+                        let mut stored_error = Err(Self::default_error());
                         std::mem::swap(&mut *error, &mut stored_error);
                         // return the original error
                         return stored_error;
@@ -439,5 +444,208 @@ impl Read for SharedBufferReader {
             self.current_data = Arc::clone(&lock[self.current_buffer_index]);
         }
         Ok(offset_in_dest)
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+    /*
+        #[test]
+        #[should_panic(
+            expected = "bin_range.start < bins && bin_range.end <= bins &&\\n    bin_range.start < bin_range.end"
+        )]
+        fn test_accountsdb_scan_snapshot_stores_illegal_range_start() {
+            let mut stats = HashStats::default();
+            let bounds = Range { start: 2, end: 2 };
+
+            AccountsDb::scan_snapshot_stores(&empty_storages(), &mut stats, 2, &bounds, false).unwrap();
+        }
+    */
+    use crossbeam_channel::{unbounded, Receiver};
+    type SimpleReaderReceiverType = Receiver<(Vec<u8>, Option<std::io::Error>)>;
+    struct SimpleReader {
+        pub receiver: SimpleReaderReceiverType,
+        pub data: Vec<u8>,
+        pub done: bool,
+        pub err: Option<std::io::Error>,
+    }
+    impl SimpleReader {
+        fn new(receiver: SimpleReaderReceiverType) -> Self {
+            Self {
+                receiver,
+                data: Vec::default(),
+                done: false,
+                err: None,
+            }
+        }
+    }
+
+    impl Read for SimpleReader {
+        fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+            if !self.done && self.data.is_empty() {
+                let (mut data, err) = self.receiver.recv().unwrap();
+                if err.is_some() {
+                    self.err = err;
+                }
+                if data.is_empty() {
+                    self.done = true;
+                } else {
+                    self.data.append(&mut data);
+                }
+            }
+            if self.err.is_some() {
+                return Err(self.err.take().unwrap());
+            }
+            let len_request = buf.len();
+            let len_data = self.data.len();
+            let to_read = std::cmp::min(len_request, len_data);
+            buf[0..to_read].copy_from_slice(&self.data[0..to_read]);
+            self.data.drain(0..to_read);
+            Ok(to_read)
+        }
+    }
+
+    #[test]
+    fn test_shared_buffer_simple_read_to_end() {
+        solana_logger::setup();
+        let (sender, receiver) = unbounded();
+        let file = SimpleReader::new(receiver);
+        let shared_buffer = SharedBuffer::new(file);
+        let mut reader = SharedBufferReader::new(&shared_buffer);
+        let mut data = Vec::new();
+        let done_signal = vec![];
+
+        let sent = vec![1, 2, 3];
+        let _ = sender.send((sent.clone(), None));
+        let _ = sender.send((done_signal, None));
+        assert!(reader.read_to_end(&mut data).is_ok());
+        assert_eq!(sent, data);
+    }
+
+    fn get_error() -> std::io::Error {
+        std::io::Error::from(std::io::ErrorKind::WriteZero)
+    }
+
+    #[test]
+    fn test_shared_buffer_simple_read() {
+        solana_logger::setup();
+        let (sender, receiver) = unbounded();
+        let file = SimpleReader::new(receiver);
+        let shared_buffer = SharedBuffer::new(file);
+        let mut reader = SharedBufferReader::new(&shared_buffer);
+        let done_signal = vec![];
+
+        let sent = vec![1, 2, 3];
+        let mut data = vec![0; sent.len()];
+        let _ = sender.send((sent.clone(), None));
+        let _ = sender.send((done_signal, None));
+        assert_eq!(reader.read(&mut data[..]).unwrap(), sent.len());
+        assert_eq!(sent, data);
+    }
+
+    #[test]
+    fn test_shared_buffer_error() {
+        solana_logger::setup();
+        let (sender, receiver) = unbounded();
+        let file = SimpleReader::new(receiver);
+        let shared_buffer = SharedBuffer::new(file);
+        let mut reader = SharedBufferReader::new(&shared_buffer);
+        let mut data = Vec::new();
+        let done_signal = vec![];
+
+        let _ = sender.send((done_signal, Some(get_error())));
+        assert_eq!(
+            reader.read_to_end(&mut data).unwrap_err().kind(),
+            get_error().kind()
+        );
+    }
+
+    #[test]
+    fn test_shared_buffer_2_errors() {
+        solana_logger::setup();
+        let (sender, receiver) = unbounded();
+        let file = SimpleReader::new(receiver);
+        let shared_buffer = SharedBuffer::new(file);
+        let mut reader = SharedBufferReader::new(&shared_buffer);
+        let mut reader2 = SharedBufferReader::new(&shared_buffer);
+        let mut data = Vec::new();
+        let done_signal = vec![];
+
+        let _ = sender.send((done_signal, Some(get_error())));
+        assert_eq!(
+            reader.read_to_end(&mut data).unwrap_err().kind(),
+            get_error().kind()
+        );
+        // #2 will read 2nd, so should get default error, but still an error
+        assert_eq!(
+            reader2.read_to_end(&mut data).unwrap_err().kind(),
+            SharedBufferReader::default_error().kind()
+        );
+    }
+
+    #[test]
+    fn test_shared_buffer_2_errors_after_read() {
+        solana_logger::setup();
+        let (sender, receiver) = unbounded();
+        let file = SimpleReader::new(receiver);
+        let shared_buffer = SharedBuffer::new(file);
+        let mut reader = SharedBufferReader::new(&shared_buffer);
+        let mut reader2 = SharedBufferReader::new(&shared_buffer);
+        let mut data = Vec::new();
+        let done_signal = vec![];
+
+        // send some data
+        let sent = vec![1, 2, 3];
+        let _ = sender.send((sent.clone(), None));
+        // send an error
+        let _ = sender.send((done_signal, Some(get_error())));
+        assert_eq!(
+            reader.read_to_end(&mut data).unwrap_err().kind(),
+            get_error().kind()
+        );
+        // #2 will read valid bytes first and succeed, then get error
+        let mut data = vec![0; sent.len()];
+        // this read should succeed because it was prior to error being received by bg reader
+        assert_eq!(reader2.read(&mut data[..]).unwrap(), sent.len(),);
+        assert_eq!(sent, data);
+        assert_eq!(
+            reader2.read_to_end(&mut data).unwrap_err().kind(),
+            SharedBufferReader::default_error().kind()
+        );
+    }
+
+    #[test]
+    fn test_shared_buffer_2_errors_after_read2() {
+        solana_logger::setup();
+        let (sender, receiver) = unbounded();
+        let file = SimpleReader::new(receiver);
+        let shared_buffer = SharedBuffer::new(file);
+        let mut reader = SharedBufferReader::new(&shared_buffer);
+        let mut reader2 = SharedBufferReader::new(&shared_buffer);
+        let mut data = Vec::new();
+        let done_signal = vec![];
+
+        // send some data
+        let sent = vec![1, 2, 3];
+        let _ = sender.send((sent.clone(), None));
+        // send an error
+        let _ = sender.send((done_signal, Some(get_error())));
+        assert_eq!(
+            reader.read_to_end(&mut data).unwrap_err().kind(),
+            get_error().kind()
+        );
+        // #2 will read valid bytes first and succeed, then get error
+        let mut data = vec![0; sent.len()];
+        // this read should succeed because it was prior to error being received by bg reader
+        let expected_len = 1;
+        for i in 0..sent.len() {
+            assert_eq!(reader2.read(&mut data[i..=i]).unwrap(), expected_len);
+        }
+        assert_eq!(sent, data);
+        assert_eq!(
+            reader2.read_to_end(&mut data).unwrap_err().kind(),
+            SharedBufferReader::default_error().kind()
+        );
     }
 }
