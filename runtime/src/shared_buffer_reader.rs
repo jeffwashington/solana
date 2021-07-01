@@ -372,12 +372,14 @@ impl Read for SharedBufferReader {
 
             let remaining_source_len = source.len() - self.index_in_current_data;
             let bytes_to_transfer = std::cmp::min(dest_len - offset_in_dest, remaining_source_len);
-
             // copy what we can
             buf[offset_in_dest..(offset_in_dest + bytes_to_transfer)].copy_from_slice(
                 &source
                     [self.index_in_current_data..(self.index_in_current_data + bytes_to_transfer)],
             );
+            if offset_in_dest > 0  {
+                assert!(buf[offset_in_dest -1] + 1 == buf[offset_in_dest]);
+            }
             self.index_in_current_data += bytes_to_transfer;
             offset_in_dest += bytes_to_transfer;
 
