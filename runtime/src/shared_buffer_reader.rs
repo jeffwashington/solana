@@ -273,11 +273,10 @@ impl SharedBufferInternal {
         // grab all data from bg
         let mut newly_read_data: Vec<OneSharedBuffer> = vec![];
         std::mem::swap(&mut *from_lock, &mut newly_read_data);
-        drop(from_lock);
         // append all data to fg
         let mut to_lock = self.data.write().unwrap();
         // from_lock has to be held until we have the to_lock lock. Otherwise, we can race with another reader and append to to_lock out of order.
-        //drop(from_lock);
+        drop(from_lock);
         to_lock.append(&mut newly_read_data);
         true // data was transferred
     }
@@ -378,26 +377,6 @@ impl Read for SharedBufferReader {
                 &source
                     [self.index_in_current_data..(self.index_in_current_data + bytes_to_transfer)],
             );
-            if offset_in_dest > 0 && bytes_to_transfer > 0 {
-                assert_eq!(
-                    (buf[offset_in_dest - 1] as usize + 1) % 256,
-                    buf[offset_in_dest] as usize,
-                    "{:?}, {}, {:?}",
-                    buf,
-                    self.current_buffer_index,
-                    self.instance.data.read().unwrap()
-                );
-            }
-            for i in 1..offset_in_dest {
-                assert_eq!(
-                    buf[i] as usize,
-                    (buf[i - 1] as usize + 1) % 256,
-                    "{:?} {}, {:?}",
-                    buf,
-                    self.current_buffer_index,
-                    self.instance.data.read().unwrap()
-                );
-            }
             self.index_in_current_data += bytes_to_transfer;
             offset_in_dest += bytes_to_transfer;
 
@@ -464,9 +443,6 @@ impl Read for SharedBufferReader {
 
             // refresh current_data inside the lock
             self.current_data = Arc::clone(&lock[self.current_buffer_index]);
-        }
-        for i in 1..offset_in_dest {
-            assert_eq!(buf[i] as usize, (buf[i - 1] as usize + 1) % 256);
         }
         Ok(offset_in_dest)
     }
