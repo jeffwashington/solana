@@ -644,6 +644,7 @@ pub fn bank_from_snapshot_archive<P>(
     limit_load_slot_count_from_snapshot: Option<usize>,
     shrink_ratio: AccountShrinkThreshold,
     test_hash_calculation: bool,
+    verify_index: bool,
 ) -> Result<(Bank, BankFromArchiveTimings)>
 where
     P: AsRef<Path> + std::marker::Sync,
@@ -687,6 +688,7 @@ where
         accounts_db_caching_enabled,
         limit_load_slot_count_from_snapshot,
         shrink_ratio,
+        verify_index,
     )?;
     measure.stop();
 
@@ -940,6 +942,7 @@ fn rebuild_bank_from_snapshots(
     accounts_db_caching_enabled: bool,
     limit_load_slot_count_from_snapshot: Option<usize>,
     shrink_ratio: AccountShrinkThreshold,
+    verify_index: bool,
 ) -> Result<Bank> {
     let (snapshot_version_enum, root_paths) =
         verify_snapshot_version_and_folder(snapshot_version, unpacked_snapshots_dir)?;
@@ -962,6 +965,7 @@ fn rebuild_bank_from_snapshots(
                 accounts_db_caching_enabled,
                 limit_load_slot_count_from_snapshot,
                 shrink_ratio,
+                verify_index,
             ),
         }?)
     })?;
@@ -1495,6 +1499,7 @@ mod tests {
             None,
             AccountShrinkThreshold::default(),
             false,
+            false,
         )
         .unwrap();
 
@@ -1582,6 +1587,7 @@ mod tests {
             false,
             None,
             AccountShrinkThreshold::default(),
+            false,
             false,
         )
         .unwrap();
