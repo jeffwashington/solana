@@ -266,17 +266,18 @@ impl SharedBufferInternal {
     // when all of 'data' has been exhausted by clients, 1 client needs to transfer from 'newly_read_data' to 'data' one time.
     // returns true if any data was added to 'data'
     fn transfer_data_from_bg(&self) -> bool {
-        let mut bg_lock = self.newly_read_data.write().unwrap();
-        if bg_lock.is_empty() {
+        let mut from_lock = self.newly_read_data.write().unwrap();
+        if from_lock.is_empty() {
             // no data available from bg
             return false;
         }
         // grab all data from bg
         let mut newly_read_data: Vec<OneSharedBuffer> = vec![];
-        std::mem::swap(&mut *bg_lock, &mut newly_read_data);
-        drop(bg_lock);
+        std::mem::swap(&mut *from_lock, &mut newly_read_data);
         // append all data to fg
         let mut to_lock = self.data.write().unwrap();
+        // from_lock has to be held until we have the to_lock lock. Otherwise, we can race with another reader and append to to_lock out of order.
+        drop(from_lock);
         to_lock.append(&mut newly_read_data);
         true // data was transferred
     }
