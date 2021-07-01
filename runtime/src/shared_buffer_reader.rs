@@ -272,10 +272,11 @@ impl SharedBufferInternal {
         // grab all data from bg
         let mut newly_read_data: Vec<OneSharedBuffer> = vec![];
         std::mem::swap(&mut *from_lock, &mut newly_read_data);
+        drop(from_lock);
         // append all data to fg
         let mut to_lock = self.data.write().unwrap();
         // from_lock has to be held until we have the to_lock lock. Otherwise, we can race with another reader and append to to_lock out of order.
-        drop(from_lock);
+        //drop(from_lock);
         to_lock.append(&mut newly_read_data);
         true // data was transferred
     }
