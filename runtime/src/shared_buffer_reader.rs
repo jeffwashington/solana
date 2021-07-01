@@ -378,10 +378,10 @@ impl Read for SharedBufferReader {
                     [self.index_in_current_data..(self.index_in_current_data + bytes_to_transfer)],
             );
             if offset_in_dest > 0 && bytes_to_transfer > 0  {
-                assert!((buf[offset_in_dest -1] as usize + 1) % 256 == buf[offset_in_dest] as usize);
+                assert_eq!((buf[offset_in_dest -1] as usize + 1) % 256,buf[offset_in_dest] as usize, "{:?}", buf);
             }
             for i in 1..offset_in_dest {
-                assert_eq!(buf[i] as usize, (buf[i-1] as usize + 1) % 256);
+                assert_eq!(buf[i] as usize, (buf[i-1] as usize + 1) % 256, "{:?}", buf);
             }
             self.index_in_current_data += bytes_to_transfer;
             offset_in_dest += bytes_to_transfer;
