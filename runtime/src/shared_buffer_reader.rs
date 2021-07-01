@@ -804,37 +804,41 @@ pub mod tests {
                                 .collect::<Vec<_>>();
 
                             let parallel_reader = reader_ct > 2;
-                            let handles = if parallel_reader {
+                            let handle = if parallel_reader {
                                 let threads = 8;
-                                Some(
-                                    (0..threads)
+                                Some({
+                                    let parallel = (0..threads)
                                         .into_iter()
                                         .map(|_| {
                                             // create before any reading starts
                                             let mut reader_ =
                                                 SharedBufferReader::new(&shared_buffer);
                                             let sent_ = sent.clone();
-                                            Builder::new()
-                                                .spawn(move || {
-                                                    let data = test_read_all(&mut reader_, read_sz);
-                                                    assert_eq!(
-                                                        sent_,
-                                                        data,
-                                                        "{:?}",
-                                                        (
-                                                            chunk_sz,
-                                                            budget_sz,
-                                                            read_sz,
-                                                            reader_ct,
-                                                            data_size,
-                                                            adjusted_budget_sz
-                                                        )
-                                                    );
-                                                })
-                                                .unwrap()
+                                            (reader_, sent_)
                                         })
-                                        .collect::<Vec<_>>(),
-                                )
+                                        .collect::<Vec<_>>();
+
+                                    Builder::new()
+                                        .spawn(move || {
+                                            parallel.into_par_iter().for_each(|(reader, sent)| {
+                                                let data = test_read_all(&mut reader, read_sz);
+                                                assert_eq!(
+                                                    sent,
+                                                    data,
+                                                    "{:?}",
+                                                    (
+                                                        chunk_sz,
+                                                        budget_sz,
+                                                        read_sz,
+                                                        reader_ct,
+                                                        data_size,
+                                                        adjusted_budget_sz
+                                                    )
+                                                );
+                                            })
+                                        })
+                                        .unwrap()
+                                })
                             } else {
                                 None
                             };
@@ -862,9 +866,7 @@ pub mod tests {
                                 assert_eq!(sent, data);
                             }
                             if parallel_reader {
-                                handles.unwrap().into_iter().for_each(|handle| {
-                                    assert!(handle.join().is_ok());
-                                });
+                                assert!(handle.unwrap().join().is_ok());
                             }
                         }
                     }
