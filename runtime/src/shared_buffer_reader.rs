@@ -223,14 +223,12 @@ impl SharedBufferInternal {
             }
 
             if eof {
-                error!("hit eof");
                 self.bg_eof_reached.store(true, Ordering::Relaxed);
                 self.newly_read_data_signal.notify_all(); // anyone waiting for new data needs to know that we reached eof
                 break;
             }
 
             if error_received {
-                error!("error");
                 // do not ask for more data from 'reader'. We got an error and saved all the data we got before the error.
                 break;
             }
@@ -420,7 +418,6 @@ impl Read for SharedBufferReader {
 
                 if eof_seen {
                     // eof detected on previous iteration, we have had a chance to read all data that was buffered, and there is not enough for us
-                    error!("eof: {}", offset_in_dest);
                     break 'outer;
                 }
 
@@ -441,7 +438,6 @@ impl Read for SharedBufferReader {
                         let mut stored_error = Err(Self::default_error());
                         std::mem::swap(&mut *error, &mut stored_error);
                         // return the original error
-                        error!("error: {}", offset_in_dest);
                         return stored_error;
                     }
                 }
@@ -697,36 +693,18 @@ pub mod tests {
                 loop {
                     let mut buffer = vec![0; size];
                     let result = reader.read(&mut buffer[..]);
-                    if !result.is_ok() {
-                        error!("Mismatched2");
-                    }
                     assert!(result.is_ok());
                     let len = result.unwrap();
-                    if size == 3 {
-                        error!("asked for 3, got: {}", len);
-                    }
                     if len == 0 {
                         break; // done reading
                     }
                     buffer.truncate(len);
-                    if data.len() > 0 {
-                        if data.last().unwrap() +1 != buffer[0] {
-                            error!("discontinuous: {}, {}, {:?}, {:?}", data.len(), len, data, buffer);
-                            panic!("failure");
-                        }
-                    }
                     data.append(&mut buffer);
                 }
             }
             None => {
                 let result = reader.read_to_end(&mut data);
-                if !result.is_ok() {
-                    error!("Mismatched3");
-                }
                 assert!(result.is_ok());
-                if data.len() != *result.as_ref().unwrap() {
-                    error!("Mismatched4");
-                }
                 assert_eq!(result.unwrap(), data.len());
             }
         }
@@ -828,21 +806,6 @@ pub mod tests {
                             } else {
                                 None
                             };
-                            {//if Some(3) == read_sz {
-                                error!(
-                                    "{:?}",
-                                    (
-                                        chunk_sz,
-                                        budget_sz,
-                                        read_sz,
-                                        reader_ct,
-                                        data_size,
-                                        adjusted_budget_sz,
-                                        second_reader,
-                                    )
-                                );
-                            }
-    
                             let sent = (0..data_size)
                                 .into_iter()
                                 .map(|i| ((i + data_size) % 256) as u8)
@@ -857,9 +820,6 @@ pub mod tests {
                                     Builder::new()
                                         .spawn(move || {
                                             let data = test_read_all(&mut reader_, read_sz);
-                                            if sent_ != data {
-                                                error!("Mismatched");
-                                            }
                                             assert_eq!(
                                                 sent_,
                                                 data,
