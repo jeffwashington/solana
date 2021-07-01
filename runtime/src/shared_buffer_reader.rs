@@ -710,7 +710,7 @@ pub mod tests {
                     buffer.truncate(len);
                     if data.len() > 0 {
                         if data.last().unwrap() +1 != buffer[0] {
-                            error!("discontinuous: {}, {}, {:?}", data.len(), len, buffer);
+                            error!("discontinuous: {}, {}, {:?}, {:?}", data.len(), len, data, buffer);
                             panic!("failure");
                         }
                     }
