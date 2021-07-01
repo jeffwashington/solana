@@ -802,7 +802,7 @@ pub mod tests {
                             budget_sz * 2 - 1,
                             budget_sz * 2 + 1,
                         ] {
-                            for threads in if reader_ct == 2 {
+                            for threads in if reader_ct == 3 {
                                 [1, 4, 9, 16].iter()
                             } else {
                                 [0].iter()
