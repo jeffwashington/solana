@@ -376,11 +376,25 @@ impl Read for SharedBufferReader {
                 &source
                     [self.index_in_current_data..(self.index_in_current_data + bytes_to_transfer)],
             );
-            if offset_in_dest > 0 && bytes_to_transfer > 0  {
-                assert_eq!((buf[offset_in_dest -1] as usize + 1) % 256,buf[offset_in_dest] as usize, "{:?}, {}, {:?}", buf, self.current_buffer_index, self.instance.data.read().unwrap());
+            if offset_in_dest > 0 && bytes_to_transfer > 0 {
+                assert_eq!(
+                    (buf[offset_in_dest - 1] as usize + 1) % 256,
+                    buf[offset_in_dest] as usize,
+                    "{:?}, {}, {:?}",
+                    buf,
+                    self.current_buffer_index,
+                    self.instance.data.read().unwrap()
+                );
             }
             for i in 1..offset_in_dest {
-                assert_eq!(buf[i] as usize, (buf[i-1] as usize + 1) % 256, "{:?} {}, {:?}", buf, self.current_buffer_index, self.instance.data.read().unwrap());
+                assert_eq!(
+                    buf[i] as usize,
+                    (buf[i - 1] as usize + 1) % 256,
+                    "{:?} {}, {:?}",
+                    buf,
+                    self.current_buffer_index,
+                    self.instance.data.read().unwrap()
+                );
             }
             self.index_in_current_data += bytes_to_transfer;
             offset_in_dest += bytes_to_transfer;
@@ -450,7 +464,7 @@ impl Read for SharedBufferReader {
             self.current_data = Arc::clone(&lock[self.current_buffer_index]);
         }
         for i in 1..offset_in_dest {
-            assert_eq!(buf[i] as usize, (buf[i-1] as usize + 1) % 256);
+            assert_eq!(buf[i] as usize, (buf[i - 1] as usize + 1) % 256);
         }
         Ok(offset_in_dest)
     }
@@ -766,7 +780,7 @@ pub mod tests {
                 equivalent_buffer_sz,
                 equivalent_buffer_sz * 2,
             ] {
-                for read_sz in [0] {//}, 1, chunk_sz - 1, chunk_sz, chunk_sz + 1] {
+                for read_sz in [0, 1, chunk_sz - 1, chunk_sz, chunk_sz + 1] {
                     let read_sz = if read_sz > 0 { Some(read_sz) } else { None };
                     for reader_ct in 1..=3 {
                         for data_size in [
@@ -785,85 +799,100 @@ pub mod tests {
                             budget_sz * 2 - 1,
                             budget_sz * 2 + 1,
                         ] {
-                            let adjusted_budget_sz = adjusted_buffer_size(budget_sz, chunk_sz);
-                            let done_signal = vec![];
-                            let (sender, receiver) = unbounded();
-                            let file = SimpleReader::new(receiver);
-                            let shared_buffer =
-                                SharedBuffer::new_with_sizes(budget_sz, chunk_sz, file);
-                            let mut reader = SharedBufferReader::new(&shared_buffer);
-                            // with the Read trait, we don't know we are eof until we get Ok(0) from the underlying reader.
-                            // This can't happen until we have enough space to store another chunk, thus we try to read another chunk and see the Ok(0) returned.
-                            // Thus, we have to use data_size < adjusted_budget_sz here instead of <=
-                            let second_reader = reader_ct > 1
-                                && data_size < adjusted_budget_sz
-                                && read_sz
-                                    .as_ref()
-                                    .map(|sz| sz < &adjusted_budget_sz)
-                                    .unwrap_or(true);
-                            let reader2 = if second_reader {
-                                Some(SharedBufferReader::new(&shared_buffer))
+                            for threads in if reader_ct == 2 {
+                                [1, 2, 4, 8, 9, 16].iter()
                             } else {
-                                None
-                            };
-                            let sent = (0..data_size)
-                                .into_iter()
-                                .map(|i| ((i + data_size) % 256) as u8)
-                                .collect::<Vec<_>>();
+                                [0].iter()
+                            } {
+                                let adjusted_budget_sz = adjusted_buffer_size(budget_sz, chunk_sz);
+                                let done_signal = vec![];
+                                let (sender, receiver) = unbounded();
+                                let file = SimpleReader::new(receiver);
+                                let shared_buffer =
+                                    SharedBuffer::new_with_sizes(budget_sz, chunk_sz, file);
+                                let mut reader = SharedBufferReader::new(&shared_buffer);
+                                // with the Read trait, we don't know we are eof until we get Ok(0) from the underlying reader.
+                                // This can't happen until we have enough space to store another chunk, thus we try to read another chunk and see the Ok(0) returned.
+                                // Thus, we have to use data_size < adjusted_budget_sz here instead of <=
+                                let second_reader = reader_ct > 1
+                                    && data_size < adjusted_budget_sz
+                                    && read_sz
+                                        .as_ref()
+                                        .map(|sz| sz < &adjusted_budget_sz)
+                                        .unwrap_or(true);
+                                let reader2 = if second_reader {
+                                    Some(SharedBufferReader::new(&shared_buffer))
+                                } else {
+                                    None
+                                };
+                                let sent = (0..data_size)
+                                    .into_iter()
+                                    .map(|i| ((i + data_size) % 256) as u8)
+                                    .collect::<Vec<_>>();
 
-                            let parallel_reader = reader_ct > 2;
-                            let handle = if parallel_reader {
-                                // create before any reading starts
-                                let mut reader_ = SharedBufferReader::new(&shared_buffer);
-                                let sent_ = sent.clone();
-                                Some(
-                                    Builder::new()
-                                        .spawn(move || {
-                                            let data = test_read_all(&mut reader_, read_sz);
-                                            assert_eq!(
-                                                sent_,
-                                                data,
-                                                "{:?}",
-                                                (
-                                                    chunk_sz,
-                                                    budget_sz,
-                                                    read_sz,
-                                                    reader_ct,
-                                                    data_size,
-                                                    adjusted_budget_sz
-                                                )
-                                            );
-                                        })
-                                        .unwrap(),
-                                )
-                            } else {
-                                None
-                            };
-                            drop(shared_buffer); // readers should work fine even if shared buffer is dropped
-                            let _ = sender.send((sent.clone(), None));
-                            let _ = sender.send((done_signal, None));
-                            let data = test_read_all(&mut reader, read_sz);
-                            assert_eq!(
-                                sent,
-                                data,
-                                "{:?}",
-                                (
-                                    chunk_sz,
-                                    budget_sz,
-                                    read_sz,
-                                    reader_ct,
-                                    data_size,
-                                    adjusted_budget_sz
-                                )
-                            );
-                            // a 2nd reader would stall us if we exceed the total buffer size
-                            if second_reader {
-                                // #2 will read valid bytes first and succeed, then get error
-                                let data = test_read_all(&mut reader2.unwrap(), read_sz);
-                                assert_eq!(sent, data);
-                            }
-                            if parallel_reader {
-                                assert!(handle.unwrap().join().is_ok());
+                                let parallel_reader = reader_ct > 2;
+                                let handles = if parallel_reader {
+                                    Some(
+                                        (0..*threads)
+                                            .into_iter()
+                                            .map(|_| {
+                                                // create before any reading starts
+                                                let mut reader_ =
+                                                    SharedBufferReader::new(&shared_buffer);
+                                                let sent_ = sent.clone();
+                                                Builder::new()
+                                                    .spawn(move || {
+                                                        let data =
+                                                            test_read_all(&mut reader_, read_sz);
+                                                        assert_eq!(
+                                                            sent_,
+                                                            data,
+                                                            "{:?}",
+                                                            (
+                                                                chunk_sz,
+                                                                budget_sz,
+                                                                read_sz,
+                                                                reader_ct,
+                                                                data_size,
+                                                                adjusted_budget_sz
+                                                            )
+                                                        );
+                                                    })
+                                                    .unwrap()
+                                            })
+                                            .collect::<Vec<_>>(),
+                                    )
+                                } else {
+                                    None
+                                };
+                                drop(shared_buffer); // readers should work fine even if shared buffer is dropped
+                                let _ = sender.send((sent.clone(), None));
+                                let _ = sender.send((done_signal, None));
+                                let data = test_read_all(&mut reader, read_sz);
+                                assert_eq!(
+                                    sent,
+                                    data,
+                                    "{:?}",
+                                    (
+                                        chunk_sz,
+                                        budget_sz,
+                                        read_sz,
+                                        reader_ct,
+                                        data_size,
+                                        adjusted_budget_sz
+                                    )
+                                );
+                                // a 2nd reader would stall us if we exceed the total buffer size
+                                if second_reader {
+                                    // #2 will read valid bytes first and succeed, then get error
+                                    let data = test_read_all(&mut reader2.unwrap(), read_sz);
+                                    assert_eq!(sent, data);
+                                }
+                                if parallel_reader {
+                                    handles.unwrap().into_iter().for_each(|handle| {
+                                        assert!(handle.join().is_ok());
+                                    });
+                                }
                             }
                         }
                     }
