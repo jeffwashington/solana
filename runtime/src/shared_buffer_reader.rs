@@ -453,7 +453,7 @@ impl Read for SharedBufferReader {
             self.current_data = Arc::clone(&lock[self.current_buffer_index]);
         }
         for i in 1..offset_in_dest {
-            assert_eq!(buf[i], buf[i-1] + 1);
+            assert_eq!(buf[i] as usize, (buf[i-1] as usize + 1) % 256);
         }
         Ok(offset_in_dest)
     }
