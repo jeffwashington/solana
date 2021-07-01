@@ -269,11 +269,12 @@ impl SharedBufferInternal {
             // no data available from bg
             return false;
         }
+        use rand::Rng;
         // grab all data from bg
         let mut newly_read_data: Vec<OneSharedBuffer> = vec![];
         std::mem::swap(&mut *from_lock, &mut newly_read_data);
         drop(from_lock);
-        std::thread::sleep_ms(rand::thread_rng().gen::<u8>() % 5);
+        std::thread::sleep_ms(rand::thread_rng().gen::<u32>() % 5);
         // append all data to fg
         let mut to_lock = self.data.write().unwrap();
         // from_lock has to be held until we have the to_lock lock. Otherwise, we can race with another reader and append to to_lock out of order.
