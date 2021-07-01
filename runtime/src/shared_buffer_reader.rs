@@ -377,7 +377,7 @@ impl Read for SharedBufferReader {
                 &source
                     [self.index_in_current_data..(self.index_in_current_data + bytes_to_transfer)],
             );
-            if offset_in_dest > 0  {
+            if offset_in_dest > 0 && bytes_to_transfer > 0  {
                 assert!(buf[offset_in_dest -1] + 1 == buf[offset_in_dest]);
             }
             for i in 1..offset_in_dest {
