@@ -380,6 +380,9 @@ impl Read for SharedBufferReader {
             if offset_in_dest > 0  {
                 assert!(buf[offset_in_dest -1] + 1 == buf[offset_in_dest]);
             }
+            for i in 1..offset_in_dest {
+                assert_eq!(buf[i], buf[i-1] + 1);
+            }
             self.index_in_current_data += bytes_to_transfer;
             offset_in_dest += bytes_to_transfer;
 
@@ -448,6 +451,9 @@ impl Read for SharedBufferReader {
 
             // refresh current_data inside the lock
             self.current_data = Arc::clone(&lock[self.current_buffer_index]);
+        }
+        for i in 1..offset_in_dest {
+            assert_eq!(buf[i], buf[i-1] + 1);
         }
         Ok(offset_in_dest)
     }
