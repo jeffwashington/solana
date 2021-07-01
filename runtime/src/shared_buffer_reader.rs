@@ -767,7 +767,7 @@ pub mod tests {
         solana_logger::setup();
         // try the inflection points with 1 to 3 readers, including a parallel reader
         // a few different chunk sizes
-        for chunk_sz in [1, 2, 100] {
+        for chunk_sz in [1, 2, 10] {
             // same # of buffers as default
             let equivalent_buffer_sz =
                 chunk_sz * (TOTAL_BUFFER_BUDGET_DEFAULT / CHUNK_SIZE_DEFAULT);
@@ -800,7 +800,7 @@ pub mod tests {
                             budget_sz * 2 + 1,
                         ] {
                             for threads in if reader_ct == 2 {
-                                [1, 2, 4, 8, 9, 16].iter()
+                                [1, 4, 9, 16].iter()
                             } else {
                                 [0].iter()
                             } {
