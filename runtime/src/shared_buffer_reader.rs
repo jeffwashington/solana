@@ -821,22 +821,24 @@ pub mod tests {
 
                                     Builder::new()
                                         .spawn(move || {
-                                            parallel.into_par_iter().for_each(|(reader, sent)| {
-                                                let data = test_read_all(&mut reader, read_sz);
-                                                assert_eq!(
-                                                    sent,
-                                                    data,
-                                                    "{:?}",
-                                                    (
-                                                        chunk_sz,
-                                                        budget_sz,
-                                                        read_sz,
-                                                        reader_ct,
-                                                        data_size,
-                                                        adjusted_budget_sz
-                                                    )
-                                                );
-                                            })
+                                            parallel.into_par_iter().for_each(
+                                                |(mut reader, sent)| {
+                                                    let data = test_read_all(&mut reader, read_sz);
+                                                    assert_eq!(
+                                                        sent,
+                                                        data,
+                                                        "{:?}",
+                                                        (
+                                                            chunk_sz,
+                                                            budget_sz,
+                                                            read_sz,
+                                                            reader_ct,
+                                                            data_size,
+                                                            adjusted_budget_sz
+                                                        )
+                                                    );
+                                                },
+                                            )
                                         })
                                         .unwrap()
                                 })
