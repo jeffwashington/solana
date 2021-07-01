@@ -799,19 +799,6 @@ pub mod tests {
                             budget_sz * 2 + 1,
                         ] {
                             let adjusted_budget_sz = adjusted_buffer_size(budget_sz, chunk_sz);
-                            {//if Some(3) == read_sz {
-                            error!(
-                                "{:?}",
-                                (
-                                    chunk_sz,
-                                    budget_sz,
-                                    read_sz,
-                                    reader_ct,
-                                    data_size,
-                                    adjusted_budget_sz
-                                )
-                            );
-                        }
                             let done_signal = vec![];
                             let (sender, receiver) = unbounded();
                             let file = SimpleReader::new(receiver);
@@ -832,7 +819,21 @@ pub mod tests {
                             } else {
                                 None
                             };
-
+                            {//if Some(3) == read_sz {
+                                error!(
+                                    "{:?}",
+                                    (
+                                        chunk_sz,
+                                        budget_sz,
+                                        read_sz,
+                                        reader_ct,
+                                        data_size,
+                                        adjusted_budget_sz,
+                                        second_reader,
+                                    )
+                                );
+                            }
+    
                             let sent = (0..data_size)
                                 .into_iter()
                                 .map(|i| ((i + data_size) % 256) as u8)
