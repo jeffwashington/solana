@@ -5919,7 +5919,7 @@ impl AccountsDb {
         let total_processed_slots_across_all_threads = AtomicU64::new(0);
         let outer_slots_len = slots.len();
         // add much higher parallelism to help out the accounts index performance
-        let chunk_size = (outer_slots_len / 256) + 1; // approximately 400k slots in a snapshot
+        let chunk_size = (outer_slots_len / 32) + 1; // approximately 400k slots in a snapshot
         let mut index_time = Measure::start("index");
         let insertion_time_us = AtomicU64::new(0);
         let scan_time: u64 = slots
