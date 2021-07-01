@@ -812,8 +812,7 @@ pub mod tests {
                                         .into_iter()
                                         .map(|_| {
                                             // create before any reading starts
-                                            let mut reader_ =
-                                                SharedBufferReader::new(&shared_buffer);
+                                            let reader_ = SharedBufferReader::new(&shared_buffer);
                                             let sent_ = sent.clone();
                                             (reader_, sent_)
                                         })
