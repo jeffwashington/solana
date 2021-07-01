@@ -269,7 +269,6 @@ impl SharedBufferInternal {
             // no data available from bg
             return false;
         }
-        use rand::Rng;
         // grab all data from bg
         let mut newly_read_data: Vec<OneSharedBuffer> = vec![];
         std::mem::swap(&mut *from_lock, &mut newly_read_data);
@@ -452,6 +451,8 @@ impl Read for SharedBufferReader {
 pub mod tests {
     use super::*;
     use crossbeam_channel::{unbounded, Receiver};
+    use rayon::prelude::*;
+
     type SimpleReaderReceiverType = Receiver<(Vec<u8>, Option<std::io::Error>)>;
     struct SimpleReader {
         pub receiver: SimpleReaderReceiverType,
