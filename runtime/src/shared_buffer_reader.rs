@@ -530,6 +530,24 @@ pub mod tests {
         SharedBufferReader::new(&shared_buffer); // created after reader already read
     }
 
+    #[test]
+    #[should_panic(expected = "SharedBufferReaders must all be created before the first one reads")]
+    fn test_shared_buffer_start_too_late2() {
+        solana_logger::setup();
+        let (sender, receiver) = unbounded();
+        let file = SimpleReader::new(receiver);
+        let shared_buffer = SharedBuffer::new(file);
+        let mut reader = SharedBufferReader::new(&shared_buffer);
+        let mut data = Vec::new();
+        let done_signal = vec![];
+
+        let sent = vec![1, 2, 3];
+        let _ = sender.send((sent.clone(), None));
+        let _ = sender.send((done_signal, None));
+        assert!(reader.read_to_end(&mut data).is_ok());
+        SharedBufferReader::new(&shared_buffer); // created after reader already read
+    }
+
 //    #[test]
     fn test_shared_buffer_simple_read_to_end() {
         solana_logger::setup();
