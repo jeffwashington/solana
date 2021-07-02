@@ -91,12 +91,10 @@ impl SharedBuffer {
         let instance = Arc::new(instance);
         let instance_ = instance.clone();
 
-        let handle = Builder::new()
-            .name("solana-compressed_file_reader".to_string())
-            .spawn(move || {
+        rayon::spawn(move || {
                 instance_.read_entire_file_in_bg(reader);
             });
-        *instance.bg_reader.lock().unwrap() = Some(handle.unwrap());
+        //*instance.bg_reader.lock().unwrap() = Some(handle.unwrap());
         Self { instance }
     }
     fn alloc_buffers(total_buffer_budget: usize, chunk_size: usize) -> Vec<OneSharedBuffer> {
