@@ -701,7 +701,9 @@ pub mod tests {
                 loop {
                     let mut buffer = vec![0; size];
                     let result = reader.read(&mut buffer[..]);
-                    if !result.is_ok() {                        error!("{}", line!());                    }
+                    if !result.is_ok() {
+                        error!("{}", line!());
+                    }
                     assert!(result.is_ok());
                     let len = result.unwrap();
                     if len == 0 {
@@ -713,9 +715,13 @@ pub mod tests {
             }
             None => {
                 let result = reader.read_to_end(&mut data);
-                if !result.is_ok() {                        error!("{}", line!());                    }
+                if !result.is_ok() {
+                    error!("{}", line!());
+                }
                 assert!(result.is_ok());
-                if result.as_ref().unwrap() != &data.len() {                        error!("{}", line!());                    }
+                if result.as_ref().unwrap() != &data.len() {
+                    error!("{}", line!());
+                }
                 assert_eq!(result.unwrap(), data.len());
             }
         }
@@ -797,16 +803,17 @@ pub mod tests {
                             budget_sz * 2 + 1,
                         ] {
                             let adjusted_budget_sz = adjusted_buffer_size(budget_sz, chunk_sz);
-                            error!(                                                        "{:?}",
-                            (
-                                chunk_sz,
-                                budget_sz,
-                                read_sz,
-                                reader_ct,
-                                data_size,
-                                adjusted_budget_sz
-                            )
-                        );
+                            error!(
+                                "{:?}",
+                                (
+                                    chunk_sz,
+                                    budget_sz,
+                                    read_sz,
+                                    reader_ct,
+                                    data_size,
+                                    adjusted_budget_sz
+                                )
+                            );
                             let done_signal = vec![];
                             let (sender, receiver) = unbounded();
                             let file = SimpleReader::new(receiver);
@@ -851,7 +858,9 @@ pub mod tests {
                                             parallel.into_par_iter().for_each(
                                                 |(mut reader, sent)| {
                                                     let data = test_read_all(&mut reader, read_sz);
-                                                    if sent != data {                        error!("{}", line!());                    }
+                                                    if sent != data {
+                                                        error!("{}", line!());
+                                                    }
 
                                                     assert_eq!(
                                                         sent,
