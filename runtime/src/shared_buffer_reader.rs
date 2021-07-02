@@ -819,7 +819,7 @@ pub mod tests {
 
                             let parallel_reader = reader_ct > 2;
                             let handle = if parallel_reader {
-                                let threads = 8;
+                                let threads = 1;
                                 Some({
                                     let parallel = (0..threads)
                                         .into_iter()
