@@ -686,6 +686,7 @@ pub mod tests {
                 loop {
                     let mut buffer = vec![0; size];
                     let result = reader.read(&mut buffer[..]);
+                    if !result.is_ok() {                        error!("{}", line!());                    }
                     assert!(result.is_ok());
                     let len = result.unwrap();
                     if len == 0 {
@@ -697,7 +698,9 @@ pub mod tests {
             }
             None => {
                 let result = reader.read_to_end(&mut data);
+                if !result.is_ok() {                        error!("{}", line!());                    }
                 assert!(result.is_ok());
+                if result.as_ref().unwrap() != &data.len() {                        error!("{}", line!());                    }
                 assert_eq!(result.unwrap(), data.len());
             }
         }
