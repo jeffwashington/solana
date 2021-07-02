@@ -766,6 +766,8 @@ pub mod tests {
     #[test]
     fn test_shared_buffer_sweep() {
         solana_logger::setup();
+        error!("waiting2");
+
         // try the inflection points with 1 to 3 readers, including a parallel reader
         // a few different chunk sizes
         for chunk_sz in [1, 2, 10] {
