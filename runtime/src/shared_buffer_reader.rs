@@ -841,6 +841,7 @@ pub mod tests {
                             let parallel_reader = reader_ct > 2;
                             let threads = 0;
                             let handle = if parallel_reader && threads > 0 {
+                                panic!("");
                                 Some({
                                     let parallel = (0..threads)
                                         .into_iter()
