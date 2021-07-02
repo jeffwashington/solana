@@ -839,8 +839,8 @@ pub mod tests {
                                 .collect::<Vec<_>>();
 
                             let parallel_reader = reader_ct > 2;
-                            let handle = if parallel_reader {
-                                let threads = 0;
+                            let threads = 0;
+                            let handle = if parallel_reader && threads > 0 {
                                 Some({
                                     let parallel = (0..threads)
                                         .into_iter()
