@@ -836,6 +836,8 @@ pub mod tests {
                                             parallel.into_par_iter().for_each(
                                                 |(mut reader, sent)| {
                                                     let data = test_read_all(&mut reader, read_sz);
+                                                    if send != data {                        error!("{}", line!());                    }
+
                                                     assert_eq!(
                                                         sent,
                                                         data,
