@@ -803,6 +803,7 @@ pub mod tests {
                             budget_sz * 2 + 1,
                         ] {
                             let adjusted_budget_sz = adjusted_buffer_size(budget_sz, chunk_sz);
+                            std::thread::sleep_ms(1);
                             error!(
                                 "{:?}",
                                 (
