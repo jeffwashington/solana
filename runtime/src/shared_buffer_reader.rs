@@ -549,6 +549,21 @@ pub mod tests {
         assert_eq!(sent, data);
     }
 
+    #[test]
+    fn test_shared_buffer_simple_read_to_end_empty() {
+        solana_logger::setup();
+        let (sender, receiver) = unbounded();
+        let file = SimpleReader::new(receiver);
+        let shared_buffer = SharedBuffer::new(file);
+        let mut reader = SharedBufferReader::new(&shared_buffer);
+        let mut data = Vec::new();
+        let done_signal = vec![];
+
+        let _ = sender.send((done_signal, None));
+        assert!(reader.read_to_end(&mut data).is_ok());
+        assert_eq!(0, data.len());
+    }
+
     fn get_error() -> std::io::Error {
         std::io::Error::from(std::io::ErrorKind::WriteZero)
     }
@@ -852,7 +867,7 @@ pub mod tests {
                                                         )
                                                     );
                                                 },
-                                            )
+                                            );
                                         })
                                         .unwrap()
                                 })
