@@ -779,6 +779,16 @@ pub mod tests {
                             budget_sz * 2 + 1,
                         ] {
                             let adjusted_budget_sz = adjusted_buffer_size(budget_sz, chunk_sz);
+                            error!(                                                        "{:?}",
+                            (
+                                chunk_sz,
+                                budget_sz,
+                                read_sz,
+                                reader_ct,
+                                data_size,
+                                adjusted_budget_sz
+                            )
+                        );
                             let done_signal = vec![];
                             let (sender, receiver) = unbounded();
                             let file = SimpleReader::new(receiver);
