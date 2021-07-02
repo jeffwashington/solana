@@ -494,7 +494,7 @@ pub mod tests {
         }
     }
 
-    #[test]
+//    #[test]
     #[should_panic(expected = "total_buffer_budget > 0")]
     fn test_shared_buffer_buffers_invalid() {
         solana_logger::setup();
@@ -503,7 +503,7 @@ pub mod tests {
         SharedBuffer::new_with_sizes(0, 1, file);
     }
 
-    #[test]
+//    #[test]
     #[should_panic(expected = "chunk_size > 0")]
     fn test_shared_buffer_buffers_invalid2() {
         solana_logger::setup();
@@ -512,7 +512,7 @@ pub mod tests {
         SharedBuffer::new_with_sizes(1, 0, file);
     }
 
-    #[test]
+//    #[test]
     #[should_panic(expected = "SharedBufferReaders must all be created before the first one reads")]
     fn test_shared_buffer_start_too_late() {
         solana_logger::setup();
@@ -530,7 +530,7 @@ pub mod tests {
         SharedBufferReader::new(&shared_buffer); // created after reader already read
     }
 
-    #[test]
+//    #[test]
     fn test_shared_buffer_simple_read_to_end() {
         solana_logger::setup();
         let (sender, receiver) = unbounded();
