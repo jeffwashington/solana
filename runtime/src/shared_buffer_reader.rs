@@ -783,7 +783,7 @@ pub mod tests {
             ] {
                 for read_sz in [0, 1, chunk_sz - 1, chunk_sz, chunk_sz + 1] {
                     let read_sz = if read_sz > 0 { Some(read_sz) } else { None };
-                    for reader_ct in 1..=2 {
+                    for reader_ct in 1..=1 {
                         for data_size in [
                             0,
                             1,
