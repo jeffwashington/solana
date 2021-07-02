@@ -292,6 +292,7 @@ impl SharedBufferReader {
         if my_client_index > 0 {
             let current_min = list.iter().min().unwrap();
             if current_min > &0 {
+                drop(list);
                 panic!("SharedBufferReaders must all be created before the first one reads");
             }
         }
