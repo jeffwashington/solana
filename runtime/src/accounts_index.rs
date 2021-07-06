@@ -1401,9 +1401,9 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
             .into_par_iter()
             .map(|(pubkey_bin, items)| {
                 let mut _reclaims = SlotList::new();
+                let mut duplicate_keys = Vec::with_capacity(items.len());
                 let mut w_account_maps = self.account_maps[pubkey_bin].write().unwrap();
                 let mut insert_time = Measure::start("insert_into_primary_index"); // really should be in each loop
-                let mut duplicate_keys = Vec::with_capacity(items.len());
                 items.into_iter().for_each(|(pubkey, new_item)| {
                     let already_exists = self.insert_new_entry_if_missing_with_lock(
                         pubkey,
