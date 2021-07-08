@@ -4620,7 +4620,7 @@ impl AccountsDb {
     }
 
     /// Scan through all the account storage in parallel
-    fn scan_account_storage_no_bank<F, F2, B, C>(
+    fn scan_account_storage_no_bank<F, F2, F3, F4, B, C>(
         accounts_cache_and_ancestors: Option<(
             &AccountsCache,
             &Ancestors,
@@ -4629,10 +4629,14 @@ impl AccountsDb {
         snapshot_storages: &SortedStorages,
         scan_func: F,
         after_func: F2,
+        prior_to_slot: F3,
+        after_slot: F4,
     ) -> Vec<C>
     where
         F: Fn(LoadedAccount, &mut B, Slot) + Send + Sync,
         F2: Fn(B) -> C + Send + Sync,
+        F3: Fn(Slot, &[Arc<AccountStorageEntry>]) -> bool + Send + Sync,
+        F4: Fn(&mut B, &mut B) + Send + Sync,
         B: Send + Default,
         C: Send + Default,
     {
@@ -4644,19 +4648,29 @@ impl AccountsDb {
             .into_par_iter()
             .map(|chunk| {
                 let mut retval = B::default();
+                let mut per_slot_data = B::default();
                 let start = snapshot_storages.range().start + chunk * MAX_ITEMS_PER_CHUNK;
                 let end = std::cmp::min(start + MAX_ITEMS_PER_CHUNK, snapshot_storages.range().end);
                 for slot in start..end {
                     let sub_storages = snapshot_storages.get(slot);
                     let mut valid_slot = false;
                     if let Some(sub_storages) = sub_storages {
+                        let user_cache = prior_to_slot(slot, sub_storages);
+                        let mut data_to_use = if user_cache {
+                            &mut per_slot_data
+                        } else {
+                            &mut retval
+                        };
                         valid_slot = true;
                         Self::scan_multiple_account_storages_one_slot(
                             sub_storages,
                             &scan_func,
                             slot,
-                            &mut retval,
+                            data_to_use,
                         );
+                        if user_cache {
+                            after_slot(&mut per_slot_data, &mut retval);
+                        }
                     }
                     if let Some((cache, ancestors, accounts_index)) = accounts_cache_and_ancestors {
                         if let Some(slot_cache) = cache.slot_cache(slot) {
@@ -4863,6 +4877,12 @@ impl AccountsDb {
                 sort_time.fetch_add(timing, Ordering::Relaxed);
                 result
             },
+            |slot, storages| {
+                false
+            },
+            |per_slot_data, accumulated| {
+                panic!("not supported yet");
+            },
         );
 
         stats.sort_time_total_us += sort_time.load(Ordering::Relaxed);
@@ -4916,6 +4936,10 @@ impl AccountsDb {
             &AccountInfoAccountsIndex,
         )>,
     ) -> Result<(Hash, u64), BankHashVerificationError> {
+        use std::backtrace::Backtrace;
+
+        let bt = Backtrace::capture();
+        error!("calculate_accounts_hash_without_index backtrace: {:?}", bt);
         let mut scan_and_hash = move || {
             // When calculating hashes, it is helpful to break the pubkeys found into bins based on the pubkey value.
             // More bins means smaller vectors to sort, copy, etc.

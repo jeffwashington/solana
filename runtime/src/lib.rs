@@ -1,4 +1,5 @@
 #![cfg_attr(RUSTC_WITH_SPECIALIZATION, feature(min_specialization))]
+#![feature(backtrace)]
 #![allow(clippy::integer_arithmetic)]
 pub mod accounts;
 pub mod accounts_background_service;
