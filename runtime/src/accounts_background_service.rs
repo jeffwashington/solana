@@ -241,6 +241,7 @@ impl AbsRequestSender {
         snapshot_request: SnapshotRequest,
     ) -> Result<(), SendError<SnapshotRequest>> {
         if let Some(ref snapshot_request_sender) = self.snapshot_request_sender {
+            error!("send snapshot request");
             snapshot_request_sender.send(snapshot_request)
         } else {
             Ok(())
