@@ -4656,7 +4656,7 @@ impl AccountsDb {
                     let mut valid_slot = false;
                     if let Some(sub_storages) = sub_storages {
                         let user_cache = prior_to_slot(slot, sub_storages);
-                        let mut data_to_use = if user_cache {
+                        let data_to_use = if user_cache {
                             &mut per_slot_data
                         } else {
                             &mut retval
@@ -4877,10 +4877,11 @@ impl AccountsDb {
                 sort_time.fetch_add(timing, Ordering::Relaxed);
                 result
             },
-            |slot, storages| {
+            |_slot, _storages| {
+                //error!("{:?}", storages.first().unwrap().accounts.get_path());
                 false
             },
-            |per_slot_data, accumulated| {
+            |_per_slot_data, _accumulated| {
                 panic!("not supported yet");
             },
         );
