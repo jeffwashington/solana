@@ -4841,6 +4841,7 @@ impl AccountsDb {
                 let pubkey = loaded_account.pubkey();
                 let mut pubkey_to_bin_index = bin_calculator.bin_from_pubkey(pubkey);
                 if !bin_range.contains(&pubkey_to_bin_index) {
+                    panic!("fail");
                     return;
                 }
 
