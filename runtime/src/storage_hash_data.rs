@@ -84,7 +84,7 @@ impl CacheHashData {
         };
 
         let encoded: Vec<u8> = bincode::serialize(&file_data).unwrap();
-        error!("writing {} bytes to: {:?}, lens: {}", encoded.len(), cache_path, file_data.data.map(|x| x.len()).collect::<Vec<_>>());
+        error!("writing {} bytes to: {:?}, lens: {:?}", encoded.len(), cache_path, file_data.data.iter().map(|x| x.len()).collect::<Vec<_>>());
         std::mem::swap(&mut file_data.data, data);
 
         let mut file = OpenOptions::new()
