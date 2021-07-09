@@ -4996,13 +4996,13 @@ impl AccountsDb {
         let mut scan_and_hash = move || {
             // When calculating hashes, it is helpful to break the pubkeys found into bins based on the pubkey value.
             // More bins means smaller vectors to sort, copy, etc.
-            const PUBKEY_BINS_FOR_CALCULATING_HASHES: usize = 2;
+            const PUBKEY_BINS_FOR_CALCULATING_HASHES: usize = 1;
 
             // # of passes should be a function of the total # of accounts that are active.
             // higher passes = slower total time, lower dynamic memory usage
             // lower passes = faster total time, higher dynamic memory usage
             // passes=2 cuts dynamic memory usage in approximately half.
-            let num_scan_passes: usize = 2;
+            let num_scan_passes: usize = 1;
 
             let bins_per_pass = PUBKEY_BINS_FOR_CALCULATING_HASHES / num_scan_passes;
             assert_eq!(
