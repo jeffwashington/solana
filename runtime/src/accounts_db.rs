@@ -4894,7 +4894,7 @@ impl AccountsDb {
                         bin_range,
                     );
                     if cached_data.is_ok() {
-                        panic!("shouldn't be loading from cache");
+                        //panic!("shouldn't be loading from cache");
                         let mut cached_data = cached_data.unwrap();
                         let mut stats = crate::storage_hash_data::CacheHashDataStats::default();
                         stats.loaded_from_cache += 1;
