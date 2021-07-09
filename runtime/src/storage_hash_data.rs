@@ -59,7 +59,7 @@ impl CacheHashData {
         drop(file);
         Ok(decoded.unwrap().data)
     }
-    pub fn save<P: AsRef<Path>>(
+    pub fn save<P: AsRef<Path> + std::fmt::Debug>(
         storage_file: &P,
         data: &mut SavedType,
         bin_range: &Range<usize>,
@@ -84,7 +84,9 @@ impl CacheHashData {
         };
 
         let encoded: Vec<u8> = bincode::serialize(&file_data).unwrap();
-        error!("writing {} bytes to: {:?}, lens: {:?}", encoded.len(), cache_path, file_data.data.iter().map(|x| x.len()).collect::<Vec<_>>());
+        let file_len = std::fs::metadata(storage_file)?.len();
+
+        error!("writing {} bytes to: {:?}, lens: {:?}, storage_len: {}, storage: {:?}", encoded.len(), cache_path, file_data.data.iter().map(|x| x.len()).collect::<Vec<_>>(), file_len, storage_file);
         std::mem::swap(&mut file_data.data, data);
 
         let mut file = OpenOptions::new()
