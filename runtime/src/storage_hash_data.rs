@@ -79,7 +79,7 @@ impl CacheHashData {
         }
         let decoded = decoded.unwrap();
         drop(file);
-        Ok(decoded.unwrap().data)
+        Ok(decoded.data)
     }
     pub fn save<P: AsRef<Path> + std::fmt::Debug>(
         storage_file: &P,
