@@ -77,7 +77,7 @@ impl CacheHashData {
             assert_eq!(bytes, file_data.len());
             panic!("failure to decode: {:?}, len: {}, error: {:?}", path, bytes, decoded);
         }
-        decoded = decoded.unwrap();
+        let decoded = decoded.unwrap();
         drop(file);
         Ok(decoded.unwrap().data)
     }
