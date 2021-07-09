@@ -71,8 +71,13 @@ impl CacheHashData {
             .create(create)
             .open(&path)?;
         let mut file_data = Vec::new();
-        let _bytes = file.read_to_end(&mut file_data)?;
-        let decoded: Option<CacheHashData> = bincode::deserialize(&file_data[..]).unwrap();
+        let bytes = file.read_to_end(&mut file_data)?;
+        let decoded: Result<CacheHashData, _> = bincode::deserialize(&file_data[..]);
+        if decoded.is_err() {
+            assert_eq!(bytes, file_data.len());
+            panic!("failure to decode: {:?}, len: {}, error: {:?}", path, bytes, decoded);
+        }
+        decoded = decoded.unwrap();
         drop(file);
         Ok(decoded.unwrap().data)
     }
