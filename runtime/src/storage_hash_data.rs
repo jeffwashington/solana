@@ -32,8 +32,8 @@ impl CacheHashData {
         let cache = parent_parent_parent.join("calculate_cache_hash");
         let result = cache.join(format!(
             "{}.{}",
+            file_name.to_str().unwrap(),
             secs.to_string(),
-            file_name.to_str().unwrap()
         ));
         Ok(result.to_path_buf())
     }
