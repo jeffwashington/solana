@@ -4888,8 +4888,12 @@ impl AccountsDb {
                 //true
             },
             |slot, storages, per_slot_data, accumulator| {
-                crate::storage_hash_data::CacheHashData::save(&storages.first().unwrap().accounts.get_path(), per_slot_data).unwrap();
+                crate::storage_hash_data::CacheHashData::save(&storages.first().unwrap().accounts.get_path(), per_slot_data, bin_range).unwrap();
                 per_slot_data.into_iter().enumerate().for_each(|(i, data)| {
+                    let len = accumulator.len();
+                    if i >= len {
+                        accumulator.append(&mut vec![vec![]; i + 1 - len]);
+                    }
                     accumulator[i].append(data);
                 });
                 panic!("not supported yet");

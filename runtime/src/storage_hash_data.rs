@@ -7,6 +7,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use std::{
     fs::{remove_file, OpenOptions},
     io::{Read, Write},
+    ops::Range,
     path::{Path, PathBuf},
 };
 
@@ -21,7 +22,10 @@ pub struct CacheHashData {
 
 use bincode::serialize;
 impl CacheHashData {
-    fn calc_path<P: AsRef<Path>>(storage_file: &P) -> Result<PathBuf, std::io::Error> {
+    fn calc_path<P: AsRef<Path>>(
+        storage_file: &P,
+        bin_range: &Range<usize>,
+    ) -> Result<PathBuf, std::io::Error> {
         let storage_file = storage_file.as_ref();
         let parent = storage_file.parent().unwrap();
         let file_name = storage_file.file_name().unwrap();
@@ -31,15 +35,19 @@ impl CacheHashData {
         let secs = amod.duration_since(UNIX_EPOCH).unwrap().as_secs();
         let cache = parent_parent_parent.join("calculate_cache_hash");
         let result = cache.join(format!(
-            "{}.{}",
+            "{}.{}.{}",
             file_name.to_str().unwrap(),
             secs.to_string(),
+            format!("{}.{}", bin_range.start, bin_range.end),
         ));
         Ok(result.to_path_buf())
     }
-    pub fn load<P: AsRef<Path>>(storage_file: &P) -> Result<SavedType, std::io::Error> {
+    pub fn load<P: AsRef<Path>>(
+        storage_file: &P,
+        bin_range: &Range<usize>,
+    ) -> Result<SavedType, std::io::Error> {
         let create = false;
-        let path = Self::calc_path(storage_file)?;
+        let path = Self::calc_path(storage_file, bin_range)?;
         let mut file = OpenOptions::new()
             .read(true)
             .write(false)
@@ -54,8 +62,9 @@ impl CacheHashData {
     pub fn save<P: AsRef<Path>>(
         storage_file: &P,
         data: &mut SavedType,
+        bin_range: &Range<usize>,
     ) -> Result<(), std::io::Error> {
-        let cache_path = Self::calc_path(storage_file)?;
+        let cache_path = Self::calc_path(storage_file, bin_range)?;
         error!("writing to: {:?}", cache_path);
         let parent = cache_path.parent().unwrap();
         std::fs::create_dir_all(parent);
