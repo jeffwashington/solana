@@ -4895,12 +4895,11 @@ impl AccountsDb {
                     );
                     if cached_data.is_ok() {
                         //panic!("shouldn't be loading from cache");
-                        let mut cached_data = cached_data.unwrap();
-                        let mut stats = crate::storage_hash_data::CacheHashDataStats::default();
+                        let (mut cached_data, mut stats) = cached_data.unwrap();
                         stats.loaded_from_cache += 1;
                         stats.entries_loaded_from_cache +=
                             cached_data.iter().map(|x| x.len()).sum::<usize>();
-                        Self::merge_slot_data(accumulator, &mut cached_data);
+                        stats.merge_us += Self::merge_slot_data(accumulator, &mut cached_data);
                         do_storage_scan = false;
                         big_stats.lock().unwrap().merge(&stats);
                     } else {
@@ -4915,14 +4914,14 @@ impl AccountsDb {
                     bin_range,
                 );
                 assert!(!cached_data.is_ok());
-                let stats = crate::storage_hash_data::CacheHashData::save(
+                let mut stats = crate::storage_hash_data::CacheHashData::save(
                     &storages.first().unwrap().accounts.get_path(),
                     per_slot_data,
                     bin_range,
                 )
                 .unwrap();
+                stats.merge_us += Self::merge_slot_data(accumulator, per_slot_data);
                 big_stats.lock().unwrap().merge(&stats);
-                Self::merge_slot_data(accumulator, per_slot_data);
                 per_slot_data.clear();
             },
         );
@@ -4948,7 +4947,8 @@ impl AccountsDb {
     fn merge_slot_data(
         accumulator: &mut crate::storage_hash_data::SavedType,
         new_data: &mut crate::storage_hash_data::SavedType,
-    ) {
+    ) -> u64{
+        let mut m = Measure::start("");
         new_data.into_iter().enumerate().for_each(|(i, data)| {
             let len = accumulator.len();
             if i >= len {
@@ -4956,6 +4956,8 @@ impl AccountsDb {
             }
             accumulator[i].append(data);
         });
+        m.stop();
+        m.as_us()
     }
 
     fn sort_slot_storage_scan(

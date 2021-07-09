@@ -3,6 +3,7 @@ use crate::accounts_hash::CalculateHashIntermediate;
 use log::*;
 use memmap2::MmapMut;
 use serde::{Deserialize, Serialize};
+use solana_measure::measure::Measure;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{
     fs::{remove_file, OpenOptions},
@@ -27,6 +28,11 @@ pub struct CacheHashDataStats {
     pub entries: usize,
     pub loaded_from_cache: usize,
     pub entries_loaded_from_cache: usize,
+    pub load_us: u64,
+    pub read_us: u64,
+    pub decode_us: u64,
+    pub calc_path_us: u64,
+    pub merge_us: u64,
 }
 
 impl CacheHashDataStats {
@@ -36,6 +42,11 @@ impl CacheHashDataStats {
         self.entries += other.entries;
         self.loaded_from_cache += other.loaded_from_cache;
         self.entries_loaded_from_cache += other.entries_loaded_from_cache;
+        self.load_us += other.load_us;
+        self.read_us += other.read_us;
+        self.decode_us += other.decode_us;
+        self.calc_path_us += other.calc_path_us;
+        self.merge_us += other.merge_us;
     }
 }
 
@@ -64,9 +75,14 @@ impl CacheHashData {
     pub fn load<P: AsRef<Path>>(
         storage_file: &P,
         bin_range: &Range<usize>,
-    ) -> Result<SavedType, std::io::Error> {
+    ) -> Result<(SavedType, CacheHashDataStats), std::io::Error> {
         let create = false;
+        let mut timings = CacheHashDataStats::default();
+        let mut m0 = Measure::start("");
         let path = Self::calc_path(storage_file, bin_range)?;
+        m0.stop();
+        timings.calc_path_us += m0.as_us();
+        let mut m0 = Measure::start("");
         let mut file = OpenOptions::new()
             .read(true)
             .write(false)
@@ -74,14 +90,20 @@ impl CacheHashData {
             .open(&path)?;
         let mut file_data = Vec::new();
         let bytes = file.read_to_end(&mut file_data)?;
+        m0.stop();
+        timings.load_us += m0.as_us();
+        let mut m0 = Measure::start("");
         let decoded: Result<CacheHashData, _> = bincode::deserialize(&file_data[..]);
+        m0.stop();
+        timings.decode_us += m0.as_us();
+        let mut m0 = Measure::start("");
         if decoded.is_err() {
             assert_eq!(bytes, file_data.len());
             panic!("failure to decode: {:?}, len: {}, error: {:?}", path, bytes, decoded);
         }
         let decoded = decoded.unwrap();
         drop(file);
-        Ok(decoded.data)
+        Ok((decoded.data, timings))
     }
     pub fn save<P: AsRef<Path> + std::fmt::Debug>(
         storage_file: &P,
