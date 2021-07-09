@@ -4657,6 +4657,7 @@ impl AccountsDb {
                     if let Some(sub_storages) = sub_storages {
                         let (do_storage_scan, use_per_slot_accumulator, call_after_slot) = prior_to_slot(slot, sub_storages, &mut retval);
                         let data_to_use = if use_per_slot_accumulator {
+                            per_slot_data.clear();
                             &mut per_slot_data
                         } else {
                             &mut retval
