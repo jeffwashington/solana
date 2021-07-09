@@ -109,7 +109,7 @@ impl CacheHashData {
 
         let encoded: Vec<u8> = bincode::serialize(&file_data).unwrap();
         let file_len = std::fs::metadata(storage_file)?.len();
-        let entries = file_data.data.iter().map(|x| x.len()).sum();
+        let entries = file_data.data.iter().map(|x: &Vec<CalculateHashIntermediate>| x.len()).sum::<usize>();
 
         //error!("writing {} bytes to: {:?}, lens: {:?}, storage_len: {}, storage: {:?}", encoded.len(), cache_path, file_data.data.iter().map(|x| x.len()).collect::<Vec<_>>(), file_len, storage_file);
         let stats = CacheHashDataStats {

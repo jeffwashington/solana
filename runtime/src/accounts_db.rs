@@ -4907,7 +4907,12 @@ impl AccountsDb {
                 }
                 (do_storage_scan, use_per_slot_accumulator)
             },
-            |slot, storages, per_slot_data, accumulator| {
+            |_slot, storages, per_slot_data, accumulator| {
+                let cached_data = crate::storage_hash_data::CacheHashData::load(
+                    &storages.first().unwrap().accounts.get_path(),
+                    bin_range,
+                );
+                assert!(!cached_data.is_ok());
                 let stats = crate::storage_hash_data::CacheHashData::save(
                     &storages.first().unwrap().accounts.get_path(),
                     per_slot_data,
