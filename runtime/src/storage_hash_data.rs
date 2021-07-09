@@ -26,6 +26,7 @@ pub struct CacheHashDataStats {
     pub cache_file_size: usize,
     pub entries: usize,
     pub loaded_from_cache: usize,
+    pub entries_loaded_from_cache: usize,
 }
 
 impl CacheHashDataStats {
@@ -34,6 +35,7 @@ impl CacheHashDataStats {
         self.cache_file_size += other.cache_file_size;
         self.entries += other.entries;
         self.loaded_from_cache += other.loaded_from_cache;
+        self.entries_loaded_from_cache += other.entries_loaded_from_cache;
     }
 }
 

@@ -4655,13 +4655,14 @@ impl AccountsDb {
                     let sub_storages = snapshot_storages.get(slot);
                     let mut valid_slot = false;
                     if let Some(sub_storages) = sub_storages {
-                        let (do_storage_scan, use_per_slot_accumulator) = prior_to_slot(slot, sub_storages, &mut retval);
-                        let data_to_use = if use_per_slot_accumulator {
-                            &mut per_slot_data
-                        } else {
-                            &mut retval
-                        };
+                        let (do_storage_scan, use_per_slot_accumulator) =
+                            prior_to_slot(slot, sub_storages, &mut retval);
                         if do_storage_scan {
+                            let data_to_use = if use_per_slot_accumulator {
+                                &mut per_slot_data
+                            } else {
+                                &mut retval
+                            };
                             valid_slot = true;
                             Self::scan_multiple_account_storages_one_slot(
                                 sub_storages,
@@ -4827,7 +4828,9 @@ impl AccountsDb {
         let mismatch_found = AtomicU64::new(0);
         let range = bin_range.end - bin_range.start;
         let sort_time = AtomicU64::new(0);
-        let big_stats = Arc::new(Mutex::new(crate::storage_hash_data::CacheHashDataStats::default()));
+        let big_stats = Arc::new(Mutex::new(
+            crate::storage_hash_data::CacheHashDataStats::default(),
+        ));
 
         let result: Vec<Vec<Vec<CalculateHashIntermediate>>> = Self::scan_account_storage_no_bank(
             accounts_cache_and_ancestors,
@@ -4871,7 +4874,7 @@ impl AccountsDb {
 
                 let max = accum.len();
                 if max == 0 {
-                    accum.extend(vec![Vec::new(); range]);
+                    accum.append(&mut vec![Vec::new(); range]);
                 }
                 accum[pubkey_to_bin_index].push(source_item);
             },
@@ -4882,26 +4885,35 @@ impl AccountsDb {
             },
             |_slot, storages, accumulator| {
                 let valid_for_caching = storages.len() == 1;
-                let mut do_storage_scan = true;//;
+                let mut do_storage_scan = true; //;
                 let mut use_per_slot_accumulator = false;
                 if valid_for_caching {
-                    let cached_data = crate::storage_hash_data::CacheHashData::load(&storages.first().unwrap().accounts.get_path(), bin_range);
+                    let cached_data = crate::storage_hash_data::CacheHashData::load(
+                        &storages.first().unwrap().accounts.get_path(),
+                        bin_range,
+                    );
                     if cached_data.is_ok() {
                         let mut cached_data = cached_data.unwrap();
-                        Self::merge_slot_data(accumulator, &mut cached_data);
-                        do_storage_scan = false;
                         let mut stats = crate::storage_hash_data::CacheHashDataStats::default();
                         stats.loaded_from_cache += 1;
+                        stats.entries_loaded_from_cache +=
+                            cached_data.iter().map(|x| x.len()).sum::<usize>();
+                        Self::merge_slot_data(accumulator, &mut cached_data);
+                        do_storage_scan = false;
                         big_stats.lock().unwrap().merge(&stats);
-                    }
-                    else {
+                    } else {
                         use_per_slot_accumulator = true;
                     }
                 }
                 (do_storage_scan, use_per_slot_accumulator)
             },
             |slot, storages, per_slot_data, accumulator| {
-                let stats = crate::storage_hash_data::CacheHashData::save(&storages.first().unwrap().accounts.get_path(), per_slot_data, bin_range).unwrap();
+                let stats = crate::storage_hash_data::CacheHashData::save(
+                    &storages.first().unwrap().accounts.get_path(),
+                    per_slot_data,
+                    bin_range,
+                )
+                .unwrap();
                 big_stats.lock().unwrap().merge(&stats);
                 Self::merge_slot_data(accumulator, per_slot_data);
                 per_slot_data.clear();
@@ -4926,7 +4938,10 @@ impl AccountsDb {
         Ok(result)
     }
 
-    fn merge_slot_data(accumulator: &mut crate::storage_hash_data::SavedType, new_data:  &mut crate::storage_hash_data::SavedType) {
+    fn merge_slot_data(
+        accumulator: &mut crate::storage_hash_data::SavedType,
+        new_data: &mut crate::storage_hash_data::SavedType,
+    ) {
         new_data.into_iter().enumerate().for_each(|(i, data)| {
             let len = accumulator.len();
             if i >= len {
