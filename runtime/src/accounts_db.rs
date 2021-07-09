@@ -4896,7 +4896,6 @@ impl AccountsDb {
                     }
                     accumulator[i].append(data);
                 });
-                panic!("not supported yet");
             },
         );
 
