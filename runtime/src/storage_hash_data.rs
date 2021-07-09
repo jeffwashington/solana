@@ -22,9 +22,10 @@ pub struct CacheHashData {
 
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct CacheHashDataStats {
-    storage_size: usize,
-    cache_file_size: usize,
-    entries: usize,
+    pub storage_size: usize,
+    pub cache_file_size: usize,
+    pub entries: usize,
+    pub loaded_from_cache: usize,
 }
 
 impl CacheHashDataStats {
@@ -32,6 +33,7 @@ impl CacheHashDataStats {
         self.storage_size += other.storage_size;
         self.cache_file_size += other.cache_file_size;
         self.entries += other.entries;
+        self.loaded_from_cache += other.loaded_from_cache;
     }
 }
 
@@ -107,6 +109,7 @@ impl CacheHashData {
             storage_size: file_len as usize,
             cache_file_size: encoded.len(),
             entries,
+            ..CacheHashDataStats::default()
         
         };
         std::mem::swap(&mut file_data.data, data);

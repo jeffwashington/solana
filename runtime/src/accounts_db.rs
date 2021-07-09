@@ -4890,6 +4890,12 @@ impl AccountsDb {
                         let mut cached_data = cached_data.unwrap();
                         Self::merge_slot_data(accumulator, &mut cached_data);
                         do_storage_scan = false;
+                        let mut stats = crate::storage_hash_data::CacheHashDataStats::default();
+                        stats.loaded_from_cache += 1;
+                        big_stats.lock().unwrap().merge(&stats);
+                    }
+                    else {
+                        use_per_slot_accumulator = true;
                     }
                 }
                 (do_storage_scan, use_per_slot_accumulator)
