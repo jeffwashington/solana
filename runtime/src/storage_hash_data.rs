@@ -65,7 +65,6 @@ impl CacheHashData {
         bin_range: &Range<usize>,
     ) -> Result<(), std::io::Error> {
         let cache_path = Self::calc_path(storage_file, bin_range)?;
-        //error!("writing to: {:?}", cache_path);
         let parent = cache_path.parent().unwrap();
         std::fs::create_dir_all(parent);
         let create = true;
@@ -85,6 +84,7 @@ impl CacheHashData {
         };
 
         let encoded: Vec<u8> = bincode::serialize(&file_data).unwrap();
+        error!("writing {} bytes to: {:?}, lens: {}", encoded.len(), cache_path, file_data.data.map(|x| x.len()).collect::<Vec<_>>());
         std::mem::swap(&mut file_data.data, data);
 
         let mut file = OpenOptions::new()
