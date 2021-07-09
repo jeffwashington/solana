@@ -4884,7 +4884,7 @@ impl AccountsDb {
                 result
             },
             |_slot, storages, accumulator| {
-                let valid_for_caching = storages.len() == 1;
+                let valid_for_caching = false;//storages.len() == 1;
                 let mut do_storage_scan = true; //;
                 let mut use_per_slot_accumulator = false;
                 if valid_for_caching {
