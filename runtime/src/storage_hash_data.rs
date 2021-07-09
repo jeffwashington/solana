@@ -56,6 +56,7 @@ impl CacheHashData {
         data: &mut SavedType,
     ) -> Result<(), std::io::Error> {
         let cache_path = Self::calc_path(storage_file)?;
+        error!("writing to: {:?}", cache_path);
         let parent = cache_path.parent().unwrap();
         std::fs::create_dir_all(parent);
         let create = true;
@@ -94,7 +95,6 @@ impl CacheHashData {
             .unwrap();
         file.write_all(&encoded)?;
         drop(file);
-        error!("wrote to {:?}", cache_path);
         Ok(())
     }
 }
