@@ -20,6 +20,21 @@ pub struct CacheHashData {
     pub expected_mod_date: u8,
 }
 
+#[derive(Default, Debug, Serialize, Deserialize)]
+pub struct CacheHashDataStats {
+    storage_size: usize,
+    cache_file_size: usize,
+    entries: usize,
+}
+
+impl CacheHashDataStats {
+    pub fn merge(&mut self, other: &CacheHashDataStats) {
+        self.storage_size += other.storage_size;
+        self.cache_file_size += other.cache_file_size;
+        self.entries += other.entries;
+    }
+}
+
 use bincode::serialize;
 impl CacheHashData {
     fn calc_path<P: AsRef<Path>>(
@@ -63,7 +78,7 @@ impl CacheHashData {
         storage_file: &P,
         data: &mut SavedType,
         bin_range: &Range<usize>,
-    ) -> Result<(), std::io::Error> {
+    ) -> Result<CacheHashDataStats, std::io::Error> {
         let cache_path = Self::calc_path(storage_file, bin_range)?;
         let parent = cache_path.parent().unwrap();
         std::fs::create_dir_all(parent);
@@ -85,8 +100,15 @@ impl CacheHashData {
 
         let encoded: Vec<u8> = bincode::serialize(&file_data).unwrap();
         let file_len = std::fs::metadata(storage_file)?.len();
+        let entries = file_data.data.iter().map(|x| x.len()).sum();
 
-        error!("writing {} bytes to: {:?}, lens: {:?}, storage_len: {}, storage: {:?}", encoded.len(), cache_path, file_data.data.iter().map(|x| x.len()).collect::<Vec<_>>(), file_len, storage_file);
+        //error!("writing {} bytes to: {:?}, lens: {:?}, storage_len: {}, storage: {:?}", encoded.len(), cache_path, file_data.data.iter().map(|x| x.len()).collect::<Vec<_>>(), file_len, storage_file);
+        let stats = CacheHashDataStats {
+            storage_size: file_len as usize,
+            cache_file_size: encoded.len(),
+            entries,
+        
+        };
         std::mem::swap(&mut file_data.data, data);
 
         let mut file = OpenOptions::new()
@@ -106,7 +128,7 @@ impl CacheHashData {
             .unwrap();
         file.write_all(&encoded)?;
         drop(file);
-        Ok(())
+        Ok(stats)
     }
 }
 

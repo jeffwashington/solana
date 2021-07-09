@@ -4635,7 +4635,7 @@ impl AccountsDb {
     where
         F: Fn(LoadedAccount, &mut B, Slot) + Send + Sync,
         F2: Fn(B) -> C + Send + Sync,
-        F3: Fn(Slot, &[Arc<AccountStorageEntry>], &mut B) -> (bool, bool, bool) + Send + Sync,
+        F3: Fn(Slot, &[Arc<AccountStorageEntry>], &mut B) -> (bool, bool) + Send + Sync,
         F4: Fn(Slot, &[Arc<AccountStorageEntry>], &mut B, &mut B) + Send + Sync,
         B: Send + Default,
         C: Send + Default,
@@ -4655,7 +4655,7 @@ impl AccountsDb {
                     let sub_storages = snapshot_storages.get(slot);
                     let mut valid_slot = false;
                     if let Some(sub_storages) = sub_storages {
-                        let (do_storage_scan, use_per_slot_accumulator, call_after_slot) = prior_to_slot(slot, sub_storages, &mut retval);
+                        let (do_storage_scan, use_per_slot_accumulator) = prior_to_slot(slot, sub_storages, &mut retval);
                         let data_to_use = if use_per_slot_accumulator {
                             &mut per_slot_data
                         } else {
@@ -4827,6 +4827,7 @@ impl AccountsDb {
         let mismatch_found = AtomicU64::new(0);
         let range = bin_range.end - bin_range.start;
         let sort_time = AtomicU64::new(0);
+        let big_stats = Arc::new(Mutex::new(crate::storage_hash_data::CacheHashDataStats::default()));
 
         let result: Vec<Vec<Vec<CalculateHashIntermediate>>> = Self::scan_account_storage_no_bank(
             accounts_cache_and_ancestors,
@@ -4879,26 +4880,29 @@ impl AccountsDb {
                 sort_time.fetch_add(timing, Ordering::Relaxed);
                 result
             },
-            |_slot, _storages, _accumulator| {
-                let do_storage_scan = true;//storages.len() != 1;
-                let use_per_slot_accumulator = do_storage_scan;
-                let call_after_slot = true;
-                (do_storage_scan, use_per_slot_accumulator, call_after_slot)
-                //error!("{:?}", storages.first().unwrap().accounts.get_path());
-                //true
+            |_slot, storages, accumulator| {
+                let valid_for_caching = storages.len() == 1;
+                let mut do_storage_scan = true;//;
+                let mut use_per_slot_accumulator = false;
+                if valid_for_caching {
+                    let cached_data = crate::storage_hash_data::CacheHashData::load(&storages.first().unwrap().accounts.get_path(), bin_range);
+                    if cached_data.is_ok() {
+                        let mut cached_data = cached_data.unwrap();
+                        Self::merge_slot_data(accumulator, &mut cached_data);
+                        do_storage_scan = false;
+                    }
+                }
+                (do_storage_scan, use_per_slot_accumulator)
             },
             |slot, storages, per_slot_data, accumulator| {
-                crate::storage_hash_data::CacheHashData::save(&storages.first().unwrap().accounts.get_path(), per_slot_data, bin_range).unwrap();
-                per_slot_data.into_iter().enumerate().for_each(|(i, data)| {
-                    let len = accumulator.len();
-                    if i >= len {
-                        accumulator.append(&mut vec![vec![]; i + 1 - len]);
-                    }
-                    accumulator[i].append(data);
-                });
+                let stats = crate::storage_hash_data::CacheHashData::save(&storages.first().unwrap().accounts.get_path(), per_slot_data, bin_range).unwrap();
+                big_stats.lock().unwrap().merge(&stats);
+                Self::merge_slot_data(accumulator, per_slot_data);
                 per_slot_data.clear();
             },
         );
+
+        error!("cache stats: {:?}", big_stats.lock().unwrap());
 
         stats.sort_time_total_us += sort_time.load(Ordering::Relaxed);
 
@@ -4914,6 +4918,16 @@ impl AccountsDb {
         stats.scan_time_total_us += time.as_us();
 
         Ok(result)
+    }
+
+    fn merge_slot_data(accumulator: &mut crate::storage_hash_data::SavedType, new_data:  &mut crate::storage_hash_data::SavedType) {
+        new_data.into_iter().enumerate().for_each(|(i, data)| {
+            let len = accumulator.len();
+            if i >= len {
+                accumulator.append(&mut vec![vec![]; i + 1 - len]);
+            }
+            accumulator[i].append(data);
+        });
     }
 
     fn sort_slot_storage_scan(
