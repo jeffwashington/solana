@@ -26,9 +26,10 @@ impl CacheHashData {
         let parent = storage_file.parent().unwrap();
         let file_name = storage_file.file_name().unwrap();
         let parent_parent = parent.parent().unwrap();
+        let parent_parent_parent = parent_parent.parent().unwrap();
         let amod = std::fs::metadata(storage_file)?.modified()?;
         let secs = amod.duration_since(UNIX_EPOCH).unwrap().as_secs();
-        let cache = parent_parent.join("calculate_cache_hash");
+        let cache = parent_parent_parent.join("calculate_cache_hash");
         let result = cache.join(format!(
             "{}.{}",
             secs.to_string(),
@@ -55,6 +56,8 @@ impl CacheHashData {
         data: &mut SavedType,
     ) -> Result<(), std::io::Error> {
         let cache_path = Self::calc_path(storage_file)?;
+        let parent = cache_path.parent().unwrap();
+        std::fs::create_dir_all(parent);
         let create = true;
         if create {
             let _ignored = remove_file(&cache_path);
