@@ -8,6 +8,7 @@ use std::borrow::Borrow;
 use std::collections::btree_map::{BTreeMap, Entry, Keys, OccupiedEntry, VacantEntry, Values};
 use std::fmt::Debug;
 use std::sync::Arc;
+use log::*;
 type K = Pubkey;
 
 #[derive(Clone, Debug)]
@@ -135,10 +136,13 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
         }
     }
     pub fn new_bucket_map() -> Arc<BucketMap<SlotT<V>>> {
-        Arc::new(BucketMap::new_buckets(PubkeyBinCalculator16::log_2(BINS as u32) as u8))
+        let buckets = PubkeyBinCalculator16::log_2(BINS as u32) as u8;
+        error!("creating: {} for {}", buckets, BINS);
+        Arc::new(BucketMap::new_buckets(buckets))
     }
 
     pub fn flush(&self) {
+        error!("flushing");
         // put entire contents of this map into the disk backing
         for (k, v) in self.in_memory.iter() {
             // TODO: have to deal with refcount here
@@ -146,6 +150,7 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
                 Some(v.slot_list.clone())
             });
         }
+        error!("flushing done");
     }
     pub fn keys(&self) -> Keys<'_, K, V2<V>> {
         panic!("todo keys");
