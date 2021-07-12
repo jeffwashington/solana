@@ -5966,6 +5966,13 @@ impl AccountsDb {
             })
             .sum();
 
+            let mut m = Measure::start("flush_index");
+        self.accounts_index.account_maps.iter().for_each(|i| {
+            i.read().unwrap().flush();});
+            m.stop();
+        error!("flush_us: {}", m.as_us());
+            
+    
         let timings = GenerateIndexTimings {
             scan_time,
             index_time: index_time.as_us(),
@@ -5982,7 +5989,7 @@ impl AccountsDb {
         }
 
         panic!("not done");
-
+/*
         let mut stored_sizes_and_counts = HashMap::new();
         self.accounts_index.account_maps.iter().for_each(|i| {
             i.read().unwrap().values().for_each(|entry| {
@@ -6014,6 +6021,7 @@ impl AccountsDb {
                 }
             }
         }
+        */
     }
 
     pub(crate) fn print_accounts_stats(&self, label: &str) {

@@ -38,7 +38,7 @@ pub type SlotSlice<'s, T> = &'s [(Slot, T)];
 pub type RefCount = u64;
 pub type AccountMap<V> = HybridBTreeMap<V>;
 
-type AccountMapEntry<T> = Arc<AccountMapEntryInner<T>>;
+pub type AccountMapEntry<T> = Arc<AccountMapEntryInner<T>>;
 
 pub trait IsCached {
     fn is_cached(&self) -> bool;
@@ -120,7 +120,7 @@ impl<T> AccountMapEntryInner<T> {
     }
 }
 
-pub enum AccountIndexGetResult<'a, T: 'static + std::fmt::Debug> {
+pub enum AccountIndexGetResult<'a, T: 'static + Clone + std::fmt::Debug> {
     Found(ReadAccountMapEntry<T>, usize),
     NotFoundOnFork,
     Missing(AccountMapsReadLock<'a, T>),
@@ -603,11 +603,11 @@ fn get_bin_pubkey(pubkey: &Pubkey) -> usize {
     (pubkey.as_ref()[byte_of_pubkey_to_bin] as usize) * BINS / ((u8::MAX as usize) + 1)
 }
 
-type MapType<T> = AccountMap<AccountMapEntry<T>>;
-type LockMapType<T> = Vec<RwLock<MapType<T>>>;
-type LockMapTypeSlice<T> = [RwLock<MapType<T>>];
-type AccountMapsWriteLock<'a, T> = RwLockWriteGuard<'a, MapType<T>>;
-type AccountMapsReadLock<'a, T> = RwLockReadGuard<'a, MapType<T>>;
+type MapType<T: Clone + std::fmt::Debug> = AccountMap<T>;
+type LockMapType<T: Clone + std::fmt::Debug> = Vec<RwLock<MapType<T>>>;
+type LockMapTypeSlice<T: Clone + std::fmt::Debug> = [RwLock<MapType<T>>];
+type AccountMapsWriteLock<'a, T: Clone + std::fmt::Debug> = RwLockWriteGuard<'a, MapType<T>>;
+type AccountMapsReadLock<'a, T: Clone + std::fmt::Debug> = RwLockReadGuard<'a, MapType<T>>;
 
 #[derive(Debug, Default)]
 pub struct ScanSlotTracker {
@@ -651,7 +651,7 @@ impl<T: Clone + std::fmt::Debug> Default for AccountsIndex<T> {
         Self {
             account_maps: (0..BINS)
                 .into_iter()
-                .map(|_| RwLock::new(AccountMap::<AccountMapEntry<T>>::default()))
+                .map(|_| RwLock::new(AccountMap::default()))
                 .collect::<Vec<_>>(),
             program_id_index: SecondaryIndex::<DashMapSecondaryIndexEntry>::new(
                 "program_id_index_stats",
@@ -672,6 +672,11 @@ impl<T: Clone + std::fmt::Debug> Default for AccountsIndex<T> {
 impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::marker::Send + std::fmt::Debug>
     AccountsIndex<T>
 {
+    pub fn flush(&self) {
+        self.account_maps.iter().for_each(|m| {
+            m.read().unwrap().flush();
+        });
+    }
     fn iter<R>(&self, range: Option<R>) -> AccountsIndexIterator<T>
     where
         R: RangeBounds<Pubkey>,
