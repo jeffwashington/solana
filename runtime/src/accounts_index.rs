@@ -31,7 +31,7 @@ use std::{
 use thiserror::Error;
 
 pub const ITER_BATCH_SIZE: usize = 1000;
-const BINS: usize = 16;
+pub const BINS: usize = 16;
 pub type ScanResult<T> = Result<T, ScanError>;
 pub type SlotList<T> = Vec<(Slot, T)>;
 pub type SlotSlice<'s, T> = &'s [(Slot, T)];
@@ -120,7 +120,7 @@ impl<T> AccountMapEntryInner<T> {
     }
 }
 
-pub enum AccountIndexGetResult<'a, T: 'static> {
+pub enum AccountIndexGetResult<'a, T: 'static + std::fmt::Debug> {
     Found(ReadAccountMapEntry<T>, usize),
     NotFoundOnFork,
     Missing(AccountMapsReadLock<'a, T>),
@@ -525,14 +525,14 @@ pub struct AccountsIndexRootsStats {
     pub unrooted_cleaned_count: usize,
 }
 
-pub struct AccountsIndexIterator<'a, T> {
+pub struct AccountsIndexIterator<'a, T: Clone + std::fmt::Debug> {
     account_maps: &'a LockMapTypeSlice<T>,
     start_bound: Bound<Pubkey>,
     end_bound: Bound<Pubkey>,
     is_finished: bool,
 }
 
-impl<'a, T> AccountsIndexIterator<'a, T> {
+impl<'a, T: Clone + std::fmt::Debug> AccountsIndexIterator<'a, T> {
     fn clone_bound(bound: Bound<&Pubkey>) -> Bound<Pubkey> {
         match bound {
             Unbounded => Unbounded,
@@ -560,7 +560,7 @@ impl<'a, T> AccountsIndexIterator<'a, T> {
     }
 }
 
-impl<'a, T: 'static + Clone> Iterator for AccountsIndexIterator<'a, T> {
+impl<'a, T: 'static + Clone + std::fmt::Debug> Iterator for AccountsIndexIterator<'a, T> {
     type Item = Vec<(Pubkey, AccountMapEntry<T>)>;
     fn next(&mut self) -> Option<Self::Item> {
         if self.is_finished {
@@ -626,7 +626,7 @@ impl ScanSlotTracker {
 }
 
 #[derive(Debug)]
-pub struct AccountsIndex<T> {
+pub struct AccountsIndex<T: Clone + std::fmt::Debug> {
     pub account_maps: LockMapType<T>,
     program_id_index: SecondaryIndex<DashMapSecondaryIndexEntry>,
     spl_token_mint_index: SecondaryIndex<DashMapSecondaryIndexEntry>,
@@ -646,7 +646,7 @@ pub struct AccountsIndex<T> {
     pub removed_bank_ids: Mutex<HashSet<BankId>>,
 }
 
-impl<T> Default for AccountsIndex<T> {
+impl<T: Clone + std::fmt::Debug> Default for AccountsIndex<T> {
     fn default() -> Self {
         Self {
             account_maps: (0..BINS)
@@ -669,7 +669,7 @@ impl<T> Default for AccountsIndex<T> {
     }
 }
 
-impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::marker::Send>
+impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::marker::Send + std::fmt::Debug>
     AccountsIndex<T>
 {
     fn iter<R>(&self, range: Option<R>) -> AccountsIndexIterator<T>
