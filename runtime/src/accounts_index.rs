@@ -1,7 +1,7 @@
 use crate::{
     ancestors::Ancestors,
     contains::Contains,
-    hybrid_btree_map::HybridBTreeMap,
+    hybrid_btree_map::{HybridBTreeMap, HybridEntry as Entry, HybridOccupiedEntry, HybridVacantEntry},
     inline_spl_token_v2_0::{self, SPL_TOKEN_ACCOUNT_MINT_OFFSET, SPL_TOKEN_ACCOUNT_OWNER_OFFSET},
     secondary_index::*,
 };
@@ -15,7 +15,7 @@ use solana_sdk::{
 };
 use std::{
     collections::{
-        btree_map::{self, BTreeMap, Entry},
+        btree_map::{BTreeMap},
         HashSet,
     },
     ops::{
@@ -196,8 +196,8 @@ pub struct WriteAccountMapEntry<'a, 'b: 'a, T: 'static + Clone + std::fmt::Debug
     #[borrows(mut lock, pubkey)]
     #[covariant]
     owned_entry: (
-        Option<std::collections::btree_map::OccupiedEntry<'this, Pubkey, AccountMapEntry<T>>>,
-        Option<std::collections::btree_map::VacantEntry<'this, Pubkey, AccountMapEntry<T>>>,
+        Option<HybridOccupiedEntry<'this, AccountMapEntry<T>>>,
+        Option<HybridVacantEntry<'this, AccountMapEntry<T>>>,
     ),
 }
 
@@ -251,7 +251,7 @@ impl<'a, 'b: 'a, T: 'static + Clone + IsCached + std::fmt::Debug> WriteAccountMa
 
     pub fn get(
         &'a self,
-    ) -> Option<&'a std::collections::btree_map::OccupiedEntry<'a, Pubkey, AccountMapEntry<T>>>
+    ) -> Option<&'a HybridOccupiedEntry<'a, AccountMapEntry<T>>>
     {
         self.borrow_owned_entry().0.as_ref()
     }
@@ -1190,7 +1190,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
         if !dead_keys.is_empty() {
             for key in dead_keys.iter() {
                 let mut w_index = self.get_account_maps_write_lock(key);
-                if let btree_map::Entry::Occupied(index_entry) = w_index.entry(**key) {
+                if let Entry::Occupied(index_entry) = w_index.entry(**key) {
                     if index_entry.get().slot_list.is_empty() {
                         index_entry.remove();
 
