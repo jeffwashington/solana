@@ -1,7 +1,7 @@
 use crate::{
     ancestors::Ancestors,
     contains::Contains,
-    hybrid_btree_map::HybridBTreeMap,
+    hybrid_btree_map::{HybridBTreeMap, HybridEntry as Entry},
     inline_spl_token_v2_0::{self, SPL_TOKEN_ACCOUNT_MINT_OFFSET, SPL_TOKEN_ACCOUNT_OWNER_OFFSET},
     secondary_index::*,
 };
@@ -15,7 +15,7 @@ use solana_sdk::{
 };
 use std::{
     collections::{
-        btree_map::{self, BTreeMap, Entry},
+        btree_map::{BTreeMap},
         HashSet,
     },
     ops::{
@@ -1082,7 +1082,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
         if !dead_keys.is_empty() {
             for key in dead_keys.iter() {
                 let mut w_index = self.get_account_maps_write_lock(key);
-                if let btree_map::Entry::Occupied(index_entry) = w_index.entry(**key) {
+                if let Entry::Occupied(index_entry) = w_index.entry(**key) {
                     if index_entry.get().slot_list.read().unwrap().is_empty() {
                         index_entry.remove();
 
