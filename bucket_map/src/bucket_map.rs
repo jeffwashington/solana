@@ -52,6 +52,7 @@ impl<T: Clone + std::fmt::Debug> BucketMap<T> {
     }
     fn default_drives() -> Arc<Vec<PathBuf>> {
         let tmpdir2 = PathBuf::from("accounts_index_buckets");
+        error!("folder: {:?}", tmpdir2);
         let paths: Vec<PathBuf> = [tmpdir2]
             .iter()
             .filter(|x| std::fs::create_dir_all(x).is_ok())

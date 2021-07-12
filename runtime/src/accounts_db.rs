@@ -5966,13 +5966,6 @@ impl AccountsDb {
             })
             .sum();
 
-            let mut m = Measure::start("flush_index");
-        self.accounts_index.account_maps.iter().for_each(|i| {
-            i.read().unwrap().flush();});
-            m.stop();
-        error!("flush_us: {}", m.as_us());
-            
-    
         let timings = GenerateIndexTimings {
             scan_time,
             index_time: index_time.as_us(),
@@ -5982,6 +5975,12 @@ impl AccountsDb {
             total_items,
         };
         timings.report();
+
+        let mut m = Measure::start("flush_index");
+        self.accounts_index.account_maps.iter().for_each(|i| {
+            i.read().unwrap().flush();});
+            m.stop();
+        error!("flush_us: {}", m.as_us());
 
         // Need to add these last, otherwise older updates will be cleaned
         for slot in slots {
