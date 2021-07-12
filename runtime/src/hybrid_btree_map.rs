@@ -13,11 +13,24 @@ pub struct HybridAccountEntry<V: Clone + Debug> {
     entry: V,
     //exists_on_disk: bool,
 }
-type V2<T: Clone + Debug> = HybridAccountEntry<T>;
+//type V2<T: Clone + Debug> = HybridAccountEntry<T>;
+type V2<T: Clone + Debug> = T;
+/*
+trait RealEntry<T: Clone + Debug> {
+    fn real_entry(&self) -> T;
+}
+
+impl<T:Clone + Debug> RealEntry<T> for T {
+    fn real_entry(&self) -> T
+    {
+        self
+    }
+}
+*/
 
 #[derive(Debug)]
 pub struct HybridBTreeMap<V: Clone + Debug> {
-    in_memory: BTreeMap<K, HybridAccountEntry<V>>,
+    in_memory: BTreeMap<K, V2<V>>,
     disk: BucketMap<V>,
 }
 
@@ -82,7 +95,7 @@ pub struct HybridVacantEntry<'a, V: 'a + Clone + Debug> {
 impl<'a, V: 'a + Clone + Debug> HybridOccupiedEntry<'a, V>
 {
     pub fn get(&self) -> &V {
-        &self.entry.get().entry
+        &self.entry.get()//.entry
     }
     pub fn get_mut(&mut self) -> &mut V {
         &mut self.entry.get_mut().entry
@@ -93,18 +106,20 @@ impl<'a, V: 'a + Clone + Debug> HybridOccupiedEntry<'a, V>
     pub fn remove(self) -> V {
         panic!("todo");
         // TODO: remember something that was deleted!?!?
-        self.entry.remove().entry
+        self.entry.remove()//.entry
     }
 }
 
 impl<'a, V: 'a + Clone + Debug> HybridVacantEntry<'a, V>
 {
     pub fn insert(self, value: V) -> &'a mut V {
+        /*
         let value = V2::<V> {
             entry: value,
             //exists_on_disk: false,
         };
-        &mut self.entry.insert(value).entry
+        */
+        self.entry.insert(value)//.entry
     }
 }
 
@@ -138,7 +153,7 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
         K: Borrow<Q> + Ord,
         Q: Ord,
     {
-        self.in_memory.get(key).map(|x| &x.entry)
+        self.in_memory.get(key)//.map(|x| &x.entry)
     }
     pub fn remove<Q: ?Sized>(&mut self, key: &Q) -> Option<V>
     where
@@ -146,6 +161,6 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
         Q: Ord,
     {
         panic!("todo");
-        self.in_memory.remove(key).map(|x| x.entry)
+        self.in_memory.remove(key)//.map(|x| x.entry)
     }
 }
