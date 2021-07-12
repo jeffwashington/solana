@@ -57,8 +57,7 @@ impl<V> HybridBTreeMap<V> {
         panic!("todo");
         self.in_memory.values()
     }
-    pub fn len(&self) -> usize {
-        panic!("todo");
+    pub fn len_inaccurate(&self) -> usize {
         self.in_memory.len()
     }
     pub fn entry(&mut self, key: K) -> Entry<'_, K, V>
