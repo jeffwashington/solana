@@ -11,7 +11,7 @@ type K = Pubkey;
 #[derive(Clone, Debug)]
 pub struct HybridAccountEntry<V: Clone + Debug> {
     entry: V,
-    exists_on_disk: bool,
+    //exists_on_disk: bool,
 }
 type V2<T: Clone + Debug> = HybridAccountEntry<T>;
 
@@ -102,7 +102,7 @@ impl<'a, V: 'a + Clone + Debug> HybridVacantEntry<'a, V>
     pub fn insert(self, value: V) -> &'a mut V {
         let value = V2::<V> {
             entry: value,
-            exists_on_disk: false,
+            //exists_on_disk: false,
         };
         &mut self.entry.insert(value).entry
     }
