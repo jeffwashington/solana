@@ -50,12 +50,15 @@ impl<'a, K: 'a, V: 'a> Iterator for HybridBTreeMap<'a, V> {
 
 impl<V> HybridBTreeMap<V> {
     pub fn keys(&self) -> Keys<'_, K, V> {
+        panic!("todo");
         self.in_memory.keys()
     }
     pub fn values(&self) -> Values<'_, K, V> {
+        panic!("todo");
         self.in_memory.values()
     }
     pub fn len(&self) -> usize {
+        panic!("todo");
         self.in_memory.len()
     }
     pub fn entry(&mut self, key: K) -> Entry<'_, K, V>
