@@ -42,8 +42,10 @@ impl<T: Clone + std::fmt::Debug> Default for BucketMap<T>  {
 
 impl<T: Clone + std::fmt::Debug> BucketMap<T> {
     pub fn new(num_buckets_pow2: u8, drives: Arc<Vec<PathBuf>>) -> Self {
-        let mut buckets = Vec::with_capacity(1 << num_buckets_pow2);
-        buckets.resize_with(1 << num_buckets_pow2, || RwLock::new(None));
+        let count = 1 << num_buckets_pow2;
+        let mut buckets = Vec::with_capacity(count);
+        buckets.resize_with(count, || RwLock::new(None));
+        error!("# buckets: {}", count);
         Self {
             buckets,
             drives,
