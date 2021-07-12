@@ -7,6 +7,7 @@ use solana_sdk::pubkey::Pubkey;
 use std::borrow::Borrow;
 use std::collections::btree_map::{BTreeMap, Entry, Keys, OccupiedEntry, VacantEntry, Values};
 use std::fmt::Debug;
+use std::sync::Arc;
 type K = Pubkey;
 
 #[derive(Clone, Debug)]
@@ -34,11 +35,11 @@ pub type SlotT<T> = (Slot, T);
 #[derive(Debug)]
 pub struct HybridBTreeMap<V: 'static + Clone + Debug> {
     in_memory: BTreeMap<K, V2<V>>,
-    disk: BucketMap<SlotT<V>>,
+    disk: Arc<BucketMap<SlotT<V>>>,
 }
 
 // TODO: we need a bit for 'exists on disk' for updates
-
+/*
 impl<V: Clone + Debug> Default for HybridBTreeMap<V> {
     /// Creates an empty `BTreeMap`.
     fn default() -> HybridBTreeMap<V> {
@@ -48,6 +49,7 @@ impl<V: Clone + Debug> Default for HybridBTreeMap<V> {
         }
     }
 }
+*/
 
 /*
 impl<'a, K: 'a, V: 'a> Iterator for HybridBTreeMap<'a, V> {
@@ -125,6 +127,17 @@ impl<'a, V: 'a + Clone + Debug> HybridVacantEntry<'a, V> {
 }
 
 impl<V: Clone + Debug> HybridBTreeMap<V> {
+    /// Creates an empty `BTreeMap`.
+    pub fn new(bucket_map: &Arc<BucketMap<SlotT<V>>>) -> HybridBTreeMap<V> {
+        Self {
+            in_memory: BTreeMap::default(),
+            disk: bucket_map.clone(),
+        }
+    }
+    pub fn new_bucket_map() -> Arc<BucketMap<SlotT<V>>> {
+        Arc::new(BucketMap::new_buckets(PubkeyBinCalculator16::log_2(BINS as u32) as u8))
+    }
+
     pub fn flush(&self) {
         // put entire contents of this map into the disk backing
         for (k, v) in self.in_memory.iter() {

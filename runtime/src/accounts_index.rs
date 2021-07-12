@@ -7,6 +7,7 @@ use crate::{
 };
 use bv::BitVec;
 use log::*;
+use rayon::prelude::*;
 use ouroboros::self_referencing;
 use solana_measure::measure::Measure;
 use solana_sdk::{
@@ -746,10 +747,11 @@ pub struct AccountsIndex<T: 'static + Clone + std::fmt::Debug> {
 
 impl<T: Clone + std::fmt::Debug> Default for AccountsIndex<T> {
     fn default() -> Self {
+        let bucket_map = HybridBTreeMap::new_bucket_map();
         Self {
             account_maps: (0..BINS)
                 .into_iter()
-                .map(|_| RwLock::new(AccountMap::default()))
+                .map(|_| RwLock::new(AccountMap::new(&bucket_map)))
                 .collect::<Vec<_>>(),
             program_id_index: SecondaryIndex::<DashMapSecondaryIndexEntry>::new(
                 "program_id_index_stats",
@@ -771,7 +773,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
     AccountsIndex<T>
 {
     pub fn flush(&self) {
-        self.account_maps.iter().for_each(|m| {
+        self.account_maps.par_iter().for_each(|m| {
             m.read().unwrap().flush();
         });
     }
