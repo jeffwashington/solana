@@ -1,6 +1,7 @@
 use crate::{
     ancestors::Ancestors,
     contains::Contains,
+    hybrid_btree_map::HybridBTreeMap,
     inline_spl_token_v2_0::{self, SPL_TOKEN_ACCOUNT_MINT_OFFSET, SPL_TOKEN_ACCOUNT_OWNER_OFFSET},
     secondary_index::*,
 };
@@ -35,7 +36,7 @@ pub type ScanResult<T> = Result<T, ScanError>;
 pub type SlotList<T> = Vec<(Slot, T)>;
 pub type SlotSlice<'s, T> = &'s [(Slot, T)];
 pub type RefCount = u64;
-pub type AccountMap<K, V> = BTreeMap<K, V>;
+pub type AccountMap<V> = HybridBTreeMap<V>;
 
 type AccountMapEntry<T> = Arc<AccountMapEntryInner<T>>;
 
@@ -565,6 +566,8 @@ impl<'a, T: 'static + Clone> Iterator for AccountsIndexIterator<'a, T> {
         if self.is_finished {
             return None;
         }
+        panic!("todo");
+        /*
 
         let chunk: Vec<(Pubkey, AccountMapEntry<T>)> = self
             .account_maps
@@ -587,6 +590,7 @@ impl<'a, T: 'static + Clone> Iterator for AccountsIndexIterator<'a, T> {
 
         self.start_bound = Excluded(chunk.last().unwrap().0);
         Some(chunk)
+        */
     }
 }
 
@@ -599,7 +603,7 @@ fn get_bin_pubkey(pubkey: &Pubkey) -> usize {
     (pubkey.as_ref()[byte_of_pubkey_to_bin] as usize) * BINS / ((u8::MAX as usize) + 1)
 }
 
-type MapType<T> = AccountMap<Pubkey, AccountMapEntry<T>>;
+type MapType<T> = AccountMap<AccountMapEntry<T>>;
 type LockMapType<T> = Vec<RwLock<MapType<T>>>;
 type LockMapTypeSlice<T> = [RwLock<MapType<T>>];
 type AccountMapsWriteLock<'a, T> = RwLockWriteGuard<'a, MapType<T>>;
@@ -647,7 +651,7 @@ impl<T> Default for AccountsIndex<T> {
         Self {
             account_maps: (0..BINS)
                 .into_iter()
-                .map(|_| RwLock::new(AccountMap::<Pubkey, AccountMapEntry<T>>::default()))
+                .map(|_| RwLock::new(AccountMap::<AccountMapEntry<T>>::default()))
                 .collect::<Vec<_>>(),
             program_id_index: SecondaryIndex::<DashMapSecondaryIndexEntry>::new(
                 "program_id_index_stats",
