@@ -6012,7 +6012,7 @@ impl AccountsDb {
         }
 
         let mut m = Measure::start("flush_index");
-        self.accounts_index.account_maps.iter().for_each(|i| {
+        self.accounts_index.account_maps.par_iter().for_each(|i| {
             i.read().unwrap().flush();});
             m.stop();
         error!("flush_us: {}", m.as_us());
