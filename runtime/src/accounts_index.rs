@@ -196,8 +196,8 @@ pub struct WriteAccountMapEntry<'a, 'b: 'a, T: 'static + Clone + std::fmt::Debug
     #[borrows(mut lock, pubkey)]
     #[covariant]
     owned_entry: (
-        Option<HybridOccupiedEntry<'this, AccountMapEntry<T>>>,
-        Option<HybridVacantEntry<'this, AccountMapEntry<T>>>,
+        Option<HybridOccupiedEntry<'this, T>>,
+        Option<HybridVacantEntry<'this, T>>,
     ),
 }
 
@@ -251,7 +251,7 @@ impl<'a, 'b: 'a, T: 'static + Clone + IsCached + std::fmt::Debug> WriteAccountMa
 
     pub fn get(
         &'a self,
-    ) -> Option<&'a HybridOccupiedEntry<'a, AccountMapEntry<T>>>
+    ) -> Option<&'a HybridOccupiedEntry<'a, T>>
     {
         self.borrow_owned_entry().0.as_ref()
     }
@@ -701,11 +701,11 @@ fn get_bin_pubkey(pubkey: &Pubkey) -> usize {
     (pubkey.as_ref()[byte_of_pubkey_to_bin] as usize) * BINS / ((u8::MAX as usize) + 1)
 }
 
-type MapType<T> = AccountMap<AccountMapEntry<T>>;
-type LockMapType<T> = Vec<RwLock<MapType<T>>>;
-type LockMapTypeSlice<T> = [RwLock<MapType<T>>];
-type AccountMapsWriteLock<'a, T> = RwLockWriteGuard<'a, MapType<T>>;
-type AccountMapsReadLock<'a, T> = RwLockReadGuard<'a, MapType<T>>;
+type MapType<T: Clone + std::fmt::Debug> = AccountMap<T>;
+type LockMapType<T: Clone + std::fmt::Debug> = Vec<RwLock<MapType<T>>>;
+type LockMapTypeSlice<T: Clone + std::fmt::Debug> = [RwLock<MapType<T>>];
+type AccountMapsWriteLock<'a, T: Clone + std::fmt::Debug> = RwLockWriteGuard<'a, MapType<T>>;
+type AccountMapsReadLock<'a, T: Clone + std::fmt::Debug> = RwLockReadGuard<'a, MapType<T>>;
 
 #[derive(Debug, Default)]
 pub struct ScanSlotTracker {
@@ -770,6 +770,11 @@ impl<T: Clone + std::fmt::Debug> Default for AccountsIndex<T> {
 impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::marker::Send + std::fmt::Debug>
     AccountsIndex<T>
 {
+    pub fn flush(&self) {
+        self.account_maps.iter().for_each(|m| {
+            m.read().unwrap().flush();
+        });
+    }
     fn iter<R>(&self, range: Option<R>) -> AccountsIndexIterator<T>
     where
         R: RangeBounds<Pubkey>,

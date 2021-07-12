@@ -6011,13 +6011,19 @@ impl AccountsDb {
             timings.report();
         }
 
+        let mut m = Measure::start("flush_index");
+        self.accounts_index.account_maps.iter().for_each(|i| {
+            i.read().unwrap().flush();});
+            m.stop();
+        error!("flush_us: {}", m.as_us());
+                
         // Need to add these last, otherwise older updates will be cleaned
         for slot in slots {
             self.accounts_index.add_root(slot, false);
         }
 
         panic!("not done");
-
+/*
         let mut stored_sizes_and_counts = HashMap::new();
         self.accounts_index.account_maps.iter().for_each(|i| {
             i.read().unwrap().values().for_each(|entry| {
@@ -6044,6 +6050,7 @@ impl AccountsDb {
                 }
             }
         }
+        */
     }
 
     pub(crate) fn print_accounts_stats(&self, label: &str) {

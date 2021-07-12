@@ -1,10 +1,11 @@
-use solana_sdk::pubkey::Pubkey;
-use std::borrow::Borrow;
-use std::collections::btree_map::{BTreeMap, Entry, Keys, Values, OccupiedEntry, VacantEntry};
-use solana_bucket_map::bucket_map::BucketMap;
+use crate::accounts_index::AccountMapEntry;
 use crate::accounts_index::BINS;
 use crate::pubkey_bins::PubkeyBinCalculator16;
-
+use solana_bucket_map::bucket_map::BucketMap;
+use solana_sdk::clock::Slot;
+use solana_sdk::pubkey::Pubkey;
+use std::borrow::Borrow;
+use std::collections::btree_map::{BTreeMap, Entry, Keys, OccupiedEntry, VacantEntry, Values};
 use std::fmt::Debug;
 type K = Pubkey;
 
@@ -14,7 +15,7 @@ pub struct HybridAccountEntry<V: Clone + Debug> {
     //exists_on_disk: bool,
 }
 //type V2<T: Clone + Debug> = HybridAccountEntry<T>;
-type V2<T: Clone + Debug> = T;
+type V2<T: Clone + Debug> = AccountMapEntry<T>;
 /*
 trait RealEntry<T: Clone + Debug> {
     fn real_entry(&self) -> T;
@@ -28,10 +29,12 @@ impl<T:Clone + Debug> RealEntry<T> for T {
 }
 */
 
+pub type SlotT<T> = (Slot, T);
+
 #[derive(Debug)]
-pub struct HybridBTreeMap<V: Clone + Debug> {
+pub struct HybridBTreeMap<V: 'static + Clone + Debug> {
     in_memory: BTreeMap<K, V2<V>>,
-    disk: BucketMap<V>,
+    disk: BucketMap<SlotT<V>>,
 }
 
 // TODO: we need a bit for 'exists on disk' for updates
@@ -77,7 +80,7 @@ impl<'a, K: 'a, V: 'a> Iterator for HybridBTreeMap<'a, V> {
 }
 */
 
-pub enum HybridEntry<'a, V: 'a + Clone + Debug> {
+pub enum HybridEntry<'a, V: 'static + Clone + Debug> {
     /// A vacant entry.
     Vacant(HybridVacantEntry<'a, V>),
 
@@ -85,46 +88,52 @@ pub enum HybridEntry<'a, V: 'a + Clone + Debug> {
     Occupied(HybridOccupiedEntry<'a, V>),
 }
 
-pub struct HybridOccupiedEntry<'a, V: 'a + Clone + Debug> {
+pub struct HybridOccupiedEntry<'a, V: 'static + Clone + Debug> {
     entry: OccupiedEntry<'a, K, V2<V>>,
 }
-pub struct HybridVacantEntry<'a, V: 'a + Clone + Debug> {
+pub struct HybridVacantEntry<'a, V: 'static + Clone + Debug> {
     entry: VacantEntry<'a, K, V2<V>>,
 }
 
-impl<'a, V: 'a + Clone + Debug> HybridOccupiedEntry<'a, V>
-{
-    pub fn get(&self) -> &V {
-        &self.entry.get()//.entry
+impl<'a, V: 'a + Clone + Debug> HybridOccupiedEntry<'a, V> {
+    pub fn get(&self) -> &V2<V> {
+        &self.entry.get() //.entry
     }
-    pub fn get_mut(&mut self) -> &mut V {
-        &mut self.entry.get_mut().entry
+    pub fn get_mut(&mut self) -> &mut V2<V> {
+        self.entry.get_mut()
     }
     pub fn key(&self) -> &K {
         self.entry.key()
     }
-    pub fn remove(self) -> V {
+    pub fn remove(self) -> V2<V> {
         panic!("todo");
         // TODO: remember something that was deleted!?!?
-        self.entry.remove()//.entry
+        self.entry.remove() //.entry
     }
 }
 
-impl<'a, V: 'a + Clone + Debug> HybridVacantEntry<'a, V>
-{
-    pub fn insert(self, value: V) -> &'a mut V {
+impl<'a, V: 'a + Clone + Debug> HybridVacantEntry<'a, V> {
+    pub fn insert(self, value: V2<V>) -> &'a mut V2<V> {
         /*
         let value = V2::<V> {
             entry: value,
             //exists_on_disk: false,
         };
         */
-        self.entry.insert(value)//.entry
+        self.entry.insert(value) //.entry
     }
 }
 
-
 impl<V: Clone + Debug> HybridBTreeMap<V> {
+    pub fn flush(&self) {
+        // put entire contents of this map into the disk backing
+        for (k, v) in self.in_memory.iter() {
+            // TODO: have to deal with refcount here
+            self.disk.update(k, |previous| {
+                Some(v.slot_list.clone())
+            });
+        }
+    }
     pub fn keys(&self) -> Keys<'_, K, V2<V>> {
         panic!("todo keys");
         //self.in_memory.keys()
@@ -136,31 +145,26 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
     pub fn len_inaccurate(&self) -> usize {
         self.in_memory.len()
     }
-    pub fn entry(&mut self, key: K) -> HybridEntry<'_, V>
-    {
+    pub fn entry(&mut self, key: K) -> HybridEntry<'_, V> {
         match self.in_memory.entry(key) {
-            Entry::Occupied(entry) => HybridEntry::Occupied(HybridOccupiedEntry {
-                entry
-            }),
-            Entry::Vacant(entry) => HybridEntry::Vacant(HybridVacantEntry {
-                entry
-            }),
+            Entry::Occupied(entry) => HybridEntry::Occupied(HybridOccupiedEntry { entry }),
+            Entry::Vacant(entry) => HybridEntry::Vacant(HybridVacantEntry { entry }),
         }
     }
 
-    pub fn get<Q: ?Sized>(&self, key: &Q) -> Option<&V>
+    pub fn get<Q: ?Sized>(&self, key: &Q) -> Option<&V2<V>>
     where
         K: Borrow<Q> + Ord,
         Q: Ord,
     {
-        self.in_memory.get(key)//.map(|x| &x.entry)
+        self.in_memory.get(key) //.map(|x| &x.entry)
     }
-    pub fn remove<Q: ?Sized>(&mut self, key: &Q) -> Option<V>
+    pub fn remove<Q: ?Sized>(&mut self, key: &Q) -> Option<V2<V>>
     where
         K: Borrow<Q> + Ord,
         Q: Ord,
     {
         panic!("todo");
-        self.in_memory.remove(key)//.map(|x| x.entry)
+        self.in_memory.remove(key) //.map(|x| x.entry)
     }
 }
