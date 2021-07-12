@@ -10,7 +10,7 @@ impl PubkeyBinCalculator16 {
         std::mem::size_of::<T>() * 8
     }
 
-    fn log_2(x: u32) -> u32 {
+    pub fn log_2(x: u32) -> u32 {
         assert!(x > 0);
         Self::num_bits::<u32>() as u32 - x.leading_zeros() - 1
     }

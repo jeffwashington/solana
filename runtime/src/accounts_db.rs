@@ -6016,6 +6016,8 @@ impl AccountsDb {
             self.accounts_index.add_root(slot, false);
         }
 
+        panic!("not done");
+
         let mut stored_sizes_and_counts = HashMap::new();
         self.accounts_index.account_maps.iter().for_each(|i| {
             i.read().unwrap().values().for_each(|entry| {

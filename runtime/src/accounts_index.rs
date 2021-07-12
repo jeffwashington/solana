@@ -31,7 +31,7 @@ use std::{
 use thiserror::Error;
 
 pub const ITER_BATCH_SIZE: usize = 1000;
-const BINS: usize = 16;
+pub const BINS: usize = 16;
 pub type ScanResult<T> = Result<T, ScanError>;
 pub type SlotList<T> = Vec<(Slot, T)>;
 pub type SlotSlice<'s, T> = &'s [(Slot, T)];
@@ -107,30 +107,36 @@ impl AccountSecondaryIndexes {
 }
 
 #[derive(Debug)]
-pub struct AccountMapEntry<T> {
+pub struct AccountMapEntry<T: 'static + Clone + std::fmt::Debug> {
     ref_count: AtomicU64,
     pub slot_list: SlotList<T>,
 }
 
-impl<T: Clone> AccountMapEntry<T> {
+impl<T: 'static + Clone + std::fmt::Debug> Clone for AccountMapEntry<T> {
+    fn clone(&self) -> Self {
+        panic!("don't call this");
+    }
+}
+
+impl<T: Clone + std::fmt::Debug> AccountMapEntry<T> {
     pub fn ref_count(&self) -> u64 {
         self.ref_count.load(Ordering::Relaxed)
     }
 }
 
-pub enum AccountIndexGetResult<'a, T: 'static> {
+pub enum AccountIndexGetResult<'a, T: 'static + Clone + std::fmt::Debug> {
     Found(ReadAccountMapEntry<'a, T>, usize),
     NotFoundOnFork,
     Missing(AccountMapsReadLock<'a, T>),
 }
 
-pub enum AccountIndexGetResultInternal<'a, T: 'static> {
+pub enum AccountIndexGetResultInternal<'a, T: 'static + Clone + std::fmt::Debug> {
     Found(ReadAccountMapEntry<'a, T>),
     Missing(AccountMapsReadLock<'a, T>),
 }
 
 #[self_referencing]
-pub struct ReadAccountMapEntry<'a, T: 'static> {
+pub struct ReadAccountMapEntry<'a, T: 'static + Clone + std::fmt::Debug> {
     lock: AccountMapsReadLock<'a, T>,
     pubkey: &'a Pubkey,
     #[borrows(lock, pubkey)]
@@ -138,7 +144,7 @@ pub struct ReadAccountMapEntry<'a, T: 'static> {
     owned_entry: Option<&'this AccountMapEntry<T>>,
 }
 
-impl<'a, T: Clone> ReadAccountMapEntry<'a, T> {
+impl<'a, T: Clone + std::fmt::Debug> ReadAccountMapEntry<'a, T> {
     pub fn new_with_lock(
         pubkey: &'a Pubkey,
         lock: AccountMapsReadLock<'a, T>,
@@ -184,7 +190,7 @@ impl<'a, T: Clone> ReadAccountMapEntry<'a, T> {
 }
 
 #[self_referencing]
-pub struct WriteAccountMapEntry<'a, 'b: 'a, T: 'static> {
+pub struct WriteAccountMapEntry<'a, 'b: 'a, T: 'static + Clone + std::fmt::Debug> {
     lock: AccountMapsWriteLock<'b, T>,
     pubkey: &'a Pubkey,
     #[borrows(mut lock, pubkey)]
@@ -195,7 +201,7 @@ pub struct WriteAccountMapEntry<'a, 'b: 'a, T: 'static> {
     ),
 }
 
-impl<'a, 'b: 'a, T: 'static + Clone + IsCached> WriteAccountMapEntry<'a, 'b, T> {
+impl<'a, 'b: 'a, T: 'static + Clone + IsCached + std::fmt::Debug> WriteAccountMapEntry<'a, 'b, T> {
     pub fn new_with_lock(
         pubkey: &'a Pubkey,
         lock: AccountMapsWriteLock<'b, T>,
@@ -612,14 +618,14 @@ pub struct AccountsIndexRootsStats {
     pub unrooted_cleaned_count: usize,
 }
 
-pub struct AccountsIndexIterator<'a, T> {
+pub struct AccountsIndexIterator<'a, T: 'static + Clone + std::fmt::Debug> {
     account_maps: &'a LockMapTypeSlice<T>,
     start_bound: Bound<Pubkey>,
     end_bound: Bound<Pubkey>,
     is_finished: bool,
 }
 
-impl<'a, T> AccountsIndexIterator<'a, T> {
+impl<'a, T: Clone + std::fmt::Debug> AccountsIndexIterator<'a, T> {
     fn clone_bound(bound: Bound<&Pubkey>) -> Bound<Pubkey> {
         match bound {
             Unbounded => Unbounded,
@@ -647,7 +653,7 @@ impl<'a, T> AccountsIndexIterator<'a, T> {
     }
 }
 
-impl<'a, T: 'static + Clone> Iterator for AccountsIndexIterator<'a, T> {
+impl<'a, T: 'static + Clone + std::fmt::Debug> Iterator for AccountsIndexIterator<'a, T> {
     type Item = Vec<Pubkey>;
     fn next(&mut self) -> Option<Self::Item> {
         if self.is_finished {
@@ -718,7 +724,7 @@ impl ScanSlotTracker {
 }
 
 #[derive(Debug)]
-pub struct AccountsIndex<T> {
+pub struct AccountsIndex<T: 'static + Clone + std::fmt::Debug> {
     pub account_maps: LockMapType<T>,
     program_id_index: SecondaryIndex<DashMapSecondaryIndexEntry>,
     spl_token_mint_index: SecondaryIndex<DashMapSecondaryIndexEntry>,
@@ -738,7 +744,7 @@ pub struct AccountsIndex<T> {
     pub removed_bank_ids: Mutex<HashSet<BankId>>,
 }
 
-impl<T> Default for AccountsIndex<T> {
+impl<T: Clone + std::fmt::Debug> Default for AccountsIndex<T> {
     fn default() -> Self {
         Self {
             account_maps: (0..BINS)
@@ -761,7 +767,7 @@ impl<T> Default for AccountsIndex<T> {
     }
 }
 
-impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::marker::Send>
+impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::marker::Send + std::fmt::Debug>
     AccountsIndex<T>
 {
     fn iter<R>(&self, range: Option<R>) -> AccountsIndexIterator<T>

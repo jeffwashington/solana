@@ -1,18 +1,25 @@
 use solana_sdk::pubkey::Pubkey;
 use std::borrow::Borrow;
 use std::collections::btree_map::{BTreeMap, Entry, Keys, Values};
+use solana_bucket_map::bucket_map::BucketMap;
+use crate::accounts_index::BINS;
+use crate::pubkey_bins::PubkeyBinCalculator16;
+
+use std::fmt::Debug;
 type K = Pubkey;
 
 #[derive(Debug)]
-pub struct HybridBTreeMap<V> {
+pub struct HybridBTreeMap<V: Clone + Debug> {
     in_memory: BTreeMap<K, V>,
+    disk: BucketMap<V>,
 }
 
-impl<V> Default for HybridBTreeMap<V> {
+impl<V: Clone + Debug> Default for HybridBTreeMap<V> {
     /// Creates an empty `BTreeMap`.
     fn default() -> HybridBTreeMap<V> {
         Self {
             in_memory: BTreeMap::<K, V>::default(),
+            disk: BucketMap::new_buckets(PubkeyBinCalculator16::log_2(BINS as u32) as u8),
         }
     }
 }
@@ -48,13 +55,13 @@ impl<'a, K: 'a, V: 'a> Iterator for HybridBTreeMap<'a, V> {
 }
 */
 
-impl<V> HybridBTreeMap<V> {
+impl<V: Clone + Debug> HybridBTreeMap<V> {
     pub fn keys(&self) -> Keys<'_, K, V> {
-        panic!("todo");
+        panic!("todo keys");
         self.in_memory.keys()
     }
     pub fn values(&self) -> Values<'_, K, V> {
-        panic!("todo");
+        panic!("todo values");
         self.in_memory.values()
     }
     pub fn len_inaccurate(&self) -> usize {
