@@ -137,7 +137,7 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
     }
     pub fn new_bucket_map() -> Arc<BucketMap<SlotT<V>>> {
         let mut buckets = PubkeyBinCalculator16::log_2(BINS as u32) as u8; // make more buckets to try to spread things out
-        buckets = std::cmp::min(buckets + 11, 6); // max # that works with open file handles and such
+        // buckets = std::cmp::min(buckets + 11, 6); // max # that works with open file handles and such
         error!("creating: {} for {}", buckets, BINS);
         Arc::new(BucketMap::new_buckets(buckets))
     }
@@ -160,12 +160,13 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
         let mut sum = 0;
         let mut min = usize::MAX;
         let mut max = 0;
-        for d in dist {
+        for d in &dist {
+            let d = *d;
             sum += d;
             min = std::cmp::min(min, d);
             max = std::cmp::max(max, d);
         }
-        error!("distribution: sum: {}, min: {}, max: {}", sum, min, max);
+        error!("distribution: sum: {}, min: {}, max: {}, bins: {}", sum, min, max, dist.len());
     }
     pub fn keys(&self) -> Keys<'_, K, V2<V>> {
         panic!("todo keys");
