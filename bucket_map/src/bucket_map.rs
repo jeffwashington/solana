@@ -120,9 +120,9 @@ impl<T: Clone + std::fmt::Debug> BucketMap<T> {
         let num_buckets = self.num_buckets();
         // group by bucket
         let mut per_bucket = vec![vec![]; num_buckets];
-        for (orig_i, key) in keys.iter().enumerate() {
+        for key in keys.iter() {
             let ix = self.bucket_ix(key);
-            per_bucket[ix].push((orig_i, key));
+            per_bucket[ix].push(key);
         }
 
         for ix in 0..num_buckets {
@@ -135,9 +135,10 @@ impl<T: Clone + std::fmt::Debug> BucketMap<T> {
                 *bucket = Some(Bucket::new(self.drives.clone()));
             }
             let bucket = bucket.as_mut().unwrap();
-            for (orig_i, key) in per_bucket {
-                let current = bucket.read_value(key);
-                let new = updatefn(current, key, *orig_i);
+            for key in per_bucket {
+                let current = None;// will never find this key: bucket.read_value(key);
+
+                let new = updatefn(current, key, usize::MAX);
                 if new.is_none() {
                     bucket.delete_key(key);
                     continue;
