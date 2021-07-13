@@ -773,7 +773,6 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
     AccountsIndex<T>
 {
     pub fn flush(&self) {
-        a
         self.account_maps.par_iter().for_each(|m| {
             m.read().unwrap().flush();
         });

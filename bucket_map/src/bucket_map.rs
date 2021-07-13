@@ -57,8 +57,12 @@ impl<T: Clone + std::fmt::Debug> BucketMap<T> {
     pub fn distribution(&self) -> Vec<usize> {
         let mut sizes = vec![];
         for ix in 0..self.num_buckets() {
-            let bucket = self.buckets[ix].read().unwrap();
-            sizes.push(bucket.as_ref().unwrap().index.used.load(Ordering::Relaxed) as usize);
+            if let Ok(bucket) = self.buckets[ix].read() {
+                sizes.push(bucket.as_ref().unwrap().index.used.load(Ordering::Relaxed) as usize);
+            }
+            else {
+                sizes.push(0);
+            }
         }
         sizes
     }
