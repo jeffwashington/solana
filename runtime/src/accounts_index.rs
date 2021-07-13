@@ -776,7 +776,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
         self.account_maps.par_iter().for_each(|m| {
             m.read().unwrap().flush();
         });
-        self.account_maps.first().unwrap().read().unwrap().distribution();
+        error!("distribution: {:?}", self.account_maps.first().unwrap().read().unwrap().distribution());
     }
     fn iter<R>(&self, range: Option<R>) -> AccountsIndexIterator<T>
     where
