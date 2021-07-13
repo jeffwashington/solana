@@ -9,6 +9,9 @@ use std::collections::btree_map::{BTreeMap, Entry, Keys, OccupiedEntry, VacantEn
 use std::fmt::Debug;
 use std::sync::Arc;
 use log::*;
+use std::{
+    sync::{atomic::Ordering},
+};
 type K = Pubkey;
 
 #[derive(Clone, Debug)]
@@ -137,7 +140,7 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
     }
     pub fn new_bucket_map() -> Arc<BucketMap<SlotT<V>>> {
         let mut buckets = PubkeyBinCalculator16::log_2(BINS as u32) as u8; // make more buckets to try to spread things out
-        // buckets = std::cmp::min(buckets + 11, 6); // max # that works with open file handles and such
+        buckets = std::cmp::min(buckets + 1, 6); // max # that works with open file handles and such
         error!("creating: {} for {}", buckets, BINS);
         Arc::new(BucketMap::new_buckets(buckets))
     }
@@ -151,7 +154,7 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
         self.disk.update_batch(&keys[..], |previous, key, orig_i| {
             let item = self.in_memory.get(key);
 
-            item.map(|item| item.slot_list.clone())
+            item.map(|item| (item.slot_list.clone(), item.ref_count()))
         });
         self.distribution();
     }

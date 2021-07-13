@@ -109,16 +109,16 @@ impl<T: Clone + std::fmt::Debug> BucketMap<T> {
             .and_then(|bucket| {
                 bucket.find_entry(key).and_then(|(elem, _)| {
                     elem.read_value(bucket)
-                        .and_then(|slice| Some((elem.ref_count, slice.to_vec())))
+                        .and_then(|slice| Some((elem.ref_count, slice.0.to_vec())))
                 })
             })
     }
 
-    pub fn read_value(&self, key: &Pubkey) -> Option<Vec<T>> {
+    pub fn read_value(&self, key: &Pubkey) -> Option<(Vec<T>, u64)> {
         let ix = self.bucket_ix(key);
         self.buckets[ix].read().unwrap().as_ref().and_then(|x| {
             let slice = x.read_value(key)?;
-            Some(slice.to_vec())
+            Some((slice.0.to_vec(), slice.1))
         })
     }
 
@@ -132,7 +132,7 @@ impl<T: Clone + std::fmt::Debug> BucketMap<T> {
 
     pub fn update_batch<'a, F>(&'a self, keys: &[&Pubkey], updatefn: F)
     where
-        F: Fn(Option<&[T]>, &Pubkey, usize) -> Option<Vec<T>>,
+        F: Fn(Option<(&[T], u64)>, &Pubkey, usize) -> Option<(Vec<T>, u64)>,
     {
         let num_buckets = self.num_buckets();
         // group by bucket
@@ -160,9 +160,9 @@ impl<T: Clone + std::fmt::Debug> BucketMap<T> {
                     bucket.delete_key(key);
                     continue;
                 }
-                let new = new.unwrap();
+                let (new, refct) = new.unwrap();
                 loop {
-                    let rv = bucket.try_write(key, &new);
+                    let rv = bucket.try_write(key, &new, refct);
                     match rv {
                         Err(BucketMapError::DataNoSpace(sz)) => {
                             debug!("GROWING SPACE {:?}", sz);
@@ -185,7 +185,7 @@ impl<T: Clone + std::fmt::Debug> BucketMap<T> {
 
     pub fn update<F>(&self, key: &Pubkey, updatefn: F)
     where
-        F: Fn(Option<&[T]>) -> Option<Vec<T>>,
+        F: Fn(Option<(&[T], u64)>) -> Option<(Vec<T>, u64)>,
     {
         let ix = self.bucket_ix(key);
         let mut bucket = self.buckets[ix].write().unwrap();
@@ -199,9 +199,9 @@ impl<T: Clone + std::fmt::Debug> BucketMap<T> {
             bucket.delete_key(key);
             return;
         }
-        let new = new.unwrap();
+        let (new, refct) = new.unwrap();
         loop {
-            let rv = bucket.try_write(key, &new);
+            let rv = bucket.try_write(key, &new, refct);
             match rv {
                 Err(BucketMapError::DataNoSpace(sz)) => {
                     debug!("GROWING SPACE {:?}", sz);
@@ -269,13 +269,13 @@ impl IndexEntry {
         self.data_location << (bucket.capacity - self.create_bucket_capacity)
     }
 
-    fn read_value<'a, T>(&self, bucket: &'a Bucket<T>) -> Option<&'a [T]> {
+    fn read_value<'a, T>(&self, bucket: &'a Bucket<T>) -> Option<(&'a [T], u64)> {
         let data_bucket = &bucket.data[self.data_bucket as usize];
         let loc = self.data_loc(data_bucket);
         let uid = Self::key_uid(&self.key);
         assert_eq!(uid, bucket.data[self.data_bucket as usize].uid(loc));
         let slice = bucket.data[self.data_bucket as usize].get_cell_slice(loc, self.num_slots);
-        Some(slice)
+        Some((slice, self.ref_count))
     }
     fn key_uid(key: &Pubkey) -> u64 {
         let mut s = DefaultHasher::new();
@@ -321,7 +321,7 @@ impl<T: Clone> Bucket<T> {
             if val.is_none() {
                 continue;
             }
-            rv.push(val.unwrap().to_vec());
+            rv.push(val.unwrap().0.to_vec());
         }
         rv
     }
@@ -377,6 +377,7 @@ impl<T: Clone> Bucket<T> {
         key: &Pubkey,
         elem_uid: u64,
         random: u64,
+        ref_count: u64,
     ) -> Result<u64, BucketMapError> {
         let ix = Self::bucket_index_ix(index, key, random);
         for i in ix..ix + MAX_SEARCH {
@@ -387,7 +388,7 @@ impl<T: Clone> Bucket<T> {
             index.allocate(ii, elem_uid).unwrap();
             let mut elem: &mut IndexEntry = index.get_mut(ii);
             elem.key = *key;
-            elem.ref_count = 0;
+            elem.ref_count = ref_count;
             elem.data_bucket = 0;
             elem.data_location = 0;
             elem.create_bucket_capacity = 0;
@@ -418,20 +419,20 @@ impl<T: Clone> Bucket<T> {
         Some(elem.ref_count)
     }
 
-    fn create_key(&self, key: &Pubkey) -> Result<u64, BucketMapError> {
-        Self::bucket_create_key(&self.index, key, IndexEntry::key_uid(key), self.random)
+    fn create_key(&self, key: &Pubkey, ref_count: u64) -> Result<u64, BucketMapError> {
+        Self::bucket_create_key(&self.index, key, IndexEntry::key_uid(key), self.random, ref_count)
     }
 
-    pub fn read_value(&self, key: &Pubkey) -> Option<&[T]> {
+    pub fn read_value(&self, key: &Pubkey) -> Option<(&[T], u64)> {
         debug!("READ_VALUE: {:?}", key);
         let (elem, _) = self.find_entry(key)?;
         elem.read_value(self)
     }
 
-    fn try_write(&mut self, key: &Pubkey, data: &[T]) -> Result<(), BucketMapError> {
+    fn try_write(&mut self, key: &Pubkey, data: &[T], ref_count: u64) -> Result<(), BucketMapError> {
         let index_entry = self.find_entry(key);
         let (elem, elem_ix) = if index_entry.is_none() {
-            let ii = self.create_key(key)?;
+            let ii = self.create_key(key, ref_count)?;
             let elem = self.index.get(ii);
             (elem, ii)
         } else {
@@ -523,7 +524,8 @@ impl<T: Clone> Bucket<T> {
                         if 0 != self.index.uid(ix) {
                             let elem: &IndexEntry = self.index.get(ix);
                             let uid = self.index.uid(ix);
-                            let new_ix = Self::bucket_create_key(&index, &elem.key, uid, random);
+                            let ref_count = 0; // ??? TODO
+                            let new_ix = Self::bucket_create_key(&index, &elem.key, uid, random, ref_count);
                             if new_ix.is_err() {
                                 return false;
                             }
