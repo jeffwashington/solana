@@ -12,7 +12,9 @@ use std::marker::PhantomData;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::RwLock;
-
+use std::{
+    sync::{atomic::Ordering},
+};
 pub struct BucketMap<T> {
     buckets: Vec<RwLock<Option<Bucket<T>>>>,
     drives: Arc<Vec<PathBuf>>,
@@ -51,6 +53,16 @@ impl<T: Clone + std::fmt::Debug> BucketMap<T> {
             bits: num_buckets_pow2,
         }
     }
+
+    pub fn distribution(&self) -> Vec<usize> {
+        let mut sizes = vec![];
+        for ix in 0..self.num_buckets() {
+            let bucket = self.buckets[ix].read().unwrap();
+            sizes.push(bucket.as_ref().unwrap().index.used.load(Ordering::Relaxed) as usize);
+        }
+        sizes
+    }
+
     fn default_drives() -> Arc<Vec<PathBuf>> {
         let tmpdir2 = PathBuf::from("accounts_index_buckets");
         error!("folder: {:?}", tmpdir2);

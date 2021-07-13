@@ -154,6 +154,18 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
             item.map(|item| item.slot_list.clone())
         });
     }
+    pub fn distribution(&self) {
+        let dist = self.disk.distribution();
+        let mut sum = 0;
+        let mut min = usize::MAX;
+        let mut max = 0;
+        for d in dist {
+            sum += d;
+            min = std::cmp::min(min, d);
+            max = std::cmp::max(max, d);
+        }
+        error!("distribution: sum: {}, min: {}, max: {}", sum, min, max);
+    }
     pub fn keys(&self) -> Keys<'_, K, V2<V>> {
         panic!("todo keys");
         //self.in_memory.keys()
