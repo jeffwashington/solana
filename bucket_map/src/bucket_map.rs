@@ -34,7 +34,6 @@ pub enum BucketMapError {
 /*
 impl<T: Clone + std::fmt::Debug> Default for BucketMap<T>  {
     fn default() -> Self {
-    
         Self::new(1, Self::default_drives())
     }
 }
@@ -76,23 +75,26 @@ impl<T: Clone + std::fmt::Debug> BucketMap<T> {
         Some(self.buckets[ix].read().unwrap().as_ref()?.values())
     }
 
-    pub fn read(&self) -> Option<&Self>{
+    pub fn read(&self) -> Option<&Self> {
         Some(self)
     }
 
-    pub fn write(&self) -> Option<&Self>{
+    pub fn write(&self) -> Option<&Self> {
         Some(self)
     }
 
     pub fn get(&self, key: &Pubkey) -> Option<(u64, Vec<T>)> {
         let ix = self.bucket_ix(key);
-        self.buckets[ix].read().unwrap().as_ref().and_then(|bucket| {
-            bucket.find_entry(key).and_then(|(elem, _)| {
-                elem.read_value(bucket).and_then(|slice| {
-                    Some((elem.ref_count, slice.to_vec()))
+        self.buckets[ix]
+            .read()
+            .unwrap()
+            .as_ref()
+            .and_then(|bucket| {
+                bucket.find_entry(key).and_then(|(elem, _)| {
+                    elem.read_value(bucket)
+                        .and_then(|slice| Some((elem.ref_count, slice.to_vec())))
                 })
             })
-        })
     }
 
     pub fn read_value(&self, key: &Pubkey) -> Option<Vec<T>> {
@@ -108,6 +110,58 @@ impl<T: Clone + std::fmt::Debug> BucketMap<T> {
         let mut bucket = self.buckets[ix].write().unwrap();
         if !bucket.is_none() {
             bucket.as_mut().unwrap().delete_key(key);
+        }
+    }
+
+    pub fn update_batch<'a, F>(&'a self, keys: &[&Pubkey], updatefn: F)
+    where
+        F: Fn(Option<&[T]>, &Pubkey, usize) -> Option<Vec<T>>,
+    {
+        let num_buckets = self.num_buckets();
+        // group by bucket
+        let mut per_bucket = vec![vec![]; num_buckets];
+        for (orig_i, key) in keys.iter().enumerate() {
+            let ix = self.bucket_ix(key);
+            per_bucket[ix].push((orig_i, key));
+        }
+
+        for ix in 0..num_buckets {
+            let per_bucket = &per_bucket[ix];
+            if per_bucket.is_empty() {
+                continue;
+            }
+            let mut bucket = self.buckets[ix].write().unwrap();
+            if bucket.is_none() {
+                *bucket = Some(Bucket::new(self.drives.clone()));
+            }
+            let bucket = bucket.as_mut().unwrap();
+            for (orig_i, key) in per_bucket {
+                let current = bucket.read_value(key);
+                let new = updatefn(current, key, *orig_i);
+                if new.is_none() {
+                    bucket.delete_key(key);
+                    continue;
+                }
+                let new = new.unwrap();
+                loop {
+                    let rv = bucket.try_write(key, &new);
+                    match rv {
+                        Err(BucketMapError::DataNoSpace(sz)) => {
+                            debug!("GROWING SPACE {:?}", sz);
+                            bucket.grow_data(sz);
+                            continue;
+                        }
+                        Err(BucketMapError::IndexNoSpace(sz)) => {
+                            debug!("GROWING INDEX {}", sz);
+                            bucket.grow_index(sz);
+                            continue;
+                        }
+                        Ok(()) => {
+                            break;
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -183,13 +237,13 @@ struct Bucket<T> {
 #[repr(C)]
 #[derive(Debug, Copy, Clone, PartialEq)]
 struct IndexEntry {
-    key: Pubkey, // can this be smaller if we have reduced the keys into buckets already?
-    ref_count: u64, // can this be smaller? Do we ever need more than 4B refcounts?
+    key: Pubkey,      // can this be smaller if we have reduced the keys into buckets already?
+    ref_count: u64,   // can this be smaller? Do we ever need more than 4B refcounts?
     data_bucket: u64, // usize? or smaller. do we ever expect more than 4B buckets?
     data_location: u64, // smaller? since these are variably sized, this could get tricky. well, actually accountinfo is not variable sized...
     //if the bucket doubled, the index can be recomputed
     create_bucket_capacity: u8, // TODO: what does this mean?
-    num_slots: u64, // can this be smaller? epoch size should be the max len
+    num_slots: u64,             // can this be smaller? epoch size should be the max len
 }
 
 impl IndexEntry {
