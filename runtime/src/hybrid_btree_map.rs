@@ -140,23 +140,25 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
     }
     pub fn new_bucket_map() -> Arc<BucketMap<SlotT<V>>> {
         let mut buckets = PubkeyBinCalculator16::log_2(BINS as u32) as u8; // make more buckets to try to spread things out
-        buckets = std::cmp::min(buckets + 1, 6); // max # that works with open file handles and such
+        buckets = std::cmp::min(buckets + 11, 11); // max # that works with open file handles and such
         error!("creating: {} for {}", buckets, BINS);
         Arc::new(BucketMap::new_buckets(buckets))
     }
 
     pub fn flush(&self) {
-        // put entire contents of this map into the disk backing
-        let mut keys = Vec::with_capacity(self.in_memory.len());
-        for k in self.in_memory.keys() {
-            keys.push(k);
+        {
+            // put entire contents of this map into the disk backing
+            let mut keys = Vec::with_capacity(self.in_memory.len());
+            for k in self.in_memory.keys() {
+                keys.push(k);
+            }
+            self.disk.update_batch(&keys[..], |previous, key, orig_i| {
+                let item = self.in_memory.get(key);
+    
+                item.map(|item| (item.slot_list.clone(), item.ref_count()))
+            });
+            self.distribution();
         }
-        self.disk.update_batch(&keys[..], |previous, key, orig_i| {
-            let item = self.in_memory.get(key);
-
-            item.map(|item| (item.slot_list.clone(), item.ref_count()))
-        });
-        self.distribution();
     }
     pub fn distribution(&self) {
         let dist = self.disk.distribution();

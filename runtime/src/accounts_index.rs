@@ -774,8 +774,11 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
 {
     pub fn flush(&self) {
         self.account_maps.par_iter().for_each(|m| {
-            m.read().unwrap().flush();
+            let l = m.read().unwrap();
+            l.flush();
             error!("flush done");
+            drop(l);
+            error!("flush done2");
         });
         error!("flush done");
         error!("distribution: {:?}", self.account_maps.first().unwrap().read().unwrap().distribution());
