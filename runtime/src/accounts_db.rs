@@ -6009,18 +6009,21 @@ impl AccountsDb {
                 total_items,
             };
             timings.report();
+
+            if pass == 0 {
+                let mut m = Measure::start("flush_index");
+                self.accounts_index.account_maps.par_iter().for_each(|i| {
+                    i.read().unwrap().flush();});
+                    m.stop();
+                error!("flush_us: {}", m.as_us());
+            }
         }
 
-        let mut m = Measure::start("flush_index");
-        self.accounts_index.account_maps.par_iter().for_each(|i| {
-            i.read().unwrap().flush();});
-            m.stop();
-        error!("flush_us: {}", m.as_us());
-                
         // Need to add these last, otherwise older updates will be cleaned
         for slot in slots {
             self.accounts_index.add_root(slot, false);
         }
+        error!("add_root done");
 
         panic!("not done");
 /*
