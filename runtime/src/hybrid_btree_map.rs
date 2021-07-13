@@ -143,7 +143,6 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
     }
 
     pub fn flush(&self) {
-        error!("flushing");
         // put entire contents of this map into the disk backing
         for (k, v) in self.in_memory.iter() {
             // need a batch update
@@ -152,7 +151,6 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
                 Some(v.slot_list.clone())
             });
         }
-        error!("flushing done");
     }
     pub fn keys(&self) -> Keys<'_, K, V2<V>> {
         panic!("todo keys");
