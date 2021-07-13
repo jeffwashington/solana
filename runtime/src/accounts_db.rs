@@ -6016,6 +6016,7 @@ impl AccountsDb {
                     i.read().unwrap().flush();});
                     m.stop();
                 error!("flush_us: {}", m.as_us());
+                self.accounts_index.account_maps.first().unwrap().read().unwrap().distribution();
             }
         }
 

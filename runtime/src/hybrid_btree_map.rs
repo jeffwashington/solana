@@ -157,7 +157,6 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
     
                 item.map(|item| (item.slot_list.clone(), item.ref_count()))
             });
-            self.distribution();
         }
     }
     pub fn distribution(&self) {
