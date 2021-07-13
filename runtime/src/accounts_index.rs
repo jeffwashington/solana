@@ -702,11 +702,11 @@ fn get_bin_pubkey(pubkey: &Pubkey) -> usize {
     (pubkey.as_ref()[byte_of_pubkey_to_bin] as usize) * BINS / ((u8::MAX as usize) + 1)
 }
 
-type MapType<T: Clone + std::fmt::Debug> = AccountMap<T>;
-type LockMapType<T: Clone + std::fmt::Debug> = Vec<RwLock<MapType<T>>>;
-type LockMapTypeSlice<T: Clone + std::fmt::Debug> = [RwLock<MapType<T>>];
-type AccountMapsWriteLock<'a, T: Clone + std::fmt::Debug> = RwLockWriteGuard<'a, MapType<T>>;
-type AccountMapsReadLock<'a, T: Clone + std::fmt::Debug> = RwLockReadGuard<'a, MapType<T>>;
+type MapType<T> = AccountMap<T>;
+type LockMapType<T> = Vec<RwLock<MapType<T>>>;
+type LockMapTypeSlice<T> = [RwLock<MapType<T>>];
+type AccountMapsWriteLock<'a, T> = RwLockWriteGuard<'a, MapType<T>>;
+type AccountMapsReadLock<'a, T> = RwLockReadGuard<'a, MapType<T>>;
 
 #[derive(Debug, Default)]
 pub struct ScanSlotTracker {

@@ -17,7 +17,7 @@ pub struct HybridAccountEntry<V: Clone + Debug> {
     //exists_on_disk: bool,
 }
 //type V2<T: Clone + Debug> = HybridAccountEntry<T>;
-type V2<T: Clone + Debug> = AccountMapEntry<T>;
+type V2<T> = AccountMapEntry<T>;
 /*
 trait RealEntry<T: Clone + Debug> {
     fn real_entry(&self) -> T;
@@ -136,7 +136,7 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
         }
     }
     pub fn new_bucket_map() -> Arc<BucketMap<SlotT<V>>> {
-        let buckets = PubkeyBinCalculator16::log_2(BINS as u32) as u8 + 4; // make more buckets to try to spread things out
+        let buckets = PubkeyBinCalculator16::log_2(BINS as u32) as u8 + 10; // make more buckets to try to spread things out
         error!("creating: {} for {}", buckets, BINS);
         Arc::new(BucketMap::new_buckets(buckets))
     }
@@ -145,6 +145,7 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
         error!("flushing");
         // put entire contents of this map into the disk backing
         for (k, v) in self.in_memory.iter() {
+            // need a batch update
             // TODO: have to deal with refcount here
             self.disk.update(k, |previous| {
                 Some(v.slot_list.clone())
