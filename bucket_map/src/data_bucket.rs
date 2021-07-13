@@ -55,6 +55,9 @@ impl Drop for DataBucket {
         if let Err(e) = remove_file(&self.path) {
             error!("failed to remove {:?}: {:?}", &self.path, e);
         }
+        else {
+            error!("removed {:?}", &self.path);
+        }
     }
 }
 
