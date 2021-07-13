@@ -153,7 +153,6 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
 
             item.map(|item| item.slot_list.clone())
         });
-        self.distribution();
     }
     pub fn distribution(&self) {
         let dist = self.disk.distribution();
