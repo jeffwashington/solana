@@ -136,7 +136,7 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
         }
     }
     pub fn new_bucket_map() -> Arc<BucketMap<SlotT<V>>> {
-        let buckets = PubkeyBinCalculator16::log_2(BINS as u32) as u8;
+        let buckets = PubkeyBinCalculator16::log_2(BINS as u32) as u8 + 4; // make more buckets to try to spread things out
         error!("creating: {} for {}", buckets, BINS);
         Arc::new(BucketMap::new_buckets(buckets))
     }
