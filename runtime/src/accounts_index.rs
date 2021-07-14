@@ -109,7 +109,7 @@ impl AccountSecondaryIndexes {
 
 #[derive(Debug)]
 pub struct AccountMapEntry<T> {
-    ref_count: RefCount,
+    pub ref_count: RefCount,
     pub slot_list: SlotList<T>,
 }
 
@@ -142,7 +142,7 @@ pub struct ReadAccountMapEntry<'a, T: 'static + Clone + std::fmt::Debug> {
     pubkey: &'a Pubkey,
     #[borrows(lock, pubkey)]
     #[covariant]
-    owned_entry: Option<&'this AccountMapEntry<T>>,
+    owned_entry: Option<AccountMapEntry<T>>, // used to be: &'this 
 }
 
 impl<'a, T: Clone + std::fmt::Debug> ReadAccountMapEntry<'a, T> {
@@ -169,12 +169,12 @@ impl<'a, T: Clone + std::fmt::Debug> ReadAccountMapEntry<'a, T> {
         lock.lock
     }
 
-    fn get(&self) -> &AccountMapEntry<T> {
-        self.borrow_owned_entry().unwrap()
+    fn get(&self) -> AccountMapEntry<T> {
+        self.borrow_owned_entry().as_ref().unwrap().clone()
     }
 
-    pub fn slot_list(&self) -> &SlotList<T> {
-        &self.get().slot_list
+    pub fn slot_list(&self) -> SlotList<T> {
+        self.get().slot_list
     }
 
     pub fn ref_count(&self) -> RefCount {
@@ -1307,7 +1307,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
         max: Option<Slot>,
     ) -> (SlotList<T>, RefCount) {
         (
-            self.get_rooted_entries(locked_account_entry.slot_list(), max),
+            self.get_rooted_entries(&locked_account_entry.slot_list(), max),
             locked_account_entry.ref_count(),
         )
     }
@@ -1409,7 +1409,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
         match account {
             AccountIndexGetResultInternal::Found(locked_entry) => {
                 let slot_list = locked_entry.slot_list();
-                let found_index = self.latest_slot(ancestors, slot_list, max_root);
+                let found_index = self.latest_slot(ancestors, &slot_list, max_root);
                 match found_index {
                     Some(found_index) => AccountIndexGetResult::Found(locked_entry, found_index),
                     None => AccountIndexGetResult::NotFoundOnFork,

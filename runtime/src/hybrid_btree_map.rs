@@ -9,9 +9,6 @@ use std::collections::btree_map::{BTreeMap, Entry, Keys, OccupiedEntry, VacantEn
 use std::fmt::Debug;
 use std::sync::Arc;
 use log::*;
-use std::{
-    sync::{atomic::Ordering},
-};
 type K = Pubkey;
 
 #[derive(Clone, Debug)]
@@ -190,12 +187,27 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
         }
     }
 
-    pub fn get<Q: ?Sized>(&self, key: &Q) -> Option<&V2<V>>
-    where
-        K: Borrow<Q> + Ord,
-        Q: Ord,
+    pub fn get(&self, key: &K) -> Option<V2<V>>
     {
-        self.in_memory.get(key) //.map(|x| &x.entry)
+        let in_mem = self.in_memory.get(key);
+        match in_mem {
+            Some(in_mem) => Some(in_mem.clone()),
+            None => {
+                // we have to load this into the in-mem cache so we can get a ref_count, if nothing else
+                let disk = self.disk.get(key);
+                disk.map(|disk| 
+                AccountMapEntry {
+                    ref_count: disk.0,
+                    slot_list: disk.1,
+                })
+                /*
+                disk.map(|item| {
+                    self.in_memory.entry(*key).map(|entry| {
+
+                    }
+                })*/
+            }
+        }
     }
     pub fn remove<Q: ?Sized>(&mut self, key: &Q) -> Option<V2<V>>
     where
