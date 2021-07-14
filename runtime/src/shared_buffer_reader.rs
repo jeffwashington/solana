@@ -497,6 +497,7 @@ pub mod tests {
                 data: Vec::default(),
                 done: false,
                 err: None,
+                calls: 0,
             }
         }
     }
