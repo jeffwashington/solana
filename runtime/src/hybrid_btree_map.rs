@@ -137,7 +137,7 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
     }
     pub fn new_bucket_map() -> Arc<BucketMap<SlotT<V>>> {
         let mut buckets = PubkeyBinCalculator16::log_2(BINS as u32) as u8; // make more buckets to try to spread things out
-        buckets = std::cmp::min(buckets + 11, 11); // max # that works with open file handles and such
+        buckets = std::cmp::min(buckets + 11, 16); // max # that works with open file handles and such
         error!("creating: {} for {}", buckets, BINS);
         Arc::new(BucketMap::new_buckets(buckets))
     }
