@@ -488,6 +488,7 @@ pub mod tests {
         pub data: Vec<u8>,
         pub done: bool,
         pub err: Option<std::io::Error>,
+        pub calls: usize,
     }
     impl SimpleReader {
         fn new(receiver: SimpleReaderReceiverType) -> Self {
@@ -502,6 +503,7 @@ pub mod tests {
 
     impl Read for SimpleReader {
         fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+            self.calls += 1;
             if !self.done && self.data.is_empty() {
                 let (mut data, err) = self.receiver.recv().unwrap();
                 if err.is_some() {
@@ -697,7 +699,7 @@ pub mod tests {
             let expected_len = 1;
             for i in 0..sent.len() {
                 let len = reader2.read(&mut data[i..=i]);
-                assert!(len.is_ok(), "{:?}, progress: {}", len, i);
+                assert!(len.is_ok(), "{:?}, progress: {}, reader calls: {}", len, i, file.calls);
                 assert_eq!(len.unwrap(), expected_len, "progress: {}", i);
             }
             assert_eq!(sent, data);
