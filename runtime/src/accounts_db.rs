@@ -6060,6 +6060,9 @@ impl AccountsDb {
                 if let Some((stored_size, count)) = stored_sizes_and_counts.get(id) {
                     trace!("id: {} setting count: {} cur: {}", id, count, store.count(),);
                     store.count_and_status.write().unwrap().0 = *count;
+                    if *count == 0 {
+                        error!("id: {}, slot: {}", id, store.slot());
+                    }
                     store.alive_bytes.store(*stored_size, Ordering::SeqCst);
                 } else {
                     trace!("id: {} clearing count", id);
