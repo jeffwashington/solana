@@ -421,6 +421,7 @@ impl Read for SharedBufferReader {
 
             let instance = &*self.instance;
             let mut lock;
+            let mut last_data_len = 0;
             // hang out in this loop until the buffer we need is available
             loop {
                 lock = instance.data.read().unwrap();
@@ -435,6 +436,7 @@ impl Read for SharedBufferReader {
 
                 // another thread may have transferred data, so check again to see if we have data now
                 lock = instance.data.read().unwrap();
+                last_data_len = lock.len();
                 if self.current_buffer_index < lock.len() {
                     break;
                 }
@@ -459,7 +461,7 @@ impl Read for SharedBufferReader {
                     let mut error = instance.bg_reader_data.error.write().unwrap();
                     if error.is_err() {
                         if dest_len == 1 {
-                            error!("error being returned: idx: {}, index in buffer: {}, request: {}, cur buf idx: {}, prev len: {}", self.index_in_current_data, offset_in_dest, dest_len, self.current_buffer_index, prev_len);
+                            error!("error being returned: idx: {}, index in buffer: {}, request: {}, cur buf idx: {}, prev len: {}, last data len: {}", self.index_in_current_data, offset_in_dest, dest_len, self.current_buffer_index, prev_len, last_data_len);
                         }
                         // replace the current error (with AN error instead of ok)
                         let mut stored_error = Err(Self::default_error());
