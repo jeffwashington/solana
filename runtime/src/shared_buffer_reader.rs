@@ -481,6 +481,7 @@ pub mod tests {
     use super::*;
     use crossbeam_channel::{unbounded, Receiver};
     use rayon::prelude::*;
+    use std::sync::atomic::AtomicUsize;
 
     type SimpleReaderReceiverType = Receiver<(Vec<u8>, Option<std::io::Error>)>;
     struct SimpleReader {
@@ -488,7 +489,7 @@ pub mod tests {
         pub data: Vec<u8>,
         pub done: bool,
         pub err: Option<std::io::Error>,
-        pub calls: usize,
+        pub calls: Arc<AtomicUsize>,
     }
     impl SimpleReader {
         fn new(receiver: SimpleReaderReceiverType) -> Self {
@@ -497,14 +498,14 @@ pub mod tests {
                 data: Vec::default(),
                 done: false,
                 err: None,
-                calls: 0,
+                calls: Arc::new(AtomicUsize::new(0)),
             }
         }
     }
 
     impl Read for SimpleReader {
         fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-            self.calls += 1;
+            self.calls.fetch_add(1, Ordering::Relaxed);
             if !self.done && self.data.is_empty() {
                 let (mut data, err) = self.receiver.recv().unwrap();
                 if err.is_some() {
@@ -679,6 +680,7 @@ pub mod tests {
         loop {
             let (sender, receiver) = unbounded();
             let file = SimpleReader::new(receiver);
+            let calls = file.calls.clone();
             let shared_buffer = SharedBuffer::new(file);
             let mut reader = SharedBufferReader::new(&shared_buffer);
             let mut reader2 = SharedBufferReader::new(&shared_buffer);
@@ -700,7 +702,7 @@ pub mod tests {
             let expected_len = 1;
             for i in 0..sent.len() {
                 let len = reader2.read(&mut data[i..=i]);
-                assert!(len.is_ok(), "{:?}, progress: {}, reader calls: {}", len, i, file.calls);
+                assert!(len.is_ok(), "{:?}, progress: {}, reader calls: {}", len, i, calls.load(Ordering::Relaxed));
                 assert_eq!(len.unwrap(), expected_len, "progress: {}", i);
             }
             assert_eq!(sent, data);
