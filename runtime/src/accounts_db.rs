@@ -6015,8 +6015,21 @@ impl AccountsDb {
                 let mut m = Measure::start("flush_index");
                 self.accounts_index.account_maps.par_iter().for_each(|i| {
                     i.write().unwrap().flush();});
-                    m.stop();
-                error!("flush_us: {}", m.as_us());
+                m.stop();
+                let total_items = self
+                .accounts_index
+                .account_maps
+                .iter()
+                .map(|i| {
+                    let len = i.read().unwrap().len_inaccurate();
+                    min_bin_size = std::cmp::min(min_bin_size, len);
+                    max_bin_size = std::cmp::max(max_bin_size, len);
+                    len
+                })
+                .sum();
+
+                error!("flush_us: {}, total items after flush: {}", m.as_us(), total_items);
+                self.accounts_index.account_maps.first().unwrap().read().unwrap().distribution();
                 self.accounts_index.account_maps.first().unwrap().read().unwrap().distribution();
             }
         }
