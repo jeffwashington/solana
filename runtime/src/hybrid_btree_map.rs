@@ -156,12 +156,12 @@ impl<'a, V: 'a + Clone + Debug> HybridOccupiedEntry<'a, V> {
     pub fn addref(&mut self) {
         self.entry.ref_count += 1;
         let result = self.map.disk.addref(&self.pubkey);
-        error!("addref: {}, {}, {:?}", self.pubkey, self.entry.ref_count(), result);
+        //error!("addref: {}, {}, {:?}", self.pubkey, self.entry.ref_count(), result);
     }
     pub fn unref(&mut self) {
         self.entry.ref_count -= 1;
         let result = self.map.disk.unref(&self.pubkey);
-        error!("addref: {}, {}, {:?}", self.pubkey, self.entry.ref_count(), result);
+        //error!("addref: {}, {}, {:?}", self.pubkey, self.entry.ref_count(), result);
     }
     /*
     pub fn get_mut(&mut self) -> &mut V2<V> {
