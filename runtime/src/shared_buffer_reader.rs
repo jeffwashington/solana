@@ -673,40 +673,42 @@ pub mod tests {
     #[test]
     fn test_shared_buffer_2_errors_after_read2() {
         solana_logger::setup();
-        let (sender, receiver) = unbounded();
-        let file = SimpleReader::new(receiver);
-        let shared_buffer = SharedBuffer::new(file);
-        let mut reader = SharedBufferReader::new(&shared_buffer);
-        let mut reader2 = SharedBufferReader::new(&shared_buffer);
-        let mut data = Vec::new();
-        let done_signal = vec![];
+        loop {
+            let (sender, receiver) = unbounded();
+            let file = SimpleReader::new(receiver);
+            let shared_buffer = SharedBuffer::new(file);
+            let mut reader = SharedBufferReader::new(&shared_buffer);
+            let mut reader2 = SharedBufferReader::new(&shared_buffer);
+            let mut data = Vec::new();
+            let done_signal = vec![];
 
-        // send some data
-        let sent = vec![1, 2, 3];
-        let _ = sender.send((sent.clone(), None));
-        // send an error
-        let _ = sender.send((done_signal, Some(get_error())));
-        assert_eq!(
-            reader.read_to_end(&mut data).unwrap_err().kind(),
-            get_error().kind()
-        );
-        // #2 will read valid bytes first and succeed, then get error
-        let mut data = vec![0; sent.len()];
-        // this read should succeed because it is reading data prior to error being received by bg reader
-        let expected_len = 1;
-        for i in 0..sent.len() {
+            // send some data
+            let sent = vec![1, 2, 3];
+            let _ = sender.send((sent.clone(), None));
+            // send an error
+            let _ = sender.send((done_signal, Some(get_error())));
             assert_eq!(
-                reader2.read(&mut data[i..=i]).unwrap(),
-                expected_len,
-                "progress: {}",
-                i
+                reader.read_to_end(&mut data).unwrap_err().kind(),
+                get_error().kind()
+            );
+            // #2 will read valid bytes first and succeed, then get error
+            let mut data = vec![0; sent.len()];
+            // this read should succeed because it is reading data prior to error being received by bg reader
+            let expected_len = 1;
+            for i in 0..sent.len() {
+                assert_eq!(
+                    reader2.read(&mut data[i..=i]).unwrap(),
+                    expected_len,
+                    "progress: {}",
+                    i
+                );
+            }
+            assert_eq!(sent, data);
+            assert_eq!(
+                reader2.read(&mut data[0..=0]).unwrap_err().kind(),
+                SharedBufferReader::default_error().kind()
             );
         }
-        assert_eq!(sent, data);
-        assert_eq!(
-            reader2.read(&mut data[0..=0]).unwrap_err().kind(),
-            SharedBufferReader::default_error().kind()
-        );
     }
 
     // read either all or in specified block sizes
