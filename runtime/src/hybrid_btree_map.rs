@@ -142,7 +142,7 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
         Arc::new(BucketMap::new_buckets(buckets))
     }
 
-    pub fn flush(&self) {
+    pub fn flush(&mut self) {
         {
             // put entire contents of this map into the disk backing
             let mut keys = Vec::with_capacity(self.in_memory.len());
@@ -154,6 +154,7 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
     
                 item.map(|item| (item.slot_list.clone(), item.ref_count()))
             });
+            self.in_memory.clear();
         }
     }
     pub fn distribution(&self) {

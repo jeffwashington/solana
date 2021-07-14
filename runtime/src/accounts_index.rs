@@ -780,9 +780,10 @@ impl<T: Clone + std::fmt::Debug> Default for AccountsIndex<T> {
 impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::marker::Send + std::fmt::Debug>
     AccountsIndex<T>
 {
+    /*
     pub fn flush(&self) {
         self.account_maps.par_iter().for_each(|m| {
-            let l = m.read().unwrap();
+            let l = m.write().unwrap();
             l.flush();
             error!("flush done");
             drop(l);
@@ -793,6 +794,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
         error!("distribution done");
         std::thread::sleep(std::time::Duration::from_millis(2000));
     }
+    */
     fn iter<R>(&self, range: Option<R>) -> AccountsIndexIterator<T>
     where
         R: RangeBounds<Pubkey>,
