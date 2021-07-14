@@ -457,7 +457,7 @@ impl Read for SharedBufferReader {
                     // This would be simpler if I could clone an io error.
                     let mut error = instance.bg_reader_data.error.write().unwrap();
                     if error.is_err() {
-                        error!("error being returned: idx: {}, index in buffer: {}, request: {}", self.index_in_current_data, offset_in_data, dest_len);
+                        error!("error being returned: idx: {}, index in buffer: {}, request: {}", self.index_in_current_data, offset_in_dest, dest_len);
                         // replace the current error (with AN error instead of ok)
                         let mut stored_error = Err(Self::default_error());
                         std::mem::swap(&mut *error, &mut stored_error);
