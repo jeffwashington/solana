@@ -263,7 +263,8 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
         let end = start + (self.bin_index + 1) / self.bins;
         let len = (start..end).into_iter().map(|ix| self.disk.bucket_len(ix) as usize).sum::<usize>();
         let mut values = Vec::with_capacity(len);
-        let len = (start..end).into_iter().for_each(|ix| values.append(&mut self.disk.values(ix).unwrap_or_default()));
+        (start..end).into_iter().for_each(|ix| values.append(&mut self.disk.values(ix).unwrap_or_default()));
+        error!("getting values: {}, bin: {}, bins: {}, start: {}, end: {}", values.len(), self.bin_index, self.bins, start, end);
         //keys.sort_unstable();
         Values {
             values,
