@@ -6026,7 +6026,7 @@ impl AccountsDb {
                     max_bin_size = std::cmp::max(max_bin_size, len);
                     len
                 })
-                .sum();
+                .sum::<usize>();
 
                 error!("flush_us: {}, total items after flush: {}", m.as_us(), total_items);
                 self.accounts_index.account_maps.first().unwrap().read().unwrap().distribution();
