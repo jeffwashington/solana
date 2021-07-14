@@ -247,7 +247,7 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
     pub fn keys(&self) -> Keys {
         let num_buckets = self.disk.num_buckets();
         let start = num_buckets * self.bin_index / self.bins;
-        let end = start + (self.bin_index + 1) / self.bins;
+        let end = num_buckets * (self.bin_index + 1) / self.bins;
         let len = (start..end).into_iter().map(|ix| self.disk.bucket_len(ix) as usize).sum::<usize>();
         let mut keys = Vec::with_capacity(len);
         let len = (start..end).into_iter().for_each(|ix| keys.append(&mut self.disk.keys(ix).unwrap_or_default()));
@@ -260,7 +260,7 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
     pub fn values(&self) -> Values<V> {
         let num_buckets = self.disk.num_buckets();
         let start = num_buckets * self.bin_index / self.bins;
-        let end = start + (self.bin_index + 1) / self.bins;
+        let end = num_buckets * (self.bin_index + 1) / self.bins;
         let len = (start..end).into_iter().map(|ix| self.disk.bucket_len(ix) as usize).sum::<usize>();
         let mut values = Vec::with_capacity(len);
         (start..end).into_iter().for_each(|ix| values.append(&mut self.disk.values(ix).unwrap_or_default()));
