@@ -681,6 +681,7 @@ pub mod tests {
     fn test_shared_buffer_2_errors_after_read2() {
         solana_logger::setup();
         loop {
+            error!("looping-----------------------");
             let (sender, receiver) = unbounded();
             let file = SimpleReader::new(receiver);
             let calls = file.calls.clone();
