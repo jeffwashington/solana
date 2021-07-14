@@ -261,12 +261,12 @@ impl<'a, 'b: 'a, T: 'static + Clone + IsCached + std::fmt::Debug> WriteAccountMa
         &mut self,
         user: impl for<'this> FnOnce(&mut SlotList<T>) -> RT,
     ) -> Option<RT> {
+        let mut sl = self.slot_list().clone();
         self.with_mut(|fields| {
             let f = fields.owned_entry;
-            f.0.as_mut().map(|entry| {
-                let x = entry.get_mut();
-                user(&mut x.slot_list)
-            })
+            let result = user(&mut sl);
+            f.0.as_mut().map(|entry| entry.update(&mut sl));
+            Some(result)
         })
     }
 
@@ -276,21 +276,15 @@ impl<'a, 'b: 'a, T: 'static + Clone + IsCached + std::fmt::Debug> WriteAccountMa
 
     pub fn unref(&mut self) {
         self.with_mut(|fields| {
-            let f = fields.owned_entry;
-            f.0.as_mut().map(|entry| {
-                let x = entry.get_mut();
-                x.ref_count -= 1;
-            })
+            let mut f = fields.owned_entry;
+            f.0.as_mut().map(|entry| entry.unref());
         });
     }
 
     pub fn addref(&mut self) {
         self.with_mut(|fields| {
-            let f = fields.owned_entry;
-            f.0.as_mut().map(|entry| {
-                let x = entry.get_mut();
-                x.ref_count += 1;
-            })
+            let mut f = fields.owned_entry;
+            f.0.as_mut().map(|entry| entry.addref());
         });
     }
 

@@ -1,6 +1,7 @@
 use crate::accounts_index::AccountMapEntry;
-use crate::accounts_index::BINS;
+use crate::accounts_index::{SlotList, BINS};
 use crate::pubkey_bins::PubkeyBinCalculator16;
+use log::*;
 use solana_bucket_map::bucket_map::BucketMap;
 use solana_sdk::clock::Slot;
 use solana_sdk::pubkey::Pubkey;
@@ -8,7 +9,6 @@ use std::borrow::Borrow;
 use std::collections::btree_map::{BTreeMap, Entry, Keys, OccupiedEntry, VacantEntry, Values};
 use std::fmt::Debug;
 use std::sync::Arc;
-use log::*;
 type K = Pubkey;
 
 #[derive(Clone, Debug)]
@@ -92,38 +92,61 @@ pub enum HybridEntry<'a, V: 'static + Clone + Debug> {
 }
 
 pub struct HybridOccupiedEntry<'a, V: 'static + Clone + Debug> {
-    entry: OccupiedEntry<'a, K, V2<V>>,
+    pubkey: Pubkey,
+    entry: AccountMapEntry<V>,
+    map: &'a HybridBTreeMap<V>,
 }
 pub struct HybridVacantEntry<'a, V: 'static + Clone + Debug> {
-    entry: VacantEntry<'a, K, V2<V>>,
+    pubkey: Pubkey,
+    map: &'a HybridBTreeMap<V>,
 }
 
 impl<'a, V: 'a + Clone + Debug> HybridOccupiedEntry<'a, V> {
     pub fn get(&self) -> &V2<V> {
-        &self.entry.get() //.entry
+        &self.entry
     }
+    pub fn update(&mut self, new_data: &SlotList<V>) {
+        self.map.disk.update(&self.pubkey, |previous| {
+            Some((new_data.clone(), self.entry.ref_count)) // TODO no clone here
+        });
+    }
+    pub fn addref(&mut self) {
+        self.entry.ref_count += 1;
+        self.map.disk.addref(&self.pubkey);
+    }
+    pub fn unref(&mut self) {
+        self.entry.ref_count -= 1;
+        self.map.disk.unref(&self.pubkey);
+    }
+    /*
     pub fn get_mut(&mut self) -> &mut V2<V> {
         self.entry.get_mut()
     }
+    */
     pub fn key(&self) -> &K {
-        self.entry.key()
+        &self.pubkey
     }
     pub fn remove(self) -> V2<V> {
         panic!("todo");
         // TODO: remember something that was deleted!?!?
-        self.entry.remove() //.entry
+        //self.entry.remove() //.entry
     }
 }
 
 impl<'a, V: 'a + Clone + Debug> HybridVacantEntry<'a, V> {
-    pub fn insert(self, value: V2<V>) -> &'a mut V2<V> {
+    pub fn insert(self, value: V2<V>) {
+        // -> &'a mut V2<V> {
         /*
         let value = V2::<V> {
             entry: value,
             //exists_on_disk: false,
         };
         */
-        self.entry.insert(value) //.entry
+        //let mut sl = SlotList::default();
+        //std::mem::swap(&mut sl, &mut value.slot_list);
+        self.map.disk.update(&self.pubkey, |_previous| {
+            Some((value.slot_list.clone() /* todo bad */, value.ref_count))
+        });
     }
 }
 
@@ -143,6 +166,7 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
     }
 
     pub fn flush(&mut self) {
+        /*
         {
             // put entire contents of this map into the disk backing
             let mut keys = Vec::with_capacity(self.in_memory.len());
@@ -151,11 +175,10 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
             }
             self.disk.update_batch(&keys[..], |previous, key, orig_i| {
                 let item = self.in_memory.get(key);
-    
                 item.map(|item| (item.slot_list.clone(), item.ref_count()))
             });
             self.in_memory.clear();
-        }
+        }*/
     }
     pub fn distribution(&self) {
         let dist = self.disk.distribution();
@@ -168,7 +191,13 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
             min = std::cmp::min(min, d);
             max = std::cmp::max(max, d);
         }
-        error!("distribution: sum: {}, min: {}, max: {}, bins: {}", sum, min, max, dist.len());
+        error!(
+            "distribution: sum: {}, min: {}, max: {}, bins: {}",
+            sum,
+            min,
+            max,
+            dist.len()
+        );
     }
     pub fn keys(&self) -> Keys<'_, K, V2<V>> {
         panic!("todo keys");
@@ -179,21 +208,30 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
         //self.in_memory.values()
     }
     pub fn len_inaccurate(&self) -> usize {
-        self.in_memory.len()
+        1 // ??? wrong
+        //self.in_memory.len()
     }
     pub fn entry(&mut self, key: K) -> HybridEntry<'_, V> {
-        match self.in_memory.entry(key) {
-            Entry::Occupied(entry) => HybridEntry::Occupied(HybridOccupiedEntry { entry }),
-            Entry::Vacant(entry) => HybridEntry::Vacant(HybridVacantEntry { entry }),
+        match self.disk.get(&key) {
+            Some(entry) => HybridEntry::Occupied(HybridOccupiedEntry {
+                pubkey: key,
+                entry: AccountMapEntry::<V> {
+                    slot_list: entry.1,
+                    ref_count: entry.0,
+                },
+                map: self,
+            }),
+            None => HybridEntry::Vacant(HybridVacantEntry {
+                pubkey: key,
+                map: self,
+            }),
         }
     }
 
-    pub fn get(&self, key: &K) -> Option<V2<V>>
-    {
+    pub fn get(&self, key: &K) -> Option<V2<V>> {
         let lookup = || {
             let disk = self.disk.get(key);
-            disk.map(|disk| 
-            AccountMapEntry {
+            disk.map(|disk| AccountMapEntry {
                 ref_count: disk.0,
                 slot_list: disk.1,
             })
@@ -201,8 +239,7 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
 
         if true {
             lookup()
-        }
-        else {
+        } else {
             let in_mem = self.in_memory.get(key);
             match in_mem {
                 Some(in_mem) => Some(in_mem.clone()),
