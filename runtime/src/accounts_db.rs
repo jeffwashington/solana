@@ -6040,11 +6040,12 @@ impl AccountsDb {
             self.accounts_index.add_root(slot, false);
         }
         error!("add_root done");
-
+        let mut values = 0;
         let mut stored_sizes_and_counts = HashMap::new();
         self.accounts_index.account_maps.iter().for_each(|i| {
             i.read().unwrap().values().for_each(|entry| {
                 entry.slot_list.iter().for_each(|(_slot, account_entry)| {
+                    values += 1;
                     let storage_entry_meta = stored_sizes_and_counts
                         .entry(account_entry.store_id)
                         .or_insert((0, 0));
@@ -6053,6 +6054,7 @@ impl AccountsDb {
                 })
             })
         });
+        error!("values: {}", values);
         for slot_stores in self.storage.0.iter() {
             for (id, store) in slot_stores.value().read().unwrap().iter() {
                 // Should be default at this point
