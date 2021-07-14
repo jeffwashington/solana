@@ -680,7 +680,6 @@ impl AccountStorageEntry {
     fn remove_account(&self, num_bytes: usize, reset_accounts: bool) -> usize {
         let mut count_and_status = self.count_and_status.write().unwrap();
         let (mut count, mut status) = *count_and_status;
-        error!("remove account: {}, slot: {}", count, self.slot());
 
         if count == 1 && status == AccountStorageStatus::Full && reset_accounts {
             // this case arises when we remove the last account from the
