@@ -88,6 +88,9 @@ impl<T: Clone + std::fmt::Debug> BucketMap<T> {
     pub fn keys(&self, ix: usize) -> Option<Vec<Pubkey>> {
         Some(self.buckets[ix].read().unwrap().as_ref()?.keys())
     }
+    pub fn bucket_len(&self, ix: usize) -> u64 {
+        self.buckets[ix].read().unwrap().as_ref().map(|entry| entry.index.used.load(Ordering::Relaxed)).unwrap_or_default()
+    }
     pub fn values(&self, ix: usize) -> Option<Vec<Vec<T>>> {
         Some(self.buckets[ix].read().unwrap().as_ref()?.values())
     }

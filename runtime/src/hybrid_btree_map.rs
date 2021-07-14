@@ -6,7 +6,7 @@ use solana_bucket_map::bucket_map::BucketMap;
 use solana_sdk::clock::Slot;
 use solana_sdk::pubkey::Pubkey;
 use std::borrow::Borrow;
-use std::collections::btree_map::{BTreeMap, Entry, Keys, OccupiedEntry, VacantEntry, Values};
+use std::collections::btree_map::{BTreeMap};
 use std::fmt::Debug;
 use std::sync::Arc;
 type K = Pubkey;
@@ -37,6 +37,8 @@ pub type SlotT<T> = (Slot, T);
 pub struct HybridBTreeMap<V: 'static + Clone + Debug> {
     in_memory: BTreeMap<K, V2<V>>,
     disk: Arc<BucketMap<SlotT<V>>>,
+    bin_index: usize,
+    bins: usize,
 }
 
 // TODO: we need a bit for 'exists on disk' for updates
@@ -91,6 +93,25 @@ pub enum HybridEntry<'a, V: 'static + Clone + Debug> {
     Occupied(HybridOccupiedEntry<'a, V>),
 }
 
+pub struct Keys {
+    keys: Vec<K>,
+    index: usize,
+}
+
+impl Iterator for Keys {
+    type Item = Pubkey;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index >= self.keys.len() {
+            None
+        }
+        else {
+            let r = Some(self.keys[self.index]);
+            self.index += 1;
+            r
+        }
+    }
+}
+
 pub struct HybridOccupiedEntry<'a, V: 'static + Clone + Debug> {
     pubkey: Pubkey,
     entry: AccountMapEntry<V>,
@@ -126,10 +147,8 @@ impl<'a, V: 'a + Clone + Debug> HybridOccupiedEntry<'a, V> {
     pub fn key(&self) -> &K {
         &self.pubkey
     }
-    pub fn remove(self) -> V2<V> {
-        panic!("todo");
-        // TODO: remember something that was deleted!?!?
-        //self.entry.remove() //.entry
+    pub fn remove(self) {
+        self.map.disk.delete_key(&self.pubkey)
     }
 }
 
@@ -152,10 +171,12 @@ impl<'a, V: 'a + Clone + Debug> HybridVacantEntry<'a, V> {
 
 impl<V: Clone + Debug> HybridBTreeMap<V> {
     /// Creates an empty `BTreeMap`.
-    pub fn new(bucket_map: &Arc<BucketMap<SlotT<V>>>) -> HybridBTreeMap<V> {
+    pub fn new(bucket_map: &Arc<BucketMap<SlotT<V>>>, bin_index: usize, bins: usize) -> HybridBTreeMap<V> {
         Self {
             in_memory: BTreeMap::default(),
             disk: bucket_map.clone(),
+            bin_index,
+            bins,
         }
     }
     pub fn new_bucket_map() -> Arc<BucketMap<SlotT<V>>> {
@@ -199,14 +220,25 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
             dist.len()
         );
     }
-    pub fn keys(&self) -> Keys<'_, K, V2<V>> {
-        panic!("todo keys");
-        //self.in_memory.keys()
+    pub fn keys(&self) -> Keys {
+        let num_buckets = self.disk.num_buckets();
+        let start = num_buckets * self.bin_index / self.bins;
+        let end = start + (self.bin_index + 1) / self.bins;
+        let len = (start..end).into_iter().map(|ix| self.disk.bucket_len(ix) as usize).sum::<usize>();
+        let mut keys = Vec::with_capacity(len);
+        let len = (start..end).into_iter().for_each(|ix| keys.append(&mut self.disk.keys(ix).unwrap_or_default()));
+        keys.sort_unstable();
+        Keys {
+            keys,
+            index: 0,
+        }
     }
-    pub fn values(&self) -> Values<'_, K, V> {
+    /*
+    pub fn values(&self) -> Values {
         panic!("todo values");
         //self.in_memory.values()
     }
+    */
     pub fn len_inaccurate(&self) -> usize {
         1 // ??? wrong
         //self.in_memory.len()
@@ -256,12 +288,8 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
             }
         }
     }
-    pub fn remove<Q: ?Sized>(&mut self, key: &Q) -> Option<V2<V>>
-    where
-        K: Borrow<Q> + Ord,
-        Q: Ord,
+    pub fn remove(&mut self, key: &K)
     {
-        panic!("todo");
-        self.in_memory.remove(key) //.map(|x| x.entry)
+        self.disk.delete_key(key); //.map(|x| x.entry)
     }
 }

@@ -4452,7 +4452,7 @@ impl AccountsDb {
             .accounts_index
             .account_maps
             .iter()
-            .map(|btree| btree.read().unwrap().keys().cloned().collect::<Vec<_>>())
+            .map(|btree| btree.read().unwrap().keys().into_iter().collect::<Vec<_>>())
             .flatten()
             .collect();
         collect.stop();
