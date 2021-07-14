@@ -148,17 +148,20 @@ impl<'a, V: 'a + Clone + Debug> HybridOccupiedEntry<'a, V> {
         &self.entry
     }
     pub fn update(&mut self, new_data: &SlotList<V>) {
+        //error!("update: {}", self.pubkey);
         self.map.disk.update(&self.pubkey, |previous| {
             Some((new_data.clone(), self.entry.ref_count)) // TODO no clone here
         });
     }
     pub fn addref(&mut self) {
         self.entry.ref_count += 1;
-        self.map.disk.addref(&self.pubkey);
+        let result = self.map.disk.addref(&self.pubkey);
+        error!("addref: {}, {}, {:?}", self.pubkey, self.entry.ref_count(), result);
     }
     pub fn unref(&mut self) {
         self.entry.ref_count -= 1;
-        self.map.disk.unref(&self.pubkey);
+        let result = self.map.disk.unref(&self.pubkey);
+        error!("addref: {}, {}, {:?}", self.pubkey, self.entry.ref_count(), result);
     }
     /*
     pub fn get_mut(&mut self) -> &mut V2<V> {
