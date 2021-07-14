@@ -235,7 +235,7 @@ impl SharedBufferBgReader {
                         bytes_read += size;
                         // loop to read some more. Underlying reader does not usually read all we ask for.
                     }
-                    Err(err) => {
+                    Err(mut err) => {
                         error_received = true;
                         std::mem::swap(&mut error, &mut err);
                         break;
