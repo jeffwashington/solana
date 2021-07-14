@@ -412,6 +412,7 @@ impl Read for SharedBufferReader {
                 break;
             }
 
+            let prev_len = self.current_data.len();
             // we exhausted the current buffer
             // increment current_buffer_index get the next buffer to continue reading
             self.current_data = self.empty_buffer.clone(); // unref it so it can be recycled without copy
@@ -458,7 +459,7 @@ impl Read for SharedBufferReader {
                     let mut error = instance.bg_reader_data.error.write().unwrap();
                     if error.is_err() {
                         if dest_len == 1 {
-                            error!("error being returned: idx: {}, index in buffer: {}, request: {}", self.index_in_current_data, offset_in_dest, dest_len);
+                            error!("error being returned: idx: {}, index in buffer: {}, request: {}, cur buf idx: {}, prev len: {}", self.index_in_current_data, offset_in_dest, dest_len, self.current_buffer_index, prev_len);
                         }
                         // replace the current error (with AN error instead of ok)
                         let mut stored_error = Err(Self::default_error());
