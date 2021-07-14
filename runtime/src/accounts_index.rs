@@ -115,7 +115,11 @@ pub struct AccountMapEntry<T> {
 
 impl<T: 'static + Clone + std::fmt::Debug> Clone for AccountMapEntry<T> {
     fn clone(&self) -> Self {
-        panic!("don't call this");
+        //panic!("don't call this");
+        Self {
+            ref_count: self.ref_count,
+            slot_list: self.slot_list.clone(),
+        }
     }
 }
 
