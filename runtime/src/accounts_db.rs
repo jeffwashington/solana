@@ -6040,8 +6040,6 @@ impl AccountsDb {
         }
         error!("add_root done");
 
-        panic!("not done");
-/*
         let mut stored_sizes_and_counts = HashMap::new();
         self.accounts_index.account_maps.iter().for_each(|i| {
             i.read().unwrap().values().for_each(|entry| {
@@ -6068,7 +6066,7 @@ impl AccountsDb {
                 }
             }
         }
-        */
+
     }
 
     pub(crate) fn print_accounts_stats(&self, label: &str) {

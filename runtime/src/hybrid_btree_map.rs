@@ -1,5 +1,5 @@
 use crate::accounts_index::AccountMapEntry;
-use crate::accounts_index::{SlotList, BINS};
+use crate::accounts_index::{SlotList, BINS, RefCount};
 use crate::pubkey_bins::PubkeyBinCalculator16;
 use log::*;
 use solana_bucket_map::bucket_map::BucketMap;
@@ -106,6 +106,27 @@ impl Iterator for Keys {
         }
         else {
             let r = Some(self.keys[self.index]);
+            self.index += 1;
+            r
+        }
+    }
+}
+
+pub struct Values<V: Clone + std::fmt::Debug> {
+    values: Vec<(SlotList<V>)>,
+    index: usize,
+}
+
+impl<V: Clone + std::fmt::Debug> Iterator for Values<V> {
+    type Item = V2<V>;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index >= self.values.len() {
+            None
+        }
+        else {
+            let r = Some(AccountMapEntry {
+                slot_list: self.values[self.index].clone(), ref_count: RefCount::MAX, // todo: no clone
+            });
             self.index += 1;
             r
         }
@@ -233,12 +254,19 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
             index: 0,
         }
     }
-    /*
-    pub fn values(&self) -> Values {
-        panic!("todo values");
-        //self.in_memory.values()
+    pub fn values(&self) -> Values<V> {
+        let num_buckets = self.disk.num_buckets();
+        let start = num_buckets * self.bin_index / self.bins;
+        let end = start + (self.bin_index + 1) / self.bins;
+        let len = (start..end).into_iter().map(|ix| self.disk.bucket_len(ix) as usize).sum::<usize>();
+        let mut values = Vec::with_capacity(len);
+        let len = (start..end).into_iter().for_each(|ix| values.append(&mut self.disk.values(ix).unwrap_or_default()));
+        //keys.sort_unstable();
+        Values {
+            values,
+            index: 0,
+        }
     }
-    */
     pub fn len_inaccurate(&self) -> usize {
         1 // ??? wrong
         //self.in_memory.len()
