@@ -692,10 +692,15 @@ pub mod tests {
         );
         // #2 will read valid bytes first and succeed, then get error
         let mut data = vec![0; sent.len()];
-        // this read should succeed because it was prior to error being received by bg reader
+        // this read should succeed because it is reading data prior to error being received by bg reader
         let expected_len = 1;
         for i in 0..sent.len() {
-            assert_eq!(reader2.read(&mut data[i..=i]).unwrap(), expected_len);
+            assert_eq!(
+                reader2.read(&mut data[i..=i]).unwrap(),
+                expected_len,
+                "progress: {}",
+                i
+            );
         }
         assert_eq!(sent, data);
         assert_eq!(
