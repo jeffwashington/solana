@@ -696,12 +696,9 @@ pub mod tests {
             // this read should succeed because it is reading data prior to error being received by bg reader
             let expected_len = 1;
             for i in 0..sent.len() {
-                assert_eq!(
-                    reader2.read(&mut data[i..=i]).unwrap(),
-                    expected_len,
-                    "progress: {}",
-                    i
-                );
+                let len = reader2.read(&mut data[i..=i]);
+                assert!(len.is_ok(), "{:?}, progress: {}", len, i);
+                assert_eq!(len.unwrap(), expected_len, "progress: {}", i);
             }
             assert_eq!(sent, data);
             assert_eq!(
