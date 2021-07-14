@@ -190,23 +190,32 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
 
     pub fn get(&self, key: &K) -> Option<V2<V>>
     {
-        let in_mem = self.in_memory.get(key);
-        match in_mem {
-            Some(in_mem) => Some(in_mem.clone()),
-            None => {
-                // we have to load this into the in-mem cache so we can get a ref_count, if nothing else
-                let disk = self.disk.get(key);
-                disk.map(|disk| 
-                AccountMapEntry {
-                    ref_count: disk.0,
-                    slot_list: disk.1,
-                })
-                /*
-                disk.map(|item| {
-                    self.in_memory.entry(*key).map(|entry| {
+        let lookup = || {
+            let disk = self.disk.get(key);
+            disk.map(|disk| 
+            AccountMapEntry {
+                ref_count: disk.0,
+                slot_list: disk.1,
+            })
+        };
 
-                    }
-                })*/
+        if true {
+            lookup()
+        }
+        else {
+            let in_mem = self.in_memory.get(key);
+            match in_mem {
+                Some(in_mem) => Some(in_mem.clone()),
+                None => {
+                    // we have to load this into the in-mem cache so we can get a ref_count, if nothing else
+                    lookup()
+                    /*
+                    disk.map(|item| {
+                        self.in_memory.entry(*key).map(|entry| {
+
+                        }
+                    })*/
+                }
             }
         }
     }
