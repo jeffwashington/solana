@@ -9,6 +9,8 @@ use std::borrow::Borrow;
 use std::collections::btree_map::{BTreeMap};
 use std::fmt::Debug;
 use std::sync::Arc;
+use std::ops::RangeBounds;
+use std::ops::Bound;
 type K = Pubkey;
 
 #[derive(Clone, Debug)]
@@ -244,6 +246,33 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
             dist.len()
         );
     }
+    fn bound<'a, T>(bound: Bound<&'a T>, unbounded: &'a T) -> &'a T {
+        match bound {
+            Bound::Included(b) | Bound::Excluded(b) => b,
+        _ => unbounded
+        }
+    }
+    pub fn range<R>(&self, range: R) -> Keys
+    where
+        R: RangeBounds<Pubkey>,
+    {
+        let start = self.disk.bucket_ix(Self::bound(range.start_bound(), &Pubkey::default()));
+        let end = self.disk.bucket_ix(Self::bound(range.end_bound(), &Pubkey::new(&[0; 32]))); // ugly
+        let len = (start..end).into_iter().map(|ix| self.disk.bucket_len(ix) as usize).sum::<usize>();
+        let mut keys = Vec::with_capacity(len);
+        let len = (start..end).into_iter().for_each(|ix| {
+            for k in self.disk.keys(ix).unwrap_or_default().into_iter() {
+                range.contains(&k);
+                keys.push(k);
+            }
+        });
+        keys.sort_unstable();
+        Keys {
+            keys,
+            index: 0,
+        }
+    }
+
     pub fn keys(&self) -> Keys {
         let num_buckets = self.disk.num_buckets();
         let start = num_buckets * self.bin_index / self.bins;

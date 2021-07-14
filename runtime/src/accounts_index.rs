@@ -662,8 +662,6 @@ impl<'a, T: 'static + Clone + std::fmt::Debug> Iterator for AccountsIndexIterato
         if self.is_finished {
             return None;
         }
-        panic!("todo");
-        /*
 
         // start in bin where 'start_bound' would exist
         let start_bin = match &self.start_bound {
@@ -673,13 +671,13 @@ impl<'a, T: 'static + Clone + std::fmt::Debug> Iterator for AccountsIndexIterato
         };
         let mut chunk: Vec<Pubkey> = Vec::with_capacity(ITER_BATCH_SIZE);
         'outer: for i in self.account_maps.iter().skip(start_bin) {
-            for (pubkey, _account_map_entry) in
+            for pubkey in
                 i.read().unwrap().range((self.start_bound, self.end_bound))
             {
                 if chunk.len() >= ITER_BATCH_SIZE {
                     break 'outer;
                 }
-                let item = *pubkey;
+                let item = pubkey;
                 chunk.push(item);
             }
         }
@@ -691,7 +689,6 @@ impl<'a, T: 'static + Clone + std::fmt::Debug> Iterator for AccountsIndexIterato
 
         self.start_bound = Excluded(*chunk.last().unwrap());
         Some(chunk)
-        */
     }
 }
 
