@@ -186,6 +186,7 @@ impl SharedBufferBgReader {
         let mut max_bytes_read = 0;
         let mut wait_us = 0;
         let mut total_bytes = 0;
+        let mut error = SharedBufferReader::default_error();
         loop {
             if self.stop.load(Ordering::Relaxed) {
                 // unsure what error is most appropriate here.
@@ -236,7 +237,7 @@ impl SharedBufferBgReader {
                     }
                     Err(err) => {
                         error_received = true;
-                        self.set_error(err);
+                        std::mem::swap(&mut error, &mut err);
                         break;
                     }
                 }
@@ -259,6 +260,7 @@ impl SharedBufferBgReader {
 
             if error_received {
                 // do not ask for more data from 'reader'. We got an error and saved all the data we got before the error.
+                self.set_error(error);
                 break;
             }
         }
