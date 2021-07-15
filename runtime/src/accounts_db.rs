@@ -85,7 +85,7 @@ pub const DEFAULT_NUM_DIRS: u32 = 4;
 
 pub const PUBKEY_BINS_FOR_CALCULATING_HASHES: usize = 65536;
 pub const num_scan_passes: usize = 1;
-pub const BINS_PER_PASS: usize = 32768;
+pub const BINS_PER_PASS: usize = 65536;
 
 // A specially reserved storage id just for entries in the cache, so that
 // operations that take a storage entry can maintain a common interface
