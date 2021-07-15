@@ -280,7 +280,7 @@ impl CacheHashData {
             i += 1;
             *d = item;
         }));
-        error!("wrote: {:?}, {}", cache_path, capacity);
+        //error!("wrote: {:?}, {}", cache_path, capacity);
     }
         m.stop();
         stats.save_us += m.as_us();
