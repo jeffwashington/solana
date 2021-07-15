@@ -3472,7 +3472,7 @@ impl Bank {
         );
         let rent_debits = self.collect_rent(executed, loaded_txs);
         collect.stop();
-        timings.collect_rent_us += collect.as_us();
+        timings.details.collect_rent_us += collect.as_us();
 
         let overwritten_vote_accounts =
             self.update_cached_accounts(hashed_txs.as_transactions_iter(), executed, loaded_txs);
