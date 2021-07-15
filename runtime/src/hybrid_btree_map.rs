@@ -261,12 +261,12 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
     where
         R: RangeBounds<Pubkey>,
     {
+        let num_buckets = self.disk.num_buckets();
         let mut start = self.disk.bucket_ix(Self::bound(range.start_bound(), &Pubkey::default()));
         // end is exclusive, so it is end + 1 we care about here
         let mut end = std::cmp::min(num_buckets, 1+ self.disk.bucket_ix(Self::bound(range.end_bound(), &Pubkey::new(&[0xff; 32])))); // ugly
         let len = (start..end).into_iter().map(|ix| self.disk.bucket_len(ix) as usize).sum::<usize>();
 
-        let num_buckets = self.disk.num_buckets();
         let mystart = num_buckets * self.bin_index / self.bins;
         let myend = num_buckets * (self.bin_index + 1) / self.bins;
         start = std::cmp::max(start, mystart);
