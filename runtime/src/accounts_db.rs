@@ -4940,7 +4940,7 @@ impl AccountsDb {
                 );
                 assert!(!cached_data.is_ok());
                 */
-                let mut stats = crate::storage_hash_data::CacheHashData::save2(
+                let (cache_item, mut stats) = crate::storage_hash_data::CacheHashData::save2(
                     slot,
                     &storages.first().unwrap().accounts.get_path(),
                     per_slot_data,

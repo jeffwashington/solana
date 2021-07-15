@@ -240,10 +240,9 @@ impl CacheHashData {
         storage_file: &P,
         data: &mut SavedType,
         bin_range: &Range<usize>,
-    ) -> Result<CacheHashDataStats, std::io::Error> {
+    ) -> Result<(Self, CacheHashDataStats), std::io::Error> {
         let mut m = Measure::start("save");
         let mut stats;
-        {
             //error!("raw path: {:?}", storage_file);
         let cache_path = Self::calc_path(storage_file, bin_range)?;
         let parent = cache_path.parent().unwrap();
@@ -294,7 +293,6 @@ impl CacheHashData {
             *d = item;
         }));
         //error!("wrote: {:?}, {}, sum: {}, elem_size: {}", cache_path, capacity, sum, elem_size);//, storage_file);
-    }
         m.stop();
         stats.save_us += m.as_us();
         
@@ -342,7 +340,7 @@ impl CacheHashData {
         file.write_all(&encoded)?;
         drop(file);
         */
-        Ok(stats)
+        Ok((chd, stats))
     }
 }
 
