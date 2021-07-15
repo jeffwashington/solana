@@ -455,7 +455,7 @@ impl<T: Clone> Bucket<T> {
             //in place update
             let elem_loc = elem.data_loc(current_bucket);
             let slice: &mut [T] = current_bucket.get_mut_cell_slice(elem_loc, data.len() as u64);
-            let elem: &mut IndexEntry = self.index.get_mut(elem_ix);
+            //let elem: &mut IndexEntry = self.index.get_mut(elem_ix);
             assert!(current_bucket.uid(elem_loc) == elem_uid);
             elem.num_slots = data.len() as u64;
             slice.clone_from_slice(data);
@@ -473,7 +473,7 @@ impl<T: Clone> Bucket<T> {
                     if elem.num_slots > 0 {
                         current_bucket.free(elem_loc, elem_uid).unwrap();
                     }
-                    let elem: &mut IndexEntry = self.index.get_mut(elem_ix);
+                    // elem: &mut IndexEntry = self.index.get_mut(elem_ix);
                     elem.data_bucket = best_fit_bucket;
                     elem.data_location = ix;
                     elem.create_bucket_capacity = best_bucket.capacity;
