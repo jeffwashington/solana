@@ -3459,6 +3459,7 @@ impl Bank {
         }
 
         let mut write_time = Measure::start("write_time");
+        let mut collect = Measure::start("collect");
         self.rc.accounts.store_cached(
             self.slot(),
             hashed_txs.as_transactions_iter(),
@@ -3470,6 +3471,8 @@ impl Bank {
             self.rent_for_sysvars(),
         );
         let rent_debits = self.collect_rent(executed, loaded_txs);
+        collect.stop();
+        timings.collect_rent_us += collect.as_us();
 
         let overwritten_vote_accounts =
             self.update_cached_accounts(hashed_txs.as_transactions_iter(), executed, loaded_txs);
