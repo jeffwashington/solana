@@ -4594,8 +4594,9 @@ impl AccountsDb {
         scan_func: &F,
         slot: Slot,
         retval: &mut B,
+        alternate_collector: bool,
     ) where
-        F: Fn(LoadedAccount, &mut B, Slot) + Send + Sync,
+        F: Fn(LoadedAccount, &mut B, Slot, bool) + Send + Sync,
         B: Send + Default,
     {
         // we have to call the scan_func in order of write_version within a slot if there are multiple storages per slot
@@ -4624,7 +4625,7 @@ impl AccountsDb {
             }
             let mut account = (0, None);
             std::mem::swap(&mut account, &mut current[min_index]);
-            scan_func(LoadedAccount::Stored(account.1.unwrap()), retval, slot);
+            scan_func(LoadedAccount::Stored(account.1.unwrap()), retval, slot, alternate_collector);
             let next = progress[min_index]
                 .next()
                 .map(|stored_account| (stored_account.meta.write_version, Some(stored_account)));
@@ -4655,7 +4656,7 @@ impl AccountsDb {
         after_slot: F4,
     ) -> Vec<C>
     where
-        F: Fn(LoadedAccount, &mut B, Slot) + Send + Sync,
+        F: Fn(LoadedAccount, &mut B, Slot, bool) + Send + Sync,
         F2: Fn(B) -> C + Send + Sync,
         F3: Fn(Slot, &[Arc<AccountStorageEntry>], &mut B) -> (bool, bool) + Send + Sync,
         F4: Fn(Slot, &[Arc<AccountStorageEntry>], &mut B, &mut B) + Send + Sync,
@@ -4691,6 +4692,7 @@ impl AccountsDb {
                                 &scan_func,
                                 slot,
                                 data_to_use,
+                                use_per_slot_accumulator,
                             );
                             if use_per_slot_accumulator {
                                 after_slot(slot, sub_storages, &mut per_slot_data, &mut retval);
@@ -4711,7 +4713,7 @@ impl AccountsDb {
                                             Cow::Owned(cached_account),
                                         )));
                                         let account = accessor.get_loaded_account().unwrap();
-                                        scan_func(account, &mut retval, slot);
+                                        scan_func(account, &mut retval, slot, false);
                                     };
                                 }
                             }
@@ -4859,7 +4861,8 @@ impl AccountsDb {
             storage,
             |loaded_account: LoadedAccount,
              accum: &mut Vec<Vec<CalculateHashIntermediate>>,
-             slot: Slot| {
+             slot: Slot,
+             per_slot_accum: bool| {
                 let pubkey = loaded_account.pubkey();
                 let mut pubkey_to_bin_index = bin_calculator.bin_from_pubkey(pubkey);
                 if !bin_range.contains(&pubkey_to_bin_index) {
@@ -4867,8 +4870,16 @@ impl AccountsDb {
                     return;
                 }
 
-                // when we are scanning with bin ranges, we don't need to use exact bin numbers. Subtract to make first bin we care about at index 0.
-                pubkey_to_bin_index -= bin_range.start;
+                let range =
+                if per_slot_accum {
+                    pubkey_to_bin_index = 0;
+                    1 // only 1 range
+                }
+                else {
+                    // when we are scanning with bin ranges, we don't need to use exact bin numbers. Subtract to make first bin we care about at index 0.
+                    pubkey_to_bin_index -= bin_range.start;
+                    range
+                };
 
                 let raw_lamports = loaded_account.lamports();
                 let zero_raw_lamports = raw_lamports == 0;
@@ -4927,7 +4938,7 @@ impl AccountsDb {
                         do_storage_scan = false;
                         big_stats.lock().unwrap().merge(&stats);
                     } else*/ {
-                        //use_per_slot_accumulator = true;
+                        use_per_slot_accumulator = true;
                     }
                 }
                 (do_storage_scan, use_per_slot_accumulator)
@@ -4950,7 +4961,7 @@ impl AccountsDb {
                 .unwrap();
                 */
                 let mut stats = crate::storage_hash_data::CacheHashDataStats::default();
-                stats.merge_us += Self::merge_slot_data(accumulator, per_slot_data);
+                stats.merge_us += Self::merge_slot_data(accumulator, per_slot_data, range, bin_range.start, &bin_calculator);
                 big_stats.lock().unwrap().merge(&stats);
                 per_slot_data.clear();
             },
@@ -4977,17 +4988,23 @@ impl AccountsDb {
     fn merge_slot_data(
         accumulator: &mut crate::storage_hash_data::SavedType,
         new_data: &mut crate::storage_hash_data::SavedType,
+        range: usize,
+        start_bin_index: usize,
+        bin_calculator:&PubkeyBinCalculator16,
     ) -> u64{
         let mut m = Measure::start("");
-        let max = new_data.len();
-        if max >= accumulator.len() {
-            accumulator.append(&mut vec![vec![]; max + 1 - accumulator.len()])
+        if accumulator.len() == 0 {
+            accumulator.append(&mut vec![Vec::new(); range]);
         }
-        new_data.into_iter().enumerate().for_each(|(i, data)| {
-            if !data.is_empty() {
-            accumulator[i].append(data);
-            }
+
+        new_data.into_iter().for_each(|data| {data.into_iter().for_each(|data| {
+            let mut pubkey_to_bin_index = bin_calculator.bin_from_pubkey(&data.pubkey);
+            pubkey_to_bin_index -= start_bin_index;
+            accumulator[pubkey_to_bin_index].push(data.clone()); // may want to avoid clone here
         });
+        data.clear();
+    }
+        );
         m.stop();
         m.as_us()
     }
