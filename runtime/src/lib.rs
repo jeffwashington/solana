@@ -1,4 +1,5 @@
 #![cfg_attr(RUSTC_WITH_SPECIALIZATION, feature(min_specialization))]
+#![feature(backtrace)]
 #![allow(clippy::integer_arithmetic)]
 pub mod accounts;
 pub mod accounts_background_service;
@@ -42,6 +43,7 @@ pub mod sorted_storages;
 pub mod stake_weighted_timestamp;
 pub mod stakes;
 pub mod status_cache;
+pub mod storage_hash_data;
 mod system_instruction_processor;
 pub mod transaction_batch;
 pub mod vote_account;
