@@ -64,6 +64,7 @@ pub struct CacheHashDataStats {
     pub entries: usize,
     pub loaded_from_cache: usize,
     pub entries_loaded_from_cache: usize,
+    pub save_us: u64,
     pub load_us: u64,
     pub read_us: u64,
     pub decode_us: u64,
@@ -83,6 +84,7 @@ impl CacheHashDataStats {
         self.decode_us += other.decode_us;
         self.calc_path_us += other.calc_path_us;
         self.merge_us += other.merge_us;
+        self.save_us += other.save_us;
     }
 }
 
@@ -231,6 +233,9 @@ impl CacheHashData {
         data: &mut SavedType,
         bin_range: &Range<usize>,
     ) -> Result<CacheHashDataStats, std::io::Error> {
+        let mut m = Measure::start("save");
+        let mut stats;
+        {
         let cache_path = Self::calc_path(storage_file, bin_range)?;
         let parent = cache_path.parent().unwrap();
         std::fs::create_dir_all(parent);
@@ -249,7 +254,7 @@ impl CacheHashData {
             mmap,
             cell_size,
         };
-        let mut stats = CacheHashDataStats {
+        stats = CacheHashDataStats {
             ..CacheHashDataStats::default()
         
         };
@@ -262,7 +267,7 @@ impl CacheHashData {
         }
 
         //error!("writing {} bytes to: {:?}, lens: {:?}, storage_len: {}, storage: {:?}", encoded.len(), cache_path, file_data.data.iter().map(|x| x.len()).collect::<Vec<_>>(), file_len, storage_file);
-        let stats = CacheHashDataStats {
+        stats = CacheHashDataStats {
             //storage_size: file_len as usize,
             //cache_file_size: encoded.len(),
             entries: sum,
@@ -276,6 +281,10 @@ impl CacheHashData {
             i += 1;
             *d = item;
         }));
+        error!("wrote: {:?}, {}", cache_path, capacity);
+    }
+        m.stop();
+        stats.save_us += m.as_us();
         
         /*
         let expected_mod_date = 0; // TODO
