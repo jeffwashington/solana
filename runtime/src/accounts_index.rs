@@ -3112,7 +3112,7 @@ pub mod tests {
     #[test]
     fn test_scan_accounts() {
         solana_logger::setup();
-        loop {
+        {
         run_test_scan_accounts(0);
         run_test_scan_accounts(1);
         run_test_scan_accounts(ITER_BATCH_SIZE * 10);
