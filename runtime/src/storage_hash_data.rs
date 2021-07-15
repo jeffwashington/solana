@@ -251,8 +251,8 @@ impl CacheHashData {
         let elem_size = std::mem::size_of::<CacheHashData>() as u64;
         let entries = data.iter().map(|x: &Vec<CalculateHashIntermediate>| x.len()).collect::<Vec<_>>();
         let sum = entries.iter().sum::<usize>();
-        let cell_size = elem_size * (sum as u64) + std::mem::size_of::<Header>() as u64;
-        let capacity = cell_size;
+        let cell_size = elem_size;
+        let capacity = elem_size * (sum as u64) + std::mem::size_of::<Header>() as u64;
         let mmap = Self::new_map(&cache_path, cell_size as usize, capacity);
         let mut chd = CacheHashData {
             //data: SavedType::default(),
