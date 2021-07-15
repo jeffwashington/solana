@@ -260,13 +260,16 @@ impl<'a, 'b: 'a, T: 'static + Clone + IsCached + std::fmt::Debug> WriteAccountMa
 
     pub fn slot_list_mut<RT>(
         &mut self,
-        user: impl for<'this> FnOnce(&mut SlotList<T>) -> RT,
+        user: impl for<'this> FnOnce(&mut SlotList<T>, &mut RefCount) -> RT,
     ) -> Option<RT> {
         let mut sl = self.slot_list().clone();
+        let mut rc = self.ref_count();
+        let rc_orig = rc;
         self.with_mut(|fields| {
             let f = fields.owned_entry;
-            let result = user(&mut sl);
-            f.0.as_mut().map(|entry| entry.update(&mut sl));
+            let result = user(&mut sl, &mut rc);
+            let update_rc = if rc != rc_orig {Some(rc)} else {None};
+            f.0.as_mut().map(|entry| entry.update(&mut sl, update_rc));
             Some(result)
         })
     }
@@ -306,12 +309,16 @@ impl<'a, 'b: 'a, T: 'static + Clone + IsCached + std::fmt::Debug> WriteAccountMa
     // the new item.
     pub fn update(&mut self, slot: Slot, account_info: T, reclaims: &mut SlotList<T>) {
         let mut addref = !account_info.is_cached();
-        self.slot_list_mut(|list| {
+        self.slot_list_mut(|list, refcount| {
             // find other dirty entries from the same slot
             for list_index in 0..list.len() {
                 let (s, previous_update_value) = &list[list_index];
                 if *s == slot {
                     addref = addref && previous_update_value.is_cached();
+                    if addref {
+                        *refcount += 1;
+                        addref = false;
+                    }
 
                     let mut new_item = (slot, account_info);
                     std::mem::swap(&mut new_item, &mut list[list_index]);
@@ -325,11 +332,12 @@ impl<'a, 'b: 'a, T: 'static + Clone + IsCached + std::fmt::Debug> WriteAccountMa
 
             // if we make it here, we did not find the slot in the list
             list.push((slot, account_info));
+            if addref {
+                // If it's the first non-cache insert, also bump the stored ref count
+                *refcount += 1;
+                addref = false;
+            }
         });
-        if addref {
-            // If it's the first non-cache insert, also bump the stored ref count
-            self.addref();
-        }
     }
 }
 
@@ -1322,7 +1330,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
         if let Some(mut write_account_map_entry) = self.get_account_write_entry(pubkey) {
             if write_account_map_entry.is_occupied() {
                 write_account_map_entry
-                    .slot_list_mut(|slot_list| {
+                    .slot_list_mut(|slot_list, _ref_count| {
                         slot_list.retain(|(slot, item)| {
                             let should_purge = slots_to_purge.contains(slot);
                             if should_purge {
@@ -1660,7 +1668,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
     ) {
         let mut is_slot_list_empty = false;
         if let Some(mut locked_entry) = self.get_account_write_entry(pubkey) {
-            locked_entry.slot_list_mut(|slot_list| {
+            locked_entry.slot_list_mut(|slot_list, _ref_count| {
                 self.purge_older_root_entries(slot_list, reclaims, max_clean_root);
                 is_slot_list_empty = slot_list.is_empty();
             });

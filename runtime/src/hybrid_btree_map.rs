@@ -149,13 +149,13 @@ impl<'a, V: 'a + Clone + Debug> HybridOccupiedEntry<'a, V> {
     pub fn get(&self) -> &V2<V> {
         &self.entry
     }
-    pub fn update(&mut self, new_data: &SlotList<V>) {
+    pub fn update(&mut self, new_data: &SlotList<V>, new_rc: Option<RefCount>) {
         //error!("update: {}", self.pubkey);
         self.map.disk.update(&self.pubkey, |previous| {
             if previous.is_some() {
                 //error!("update {} to {:?}", self.pubkey, new_data);
             }
-            Some((new_data.clone(), self.entry.ref_count)) // TODO no clone here
+            Some((new_data.clone(), new_rc.unwrap_or(self.entry.ref_count))) // TODO no clone here
         });
         let g = self.map.disk.get(&self.pubkey).unwrap();
         assert_eq!(format!("{:?}", g.1), format!("{:?}", new_data));

@@ -433,13 +433,17 @@ impl<T: Clone> Bucket<T> {
     }
 
     fn try_write(&mut self, key: &Pubkey, data: &[T], ref_count: u64) -> Result<(), BucketMapError> {
-        let index_entry = self.find_entry(key);
+        let mut index_entry = self.find_entry_mut(key);
         let (elem, elem_ix) = if index_entry.is_none() {
             let ii = self.create_key(key, ref_count)?;
-            let elem = self.index.get(ii);
+            let elem = self.index.get_mut(ii); // get_mut here is right?
             (elem, ii)
         } else {
-            index_entry.unwrap()
+            let res = index_entry.unwrap();
+            if ref_count != res.0.ref_count {
+                res.0.ref_count = ref_count;
+            }
+            res
         };
         let elem_uid = self.index.uid(elem_ix);
         let best_fit_bucket = Self::best_fit(data.len() as u64);
