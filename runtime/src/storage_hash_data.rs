@@ -76,6 +76,7 @@ pub struct CacheHashDataStats {
     pub decode_us: u64,
     pub calc_path_us: u64,
     pub merge_us: u64,
+    pub sum_entries_us: u64,
 }
 
 impl CacheHashDataStats {
@@ -94,6 +95,7 @@ impl CacheHashDataStats {
         self.create_save_us += other.create_save_us;
         self.cache_file_count += other.cache_file_count;
         self.write_to_mmap_us += other.write_to_mmap_us;
+        self.sum_entries_us += other.sum_entries_us;
     }
 }
 
@@ -246,7 +248,15 @@ impl CacheHashData {
         let mut m = Measure::start("save");
         let mut stats;
             //error!("raw path: {:?}", storage_file);
+            let mut m0 = Measure::start("");
         let cache_path = Self::calc_path(storage_file, bin_range)?;
+        m0.stop();
+        stats = CacheHashDataStats {
+            ..CacheHashDataStats::default()
+        
+        };
+
+        stats.calc_path_us += m0.as_us();
         let parent = cache_path.parent().unwrap();
         std::fs::create_dir_all(parent);
         let create = true;
@@ -254,8 +264,11 @@ impl CacheHashData {
             let _ignored = remove_file(&cache_path);
         }
         let elem_size = std::mem::size_of::<CacheHashData>() as u64;
+        let mut m0 = Measure::start("");
         let entries = data.iter().map(|x: &Vec<CalculateHashIntermediate>| x.len()).collect::<Vec<_>>();
         let sum = entries.iter().sum::<usize>();
+        m0.stop();
+        stats.sum_entries_us += m0.as_us();
         let cell_size = elem_size;
         let capacity = elem_size * (sum as u64) + std::mem::size_of::<Header>() as u64;
         let mut m1 = Measure::start("");
@@ -267,17 +280,15 @@ impl CacheHashData {
             mmap,
             cell_size,
         };
-        stats = CacheHashDataStats {
-            create_save_us: m1.as_us(),
-            cache_file_count: 1,
-            ..CacheHashDataStats::default()
-        
-        };
+            stats.create_save_us= m1.as_us();
+            stats.cache_file_count= 1;
 
+        /*
         let mut header = chd.get_header_mut();
         for i in 0..BINS_PER_PASS {
             //header.bin_sizes[i] = if i <= entries.len() { entries[i] as u64} else {0};
         }
+        */
 
         //error!("writing {} bytes to: {:?}, lens: {:?}, storage_len: {}, storage: {:?}", encoded.len(), cache_path, file_data.data.iter().map(|x| x.len()).collect::<Vec<_>>(), file_len, storage_file);
         stats = CacheHashDataStats {
