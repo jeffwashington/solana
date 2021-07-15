@@ -64,10 +64,12 @@ pub struct CacheHashData {
 pub struct CacheHashDataStats {
     pub storage_size: usize,
     pub cache_file_size: usize,
+    pub cache_file_count: usize,
     pub entries: usize,
     pub loaded_from_cache: usize,
     pub entries_loaded_from_cache: usize,
     pub save_us: u64,
+    pub create_save_us: u64,
     pub load_us: u64,
     pub read_us: u64,
     pub decode_us: u64,
@@ -88,6 +90,8 @@ impl CacheHashDataStats {
         self.calc_path_us += other.calc_path_us;
         self.merge_us += other.merge_us;
         self.save_us += other.save_us;
+        self.create_save_us += other.create_save_us;
+        self.cache_file_count += other.cache_file_count;
     }
 }
 
@@ -253,7 +257,9 @@ impl CacheHashData {
         let sum = entries.iter().sum::<usize>();
         let cell_size = elem_size;
         let capacity = elem_size * (sum as u64) + std::mem::size_of::<Header>() as u64;
+        let mut m1 = Measure::start("");
         let mmap = Self::new_map(&cache_path, cell_size as usize, capacity);
+        m1.stop();
         let mut chd = CacheHashData {
             //data: SavedType::default(),
             //storage_path
@@ -261,6 +267,7 @@ impl CacheHashData {
             cell_size,
         };
         stats = CacheHashDataStats {
+            create_save_us: m1.as_us(),
             ..CacheHashDataStats::default()
         
         };
