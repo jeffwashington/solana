@@ -69,6 +69,7 @@ pub struct CacheHashDataStats {
     pub loaded_from_cache: usize,
     pub entries_loaded_from_cache: usize,
     pub save_us: u64,
+    pub write_to_mmap_us: u64,
     pub create_save_us: u64,
     pub load_us: u64,
     pub read_us: u64,
@@ -92,6 +93,7 @@ impl CacheHashDataStats {
         self.save_us += other.save_us;
         self.create_save_us += other.create_save_us;
         self.cache_file_count += other.cache_file_count;
+        self.write_to_mmap_us += other.write_to_mmap_us;
     }
 }
 
@@ -286,12 +288,15 @@ impl CacheHashData {
         
         };
 
+        let mut m2 = Measure::start("");
         let mut i = 0;
         data.iter().for_each(|x| x.iter().for_each(|item| {
             let mut d = chd.get_mut(i as u64);
             i += 1;
             *d = item;
         }));
+        m2.stop();
+        stats.write_to_mmap_us += m2.as_us();
         //error!("wrote: {:?}, {}, sum: {}, elem_size: {}", cache_path, capacity, sum, elem_size);//, storage_file);
         m.stop();
         stats.save_us += m.as_us();
