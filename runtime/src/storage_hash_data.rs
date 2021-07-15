@@ -237,10 +237,11 @@ impl CacheHashData {
             stats.entries_loaded_from_cache += sum;
             stats.entries += sum;
             m2.stop();
-            stats.load_us += m2.as_us();
+            stats.decode_us += m2.as_us();
             //stats.write_to_mmap_us += m2.as_us();
             //error!("wrote: {:?}, {}, sum: {}, elem_size: {}", cache_path, capacity, sum, elem_size);//, storage_file);
             m.stop();
+            stats.load_us += m.as_us();
             //stats.save_us += m.as_us();
 
 
