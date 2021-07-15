@@ -18,6 +18,9 @@ use std::{
     ops::Range,
     path::{Path},
 };
+use solana_sdk::{
+    clock::Slot,
+};
 
 use crate::accounts_db::{PUBKEY_BINS_FOR_CALCULATING_HASHES, num_scan_passes, BINS_PER_PASS};
 
@@ -229,6 +232,7 @@ impl CacheHashData {
 
 
     pub fn save2<P: AsRef<Path> + std::fmt::Debug>(
+        slot: Slot,
         storage_file: &P,
         data: &mut SavedType,
         bin_range: &Range<usize>,
