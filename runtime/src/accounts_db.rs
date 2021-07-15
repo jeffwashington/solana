@@ -4927,7 +4927,7 @@ impl AccountsDb {
                         do_storage_scan = false;
                         big_stats.lock().unwrap().merge(&stats);
                     } else*/ {
-                        use_per_slot_accumulator = true;
+                        //use_per_slot_accumulator = true;
                     }
                 }
                 (do_storage_scan, use_per_slot_accumulator)
