@@ -1,18 +1,48 @@
 //! Cached data for hashing accounts
-use crate::accounts_hash::CalculateHashIntermediate;
 use log::*;
 use memmap2::MmapMut;
+use rand::{thread_rng, Rng};
+use std::fs::{remove_file, OpenOptions};
+use std::io::Seek;
+use std::io::SeekFrom;
+use std::io::Write;
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
+use crate::accounts_hash::CalculateHashIntermediate;
 use serde::{Deserialize, Serialize};
 use solana_measure::measure::Measure;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{UNIX_EPOCH};
 use std::{
-    fs::{remove_file, OpenOptions},
-    io::{Read, Write},
+    io::{Read},
     ops::Range,
-    path::{Path, PathBuf},
+    path::{Path},
 };
 
 pub type SavedType = Vec<Vec<CalculateHashIntermediate>>;
+
+#[repr(C)]
+struct Header {
+    lock: AtomicU64,
+}
+
+impl Header {
+    fn try_lock(&self, uid: u64) -> bool {
+        Ok(0)
+            == self
+                .lock
+                .compare_exchange(0, uid, Ordering::Relaxed, Ordering::Relaxed)
+    }
+    fn unlock(&self, uid: u64) -> bool {
+        Ok(uid)
+            == self
+                .lock
+                .compare_exchange(uid, 0, Ordering::Relaxed, Ordering::Relaxed)
+    }
+    fn uid(&self) -> u64 {
+        self.lock.load(Ordering::Relaxed)
+    }
+}
 
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct CacheHashData {
@@ -71,6 +101,70 @@ impl CacheHashData {
             format!("{}.{}", bin_range.start, bin_range.end),
         ));
         Ok(result.to_path_buf())
+    }
+
+    fn new_map(drives: &[PathBuf], cell_size: usize, capacity: u8) -> (MmapMut, PathBuf) {
+        let capacity = 1u64 << capacity;
+        let r = thread_rng().gen_range(0, drives.len());
+        let drive = &drives[r];
+        let pos = format!("{}", thread_rng().gen_range(0, u128::MAX),);
+        let file = drive.join(pos);
+        let mut data = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(file.clone())
+            .map_err(|e| {
+                panic!(
+                    "Unable to create data file {} in current dir({:?}): {:?}",
+                    file.display(),
+                    std::env::current_dir(),
+                    e
+                );
+            })
+            .unwrap();
+
+        // Theoretical performance optimization: write a zero to the end of
+        // the file so that we won't have to resize it later, which may be
+        // expensive.
+        debug!("GROWING file {}", capacity * cell_size as u64);
+        data.seek(SeekFrom::Start(capacity * cell_size as u64 - 1))
+            .unwrap();
+        data.write_all(&[0]).unwrap();
+        data.seek(SeekFrom::Start(0)).unwrap();
+        data.flush().unwrap();
+        (unsafe { MmapMut::map_mut(&data).unwrap() }, file)
+    }
+
+    pub fn test() {
+        let drives = Arc::new(vec![]);//    drives: Arc<Vec<PathBuf>>,
+        let elements = 0;
+        let index = Self::new_with_capacity(
+            drives.clone(),
+            1,
+            std::mem::size_of::<CacheHashData>() as u64,
+            elements,
+        );
+    }
+
+    pub fn new_with_capacity(
+        drives: Arc<Vec<PathBuf>>,
+        num_elems: u64,
+        elem_size: u64,
+        capacity: u8,
+    ) {
+        // todo
+        let cell_size = elem_size * num_elems + std::mem::size_of::<Header>() as u64;
+        let (mmap, path) = Self::new_map(&drives, cell_size as usize, capacity);
+        /*
+        Self {
+            path,
+            mmap,
+            drives,
+            cell_size,
+            used: AtomicU64::new(0),
+            capacity,
+        }*/
     }
     pub fn load<P: AsRef<Path>>(
         storage_file: &P,
