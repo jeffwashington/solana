@@ -285,7 +285,7 @@ impl CacheHashData {
             i += 1;
             *d = item;
         }));
-        error!("wrote: {:?}, {}", cache_path, capacity);//, storage_file);
+        error!("wrote: {:?}, {}, sum: {}, elem_size: {}", cache_path, capacity, sum, elem_size);//, storage_file);
     }
         m.stop();
         stats.save_us += m.as_us();
