@@ -5012,7 +5012,6 @@ impl AccountsDb {
             &AccountInfoAccountsIndex,
         )>,
     ) -> Result<(Hash, u64), BankHashVerificationError> {
-        use std::backtrace::Backtrace;
 
         let mut scan_and_hash = move || {
             // When calculating hashes, it is helpful to break the pubkeys found into bins based on the pubkey value.

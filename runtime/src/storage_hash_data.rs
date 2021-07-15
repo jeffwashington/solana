@@ -96,7 +96,6 @@ impl CacheHashData {
         let decoded: Result<CacheHashData, _> = bincode::deserialize(&file_data[..]);
         m0.stop();
         timings.decode_us += m0.as_us();
-        let mut m0 = Measure::start("");
         if decoded.is_err() {
             assert_eq!(bytes, file_data.len());
             panic!("failure to decode: {:?}, len: {}, error: {:?}", path, bytes, decoded);
