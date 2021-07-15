@@ -30,6 +30,7 @@ pub type SavedType = Vec<Vec<CalculateHashIntermediate>>;
 #[repr(C)]
 pub struct Header {
     lock: AtomicU64,
+    count: usize,
     //bin_sizes: [u64; BINS_PER_PASS],
 }
 
@@ -187,6 +188,7 @@ impl CacheHashData {
         storage_file: &P,
         bin_range: &Range<usize>,
     ) -> Result<(SavedType, CacheHashDataStats), std::io::Error> {
+        let mut m = Measure::start("overall");
         let create = false;
         let mut timings = CacheHashDataStats::default();
         let mut m0 = Measure::start("");
@@ -199,24 +201,50 @@ impl CacheHashData {
             .write(false)
             .create(create)
             .open(&path)?;
-        panic!("loading: {:?}", path);
-        /*
-        let mut file_data = Vec::new();
-        let bytes = file.read_to_end(&mut file_data)?;
-        m0.stop();
-        timings.load_us += m0.as_us();
-        let mut m0 = Measure::start("");
-        let decoded: Result<CacheHashData, _> = bincode::deserialize(&file_data[..]);
-        m0.stop();
-        timings.decode_us += m0.as_us();
-        if decoded.is_err() {
-            assert_eq!(bytes, file_data.len());
-            panic!("failure to decode: {:?}, len: {}, error: {:?}", path, bytes, decoded);
-        }
-        let decoded = decoded.unwrap();
-        drop(file);
-        Ok((decoded.data, timings))
-        */
+
+            let elem_size = std::mem::size_of::<CalculateHashIntermediate>() as u64;
+            let mut m0 = Measure::start("");
+            m0.stop();
+            let cell_size = elem_size;
+            let mut m1 = Measure::start("");
+            let mmap = unsafe { MmapMut::map_mut(&file).unwrap() };
+            m1.stop();
+            let mut chd = CacheHashData {
+                //data: SavedType::default(),
+                //storage_path
+                mmap,
+                cell_size,
+            };
+            let mut header = chd.get_header_mut();
+            let sum = header.count;
+    
+            //error!("writing {} bytes to: {:?}, lens: {:?}, storage_len: {}, storage: {:?}", encoded.len(), cache_path, file_data.data.iter().map(|x| x.len()).collect::<Vec<_>>(), file_len, storage_file);
+            let mut stats = CacheHashDataStats {
+                //storage_size: file_len as usize,
+                entries: sum,
+                ..CacheHashDataStats::default()
+            
+            };
+    
+            let mut m2 = Measure::start("");
+            let mut i = 0;
+            let mut result = Vec::with_capacity(sum);
+            for i in 0..sum {
+                let mut d = chd.get_mut::<CalculateHashIntermediate>(i as u64);
+                result.push(d.clone());
+            }
+            stats.loaded_from_cache += 1;
+            stats.entries_loaded_from_cache += sum;
+            stats.entries += sum;
+            m2.stop();
+            stats.load_us += m2.as_us();
+            //stats.write_to_mmap_us += m2.as_us();
+            //error!("wrote: {:?}, {}, sum: {}, elem_size: {}", cache_path, capacity, sum, elem_size);//, storage_file);
+            m.stop();
+            //stats.save_us += m.as_us();
+
+
+        Ok((vec![result], stats))
     }
     pub fn get_mut<T: Sized>(&self, ix: u64) -> &mut T {
         let start = (ix * self.cell_size) as usize + std::mem::size_of::<Header>();
@@ -283,12 +311,8 @@ impl CacheHashData {
             stats.create_save_us= m1.as_us();
             stats.cache_file_count= 1;
 
-        /*
         let mut header = chd.get_header_mut();
-        for i in 0..BINS_PER_PASS {
-            //header.bin_sizes[i] = if i <= entries.len() { entries[i] as u64} else {0};
-        }
-        */
+        header.count = sum;
 
         //error!("writing {} bytes to: {:?}, lens: {:?}, storage_len: {}, storage: {:?}", encoded.len(), cache_path, file_data.data.iter().map(|x| x.len()).collect::<Vec<_>>(), file_len, storage_file);
         stats = CacheHashDataStats {
