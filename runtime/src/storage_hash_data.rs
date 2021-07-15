@@ -135,7 +135,7 @@ impl CacheHashData {
         // the file so that we won't have to resize it later, which may be
         // expensive.
         //debug!("GROWING file {}", capacity * cell_size as u64);
-        data.seek(SeekFrom::Start(capacity * cell_size as u64 - 1))
+        data.seek(SeekFrom::Start(capacity - 1))
             .unwrap();
         data.write_all(&[0]).unwrap();
         data.seek(SeekFrom::Start(0)).unwrap();
@@ -240,7 +240,7 @@ impl CacheHashData {
         let mut m = Measure::start("save");
         let mut stats;
         {
-            error!("raw path: {:?}", storage_file);
+            //error!("raw path: {:?}", storage_file);
         let cache_path = Self::calc_path(storage_file, bin_range)?;
         let parent = cache_path.parent().unwrap();
         std::fs::create_dir_all(parent);
@@ -285,7 +285,7 @@ impl CacheHashData {
             i += 1;
             *d = item;
         }));
-        error!("wrote: {:?}, {}, {:?}", cache_path, capacity, storage_file);
+        error!("wrote: {:?}, {}", cache_path, capacity);//, storage_file);
     }
         m.stop();
         stats.save_us += m.as_us();
