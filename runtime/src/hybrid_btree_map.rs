@@ -261,12 +261,20 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
     where
         R: RangeBounds<Pubkey>,
     {
-        let start = self.disk.bucket_ix(Self::bound(range.start_bound(), &Pubkey::default()));
-        let end = self.disk.bucket_ix(Self::bound(range.end_bound(), &Pubkey::new(&[0xff; 32]))); // ugly
+        let mut start = self.disk.bucket_ix(Self::bound(range.start_bound(), &Pubkey::default()));
+        let mut end = self.disk.bucket_ix(Self::bound(range.end_bound(), &Pubkey::new(&[0xff; 32]))); // ugly
         let len = (start..end).into_iter().map(|ix| self.disk.bucket_len(ix) as usize).sum::<usize>();
+
+        let num_buckets = self.disk.num_buckets();
+        let mystart = num_buckets * self.bin_index / self.bins;
+        let myend = num_buckets * (self.bin_index + 1) / self.bins;
+        start = std::cmp::max(start, mystart);
+        end = std::cmp::min(end, myend);
+        
         let mut keys = Vec::with_capacity(len);
-        let len = (start..end).into_iter().for_each(|ix| {
-            for k in self.disk.keys(ix).unwrap_or_default().into_iter() {
+        (start..end).into_iter().for_each(|ix| {
+            let ks = self.disk.keys(ix).unwrap_or_default();
+            for k in ks.into_iter() {
                 if range.contains(&k) {
                 keys.push(k);
                 }
