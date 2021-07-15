@@ -83,6 +83,10 @@ pub const DEFAULT_FILE_SIZE: u64 = PAGE_SIZE * 1024;
 pub const DEFAULT_NUM_THREADS: u32 = 8;
 pub const DEFAULT_NUM_DIRS: u32 = 4;
 
+pub const PUBKEY_BINS_FOR_CALCULATING_HASHES: usize = 65536;
+pub const num_scan_passes: usize = 1;
+pub const BINS_PER_PASS: usize = 32768;
+
 // A specially reserved storage id just for entries in the cache, so that
 // operations that take a storage entry can maintain a common interface
 // when interacting with cached accounts. This id is "virtual" in that it
@@ -5016,14 +5020,11 @@ impl AccountsDb {
         let mut scan_and_hash = move || {
             // When calculating hashes, it is helpful to break the pubkeys found into bins based on the pubkey value.
             // More bins means smaller vectors to sort, copy, etc.
-            const PUBKEY_BINS_FOR_CALCULATING_HASHES: usize = 65536;
 
             // # of passes should be a function of the total # of accounts that are active.
             // higher passes = slower total time, lower dynamic memory usage
             // lower passes = faster total time, higher dynamic memory usage
             // passes=2 cuts dynamic memory usage in approximately half.
-            let num_scan_passes: usize = 1;
-
             let bins_per_pass = PUBKEY_BINS_FOR_CALCULATING_HASHES / num_scan_passes;
             assert_eq!(
                 bins_per_pass * num_scan_passes,

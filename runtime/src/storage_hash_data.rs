@@ -19,11 +19,15 @@ use std::{
     path::{Path},
 };
 
+use crate::accounts_db::{PUBKEY_BINS_FOR_CALCULATING_HASHES, num_scan_passes, BINS_PER_PASS};
+
+
 pub type SavedType = Vec<Vec<CalculateHashIntermediate>>;
 
 #[repr(C)]
-struct Header {
+pub struct Header {
     lock: AtomicU64,
+    bin_sizes: [u64; BINS_PER_PASS],
 }
 
 impl Header {
@@ -44,11 +48,13 @@ impl Header {
     }
 }
 
-#[derive(Default, Debug, Serialize, Deserialize)]
+//#[derive(Default, Debug, Serialize, Deserialize)]
 pub struct CacheHashData {
-    pub data: SavedType,
-    pub storage_path: PathBuf,
-    pub expected_mod_date: u8,
+    //pub data: SavedType,
+    //pub storage_path: PathBuf,
+    //pub expected_mod_date: u8,
+    pub cell_size: u64,
+    pub mmap: MmapMut,
 }
 
 #[derive(Default, Debug, Serialize, Deserialize)]
@@ -103,12 +109,8 @@ impl CacheHashData {
         Ok(result.to_path_buf())
     }
 
-    fn new_map(drives: &[PathBuf], cell_size: usize, capacity: u8) -> (MmapMut, PathBuf) {
-        let capacity = 1u64 << capacity;
-        let r = thread_rng().gen_range(0, drives.len());
-        let drive = &drives[r];
+    fn new_map(file: &PathBuf, cell_size: usize, capacity: u64) -> MmapMut {
         let pos = format!("{}", thread_rng().gen_range(0, u128::MAX),);
-        let file = drive.join(pos);
         let mut data = OpenOptions::new()
             .read(true)
             .write(true)
@@ -127,15 +129,15 @@ impl CacheHashData {
         // Theoretical performance optimization: write a zero to the end of
         // the file so that we won't have to resize it later, which may be
         // expensive.
-        debug!("GROWING file {}", capacity * cell_size as u64);
+        //debug!("GROWING file {}", capacity * cell_size as u64);
         data.seek(SeekFrom::Start(capacity * cell_size as u64 - 1))
             .unwrap();
         data.write_all(&[0]).unwrap();
         data.seek(SeekFrom::Start(0)).unwrap();
         data.flush().unwrap();
-        (unsafe { MmapMut::map_mut(&data).unwrap() }, file)
+        unsafe { MmapMut::map_mut(&data).unwrap() }
     }
-
+/*
     pub fn test() {
         let drives = Arc::new(vec![]);//    drives: Arc<Vec<PathBuf>>,
         let elements = 0;
@@ -146,7 +148,8 @@ impl CacheHashData {
             elements,
         );
     }
-
+    */
+/*
     pub fn new_with_capacity(
         drives: Arc<Vec<PathBuf>>,
         num_elems: u64,
@@ -166,10 +169,13 @@ impl CacheHashData {
             capacity,
         }*/
     }
+    */
     pub fn load<P: AsRef<Path>>(
         storage_file: &P,
         bin_range: &Range<usize>,
     ) -> Result<(SavedType, CacheHashDataStats), std::io::Error> {
+        panic!("");
+        /*
         let create = false;
         let mut timings = CacheHashDataStats::default();
         let mut m0 = Measure::start("");
@@ -197,7 +203,29 @@ impl CacheHashData {
         let decoded = decoded.unwrap();
         drop(file);
         Ok((decoded.data, timings))
+        */
     }
+    pub fn get_mut<T: Sized>(&self, ix: u64) -> &mut T {
+        let start = (ix * self.cell_size) as usize + std::mem::size_of::<Header>();
+        let end = start + std::mem::size_of::<T>();
+        let item_slice: &[u8] = &self.mmap[start..end];
+        unsafe {
+            let item = item_slice.as_ptr() as *mut T;
+            &mut *item
+        }
+    }
+
+    pub fn get_header_mut(&self) -> &mut Header {
+        let start = 0 as usize;
+        let end = start + std::mem::size_of::<Header>();
+        let item_slice: &[u8] = &self.mmap[start..end];
+        unsafe {
+            let item = item_slice.as_ptr() as *mut Header;
+            &mut *item
+        }
+    }
+
+
     pub fn save<P: AsRef<Path> + std::fmt::Debug>(
         storage_file: &P,
         data: &mut SavedType,
@@ -210,7 +238,46 @@ impl CacheHashData {
         if create {
             let _ignored = remove_file(&cache_path);
         }
+        let elem_size = std::mem::size_of::<CacheHashData>() as u64;
+        let num_elems = data.len() as u64;
+        let cell_size = elem_size * num_elems + std::mem::size_of::<Header>() as u64;
+        let capacity = cell_size;
+        let mmap = Self::new_map(&cache_path, cell_size as usize, capacity);
+        let mut chd = CacheHashData {
+            //data: SavedType::default(),
+            //storage_path
+            mmap,
+            cell_size,
+        };
+        let mut stats = CacheHashDataStats {
+            ..CacheHashDataStats::default()
+        
+        };
+        let entries = data.iter().map(|x: &Vec<CalculateHashIntermediate>| x.len()).collect::<Vec<_>>();
+        let sum = entries.iter().sum::<usize>();
 
+        let mut header = chd.get_header_mut();
+        for i in 0..BINS_PER_PASS {
+            header.bin_sizes[i] = if i <= entries.len() { entries[i] as u64} else {0};
+        }
+
+        //error!("writing {} bytes to: {:?}, lens: {:?}, storage_len: {}, storage: {:?}", encoded.len(), cache_path, file_data.data.iter().map(|x| x.len()).collect::<Vec<_>>(), file_len, storage_file);
+        let stats = CacheHashDataStats {
+            //storage_size: file_len as usize,
+            //cache_file_size: encoded.len(),
+            entries: sum,
+            ..CacheHashDataStats::default()
+        
+        };
+
+        let mut i = 0;
+        data.iter().for_each(|x| x.iter().for_each(|item| {
+            let mut d = chd.get_mut(i as u64);
+            i += 1;
+            *d = item;
+        }));
+        
+        /*
         let expected_mod_date = 0; // TODO
         let file_size = 0; // TODO
 
@@ -253,6 +320,7 @@ impl CacheHashData {
             .unwrap();
         file.write_all(&encoded)?;
         drop(file);
+        */
         Ok(stats)
     }
 }
