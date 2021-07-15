@@ -6098,9 +6098,8 @@ impl AccountsDb {
         let mut roots: Vec<_> = self.accounts_index.all_roots();
         #[allow(clippy::stable_sort_primitive)]
         roots.sort();
-        info!("{}: accounts_index roots: {:?}", label, roots,);
-        panic!("todo");
         /*
+        info!("{}: accounts_index roots: {:?}", label, roots,);
         self.accounts_index.account_maps.iter().for_each(|i| {
             for (pubkey, account_entry) in i.read().unwrap().iter() {
                 info!("  key: {} ref_count: {}", pubkey, account_entry.ref_count(),);
