@@ -572,7 +572,7 @@ impl AccountStorageEntry {
     pub fn new(path: &Path, slot: Slot, id: usize, file_size: u64) -> Self {
         let tail = AppendVec::file_name(slot, id);
         let path = Path::new(path).join(tail);
-        error!("AccountStorageEntry::new: {:?}", path);
+        //error!("AccountStorageEntry::new: {:?}", path);
         let accounts = AppendVec::new(&path, true, file_size as usize);
 
         Self {
@@ -5942,7 +5942,7 @@ impl AccountsDb {
         let mut accounts_map = GenerateIndexAccountsMap::with_capacity(num_accounts);
         storage_maps.iter().for_each(|storage| {
             let accounts = storage.all_accounts();
-            //error!("storage path: {:?}", storage.path());
+            error!("storage path: {:?}", storage.accounts.get_path());
             accounts.into_iter().for_each(|stored_account| {
                 let this_version = stored_account.meta.write_version;
                 match accounts_map.entry(stored_account.meta.pubkey) {
