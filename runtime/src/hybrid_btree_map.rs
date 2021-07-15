@@ -267,8 +267,9 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
         let mut keys = Vec::with_capacity(len);
         let len = (start..end).into_iter().for_each(|ix| {
             for k in self.disk.keys(ix).unwrap_or_default().into_iter() {
-                range.contains(&k);
+                if range.contains(&k) {
                 keys.push(k);
+                }
             }
         });
         keys.sort_unstable();
