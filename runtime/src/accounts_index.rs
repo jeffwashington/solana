@@ -3092,13 +3092,20 @@ pub mod tests {
     }
 
     fn run_test_scan_accounts(num_pubkeys: usize) {
-        let (index, _) = setup_accounts_index_keys(num_pubkeys);
+        let (index, keys) = setup_accounts_index_keys(num_pubkeys);
         let ancestors = Ancestors::default();
 
         let mut scanned_keys = HashSet::new();
         index.unchecked_scan_accounts("", &ancestors, |pubkey, _index| {
             scanned_keys.insert(*pubkey);
         });
+        if scanned_keys.len() != num_pubkeys {
+            for i in keys {
+                if !scanned_keys.contains(i) {
+                    error!("missing: {}", i);
+                }
+            }
+        }
         assert_eq!(scanned_keys.len(), num_pubkeys);
     }
 
