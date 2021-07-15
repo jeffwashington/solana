@@ -262,7 +262,7 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
         R: RangeBounds<Pubkey>,
     {
         let start = self.disk.bucket_ix(Self::bound(range.start_bound(), &Pubkey::default()));
-        let end = self.disk.bucket_ix(Self::bound(range.end_bound(), &Pubkey::new(&[0; 32]))); // ugly
+        let end = self.disk.bucket_ix(Self::bound(range.end_bound(), &Pubkey::new(&[0xff; 32]))); // ugly
         let len = (start..end).into_iter().map(|ix| self.disk.bucket_len(ix) as usize).sum::<usize>();
         let mut keys = Vec::with_capacity(len);
         let len = (start..end).into_iter().for_each(|ix| {
