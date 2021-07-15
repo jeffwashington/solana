@@ -244,8 +244,9 @@ impl CacheHashData {
             let _ignored = remove_file(&cache_path);
         }
         let elem_size = std::mem::size_of::<CacheHashData>() as u64;
-        let num_elems = data.len() as u64;
-        let cell_size = elem_size * num_elems + std::mem::size_of::<Header>() as u64;
+        let entries = data.iter().map(|x: &Vec<CalculateHashIntermediate>| x.len()).collect::<Vec<_>>();
+        let sum = entries.iter().sum::<usize>();
+        let cell_size = elem_size * (sum as u64) + std::mem::size_of::<Header>() as u64;
         let capacity = cell_size;
         let mmap = Self::new_map(&cache_path, cell_size as usize, capacity);
         let mut chd = CacheHashData {
@@ -258,8 +259,6 @@ impl CacheHashData {
             ..CacheHashDataStats::default()
         
         };
-        let entries = data.iter().map(|x: &Vec<CalculateHashIntermediate>| x.len()).collect::<Vec<_>>();
-        let sum = entries.iter().sum::<usize>();
 
         let mut header = chd.get_header_mut();
         for i in 0..BINS_PER_PASS {
