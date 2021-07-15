@@ -4984,7 +4984,9 @@ impl AccountsDb {
             accumulator.append(&mut vec![vec![]; max + 1 - accumulator.len()])
         }
         new_data.into_iter().enumerate().for_each(|(i, data)| {
+            if !data.is_empty() {
             accumulator[i].append(data);
+            }
         });
         m.stop();
         m.as_us()
