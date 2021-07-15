@@ -198,7 +198,7 @@ impl CacheHashData {
         let mut m0 = Measure::start("");
         let mut file = OpenOptions::new()
             .read(true)
-            .write(false)
+            .write(true)
             .create(create)
             .open(&path)?;
 
