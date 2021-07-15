@@ -4935,7 +4935,7 @@ impl AccountsDb {
                     bin_range,
                 );
                 assert!(!cached_data.is_ok());
-                let mut stats = crate::storage_hash_data::CacheHashData::save(
+                let mut stats = crate::storage_hash_data::CacheHashData::save2(
                     &storages.first().unwrap().accounts.get_path(),
                     per_slot_data,
                     bin_range,

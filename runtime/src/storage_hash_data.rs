@@ -228,7 +228,7 @@ impl CacheHashData {
     }
 
 
-    pub fn save<P: AsRef<Path> + std::fmt::Debug>(
+    pub fn save2<P: AsRef<Path> + std::fmt::Debug>(
         storage_file: &P,
         data: &mut SavedType,
         bin_range: &Range<usize>,
@@ -280,7 +280,7 @@ impl CacheHashData {
             i += 1;
             *d = item;
         }));
-        //error!("wrote: {:?}, {}", cache_path, capacity);
+        error!("wrote: {:?}, {}", cache_path, capacity, storage_file);
     }
         m.stop();
         stats.save_us += m.as_us();
