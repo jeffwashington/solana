@@ -273,7 +273,7 @@ impl CacheHashData {
         //error!("writing {} bytes to: {:?}, lens: {:?}, storage_len: {}, storage: {:?}", encoded.len(), cache_path, file_data.data.iter().map(|x| x.len()).collect::<Vec<_>>(), file_len, storage_file);
         stats = CacheHashDataStats {
             //storage_size: file_len as usize,
-            cache_file_size: capacity,
+            cache_file_size: capacity as usize,
             entries: sum,
             ..CacheHashDataStats::default()
         
