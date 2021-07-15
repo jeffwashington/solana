@@ -4976,11 +4976,11 @@ impl AccountsDb {
         new_data: &mut crate::storage_hash_data::SavedType,
     ) -> u64{
         let mut m = Measure::start("");
+        let max = new_data.len();
+        if max >= accumulator.len() {
+            accumulator.append(&mut vec![vec![]; max + 1 - accumulator.len()])
+        }
         new_data.into_iter().enumerate().for_each(|(i, data)| {
-            let len = accumulator.len();
-            if i >= len {
-                accumulator.append(&mut vec![vec![]; i + 1 - len]);
-            }
             accumulator[i].append(data);
         });
         m.stop();
