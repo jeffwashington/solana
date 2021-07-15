@@ -153,7 +153,7 @@ impl<'a, V: 'a + Clone + Debug> HybridOccupiedEntry<'a, V> {
         //error!("update: {}", self.pubkey);
         self.map.disk.update(&self.pubkey, |previous| {
             if previous.is_some() {
-                error!("update {} to {:?}", self.pubkey, new_data);
+                //error!("update {} to {:?}", self.pubkey, new_data);
             }
             Some((new_data.clone(), self.entry.ref_count)) // TODO no clone here
         });
