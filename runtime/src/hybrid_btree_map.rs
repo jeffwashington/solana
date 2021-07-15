@@ -157,6 +157,8 @@ impl<'a, V: 'a + Clone + Debug> HybridOccupiedEntry<'a, V> {
             }
             Some((new_data.clone(), self.entry.ref_count)) // TODO no clone here
         });
+        let g = self.map.disk.get(&self.pubkey).unwrap();
+        assert_eq!(format!("{:?}", g.1), format!("{:?}", new_data));
     }
     pub fn addref(&mut self) {
         self.entry.ref_count += 1;
