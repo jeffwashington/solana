@@ -3101,7 +3101,7 @@ pub mod tests {
         });
         if scanned_keys.len() != num_pubkeys {
             for i in keys {
-                if !scanned_keys.contains(i) {
+                if !scanned_keys.contains(&i) {
                     error!("missing: {}", i);
                 }
             }
