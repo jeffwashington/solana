@@ -186,7 +186,7 @@ impl CacheHashData {
             .write(false)
             .create(create)
             .open(&path)?;
-        panic!("loading: {}", path);
+        panic!("loading: {:?}", path);
         /*
         let mut file_data = Vec::new();
         let bytes = file.read_to_end(&mut file_data)?;
