@@ -236,6 +236,7 @@ impl CacheHashData {
         let mut m = Measure::start("save");
         let mut stats;
         {
+            error!("raw path: {:?}", storage_file);
         let cache_path = Self::calc_path(storage_file, bin_range)?;
         let parent = cache_path.parent().unwrap();
         std::fs::create_dir_all(parent);

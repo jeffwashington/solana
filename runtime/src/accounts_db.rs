@@ -4911,11 +4911,13 @@ impl AccountsDb {
                 let mut do_storage_scan = true; //;
                 let mut use_per_slot_accumulator = false;
                 if valid_for_caching {
+                    /*
                     let cached_data = crate::storage_hash_data::CacheHashData::load(
                         &storages.first().unwrap().accounts.get_path(),
                         bin_range,
                     );
-                    if cached_data.is_ok() {
+                    if cached_data.is_ok() */
+                    if false {
                         //panic!("shouldn't be loading from cache");
                         let (mut cached_data, mut stats) = cached_data.unwrap();
                         stats.loaded_from_cache += 1;
@@ -4931,10 +4933,12 @@ impl AccountsDb {
                 (do_storage_scan, use_per_slot_accumulator)
             },
             |_slot, storages, per_slot_data, accumulator| {
+                /*
                 let cached_data = crate::storage_hash_data::CacheHashData::load(
                     &storages.first().unwrap().accounts.get_path(),
                     bin_range,
                 );
+                */
                 assert!(!cached_data.is_ok());
                 let mut stats = crate::storage_hash_data::CacheHashData::save2(
                     &storages.first().unwrap().accounts.get_path(),
