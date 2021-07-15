@@ -4922,7 +4922,6 @@ impl AccountsDb {
                 let mut do_storage_scan = true; //;
                 let mut use_per_slot_accumulator = false;
                 if valid_for_caching {
-                    /*
                     let cached_data = crate::storage_hash_data::CacheHashData::load(
                         &storages.first().unwrap().accounts.get_path(),
                         bin_range,
@@ -4934,10 +4933,10 @@ impl AccountsDb {
                         stats.loaded_from_cache += 1;
                         stats.entries_loaded_from_cache +=
                             cached_data.iter().map(|x| x.len()).sum::<usize>();
-                        stats.merge_us += Self::merge_slot_data(accumulator, &mut cached_data);
+                        stats.merge_us += Self::merge_slot_data(accumulator, &mut cached_data, range, bin_range.start, &bin_calculator);
                         do_storage_scan = false;
                         big_stats.lock().unwrap().merge(&stats);
-                    } else*/ {
+                    } else {
                         use_per_slot_accumulator = true;
                     }
                 }
