@@ -3459,7 +3459,6 @@ impl Bank {
         }
 
         let mut write_time = Measure::start("write_time");
-        let mut collect = Measure::start("collect");
         self.rc.accounts.store_cached(
             self.slot(),
             hashed_txs.as_transactions_iter(),
@@ -3470,6 +3469,7 @@ impl Bank {
             self.fix_recent_blockhashes_sysvar_delay(),
             self.rent_for_sysvars(),
         );
+        let mut collect = Measure::start("collect");
         let rent_debits = self.collect_rent(executed, loaded_txs);
         collect.stop();
         timings.details.collect_rent_us += collect.as_us();
