@@ -3111,6 +3111,7 @@ pub mod tests {
 
     #[test]
     fn test_scan_accounts() {
+        solana_logger::setup();
         loop {
         run_test_scan_accounts(0);
         run_test_scan_accounts(1);
