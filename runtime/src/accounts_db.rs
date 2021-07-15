@@ -570,9 +570,9 @@ pub struct AccountStorageEntry {
 
 impl AccountStorageEntry {
     pub fn new(path: &Path, slot: Slot, id: usize, file_size: u64) -> Self {
-        error!("AccountStorageEntry::new: {:?}", path);
         let tail = AppendVec::file_name(slot, id);
         let path = Path::new(path).join(tail);
+        error!("AccountStorageEntry::new: {:?}", path);
         let accounts = AppendVec::new(&path, true, file_size as usize);
 
         Self {
