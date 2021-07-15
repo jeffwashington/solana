@@ -30,7 +30,7 @@ pub type SavedType = Vec<Vec<CalculateHashIntermediate>>;
 #[repr(C)]
 pub struct Header {
     lock: AtomicU64,
-    bin_sizes: [u64; BINS_PER_PASS],
+    //bin_sizes: [u64; BINS_PER_PASS],
 }
 
 impl Header {
@@ -267,7 +267,7 @@ impl CacheHashData {
 
         let mut header = chd.get_header_mut();
         for i in 0..BINS_PER_PASS {
-            header.bin_sizes[i] = if i <= entries.len() { entries[i] as u64} else {0};
+            //header.bin_sizes[i] = if i <= entries.len() { entries[i] as u64} else {0};
         }
 
         //error!("writing {} bytes to: {:?}, lens: {:?}, storage_len: {}, storage: {:?}", encoded.len(), cache_path, file_data.data.iter().map(|x| x.len()).collect::<Vec<_>>(), file_len, storage_file);
