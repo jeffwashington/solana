@@ -326,6 +326,13 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
         }
     }
 
+    pub fn insert(&mut self, key: K, value: V2<V>) {
+        match self.entry(key){
+            HybridEntry::Occupied(occupied) => {panic!("");},
+            HybridEntry::Vacant(vacant) => vacant.insert(value),
+        }
+    }
+
     pub fn get(&self, key: &K) -> Option<V2<V>> {
         let lookup = || {
             let disk = self.disk.get(key);

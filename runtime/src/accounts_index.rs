@@ -19,6 +19,7 @@ use std::{
         btree_map::{BTreeMap},
         HashSet,
     },
+    fmt::Debug,
     ops::{
         Bound,
         Bound::{Excluded, Included, Unbounded},
@@ -1892,7 +1893,7 @@ pub mod tests {
         }
     }
 
-    impl<'a, T: 'static> AccountIndexGetResult<'a, T> {
+    impl<'a, T: 'static + Clone + Debug> AccountIndexGetResult<'a, T> {
         pub fn unwrap(self) -> (ReadAccountMapEntry<'a, T>, usize) {
             match self {
                 AccountIndexGetResult::Found(lock, size) => (lock, size),

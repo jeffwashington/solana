@@ -7025,7 +7025,7 @@ pub(crate) mod tests {
     }
 
     fn map_to_test_bad_range() -> AccountMap<i8> {
-        let mut map: AccountMap<i8> = AccountMap::new();
+        let mut map: AccountMap<i8> = AccountMap::new(&AccountMap::new_bucket_map(), 0, 1);
         // when empty, AccountMap (= std::collections::BTreeMap) doesn't sanitize given range...
         map.insert(solana_sdk::pubkey::new_rand(), 1);
         map
