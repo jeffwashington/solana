@@ -331,7 +331,7 @@ impl CacheHashData {
             i += 1;
             *d = item;
         }));
-        assert_eq!(i == sum);
+        assert_eq!(i, sum);
         m2.stop();
         stats.write_to_mmap_us += m2.as_us();
         //error!("wrote: {:?}, {}, sum: {}, elem_size: {}", cache_path, capacity, sum, elem_size);//, storage_file);
