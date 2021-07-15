@@ -174,8 +174,6 @@ impl CacheHashData {
         storage_file: &P,
         bin_range: &Range<usize>,
     ) -> Result<(SavedType, CacheHashDataStats), std::io::Error> {
-        panic!("");
-        /*
         let create = false;
         let mut timings = CacheHashDataStats::default();
         let mut m0 = Measure::start("");
@@ -188,6 +186,8 @@ impl CacheHashData {
             .write(false)
             .create(create)
             .open(&path)?;
+        panic!("loading");
+        /*
         let mut file_data = Vec::new();
         let bytes = file.read_to_end(&mut file_data)?;
         m0.stop();
