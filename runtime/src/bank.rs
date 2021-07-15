@@ -7027,10 +7027,11 @@ pub(crate) mod tests {
     fn map_to_test_bad_range() -> AccountMap<i8> {
         let mut map: AccountMap<i8> = AccountMap::new(&AccountMap::new_bucket_map(), 0, 1);
         // when empty, AccountMap (= std::collections::BTreeMap) doesn't sanitize given range...
-        map.insert(solana_sdk::pubkey::new_rand(), 1);
+        //map.insert(solana_sdk::pubkey::new_rand(), 1);
         map
     }
 
+    
     #[test]
     #[should_panic(expected = "range start is greater than range end in BTreeMap")]
     fn test_rent_eager_bad_range() {
