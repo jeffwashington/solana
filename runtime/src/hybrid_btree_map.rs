@@ -2,6 +2,7 @@ use crate::accounts_index::AccountMapEntry;
 use crate::accounts_index::{SlotList, BINS, RefCount};
 use crate::pubkey_bins::PubkeyBinCalculator16;
 use log::*;
+use std::sync::RwLock;
 use solana_bucket_map::bucket_map::BucketMap;
 use solana_sdk::clock::Slot;
 use solana_sdk::pubkey::Pubkey;
@@ -36,17 +37,25 @@ impl<T:Clone + Debug> RealEntry<T> for T {
 
 pub type SlotT<T> = (Slot, T);
 
+pub type WriteCache<V> = HashMap<Pubkey, V>;
+
 #[derive(Debug)]
 pub struct BucketMapWriteHolder<V> {
     pub disk: BucketMap<SlotT<V>>,
-    pub write_cache: Vec<HashMap<Pubkey, V2<V>>>,
+    pub write_cache: Vec<RwLock<WriteCache<V2<V>>>>,
+    pub bins: usize,
 }
 
 impl<V: 'static + Clone + Debug> BucketMapWriteHolder<V> {
     fn new(bucket_map: BucketMap<SlotT<V>>) -> Self{
+        let mut write_cache = vec![];
+        let bins = bucket_map.num_buckets();
+        write_cache = (0..bins).map(|i| RwLock::new(WriteCache::default())).collect::<Vec<_>>();
+
         Self {
             disk: bucket_map,
-            write_cache: vec![],
+            write_cache,
+            bins,
         }
     }
     pub fn bucket_len(&self, ix: usize) -> u64 {
@@ -65,11 +74,26 @@ impl<V: 'static + Clone + Debug> BucketMapWriteHolder<V> {
     pub fn num_buckets(&self) -> usize {
         self.disk.num_buckets()
     }
-        pub fn update<F>(&self, key: &Pubkey, updatefn: F)
+        pub fn update<F>(&self, key: &Pubkey, updatefn: F, current_value: Option<&V2<V>>)
     where
         F: Fn(Option<(&[SlotT<V>], u64)>) -> Option<(Vec<SlotT<V>>, u64)>,
     {
-        self.disk.update(key, updatefn);
+        if current_value.is_none() {
+            // we are an insert
+            let result = updatefn(None);
+            if let Some(result) = result {
+                // stick this in the write cache and flush it later
+                let ix = self.disk.bucket_ix(key);
+                let wc = &mut self.write_cache[ix].write().unwrap();
+                wc.insert(key.clone(), AccountMapEntry {
+                    slot_list: result.0,
+                    ref_count: result.1
+                });
+            }
+        }
+        else {
+            self.disk.update(key, updatefn);
+        }
     }
     pub fn get(&self, key: &Pubkey) -> Option<(u64, Vec<SlotT<V>>)> {
         self.disk.get(key)
@@ -191,7 +215,7 @@ impl<V: Clone + std::fmt::Debug> Iterator for Values<V> {
 
 pub struct HybridOccupiedEntry<'a, V: 'static + Clone + Debug> {
     pubkey: Pubkey,
-    entry: AccountMapEntry<V>,
+    entry: V2<V>,
     map: &'a HybridBTreeMap<V>,
 }
 pub struct HybridVacantEntry<'a, V: 'static + Clone + Debug> {
@@ -210,7 +234,7 @@ impl<'a, V: 'a + Clone + Debug> HybridOccupiedEntry<'a, V> {
                 //error!("update {} to {:?}", self.pubkey, new_data);
             }
             Some((new_data.clone(), new_rc.unwrap_or(self.entry.ref_count))) // TODO no clone here
-        });
+        }, Some(&self.entry));
         let g = self.map.disk.get(&self.pubkey).unwrap();
         assert_eq!(format!("{:?}", g.1), format!("{:?}", new_data));
     }
@@ -250,7 +274,7 @@ impl<'a, V: 'a + Clone + Debug> HybridVacantEntry<'a, V> {
         //std::mem::swap(&mut sl, &mut value.slot_list);
         self.map.disk.update(&self.pubkey, |_previous| {
             Some((value.slot_list.clone() /* todo bad */, value.ref_count))
-        });
+        }, None);
     }
 }
 
