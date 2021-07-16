@@ -257,7 +257,7 @@ impl CacheHashData {
     pub fn get_mut<T: Sized>(&self, ix: u64) -> &mut T {
         let start = (ix * self.cell_size) as usize + std::mem::size_of::<Header>();
         let end = start + std::mem::size_of::<T>();
-        assert!(end < self.capacity as usize);
+        assert!(end < self.capacity as usize, "end: {}, capacity: {}, ix: {}, cell size: {}", end, self.capacity, ix, self.cell_size);
         let item_slice: &[u8] = &self.mmap[start..end];
         unsafe {
             let item = item_slice.as_ptr() as *mut T;
@@ -348,7 +348,7 @@ impl CacheHashData {
         //error!("wrote: {:?}, {}, sum: {}, elem_size: {}", cache_path, capacity, sum, elem_size);//, storage_file);
         m.stop();
         stats.save_us += m.as_us();
-        chd.mmap.flush()?;
+        //chd.mmap.flush()?;
         
         /*
         let expected_mod_date = 0; // TODO
