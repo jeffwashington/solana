@@ -4932,7 +4932,7 @@ impl AccountsDb {
                         let (mut cached_data, mut stats) = cached_data.unwrap();
                         stats.loaded_from_cache += 1;
                         let loaded = cached_data.iter().map(|x| x.len()).sum::<usize>();
-                        stats.entries += sum;
+                        stats.entries += loaded;
                         stats.entries_loaded_from_cache +=loaded;
                             loaded;
                         stats.merge_us += Self::merge_slot_data(accumulator, &mut cached_data, range, bin_range.start, &bin_calculator);
