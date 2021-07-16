@@ -59,6 +59,7 @@ pub struct CacheHashData {
     //pub expected_mod_date: u8,
     pub cell_size: u64,
     pub mmap: MmapMut,
+    pub capacity: u64,
 }
 
 #[derive(Default, Debug, Serialize, Deserialize)]
@@ -215,11 +216,13 @@ impl CacheHashData {
                 //storage_path
                 mmap,
                 cell_size,
+                capacity: 0,
             };
             let mut header = chd.get_header_mut();
             let sum = header.count;
     
             let capacity = elem_size * (sum as u64) + std::mem::size_of::<Header>() as u64;
+            chd.capacity = capacity;
             assert_eq!(capacity, file_len);
 
             //error!("writing {} bytes to: {:?}, lens: {:?}, storage_len: {}, storage: {:?}", encoded.len(), cache_path, file_data.data.iter().map(|x| x.len()).collect::<Vec<_>>(), file_len, storage_file);
@@ -254,6 +257,7 @@ impl CacheHashData {
     pub fn get_mut<T: Sized>(&self, ix: u64) -> &mut T {
         let start = (ix * self.cell_size) as usize + std::mem::size_of::<Header>();
         let end = start + std::mem::size_of::<T>();
+        assert!(end < self.capacity as usize);
         let item_slice: &[u8] = &self.mmap[start..end];
         unsafe {
             let item = item_slice.as_ptr() as *mut T;
@@ -277,7 +281,7 @@ impl CacheHashData {
         storage_file: &P,
         data: &mut SavedType,
         bin_range: &Range<usize>,
-    ) -> Result<(Self, CacheHashDataStats), std::io::Error> {
+    ) -> Result<CacheHashDataStats, std::io::Error> {
         let mut m = Measure::start("save");
         let mut stats;
             //error!("raw path: {:?}", storage_file);
@@ -312,6 +316,7 @@ impl CacheHashData {
             //storage_path
             mmap,
             cell_size,
+            capacity,
         };
             stats.create_save_us= m1.as_us();
             stats.cache_file_count= 1;
@@ -341,7 +346,7 @@ impl CacheHashData {
         //error!("wrote: {:?}, {}, sum: {}, elem_size: {}", cache_path, capacity, sum, elem_size);//, storage_file);
         m.stop();
         stats.save_us += m.as_us();
-        chd.mmap.flush();
+        chd.mmap.flush()?;
         
         /*
         let expected_mod_date = 0; // TODO
@@ -387,7 +392,7 @@ impl CacheHashData {
         file.write_all(&encoded)?;
         drop(file);
         */
-        Ok((chd, stats))
+        Ok(stats)
     }
 }
 
