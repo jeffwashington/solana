@@ -4962,6 +4962,7 @@ impl AccountsDb {
                     bin_range,
                 )
                 .unwrap();
+                error!("per_slot_items: {}, total_items: {}", per_slot_data.iter().map(|x| x.len()).sum::<usize>(), accumulator.iter().map(|x| x.len()).sum::<usize>());
                 if let Ok(cached_data) = cached_data {
                     assert_eq!(cached_data.0[0].len(), per_slot_data[0].len(), "slot: {}", slot);
                     assert_eq!(&cached_data.0, per_slot_data, "slot: {}, {:?}, {:?}", slot, cached_data.0, per_slot_data);
@@ -4969,6 +4970,7 @@ impl AccountsDb {
                 
                 //let mut stats = crate::storage_hash_data::CacheHashDataStats::default();
                 stats.merge_us += Self::merge_slot_data(accumulator, per_slot_data, range, bin_range.start, &bin_calculator);
+                assert!(per_slot_data.is_empty());
                 big_stats.lock().unwrap().merge(&stats);
                 per_slot_data.clear();
             },

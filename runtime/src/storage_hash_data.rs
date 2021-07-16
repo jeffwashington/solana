@@ -350,7 +350,7 @@ impl CacheHashData {
                 let mut d = chd.get_mut(i as u64);
                 i += 1;
                 *d = item;
-                assert_eq!(d.pubkey, item.pubkey);
+                assert_eq!(d, &item);
             })
         });
         assert_eq!(i, sum);
