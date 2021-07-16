@@ -178,6 +178,7 @@ impl CacheHashData {
     }
     */
     pub fn load<P: AsRef<Path>>(
+        slot: Slot,
         storage_file: &P,
         bin_range: &Range<usize>,
     ) -> Result<(SavedType, CacheHashDataStats), std::io::Error> {
@@ -220,6 +221,10 @@ impl CacheHashData {
             "expected: {}, len on disk: {} {:?}, sum: {}, elem_size: {}",
             capacity, file_len, path, sum, cell_size
         );
+        if slot == 86376721 {
+            error!("load: expected: {}, len on disk: {} {:?}, sum: {}, elem_size: {}",
+            capacity, file_len, path, sum, cell_size);
+        }
 
         //error!("writing {} bytes to: {:?}, lens: {:?}, storage_len: {}, storage: {:?}", encoded.len(), cache_path, file_data.data.iter().map(|x| x.len()).collect::<Vec<_>>(), file_len, storage_file);
         let mut stats = CacheHashDataStats {
@@ -236,6 +241,11 @@ impl CacheHashData {
             result.push(d.clone());
         }
         assert_eq!(result.len(), sum);
+        if slot == 86376721 {
+            error!("load: result len: {}",
+            result.len());
+        }
+
         m2.stop();
         stats.decode_us += m2.as_us();
         //stats.write_to_mmap_us += m2.as_us();
@@ -340,12 +350,15 @@ impl CacheHashData {
                 let mut d = chd.get_mut(i as u64);
                 i += 1;
                 *d = item;
+                assert_eq!(d.pubkey, item.pubkey);
             })
         });
         assert_eq!(i, sum);
         m2.stop();
         stats.write_to_mmap_us += m2.as_us();
-        //error!("wrote: {:?}, {}, sum: {}, elem_size: {}", cache_path, capacity, sum, elem_size);//, storage_file);
+        if slot == 86376721 {
+            error!("wrote: {:?}, {}, sum: {}, elem_size: {}", cache_path, capacity, sum, elem_size);//, storage_file);
+        }
         m.stop();
         stats.save_us += m.as_us();
         //chd.mmap.flush()?;

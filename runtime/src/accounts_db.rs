@@ -4950,6 +4950,7 @@ impl AccountsDb {
             // post-scan
             |slot, storages, per_slot_data, accumulator| {
                 let cached_data = crate::storage_hash_data::CacheHashData::load(
+                    slot,
                     &storages.first().unwrap().accounts.get_path(),
                     bin_range,
                 );
