@@ -4926,7 +4926,7 @@ impl AccountsDb {
                         &storages.first().unwrap().accounts.get_path(),
                         bin_range,
                     );
-                    if cached_data.is_ok()
+                    if cached_data.is_ok() && false
                     {
                         //panic!("shouldn't be loading from cache");
                         let (mut cached_data, mut stats) = cached_data.unwrap();
@@ -4949,7 +4949,7 @@ impl AccountsDb {
                     &storages.first().unwrap().accounts.get_path(),
                     bin_range,
                 );
-                assert!(!cached_data.is_ok());
+                //assert!(!cached_data.is_ok());
                 let mut stats = crate::storage_hash_data::CacheHashData::save2(
                     slot,
                     &storages.first().unwrap().accounts.get_path(),
@@ -4957,6 +4957,10 @@ impl AccountsDb {
                     bin_range,
                 )
                 .unwrap();
+                if let Ok(cached_data) = cached_data {
+                    assert_eq!(cached_data.0.len(), per_slot_data[0].len());
+                    assert_eq!(&cached_data.0, per_slot_data, "{:?}, {:?}", cached_data.0, per_slot_data);
+                }
                 
                 //let mut stats = crate::storage_hash_data::CacheHashDataStats::default();
                 stats.merge_us += Self::merge_slot_data(accumulator, per_slot_data, range, bin_range.start, &bin_calculator);
