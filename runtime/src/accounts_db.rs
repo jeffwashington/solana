@@ -4859,9 +4859,9 @@ impl AccountsDb {
             CacheHashDataStats::default(),
         ));
 
-        let cache_files_list = storage.get(storage.range().start).map(|storage| storage.first().map(|s| 
-        CacheHashData::get_cache_files(&s.get_path()))).unwrap_or_default();
-        error!("cache files {:?}", cache_files_list);
+        let pre_existing_cache_files = RwLock::new(storage.get(storage.range().start).and_then(|storage| storage.first().map(|s| 
+        CacheHashData::get_cache_files(&s.get_path()))).unwrap_or_default());
+        //error!("cache files {:?}", cache_files_list);
 
         let result: Vec<Vec<Vec<CalculateHashIntermediate>>> = Self::scan_account_storage_no_bank(
             accounts_cache_and_ancestors,
@@ -4940,6 +4940,7 @@ impl AccountsDb {
                         accumulator,
                         bin_range.start,
                         &bin_calculator,
+                        &pre_existing_cache_files,
                     );
                     if cached_data.is_ok()
                     {
@@ -4975,6 +4976,7 @@ impl AccountsDb {
         );
 
         error!("cache stats: {:?}", big_stats.lock().unwrap());
+        error!("pre-existing cache files that were unused: {}", pre_existing_cache_files.read().unwrap().len());
 
         stats.sort_time_total_us += sort_time.load(Ordering::Relaxed);
 

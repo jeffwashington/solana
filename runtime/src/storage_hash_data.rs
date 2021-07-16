@@ -14,10 +14,11 @@ use std::io::SeekFrom;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::time::UNIX_EPOCH;
 use std::{io::Read, ops::Range, path::Path};
 use crate::pubkey_bins::PubkeyBinCalculator16;
+use std::collections::HashSet;
 
 use crate::accounts_db::{num_scan_passes, BINS_PER_PASS, PUBKEY_BINS_FOR_CALCULATING_HASHES};
 
@@ -97,7 +98,8 @@ impl CacheHashDataStats {
     }
 }
 
-use bincode::serialize;
+pub type PreExistingCacheFiles = HashSet<String>;
+
 impl CacheHashData {
     fn directory<P: AsRef<Path>>(storage_file: &P) -> (PathBuf, String) {
         let storage_file = storage_file.as_ref();
@@ -111,7 +113,7 @@ impl CacheHashData {
     fn calc_path<P: AsRef<Path>>(
         storage_file: &P,
         bin_range: &Range<usize>,
-    ) -> Result<PathBuf, std::io::Error> {
+    ) -> Result<(PathBuf, String), std::io::Error> {
         let (cache, file_name) = Self::directory(storage_file);
         let amod = std::fs::metadata(storage_file)?.modified()?;
         let secs = amod.duration_since(UNIX_EPOCH).unwrap().as_secs();
@@ -121,7 +123,7 @@ impl CacheHashData {
             secs.to_string(),
             format!("{}.{}", bin_range.start, bin_range.end),
         ));
-        Ok(result.to_path_buf())
+        Ok((result.to_path_buf(), file_name))
     }
 
     fn new_map(file: &PathBuf, cell_size: usize, capacity: u64) -> MmapMut {
@@ -184,8 +186,8 @@ impl CacheHashData {
         }*/
     }
     */
-    pub fn get_cache_files<P: AsRef<Path>>(storage_path: &P) -> Vec<String> {
-        let mut items = vec![];
+    pub fn get_cache_files<P: AsRef<Path>>(storage_path: &P) -> PreExistingCacheFiles {
+        let mut items = PreExistingCacheFiles::new();
         let (cache, _) = Self::directory(storage_path);
         if cache.is_dir() {
             let dir = fs::read_dir(cache);
@@ -193,7 +195,7 @@ impl CacheHashData {
                 for entry in dir {
                     if let Ok(entry) = entry {
                         if let Some(name) = entry.path().file_name() {
-                            items.push(name.to_str().unwrap().to_string());
+                            items.insert(name.to_str().unwrap().to_string());
                         }
                     }
                 }
@@ -208,12 +210,13 @@ impl CacheHashData {
         accumulator: &mut Vec<Vec<CalculateHashIntermediate>>,
         start_bin_index: usize,
         bin_calculator:&PubkeyBinCalculator16,
+        preexisting: &RwLock<PreExistingCacheFiles>,
     ) -> Result<(SavedType, CacheHashDataStats), std::io::Error> {
         let mut m = Measure::start("overall");
         let create = false;
         let mut timings = CacheHashDataStats::default();
         let mut m0 = Measure::start("");
-        let path = Self::calc_path(storage_file, bin_range)?;
+        let (path, file_name) = Self::calc_path(storage_file, bin_range)?;
         m0.stop();
         timings.calc_path_us += m0.as_us();
         let file_len = std::fs::metadata(path.clone())?.len();
@@ -259,6 +262,8 @@ impl CacheHashData {
         };
         stats.read_us = m1.as_us();
         stats.cache_file_size += capacity as usize;
+
+        preexisting.write().unwrap().remove(&file_name);
 
 
         stats.entries_loaded_from_cache +=sum;
@@ -318,7 +323,7 @@ impl CacheHashData {
         let mut stats;
         //error!("raw path: {:?}", storage_file);
         let mut m0 = Measure::start("");
-        let cache_path = Self::calc_path(storage_file, bin_range)?;
+        let (cache_path, _) = Self::calc_path(storage_file, bin_range)?;
         m0.stop();
         stats = CacheHashDataStats {
             ..CacheHashDataStats::default()
