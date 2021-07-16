@@ -4930,16 +4930,18 @@ impl AccountsDb {
                         slot,
                         &storages.first().unwrap().accounts.get_path(),
                         bin_range,
+                        |loaded_item| {
+                            let mut pubkey_to_bin_index = bin_calculator.bin_from_pubkey(&loaded_item.pubkey);
+                            pubkey_to_bin_index -= bin_range.start;
+                            accumulator[pubkey_to_bin_index].push(loaded_item.clone()); // can't avoid clone here - the data is a ref from a file
+                        }
                     );
                     if cached_data.is_ok()
                     {
                         //panic!("shouldn't be loading from cache");
                         let (mut cached_data, mut stats) = cached_data.unwrap();
                         stats.loaded_from_cache += 1;
-                        let loaded = cached_data.iter().map(|x| x.len()).sum::<usize>();
-                        stats.entries += loaded;
-                        stats.entries_loaded_from_cache +=loaded;
-                        stats.merge_us += Self::merge_slot_data(accumulator, &mut cached_data, range, bin_range.start, &bin_calculator);
+                        //let loaded = cached_data.iter().map(|x| x.len()).sum::<usize>();
                         do_storage_scan = false;
                         big_stats.lock().unwrap().merge(&stats);
                         //*/
@@ -4951,12 +4953,6 @@ impl AccountsDb {
             },
             // post-scan
             |slot, storages, per_slot_data, accumulator| {
-                let cached_data = crate::storage_hash_data::CacheHashData::load(
-                    slot,
-                    &storages.first().unwrap().accounts.get_path(),
-                    bin_range,
-                );
-                assert!(!cached_data.is_ok());
                 let mut stats = crate::storage_hash_data::CacheHashData::save2(
                     slot,
                     &storages.first().unwrap().accounts.get_path(),
@@ -4964,12 +4960,6 @@ impl AccountsDb {
                     bin_range,
                 )
                 .unwrap();
-                //assert_eq!(per_slot_data.iter().map(|x| x.len()).sum::<usize>(), per_slot_data[0].len());
-                //error!("per_slot_items: {}, total_items: {}", per_slot_data.iter().map(|x| x.len()).sum::<usize>(), accumulator.iter().map(|x| x.len()).sum::<usize>());
-                if let Ok(cached_data) = cached_data {
-                    assert_eq!(cached_data.0[0].len(), per_slot_data[0].len(), "slot: {}", slot);
-                    assert_eq!(&cached_data.0, per_slot_data, "slot: {}, {:?}, {:?}", slot, cached_data.0, per_slot_data);
-                }
                 
                 //let mut stats = crate::storage_hash_data::CacheHashDataStats::default();
                 stats.merge_us += Self::merge_slot_data(accumulator, per_slot_data, range, bin_range.start, &bin_calculator);

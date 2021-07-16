@@ -177,10 +177,13 @@ impl CacheHashData {
         }*/
     }
     */
-    pub fn load<P: AsRef<Path>>(
+    pub fn load<P: AsRef<Path>, F:
+    FnMut(&CalculateHashIntermediate) + Send + Sync,    
+    >(
         slot: Slot,
         storage_file: &P,
         bin_range: &Range<usize>,
+        mut loaded_item: F,
     ) -> Result<(SavedType, CacheHashDataStats), std::io::Error> {
         let mut m = Measure::start("overall");
         let create = false;
@@ -221,7 +224,7 @@ impl CacheHashData {
             "expected: {}, len on disk: {} {:?}, sum: {}, elem_size: {}",
             capacity, file_len, path, sum, cell_size
         );
-        if slot == 86376721 {
+        if false && slot == 86376721 {
             error!("load: expected: {}, len on disk: {} {:?}, sum: {}, elem_size: {}",
             capacity, file_len, path, sum, cell_size);
         }
@@ -233,21 +236,14 @@ impl CacheHashData {
             ..CacheHashDataStats::default()
         };
 
+
+        stats.entries += sum;
+        stats.entries_loaded_from_cache +=sum;
         let mut m2 = Measure::start("");
         let mut i = 0;
-        let mut result = Vec::with_capacity(sum);
         for i in 0..sum {
             let mut d = chd.get_mut::<CalculateHashIntermediate>(i as u64);
-            if slot == 86376721 {
-                error!("read: {:?}", d.clone());
-            }
-
-            result.push(d.clone());
-        }
-        assert_eq!(result.len(), sum);
-        if slot == 86376721 {
-            error!("load: result len: {}",
-            result.len());
+            loaded_item(d);
         }
 
         m2.stop();
@@ -257,7 +253,7 @@ impl CacheHashData {
         m.stop();
         stats.load_us += m.as_us();
         //stats.save_us += m.as_us();
-        Ok((vec![result], stats))
+        Ok((vec![], stats))
     }
     pub fn get_mut<T: Sized>(&self, ix: u64) -> &mut T {
         let start = (ix * self.cell_size) as usize + std::mem::size_of::<Header>();
