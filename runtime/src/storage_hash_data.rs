@@ -184,7 +184,7 @@ impl CacheHashData {
         }*/
     }
     */
-    pub fn get_cache_files<P: AsRef<Path>>(storage_path: &P) -> Vec<PathBuf> {
+    pub fn get_cache_files<P: AsRef<Path>>(storage_path: &P) -> Vec<String> {
         let mut items = vec![];
         let (cache, _) = Self::directory(storage_path);
         if cache.is_dir() {
@@ -192,8 +192,9 @@ impl CacheHashData {
             if let Ok(dir) = dir {
                 for entry in dir {
                     if let Ok(entry) = entry {
-                        let path = entry.path();
-                        items.push(path.clone());
+                        if let Some(name) = entry.path().file_name() {
+                            items.push(name.to_str().unwrap().to_string());
+                        }
                     }
                 }
             }
