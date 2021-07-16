@@ -4859,8 +4859,9 @@ impl AccountsDb {
             CacheHashDataStats::default(),
         ));
 
-        let pre_existing_cache_files = RwLock::new(storage.get(storage.range().start).and_then(|storage| storage.first().map(|s| 
-        CacheHashData::get_cache_files(&s.get_path()))).unwrap_or_default());
+        let a_storage_path = storage.get(storage.range().start).and_then(|storage| storage.first()).map(|s| s.get_path());
+        let pre_existing_cache_files = RwLock::new(a_storage_path.map(|s| 
+        CacheHashData::get_cache_files(&s)).unwrap_or_default());
         //error!("cache files {:?}", cache_files_list);
 
         let result: Vec<Vec<Vec<CalculateHashIntermediate>>> = Self::scan_account_storage_no_bank(
@@ -4977,6 +4978,11 @@ impl AccountsDb {
 
         error!("cache stats: {:?}", big_stats.lock().unwrap());
         error!("pre-existing cache files that were unused: {}", pre_existing_cache_files.read().unwrap().len());
+        let a_storage_path = storage.get(storage.range().start).and_then(|storage| storage.first()).map(|s| s.get_path());
+        let pre_existing_cache_files = pre_existing_cache_files.read().unwrap();
+        if !pre_existing_cache_files.is_empty() {
+        CacheHashData::delete_old_cache_files(&a_storage_path.unwrap(), &pre_existing_cache_files);    
+        }
 
         stats.sort_time_total_us += sort_time.load(Ordering::Relaxed);
 

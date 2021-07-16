@@ -186,6 +186,9 @@ impl CacheHashData {
         }*/
     }
     */
+    pub fn delete_old_cache_files<P: AsRef<Path>>(storage_path: &P, file_names: &PreExistingCacheFiles) {
+        // todo
+    }
     pub fn get_cache_files<P: AsRef<Path>>(storage_path: &P) -> PreExistingCacheFiles {
         let mut items = PreExistingCacheFiles::new();
         let (cache, _) = Self::directory(storage_path);
@@ -263,7 +266,10 @@ impl CacheHashData {
         stats.read_us = m1.as_us();
         stats.cache_file_size += capacity as usize;
 
-        preexisting.write().unwrap().remove(&file_name);
+        let found = preexisting.write().unwrap().remove(&file_name);
+        if !found {
+            error!("tried to mark {:?} as used, but it wasn't in the set: {:?}", file_name, preexisting.read().unwrap().iter().next());
+        }
 
 
         stats.entries_loaded_from_cache +=sum;
