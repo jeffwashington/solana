@@ -4222,6 +4222,14 @@ impl Bank {
         }
     }
 
+         pub fn report_store_timings(&self) {
+            self.rc
+            .accounts
+            .accounts_db
+            .report_store_timings();
+         }
+
+
     pub fn force_flush_accounts_cache(&self) {
         self.rc
             .accounts

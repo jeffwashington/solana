@@ -341,7 +341,7 @@ impl<V: 'static + Clone + Debug> HybridBTreeMap<V> {
         let num_buckets = self.disk.num_buckets();
         let mystart = num_buckets * self.bin_index / self.bins;
         let myend = num_buckets * (self.bin_index + 1) / self.bins;
-        (mystart..=myend).for_each(|ix| { // = here?
+        (mystart..myend).for_each(|ix| {
             self.disk.flush(ix);
         });
 

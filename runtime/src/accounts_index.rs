@@ -33,7 +33,7 @@ use std::{
 use thiserror::Error;
 
 pub const ITER_BATCH_SIZE: usize = 1000;
-pub const BINS: usize = 1;
+pub const BINS: usize = 256;
 pub type ScanResult<T> = Result<T, ScanError>;
 pub type SlotList<T> = Vec<(Slot, T)>;
 pub type SlotSlice<'s, T> = &'s [(Slot, T)];
