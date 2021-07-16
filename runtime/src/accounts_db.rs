@@ -4907,11 +4907,6 @@ impl AccountsDb {
                         mismatch_found.fetch_add(1, Ordering::Relaxed);
                     }
                 }
-
-                let max = accum.len();
-                if max == 0 {
-                    accum.append(&mut vec![Vec::new(); range]);
-                }
                 accum[pubkey_to_bin_index].push(source_item);
             },
             |x| {
@@ -4921,6 +4916,10 @@ impl AccountsDb {
             },
             // pre-scan
             |slot, storages, accumulator, all_data_from_storages| {
+                if accumulator.is_empty() {
+                    accumulator.append(&mut vec![Vec::new(); range]);
+                }
+        
                 let valid_for_caching = storages.len() == 1 && all_data_from_storages;
                 let mut do_storage_scan = true; //;
                 let mut use_per_slot_accumulator = false;
