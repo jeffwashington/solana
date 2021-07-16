@@ -58,6 +58,15 @@ impl<V: 'static + Clone + Debug> BucketMapWriteHolder<V> {
             bins,
         }
     }
+    pub fn flush(&self, ix: usize) {
+        let wc = &mut self.write_cache[ix].write().unwrap();
+        for (k,v) in wc.iter() {
+            self.disk.update(k, |_previous| {
+                Some((v.slot_list.clone(), v.ref_count))
+            });
+        }
+        wc.clear();
+    }
     pub fn bucket_len(&self, ix: usize) -> u64 {
         self.disk.bucket_len(ix)
     }
@@ -322,6 +331,13 @@ impl<V: 'static + Clone + Debug> HybridBTreeMap<V> {
     }
 
     pub fn flush(&mut self) {
+        let num_buckets = self.disk.num_buckets();
+        let mystart = num_buckets * self.bin_index / self.bins;
+        let myend = num_buckets * (self.bin_index + 1) / self.bins;
+        (mystart..myend).for_each(|ix| {
+            self.disk.flush(ix);
+        });
+
         /*
         {
             // put entire contents of this map into the disk backing
