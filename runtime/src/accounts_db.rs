@@ -4676,7 +4676,7 @@ impl AccountsDb {
                 let end = std::cmp::min(start + MAX_ITEMS_PER_CHUNK, snapshot_storages.range().end);
                 for slot in start..end {
                     let sub_storages = snapshot_storages.get(slot);
-                    let mut valid_slot = false;
+                    let mut valid_slot = sub_storages.is_some();
                     let mut all_data_from_storage = true;
                     if let Some((cache, ancestors, accounts_index)) = accounts_cache_and_ancestors {
                         if let Some(slot_cache) = cache.slot_cache(slot) {
@@ -4709,7 +4709,6 @@ impl AccountsDb {
                             } else {
                                 &mut retval
                             };
-                            valid_slot = true;
                             Self::scan_multiple_account_storages_one_slot(
                                 sub_storages,
                                 &scan_func,
@@ -4963,7 +4962,7 @@ impl AccountsDb {
                 )
                 .unwrap();
                 if let Ok(cached_data) = cached_data {
-                    //assert_eq!(cached_data.0.len(), per_slot_data[0].len());
+                    assert_eq!(cached_data.0.[0].len(), per_slot_data[0].len());
                     assert_eq!(&cached_data.0, per_slot_data, "{:?}, {:?}", cached_data.0, per_slot_data);
                 }
                 
