@@ -12,6 +12,7 @@ use std::sync::Arc;
 use std::ops::RangeBounds;
 use std::ops::Bound;
 type K = Pubkey;
+use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
 pub struct HybridAccountEntry<V: Clone + Debug> {
@@ -36,9 +37,62 @@ impl<T:Clone + Debug> RealEntry<T> for T {
 pub type SlotT<T> = (Slot, T);
 
 #[derive(Debug)]
+pub struct BucketMapWriteHolder<V> {
+    pub disk: BucketMap<SlotT<V>>,
+    pub write_cache: Vec<HashMap<Pubkey, V2<V>>>,
+}
+
+impl<V: 'static + Clone + Debug> BucketMapWriteHolder<V> {
+    fn new(bucket_map: BucketMap<SlotT<V>>) -> Self{
+        Self {
+            disk: bucket_map,
+            write_cache: vec![],
+        }
+    }
+    pub fn bucket_len(&self, ix: usize) -> u64 {
+        self.disk.bucket_len(ix)
+    }
+    pub fn bucket_ix(&self, key: &Pubkey) -> usize {
+        self.disk.bucket_ix(key)
+    }
+    pub fn keys(&self, ix: usize) -> Option<Vec<Pubkey>> {
+        self.disk.keys(ix)
+    }
+    pub fn values(&self, ix: usize) -> Option<Vec<Vec<SlotT<V>>>> {
+        self.disk.values(ix)
+    }
+
+    pub fn num_buckets(&self) -> usize {
+        self.disk.num_buckets()
+    }
+        pub fn update<F>(&self, key: &Pubkey, updatefn: F)
+    where
+        F: Fn(Option<(&[SlotT<V>], u64)>) -> Option<(Vec<SlotT<V>>, u64)>,
+    {
+        self.disk.update(key, updatefn);
+    }
+    pub fn get(&self, key: &Pubkey) -> Option<(u64, Vec<SlotT<V>>)> {
+        self.disk.get(key)
+    }
+    pub fn addref(&self, key: &Pubkey) -> Option<u64> {
+        self.disk.addref(key)
+    }
+
+    pub fn unref(&self, key: &Pubkey) -> Option<u64> {
+        self.disk.unref(key)
+    }
+    fn delete_key(&self, key: &Pubkey) {
+        self.disk.delete_key(key)
+    }
+    pub fn distribution(&self) -> Vec<usize> {
+        self.disk.distribution()
+    }
+}
+
+#[derive(Debug)]
 pub struct HybridBTreeMap<V: 'static + Clone + Debug> {
     in_memory: BTreeMap<K, V2<V>>,
-    disk: Arc<BucketMap<SlotT<V>>>,
+    disk: Arc<BucketMapWriteHolder<V>>,
     bin_index: usize,
     bins: usize,
 }
@@ -200,9 +254,9 @@ impl<'a, V: 'a + Clone + Debug> HybridVacantEntry<'a, V> {
     }
 }
 
-impl<V: Clone + Debug> HybridBTreeMap<V> {
+impl<V: 'static + Clone + Debug> HybridBTreeMap<V> {
     /// Creates an empty `BTreeMap`.
-    pub fn new(bucket_map: &Arc<BucketMap<SlotT<V>>>, bin_index: usize, bins: usize) -> HybridBTreeMap<V> {
+    pub fn new(bucket_map: &Arc<BucketMapWriteHolder<V>>, bin_index: usize, bins: usize) -> HybridBTreeMap<V> {
         Self {
             in_memory: BTreeMap::default(),
             disk: bucket_map.clone(),
@@ -210,11 +264,11 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
             bins,
         }
     }
-    pub fn new_bucket_map() -> Arc<BucketMap<SlotT<V>>> {
+    pub fn new_bucket_map() -> Arc<BucketMapWriteHolder<V>> {
         let mut buckets = PubkeyBinCalculator16::log_2(BINS as u32) as u8; // make more buckets to try to spread things out
         buckets = std::cmp::min(buckets + 11, 16); // max # that works with open file handles and such
         error!("creating: {} for {}", buckets, BINS);
-        Arc::new(BucketMap::new_buckets(buckets))
+        Arc::new(BucketMapWriteHolder::new(BucketMap::new_buckets(buckets)))
     }
 
     pub fn flush(&mut self) {
@@ -302,6 +356,7 @@ impl<V: Clone + Debug> HybridBTreeMap<V> {
         }
     }
     pub fn values(&self) -> Values<V> {
+        // todo: this may be unsafe if we are asking for things with an update cache active. thankfully, we only call values at startup right now
         let num_buckets = self.disk.num_buckets();
         let start = num_buckets * self.bin_index / self.bins;
         let end = num_buckets * (self.bin_index + 1) / self.bins;
