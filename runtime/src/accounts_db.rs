@@ -4665,7 +4665,7 @@ impl AccountsDb {
     {
         // Without chunks, we end up with 1 output vec for each outer snapshot storage.
         // This results in too many vectors to be efficient.
-        const MAX_ITEMS_PER_CHUNK: Slot = 5_000;
+        const MAX_ITEMS_PER_CHUNK: Slot = 5000_000;
         let chunks = 1 + (snapshot_storages.range_width() as Slot / MAX_ITEMS_PER_CHUNK);
         (0..chunks)
             .into_par_iter()
@@ -4925,6 +4925,7 @@ impl AccountsDb {
                 let mut do_storage_scan = true; //;
                 let mut use_per_slot_accumulator = false;
                 if valid_for_caching {
+                    if false {/*
                     let cached_data = crate::storage_hash_data::CacheHashData::load(
                         &storages.first().unwrap().accounts.get_path(),
                         bin_range,
@@ -4937,10 +4938,9 @@ impl AccountsDb {
                         let loaded = cached_data.iter().map(|x| x.len()).sum::<usize>();
                         stats.entries += loaded;
                         stats.entries_loaded_from_cache +=loaded;
-                            loaded;
                         stats.merge_us += Self::merge_slot_data(accumulator, &mut cached_data, range, bin_range.start, &bin_calculator);
                         do_storage_scan = false;
-                        big_stats.lock().unwrap().merge(&stats);
+                        big_stats.lock().unwrap().merge(&stats);*/
                     } else {
                         use_per_slot_accumulator = true;
                     }
@@ -4962,8 +4962,8 @@ impl AccountsDb {
                 )
                 .unwrap();
                 if let Ok(cached_data) = cached_data {
-                    assert_eq!(cached_data.0[0].len(), per_slot_data[0].len());
-                    assert_eq!(&cached_data.0, per_slot_data, "{:?}, {:?}", cached_data.0, per_slot_data);
+                    assert_eq!(cached_data.0[0].len(), per_slot_data[0].len(), "slot: {}", slot);
+                    assert_eq!(&cached_data.0, per_slot_data, "slot: {}, {:?}, {:?}", slot, cached_data.0, per_slot_data);
                 }
                 
                 //let mut stats = crate::storage_hash_data::CacheHashDataStats::default();
