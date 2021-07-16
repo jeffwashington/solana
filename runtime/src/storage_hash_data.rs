@@ -351,10 +351,10 @@ impl CacheHashData {
         let mut i = 0;
         data.iter().for_each(|x| {
             x.iter().for_each(|item| {
-                let mut d = chd.get_mut(i as u64);
+                let mut d = chd.get_mut::<CalculateHashIntermediate>(i as u64);
                 i += 1;
-                *d = item;
-                assert_eq!(d, &item);
+                *d = item.clone();
+                assert_eq!(d, item);
                 if slot == 86376721 {
                     error!("wrote: {:?}", *d);
                     if i > 1 {
