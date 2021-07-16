@@ -33,7 +33,7 @@ use std::{
 use thiserror::Error;
 
 pub const ITER_BATCH_SIZE: usize = 1000;
-pub const BINS: usize = 256;
+pub const BINS: usize = 4096;
 pub type ScanResult<T> = Result<T, ScanError>;
 pub type SlotList<T> = Vec<(Slot, T)>;
 pub type SlotSlice<'s, T> = &'s [(Slot, T)];
@@ -706,8 +706,7 @@ pub trait ZeroLamport {
 }
 
 fn get_bin_pubkey(pubkey: &Pubkey) -> usize {
-    let byte_of_pubkey_to_bin = 0; // TODO: this should not be 0. For now it needs to be due to requests for in-order pubkeys
-    (pubkey.as_ref()[byte_of_pubkey_to_bin] as usize) * BINS / ((u8::MAX as usize) + 1)
+    crate::pubkey_bins::PubkeyBinCalculator16::bin_from_pubkey_static(BINS, pubkey)
 }
 
 type MapType<T> = AccountMap<T>;
