@@ -195,6 +195,7 @@ impl CacheHashData {
         let path = Self::calc_path(storage_file, bin_range)?;
         m0.stop();
         timings.calc_path_us += m0.as_us();
+        let file_len = std::fs::metadata(path.clone())?.len();
         let mut m0 = Measure::start("");
         let mut file = OpenOptions::new()
             .read(true)
@@ -218,6 +219,9 @@ impl CacheHashData {
             let mut header = chd.get_header_mut();
             let sum = header.count;
     
+            let capacity = elem_size * (sum as u64) + std::mem::size_of::<Header>() as u64;
+            assert_eq!(capacity, file_len);
+
             //error!("writing {} bytes to: {:?}, lens: {:?}, storage_len: {}, storage: {:?}", encoded.len(), cache_path, file_data.data.iter().map(|x| x.len()).collect::<Vec<_>>(), file_len, storage_file);
             let mut stats = CacheHashDataStats {
                 //storage_size: file_len as usize,
