@@ -300,7 +300,7 @@ impl CacheHashData {
         if create {
             let _ignored = remove_file(&cache_path);
         }
-        let elem_size = std::mem::size_of::<CacheHashData>() as u64;
+        let elem_size = std::mem::size_of::<CalculateHashIntermediate>() as u64;
         let mut m0 = Measure::start("");
         let entries = data.iter().map(|x: &Vec<CalculateHashIntermediate>| x.len()).collect::<Vec<_>>();
         let sum = entries.iter().sum::<usize>();
@@ -309,7 +309,7 @@ impl CacheHashData {
         let cell_size = elem_size;
         let capacity = elem_size * (sum as u64) + std::mem::size_of::<Header>() as u64;
         let mut m1 = Measure::start("");
-        error!("writing: len on disk: {} {:?}, sum: {}", capacity, cache_path, sum);
+        //error!("writing: len on disk: {} {:?}, sum: {}", capacity, cache_path, sum);
 
         let mmap = Self::new_map(&cache_path, cell_size as usize, capacity);
         m1.stop();
