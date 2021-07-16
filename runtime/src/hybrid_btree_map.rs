@@ -126,7 +126,7 @@ impl<V: 'static + Clone + Debug> BucketMapWriteHolder<V> {
                     },
                 }
             }
-            self.disk.update(key, updatefn);
+            //self.disk.update(key, updatefn);
         }
     }
     pub fn get(&self, key: &Pubkey) -> Option<(u64, Vec<SlotT<V>>)> {

@@ -1596,8 +1596,8 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
             //  - The secondary index is never consulted as primary source of truth for gets/stores.
             //  So, what the accounts_index sees alone is sufficient as a source of truth for other non-scan
             //  account operations.
-            let w_account_maps = self.get_account_maps_write_lock(pubkey);
             let new_item = WriteAccountMapEntry::new_entry_after_update(slot, account_info);
+            let w_account_maps = self.get_account_maps_write_lock(pubkey);
             self.upsert_with_lock(*pubkey, w_account_maps, new_item, reclaims)
         }
         .0;
