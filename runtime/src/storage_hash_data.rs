@@ -240,9 +240,6 @@ impl CacheHashData {
                 let mut d = chd.get_mut::<CalculateHashIntermediate>(i as u64);
                 result.push(d.clone());
             }
-            stats.loaded_from_cache += 1;
-            stats.entries_loaded_from_cache += sum;
-            stats.entries += sum;
             m2.stop();
             stats.decode_us += m2.as_us();
             //stats.write_to_mmap_us += m2.as_us();

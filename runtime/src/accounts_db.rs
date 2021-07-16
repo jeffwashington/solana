@@ -4931,8 +4931,10 @@ impl AccountsDb {
                         //panic!("shouldn't be loading from cache");
                         let (mut cached_data, mut stats) = cached_data.unwrap();
                         stats.loaded_from_cache += 1;
-                        stats.entries_loaded_from_cache +=
-                            cached_data.iter().map(|x| x.len()).sum::<usize>();
+                        let loaded = cached_data.iter().map(|x| x.len()).sum::<usize>();
+                        stats.entries += sum;
+                        stats.entries_loaded_from_cache +=loaded;
+                            loaded;
                         stats.merge_us += Self::merge_slot_data(accumulator, &mut cached_data, range, bin_range.start, &bin_calculator);
                         do_storage_scan = false;
                         big_stats.lock().unwrap().merge(&stats);
@@ -4943,14 +4945,11 @@ impl AccountsDb {
                 (do_storage_scan, use_per_slot_accumulator)
             },
             |slot, storages, per_slot_data, accumulator| {
-                /*
                 let cached_data = crate::storage_hash_data::CacheHashData::load(
                     &storages.first().unwrap().accounts.get_path(),
                     bin_range,
                 );
                 assert!(!cached_data.is_ok());
-                */
-
                 let mut stats = crate::storage_hash_data::CacheHashData::save2(
                     slot,
                     &storages.first().unwrap().accounts.get_path(),
