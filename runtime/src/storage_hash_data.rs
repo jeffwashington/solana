@@ -238,6 +238,10 @@ impl CacheHashData {
         let mut result = Vec::with_capacity(sum);
         for i in 0..sum {
             let mut d = chd.get_mut::<CalculateHashIntermediate>(i as u64);
+            if slot == 86376721 {
+                error!("read: {:?}", d.clone());
+            }
+
             result.push(d.clone());
         }
         assert_eq!(result.len(), sum);
@@ -351,6 +355,14 @@ impl CacheHashData {
                 i += 1;
                 *d = item;
                 assert_eq!(d, &item);
+                if slot == 86376721 {
+                    error!("wrote: {:?}", *d);
+                    if i > 1 {
+                        let mut d = chd.get_mut((i - 1) as u64);
+                        error!("wrote: {:?} previous one", *d);
+                    }
+
+                }
             })
         });
         assert_eq!(i, sum);
