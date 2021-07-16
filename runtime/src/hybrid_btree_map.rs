@@ -59,13 +59,15 @@ impl<V: 'static + Clone + Debug> BucketMapWriteHolder<V> {
         }
     }
     pub fn flush(&self, ix: usize) {
-        let wc = &mut self.write_cache[ix].write().unwrap();
-        for (k,v) in wc.iter() {
-            self.disk.update(k, |_previous| {
-                Some((v.slot_list.clone(), v.ref_count))
-            });
+        if ix < self.write_cache.len() {
+            let wc = &mut self.write_cache[ix].write().unwrap();
+            for (k,v) in wc.iter() {
+                self.disk.update(k, |_previous| {
+                    Some((v.slot_list.clone(), v.ref_count))
+                });
+            }
+            wc.clear();
         }
-        wc.clear();
     }
     pub fn bucket_len(&self, ix: usize) -> u64 {
         self.disk.bucket_len(ix)
