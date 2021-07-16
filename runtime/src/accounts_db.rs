@@ -4920,7 +4920,7 @@ impl AccountsDb {
                 result
             },
             // pre-scan
-            |_slot, storages, accumulator, all_data_from_storages| {
+            |slot, storages, accumulator, all_data_from_storages| {
                 let valid_for_caching = storages.len() == 1 && all_data_from_storages;
                 let mut do_storage_scan = true; //;
                 let mut use_per_slot_accumulator = false;
