@@ -4970,7 +4970,7 @@ impl AccountsDb {
                 
                 //let mut stats = crate::storage_hash_data::CacheHashDataStats::default();
                 stats.merge_us += Self::merge_slot_data(accumulator, per_slot_data, range, bin_range.start, &bin_calculator);
-                assert!(per_slot_data.is_empty());
+                assert_eq!(per_slot_data.iter().map(|x| x.len()).sum::<usize>(), 0);
                 big_stats.lock().unwrap().merge(&stats);
                 per_slot_data.clear();
             },
