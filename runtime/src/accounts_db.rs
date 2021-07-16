@@ -4962,6 +4962,7 @@ impl AccountsDb {
                     bin_range,
                 )
                 .unwrap();
+                assert_eq!(per_slot_data.iter().map(|x| x.len()).sum::<usize>(), per_slot_data[0].len());
                 error!("per_slot_items: {}, total_items: {}", per_slot_data.iter().map(|x| x.len()).sum::<usize>(), accumulator.iter().map(|x| x.len()).sum::<usize>());
                 if let Ok(cached_data) = cached_data {
                     assert_eq!(cached_data.0[0].len(), per_slot_data[0].len(), "slot: {}", slot);
