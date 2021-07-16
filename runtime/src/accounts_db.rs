@@ -4677,7 +4677,7 @@ impl AccountsDb {
                 for slot in start..end {
                     let sub_storages = snapshot_storages.get(slot);
                     let mut valid_slot = false;
-                    let mut all_data_from_storage = false;
+                    let mut all_data_from_storage = true;
                     if let Some((cache, ancestors, accounts_index)) = accounts_cache_and_ancestors {
                         if let Some(slot_cache) = cache.slot_cache(slot) {
                             if valid_slot
