@@ -4932,11 +4932,9 @@ impl AccountsDb {
                         slot,
                         &storages.first().unwrap().accounts.get_path(),
                         bin_range,
-                        |loaded_item| {
-                            let mut pubkey_to_bin_index = bin_calculator.bin_from_pubkey(&loaded_item.pubkey);
-                            pubkey_to_bin_index -= bin_range.start;
-                            accumulator[pubkey_to_bin_index].push(loaded_item.clone()); // can't avoid clone here - the data is a ref from a file
-                        }
+                        accumulator,
+                        bin_range.start,
+                        &bin_calculator,
                     );
                     if cached_data.is_ok()
                     {

@@ -15,6 +15,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::UNIX_EPOCH;
 use std::{io::Read, ops::Range, path::Path};
+use crate::pubkey_bins::PubkeyBinCalculator16;
 
 use crate::accounts_db::{num_scan_passes, BINS_PER_PASS, PUBKEY_BINS_FOR_CALCULATING_HASHES};
 
@@ -177,13 +178,13 @@ impl CacheHashData {
         }*/
     }
     */
-    pub fn load<P: AsRef<Path>, F:
-    FnMut(&CalculateHashIntermediate) + Send + Sync,    
-    >(
+    pub fn load<P: AsRef<Path>>(
         slot: Slot,
         storage_file: &P,
         bin_range: &Range<usize>,
-        mut loaded_item: F,
+        accumulator: &mut Vec<Vec<CalculateHashIntermediate>>,
+        start_bin_index: usize,
+        bin_calculator:&PubkeyBinCalculator16,
     ) -> Result<(SavedType, CacheHashDataStats), std::io::Error> {
         let mut m = Measure::start("overall");
         let create = false;
@@ -194,6 +195,7 @@ impl CacheHashData {
         timings.calc_path_us += m0.as_us();
         let file_len = std::fs::metadata(path.clone())?.len();
         let mut m0 = Measure::start("");
+        let mut m1 = Measure::start("");
         let mut file = OpenOptions::new()
             .read(true)
             .write(true)
@@ -201,10 +203,7 @@ impl CacheHashData {
             .open(&path.clone())?;
 
         let elem_size = std::mem::size_of::<CalculateHashIntermediate>() as u64;
-        let mut m0 = Measure::start("");
-        m0.stop();
         let cell_size = elem_size;
-        let mut m1 = Measure::start("");
         let mmap = unsafe { MmapMut::map_mut(&file).unwrap() };
         m1.stop();
         let mut chd = CacheHashData {
@@ -235,6 +234,8 @@ impl CacheHashData {
             entries: sum,
             ..CacheHashDataStats::default()
         };
+        stats.read_us = m1.as_us();
+
 
 
         stats.entries_loaded_from_cache +=sum;
@@ -242,7 +243,9 @@ impl CacheHashData {
         let mut i = 0;
         for i in 0..sum {
             let mut d = chd.get_mut::<CalculateHashIntermediate>(i as u64);
-            loaded_item(d);
+            let mut pubkey_to_bin_index = bin_calculator.bin_from_pubkey(&d.pubkey);
+            pubkey_to_bin_index -= start_bin_index;
+            accumulator[pubkey_to_bin_index].push(d.clone()); // may want to avoid clone here
         }
 
         m2.stop();
