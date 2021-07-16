@@ -341,6 +341,7 @@ impl CacheHashData {
         //error!("wrote: {:?}, {}, sum: {}, elem_size: {}", cache_path, capacity, sum, elem_size);//, storage_file);
         m.stop();
         stats.save_us += m.as_us();
+        chd.mmap.flush();
         
         /*
         let expected_mod_date = 0; // TODO
