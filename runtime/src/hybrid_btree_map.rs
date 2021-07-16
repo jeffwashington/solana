@@ -116,7 +116,12 @@ impl<V: 'static + Clone + Debug> BucketMapWriteHolder<V> {
                         gm.slot_list = result.0;
                         gm.ref_count = result.1;
                     },
-                    HashMapEntry::Vacant(vacant) => {panic!("");},
+                    HashMapEntry::Vacant(vacant) => {
+                        vacant.insert(AccountMapEntry {
+                            slot_list: result.0,
+                            ref_count: result.1,
+                        });
+                    },
                 }
             }
             self.disk.update(key, updatefn);
@@ -334,7 +339,7 @@ impl<V: 'static + Clone + Debug> HybridBTreeMap<V> {
         let num_buckets = self.disk.num_buckets();
         let mystart = num_buckets * self.bin_index / self.bins;
         let myend = num_buckets * (self.bin_index + 1) / self.bins;
-        (mystart..myend).for_each(|ix| {
+        (mystart..=myend).for_each(|ix| { // = here?
             self.disk.flush(ix);
         });
 
