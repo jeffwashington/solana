@@ -4873,7 +4873,7 @@ impl AccountsDb {
                 }
 
                 let range =
-                if per_slot_accum {
+                if per_slot_accum && false {
                     pubkey_to_bin_index = 0;
                     1 // only 1 range
                 }

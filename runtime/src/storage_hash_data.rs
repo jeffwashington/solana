@@ -237,7 +237,6 @@ impl CacheHashData {
         };
 
 
-        stats.entries += sum;
         stats.entries_loaded_from_cache +=sum;
         let mut m2 = Measure::start("");
         let mut i = 0;
