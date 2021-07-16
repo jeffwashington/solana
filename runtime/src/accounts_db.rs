@@ -4658,7 +4658,7 @@ impl AccountsDb {
     where
         F: Fn(LoadedAccount, &mut B, Slot, bool) + Send + Sync,
         F2: Fn(B) -> C + Send + Sync,
-        F3: Fn(Slot, &[Arc<AccountStorageEntry>], &mut B) -> (bool, bool) + Send + Sync,
+        F3: Fn(Slot, &[Arc<AccountStorageEntry>], &mut B, bool) -> (bool, bool) + Send + Sync,
         F4: Fn(Slot, &[Arc<AccountStorageEntry>], &mut B, &mut B) + Send + Sync,
         B: Send + Default,
         C: Send + Default,
@@ -4677,9 +4677,32 @@ impl AccountsDb {
                 for slot in start..end {
                     let sub_storages = snapshot_storages.get(slot);
                     let mut valid_slot = false;
+                    let mut all_data_from_storage = false;
+                    if let Some((cache, ancestors, accounts_index)) = accounts_cache_and_ancestors {
+                        if let Some(slot_cache) = cache.slot_cache(slot) {
+                            if valid_slot
+                                || ancestors.contains_key(&slot)
+                                || accounts_index.is_root(slot)
+                            {
+                                let keys = slot_cache.get_all_pubkeys();
+                                all_data_from_storage = keys.is_empty();
+                                for key in keys {
+                                    if let Some(cached_account) = slot_cache.get_cloned(&key) {
+                                        let mut accessor = LoadedAccountAccessor::Cached(Some((
+                                            key,
+                                            Cow::Owned(cached_account),
+                                        )));
+                                        let account = accessor.get_loaded_account().unwrap();
+                                        scan_func(account, &mut retval, slot, false);
+                                    };
+                                }
+                            }
+                        }
+                    }
+
                     if let Some(sub_storages) = sub_storages {
                         let (do_storage_scan, use_per_slot_accumulator) =
-                            prior_to_slot(slot, sub_storages, &mut retval);
+                            prior_to_slot(slot, sub_storages, &mut retval, all_data_from_storage);
                         if do_storage_scan {
                             let data_to_use = if use_per_slot_accumulator {
                                 &mut per_slot_data
@@ -4696,26 +4719,6 @@ impl AccountsDb {
                             );
                             if use_per_slot_accumulator {
                                 after_slot(slot, sub_storages, &mut per_slot_data, &mut retval);
-                            }
-                        }
-                    }
-                    if let Some((cache, ancestors, accounts_index)) = accounts_cache_and_ancestors {
-                        if let Some(slot_cache) = cache.slot_cache(slot) {
-                            if valid_slot
-                                || ancestors.contains_key(&slot)
-                                || accounts_index.is_root(slot)
-                            {
-                                let keys = slot_cache.get_all_pubkeys();
-                                for key in keys {
-                                    if let Some(cached_account) = slot_cache.get_cloned(&key) {
-                                        let mut accessor = LoadedAccountAccessor::Cached(Some((
-                                            key,
-                                            Cow::Owned(cached_account),
-                                        )));
-                                        let account = accessor.get_loaded_account().unwrap();
-                                        scan_func(account, &mut retval, slot, false);
-                                    };
-                                }
                             }
                         }
                     }
@@ -4917,8 +4920,9 @@ impl AccountsDb {
                 sort_time.fetch_add(timing, Ordering::Relaxed);
                 result
             },
-            |_slot, storages, accumulator| {
-                let valid_for_caching = storages.len() == 1;
+            // pre-scan
+            |_slot, storages, accumulator, all_data_from_storages| {
+                let valid_for_caching = storages.len() == 1 && all_data_from_storages;
                 let mut do_storage_scan = true; //;
                 let mut use_per_slot_accumulator = false;
                 if valid_for_caching {
@@ -4944,6 +4948,7 @@ impl AccountsDb {
                 }
                 (do_storage_scan, use_per_slot_accumulator)
             },
+            // post-scan
             |slot, storages, per_slot_data, accumulator| {
                 let cached_data = crate::storage_hash_data::CacheHashData::load(
                     &storages.first().unwrap().accounts.get_path(),
@@ -4958,7 +4963,7 @@ impl AccountsDb {
                 )
                 .unwrap();
                 if let Ok(cached_data) = cached_data {
-                    assert_eq!(cached_data.0.len(), per_slot_data[0].len());
+                    //assert_eq!(cached_data.0.len(), per_slot_data[0].len());
                     assert_eq!(&cached_data.0, per_slot_data, "{:?}, {:?}", cached_data.0, per_slot_data);
                 }
                 

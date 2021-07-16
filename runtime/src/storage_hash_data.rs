@@ -1,7 +1,11 @@
 //! Cached data for hashing accounts
+use crate::accounts_hash::CalculateHashIntermediate;
 use log::*;
 use memmap2::MmapMut;
 use rand::{thread_rng, Rng};
+use serde::{Deserialize, Serialize};
+use solana_measure::measure::Measure;
+use solana_sdk::clock::Slot;
 use std::fs::{remove_file, OpenOptions};
 use std::io::Seek;
 use std::io::SeekFrom;
@@ -9,21 +13,10 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use crate::accounts_hash::CalculateHashIntermediate;
-use serde::{Deserialize, Serialize};
-use solana_measure::measure::Measure;
-use std::time::{UNIX_EPOCH};
-use std::{
-    io::{Read},
-    ops::Range,
-    path::{Path},
-};
-use solana_sdk::{
-    clock::Slot,
-};
+use std::time::UNIX_EPOCH;
+use std::{io::Read, ops::Range, path::Path};
 
-use crate::accounts_db::{PUBKEY_BINS_FOR_CALCULATING_HASHES, num_scan_passes, BINS_PER_PASS};
-
+use crate::accounts_db::{num_scan_passes, BINS_PER_PASS, PUBKEY_BINS_FOR_CALCULATING_HASHES};
 
 pub type SavedType = Vec<Vec<CalculateHashIntermediate>>;
 
@@ -145,14 +138,13 @@ impl CacheHashData {
         // the file so that we won't have to resize it later, which may be
         // expensive.
         //debug!("GROWING file {}", capacity * cell_size as u64);
-        data.seek(SeekFrom::Start(capacity - 1))
-            .unwrap();
+        data.seek(SeekFrom::Start(capacity - 1)).unwrap();
         data.write_all(&[0]).unwrap();
         data.seek(SeekFrom::Start(0)).unwrap();
         data.flush().unwrap();
         unsafe { MmapMut::map_mut(&data).unwrap() }
     }
-/*
+    /*
     pub fn test() {
         let drives = Arc::new(vec![]);//    drives: Arc<Vec<PathBuf>>,
         let elements = 0;
@@ -164,7 +156,7 @@ impl CacheHashData {
         );
     }
     */
-/*
+    /*
     pub fn new_with_capacity(
         drives: Arc<Vec<PathBuf>>,
         num_elems: u64,
@@ -204,58 +196,66 @@ impl CacheHashData {
             .create(create)
             .open(&path.clone())?;
 
-            let elem_size = std::mem::size_of::<CalculateHashIntermediate>() as u64;
-            let mut m0 = Measure::start("");
-            m0.stop();
-            let cell_size = elem_size;
-            let mut m1 = Measure::start("");
-            let mmap = unsafe { MmapMut::map_mut(&file).unwrap() };
-            m1.stop();
-            let mut chd = CacheHashData {
-                //data: SavedType::default(),
-                //storage_path
-                mmap,
-                cell_size,
-                capacity: 0,
-            };
-            let mut header = chd.get_header_mut();
-            let sum = header.count;
-    
-            let capacity = elem_size * (sum as u64) + std::mem::size_of::<Header>() as u64;
-            chd.capacity = capacity;
-            assert_eq!(capacity, file_len, "expected: {}, len on disk: {} {:?}, sum: {}, elem_size: {}", capacity, file_len, path, sum, cell_size);
+        let elem_size = std::mem::size_of::<CalculateHashIntermediate>() as u64;
+        let mut m0 = Measure::start("");
+        m0.stop();
+        let cell_size = elem_size;
+        let mut m1 = Measure::start("");
+        let mmap = unsafe { MmapMut::map_mut(&file).unwrap() };
+        m1.stop();
+        let mut chd = CacheHashData {
+            //data: SavedType::default(),
+            //storage_path
+            mmap,
+            cell_size,
+            capacity: 0,
+        };
+        let mut header = chd.get_header_mut();
+        let sum = header.count;
 
-            //error!("writing {} bytes to: {:?}, lens: {:?}, storage_len: {}, storage: {:?}", encoded.len(), cache_path, file_data.data.iter().map(|x| x.len()).collect::<Vec<_>>(), file_len, storage_file);
-            let mut stats = CacheHashDataStats {
-                //storage_size: file_len as usize,
-                entries: sum,
-                ..CacheHashDataStats::default()
-            
-            };
-    
-            let mut m2 = Measure::start("");
-            let mut i = 0;
-            let mut result = Vec::with_capacity(sum);
-            for i in 0..sum {
-                let mut d = chd.get_mut::<CalculateHashIntermediate>(i as u64);
-                result.push(d.clone());
-            }
-            assert_eq!(result.len(), sum);
-            m2.stop();
-            stats.decode_us += m2.as_us();
-            //stats.write_to_mmap_us += m2.as_us();
-            //error!("wrote: {:?}, {}, sum: {}, elem_size: {}", cache_path, capacity, sum, elem_size);//, storage_file);
-            m.stop();
-            stats.load_us += m.as_us();
-            //stats.save_us += m.as_us();
+        let capacity = elem_size * (sum as u64) + std::mem::size_of::<Header>() as u64;
+        chd.capacity = capacity;
+        assert_eq!(
+            capacity, file_len,
+            "expected: {}, len on disk: {} {:?}, sum: {}, elem_size: {}",
+            capacity, file_len, path, sum, cell_size
+        );
 
+        //error!("writing {} bytes to: {:?}, lens: {:?}, storage_len: {}, storage: {:?}", encoded.len(), cache_path, file_data.data.iter().map(|x| x.len()).collect::<Vec<_>>(), file_len, storage_file);
+        let mut stats = CacheHashDataStats {
+            //storage_size: file_len as usize,
+            entries: sum,
+            ..CacheHashDataStats::default()
+        };
 
+        let mut m2 = Measure::start("");
+        let mut i = 0;
+        let mut result = Vec::with_capacity(sum);
+        for i in 0..sum {
+            let mut d = chd.get_mut::<CalculateHashIntermediate>(i as u64);
+            result.push(d.clone());
+        }
+        assert_eq!(result.len(), sum);
+        m2.stop();
+        stats.decode_us += m2.as_us();
+        //stats.write_to_mmap_us += m2.as_us();
+        //error!("wrote: {:?}, {}, sum: {}, elem_size: {}", cache_path, capacity, sum, elem_size);//, storage_file);
+        m.stop();
+        stats.load_us += m.as_us();
+        //stats.save_us += m.as_us();
         Ok((vec![result], stats))
     }
     pub fn get_mut<T: Sized>(&self, ix: u64) -> &mut T {
         let start = (ix * self.cell_size) as usize + std::mem::size_of::<Header>();
         let end = start + std::mem::size_of::<T>();
-        assert!(end <= self.capacity as usize, "end: {}, capacity: {}, ix: {}, cell size: {}", end, self.capacity, ix, self.cell_size);
+        assert!(
+            end <= self.capacity as usize,
+            "end: {}, capacity: {}, ix: {}, cell size: {}",
+            end,
+            self.capacity,
+            ix,
+            self.cell_size
+        );
         let item_slice: &[u8] = &self.mmap[start..end];
         unsafe {
             let item = item_slice.as_ptr() as *mut T;
@@ -273,7 +273,6 @@ impl CacheHashData {
         }
     }
 
-
     pub fn save2<P: AsRef<Path> + std::fmt::Debug>(
         slot: Slot,
         storage_file: &P,
@@ -282,13 +281,12 @@ impl CacheHashData {
     ) -> Result<CacheHashDataStats, std::io::Error> {
         let mut m = Measure::start("save");
         let mut stats;
-            //error!("raw path: {:?}", storage_file);
-            let mut m0 = Measure::start("");
+        //error!("raw path: {:?}", storage_file);
+        let mut m0 = Measure::start("");
         let cache_path = Self::calc_path(storage_file, bin_range)?;
         m0.stop();
         stats = CacheHashDataStats {
             ..CacheHashDataStats::default()
-        
         };
 
         stats.calc_path_us += m0.as_us();
@@ -300,7 +298,10 @@ impl CacheHashData {
         }
         let elem_size = std::mem::size_of::<CalculateHashIntermediate>() as u64;
         let mut m0 = Measure::start("");
-        let entries = data.iter().map(|x: &Vec<CalculateHashIntermediate>| x.len()).collect::<Vec<_>>();
+        let entries = data
+            .iter()
+            .map(|x: &Vec<CalculateHashIntermediate>| x.len())
+            .collect::<Vec<_>>();
         let sum = entries.iter().sum::<usize>();
         m0.stop();
         stats.sum_entries_us += m0.as_us();
@@ -318,8 +319,8 @@ impl CacheHashData {
             cell_size,
             capacity,
         };
-            stats.create_save_us= m1.as_us();
-            stats.cache_file_count= 1;
+        stats.create_save_us = m1.as_us();
+        stats.cache_file_count = 1;
 
         let mut header = chd.get_header_mut();
         header.count = sum;
@@ -330,16 +331,17 @@ impl CacheHashData {
             cache_file_size: capacity as usize,
             entries: sum,
             ..CacheHashDataStats::default()
-        
         };
 
         let mut m2 = Measure::start("");
         let mut i = 0;
-        data.iter().for_each(|x| x.iter().for_each(|item| {
-            let mut d = chd.get_mut(i as u64);
-            i += 1;
-            *d = item;
-        }));
+        data.iter().for_each(|x| {
+            x.iter().for_each(|item| {
+                let mut d = chd.get_mut(i as u64);
+                i += 1;
+                *d = item;
+            })
+        });
         assert_eq!(i, sum);
         m2.stop();
         stats.write_to_mmap_us += m2.as_us();
@@ -347,7 +349,6 @@ impl CacheHashData {
         m.stop();
         stats.save_us += m.as_us();
         //chd.mmap.flush()?;
-        
         /*
         let expected_mod_date = 0; // TODO
         let file_size = 0; // TODO
@@ -370,7 +371,6 @@ impl CacheHashData {
             cache_file_size: encoded.len(),
             entries,
             ..CacheHashDataStats::default()
-        
         };
         std::mem::swap(&mut file_data.data, data);
 
