@@ -96,7 +96,15 @@ impl<V: 'static + Clone + Debug> BucketMapWriteHolder<V> {
         }
     }
     pub fn get(&self, key: &Pubkey) -> Option<(u64, Vec<SlotT<V>>)> {
-        self.disk.get(key)
+        let ix = self.disk.bucket_ix(key);
+        let wc = &mut self.write_cache[ix].read().unwrap();
+        let res = wc.get(key);
+        if let Some(res) = res {
+            Some((res.ref_count, res.slot_list.clone()))
+        }
+        else {
+            self.disk.get(key)
+        }
     }
     pub fn addref(&self, key: &Pubkey) -> Option<u64> {
         self.disk.addref(key)
