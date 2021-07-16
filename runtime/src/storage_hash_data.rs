@@ -358,7 +358,7 @@ impl CacheHashData {
                 if slot == 86376721 {
                     error!("wrote: {:?}", *d);
                     if i > 1 {
-                        let mut d = chd.get_mut((i - 1) as u64);
+                        let mut d = chd.get_mut::<CalculateHashIntermediate>((i - 1) as u64);
                         error!("wrote: {:?} previous one", *d);
                     }
 
