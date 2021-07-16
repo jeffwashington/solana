@@ -117,12 +117,13 @@ impl CacheHashData {
         let (cache, file_name) = Self::directory(storage_file);
         let amod = std::fs::metadata(storage_file)?.modified()?;
         let secs = amod.duration_since(UNIX_EPOCH).unwrap().as_secs();
-        let result = cache.join(format!(
+        let file_name = format!(
             "{}.{}.{}",
             file_name,
             secs.to_string(),
             format!("{}.{}", bin_range.start, bin_range.end),
-        ));
+        );
+        let result = cache.join(file_name.clone());
         Ok((result.to_path_buf(), file_name))
     }
 
