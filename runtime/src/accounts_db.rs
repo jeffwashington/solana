@@ -4907,6 +4907,9 @@ impl AccountsDb {
                         mismatch_found.fetch_add(1, Ordering::Relaxed);
                     }
                 }
+                if accumulator.is_empty() {
+                    accumulator.append(&mut vec![Vec::new(); range]);
+                }
                 accum[pubkey_to_bin_index].push(source_item);
             },
             |x| {
