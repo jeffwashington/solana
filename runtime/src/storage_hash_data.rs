@@ -223,7 +223,7 @@ impl CacheHashData {
     
             let capacity = elem_size * (sum as u64) + std::mem::size_of::<Header>() as u64;
             chd.capacity = capacity;
-            assert_eq!(capacity, file_len, "expected: {}, len on disk: {} {:?}", capacity, file_len, path);
+            assert_eq!(capacity, file_len, "expected: {}, len on disk: {} {:?}, sum: {}, elem_size: {}", capacity, file_len, path, sum, cell_size);
 
             //error!("writing {} bytes to: {:?}, lens: {:?}, storage_len: {}, storage: {:?}", encoded.len(), cache_path, file_data.data.iter().map(|x| x.len()).collect::<Vec<_>>(), file_len, storage_file);
             let mut stats = CacheHashDataStats {
@@ -309,7 +309,7 @@ impl CacheHashData {
         let cell_size = elem_size;
         let capacity = elem_size * (sum as u64) + std::mem::size_of::<Header>() as u64;
         let mut m1 = Measure::start("");
-        error!("writing: len on disk: {} {:?}", capacity, cache_path);
+        error!("writing: len on disk: {} {:?}, sum: {}", capacity, cache_path, sum);
 
         let mmap = Self::new_map(&cache_path, cell_size as usize, capacity);
         m1.stop();
