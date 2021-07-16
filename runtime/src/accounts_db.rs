@@ -18,6 +18,7 @@
 //! tracks the number of commits to the entire data store. So the latest
 //! commit for each slot entry would be indexed.
 
+use crate::storage_hash_data::{CacheHashData, CacheHashDataStats};
 use crate::{
     accounts_background_service::{DroppedSlotsSender, SendDroppedBankCallback},
     accounts_cache::{AccountsCache, CachedAccount, SlotCache},
@@ -4855,8 +4856,12 @@ impl AccountsDb {
         let range = bin_range.end - bin_range.start;
         let sort_time = AtomicU64::new(0);
         let big_stats = Arc::new(Mutex::new(
-            crate::storage_hash_data::CacheHashDataStats::default(),
+            CacheHashDataStats::default(),
         ));
+
+        let cache_files_list = storage.get(storage.range().start).map(|storage| storage.first().map(|s| 
+        CacheHashData::get_cache_files(&s.get_path()))).unwrap_or_default();
+        error!("cache files {:?}", cache_files_list);
 
         let result: Vec<Vec<Vec<CalculateHashIntermediate>>> = Self::scan_account_storage_no_bank(
             accounts_cache_and_ancestors,
@@ -4928,7 +4933,7 @@ impl AccountsDb {
                 let mut use_per_slot_accumulator = false;
                 if valid_for_caching {
                     //if false {/*
-                    let cached_data = crate::storage_hash_data::CacheHashData::load(
+                    let cached_data = CacheHashData::load(
                         slot,
                         &storages.first().unwrap().accounts.get_path(),
                         bin_range,
@@ -4953,7 +4958,7 @@ impl AccountsDb {
             },
             // post-scan
             |slot, storages, per_slot_data, accumulator| {
-                let mut stats = crate::storage_hash_data::CacheHashData::save2(
+                let mut stats = CacheHashData::save2(
                     slot,
                     &storages.first().unwrap().accounts.get_path(),
                     per_slot_data,
@@ -4961,7 +4966,7 @@ impl AccountsDb {
                 )
                 .unwrap();
                 
-                //let mut stats = crate::storage_hash_data::CacheHashDataStats::default();
+                //let mut stats = CacheHashDataStats::default();
                 stats.merge_us += Self::merge_slot_data(accumulator, per_slot_data, range, bin_range.start, &bin_calculator);
                 assert_eq!(per_slot_data.iter().map(|x| x.len()).sum::<usize>(), 0);
                 big_stats.lock().unwrap().merge(&stats);

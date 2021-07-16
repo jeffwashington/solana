@@ -1,4 +1,6 @@
 //! Cached data for hashing accounts
+use std::io;
+use std::fs::{self, DirEntry};
 use crate::accounts_hash::CalculateHashIntermediate;
 use log::*;
 use memmap2::MmapMut;
@@ -178,6 +180,21 @@ impl CacheHashData {
         }*/
     }
     */
+    pub fn get_cache_files<P: AsRef<Path>>(storage_path: &P) -> Vec<PathBuf> {
+        let mut items = vec![];
+        if storage_path.as_ref().is_dir() {
+            let dir = fs::read_dir(storage_path);
+            if let Ok(dir) = dir {
+                for entry in dir {
+                    if let Ok(entry) = entry {
+                        let path = entry.path();
+                        items.push(path.clone());
+                    }
+                }
+            }
+        }
+        items
+    }
     pub fn load<P: AsRef<Path>>(
         slot: Slot,
         storage_file: &P,
@@ -235,7 +252,7 @@ impl CacheHashData {
             ..CacheHashDataStats::default()
         };
         stats.read_us = m1.as_us();
-
+        stats.cache_file_size += capacity as usize;
 
 
         stats.entries_loaded_from_cache +=sum;
