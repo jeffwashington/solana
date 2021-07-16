@@ -99,21 +99,25 @@ impl CacheHashDataStats {
 
 use bincode::serialize;
 impl CacheHashData {
-    fn calc_path<P: AsRef<Path>>(
-        storage_file: &P,
-        bin_range: &Range<usize>,
-    ) -> Result<PathBuf, std::io::Error> {
+    fn directory<P: AsRef<Path>>(storage_file: &P) -> (PathBuf, String) {
         let storage_file = storage_file.as_ref();
         let parent = storage_file.parent().unwrap();
         let file_name = storage_file.file_name().unwrap();
         let parent_parent = parent.parent().unwrap();
         let parent_parent_parent = parent_parent.parent().unwrap();
+        let cache = parent_parent_parent.join("calculate_cache_hash");
+        (cache, file_name.to_str().unwrap().to_string())
+    }
+    fn calc_path<P: AsRef<Path>>(
+        storage_file: &P,
+        bin_range: &Range<usize>,
+    ) -> Result<PathBuf, std::io::Error> {
+        let (cache, file_name) = Self::directory(storage_file);
         let amod = std::fs::metadata(storage_file)?.modified()?;
         let secs = amod.duration_since(UNIX_EPOCH).unwrap().as_secs();
-        let cache = parent_parent_parent.join("calculate_cache_hash");
         let result = cache.join(format!(
             "{}.{}.{}",
-            file_name.to_str().unwrap(),
+            file_name,
             secs.to_string(),
             format!("{}.{}", bin_range.start, bin_range.end),
         ));
@@ -182,8 +186,9 @@ impl CacheHashData {
     */
     pub fn get_cache_files<P: AsRef<Path>>(storage_path: &P) -> Vec<PathBuf> {
         let mut items = vec![];
-        if storage_path.as_ref().is_dir() {
-            let dir = fs::read_dir(storage_path);
+        let (cache, _) = Self::directory(storage_path);
+        if cache.is_dir() {
+            let dir = fs::read_dir(cache);
             if let Ok(dir) = dir {
                 for entry in dir {
                     if let Ok(entry) = entry {
@@ -369,23 +374,11 @@ impl CacheHashData {
                 let mut d = chd.get_mut::<CalculateHashIntermediate>(i as u64);
                 i += 1;
                 *d = item.clone();
-                assert_eq!(d, item);
-                if slot == 86376721 {
-                    error!("wrote: {:?}", *d);
-                    if i > 1 {
-                        let mut d = chd.get_mut::<CalculateHashIntermediate>((i - 1) as u64);
-                        error!("wrote: {:?} previous one", *d);
-                    }
-
-                }
             })
         });
         assert_eq!(i, sum);
         m2.stop();
         stats.write_to_mmap_us += m2.as_us();
-        if slot == 86376721 {
-            error!("wrote: {:?}, {}, sum: {}, elem_size: {}", cache_path, capacity, sum, elem_size);//, storage_file);
-        }
         m.stop();
         stats.save_us += m.as_us();
         //chd.mmap.flush()?;
