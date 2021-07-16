@@ -13,7 +13,7 @@ use std::sync::Arc;
 use std::ops::RangeBounds;
 use std::ops::Bound;
 type K = Pubkey;
-use std::collections::HashMap;
+use std::collections::{HashMap, hash_map::Entry as HashMapEntry};
 
 #[derive(Clone, Debug)]
 pub struct HybridAccountEntry<V: Clone + Debug> {
@@ -92,6 +92,24 @@ impl<V: 'static + Clone + Debug> BucketMapWriteHolder<V> {
             }
         }
         else {
+            let entry = current_value.unwrap();
+            let current_value = Some((&entry.slot_list[..], entry.ref_count));
+            // we are an update
+            let result = updatefn(current_value);
+            if let Some(result) = result {
+                // stick this in the write cache and flush it later
+                let ix = self.disk.bucket_ix(key);
+                let wc = &mut self.write_cache[ix].write().unwrap();
+
+                match wc.entry(key.clone()){
+                    HashMapEntry::Occupied(mut occupied) => {
+                        let mut gm = occupied.get_mut();
+                        gm.slot_list = result.0;
+                        gm.ref_count = result.1;
+                    },
+                    HashMapEntry::Vacant(vacant) => {panic!("");},
+                }
+            }
             self.disk.update(key, updatefn);
         }
     }
