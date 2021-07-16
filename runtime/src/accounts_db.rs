@@ -5495,6 +5495,7 @@ impl AccountsDb {
                 Ordering::Relaxed,
             ) == Ok(last)
         {
+            self.accounts_index.account_maps.first().unwrap().read().unwrap().distribution();
             let (read_only_cache_hits, read_only_cache_misses) =
                 self.read_only_accounts_cache.get_and_reset_stats();
             datapoint_info!(
@@ -6029,7 +6030,6 @@ impl AccountsDb {
                 .sum::<usize>();
 
                 error!("flush_us: {}, total items after flush: {}", m.as_us(), total_items);
-                self.accounts_index.account_maps.first().unwrap().read().unwrap().distribution();
                 self.accounts_index.account_maps.first().unwrap().read().unwrap().distribution();
             }
         }

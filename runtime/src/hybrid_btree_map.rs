@@ -151,6 +151,11 @@ impl<V: 'static + Clone + Debug> BucketMapWriteHolder<V> {
         self.disk.delete_key(key)
     }
     pub fn distribution(&self) -> Vec<usize> {
+        let mut ct = 0;
+        for i in 0..self.bins {
+            ct += self.write_cache[i].read().unwrap().len();
+        }
+        error!("{} items in write cache", ct);
         self.disk.distribution()
     }
 }
