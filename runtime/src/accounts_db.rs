@@ -4962,7 +4962,7 @@ impl AccountsDb {
                 )
                 .unwrap();
                 if let Ok(cached_data) = cached_data {
-                    assert_eq!(cached_data.0.[0].len(), per_slot_data[0].len());
+                    assert_eq!(cached_data.0[0].len(), per_slot_data[0].len());
                     assert_eq!(&cached_data.0, per_slot_data, "{:?}, {:?}", cached_data.0, per_slot_data);
                 }
                 
