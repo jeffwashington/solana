@@ -12,6 +12,8 @@ use std::fmt::Debug;
 use std::sync::Arc;
 use std::ops::RangeBounds;
 use std::ops::Bound;
+use std::marker::{Sync, Send};
+use std::sync::atomic::Ordering;
 type K = Pubkey;
 use std::collections::{HashMap, hash_map::Entry as HashMapEntry};
 
@@ -38,24 +40,53 @@ impl<T:Clone + Debug> RealEntry<T> for T {
 pub type SlotT<T> = (Slot, T);
 
 pub type WriteCache<V> = HashMap<Pubkey, V>;
-
+use std::sync::atomic::AtomicBool;
+use crate::waitable_condvar::WaitableCondvar;
+use std::time::Duration;
 #[derive(Debug)]
 pub struct BucketMapWriteHolder<V> {
     pub disk: BucketMap<SlotT<V>>,
     pub write_cache: Vec<RwLock<WriteCache<V2<V>>>>,
     pub bins: usize,
+    pub wait: WaitableCondvar,
 }
 
 impl<V: 'static + Clone + Debug> BucketMapWriteHolder<V> {
+    pub fn bg_flusher(&self, exit: Arc<AtomicBool>) {
+        let mut found_one = false;
+        loop {
+            if exit.load(Ordering::Relaxed) {
+                break;
+            }
+            if !found_one && self.wait.wait_timeout(Duration::from_millis(500)) {
+                continue;
+            }
+            found_one = false;
+            for ix in 0..self.bins {
+                if !self.write_cache[ix].read().unwrap().is_empty() {
+                    found_one = true;
+                    let mut wc = self.write_cache[ix].write().unwrap();
+                    for (k,v) in wc.iter() {
+                        self.disk.update(k, |_current| {
+                            Some((v.slot_list.clone(), v.ref_count))
+                        });
+                    }
+                    wc.clear();
+                }
+            }
+        }
+    }
     fn new(bucket_map: BucketMap<SlotT<V>>) -> Self{
         let mut write_cache = vec![];
         let bins = bucket_map.num_buckets();
         write_cache = (0..bins).map(|i| RwLock::new(WriteCache::default())).collect::<Vec<_>>();
+        let wait = WaitableCondvar::default();
 
         Self {
             disk: bucket_map,
             write_cache,
             bins,
+            wait,
         }
     }
     pub fn flush(&self, ix: usize) {
@@ -79,6 +110,7 @@ impl<V: 'static + Clone + Debug> BucketMapWriteHolder<V> {
         self.disk.keys(ix)
     }
     pub fn values(&self, ix: usize) -> Option<Vec<Vec<SlotT<V>>>> {
+        // only valid when write cache is empty
         self.disk.values(ix)
     }
 
@@ -91,6 +123,9 @@ impl<V: 'static + Clone + Debug> BucketMapWriteHolder<V> {
     {
         if current_value.is_none() {
             // we are an insert
+            // send straight to disk. if we try to keep it in the write cache, then 'keys' will be incorrect
+            self.disk.update(key, updatefn);
+            /*
             let result = updatefn(None);
             if let Some(result) = result {
                 // stick this in the write cache and flush it later
@@ -101,6 +136,7 @@ impl<V: 'static + Clone + Debug> BucketMapWriteHolder<V> {
                     ref_count: result.1
                 });
             }
+            */
         }
         else {
             let entry = current_value.unwrap();
@@ -126,7 +162,6 @@ impl<V: 'static + Clone + Debug> BucketMapWriteHolder<V> {
                     },
                 }
             }
-            //self.disk.update(key, updatefn);
         }
     }
     pub fn get(&self, key: &Pubkey) -> Option<(u64, Vec<SlotT<V>>)> {
@@ -140,14 +175,41 @@ impl<V: 'static + Clone + Debug> BucketMapWriteHolder<V> {
             self.disk.get(key)
         }
     }
-    pub fn addref(&self, key: &Pubkey) -> Option<u64> {
-        self.disk.addref(key)
+    pub fn addref(&self, key: &Pubkey) {
+        let ix = self.disk.bucket_ix(key);
+        let wc = &mut self.write_cache[ix].write().unwrap();
+
+        match wc.entry(key.clone()){
+            HashMapEntry::Occupied(mut occupied) => {
+                let mut gm = occupied.get_mut();
+                gm.ref_count += 1;
+            },
+            HashMapEntry::Vacant(vacant) => {
+                self.disk.addref(key);
+            },
+        }
     }
 
-    pub fn unref(&self, key: &Pubkey) -> Option<u64> {
-        self.disk.unref(key)
+    pub fn unref(&self, key: &Pubkey) {
+        let ix = self.disk.bucket_ix(key);
+        let wc = &mut self.write_cache[ix].write().unwrap();
+
+        match wc.entry(key.clone()){
+            HashMapEntry::Occupied(mut occupied) => {
+                let mut gm = occupied.get_mut();
+                gm.ref_count -= 1;
+            },
+            HashMapEntry::Vacant(vacant) => {
+                self.disk.unref(key);
+            },
+        }
     }
     fn delete_key(&self, key: &Pubkey) {
+        let ix = self.disk.bucket_ix(key);
+        {
+            let wc = &mut self.write_cache[ix].write().unwrap();
+            wc.remove(key);
+        }
         self.disk.delete_key(key)
     }
     pub fn distribution(&self) -> Vec<usize> {

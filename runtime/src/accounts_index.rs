@@ -26,9 +26,11 @@ use std::{
         Range, RangeBounds,
     },
     sync::{
-        atomic::{AtomicU64, Ordering},
+        Arc,
+        atomic::{AtomicBool, AtomicU64, Ordering},
         Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard,
     },
+    thread::{Builder, JoinHandle},
 };
 use thiserror::Error;
 
@@ -750,11 +752,23 @@ pub struct AccountsIndex<T: 'static + Clone + std::fmt::Debug> {
     // on any of these slots fails. This is safe to purge once the associated Bank is dropped and
     // scanning the fork with that Bank at the tip is no longer possible.
     pub removed_bank_ids: Mutex<HashSet<BankId>>,
+    pub flusher: JoinHandle<()>,
+    exit: Arc<AtomicBool>,
 }
 
-impl<T: Clone + std::fmt::Debug> Default for AccountsIndex<T> {
+impl<T: Clone + std::fmt::Debug + Sync + Send> Default for AccountsIndex<T> {
     fn default() -> Self {
+        let exit = Arc::new(AtomicBool::new(false));
+        let exit_ = exit.clone();
         let bucket_map = HybridBTreeMap::new_bucket_map();
+        let bucket_map_ = bucket_map.clone();
+        let flusher = Builder::new()
+            .name("solana-index-flusher".to_string())
+            .spawn(move || {
+                bucket_map_.bg_flusher(exit_);
+            })
+            .unwrap();
+
         Self {
             account_maps: (0..BINS)
                 .into_iter()
@@ -772,6 +786,8 @@ impl<T: Clone + std::fmt::Debug> Default for AccountsIndex<T> {
             roots_tracker: RwLock::<RootsTracker>::default(),
             ongoing_scan_roots: RwLock::<BTreeMap<Slot, u64>>::default(),
             removed_bank_ids: Mutex::<HashSet<BankId>>::default(),
+            flusher,
+            exit,
         }
     }
 }
