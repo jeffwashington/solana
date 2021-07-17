@@ -105,6 +105,7 @@ pub type PreExistingCacheFiles = HashSet<String>;
 #[derive(Debug)]
 pub struct CacheHashDataManager {
     cache_path: PathBuf,
+    stats: RwLock<CacheHashDataStats>,
 }
 
 impl CacheHashDataManager {
@@ -112,7 +113,17 @@ impl CacheHashDataManager {
         let cache_path = ledger_path.as_ref().join("calculate_cache_hash");
         std::fs::create_dir_all(cache_path.clone())?;
         info!("CacheHash folder: {:?}", cache_path);
-        Ok(Self { cache_path })
+        Ok(Self { cache_path,
+            stats: RwLock::new(CacheHashDataStats::default()),
+         })
+    }
+    pub fn update_stats(&self, stats: &CacheHashDataStats) {
+        self.stats.write().unwrap().merge(stats);
+    }
+    pub fn report_stats(&self) {
+        let mut stats = self.stats.write().unwrap();
+        info!("hash calculation cache stats: {:?}", stats);
+        *stats = CacheHashDataStats::default();
     }
     fn cache_path(&self) -> &PathBuf {
         &self.cache_path

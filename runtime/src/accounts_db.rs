@@ -18,7 +18,7 @@
 //! tracks the number of commits to the entire data store. So the latest
 //! commit for each slot entry would be indexed.
 
-use crate::storage_hash_data::{CacheHashData, CacheHashDataManager, CacheHashDataStats};
+use crate::storage_hash_data::{CacheHashData, CacheHashDataManager, CacheHashDataStats, PreExistingCacheFiles};
 use crate::{
     accounts_background_service::{DroppedSlotsSender, SendDroppedBankCallback},
     accounts_cache::{AccountsCache, CachedAccount, SlotCache},
@@ -4865,6 +4865,7 @@ impl AccountsDb {
             &AccountInfoAccountsIndex,
         )>,
         cache_manager: Option<&CacheHashDataManager>,
+        pre_existing_cache_files: &RwLock<PreExistingCacheFiles>,
     ) -> Result<Vec<Vec<Vec<CalculateHashIntermediate>>>, BankHashVerificationError> {
         let bin_calculator = PubkeyBinCalculator16::new(bins);
         assert!(bin_range.start < bins && bin_range.end <= bins && bin_range.start < bin_range.end);
@@ -4873,14 +4874,6 @@ impl AccountsDb {
         let mismatch_found = AtomicU64::new(0);
         let range = bin_range.end - bin_range.start;
         let sort_time = AtomicU64::new(0);
-        let big_stats = Arc::new(Mutex::new(CacheHashDataStats::default()));
-
-        let pre_existing_cache_files = RwLock::new(
-            cache_manager
-                .map(|m| m.get_cache_files())
-                .unwrap_or_default(),
-        );
-        //error!("cache files {:?}", cache_files_list);
 
         let result: Vec<Vec<Vec<CalculateHashIntermediate>>> = Self::scan_account_storage_no_bank(
             accounts_cache_and_ancestors,
@@ -4957,7 +4950,7 @@ impl AccountsDb {
                             accumulator,
                             bin_range.start,
                             &bin_calculator,
-                            &pre_existing_cache_files,
+                            pre_existing_cache_files,
                             manager,
                         );
                         if cached_data.is_ok() {
@@ -4966,7 +4959,7 @@ impl AccountsDb {
                             stats.loaded_from_cache += 1;
                             //let loaded = cached_data.iter().map(|x| x.len()).sum::<usize>();
                             do_storage_scan = false;
-                            big_stats.lock().unwrap().merge(&stats);
+                            manager.update_stats(&stats);
                             //*/
                         } else {
                             use_per_slot_accumulator = true;
@@ -4996,19 +4989,11 @@ impl AccountsDb {
                         &bin_calculator,
                     );
                     assert_eq!(per_slot_data.iter().map(|x| x.len()).sum::<usize>(), 0);
-                    big_stats.lock().unwrap().merge(&stats);
+                    manager.update_stats(&stats);
                     per_slot_data.clear();
                 }
             },
         );
-
-        let mut big_stats = big_stats.lock().unwrap();
-        big_stats.files_purged += pre_existing_cache_files.read().unwrap().len() as u64;
-        info!("hash calculation cache stats: {:?}", big_stats);
-        let pre_existing_cache_files = pre_existing_cache_files.read().unwrap();
-        if !pre_existing_cache_files.is_empty() {
-            cache_manager.map(|m| m.delete_old_cache_files(&pre_existing_cache_files));
-        }
 
         stats.sort_time_total_us += sort_time.load(Ordering::Relaxed);
 
@@ -5101,7 +5086,13 @@ impl AccountsDb {
             ); // evenly divisible
             let mut previous_pass = PreviousPass::default();
             let mut final_result = (Hash::default(), 0);
-
+    
+            let pre_existing_cache_files = RwLock::new(
+                cache_manager
+                    .map(|m| m.get_cache_files())
+                    .unwrap_or_default(),
+            );
+    
             for pass in 0..num_scan_passes {
                 let bounds = Range {
                     start: pass * bins_per_pass,
@@ -5116,6 +5107,7 @@ impl AccountsDb {
                     check_hash,
                     accounts_cache_and_ancestors,
                     cache_manager,
+                    &pre_existing_cache_files,
                 )?;
 
                 let (hash, lamports, for_next_pass) = AccountsHash::rest_of_hash_calculation(
@@ -5128,6 +5120,20 @@ impl AccountsDb {
                 previous_pass = for_next_pass;
                 final_result = (hash, lamports);
             }
+
+            if let Some(cache_manager) = cache_manager.as_ref() {
+                let stats = CacheHashDataStats {
+                    files_purged: pre_existing_cache_files.read().unwrap().len() as u64,
+                    ..CacheHashDataStats::default()
+                };
+                cache_manager.update_stats(&stats);
+                cache_manager.report_stats();
+                let pre_existing_cache_files = pre_existing_cache_files.read().unwrap();
+                if !pre_existing_cache_files.is_empty() {
+                    cache_manager.delete_old_cache_files(&pre_existing_cache_files);
+                }
+            }
+
             Ok(final_result)
         };
         if let Some(thread_pool) = thread_pool {
