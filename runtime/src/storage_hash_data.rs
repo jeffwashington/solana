@@ -116,17 +116,16 @@ impl CacheHashDataManager {
     fn cache_path(&self) -> &PathBuf {
         &self.cache_path
     }
-    fn directory<P: AsRef<Path>>(&self, storage_file: &P) -> (PathBuf, String) {
+    fn directory<P: AsRef<Path>>(&self, storage_file: &P) -> String {
         let storage_file = storage_file.as_ref();
         let file_name = storage_file.file_name().unwrap();
-        let cache = self.cache_path.join("calculate_cache_hash");
-        (cache, file_name.to_str().unwrap().to_string())
+        file_name.to_str().unwrap().to_string()
     }
     fn calc_path<P: AsRef<Path>>(&self, 
         storage_file: &P,
         bin_range: &Range<usize>,
     ) -> Result<(PathBuf, String), std::io::Error> {
-        let (cache, file_name) = self.directory(storage_file);
+        let file_name = self.directory(storage_file);
         let amod = std::fs::metadata(storage_file)?.modified()?;
         let secs = amod.duration_since(UNIX_EPOCH).unwrap().as_secs();
         let file_name = format!(
@@ -135,7 +134,7 @@ impl CacheHashDataManager {
             secs.to_string(),
             format!("{}.{}", bin_range.start, bin_range.end),
         );
-        let result = cache.join(file_name.clone());
+        let result = self.cache_path.join(file_name.clone());
         Ok((result.to_path_buf(), file_name))
     }
     pub fn delete_old_cache_files(&self, file_names: &PreExistingCacheFiles) {
