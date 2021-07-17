@@ -18,7 +18,7 @@
 //! tracks the number of commits to the entire data store. So the latest
 //! commit for each slot entry would be indexed.
 
-use crate::storage_hash_data::{CacheHashData, CacheHashDataStats};
+use crate::storage_hash_data::{CacheHashData, CacheHashDataManager, CacheHashDataStats};
 use crate::{
     accounts_background_service::{DroppedSlotsSender, SendDroppedBankCallback},
     accounts_cache::{AccountsCache, CachedAccount, SlotCache},
@@ -914,6 +914,8 @@ pub struct AccountsDb {
     /// Set of storage paths to pick from
     pub(crate) paths: Vec<PathBuf>,
 
+    cache_hash_manager: Option<CacheHashDataManager>,
+
     pub shrink_paths: RwLock<Option<Vec<PathBuf>>>,
 
     /// Directory of paths this accounts_db needs to hold/remove
@@ -1420,6 +1422,7 @@ impl Default for AccountsDb {
             remove_unrooted_slots_synchronization: RemoveUnrootedSlotsSynchronization::default(),
             shrink_ratio: AccountShrinkThreshold::default(),
             dirty_stores: DashMap::default(),
+            cache_hash_manager: None,
         }
     }
 }
@@ -1438,6 +1441,13 @@ impl AccountsDb {
         )
     }
 
+    fn build_cache_hash_data_manager(paths: &Vec<PathBuf>) -> Option<CacheHashDataManager> {
+        paths.first().and_then(|path| {
+            path.parent()
+                .map(|parent| CacheHashDataManager::new(&parent).unwrap()) // fails if cache folder can't be created
+        })
+    }
+
     pub fn new_with_config(
         paths: Vec<PathBuf>,
         cluster_type: &ClusterType,
@@ -1447,6 +1457,7 @@ impl AccountsDb {
     ) -> Self {
         let mut new = if !paths.is_empty() {
             Self {
+                cache_hash_manager: Self::build_cache_hash_data_manager(&paths),
                 paths,
                 temp_paths: None,
                 cluster_type: Some(*cluster_type),
@@ -4626,7 +4637,12 @@ impl AccountsDb {
             }
             let mut account = (0, None);
             std::mem::swap(&mut account, &mut current[min_index]);
-            scan_func(LoadedAccount::Stored(account.1.unwrap()), retval, slot, alternate_collector);
+            scan_func(
+                LoadedAccount::Stored(account.1.unwrap()),
+                retval,
+                slot,
+                alternate_collector,
+            );
             let next = progress[min_index]
                 .next()
                 .map(|stored_account| (stored_account.meta.write_version, Some(stored_account)));
@@ -4768,6 +4784,7 @@ impl AccountsDb {
                 timings,
                 check_hash,
                 accounts_cache_and_ancestors,
+                self.cache_hash_manager.as_ref(),
             )
         } else {
             self.calculate_accounts_hash(slot, ancestors, check_hash)
@@ -4847,6 +4864,7 @@ impl AccountsDb {
             &Ancestors,
             &AccountInfoAccountsIndex,
         )>,
+        cache_manager: Option<&CacheHashDataManager>,
     ) -> Result<Vec<Vec<Vec<CalculateHashIntermediate>>>, BankHashVerificationError> {
         let bin_calculator = PubkeyBinCalculator16::new(bins);
         assert!(bin_range.start < bins && bin_range.end <= bins && bin_range.start < bin_range.end);
@@ -4855,13 +4873,13 @@ impl AccountsDb {
         let mismatch_found = AtomicU64::new(0);
         let range = bin_range.end - bin_range.start;
         let sort_time = AtomicU64::new(0);
-        let big_stats = Arc::new(Mutex::new(
-            CacheHashDataStats::default(),
-        ));
+        let big_stats = Arc::new(Mutex::new(CacheHashDataStats::default()));
 
-        let a_storage_path = storage.get(storage.range().start).and_then(|storage| storage.first()).map(|s| s.get_path());
-        let pre_existing_cache_files = RwLock::new(a_storage_path.map(|s| 
-        CacheHashData::get_cache_files(&s)).unwrap_or_default());
+        let pre_existing_cache_files = RwLock::new(
+            cache_manager
+                .map(|m| m.get_cache_files())
+                .unwrap_or_default(),
+        );
         //error!("cache files {:?}", cache_files_list);
 
         let result: Vec<Vec<Vec<CalculateHashIntermediate>>> = Self::scan_account_storage_no_bank(
@@ -4878,12 +4896,10 @@ impl AccountsDb {
                     return;
                 }
 
-                let range =
-                if per_slot_accum && false {
+                let range = if per_slot_accum && false {
                     pubkey_to_bin_index = 0;
                     1 // only 1 range
-                }
-                else {
+                } else {
                     // when we are scanning with bin ranges, we don't need to use exact bin numbers. Subtract to make first bin we care about at index 0.
                     pubkey_to_bin_index -= bin_range.start;
                     range
@@ -4925,63 +4941,75 @@ impl AccountsDb {
             },
             // pre-scan
             |slot, storages, accumulator, all_data_from_storages| {
-                if accumulator.is_empty() {
-                    accumulator.append(&mut vec![Vec::new(); range]);
-                }
-        
-                let valid_for_caching = storages.len() == 1 && all_data_from_storages;
                 let mut do_storage_scan = true; //;
                 let mut use_per_slot_accumulator = false;
-                if valid_for_caching {
-                    //if false {/*
-                    let cached_data = CacheHashData::load(
-                        slot,
-                        &storages.first().unwrap().accounts.get_path(),
-                        bin_range,
-                        accumulator,
-                        bin_range.start,
-                        &bin_calculator,
-                        &pre_existing_cache_files,
-                    );
-                    if cached_data.is_ok()
-                    {
-                        //panic!("shouldn't be loading from cache");
-                        let (mut cached_data, mut stats) = cached_data.unwrap();
-                        stats.loaded_from_cache += 1;
-                        //let loaded = cached_data.iter().map(|x| x.len()).sum::<usize>();
-                        do_storage_scan = false;
-                        big_stats.lock().unwrap().merge(&stats);
-                        //*/
-                    } else {
-                        use_per_slot_accumulator = true;
+                if let Some(manager) = cache_manager.as_ref() {
+                    let valid_for_caching = storages.len() == 1 && all_data_from_storages;
+                    if valid_for_caching {
+                        if accumulator.is_empty() {
+                            accumulator.append(&mut vec![Vec::new(); range]);
+                        }
+                        //if false {/*
+                        let cached_data = CacheHashData::load(
+                            slot,
+                            &storages.first().unwrap().accounts.get_path(),
+                            bin_range,
+                            accumulator,
+                            bin_range.start,
+                            &bin_calculator,
+                            &pre_existing_cache_files,
+                            manager,
+                        );
+                        if cached_data.is_ok() {
+                            //panic!("shouldn't be loading from cache");
+                            let (mut cached_data, mut stats) = cached_data.unwrap();
+                            stats.loaded_from_cache += 1;
+                            //let loaded = cached_data.iter().map(|x| x.len()).sum::<usize>();
+                            do_storage_scan = false;
+                            big_stats.lock().unwrap().merge(&stats);
+                            //*/
+                        } else {
+                            use_per_slot_accumulator = true;
+                        }
                     }
                 }
                 (do_storage_scan, use_per_slot_accumulator)
             },
             // post-scan
             |slot, storages, per_slot_data, accumulator| {
-                let mut stats = CacheHashData::save2(
-                    slot,
-                    &storages.first().unwrap().accounts.get_path(),
-                    per_slot_data,
-                    bin_range,
-                )
-                .unwrap();
-                
-                //let mut stats = CacheHashDataStats::default();
-                stats.merge_us += Self::merge_slot_data(accumulator, per_slot_data, range, bin_range.start, &bin_calculator);
-                assert_eq!(per_slot_data.iter().map(|x| x.len()).sum::<usize>(), 0);
-                big_stats.lock().unwrap().merge(&stats);
-                per_slot_data.clear();
+                if let Some(manager) = cache_manager.as_ref() {
+                    let mut stats = CacheHashData::save2(
+                        slot,
+                        &storages.first().unwrap().accounts.get_path(),
+                        per_slot_data,
+                        bin_range,
+                        manager,
+                    )
+                    .unwrap();
+
+                    //let mut stats = CacheHashDataStats::default();
+                    stats.merge_us += Self::merge_slot_data(
+                        accumulator,
+                        per_slot_data,
+                        range,
+                        bin_range.start,
+                        &bin_calculator,
+                    );
+                    assert_eq!(per_slot_data.iter().map(|x| x.len()).sum::<usize>(), 0);
+                    big_stats.lock().unwrap().merge(&stats);
+                    per_slot_data.clear();
+                }
             },
         );
 
         error!("cache stats: {:?}", big_stats.lock().unwrap());
-        error!("pre-existing cache files that were unused: {}", pre_existing_cache_files.read().unwrap().len());
-        let a_storage_path = storage.get(storage.range().start).and_then(|storage| storage.first()).map(|s| s.get_path());
+        error!(
+            "pre-existing cache files that were unused: {}",
+            pre_existing_cache_files.read().unwrap().len()
+        );
         let pre_existing_cache_files = pre_existing_cache_files.read().unwrap();
         if !pre_existing_cache_files.is_empty() {
-        CacheHashData::delete_old_cache_files(&a_storage_path.unwrap(), &pre_existing_cache_files);    
+            cache_manager.map(|m| m.delete_old_cache_files(&pre_existing_cache_files));
         }
 
         stats.sort_time_total_us += sort_time.load(Ordering::Relaxed);
@@ -5005,21 +5033,21 @@ impl AccountsDb {
         new_data: &mut crate::storage_hash_data::SavedType,
         range: usize,
         start_bin_index: usize,
-        bin_calculator:&PubkeyBinCalculator16,
-    ) -> u64{
+        bin_calculator: &PubkeyBinCalculator16,
+    ) -> u64 {
         let mut m = Measure::start("");
         if accumulator.len() == 0 {
             accumulator.append(&mut vec![Vec::new(); range]);
         }
 
-        new_data.into_iter().for_each(|data| {data.into_iter().for_each(|data| {
-            let mut pubkey_to_bin_index = bin_calculator.bin_from_pubkey(&data.pubkey);
-            pubkey_to_bin_index -= start_bin_index;
-            accumulator[pubkey_to_bin_index].push(data.clone()); // may want to avoid clone here
+        new_data.into_iter().for_each(|data| {
+            data.into_iter().for_each(|data| {
+                let mut pubkey_to_bin_index = bin_calculator.bin_from_pubkey(&data.pubkey);
+                pubkey_to_bin_index -= start_bin_index;
+                accumulator[pubkey_to_bin_index].push(data.clone()); // may want to avoid clone here
+            });
+            data.clear();
         });
-        data.clear();
-    }
-        );
         m.stop();
         m.as_us()
     }
@@ -5058,8 +5086,8 @@ impl AccountsDb {
             &Ancestors,
             &AccountInfoAccountsIndex,
         )>,
+        cache_manager: Option<&CacheHashDataManager>,
     ) -> Result<(Hash, u64), BankHashVerificationError> {
-
         let mut scan_and_hash = move || {
             // When calculating hashes, it is helpful to break the pubkeys found into bins based on the pubkey value.
             // More bins means smaller vectors to sort, copy, etc.
@@ -5089,6 +5117,7 @@ impl AccountsDb {
                     &bounds,
                     check_hash,
                     accounts_cache_and_ancestors,
+                    cache_manager,
                 )?;
 
                 let (hash, lamports, for_next_pass) = AccountsHash::rest_of_hash_calculation(

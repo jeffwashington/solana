@@ -100,21 +100,33 @@ impl CacheHashDataStats {
 
 pub type PreExistingCacheFiles = HashSet<String>;
 
-impl CacheHashData {
-    fn directory<P: AsRef<Path>>(storage_file: &P) -> (PathBuf, String) {
+#[derive(Debug)]
+pub struct CacheHashDataManager {
+    cache_path: PathBuf,
+}
+
+impl CacheHashDataManager {
+    pub fn new<P: AsRef<Path>>(ledger_path: &P) -> io::Result<Self> {
+        let cache_path = ledger_path.as_ref().join("calculate_cache_hash");
+        std::fs::create_dir_all(cache_path.clone())?;
+        Ok(Self {
+            cache_path,
+        })
+    }
+    fn cache_path(&self) -> &PathBuf {
+        &self.cache_path
+    }
+    fn directory<P: AsRef<Path>>(&self, storage_file: &P) -> (PathBuf, String) {
         let storage_file = storage_file.as_ref();
-        let parent = storage_file.parent().unwrap();
         let file_name = storage_file.file_name().unwrap();
-        let parent_parent = parent.parent().unwrap();
-        let parent_parent_parent = parent_parent.parent().unwrap();
-        let cache = parent_parent_parent.join("calculate_cache_hash");
+        let cache = self.cache_path.join("calculate_cache_hash");
         (cache, file_name.to_str().unwrap().to_string())
     }
-    fn calc_path<P: AsRef<Path>>(
+    fn calc_path<P: AsRef<Path>>(&self, 
         storage_file: &P,
         bin_range: &Range<usize>,
     ) -> Result<(PathBuf, String), std::io::Error> {
-        let (cache, file_name) = Self::directory(storage_file);
+        let (cache, file_name) = self.directory(storage_file);
         let amod = std::fs::metadata(storage_file)?.modified()?;
         let secs = amod.duration_since(UNIX_EPOCH).unwrap().as_secs();
         let file_name = format!(
@@ -126,7 +138,31 @@ impl CacheHashData {
         let result = cache.join(file_name.clone());
         Ok((result.to_path_buf(), file_name))
     }
+    pub fn delete_old_cache_files(&self, file_names: &PreExistingCacheFiles) {
+        for file_name in file_names {
+            let result = self.cache_path.join(file_name);
+            let _ = fs::remove_file(result);
+        }
+    }
+    pub fn get_cache_files(&self) -> PreExistingCacheFiles {
+        let mut items = PreExistingCacheFiles::new();
+        if self.cache_path.is_dir() {
+            let dir = fs::read_dir(self.cache_path.clone());
+            if let Ok(dir) = dir {
+                for entry in dir {
+                    if let Ok(entry) = entry {
+                        if let Some(name) = entry.path().file_name() {
+                            items.insert(name.to_str().unwrap().to_string());
+                        }
+                    }
+                }
+            }
+        }
+        items
+    }
+}
 
+impl CacheHashData {
     fn new_map(file: &PathBuf, cell_size: usize, capacity: u64) -> MmapMut {
         let pos = format!("{}", thread_rng().gen_range(0, u128::MAX),);
         let mut data = OpenOptions::new()
@@ -187,30 +223,6 @@ impl CacheHashData {
         }*/
     }
     */
-    pub fn delete_old_cache_files<P: AsRef<Path>>(storage_path: &P, file_names: &PreExistingCacheFiles) {
-        let (cache, _) = Self::directory(storage_path);
-        for file_name in file_names {
-            let result = cache.join(file_name);
-            let _ = fs::remove_file(result);
-        }
-    }
-    pub fn get_cache_files<P: AsRef<Path>>(storage_path: &P) -> PreExistingCacheFiles {
-        let mut items = PreExistingCacheFiles::new();
-        let (cache, _) = Self::directory(storage_path);
-        if cache.is_dir() {
-            let dir = fs::read_dir(cache);
-            if let Ok(dir) = dir {
-                for entry in dir {
-                    if let Ok(entry) = entry {
-                        if let Some(name) = entry.path().file_name() {
-                            items.insert(name.to_str().unwrap().to_string());
-                        }
-                    }
-                }
-            }
-        }
-        items
-    }
     pub fn load<P: AsRef<Path>>(
         slot: Slot,
         storage_file: &P,
@@ -219,12 +231,13 @@ impl CacheHashData {
         start_bin_index: usize,
         bin_calculator:&PubkeyBinCalculator16,
         preexisting: &RwLock<PreExistingCacheFiles>,
+        manager: &CacheHashDataManager,
     ) -> Result<(SavedType, CacheHashDataStats), std::io::Error> {
         let mut m = Measure::start("overall");
         let create = false;
         let mut timings = CacheHashDataStats::default();
         let mut m0 = Measure::start("");
-        let (path, file_name) = Self::calc_path(storage_file, bin_range)?;
+        let (path, file_name) = manager.calc_path(storage_file, bin_range)?;
         m0.stop();
         timings.calc_path_us += m0.as_us();
         let file_len = std::fs::metadata(path.clone())?.len();
@@ -329,20 +342,19 @@ impl CacheHashData {
         storage_file: &P,
         data: &mut SavedType,
         bin_range: &Range<usize>,
+        manager: &CacheHashDataManager,
     ) -> Result<CacheHashDataStats, std::io::Error> {
         let mut m = Measure::start("save");
         let mut stats;
         //error!("raw path: {:?}", storage_file);
         let mut m0 = Measure::start("");
-        let (cache_path, _) = Self::calc_path(storage_file, bin_range)?;
+        let (cache_path, _) = manager.calc_path(storage_file, bin_range)?;
         m0.stop();
         stats = CacheHashDataStats {
             ..CacheHashDataStats::default()
         };
 
         stats.calc_path_us += m0.as_us();
-        let parent = cache_path.parent().unwrap();
-        std::fs::create_dir_all(parent);
         let create = true;
         if create {
             let _ignored = remove_file(&cache_path);
