@@ -188,7 +188,11 @@ impl CacheHashData {
     }
     */
     pub fn delete_old_cache_files<P: AsRef<Path>>(storage_path: &P, file_names: &PreExistingCacheFiles) {
-        // todo
+        let (cache, _) = Self::directory(storage_path);
+        for file_name in file_names {
+            let result = cache.join(file_name);
+            let _ = fs::remove_file(result);
+        }
     }
     pub fn get_cache_files<P: AsRef<Path>>(storage_path: &P) -> PreExistingCacheFiles {
         let mut items = PreExistingCacheFiles::new();
