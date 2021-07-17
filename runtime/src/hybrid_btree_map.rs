@@ -159,6 +159,7 @@ impl<V: 'static + Clone + Debug> BucketMapWriteHolder<V> {
                             slot_list: result.0,
                             ref_count: result.1,
                         });
+                        self.wait.notify_all(); // we have put something in the write cache that needs to be flushed sometime
                     },
                 }
             }
