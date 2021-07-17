@@ -5002,11 +5002,9 @@ impl AccountsDb {
             },
         );
 
-        error!("cache stats: {:?}", big_stats.lock().unwrap());
-        error!(
-            "pre-existing cache files that were unused: {}",
-            pre_existing_cache_files.read().unwrap().len()
-        );
+        let mut big_stats = big_stats.lock().unwrap();
+        big_stats.files_purged += pre_existing_cache_files.read().unwrap().len() as u64;
+        info!("hash calculation cache stats: {:?}", big_stats);
         let pre_existing_cache_files = pre_existing_cache_files.read().unwrap();
         if !pre_existing_cache_files.is_empty() {
             cache_manager.map(|m| m.delete_old_cache_files(&pre_existing_cache_files));
