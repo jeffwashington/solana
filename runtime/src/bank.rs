@@ -4933,6 +4933,7 @@ impl Bank {
             self.slot(),
             can_cached_slot_be_unflushed,
             debug_verify,
+            Some(self.capitalization())
         )
     }
 
