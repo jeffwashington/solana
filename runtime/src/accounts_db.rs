@@ -6047,8 +6047,34 @@ impl AccountsDb {
 
                 self.initialize_storage_count_and_alive_bytes(&mut timings);
             }
+
             timings.report();
         }
+
+        self.add_test_accounts();
+    }
+
+    fn add_test_accounts(&self) {
+        let threads = 30;
+        let count = 30_000_000;
+        info!("adding test accounts");
+        (0..threads).into_par_iter().for_each(|_| {
+            let mut reclaims = vec![];
+            (0..count).into_iter().for_each(|_| {
+                let key = Pubkey::new_rand();
+                let info = AccountInfo::default();
+                self.accounts_index.upsert(
+                    0,
+                    &key,
+                    &key,
+                    &vec![][..],
+                    &self.account_indexes,
+                    info,
+                    &mut reclaims,
+                );
+            });
+        });
+        info!("done adding test accounts");
     }
 
     fn calculate_storage_count_and_alive_bytes(
