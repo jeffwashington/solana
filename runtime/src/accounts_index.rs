@@ -181,10 +181,13 @@ impl<T: Clone> ReadAccountMapEntry<T> {
 
     pub fn unref(&self) {
         self.ref_count().fetch_sub(1, Ordering::Relaxed);
+        self.borrow_owned_entry().dirty.store(true, Ordering::Relaxed);
     }
 
     pub fn addref(&self) {
+        // If it's the first non-cache insert, also bump the stored ref count
         self.ref_count().fetch_add(1, Ordering::Relaxed);
+        self.borrow_owned_entry().dirty.store(true, Ordering::Relaxed);
     }
 }
 
@@ -239,6 +242,7 @@ impl<T: 'static + Clone + IsCached> WriteAccountMapEntry<T> {
 
     fn addref(item: &AtomicU64) {
         item.fetch_add(1, Ordering::Relaxed);
+        self.borrow_owned_entry().dirty.store(true, Ordering::Relaxed);
     }
 
     pub fn upsert_new_key<'a>(
