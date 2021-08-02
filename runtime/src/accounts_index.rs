@@ -219,8 +219,8 @@ impl<T: 'static + Clone + IsCached> WriteAccountMapEntry<T> {
         self.with_slot_list_guard_mut(user)
     }
 
-    pub fn ref_count(&self) -> &AtomicU64 {
-        &self.borrow_owned_entry().ref_count
+    pub fn ref_count(&self) -> RefCount {
+        self.borrow_owned_entry().ref_count.load(Ordering::Relaxed)
     }
 
     // create an entry that is equivalent to this process:
@@ -242,7 +242,6 @@ impl<T: 'static + Clone + IsCached> WriteAccountMapEntry<T> {
 
     fn addref(item: &AtomicU64) {
         item.fetch_add(1, Ordering::Relaxed);
-        self.borrow_owned_entry().dirty.store(true, Ordering::Relaxed);
     }
 
     pub fn upsert_new_key<'a>(
@@ -348,10 +347,12 @@ impl<T: 'static + Clone + IsCached> WriteAccountMapEntry<T> {
         self.slot_list_mut(|list| {
             addref = Self::update_static(list, slot, account_info, reclaims, false);
         });
-        self.borrow_owned_entry().dirty.store(true, Ordering::Relaxed);
+        let entry = self.borrow_owned_entry();
+        entry.dirty.store(true, Ordering::Relaxed);
         if addref {
             // If it's the first non-cache insert, also bump the stored ref count
-            self.ref_count().fetch_add(1, Ordering::Relaxed);
+            entry.ref_count.fetch_add(1, Ordering::Relaxed);
+            entry.dirty.store(true, Ordering::Relaxed);
         }
     }
 }
