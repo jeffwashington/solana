@@ -306,13 +306,12 @@ impl<V: 'static + Clone + IsCached + Debug> BucketMapWriteHolder<V> {
             let wc = &mut self.write_cache[ix].write().unwrap(); // maybe get lock for each item?
             for k in delete_keys.iter() {
                 if let Some(item) = wc.remove(k) {
-                    //error!("mid flush: {}, {}", ix, line!());
-                    //error!("mid flush: {}, {}", ix, line!());
                     // if someone else dirtied it or aged it newer, so re-insert it into the cache
+                    // we only had a read lock when we gathered this list.
+                    // In transitioning to a write lock, we could have had someone modify something or update its age.
                     if item.dirty.load(Ordering::Relaxed)
                         || (do_age && item.age.load(Ordering::Relaxed) != age_comp)
                     {
-                        panic!("reinserting");
                         self.reinserted_in_flush.fetch_add(1, Ordering::Relaxed);
                         wc.insert(*k, item);
                     }
@@ -358,26 +357,25 @@ impl<V: 'static + Clone + IsCached + Debug> BucketMapWriteHolder<V> {
         self.keys.fetch_add(1, Ordering::Relaxed);
         self.flush(ix, false, None);
         let values = self.disk.keys(ix);
-        let read = self.write_cache[ix].read().unwrap();
-        let mut values_temp = read.keys().collect::<Vec<_>>();
-        if values.is_none() {
-            assert!(values_temp.is_empty());
-            return None;
-        }
         if false {
-            assert_eq!(values.as_ref().unwrap().len(), values_temp.len());
-            for i in values.as_ref().unwrap().iter() {
-                let mut found = false;
-                for k in 0..values_temp.len() {
-                    //assert!(!values_temp[k].dirty.load(Ordering::Relaxed));
-                    if values_temp[k] == i {
-                        values_temp.remove(k);
-                        found = true;
-                        break;
+            let read = self.write_cache[ix].read().unwrap();
+            let mut values_temp = read.keys().collect::<Vec<_>>();
+            if values.is_none() {
+                assert!(values_temp.is_empty());
+                return None;
+            }
+            if false {
+                assert_eq!(values.as_ref().unwrap().len(), values_temp.len());
+                for i in values.as_ref().unwrap().iter() {
+                    for k in 0..values_temp.len() {
+                        if values_temp[k] == i {
+                            values_temp.remove(k);
+                            break;
+                        }
                     }
                 }
+                assert!(values_temp.is_empty());
             }
-            assert!(values_temp.is_empty());
         }
         values
     }
@@ -389,46 +387,46 @@ impl<V: 'static + Clone + IsCached + Debug> BucketMapWriteHolder<V> {
         self.flush(ix, false, None);
         let values = self.disk.values(ix);
         if false {
-            let read = self.write_cache[ix].read().unwrap();
-            let mut values_temp = read.values().collect::<Vec<_>>();
-            if values.is_none() {
+            if false {
+                let read = self.write_cache[ix].read().unwrap();
+                let mut values_temp = read.values().collect::<Vec<_>>();
+                if values.is_none() {
+                    assert!(values_temp.is_empty());
+                    return None;
+                }
+                assert_eq!(values.as_ref().unwrap().len(), values_temp.len());
+                for i in values.as_ref().unwrap().iter() {
+                    let mut found = false;
+                    for k in 0..values_temp.len() {
+                        if &values_temp[k].slot_list.read().unwrap().clone() == i {
+                            values_temp.remove(k);
+                            found = true;
+                            break;
+                        }
+                    }
+                    assert!(found);
+                }
                 assert!(values_temp.is_empty());
-                return None;
             }
-            assert_eq!(values.as_ref().unwrap().len(), values_temp.len());
-            for i in values.as_ref().unwrap().iter() {
-                let mut found = false;
-                for k in 0..values_temp.len() {
-                    if &values_temp[k].slot_list.read().unwrap().clone() == i {
-                        values_temp.remove(k);
-                        found = true;
-                        break;
+            else {
+                let read = self.write_cache[ix].read().unwrap();
+                let mut values_temp = read.values().collect::<Vec<_>>();
+                if values.is_none() {
+                    assert!(values_temp.is_empty());
+                    return None;
+                }
+                assert_eq!(values.as_ref().unwrap().len(), values_temp.len());
+                for i in values.as_ref().unwrap().iter() {
+                    for k in 0..values_temp.len() {
+                        assert!(!values_temp[k].dirty.load(Ordering::Relaxed));
+                        if &values_temp[k].slot_list.read().unwrap().clone() == i {
+                            values_temp.remove(k);
+                            break;
+                        }
                     }
                 }
-                assert!(found);
-            }
-            assert!(values_temp.is_empty());
-        }
-        else {
-            let read = self.write_cache[ix].read().unwrap();
-            let mut values_temp = read.values().collect::<Vec<_>>();
-            if values.is_none() {
                 assert!(values_temp.is_empty());
-                return None;
             }
-            assert_eq!(values.as_ref().unwrap().len(), values_temp.len());
-            for i in values.as_ref().unwrap().iter() {
-                let mut found = false;
-                for k in 0..values_temp.len() {
-                    assert!(!values_temp[k].dirty.load(Ordering::Relaxed));
-                    if &values_temp[k].slot_list.read().unwrap().clone() == i {
-                        values_temp.remove(k);
-                        found = true;
-                        break;
-                    }
-                }
-            }
-            assert!(values_temp.is_empty());
         }
         values
     }
@@ -882,6 +880,7 @@ impl<V: 'static + Clone + IsCached + Debug> BucketMapWriteHolder<V> {
                     } else {
                         instance.ref_count.fetch_sub(1, Ordering::Relaxed);
                     }
+                    instance.dirty.store(true, Ordering::Relaxed);
                 }
             }
             Entry::Vacant(_vacant) => {
