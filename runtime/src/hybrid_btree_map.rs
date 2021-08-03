@@ -258,7 +258,7 @@ impl<V: 'static + Clone + IsCached + Debug> BucketMapWriteHolder<V> {
                 had_dirty = true;
             }
             if do_age {
-                if instance.age.load(Ordering::Relaxed) == age_comp && !keep_this_in_cache {
+                if !dirty && instance.age.load(Ordering::Relaxed) == age_comp && !keep_this_in_cache {
                     // clear the cache of things that have aged out
                     delete_keys.push(*k);
                     get_purges += 1;
