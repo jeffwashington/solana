@@ -216,7 +216,9 @@ impl<T: 'static + Clone + IsCached> WriteAccountMapEntry<T> {
         &mut self,
         user: impl for<'this> FnOnce(&mut RwLockWriteGuard<'this, SlotList<T>>) -> RT,
     ) -> RT {
-        self.with_slot_list_guard_mut(user)
+        let result = self.with_slot_list_guard_mut(user);
+        self.borrow_owned_entry().dirty.store(true, Ordering::Relaxed);
+        result
     }
 
     pub fn ref_count(&self) -> RefCount {
@@ -1354,6 +1356,7 @@ impl<
     {
         if let Some(mut write_account_map_entry) = self.get_account_write_entry(pubkey) {
             write_account_map_entry.slot_list_mut(|slot_list| {
+                error!("purge_exact: {}, {:?}", pubkey, slot_list);
                 slot_list.retain(|(slot, item)| {
                     let should_purge = slots_to_purge.contains(slot);
                     if should_purge {
