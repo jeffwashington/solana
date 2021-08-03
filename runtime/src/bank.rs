@@ -3525,7 +3525,10 @@ impl Bank {
             self.fix_recent_blockhashes_sysvar_delay(),
             self.rent_for_sysvars(),
         );
+        let mut collect = Measure::start("collect");
         let rent_debits = self.collect_rent(executed, loaded_txs);
+        collect.stop();
+        timings.details.collect_rent_us += collect.as_us();
 
         let overwritten_vote_accounts =
             self.update_cached_accounts(sanitized_txs.as_transactions_iter(), executed, loaded_txs);
@@ -4290,6 +4293,14 @@ impl Bank {
             );
         }
     }
+
+         pub fn report_store_timings(&self) {
+            self.rc
+            .accounts
+            .accounts_db
+            .report_store_timings();
+         }
+
 
     pub fn force_flush_accounts_cache(&self) {
         self.rc
@@ -5568,7 +5579,7 @@ pub(crate) mod tests {
         accounts_background_service::{AbsRequestHandler, SendDroppedBankCallback},
         accounts_db::DEFAULT_ACCOUNTS_SHRINK_RATIO,
         accounts_index::{
-            AccountIndex, AccountMap, AccountSecondaryIndexes, ScanError, ITER_BATCH_SIZE,
+            AccountIndex, AccountMap, AccountSecondaryIndexes, IsCached, ScanError, ITER_BATCH_SIZE,
         },
         ancestors::Ancestors,
         genesis_utils::{
@@ -7136,19 +7147,27 @@ pub(crate) mod tests {
         }
     }
 
-    fn map_to_test_bad_range() -> AccountMap<Pubkey, i8> {
-        let mut map: AccountMap<Pubkey, i8> = AccountMap::new();
+    impl IsCached for i8 {
+        fn is_cached(&self) -> bool {
+            false
+        }
+    }
+   
+    
+    fn map_to_test_bad_range() -> AccountMap<i8> {
+        let map: AccountMap<i8> = AccountMap::new2(&AccountMap::new_bucket_map(), 0, 1);
         // when empty, AccountMap (= std::collections::BTreeMap) doesn't sanitize given range...
-        map.insert(solana_sdk::pubkey::new_rand(), 1);
+        //map.insert(solana_sdk::pubkey::new_rand(), 1);
         map
     }
 
+    
     #[test]
-    #[should_panic(expected = "range start is greater than range end in BTreeMap")]
+    #[should_panic(expected = "range start is greater than range end")]
     fn test_rent_eager_bad_range() {
         let test_map = map_to_test_bad_range();
         test_map.range(
-            Pubkey::new_from_array([
+            Some(Pubkey::new_from_array([
                 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 0x00, 0x00, 0x00, 0x01,
@@ -7157,7 +7176,7 @@ pub(crate) mod tests {
                     0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0x00, 0x00, 0x00, 0x00, 0x00,
                     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                     0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                ]),
+                ])),
         );
     }
 
@@ -7179,7 +7198,7 @@ pub(crate) mod tests {
                     0xff, 0xff, 0xff, 0xff, 0xff, 0xff
                 ])
         );
-        test_map.range(range);
+        test_map.range(Some(range));
 
         let range = Bank::pubkey_range_from_partition((1, 1, 3));
         assert_eq!(
@@ -7195,7 +7214,7 @@ pub(crate) mod tests {
                     0x00, 0x00, 0x00, 0x00, 0x00, 0x00
                 ])
         );
-        test_map.range(range);
+        test_map.range(Some(range));
 
         let range = Bank::pubkey_range_from_partition((2, 2, 3));
         assert_eq!(
@@ -7211,7 +7230,7 @@ pub(crate) mod tests {
                     0xff, 0xff, 0xff, 0xff, 0xff, 0xff
                 ])
         );
-        test_map.range(range);
+        test_map.range(Some(range));
     }
 
     #[test]
@@ -7232,7 +7251,7 @@ pub(crate) mod tests {
                     0xff, 0xff, 0xff, 0xff, 0xff, 0xff
                 ])
         );
-        test_map.range(range);
+        test_map.range(Some(range));
 
         let range = Bank::pubkey_range_from_partition((0, 1, 2));
         assert_eq!(
@@ -7248,7 +7267,7 @@ pub(crate) mod tests {
                     0xff, 0xff, 0xff, 0xff, 0xff, 0xff
                 ])
         );
-        test_map.range(range);
+        test_map.range(Some(range));
     }
 
     #[test]
@@ -7270,7 +7289,7 @@ pub(crate) mod tests {
                     0xff, 0xff, 0xff, 0xff, 0xff, 0xff
                 ])
         );
-        test_map.range(range);
+        test_map.range(Some(range));
 
         let range = Bank::pubkey_range_from_partition((0, 1, 3));
         assert_eq!(
@@ -7286,7 +7305,7 @@ pub(crate) mod tests {
                     0xff, 0xff, 0xff, 0xff, 0xff, 0xff
                 ])
         );
-        test_map.range(range);
+        test_map.range(Some(range));
 
         let range = Bank::pubkey_range_from_partition((1, 2, 3));
         assert_eq!(
@@ -7302,7 +7321,7 @@ pub(crate) mod tests {
                     0xff, 0xff, 0xff, 0xff, 0xff, 0xff
                 ])
         );
-        test_map.range(range);
+        test_map.range(Some(range));
     }
 
     #[test]
@@ -7324,7 +7343,7 @@ pub(crate) mod tests {
                     0xff, 0xff, 0xff, 0xff, 0xff, 0xff
                 ])
         );
-        test_map.range(range);
+        test_map.range(Some(range));
     }
 
     impl Bank {
