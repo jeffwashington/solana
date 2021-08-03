@@ -2060,6 +2060,7 @@ impl AccountsDb {
         reclaim_result: Option<&mut ReclaimResult>,
         reset_accounts: bool,
     ) {
+        error!("handle reclaims: {:?}", reclaims);
         if reclaims.is_empty() {
             return;
         }
@@ -3629,6 +3630,7 @@ impl AccountsDb {
             remove_slot,
             |loaded_account: LoadedAccount| Some(*loaded_account.pubkey()),
             |accum: &Arc<Mutex<HashSet<(Pubkey, Slot)>>>, loaded_account: LoadedAccount| {
+                error!("purging: {} from {}", loaded_account.pubkey(), remove_slot);
                 accum
                     .lock()
                     .unwrap()
@@ -5289,6 +5291,8 @@ impl AccountsDb {
                     "AccountDB::accounts_index corrupted. Storage pointed to: {}, expected: {}, should only point to one slot",
                     store.slot(), *slot
                 );
+                error!("remove account: {:?}", account_info);
+
                 let count = store.remove_account(account_info.stored_size, reset_accounts);
                 if count == 0 {
                     self.dirty_stores
@@ -6156,7 +6160,7 @@ impl AccountsDb {
         let mut maps = self
             .accounts_index
             .account_maps
-            .par_iter()
+            .iter()
             .map(|bin_map| {
                 let mut stored_sizes_and_counts = HashMap::new();
                 bin_map.read().unwrap().values().for_each(|entry| {
@@ -6169,6 +6173,7 @@ impl AccountsDb {
                             let storage_entry_meta = stored_sizes_and_counts
                                 .entry(account_entry.store_id)
                                 .or_insert((0, 0));
+                            error!("calculate_storage_count_and_alive_bytes {}, {:?}", _slot, account_entry);
                             storage_entry_meta.0 += account_entry.stored_size;
                             storage_entry_meta.1 += 1;
                         })
@@ -6209,7 +6214,7 @@ impl AccountsDb {
                 // Should be default at this point
                 assert_eq!(store.alive_bytes(), 0);
                 if let Some((stored_size, count)) = stored_sizes_and_counts.get(id) {
-                    trace!("id: {} setting count: {} cur: {}", id, count, store.count(),);
+                    error!("id: {} setting count: {} cur: {}", id, count, store.count(),);
                     store.count_and_status.write().unwrap().0 = *count;
                     if *count == 0 {
                         error!("id: {}, slot: {}", id, store.slot());
