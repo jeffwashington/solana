@@ -279,6 +279,7 @@ impl<V: 'static + Clone + IsCached + Debug> BucketMapWriteHolder<V> {
                 match wc.entry(k) {
                     Entry::Occupied(occupied) => {
                         let instance = occupied.get();
+                        assert_eq!(Arc::strong_count(&instance), 1);
                         if instance.dirty.load(Ordering::Relaxed) {
                             self.update_no_cache(
                                 occupied.key(),
@@ -293,6 +294,7 @@ impl<V: 'static + Clone + IsCached + Debug> BucketMapWriteHolder<V> {
                             );
                             instance.age.store(next_age, Ordering::Relaxed); // keep newly updated stuff around
                             instance.dirty.store(false, Ordering::Relaxed);
+                            assert_eq!(Arc::strong_count(&instance), 1);
                             flushed += 1;
                         }
                     }
@@ -309,6 +311,7 @@ impl<V: 'static + Clone + IsCached + Debug> BucketMapWriteHolder<V> {
                     // if someone else dirtied it or aged it newer, so re-insert it into the cache
                     // we only had a read lock when we gathered this list.
                     // In transitioning to a write lock, we could have had someone modify something or update its age.
+                    assert_eq!(Arc::strong_count(&item), 1);
                     if item.dirty.load(Ordering::Relaxed)
                         || (do_age && item.age.load(Ordering::Relaxed) != age_comp)
                     {
