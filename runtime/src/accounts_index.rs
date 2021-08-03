@@ -352,7 +352,6 @@ impl<T: 'static + Clone + IsCached> WriteAccountMapEntry<T> {
         if addref {
             // If it's the first non-cache insert, also bump the stored ref count
             entry.ref_count.fetch_add(1, Ordering::Relaxed);
-            entry.dirty.store(true, Ordering::Relaxed);
         }
     }
 }

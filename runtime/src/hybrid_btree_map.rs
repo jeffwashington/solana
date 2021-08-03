@@ -726,40 +726,6 @@ impl<V: 'static + Clone + IsCached + Debug> BucketMapWriteHolder<V> {
         }
     }
 
-    pub fn update<F>(&self, key: &Pubkey, updatefn: F, current_value: Option<&V2<V>>)
-    where
-        F: Fn(Option<(&[SlotT<V>], u64)>) -> Option<(Vec<SlotT<V>>, u64)>,
-    {
-        /*
-        let k = Pubkey::from_str("5x3NHJ4VEu2abiZJ5EHEibTc2iqW22Lc245Z3fCwCxRS").unwrap();
-        if key == &k {
-            error!("{} {} update {}", file!(), line!(), key);
-        }
-        */
-
-        if current_value.is_none() {
-            // we are an insert
-            self.inserts.fetch_add(1, Ordering::Relaxed);
-
-            if INSERT_CACHING {
-                self.upsert_in_cache(key, updatefn, current_value);
-            } else {
-                self.update_no_cache(key, updatefn, current_value, false);
-            }
-        } else {
-            if VERIFY_GET_ON_INSERT {
-                panic!("");
-                //assert!(self.get(key).is_some());
-            }
-            // if we have a previous value, then that item is currently open and locked, so it could not have been changed. Thus, this is an in-cache update as long as we are caching gets.
-            self.updates_in_cache.fetch_add(1, Ordering::Relaxed);
-            if UPDATE_CACHING {
-                self.upsert_in_cache(key, updatefn, current_value);
-            } else {
-                self.update_no_cache(key, updatefn, current_value, false);
-            }
-        }
-    }
     pub fn get_no_cache(&self, key: &Pubkey) -> Option<(u64, Vec<SlotT<V>>)> {
         let mut m1 = Measure::start("");
         let r = self.disk.get(key);
