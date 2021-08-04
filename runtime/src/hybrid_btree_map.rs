@@ -538,7 +538,7 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
                 error!("not an insert");
             }
             if !instance.insert && !instance.dirty && instance.confirmed_not_on_disk {
-                error!("confirmed not on disk");
+                error!("confirmed not on disk2: {}", k);
             }
             if !delete_key && !keep_this_in_cache && instance.insert {
                 delete_key = true;
@@ -557,44 +557,52 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
                     }
                 }
                 else {
-                    error!("not delete_key2: {:?}", instance);
+                    //error!("not delete_key2: {:?}, {}", instance, k);
 
                 }
             }
             else {
-                error!("not delete_key: {:?}", instance);
+                //error!("not delete_key: {:?}", instance);
             }
         }
         drop(read_lock);
 
         {
             for k in flush_keys.into_iter() {
-                let mut wc = &mut self.write_cache[ix].read().unwrap(); // maybe get lock for each item?
-                if let Some(occupied) = wc.get(&k) {
-                    let mut instance = occupied.instance.write().unwrap();
-                    if instance.dirty {
-                        self.update_no_cache(
-                            &k,
-                            |_current| {
-                                Some((
-                                    instance.data.slot_list.clone(),
-                                    instance.data.ref_count,
-                                ))
-                            },
-                            None,
-                            true,
-                        );
-                        let mut keep_this_in_cache = true;
-                        if instance.insert {
-                            keep_this_in_cache = Self::in_cache(&instance.data.slot_list); // || instance.data.slot_list.len() > 1);
+                let mut wc = &mut self.write_cache[ix].write().unwrap(); // maybe get lock for each item?
+                match wc.entry(k) {
+                    HashMapEntry::Occupied(occupied) => {
+                        let mut instance = occupied.get().instance.write().unwrap();
+                        if instance.dirty {
+                            self.update_no_cache(
+                                &k,
+                                |_current| {
+                                    Some((
+                                        instance.data.slot_list.clone(),
+                                        instance.data.ref_count,
+                                    ))
+                                },
+                                None,
+                                true,
+                            );
+                            let mut keep_this_in_cache = true;
+                            if instance.insert {
+                                keep_this_in_cache = Self::in_cache(&instance.data.slot_list); // || instance.data.slot_list.len() > 1);
+                            }
+                            if keep_this_in_cache {
+                                instance.age = next_age; // keep newly updated stuff around
+                            }
+                            instance.dirty = false;
+                            instance.insert = false;
+                            if !keep_this_in_cache {
+                                // delete immediately to avoid a race condition
+                                drop(instance);
+                                occupied.remove();
+                            }
+                            flushed += 1;
                         }
-                        if keep_this_in_cache {
-                            instance.age = next_age; // keep newly updated stuff around
-                        }
-                        instance.dirty = false;
-                        instance.insert = false;
-                        flushed += 1;
-                    }
+                    },
+                    _ => {},
                 }
             }
         }
@@ -607,6 +615,7 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
                     //error!("mid flush: {}, {}", ix, line!());
                     // if someone else dirtied it or aged it newer, so re-insert it into the cache
                     if instance.dirty || (do_age && instance.age != age_comp) {
+                        panic!("re-adding: {}, {:?}, age: {}", k, instance, do_age);
                         drop(instance);
                         wc.insert(*k, item);
                     }
@@ -978,6 +987,9 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
                         error!("not an insert1");
                     }
                     *gm = self.allocate(&result.0, result.1, true, insert, must_do_lookup_from_disk, confirmed_not_on_disk);
+                    drop(gm);
+                    assert_eq!(occupied.get().instance.read().unwrap().insert, insert);
+                    assert_eq!(occupied.get().instance.read().unwrap().confirmed_not_on_disk, confirmed_not_on_disk);
                 }
                 HashMapEntry::Vacant(vacant) => {
                     error!("not an insert2");
@@ -1105,11 +1117,13 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
                 HashMapEntry::Vacant(vacant) => {
                     let r = self.get_no_cache(key);
                     if let Some(loaded) = &r {
+                        error!("loaded: {}", key);
                         vacant.insert(self.allocate(&loaded.1, loaded.0, false, false, must_do_lookup_from_disk, confirmed_not_on_disk));
                     }
                     else {
                         // we looked this up. it does not exist. let's insert a marker in the cache saying it doesn't exist. otherwise, we have to look it up again on insert!
                         confirmed_not_on_disk = true;
+                        //error!("confirmed not on disk3: {}", key);
                         vacant.insert(self.allocate(&SlotList::default(), RefCount::MAX, false, false, must_do_lookup_from_disk, confirmed_not_on_disk));
                     }
                     m1.stop();
