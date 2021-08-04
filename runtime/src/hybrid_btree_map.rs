@@ -534,6 +534,12 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
             }
             let mut delete_key = (do_age && !dirty) || startup;
             let mut purging_non_cached_insert = false;
+            if !delete_key && !keep_this_in_cache && !instance.insert && instance.dirty {
+                error!("not an insert");
+            }
+            if !instance.insert && !instance.dirty && instance.confirmed_not_on_disk {
+                error!("confirmed not on disk");
+            }
             if !delete_key && !keep_this_in_cache && instance.insert {
                 delete_key = true;
                 // get rid of non-cached inserts from the write cache asap - we won't need them again any sooner than any other account
@@ -550,6 +556,13 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
                         flush_keys.push(*k);
                     }
                 }
+                else {
+                    error!("not delete_key2: {:?}", instance);
+
+                }
+            }
+            else {
+                error!("not delete_key: {:?}", instance);
             }
         }
         drop(read_lock);
@@ -961,9 +974,13 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
                     if insert {
                         //error!("insert");
                     }
+                    else {
+                        error!("not an insert1");
+                    }
                     *gm = self.allocate(&result.0, result.1, true, insert, must_do_lookup_from_disk, confirmed_not_on_disk);
                 }
                 HashMapEntry::Vacant(vacant) => {
+                    error!("not an insert2");
                     vacant.insert(self.allocate(&result.0, result.1, true, true, must_do_lookup_from_disk, confirmed_not_on_disk));
                     self.wait.notify_all(); // we have put something in the write cache that needs to be flushed sometime
                 }
