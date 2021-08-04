@@ -35,7 +35,7 @@ use std::{
 use thiserror::Error;
 
 pub const ITER_BATCH_SIZE: usize = 1000;
-pub const BINS: usize = 10;
+pub const BINS: usize = 2;
 pub type ScanResult<T> = Result<T, ScanError>;
 pub type SlotList<T> = Vec<(Slot, T)>;
 pub type SlotSlice<'s, T> = &'s [(Slot, T)];
@@ -2802,7 +2802,7 @@ pub mod tests {
     fn test_insert_perf() {
         solana_logger::setup();
         let index = AccountsIndex::<AccountInfo>::default();
-        let threads: usize = 10;
+        let threads: usize = 2;
         let count = 100;
         let bins = index.account_maps.len();
         let mut sum = 0;
