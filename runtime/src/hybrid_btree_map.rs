@@ -356,6 +356,10 @@ pub struct BucketMapWriteHolder<V> {
     pub gets_from_disk_empty: AtomicU64,
     pub gets_from_cache: AtomicU64,
     pub updates: AtomicU64,
+    pub flush0:  AtomicU64,
+    pub flush1:  AtomicU64,
+    pub flush2:  AtomicU64,
+    pub flush3:  AtomicU64,
     pub using_empty_get: AtomicU64,
     pub insert_without_lookup: AtomicU64,
     pub updates_in_cache: AtomicU64,
@@ -426,7 +430,12 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
         age.wrapping_add(inc)
     }
 
+    pub fn dump_metrics(&self) {
+        self.distribution2();
+    }
+
     pub fn bg_flusher(&self, exit: Arc<AtomicBool>) {
+        return;
         let mut found_one = false;
         let mut last = Instant::now();
         let mut aging = Instant::now();
@@ -481,6 +490,11 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
         let updates_in_cache = AtomicU64::new(0);
         let inserts_without_checking_disk = AtomicU64::new(0);
         let updates = AtomicU64::new(0);
+        let flush0 = AtomicU64::new(0);
+        let flush1 = AtomicU64::new(0);
+        let flush2 = AtomicU64::new(0);
+        let flush3 = AtomicU64::new(0);
+    
         let inserts = AtomicU64::new(0);
         let deletes = AtomicU64::new(0);
         let mut write_cache = vec![];
@@ -511,6 +525,10 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
             write_cache_flushes,
             updates,
             inserts,
+            flush0,
+            flush1,
+            flush2,
+            flush3,
             db,
             binner,
             unified_backing,
@@ -550,6 +568,7 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
         let mut delete_keys = Vec::with_capacity(len);
         let mut flushed = 0;
         let mut get_purges = 0;
+        let mut m0 = Measure::start("");
         for (k, mut v) in read_lock.iter() {
             let mut instance = v.instance.read().unwrap();
             let dirty = instance.dirty;
@@ -597,7 +616,9 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
             }
         }
         drop(read_lock);
+        m0.stop();
 
+        let mut m1 = Measure::start("");
         {
             for k in flush_keys.into_iter() {
                 let mut wc = &mut self.write_cache[ix].write().unwrap(); // maybe get lock for each item?
@@ -660,6 +681,9 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
                 }
             }
         }
+        m1.stop();
+
+        let mut m2 = Measure::start("");
         {
             let mut wc = &mut self.write_cache[ix].write().unwrap(); // maybe get lock for each item?
             for k in delete_keys.iter() {
@@ -677,9 +701,14 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
                 }
             }
         }
+        m2.stop();
         let mut wc = &mut self.write_cache[ix].read().unwrap(); // maybe get lock for each item?
         let len = wc.len();
         drop(wc);
+
+        self.flush0.fetch_add(m0.as_us(), Ordering::Relaxed);
+        self.flush1.fetch_add(m1.as_us(), Ordering::Relaxed);
+        self.flush2.fetch_add(m2.as_us(), Ordering::Relaxed);
 
         if flushed != 0 {
             self.write_cache_flushes
@@ -1306,6 +1335,10 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
             ("max", max, i64),
             ("sum", sum, i64),
             ("updates_not_in_cache", self.updates.swap(0, Ordering::Relaxed), i64),
+            ("flush0", self.flush0.swap(0, Ordering::Relaxed), i64),
+            ("flush1", self.flush1.swap(0, Ordering::Relaxed), i64),
+            ("flush2", self.flush2.swap(0, Ordering::Relaxed), i64),
+            ("flush3", self.flush3.swap(0, Ordering::Relaxed), i64),
             //("updates_not_in_cache", self.updates.load(Ordering::Relaxed), i64),
             ("updates_in_cache", self.updates_in_cache.swap(0, Ordering::Relaxed), i64),
             ("inserts", self.inserts.swap(0, Ordering::Relaxed), i64),
@@ -1822,5 +1855,8 @@ impl<V: 'static + Clone + Debug + IsCached + Guts> HybridBTreeMap<V> {
 
     pub fn update_or_insert_async(&self, pubkey: Pubkey, new_entry: AccountMapEntry<V>) {
         self.disk.update_or_insert_async(self.bin_index, pubkey, new_entry);
+    }
+    pub fn dump_metrics(&self) {
+        self.disk.dump_metrics()        ;
     }
 }

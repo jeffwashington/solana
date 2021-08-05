@@ -2845,6 +2845,7 @@ pub mod tests {
             }).sum::<usize>();
             m1.stop();
             sum += per;
+            index.account_maps.first().unwrap().read().unwrap().dump_metrics();
             error!("{} {} {} {} {} {}", sum, m0.as_ms(), m1.as_ms(), m0.as_ns() / per as u64, m1.as_ns() / per as u64, cache_entries);
 
             i += 1;
