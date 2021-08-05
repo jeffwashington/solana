@@ -27,7 +27,7 @@ use std::{
     },
     sync::{
         Arc,
-        atomic::{AtomicBool, AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering, AtomicUsize},
         Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard,
     },
     thread::{Builder, JoinHandle},
@@ -2830,18 +2830,19 @@ pub mod tests {
 
             let mut m1 = Measure::start("");
             info!("flushing");
-            let cache_entries = (0..threads).into_par_iter().map(|i| {
-                let skip = i * bins / threads;
-                let end = (i + 1) * bins / threads;
-                let take = end - skip;
-                index
-                    .account_maps
-                    .iter()
-                    .skip(skip)
-                    .take(take)
-                    .map(|i| {
-                        i.read().unwrap().flush()
-                    }).sum::<usize>()
+            let count = AtomicUsize::new(0);
+            let cache_entries = (0..threads).into_par_iter().map(|_| {
+                let mut size = 0;
+                loop {
+                    let old = count.fetch_add(1, Ordering::Relaxed);
+                    if old >= bins {
+                        break;
+                    }
+                    size += 
+                    index
+                    .account_maps[old].read().unwrap().flush();
+                }
+                sum
             }).sum::<usize>();
             m1.stop();
             sum += per;
