@@ -623,8 +623,8 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
         for (k, mut v) in read_lock.iter() {
             self.disk.get(k);
         }
-        drop(read_lock);
         */
+        drop(read_lock);
         m3.stop();
 
         let mut m1 = Measure::start("");
