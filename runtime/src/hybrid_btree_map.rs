@@ -617,6 +617,7 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
         }
         m0.stop();
 
+        /*
         // time how long just to get everything from disk
         let mut m3 = Measure::start("");
         for (k, mut v) in read_lock.iter() {
@@ -624,6 +625,7 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
         }
         m3.stop();
         drop(read_lock);
+        */
 
         let mut m1 = Measure::start("");
         {
