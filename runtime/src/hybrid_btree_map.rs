@@ -716,7 +716,7 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
         self.flush0.fetch_add(m0.as_us(), Ordering::Relaxed);
         self.flush1.fetch_add(m1.as_us(), Ordering::Relaxed);
         self.flush2.fetch_add(m2.as_us(), Ordering::Relaxed);
-        self.flush2.fetch_add(m3.as_us(), Ordering::Relaxed);
+        self.flush3.fetch_add(m3.as_us(), Ordering::Relaxed);
 
         if flushed != 0 {
             self.write_cache_flushes
