@@ -2,7 +2,7 @@ use crate::{
     ancestors::Ancestors,
     contains::Contains,
     hybrid_btree_map::{
-        HybridBTreeMap, HybridEntry as Entry, HybridOccupiedEntry, HybridVacantEntry,
+        HybridBTreeMap, HybridEntry as Entry,
     },
     inline_spl_token_v2_0::{self, SPL_TOKEN_ACCOUNT_MINT_OFFSET, SPL_TOKEN_ACCOUNT_OWNER_OFFSET},
     pubkey_bins::PubkeyBinCalculator16,
@@ -176,110 +176,23 @@ impl<'a, T: Clone + std::fmt::Debug + IsCached> ReadAccountMapEntry<'a, T> {
     pub fn ref_count(&self) -> RefCount {
         self.get().ref_count
     }
-}
 
-#[self_referencing]
-pub struct WriteAccountMapEntry<'a, 'b: 'a, T: IsCached> {
-    lock: AccountMapsWriteLock<'b, T>,
-    pubkey: &'a Pubkey,
-    #[borrows(mut lock, pubkey)]
-    #[covariant]
-    owned_entry: (
-        Option<HybridOccupiedEntry<'this, T>>,
-        Option<HybridVacantEntry<'this, T>>,
-    ),
-}
-
-impl<'a, 'b: 'a, T: IsCached> WriteAccountMapEntry<'a, 'b, T> {
-    pub fn new_with_lock(
-        pubkey: &'a Pubkey,
-        lock: AccountMapsWriteLock<'b, T>,
-        allow_vacant: bool,
-    ) -> Option<Self> {
-        let result = WriteAccountMapEntryBuilder {
-            lock,
-            pubkey,
-            owned_entry_builder: |lock, pubkey| match lock.entry(**pubkey) {
-                Entry::Occupied(occupied) => (Some(occupied), None),
-                Entry::Vacant(vacant) => (None, Some(vacant)),
-            },
-        }
-        .build();
-        if allow_vacant || result.is_occupied() {
-            Some(result)
-        } else {
-            None
-        }
-    }
-
-    pub fn destroy(self) -> AccountMapsWriteLock<'b, T> {
+    pub fn unref(self) {
         let lock = Self::into_heads(self);
-        lock.lock
+        lock.lock.unref(&lock.pubkey);
     }
 
-    pub fn pubkey(&self) -> &Pubkey {
-        self.borrow_pubkey()
+    pub fn addref(self) {
+        let lock = Self::into_heads(self);
+        lock.lock.unref(&lock.pubkey);
     }
+}
 
-    pub fn is_occupied(&self) -> bool {
-        // rename to is_occupied
-        let eg = &self.borrow_owned_entry();
-        eg.0.is_some()
-    }
+pub struct WriteAccountMapEntry<T: 'static> {
+    phantom: std::marker::PhantomData<T>,
+}
 
-    pub fn insert(mut self, new_entry: AccountMapEntry<T>) -> AccountMapsWriteLock<'b, T> {
-        assert!(!self.is_occupied());
-        self.with_mut(|fields| {
-            let f = fields.owned_entry;
-            let vacant = f.1.take().unwrap();
-
-            vacant.insert(new_entry);
-        });
-        self.destroy()
-    }
-
-    pub fn get(&'a self) -> Option<&'a HybridOccupiedEntry<'a, T>> {
-        self.borrow_owned_entry().0.as_ref()
-    }
-
-    pub fn slot_list(&mut self) -> &SlotList<T> {
-        &self.get().unwrap().get().slot_list
-    }
-
-    pub fn slot_list_mut<RT>(
-        &mut self,
-        user: impl for<'this> FnOnce(&mut SlotList<T>, &mut RefCount) -> RT,
-    ) -> Option<RT> {
-        let mut sl = self.slot_list().clone();
-        let mut rc = self.ref_count();
-        let rc_orig = rc;
-        self.with_mut(|fields| {
-            let f = fields.owned_entry;
-            let result = user(&mut sl, &mut rc);
-            let update_rc = if rc != rc_orig { Some(rc) } else { None };
-            f.0.as_mut().map(|entry| entry.update(&mut sl, update_rc));
-            Some(result)
-        })
-    }
-
-    pub fn ref_count(&self) -> RefCount {
-        self.get().unwrap().get().ref_count
-    }
-
-    pub fn unref(&mut self) {
-        self.with_mut(|fields| {
-            let f = fields.owned_entry;
-            f.0.as_mut().map(|entry| entry.unref());
-        });
-    }
-
-    pub fn addref(&mut self) {
-        self.with_mut(|fields| {
-            let f = fields.owned_entry;
-            f.0.as_mut().map(|entry| entry.addref());
-        });
-    }
-
+impl<T: IsCached> WriteAccountMapEntry<T> {
     // create an entry that is equivalent to this process:
     // 1. new empty (refcount=0, slot_list={})
     // 2. update(slot, account_info)
@@ -292,14 +205,15 @@ impl<'a, 'b: 'a, T: IsCached> WriteAccountMapEntry<'a, 'b, T> {
         }
     }
 
-    pub fn upsert(
-        w_account_maps: AccountMapsReadLock<'a, T>,
+    // true if item existed already and was updated
+    pub fn upsert<'a>(
+        w_account_maps: &AccountMapsReadLock<'a, T>,
         pubkey: &Pubkey,
         new_value: AccountMapEntry<T>,
         reclaims: &mut SlotList<T>,
         previous_slot_entry_was_cached: bool,
-    ) {
-        w_account_maps.upsert(pubkey, new_value, reclaims, previous_slot_entry_was_cached);
+    ) -> bool {
+        w_account_maps.upsert(pubkey, new_value, reclaims, previous_slot_entry_was_cached)
     }
 
     // modifies slot_list
@@ -337,17 +251,6 @@ impl<'a, 'b: 'a, T: IsCached> WriteAccountMapEntry<'a, 'b, T> {
         // if we make it here, we did not find the slot in the list
         list.push((slot, account_info));
         addref
-    }
-
-    // Try to update an item in the slot list the given `slot` If an item for the slot
-    // already exists in the list, remove the older item, add it to `reclaims`, and insert
-    // the new item.
-    pub fn update(&mut self, slot: Slot, account_info: T, reclaims: &mut SlotList<T>) {
-        self.slot_list_mut(|list, refcount| {
-            if Self::update_slot_list(list, slot, account_info, reclaims, false) {
-                *refcount += 1;
-            }
-        });
     }
 }
 
@@ -1131,7 +1034,6 @@ impl<T: IsCached> AccountsIndex<T> {
         for pubkey_list in self.iter(range) {
             iterator_timer.stop();
             iterator_elapsed += iterator_timer.as_us();
-            let l = pubkey_list.len();
             for pubkey in pubkey_list {
                 //error!("pubkey: {}", pubkey);
                 num_keys_iterated += 1;
@@ -1216,52 +1118,21 @@ impl<T: IsCached> AccountsIndex<T> {
         ReadAccountMapEntry::new_with_lock(*pubkey, lock)
     }
 
-    pub fn get_account_write_entry<'a, 'b>(
-        &'a self,
-        pubkey: &'b Pubkey,
-    ) -> Option<WriteAccountMapEntry<'b, 'a, T>> {
-        let lock = self.get_account_maps_write_lock(pubkey);
-        let allow_vacant = false;
-        Self::get_account_write_entry_with_lock(pubkey, lock, allow_vacant)
-    }
-
-    fn get_account_write_entry_with_lock<'a, 'b>(
-        pubkey: &'b Pubkey,
-        lock: AccountMapsWriteLock<'a, T>,
-        allow_vacant: bool,
-    ) -> Option<WriteAccountMapEntry<'b, 'a, T>> {
-        WriteAccountMapEntry::new_with_lock(pubkey, lock, allow_vacant)
-    }
-
-    // return None if item was created new
-    // if entry for pubkey already existed, return Some(entry). Caller needs to call entry.update.
-    fn upsert_with_lock_pubkey_result<'a>(
-        // rename: maybe insert_or_update
+    fn slot_list_mut<RT>(
         &self,
-        pubkey: Pubkey,
-        w_account_maps: AccountMapsWriteLock<'a, T>,
-        new_entry: AccountMapEntry<T>,
-    ) -> (Option<Pubkey>, AccountMapsWriteLock<'a, T>) {
-        // caller does not need to know whether the item existed already or not
-        w_account_maps.update_or_insert_async(pubkey, new_entry);
-        (None, w_account_maps)
-        /*
+        pubkey: &Pubkey,
+        user: impl for<'a> FnOnce(&mut SlotList<T>) -> RT,
+    ) -> Option<RT> {
+        let mut read_lock = self.account_maps[self.bin_calculator.bin_from_pubkey(pubkey)]
+            .write()
+            .unwrap();
 
-        let allow_vacant = true;
-        let mut result =
-            WriteAccountMapEntry::new_with_lock(&pubkey, w_account_maps, allow_vacant).unwrap();
-
-        if result.is_occupied() {
-            let (slot, account_info) = new_entry.slot_list.remove(0);
-            result.update(slot, account_info, reclaims);
-            let r = result.destroy();
-            (Some(pubkey), r)
-        } else {
-            // entry did not exist
-            let r = result.insert(new_entry);
-            (None, r)
+        if let Entry::Occupied(mut index_entry) = read_lock.entry(*pubkey) {
+            Some(index_entry.slot_list_mut(user))
         }
-        */
+        else {
+            None
+        }
     }
 
     pub fn handle_dead_keys(
@@ -1384,28 +1255,19 @@ impl<T: IsCached> AccountsIndex<T> {
     where
         C: Contains<'a, Slot>,
     {
-        if let Some(mut write_account_map_entry) = self.get_account_write_entry(pubkey) {
-            if write_account_map_entry.is_occupied() {
-                write_account_map_entry
-                    .slot_list_mut(|slot_list, _ref_count| {
-                        slot_list.retain(|(slot, item)| {
-                            let should_purge = slots_to_purge.contains(slot);
-                            if should_purge {
-                                reclaims.push((*slot, item.clone()));
-                                false
-                            } else {
-                                true
-                            }
-                        });
-                        slot_list.is_empty()
-                    })
-                    .unwrap() // will always be Some because we checked for is_occupied above
-            } else {
-                true
-            }
-        } else {
-            true
-        }
+        self.slot_list_mut(pubkey, |slot_list| {
+            slot_list.retain(|(slot, item)| {
+                let should_purge = slots_to_purge.contains(slot);
+                if should_purge {
+                    reclaims.push((*slot, item.clone()));
+                    false
+                } else {
+                    true
+                }
+            });
+            slot_list.is_empty()
+        })
+        .unwrap_or(true)
     }
 
     pub fn min_ongoing_scan_root(&self) -> Option<Slot> {
@@ -1614,19 +1476,23 @@ impl<T: IsCached> AccountsIndex<T> {
                 // big enough so not likely to re-allocate, small enough to not over-allocate by too much
                 // this assumes 10% of keys are duplicates. This vector will be flattened below.
                 let mut dirty_pubkeys = Vec::with_capacity(items.len() / 10);
-                let mut w_account_maps = self.account_maps[pubkey_bin].write().unwrap();
+                let w_account_maps = self.account_maps[pubkey_bin].read().unwrap();
                 let mut insert_time = Measure::start("insert_into_primary_index");
-                // for loop because of capture of w_account_maps
-                for (pubkey, new_item, is_zero_lamport) in items.into_iter() {
-                    let (already_exists, returned_lock) =
-                        self.upsert_with_lock_pubkey_result(pubkey, w_account_maps, new_item);
-                    w_account_maps = returned_lock; // re-use the lock
-                    if let Some(pubkey) = already_exists {
-                        dirty_pubkeys.push(pubkey);
-                    } else if is_zero_lamport {
-                        dirty_pubkeys.push(pubkey);
-                    }
-                }
+                let mut _reclaims = vec![];
+                items
+                    .into_iter()
+                    .for_each(|(pubkey, new_item, is_zero_lamport)| {
+                        let already_exists = WriteAccountMapEntry::upsert(
+                            &w_account_maps,
+                            &pubkey,
+                            new_item,
+                            &mut _reclaims,
+                            false,
+                        );
+                        if already_exists || is_zero_lamport {
+                            dirty_pubkeys.push(pubkey);
+                        }
+                    });
                 insert_time.stop();
                 insertion_time.fetch_add(insert_time.as_us(), Ordering::Relaxed);
                 dirty_pubkeys
@@ -1666,7 +1532,7 @@ impl<T: IsCached> AccountsIndex<T> {
         {
             let w_account_maps = self.get_account_maps_read_lock(pubkey);
             WriteAccountMapEntry::upsert(
-                w_account_maps,
+                &w_account_maps,
                 pubkey,
                 new_item,
                 reclaims,
@@ -1677,7 +1543,7 @@ impl<T: IsCached> AccountsIndex<T> {
     }
 
     pub fn unref_from_storage(&self, pubkey: &Pubkey) {
-        if let Some(mut locked_entry) = self.get_account_write_entry(pubkey) {
+        if let Some(locked_entry) = self.get_account_read_entry(pubkey) {
             locked_entry.unref();
         }
     }
@@ -1737,12 +1603,10 @@ impl<T: IsCached> AccountsIndex<T> {
         max_clean_root: Option<Slot>,
     ) {
         let mut is_slot_list_empty = false;
-        if let Some(mut locked_entry) = self.get_account_write_entry(pubkey) {
-            locked_entry.slot_list_mut(|slot_list, _ref_count| {
-                self.purge_older_root_entries(slot_list, reclaims, max_clean_root);
-                is_slot_list_empty = slot_list.is_empty();
-            });
-        }
+        self.slot_list_mut(pubkey, |slot_list| {
+            self.purge_older_root_entries(slot_list, reclaims, max_clean_root);
+            is_slot_list_empty = slot_list.is_empty();
+        });
 
         // If the slot list is empty, remove the pubkey from `account_maps`.  Make sure to grab the
         // lock and double check the slot list is still empty, because another writer could have
@@ -1932,14 +1796,12 @@ impl<T: IsCached> AccountsIndex<T> {
     // if this account has no more entries. Note this does not update the secondary
     // indexes!
     pub fn purge_roots(&self, pubkey: &Pubkey) -> (SlotList<T>, bool) {
-        let mut write_account_map_entry = self.get_account_write_entry(pubkey).unwrap();
-        write_account_map_entry
-            .slot_list_mut(|slot_list: &mut SlotList<T>, _ref_count| {
-                let reclaims = self.get_rooted_entries(slot_list, None);
-                slot_list.retain(|(slot, _)| !self.is_root(*slot));
-                (reclaims, slot_list.is_empty())
-            })
-            .unwrap()
+        self.slot_list_mut(pubkey, |slot_list| {
+            let reclaims = self.get_rooted_entries(slot_list, None);
+            slot_list.retain(|(slot, _)| !self.is_root(*slot));
+            (reclaims, slot_list.is_empty())
+        })
+        .unwrap()
     }
 }
 
@@ -3048,12 +2910,13 @@ pub mod tests {
 
         let w_account_maps = index.get_account_maps_read_lock(&key.pubkey());
         WriteAccountMapEntry::upsert(
-            w_account_maps,
+            &w_account_maps,
             &key.pubkey(),
             new_entry,
             &mut SlotList::default(),
             UPSERT_PREVIOUS_SLOT_ENTRY_WAS_CACHED_FALSE,
         );
+        drop(w_account_maps);
         assert_eq!(1, account_maps_len_expensive(&index));
 
         let mut ancestors = Ancestors::default();
@@ -3954,10 +3817,7 @@ pub mod tests {
 
         secondary_indexes.keys = None;
 
-        index
-            .get_account_write_entry(&account_key)
-            .unwrap()
-            .slot_list_mut(|slot_list, _ref_count| slot_list.clear());
+        index.slot_list_mut(&account_key, |slot_list| slot_list.clear());
 
         // Everything should be deleted
         index.handle_dead_keys(&[&account_key], &secondary_indexes);
@@ -4060,12 +3920,9 @@ pub mod tests {
         // was outdated by the update in the later slot, the primary account key is still alive,
         // so both secondary keys will still be kept alive.
         index.add_root(later_slot, false);
-        index
-            .get_account_write_entry(&account_key)
-            .unwrap()
-            .slot_list_mut(|slot_list, _ref_count| {
-                index.purge_older_root_entries(slot_list, &mut vec![], None)
-            });
+        index.slot_list_mut(&account_key, |slot_list| {
+            index.purge_older_root_entries(slot_list, &mut vec![], None)
+        });
 
         check_secondary_index_mapping_correct(
             secondary_index,

@@ -583,7 +583,7 @@ impl<V: IsCached> BucketMapWriteHolder<V> {
         mut new_value: AccountMapEntry<V>,
         reclaims: &mut SlotList<V>,
         reclaims_must_be_empty: bool,
-    ) {
+    ) -> bool {
         let must_do_lookup_from_disk = false;
         let confirmed_not_on_disk = false;
         /*
@@ -608,7 +608,7 @@ impl<V: IsCached> BucketMapWriteHolder<V> {
                     reclaims_must_be_empty,
                     m1,
                 );
-                return;
+                return false; // todo
             }
         }
 
@@ -626,7 +626,7 @@ impl<V: IsCached> BucketMapWriteHolder<V> {
                     reclaims_must_be_empty,
                     m1,
                 );
-                return;
+                return false; // todo
             }
             HashMapEntry::Vacant(vacant) => {
                 if !reclaims_must_be_empty {
@@ -649,7 +649,7 @@ impl<V: IsCached> BucketMapWriteHolder<V> {
                         must_do_lookup_from_disk,
                         confirmed_not_on_disk,
                     ));
-                    return; // we can be satisfied that this index will be looked up later
+                    return false; // todo // we can be satisfied that this index will be looked up later
                 }
                 let r = self.get_no_cache(&key); // maybe move this outside lock - but race conditions unclear
                 if let Some(mut current) = r {
@@ -692,6 +692,7 @@ impl<V: IsCached> BucketMapWriteHolder<V> {
                 }
             }
         }
+        false // todo: this is always returning that the pubkey did not exist. This is not correct
     }
 
     fn in_cache(slot_list: &SlotList<V>) -> bool {
@@ -1044,7 +1045,7 @@ impl<V: IsCached> BucketMapWriteHolder<V> {
             }
         }
     }
-    fn addunref(&self, key: &Pubkey, _ref_count: RefCount, _slot_list: &Vec<SlotT<V>>, add: bool) {
+    fn addunref(&self, key: &Pubkey, add: bool) {
         // todo: measure this and unref
         let ix = self.bucket_ix(key);
         let mut m1 = Measure::start("");
@@ -1078,14 +1079,23 @@ impl<V: IsCached> BucketMapWriteHolder<V> {
             }
         }
     }
-    pub fn addref(&self, key: &Pubkey, ref_count: RefCount, slot_list: &Vec<SlotT<V>>) {
+    pub fn addref2(&self, key: &Pubkey) {
         self.addrefs.fetch_add(1, Ordering::Relaxed);
-        self.addunref(key, ref_count, slot_list, true);
+        self.addunref(key, true);
     }
 
-    pub fn unref(&self, key: &Pubkey, ref_count: RefCount, slot_list: &Vec<SlotT<V>>) {
+    pub fn unref2(&self, key: &Pubkey) {
         self.unrefs.fetch_add(1, Ordering::Relaxed);
-        self.addunref(key, ref_count, slot_list, false);
+        self.addunref(key, false);
+    }
+    pub fn addref(&self, key: &Pubkey, _ref_count: RefCount, _slot_list: &Vec<SlotT<V>>) {
+        self.addrefs.fetch_add(1, Ordering::Relaxed);
+        self.addunref(key, true);
+    }
+
+    pub fn unref(&self, key: &Pubkey, _ref_count: RefCount, _slot_list: &Vec<SlotT<V>>) {
+        self.unrefs.fetch_add(1, Ordering::Relaxed);
+        self.addunref(key, false);
     }
     pub fn delete_key(&self, key: &Pubkey) {
         self.deletes.fetch_add(1, Ordering::Relaxed);

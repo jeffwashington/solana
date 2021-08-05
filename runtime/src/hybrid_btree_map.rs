@@ -154,6 +154,9 @@ impl<'a, V: 'a + Clone + IsCached + Debug> HybridOccupiedEntry<'a, V> {
     pub fn get(&self) -> &V2<V> {
         &self.entry
     }
+    pub fn slot_list_mut<RT>(&mut self, user: impl for<'b> FnOnce(&mut SlotList<V>) -> RT,) -> RT {
+        user(&mut self.entry.slot_list)
+    }
     pub fn update(&mut self, new_data: &SlotList<V>, new_rc: Option<RefCount>) {
         //error!("update: {}", self.pubkey);
         self.map.disk.update(
@@ -380,9 +383,9 @@ impl<V: IsCached> HybridBTreeMap<V> {
         new_value: AccountMapEntry<V>,
         reclaims: &mut SlotList<V>,
         reclaims_must_be_empty: bool,
-    ) {
+    ) -> bool {
         self.disk
-            .upsert(pubkey, new_value, reclaims, reclaims_must_be_empty);
+            .upsert(pubkey, new_value, reclaims, reclaims_must_be_empty)
     }
 
     pub fn entry(&mut self, key: K) -> HybridEntry<'_, V> {
@@ -456,5 +459,13 @@ impl<V: IsCached> HybridBTreeMap<V> {
     }
     pub fn dump_metrics(&self) {
         self.disk.dump_metrics();
+    }
+
+    pub fn addref(&self, pubkey: &Pubkey) {
+        self.disk.addref2(pubkey)
+    }
+
+    pub fn unref(&self, pubkey: &Pubkey) {
+        self.disk.unref2(pubkey)
     }
 }
