@@ -2842,7 +2842,7 @@ pub mod tests {
                     index
                     .account_maps[old].read().unwrap().flush();
                 }
-                sum
+                size
             }).sum::<usize>();
             m1.stop();
             sum += per;
