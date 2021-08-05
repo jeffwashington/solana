@@ -615,7 +615,6 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
                 //error!("not delete_key: {:?}", instance);
             }
         }
-        drop(read_lock);
         m0.stop();
 
         // time how long just to get everything from disk
@@ -624,6 +623,7 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
             self.disk.get(k);
         }
         m3.stop();
+        drop(read_lock);
 
         let mut m1 = Measure::start("");
         {
