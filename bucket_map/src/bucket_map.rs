@@ -68,9 +68,11 @@ impl<T: Clone + Copy + std::fmt::Debug> BucketMap<T> {
         }
     }
 
-    pub fn distribution(&self) -> (Vec<usize>, Vec<usize>, usize, usize) {
-        let mut sizes = vec![];
-        let mut data_sizes = vec![];
+    pub fn distribution(&self) -> (Vec<usize>, Vec<usize>, usize, usize, ( usize, usize, usize, usize)) {
+        let len = self.num_buckets();
+        let mut sizes = Vec::with_capacity(len);
+        let mut data_sizes = Vec::with_capacity(len);
+        let mut data_items_allocated = Vec::with_capacity(len);
         let mut data_bytes_allocated = 0;
         let mut index_bytes_allocated = 0;
         for ix in 0..self.num_buckets() {
@@ -82,13 +84,21 @@ impl<T: Clone + Copy + std::fmt::Debug> BucketMap<T> {
                     len = bucket.index.used.load(Ordering::Relaxed) as usize;
                     index_bytes_allocated += bucket.index.bytes;
                     size = bucket.data.get(0).map(|b| b.used.load(Ordering::Relaxed) as usize).unwrap_or_default();
-                    bucket.data.iter().for_each(|b| {data_bytes_allocated += b.bytes;})
+                    let mut allocated = 0;
+                    bucket.data.iter().for_each(|b| {allocated += b.bytes;});
+                    data_bytes_allocated += allocated;
+                    data_items_allocated.push(allocated);
                 }
             }
             sizes.push(len);
             data_sizes.push(size);
         }
-        (sizes, data_sizes, index_bytes_allocated as usize, data_bytes_allocated as usize)
+        data_items_allocated.sort_unstable();
+        let q0 = data_items_allocated[len / 4];
+        let q1 = data_items_allocated[len / 2];
+        let q2 = data_items_allocated[len * 3 / 4];
+        let q3 = data_items_allocated[len - 1];
+        (sizes, data_sizes, index_bytes_allocated as usize, data_bytes_allocated as usize, (q0 as usize, q1 as usize, q2 as usize, q3 as usize))
     }
 
     fn delete_previous(drives: &Arc<Vec<PathBuf>>) {
