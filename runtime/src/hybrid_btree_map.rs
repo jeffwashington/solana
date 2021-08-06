@@ -1332,11 +1332,20 @@ impl<V: 'static + Clone + Copy + IsCached + Debug + Guts> BucketMapWriteHolder<V
         let mut sum = 0;
         let mut min = usize::MAX;
         let mut max = 0;
-        for d in &dist {
+        for d in &dist.0 {
             let d = *d;
             sum += d;
             min = std::cmp::min(min, d);
             max = std::cmp::max(max, d);
+        }
+        let mut sumd = 0;
+        let mut mind = usize::MAX;
+        let mut maxd = 0;
+        for d in &dist.1 {
+            let d = *d;
+            sumd += d;
+            mind = std::cmp::min(min, d);
+            maxd = std::cmp::max(max, d);
         }
         datapoint_info!(
             "accounts_index",
@@ -1344,6 +1353,9 @@ impl<V: 'static + Clone + Copy + IsCached + Debug + Guts> BucketMapWriteHolder<V
             ("min", min, i64),
             ("max", max, i64),
             ("sum", sum, i64),
+            ("mind", mind, i64),
+            ("maxd", maxd, i64),
+            ("sumd", sumd, i64),
             ("updates_not_in_cache", self.updates.swap(0, Ordering::Relaxed), i64),
             ("flush0", self.flush0.swap(0, Ordering::Relaxed), i64),
             ("flush1", self.flush1.swap(0, Ordering::Relaxed), i64),

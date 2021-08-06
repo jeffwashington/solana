@@ -140,7 +140,7 @@ impl DataBucket {
         }
         let mut e = Err(DataBucketError::AlreadyAllocated);
         let ix = (ix * self.cell_size) as usize;
-        debug!("ALLOC {} {}", ix, uid);
+        //debug!("ALLOC {} {}", ix, uid);
         let hdr_slice: &[u8] = &self.mmap[ix..ix + std::mem::size_of::<Header>()];
         unsafe {
             let hdr = hdr_slice.as_ptr() as *const Header;
@@ -160,12 +160,12 @@ impl DataBucket {
             panic!("free: bad uid");
         }
         let ix = (ix * self.cell_size) as usize;
-        debug!("FREE {} {}", ix, uid);
+        //debug!("FREE {} {}", ix, uid);
         let hdr_slice: &[u8] = &self.mmap[ix..ix + std::mem::size_of::<Header>()];
         let mut e = Err(DataBucketError::InvalidFree);
         unsafe {
             let hdr = hdr_slice.as_ptr() as *const Header;
-            debug!("FREE uid: {}", hdr.as_ref().unwrap().uid());
+            //debug!("FREE uid: {}", hdr.as_ref().unwrap().uid());
             if hdr.as_ref().unwrap().unlock(uid) {
                 self.used.fetch_sub(1, Ordering::Relaxed);
                 e = Ok(());
@@ -203,7 +203,7 @@ impl DataBucket {
         let ix = self.cell_size * ix;
         let start = ix as usize + std::mem::size_of::<Header>();
         let end = start + std::mem::size_of::<T>() * len as usize;
-        debug!("GET slice {} {}", start, end);
+        //debug!("GET slice {} {}", start, end);
         let item_slice: &[u8] = &self.mmap[start..end];
         unsafe {
             let item = item_slice.as_ptr() as *const T;
@@ -231,7 +231,7 @@ impl DataBucket {
         let ix = self.cell_size * ix;
         let start = ix as usize + std::mem::size_of::<Header>();
         let end = start + std::mem::size_of::<T>() * len as usize;
-        debug!("GET mut slice {} {}", start, end);
+        //debug!("GET mut slice {} {}", start, end);
         let item_slice: &[u8] = &self.mmap[start..end];
         unsafe {
             let item = item_slice.as_ptr() as *mut T;
@@ -264,7 +264,7 @@ impl DataBucket {
         // Theoretical performance optimization: write a zero to the end of
         // the file so that we won't have to resize it later, which may be
         // expensive.
-        debug!("GROWING file {}", capacity * cell_size as u64);
+        //debug!("GROWING file {}", capacity * cell_size as u64);
         data.seek(SeekFrom::Start(capacity * cell_size as u64 - 1))
             .unwrap();
         data.write_all(&[0]).unwrap();
