@@ -42,7 +42,7 @@ pub type SlotSlice<'s, T> = &'s [(Slot, T)];
 pub type RefCount = u64;
 pub type AccountMap<V> = HybridBTreeMap<V>;
 
-pub trait IsCached {
+pub trait IsCached : Copy {
     fn is_cached(&self) -> bool;
 }
 

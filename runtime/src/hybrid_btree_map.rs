@@ -377,7 +377,7 @@ pub struct BucketMapWriteHolder<V> {
     pub unified_backing: bool,
 }
 
-impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
+impl<V: 'static + Clone + Copy + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
     pub fn update_or_insert_async(&self, ix: usize, key: Pubkey, new_value: AccountMapEntry<V>) {
         // if in cache, update now in cache
         // if known not present, insert into cache

@@ -57,6 +57,7 @@ pub struct DataBucket {
     pub cell_size: u64,
     //power of 2
     pub capacity: u8,
+    pub bytes: u64,
     pub used: AtomicU64,
     pub stats: Arc<BucketStats>,
 }
@@ -93,6 +94,7 @@ impl DataBucket {
             used: AtomicU64::new(0),
             capacity,
             stats,
+            bytes: 1 << capacity,
         }
     }
 
@@ -269,7 +271,7 @@ impl DataBucket {
             unsafe {
                 let dst = dst_slice.as_ptr() as *mut u8;
                 let src = src_slice.as_ptr() as *const u8;
-                std::ptr::copy(src, dst, self.cell_size as usize);
+                std::ptr::copy_nonoverlapping(src, dst, self.cell_size as usize);
             };
         });
         self.mmap = new_map;
@@ -287,6 +289,6 @@ impl DataBucket {
 
     }
     pub fn num_cells(&self) -> u64 {
-        1u64 << self.capacity
+        self.bytes
     }
 }

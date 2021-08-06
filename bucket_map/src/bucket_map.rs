@@ -52,7 +52,7 @@ impl<T: Clone + std::fmt::Debug> Default for BucketMap<T>  {
 }
 */
 
-impl<T: Clone + std::fmt::Debug> BucketMap<T> {
+impl<T: Clone + Copy + std::fmt::Debug> BucketMap<T> {
     pub fn new(mut num_buckets_pow2: u8, drives: Arc<Vec<PathBuf>>) -> Self {
         Self::delete_previous(&drives);
         let count = 1 << num_buckets_pow2;
@@ -339,7 +339,7 @@ impl IndexEntry {
 
 const MAX_SEARCH: u64 = 16;
 
-impl<T: Clone> Bucket<T> {
+impl<T: Clone + Copy> Bucket<T> {
     fn new(drives: Arc<Vec<PathBuf>>, stats: Arc<BucketMapStats>) -> Self {
         let index = DataBucket::new(
             drives.clone(),
@@ -552,7 +552,7 @@ impl<T: Clone> Bucket<T> {
                     if elem.num_slots > 0 {
                         best_bucket.allocate(ix, elem_uid).unwrap();
                         let slice = best_bucket.get_mut_cell_slice(ix, data.len() as u64);
-                        slice.clone_from_slice(data);
+                        slice.copy_from_slice(data);
                     }
                     return Ok(());
                 }
