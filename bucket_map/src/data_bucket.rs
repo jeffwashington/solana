@@ -298,6 +298,7 @@ impl DataBucket {
         self.mmap = new_map;
         self.path = new_file;
         self.capacity = self.capacity + 1;
+        self.bytes = 1 << self.capacity;
         remove_file(old_file).unwrap();
         m.stop();
         let sz = 1 << self.capacity;
