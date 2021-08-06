@@ -608,9 +608,9 @@ impl<T: Clone + Copy> Bucket<T> {
                 let random = thread_rng().gen();
                 let mut valid = true;
                 for ix in 0..self.index.num_cells() {
-                    if 0 != self.index.uid(ix) {
+                    let uid = self.index.uid(ix);
+                    if 0 != uid {
                         let elem: &IndexEntry = self.index.get(ix);
-                        let uid = self.index.uid(ix);
                         let ref_count = 0; // ??? TODO
                         let new_ix =
                             Self::bucket_create_key(&index, &elem.key, uid, random, ref_count);
