@@ -15,6 +15,7 @@ pub struct BucketStats {
     pub resizes: AtomicU64,
     pub max_size: Mutex<u64>,
     pub resize_us: AtomicU64,
+    pub new_file_us: AtomicU64,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -23,6 +24,22 @@ pub struct BucketMapStats {
     pub data: Arc<BucketStats>,
 }
 
+/*
+1	2
+2	4
+3	8
+4	16
+5	32
+6	64
+7	128
+8	256
+9	512
+10	1024
+11	2048
+12	4096
+13	8192
+14	16384
+*/
 // 23: 8,388,608
 // 24; // 16,777,216
 const DEFAULT_CAPACITY: u8 = 14;
@@ -82,10 +99,10 @@ impl DataBucket {
         num_elems: u64,
         elem_size: u64,
         capacity: u8,
-        stats: Arc<BucketStats>,
+        mut stats: Arc<BucketStats>,
     ) -> Self {
         let cell_size = elem_size * num_elems + std::mem::size_of::<Header>() as u64;
-        let (mmap, path) = Self::new_map(&drives, cell_size as usize, capacity);
+        let (mmap, path) = Self::new_map(&drives, cell_size as usize, capacity, &mut stats);
         Self {
             path,
             mmap,
@@ -222,7 +239,8 @@ impl DataBucket {
         }
     }
 
-    fn new_map(drives: &[PathBuf], cell_size: usize, capacity: u8) -> (MmapMut, PathBuf) {
+    fn new_map(drives: &[PathBuf], cell_size: usize, capacity: u8, stats: &mut Arc<BucketStats>) -> (MmapMut, PathBuf) {
+        let mut m0 = Measure::start("");
         let capacity = 1u64 << capacity;
         let r = thread_rng().gen_range(0, drives.len());
         let drive = &drives[r];
@@ -252,7 +270,10 @@ impl DataBucket {
         data.write_all(&[0]).unwrap();
         data.seek(SeekFrom::Start(0)).unwrap();
         data.flush().unwrap();
-        (unsafe { MmapMut::map_mut(&data).unwrap() }, file)
+        let res = (unsafe { MmapMut::map_mut(&data).unwrap() }, file);
+        m0.stop();
+        stats.new_file_us.fetch_add(m0.as_us(), Ordering::Relaxed);
+        res
     }
 
     pub fn grow(&mut self) {
@@ -261,7 +282,7 @@ impl DataBucket {
         let old_map = &self.mmap;
         let old_file = self.path.clone();
         let (new_map, new_file) =
-            Self::new_map(&self.drives, self.cell_size as usize, self.capacity + 1);
+            Self::new_map(&self.drives, self.cell_size as usize, self.capacity + 1, &mut self.stats);
         (0..old_cap as usize).into_iter().for_each(|i| {
             let old_ix = i * self.cell_size as usize;
             let new_ix = old_ix * 2;

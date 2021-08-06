@@ -1388,6 +1388,11 @@ impl<V: 'static + Clone + Copy + IsCached + Debug + Guts> BucketMapWriteHolder<V
                 i64
             ),
             (
+                "bucket_index_new_file_us",
+                self.disk.stats.index.new_file_us.swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
                 "bucket_data_resizes",
                 self.disk.stats.data.resizes.swap(0, Ordering::Relaxed),
                 i64
@@ -1400,6 +1405,11 @@ impl<V: 'static + Clone + Copy + IsCached + Debug + Guts> BucketMapWriteHolder<V
             (
                 "bucket_data_max",
                 *self.disk.stats.data.max_size.lock().unwrap(),
+                i64
+            ),
+            (
+                "bucket_data_new_file_us",
+                self.disk.stats.data.new_file_us.swap(0, Ordering::Relaxed),
                 i64
             ),
             (
