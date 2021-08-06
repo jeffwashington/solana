@@ -594,31 +594,31 @@ impl<T: Clone> Bucket<T> {
                     self.stats.index.clone(),
                 );
                 let random = thread_rng().gen();
-                let rvs: Vec<bool> = (0..self.index.num_cells())
-                    .into_iter()
-                    .map(|ix| {
-                        if 0 != self.index.uid(ix) {
-                            let elem: &IndexEntry = self.index.get(ix);
-                            let uid = self.index.uid(ix);
-                            let ref_count = 0; // ??? TODO
-                            let new_ix =
-                                Self::bucket_create_key(&index, &elem.key, uid, random, ref_count);
-                            if new_ix.is_err() {
-                                return false;
-                            }
-                            let new_ix = new_ix.unwrap();
-                            let new_elem: &mut IndexEntry = index.get_mut(new_ix);
-                            *new_elem = *elem;
-                            let dbg_elem: IndexEntry = *new_elem;
-                            assert_eq!(
-                                Self::bucket_find_entry(&index, &elem.key, random).unwrap(),
-                                (&dbg_elem, new_ix)
-                            );
+                let mut valid = true;
+                for ix in 0..self.index.num_cells() {
+                    if 0 != self.index.uid(ix) {
+                        let elem: &IndexEntry = self.index.get(ix);
+                        let uid = self.index.uid(ix);
+                        let ref_count = 0; // ??? TODO
+                        let new_ix =
+                            Self::bucket_create_key(&index, &elem.key, uid, random, ref_count);
+                        if new_ix.is_err() {
+                            valid = false;
+                            break;
                         }
-                        true
-                    })
-                    .collect();
-                if rvs.into_iter().all(|x| x) {
+                        let new_ix = new_ix.unwrap();
+                        let new_elem: &mut IndexEntry = index.get_mut(new_ix);
+                        *new_elem = *elem;
+                        /*
+                        let dbg_elem: IndexEntry = *new_elem;
+                        assert_eq!(
+                            Self::bucket_find_entry(&index, &elem.key, random).unwrap(),
+                            (&dbg_elem, new_ix)
+                        );
+                        */
+                    }
+                }
+                if valid {
                     self.index = index;
                     self.random = random;
                     break;
