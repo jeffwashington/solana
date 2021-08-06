@@ -16,6 +16,8 @@ pub struct BucketStats {
     pub max_size: Mutex<u64>,
     pub resize_us: AtomicU64,
     pub new_file_us: AtomicU64,
+    pub flush_file_us: AtomicU64,
+    pub mmap_us: AtomicU64,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -269,10 +271,16 @@ impl DataBucket {
             .unwrap();
         data.write_all(&[0]).unwrap();
         data.seek(SeekFrom::Start(0)).unwrap();
-        data.flush().unwrap(); // can we skip this?
-        let res = (unsafe { MmapMut::map_mut(&data).unwrap() }, file);
         m0.stop();
+        let mut m1 = Measure::start("");
+        data.flush().unwrap(); // can we skip this?
+        m1.stop();
+        let mut m2 = Measure::start("");
+        let res = (unsafe { MmapMut::map_mut(&data).unwrap() }, file);
+        m2.stop();
         stats.new_file_us.fetch_add(m0.as_us(), Ordering::Relaxed);
+        stats.flush_file_us.fetch_add(m0.as_us(), Ordering::Relaxed);
+        stats.mmap_us.fetch_add(m0.as_us(), Ordering::Relaxed);
         res
     }
 

@@ -1411,6 +1411,16 @@ impl<V: 'static + Clone + Copy + IsCached + Debug + Guts> BucketMapWriteHolder<V
                 i64
             ),
             (
+                "bucket_flush_file_us_us",
+                self.disk.stats.index.flush_file_us.swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "bucket_mmap_us",
+                self.disk.stats.index.mmap_us.swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
                 "bucket_data_resizes",
                 self.disk.stats.data.resizes.swap(0, Ordering::Relaxed),
                 i64
