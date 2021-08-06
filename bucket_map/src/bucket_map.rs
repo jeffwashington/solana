@@ -299,34 +299,47 @@ struct Bucket<T> {
     stats: Arc<BucketMapStats>,
 }
 
+type NumSlots = u64;
+
 #[repr(C)]
 #[derive(Debug, Copy, Clone, PartialEq)]
 struct IndexEntry {
     key: Pubkey,      // can this be smaller if we have reduced the keys into buckets already?
     ref_count: u64,   // can this be smaller? Do we ever need more than 4B refcounts?
-    data_bucket: u64, // usize? or smaller. do we ever expect more than 4B buckets?
+    //data_bucket: u64, // usize? or smaller. do we ever expect more than 4B buckets? even so, we do log2(data.len()) to find the data bucket - in fact, data_bucket can be calculated from num_slots
     data_location: u64, // smaller? since these are variably sized, this could get tricky. well, actually accountinfo is not variable sized...
     //if the bucket doubled, the index can be recomputed
-    create_bucket_capacity: u8, // TODO: what does this mean?
-    num_slots: u64,             // can this be smaller? epoch size should be the max len
+    create_bucket_capacity: u8, // see data_loc
+    num_slots: NumSlots,             // can this be smaller? epoch size should ~ be the max len. this is the num elements in the slot list
 }
 
 impl IndexEntry {
+    pub fn data_bucket_from_num_slots(num_slots: NumSlots) -> u64 {
+        (num_slots as f64).log2().ceil() as u64 // use int log here?
+    }
+
+    pub fn data_bucket_ix(&self) -> u64 {
+        Self::data_bucket_from_num_slots(self.num_slots)
+    }
+
+    // This function maps the original data location into an index in the current data bucket.
+    // This is coupled with how we resize data buckets.
     fn data_loc(&self, bucket: &DataBucket) -> u64 {
         self.data_location << (bucket.capacity - self.create_bucket_capacity)
     }
 
     fn read_value<'a, T>(&self, bucket: &'a Bucket<T>) -> Option<(&'a [T], u64)> {
-        let data_bucket = &bucket.data[self.data_bucket as usize];
+        let data_bucket_ix = self.data_bucket_ix();
+        let data_bucket = &bucket.data[data_bucket_ix as usize];
         let slice = if self.num_slots > 0 {
             let loc = self.data_loc(data_bucket);
             let uid = Self::key_uid(&self.key);
-            assert_eq!(uid, bucket.data[self.data_bucket as usize].uid(loc));
-            bucket.data[self.data_bucket as usize].get_cell_slice(loc, self.num_slots)
+            assert_eq!(uid, bucket.data[data_bucket_ix as usize].uid(loc));
+            bucket.data[data_bucket_ix as usize].get_cell_slice(loc, self.num_slots)
         } else {
             // num_slots is 0. This means we don't have an actual allocation.
             // can we trust that the data_bucket is even safe?
-            bucket.data[self.data_bucket as usize].get_empty_cell_slice()
+            bucket.data[data_bucket_ix as usize].get_empty_cell_slice()
         };
         Some((slice, self.ref_count))
     }
@@ -449,7 +462,6 @@ impl<T: Clone + Copy> Bucket<T> {
             let mut elem: &mut IndexEntry = index.get_mut(ii);
             elem.key = *key;
             elem.ref_count = ref_count;
-            elem.data_bucket = 0;
             elem.data_location = 0;
             elem.create_bucket_capacity = 0;
             elem.num_slots = 0;
@@ -514,12 +526,12 @@ impl<T: Clone + Copy> Bucket<T> {
             res
         };
         let elem_uid = self.index.uid(elem_ix);
-        let best_fit_bucket = Self::best_fit(data.len() as u64);
+        let best_fit_bucket = IndexEntry::data_bucket_from_num_slots(data.len() as u64);
         if self.data.get(best_fit_bucket as usize).is_none() {
             return Err(BucketMapError::DataNoSpace((best_fit_bucket, 0)));
         }
-        let current_bucket = &self.data[elem.data_bucket as usize];
-        if best_fit_bucket == elem.data_bucket && elem.num_slots > 0 {
+        let current_bucket = &self.data[elem.data_bucket_ix() as usize];
+        if best_fit_bucket == elem.data_bucket_ix() && elem.num_slots > 0 {
             //in place update
             let elem_loc = elem.data_loc(current_bucket);
             let slice: &mut [T] = current_bucket.get_mut_cell_slice(elem_loc, data.len() as u64);
@@ -542,7 +554,6 @@ impl<T: Clone + Copy> Bucket<T> {
                         current_bucket.free(elem_loc, elem_uid).unwrap();
                     }
                     // elem: &mut IndexEntry = self.index.get_mut(elem_ix);
-                    elem.data_bucket = best_fit_bucket;
                     elem.data_location = ix;
                     elem.create_bucket_capacity = best_bucket.capacity;
                     elem.num_slots = data.len() as u64;
@@ -566,7 +577,7 @@ impl<T: Clone + Copy> Bucket<T> {
         if let Some((elem, elem_ix)) = self.find_entry(key) {
             let elem_uid = self.index.uid(elem_ix);
             if elem.num_slots > 0 {
-                let data_bucket = &self.data[elem.data_bucket as usize];
+                let data_bucket = &self.data[elem.data_bucket_ix() as usize];
                 let loc = elem.data_loc(data_bucket);
                 debug!(
                     "DATA FREE {:?} {} {} {}",
@@ -637,10 +648,6 @@ impl<T: Clone + Copy> Bucket<T> {
                 .resize_us
                 .fetch_add(m.as_us(), Ordering::Relaxed);
         }
-    }
-
-    fn best_fit(sz: u64) -> u64 {
-        (sz as f64).log2().ceil() as u64
     }
 
     fn grow_data(&mut self, sz: (u64, u8)) {
