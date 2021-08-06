@@ -269,7 +269,7 @@ impl DataBucket {
             .unwrap();
         data.write_all(&[0]).unwrap();
         data.seek(SeekFrom::Start(0)).unwrap();
-        //data.flush().unwrap(); // can we skip this?
+        data.flush().unwrap(); // can we skip this?
         let res = (unsafe { MmapMut::map_mut(&data).unwrap() }, file);
         m0.stop();
         stats.new_file_us.fetch_add(m0.as_us(), Ordering::Relaxed);
