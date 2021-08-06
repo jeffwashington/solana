@@ -68,9 +68,11 @@ impl<T: Clone + Copy + std::fmt::Debug> BucketMap<T> {
         }
     }
 
-    pub fn distribution(&self) -> (Vec<usize>, Vec<usize>) {
+    pub fn distribution(&self) -> (Vec<usize>, Vec<usize>, usize, usize) {
         let mut sizes = vec![];
         let mut data_sizes = vec![];
+        let mut data_bytes_allocated = 0;
+        let mut index_bytes_allocated = 0;
         for ix in 0..self.num_buckets() {
             let mut len = 0;
             let mut size = 0;
@@ -78,13 +80,15 @@ impl<T: Clone + Copy + std::fmt::Debug> BucketMap<T> {
                 if let Some(bucket) = bucket.as_ref() {
 
                     len = bucket.index.used.load(Ordering::Relaxed) as usize;
+                    index_bytes_allocated += bucket.index.bytes;
                     size = bucket.data.get(0).map(|b| b.used.load(Ordering::Relaxed) as usize).unwrap_or_default();
+                    bucket.data.iter().for_each(|b| {data_bytes_allocated += b.bytes;})
                 }
             }
             sizes.push(len);
             data_sizes.push(size);
         }
-        (sizes, data_sizes)
+        (sizes, data_sizes, index_bytes_allocated as usize, data_bytes_allocated as usize)
     }
 
     fn delete_previous(drives: &Arc<Vec<PathBuf>>) {
