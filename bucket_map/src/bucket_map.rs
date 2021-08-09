@@ -544,7 +544,7 @@ impl<T: Clone + Copy> Bucket<T> {
         let elem_uid = self.index.uid(elem_ix);
         let best_fit_bucket = IndexEntry::data_bucket_from_num_slots(data.len() as u64);
         if self.data.get(best_fit_bucket as usize).is_none() {
-            error!("resizing because missing bucket");
+            //error!("resizing because missing bucket");
             return Err(BucketMapError::DataNoSpace((best_fit_bucket, 0)));
         }
         let bucket_ix = elem.data_bucket_ix();
