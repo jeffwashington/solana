@@ -2804,7 +2804,7 @@ pub mod tests {
     fn test_insert_perf() {
         solana_logger::setup();
         let index = AccountsIndex::<AccountInfo>::default();
-        let threads: usize = 2;
+        let threads: usize = 16;
         let count = 1_000_000;
         let bins = index.account_maps.len();
         let mut sum = 0;
@@ -2847,7 +2847,18 @@ pub mod tests {
             m1.stop();
             sum += per;
             index.account_maps.first().unwrap().read().unwrap().dump_metrics();
-            error!("{} {} {} {} {} {}", sum, m0.as_ms(), m1.as_ms(), m0.as_ns() / per as u64, m1.as_ns() / per as u64, cache_entries);
+            datapoint_info!(
+                "test_insert_perf",
+                (
+                    "sum",
+                    sum,
+                    i64
+                ),
+                ("add_time_us", m0.as_us() as i64, i64),
+                ("flush_time_us", m1.as_us() as i64, i64),
+                ("cache_entries", cache_entries as i64, i64),
+            );
+            //error!("{} {} {} {} {} {}", sum, m0.as_ms(), m1.as_ms(), m0.as_ns() / per as u64, m1.as_ns() / per as u64, cache_entries);
 
             i += 1;
             if i > 3 {

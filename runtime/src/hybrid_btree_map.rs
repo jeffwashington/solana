@@ -629,8 +629,8 @@ impl<V: 'static + Clone + Copy + IsCached + Debug + Guts> BucketMapWriteHolder<V
 
         let mut m1 = Measure::start("");
         {
+            let mut wc = &mut self.write_cache[ix].write().unwrap(); // maybe get lock for each item?
             for k in flush_keys.into_iter() {
-                let mut wc = &mut self.write_cache[ix].write().unwrap(); // maybe get lock for each item?
                 match wc.entry(k) {
                     HashMapEntry::Occupied(occupied) => {
                         let mut instance = occupied.get().instance.write().unwrap();
@@ -1691,6 +1691,7 @@ impl<V: 'static + Clone + Debug + IsCached + Guts> HybridBTreeMap<V> {
         let num_buckets = self.disk.num_buckets();
         let mystart = num_buckets * self.bin_index / self.bins;
         let myend = num_buckets * (self.bin_index + 1) / self.bins;
+        assert_eq!(myend - mystart, 1, "{}", self.bin_index);
         (mystart..myend).map(|ix| {
             self.disk.flush(ix, false, None).1
         }).sum()
