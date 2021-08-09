@@ -1,20 +1,26 @@
 use log::*;
 use memmap2::MmapMut;
 use rand::{thread_rng, Rng};
+use solana_measure::measure::Measure;
 use std::fs::{remove_file, OpenOptions};
 use std::io::Seek;
 use std::io::SeekFrom;
 use std::io::Write;
 use std::path::PathBuf;
-use std::sync::{Mutex, atomic::{AtomicU64, Ordering}};
 use std::sync::Arc;
-use solana_measure::measure::Measure;
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Mutex,
+};
 
 #[derive(Debug, Default)]
 pub struct BucketStats {
     pub resizes: AtomicU64,
     pub max_size: Mutex<u64>,
     pub resize_us: AtomicU64,
+    pub new_file_us: AtomicU64,
+    pub flush_file_us: AtomicU64,
+    pub mmap_us: AtomicU64,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -23,7 +29,25 @@ pub struct BucketMapStats {
     pub data: Arc<BucketStats>,
 }
 
-const DEFAULT_CAPACITY: u8 = 4;
+/*
+1	2
+2	4
+3	8
+4	16
+5	32
+6	64
+7	128
+8	256
+9	512
+10	1024
+11	2048
+12	4096
+13	8192
+14	16384
+*/
+// 23: 8,388,608
+// 24; // 16,777,216
+const DEFAULT_CAPACITY: u8 = 14;
 
 #[repr(C)]
 struct Header {
@@ -55,6 +79,7 @@ pub struct DataBucket {
     pub cell_size: u64,
     //power of 2
     pub capacity: u8,
+    pub bytes: u64,
     pub used: AtomicU64,
     pub stats: Arc<BucketStats>,
 }
@@ -79,10 +104,10 @@ impl DataBucket {
         num_elems: u64,
         elem_size: u64,
         capacity: u8,
-        stats: Arc<BucketStats>,
+        mut stats: Arc<BucketStats>,
     ) -> Self {
         let cell_size = elem_size * num_elems + std::mem::size_of::<Header>() as u64;
-        let (mmap, path) = Self::new_map(&drives, cell_size as usize, capacity);
+        let (mmap, path) = Self::new_map(&drives, cell_size as usize, capacity, &mut stats);
         Self {
             path,
             mmap,
@@ -91,10 +116,16 @@ impl DataBucket {
             used: AtomicU64::new(0),
             capacity,
             stats,
+            bytes: 1 << capacity,
         }
     }
 
-    pub fn new(drives: Arc<Vec<PathBuf>>, num_elems: u64, elem_size: u64, stats: Arc<BucketStats>) -> Self {
+    pub fn new(
+        drives: Arc<Vec<PathBuf>>,
+        num_elems: u64,
+        elem_size: u64,
+        stats: Arc<BucketStats>,
+    ) -> Self {
         Self::new_with_capacity(drives, num_elems, elem_size, DEFAULT_CAPACITY, stats)
     }
 
@@ -119,7 +150,7 @@ impl DataBucket {
         }
         let mut e = Err(DataBucketError::AlreadyAllocated);
         let ix = (ix * self.cell_size) as usize;
-        debug!("ALLOC {} {}", ix, uid);
+        //debug!("ALLOC {} {}", ix, uid);
         let hdr_slice: &[u8] = &self.mmap[ix..ix + std::mem::size_of::<Header>()];
         unsafe {
             let hdr = hdr_slice.as_ptr() as *const Header;
@@ -139,12 +170,12 @@ impl DataBucket {
             panic!("free: bad uid");
         }
         let ix = (ix * self.cell_size) as usize;
-        debug!("FREE {} {}", ix, uid);
+        //debug!("FREE {} {}", ix, uid);
         let hdr_slice: &[u8] = &self.mmap[ix..ix + std::mem::size_of::<Header>()];
         let mut e = Err(DataBucketError::InvalidFree);
         unsafe {
             let hdr = hdr_slice.as_ptr() as *const Header;
-            debug!("FREE uid: {}", hdr.as_ref().unwrap().uid());
+            //debug!("FREE uid: {}", hdr.as_ref().unwrap().uid());
             if hdr.as_ref().unwrap().unlock(uid) {
                 self.used.fetch_sub(1, Ordering::Relaxed);
                 e = Ok(());
@@ -182,7 +213,7 @@ impl DataBucket {
         let ix = self.cell_size * ix;
         let start = ix as usize + std::mem::size_of::<Header>();
         let end = start + std::mem::size_of::<T>() * len as usize;
-        debug!("GET slice {} {}", start, end);
+        //debug!("GET slice {} {}", start, end);
         let item_slice: &[u8] = &self.mmap[start..end];
         unsafe {
             let item = item_slice.as_ptr() as *const T;
@@ -210,7 +241,7 @@ impl DataBucket {
         let ix = self.cell_size * ix;
         let start = ix as usize + std::mem::size_of::<Header>();
         let end = start + std::mem::size_of::<T>() * len as usize;
-        debug!("GET mut slice {} {}", start, end);
+        //debug!("GET mut slice {} {}", start, end);
         let item_slice: &[u8] = &self.mmap[start..end];
         unsafe {
             let item = item_slice.as_ptr() as *mut T;
@@ -218,7 +249,13 @@ impl DataBucket {
         }
     }
 
-    fn new_map(drives: &[PathBuf], cell_size: usize, capacity: u8) -> (MmapMut, PathBuf) {
+    fn new_map(
+        drives: &[PathBuf],
+        cell_size: usize,
+        capacity: u8,
+        stats: &mut Arc<BucketStats>,
+    ) -> (MmapMut, PathBuf) {
+        let mut m0 = Measure::start("");
         let capacity = 1u64 << capacity;
         let r = thread_rng().gen_range(0, drives.len());
         let drive = &drives[r];
@@ -242,13 +279,22 @@ impl DataBucket {
         // Theoretical performance optimization: write a zero to the end of
         // the file so that we won't have to resize it later, which may be
         // expensive.
-        debug!("GROWING file {}", capacity * cell_size as u64);
+        //debug!("GROWING file {}", capacity * cell_size as u64);
         data.seek(SeekFrom::Start(capacity * cell_size as u64 - 1))
             .unwrap();
         data.write_all(&[0]).unwrap();
         data.seek(SeekFrom::Start(0)).unwrap();
-        data.flush().unwrap();
-        (unsafe { MmapMut::map_mut(&data).unwrap() }, file)
+        m0.stop();
+        let mut m1 = Measure::start("");
+        data.flush().unwrap(); // can we skip this?
+        m1.stop();
+        let mut m2 = Measure::start("");
+        let res = (unsafe { MmapMut::map_mut(&data).unwrap() }, file);
+        m2.stop();
+        stats.new_file_us.fetch_add(m0.as_us(), Ordering::Relaxed);
+        stats.flush_file_us.fetch_add(m0.as_us(), Ordering::Relaxed);
+        stats.mmap_us.fetch_add(m0.as_us(), Ordering::Relaxed);
+        res
     }
 
     pub fn grow(&mut self) {
@@ -256,8 +302,12 @@ impl DataBucket {
         let old_cap = self.num_cells();
         let old_map = &self.mmap;
         let old_file = self.path.clone();
-        let (new_map, new_file) =
-            Self::new_map(&self.drives, self.cell_size as usize, self.capacity + 1);
+        let (new_map, new_file) = Self::new_map(
+            &self.drives,
+            self.cell_size as usize,
+            self.capacity + 1,
+            &mut self.stats,
+        );
         (0..old_cap as usize).into_iter().for_each(|i| {
             let old_ix = i * self.cell_size as usize;
             let new_ix = old_ix * 2;
@@ -267,12 +317,13 @@ impl DataBucket {
             unsafe {
                 let dst = dst_slice.as_ptr() as *mut u8;
                 let src = src_slice.as_ptr() as *const u8;
-                std::ptr::copy(src, dst, self.cell_size as usize);
+                std::ptr::copy_nonoverlapping(src, dst, self.cell_size as usize);
             };
         });
         self.mmap = new_map;
         self.path = new_file;
         self.capacity = self.capacity + 1;
+        self.bytes = 1 << self.capacity;
         remove_file(old_file).unwrap();
         m.stop();
         let sz = 1 << self.capacity;
@@ -282,9 +333,8 @@ impl DataBucket {
         }
         self.stats.resizes.fetch_add(1, Ordering::Relaxed);
         self.stats.resize_us.fetch_add(m.as_us(), Ordering::Relaxed);
-
     }
     pub fn num_cells(&self) -> u64 {
-        1u64 << self.capacity
+        self.bytes
     }
 }

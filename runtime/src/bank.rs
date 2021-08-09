@@ -1034,7 +1034,8 @@ impl Default for BlockhashQueue {
 }
 
 impl Bank {
-    pub fn set_account_index_db(&self, db: Arc<Box<dyn crate::hybrid_btree_map::Rox>>) {//} LedgerColumn<cf::AccountIndex>) {
+    pub fn set_account_index_db(&self, db: Arc<Box<dyn crate::hybrid_btree_map::Rox>>) {
+        //} LedgerColumn<cf::AccountIndex>) {
         self.rc.accounts.accounts_db.set_account_index_db(db);
     }
     pub fn new(genesis_config: &GenesisConfig) -> Self {
@@ -4259,13 +4260,9 @@ impl Bank {
         }
     }
 
-         pub fn report_store_timings(&self) {
-            self.rc
-            .accounts
-            .accounts_db
-            .report_store_timings();
-         }
-
+    pub fn report_store_timings(&self) {
+        self.rc.accounts.accounts_db.report_store_timings();
+    }
 
     pub fn force_flush_accounts_cache(&self) {
         self.rc
@@ -4832,13 +4829,14 @@ impl Bank {
         let mut verify_time = Measure::start("verify_bank_hash");
         let mut verify = self.verify_bank_hash(test_hash_calculation);
         verify_time.stop();
-        
 
         info!("verify_hash..");
         let mut verify2_time = Measure::start("verify_hash");
         // Order and short-circuiting is significant; verify_hash requires a valid bank hash
         verify = verify && self.verify_hash();
         verify2_time.stop();
+
+        crate::accounts_db::AccountsDb::add_test_accounts(self.rc.accounts.clone());
 
         datapoint_info!(
             "verify_snapshot_bank",
@@ -7092,13 +7090,12 @@ pub(crate) mod tests {
         map
     }
 
-    
     #[test]
     #[should_panic(expected = "range start is greater than range end")]
     fn test_rent_eager_bad_range() {
         let test_map = map_to_test_bad_range();
-        test_map.range(
-            Some(Pubkey::new_from_array([
+        test_map.range(Some(
+            Pubkey::new_from_array([
                 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 0x00, 0x00, 0x00, 0x01,
@@ -7107,8 +7104,8 @@ pub(crate) mod tests {
                     0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0x00, 0x00, 0x00, 0x00, 0x00,
                     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                     0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                ])),
-        );
+                ]),
+        ));
     }
 
     #[test]

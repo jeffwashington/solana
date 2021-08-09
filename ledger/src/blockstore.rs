@@ -156,7 +156,7 @@ pub struct Blockstore {
 }
 
 use solana_runtime::accounts_db::AccountInfo;
-use solana_runtime::accounts_index::{AccountMapEntrySerialize, SlotList, RefCount};
+use solana_runtime::accounts_index::{AccountMapEntrySerialize, RefCount, SlotList};
 use solana_runtime::hybrid_btree_map::PubkeyRange;
 
 pub struct AccountIndexRoxAdapter {
@@ -223,7 +223,8 @@ impl solana_runtime::hybrid_btree_map::Rox for AccountIndexRoxAdapter {
             }
         } else {
             let value = AccountMapEntrySerialize {
-                slot_list: info.clone(), ref_count: ref_count
+                slot_list: info.clone(),
+                ref_count: ref_count,
             };
             self.account_index_cf.put(*pubkey, &value).unwrap();
         }
@@ -240,7 +241,8 @@ impl solana_runtime::hybrid_btree_map::Rox for AccountIndexRoxAdapter {
             }
         } else {
             let value = AccountMapEntrySerialize {
-                slot_list: info.clone(), ref_count: ref_count
+                slot_list: info.clone(),
+                ref_count: ref_count,
             };
             self.account_index_cf.put(*pubkey, &value).unwrap();
         }
@@ -258,8 +260,7 @@ impl solana_runtime::hybrid_btree_map::Rox for AccountIndexRoxAdapter {
             if let Some(range) = range {
                 if let Some(start_include) = range.start_pubkey_include {
                     iter = IteratorMode::From(start_include, IteratorDirection::Forward)
-                }
-                else if let Some(start_exclude) = range.start_pubkey_exclude {
+                } else if let Some(start_exclude) = range.start_pubkey_exclude {
                     let mut start_include = start_exclude.clone();
                     let mut m = start_include.as_mut();
                     for i in 0..32 {
@@ -268,8 +269,7 @@ impl solana_runtime::hybrid_btree_map::Rox for AccountIndexRoxAdapter {
                         if v == u8::MAX {
                             m[idx] = 0;
                             // loop again to bump the next byte
-                        }
-                        else {
+                        } else {
                             m[idx] += 1;
                         }
                     }
@@ -277,7 +277,13 @@ impl solana_runtime::hybrid_btree_map::Rox for AccountIndexRoxAdapter {
                 }
             }
             // fix iter... todo
-            Some(self.account_index_cf.iter(iter).unwrap().map(|d| d.0).collect::<Vec<_>>())
+            Some(
+                self.account_index_cf
+                    .iter(iter)
+                    .unwrap()
+                    .map(|d| d.0)
+                    .collect::<Vec<_>>(),
+            )
         }
     }
     fn values(&self, range: Option<&PubkeyRange>) -> Option<Vec<AccountMapEntrySerialize>> {
@@ -494,22 +500,23 @@ impl Blockstore {
         let block_height_cf = db.column();
         let program_costs_cf = db.column();
         let bank_hash_cf = db.column();
-        if false
-        {
+        if false {
             let mut batch = db.batch().unwrap();
             let start = Pubkey::default();
             let end = Pubkey::new(Pubkey::new(&[0xffu8; 32]).as_ref());
             let cf = db.cf_handle::<cf::AccountIndex>();
             /*let from_index = cf::AccountIndex::as_index(start);
             let to_index = cf::AccountIndex::as_index(end);*/
-            batch.delete_range_cf::<cf::AccountIndex>(cf, start, end).unwrap();
+            batch
+                .delete_range_cf::<cf::AccountIndex>(cf, start, end)
+                .unwrap();
         }
         let db = Arc::new(db);
         /*
         let account_index_cf = db.column();
 
         let backing = RwLock::new(HashMap::new());
-        
+
         let account_index = AccountIndexRoxAdapter {
             db: db.clone(),
             account_index_cf,

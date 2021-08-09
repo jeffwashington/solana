@@ -27,10 +27,9 @@ pub struct BucketMap<T> {
 
 impl<T> Drop for BucketMap<T> {
     fn drop(&mut self) {
-        //error!("dropping bucket map");
+        error!("dropping bucket map");
     }
 }
-
 
 impl<T> std::fmt::Debug for BucketMap<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -52,7 +51,7 @@ impl<T: Clone + std::fmt::Debug> Default for BucketMap<T>  {
 }
 */
 
-impl<T: Clone + std::fmt::Debug> BucketMap<T> {
+impl<T: Clone + Copy + std::fmt::Debug> BucketMap<T> {
     pub fn new(mut num_buckets_pow2: u8, drives: Arc<Vec<PathBuf>>) -> Self {
         Self::delete_previous(&drives);
         let count = 1 << num_buckets_pow2;
@@ -68,18 +67,56 @@ impl<T: Clone + std::fmt::Debug> BucketMap<T> {
         }
     }
 
-    pub fn distribution(&self) -> Vec<usize> {
-        let mut sizes = vec![];
+    pub fn distribution(
+        &self,
+    ) -> (
+        Vec<usize>,
+        Vec<usize>,
+        usize,
+        usize,
+        (usize, usize, usize, usize),
+    ) {
+        let len = self.num_buckets();
+        let mut sizes = Vec::with_capacity(len);
+        let mut data_sizes = Vec::with_capacity(len);
+        let mut data_items_allocated = Vec::with_capacity(len);
+        let mut data_bytes_allocated = 0;
+        let mut index_bytes_allocated = 0;
         for ix in 0..self.num_buckets() {
             let mut len = 0;
+            let mut size = 0;
             if let Ok(bucket) = self.buckets[ix].read() {
                 if let Some(bucket) = bucket.as_ref() {
                     len = bucket.index.used.load(Ordering::Relaxed) as usize;
+                    index_bytes_allocated += bucket.index.bytes;
+                    size = bucket
+                        .data
+                        .get(0)
+                        .map(|b| b.used.load(Ordering::Relaxed) as usize)
+                        .unwrap_or_default();
+                    let mut allocated = 0;
+                    bucket.data.iter().for_each(|b| {
+                        allocated += b.bytes;
+                    });
+                    data_bytes_allocated += allocated;
+                    data_items_allocated.push(allocated);
                 }
             }
             sizes.push(len);
+            data_sizes.push(size);
         }
-        sizes
+        data_items_allocated.sort_unstable();
+        let q0 = data_items_allocated[len / 4];
+        let q1 = data_items_allocated[len / 2];
+        let q2 = data_items_allocated[len * 3 / 4];
+        let q3 = data_items_allocated[len - 1];
+        (
+            sizes,
+            data_sizes,
+            index_bytes_allocated as usize,
+            data_bytes_allocated as usize,
+            (q0 as usize, q1 as usize, q2 as usize, q3 as usize),
+        )
     }
 
     fn delete_previous(drives: &Arc<Vec<PathBuf>>) {
@@ -104,7 +141,7 @@ impl<T: Clone + std::fmt::Debug> BucketMap<T> {
         let tmpdir2 = PathBuf::from("accounts_index_buckets");
         let random = PathBuf::from(format!("folder{}", thread_rng().gen::<usize>()));
         let tmpdir2 = random.join(tmpdir2);
-        
+
         let paths: Vec<PathBuf> = [tmpdir2]
             .iter()
             .filter(|x| std::fs::create_dir_all(x).is_ok())
@@ -207,12 +244,12 @@ impl<T: Clone + std::fmt::Debug> BucketMap<T> {
                     let rv = bucket.try_write(key, &new, refct);
                     match rv {
                         Err(BucketMapError::DataNoSpace(sz)) => {
-                            debug!("GROWING SPACE {:?}", sz);
+                            //debug!("GROWING SPACE {:?}", sz);
                             bucket.grow_data(sz);
                             continue;
                         }
                         Err(BucketMapError::IndexNoSpace(sz)) => {
-                            debug!("GROWING INDEX {}", sz);
+                            //debug!("GROWING INDEX {}", sz);
                             bucket.grow_index(sz);
                             continue;
                         }
@@ -246,12 +283,12 @@ impl<T: Clone + std::fmt::Debug> BucketMap<T> {
             let rv = bucket.try_write(key, &new, refct);
             match rv {
                 Err(BucketMapError::DataNoSpace(sz)) => {
-                    debug!("GROWING SPACE {:?}", sz);
+                    //debug!("GROWING SPACE {:?}", sz);
                     bucket.grow_data(sz);
                     continue;
                 }
                 Err(BucketMapError::IndexNoSpace(sz)) => {
-                    debug!("GROWING INDEX {}", sz);
+                    //debug!("GROWING INDEX {}", sz);
                     bucket.grow_index(sz);
                     continue;
                 }
@@ -299,34 +336,47 @@ struct Bucket<T> {
     stats: Arc<BucketMapStats>,
 }
 
+type NumSlots = u64;
+
 #[repr(C)]
 #[derive(Debug, Copy, Clone, PartialEq)]
 struct IndexEntry {
-    key: Pubkey,      // can this be smaller if we have reduced the keys into buckets already?
-    ref_count: u64,   // can this be smaller? Do we ever need more than 4B refcounts?
-    data_bucket: u64, // usize? or smaller. do we ever expect more than 4B buckets?
+    key: Pubkey,    // can this be smaller if we have reduced the keys into buckets already?
+    ref_count: u64, // can this be smaller? Do we ever need more than 4B refcounts?
+    //data_bucket: u64, // usize? or smaller. do we ever expect more than 4B buckets? even so, we do log2(data.len()) to find the data bucket - in fact, data_bucket can be calculated from num_slots
     data_location: u64, // smaller? since these are variably sized, this could get tricky. well, actually accountinfo is not variable sized...
     //if the bucket doubled, the index can be recomputed
-    create_bucket_capacity: u8, // TODO: what does this mean?
-    num_slots: u64,             // can this be smaller? epoch size should be the max len
+    create_bucket_capacity: u8, // see data_loc
+    num_slots: NumSlots, // can this be smaller? epoch size should ~ be the max len. this is the num elements in the slot list
 }
 
 impl IndexEntry {
+    pub fn data_bucket_from_num_slots(num_slots: NumSlots) -> u64 {
+        (num_slots as f64).log2().ceil() as u64 // use int log here?
+    }
+
+    pub fn data_bucket_ix(&self) -> u64 {
+        Self::data_bucket_from_num_slots(self.num_slots)
+    }
+
+    // This function maps the original data location into an index in the current data bucket.
+    // This is coupled with how we resize data buckets.
     fn data_loc(&self, bucket: &DataBucket) -> u64 {
         self.data_location << (bucket.capacity - self.create_bucket_capacity)
     }
 
     fn read_value<'a, T>(&self, bucket: &'a Bucket<T>) -> Option<(&'a [T], u64)> {
-        let data_bucket = &bucket.data[self.data_bucket as usize];
+        let data_bucket_ix = self.data_bucket_ix();
+        let data_bucket = &bucket.data[data_bucket_ix as usize];
         let slice = if self.num_slots > 0 {
             let loc = self.data_loc(data_bucket);
             let uid = Self::key_uid(&self.key);
-            assert_eq!(uid, bucket.data[self.data_bucket as usize].uid(loc));
-            bucket.data[self.data_bucket as usize].get_cell_slice(loc, self.num_slots)
+            assert_eq!(uid, bucket.data[data_bucket_ix as usize].uid(loc));
+            bucket.data[data_bucket_ix as usize].get_cell_slice(loc, self.num_slots)
         } else {
             // num_slots is 0. This means we don't have an actual allocation.
             // can we trust that the data_bucket is even safe?
-            bucket.data[self.data_bucket as usize].get_empty_cell_slice()
+            bucket.data[data_bucket_ix as usize].get_empty_cell_slice()
         };
         Some((slice, self.ref_count))
     }
@@ -337,9 +387,10 @@ impl IndexEntry {
     }
 }
 
-const MAX_SEARCH: u64 = 16;
+// this should be <= 1 << DEFAULT_CAPACITY or we end up searching the same items over and over - probably not a big deal since it is so small anyway
+const MAX_SEARCH: u64 = 10;
 
-impl<T: Clone> Bucket<T> {
+impl<T: Clone + Copy> Bucket<T> {
     fn new(drives: Arc<Vec<PathBuf>>, stats: Arc<BucketMapStats>) -> Self {
         let index = DataBucket::new(
             drives.clone(),
@@ -448,14 +499,10 @@ impl<T: Clone> Bucket<T> {
             let mut elem: &mut IndexEntry = index.get_mut(ii);
             elem.key = *key;
             elem.ref_count = ref_count;
-            elem.data_bucket = 0;
             elem.data_location = 0;
             elem.create_bucket_capacity = 0;
             elem.num_slots = 0;
-            debug!(
-                "INDEX ALLOC {:?} {} {} {}",
-                key, ii, index.capacity, elem_uid
-            );
+            //debug!(                "INDEX ALLOC {:?} {} {} {}",                key, ii, index.capacity, elem_uid            );
             return Ok(ii);
         }
         Err(BucketMapError::IndexNoSpace(index.capacity))
@@ -489,7 +536,7 @@ impl<T: Clone> Bucket<T> {
     }
 
     pub fn read_value(&self, key: &Pubkey) -> Option<(&[T], u64)> {
-        debug!("READ_VALUE: {:?}", key);
+        //debug!("READ_VALUE: {:?}", key);
         let (elem, _) = self.find_entry(key)?;
         elem.read_value(self)
     }
@@ -513,12 +560,14 @@ impl<T: Clone> Bucket<T> {
             res
         };
         let elem_uid = self.index.uid(elem_ix);
-        let best_fit_bucket = Self::best_fit(data.len() as u64);
+        let best_fit_bucket = IndexEntry::data_bucket_from_num_slots(data.len() as u64);
         if self.data.get(best_fit_bucket as usize).is_none() {
+            //error!("resizing because missing bucket");
             return Err(BucketMapError::DataNoSpace((best_fit_bucket, 0)));
         }
-        let current_bucket = &self.data[elem.data_bucket as usize];
-        if best_fit_bucket == elem.data_bucket && elem.num_slots > 0 {
+        let bucket_ix = elem.data_bucket_ix();
+        let current_bucket = &self.data[bucket_ix as usize];
+        if best_fit_bucket == bucket_ix && elem.num_slots > 0 {
             //in place update
             let elem_loc = elem.data_loc(current_bucket);
             let slice: &mut [T] = current_bucket.get_mut_cell_slice(elem_loc, data.len() as u64);
@@ -541,18 +590,14 @@ impl<T: Clone> Bucket<T> {
                         current_bucket.free(elem_loc, elem_uid).unwrap();
                     }
                     // elem: &mut IndexEntry = self.index.get_mut(elem_ix);
-                    elem.data_bucket = best_fit_bucket;
                     elem.data_location = ix;
                     elem.create_bucket_capacity = best_bucket.capacity;
                     elem.num_slots = data.len() as u64;
-                    debug!(
-                        "DATA ALLOC {:?} {} {} {}",
-                        key, elem.data_location, best_bucket.capacity, elem_uid
-                    );
+                    //debug!(                        "DATA ALLOC {:?} {} {} {}",                        key, elem.data_location, best_bucket.capacity, elem_uid                    );
                     if elem.num_slots > 0 {
                         best_bucket.allocate(ix, elem_uid).unwrap();
                         let slice = best_bucket.get_mut_cell_slice(ix, data.len() as u64);
-                        slice.clone_from_slice(data);
+                        slice.copy_from_slice(data);
                     }
                     return Ok(());
                 }
@@ -565,15 +610,12 @@ impl<T: Clone> Bucket<T> {
         if let Some((elem, elem_ix)) = self.find_entry(key) {
             let elem_uid = self.index.uid(elem_ix);
             if elem.num_slots > 0 {
-                let data_bucket = &self.data[elem.data_bucket as usize];
+                let data_bucket = &self.data[elem.data_bucket_ix() as usize];
                 let loc = elem.data_loc(data_bucket);
-                debug!(
-                    "DATA FREE {:?} {} {} {}",
-                    key, elem.data_location, data_bucket.capacity, elem_uid
-                );
+                //debug!(                    "DATA FREE {:?} {} {} {}",                    key, elem.data_location, data_bucket.capacity, elem_uid                );
                 data_bucket.free(loc, elem_uid).unwrap();
             }
-            debug!("INDEX FREE {:?} {}", key, elem_uid);
+            //debug!("INDEX FREE {:?} {}", key, elem_uid);
             self.index.free(elem_ix, elem_uid).unwrap();
         }
     }
@@ -581,7 +623,7 @@ impl<T: Clone> Bucket<T> {
     fn grow_index(&mut self, sz: u8) {
         if self.index.capacity == sz {
             let mut m = Measure::start("");
-            debug!("GROW_INDEX: {}", sz);
+            //debug!("GROW_INDEX: {}", sz);
             for i in 1.. {
                 //increasing the capacity by ^4 reduces the
                 //likelyhood of a re-index collision of 2^(max_search)^2
@@ -590,35 +632,35 @@ impl<T: Clone> Bucket<T> {
                     self.drives.clone(),
                     1,
                     std::mem::size_of::<IndexEntry>() as u64,
-                    self.index.capacity + i * 2,
+                    self.index.capacity + i, // * 2,
                     self.stats.index.clone(),
                 );
                 let random = thread_rng().gen();
-                let rvs: Vec<bool> = (0..self.index.num_cells())
-                    .into_iter()
-                    .map(|ix| {
-                        if 0 != self.index.uid(ix) {
-                            let elem: &IndexEntry = self.index.get(ix);
-                            let uid = self.index.uid(ix);
-                            let ref_count = 0; // ??? TODO
-                            let new_ix =
-                                Self::bucket_create_key(&index, &elem.key, uid, random, ref_count);
-                            if new_ix.is_err() {
-                                return false;
-                            }
-                            let new_ix = new_ix.unwrap();
-                            let new_elem: &mut IndexEntry = index.get_mut(new_ix);
-                            *new_elem = *elem;
-                            let dbg_elem: IndexEntry = *new_elem;
-                            assert_eq!(
-                                Self::bucket_find_entry(&index, &elem.key, random).unwrap(),
-                                (&dbg_elem, new_ix)
-                            );
+                let mut valid = true;
+                for ix in 0..self.index.num_cells() {
+                    let uid = self.index.uid(ix);
+                    if 0 != uid {
+                        let elem: &IndexEntry = self.index.get(ix);
+                        let ref_count = 0; // ??? TODO
+                        let new_ix =
+                            Self::bucket_create_key(&index, &elem.key, uid, random, ref_count);
+                        if new_ix.is_err() {
+                            valid = false;
+                            break;
                         }
-                        true
-                    })
-                    .collect();
-                if rvs.into_iter().all(|x| x) {
+                        let new_ix = new_ix.unwrap();
+                        let new_elem: &mut IndexEntry = index.get_mut(new_ix);
+                        *new_elem = *elem;
+                        /*
+                        let dbg_elem: IndexEntry = *new_elem;
+                        assert_eq!(
+                            Self::bucket_find_entry(&index, &elem.key, random).unwrap(),
+                            (&dbg_elem, new_ix)
+                        );
+                        */
+                    }
+                }
+                if valid {
                     self.index = index;
                     self.random = random;
                     break;
@@ -638,10 +680,6 @@ impl<T: Clone> Bucket<T> {
         }
     }
 
-    fn best_fit(sz: u64) -> u64 {
-        (sz as f64).log2().ceil() as u64
-    }
-
     fn grow_data(&mut self, sz: (u64, u8)) {
         if self.data.get(sz.0 as usize).is_none() {
             for i in self.data.len() as u64..(sz.0 + 1) {
@@ -654,7 +692,7 @@ impl<T: Clone> Bucket<T> {
             }
         }
         if self.data[sz.0 as usize].capacity == sz.1 {
-            debug!("GROW_DATA: {} {}", sz.0, sz.1);
+            //debug!("GROW_DATA: {} {}", sz.0, sz.1);
             self.data[sz.0 as usize].grow();
         }
     }
@@ -669,13 +707,7 @@ impl<T: Clone> Bucket<T> {
         random.hash(&mut s);
         let ix = s.finish();
         let location = ix % index.num_cells();
-        debug!(
-            "INDEX_IX: {:?} uid:{} loc: {} cap:{}",
-            key,
-            uid,
-            location,
-            index.num_cells()
-        );
+        //debug!(            "INDEX_IX: {:?} uid:{} loc: {} cap:{}",            key,            uid,            location,            index.num_cells()        );
         location
     }
 }
@@ -811,7 +843,7 @@ mod tests {
             for j in 0..k {
                 let key = &keys[j];
                 let i = read_be_u64(key.as_ref());
-                debug!("READ: {:?} {}", key, i);
+                //debug!("READ: {:?} {}", key, i);
                 assert_eq!(index.read_value(&key), Some(vec![i]));
             }
         }
@@ -832,7 +864,7 @@ mod tests {
         }
         for key in keys.iter() {
             let i = read_be_u64(key.as_ref());
-            debug!("READ: {:?} {}", key, i);
+            //debug!("READ: {:?} {}", key, i);
             assert_eq!(index.read_value(&key), Some(vec![i]));
         }
         for k in 0..keys.len() {

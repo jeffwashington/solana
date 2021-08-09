@@ -1,24 +1,23 @@
 use crate::{
     ancestors::Ancestors,
     contains::Contains,
-    hybrid_btree_map::{HybridBTreeMap, HybridEntry as Entry, HybridOccupiedEntry, HybridVacantEntry},
+    hybrid_btree_map::{
+        HybridBTreeMap, HybridEntry as Entry, HybridOccupiedEntry, HybridVacantEntry,
+    },
     inline_spl_token_v2_0::{self, SPL_TOKEN_ACCOUNT_MINT_OFFSET, SPL_TOKEN_ACCOUNT_OWNER_OFFSET},
     secondary_index::*,
 };
 use bv::BitVec;
 use log::*;
-use rayon::prelude::*;
 use ouroboros::self_referencing;
+use rayon::prelude::*;
 use solana_measure::measure::Measure;
 use solana_sdk::{
     clock::{BankId, Slot},
     pubkey::{Pubkey, PUBKEY_BYTES},
 };
 use std::{
-    collections::{
-        btree_map::{BTreeMap},
-        HashSet,
-    },
+    collections::{btree_map::BTreeMap, HashSet},
     fmt::Debug,
     ops::{
         Bound,
@@ -26,23 +25,22 @@ use std::{
         Range, RangeBounds,
     },
     sync::{
-        Arc,
-        atomic::{AtomicBool, AtomicU64, Ordering},
-        Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard,
+        atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
+        Arc, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard,
     },
     thread::{Builder, JoinHandle},
 };
 use thiserror::Error;
 
 pub const ITER_BATCH_SIZE: usize = 1000;
-pub const BINS: usize = 16384;
+pub const BINS: usize = 8192;
 pub type ScanResult<T> = Result<T, ScanError>;
 pub type SlotList<T> = Vec<(Slot, T)>;
 pub type SlotSlice<'s, T> = &'s [(Slot, T)];
 pub type RefCount = u64;
 pub type AccountMap<V> = HybridBTreeMap<V>;
 
-pub trait IsCached {
+pub trait IsCached: Copy {
     fn is_cached(&self) -> bool;
 }
 
@@ -110,20 +108,21 @@ impl AccountSecondaryIndexes {
     }
 }
 use serde::ser::*;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug)]//, Serialize, Deserialize)]
-pub struct AccountMapEntry<T> {// }: Serialize + Deserialize> {
+#[derive(Debug)] //, Serialize, Deserialize)]
+pub struct AccountMapEntry<T> {
+    // }: Serialize + Deserialize> {
     pub ref_count: RefCount,
     pub slot_list: SlotList<T>,
 }
 use crate::accounts_db::AccountInfo;
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AccountMapEntrySerialize {// }: Serialize + Deserialize> {
+pub struct AccountMapEntrySerialize {
+    // }: Serialize + Deserialize> {
     pub ref_count: RefCount,
     pub slot_list: SlotList<AccountInfo>,
 }
-
 
 impl<T: 'static + Clone + std::fmt::Debug> Clone for AccountMapEntry<T> {
     fn clone(&self) -> Self {
@@ -158,7 +157,7 @@ pub struct ReadAccountMapEntry<'a, T: 'static + Clone + IsCached + std::fmt::Deb
     pubkey: &'a Pubkey,
     #[borrows(lock, pubkey)]
     #[covariant]
-    owned_entry: Option<AccountMapEntry<T>>, // used to be: &'this 
+    owned_entry: Option<AccountMapEntry<T>>, // used to be: &'this
 }
 
 impl<'a, T: Clone + std::fmt::Debug + IsCached + Guts> ReadAccountMapEntry<'a, T> {
@@ -199,7 +198,8 @@ impl<'a, T: Clone + std::fmt::Debug + IsCached + Guts> ReadAccountMapEntry<'a, T
 }
 
 #[self_referencing]
-pub struct WriteAccountMapEntry<'a, 'b: 'a, T: 'static + Clone + IsCached + std::fmt::Debug + Guts> {
+pub struct WriteAccountMapEntry<'a, 'b: 'a, T: 'static + Clone + IsCached + std::fmt::Debug + Guts>
+{
     lock: AccountMapsWriteLock<'b, T>,
     pubkey: &'a Pubkey,
     #[borrows(mut lock, pubkey)]
@@ -210,7 +210,9 @@ pub struct WriteAccountMapEntry<'a, 'b: 'a, T: 'static + Clone + IsCached + std:
     ),
 }
 
-impl<'a, 'b: 'a, T: 'static + Clone + IsCached + std::fmt::Debug + IsCached + Guts> WriteAccountMapEntry<'a, 'b, T> {
+impl<'a, 'b: 'a, T: 'static + Clone + IsCached + std::fmt::Debug + IsCached + Guts>
+    WriteAccountMapEntry<'a, 'b, T>
+{
     pub fn new_with_lock(
         pubkey: &'a Pubkey,
         lock: AccountMapsWriteLock<'b, T>,
@@ -258,10 +260,7 @@ impl<'a, 'b: 'a, T: 'static + Clone + IsCached + std::fmt::Debug + IsCached + Gu
         self.destroy()
     }
 
-    pub fn get(
-        &'a self,
-    ) -> Option<&'a HybridOccupiedEntry<'a, T>>
-    {
+    pub fn get(&'a self) -> Option<&'a HybridOccupiedEntry<'a, T>> {
         self.borrow_owned_entry().0.as_ref()
     }
 
@@ -279,7 +278,7 @@ impl<'a, 'b: 'a, T: 'static + Clone + IsCached + std::fmt::Debug + IsCached + Gu
         self.with_mut(|fields| {
             let f = fields.owned_entry;
             let result = user(&mut sl, &mut rc);
-            let update_rc = if rc != rc_orig {Some(rc)} else {None};
+            let update_rc = if rc != rc_orig { Some(rc) } else { None };
             f.0.as_mut().map(|entry| entry.update(&mut sl, update_rc));
             Some(result)
         })
@@ -322,8 +321,7 @@ impl<'a, 'b: 'a, T: 'static + Clone + IsCached + std::fmt::Debug + IsCached + Gu
         reclaims: &mut SlotList<T>,
         reclaims_must_be_empty: bool,
     ) {
-        w_account_maps.upsert(pubkey, new_value, reclaims        ,reclaims_must_be_empty,
-        );
+        w_account_maps.upsert(pubkey, new_value, reclaims, reclaims_must_be_empty);
     }
 
     // modifies slot_list
@@ -348,8 +346,7 @@ impl<'a, 'b: 'a, T: 'static + Clone + IsCached + std::fmt::Debug + IsCached + Gu
                 std::mem::swap(&mut new_item, &mut list[list_index]);
                 if reclaims_must_be_empty {
                     assert!(previous_cached);
-                }
-                else {
+                } else {
                     reclaims.push(new_item);
                 }
                 list[(list_index + 1)..]
@@ -722,7 +719,9 @@ impl<'a, T: Clone + std::fmt::Debug + IsCached + Guts> AccountsIndexIterator<'a,
     }
 }
 
-impl<'a, T: 'static + Clone + std::fmt::Debug + IsCached + Guts> Iterator for AccountsIndexIterator<'a, T> {
+impl<'a, T: 'static + Clone + std::fmt::Debug + IsCached + Guts> Iterator
+    for AccountsIndexIterator<'a, T>
+{
     type Item = Vec<Pubkey>;
     fn next(&mut self) -> Option<Self::Item> {
         if self.is_finished {
@@ -741,8 +740,10 @@ impl<'a, T: 'static + Clone + std::fmt::Debug + IsCached + Guts> Iterator for Ac
         };
         let mut chunk: Vec<Pubkey> = Vec::with_capacity(ITER_BATCH_SIZE);
         'outer: for i in self.account_maps.iter().skip(start_bin).take(bin_range) {
-            for pubkey in
-                i.read().unwrap().range(Some((self.start_bound, self.end_bound)))
+            for pubkey in i
+                .read()
+                .unwrap()
+                .range(Some((self.start_bound, self.end_bound)))
             {
                 if chunk.len() >= ITER_BATCH_SIZE {
                     break 'outer;
@@ -832,12 +833,14 @@ impl<T: Clone + std::fmt::Debug + Sync + Send + Guts> Default for AccountsIndex<
         let exit_ = exit.clone();
         let bucket_map = HybridBTreeMap::new_bucket_map();
         let bucket_map_ = bucket_map.clone();
-        let flusher = Some(Builder::new()
-            .name("solana-index-flusher".to_string())
-            .spawn(move || {
-                bucket_map_.bg_flusher(exit_);
-            })
-            .unwrap());
+        let flusher = Some(
+            Builder::new()
+                .name("solana-index-flusher".to_string())
+                .spawn(move || {
+                    bucket_map_.bg_flusher(exit_);
+                })
+                .unwrap(),
+        );
 
         Self {
             account_maps: (0..BINS)
@@ -862,8 +865,16 @@ impl<T: Clone + std::fmt::Debug + Sync + Send + Guts> Default for AccountsIndex<
     }
 }
 
-impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::marker::Send + std::fmt::Debug + Guts>
-    AccountsIndex<T>
+impl<
+        T: 'static
+            + Clone
+            + IsCached
+            + ZeroLamport
+            + std::marker::Sync
+            + std::marker::Send
+            + std::fmt::Debug
+            + Guts,
+    > AccountsIndex<T>
 {
     /*
     pub fn flush(&self) {
@@ -1134,7 +1145,12 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
         //error!("do_scan_accounts, {}, {}, {}, range: {:?}", file!(), line!(), metric_name, range);
 
         if metric_name.is_empty() {
-            error!("empty metric name! {} {}, range: {:?}", file!(), line!(), range);
+            error!(
+                "empty metric name! {} {}, range: {:?}",
+                file!(),
+                line!(),
+                range
+            );
             //panic!("empty metric name");
         }
 
@@ -1261,8 +1277,12 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
         pubkey: Pubkey,
         w_account_maps: AccountMapsWriteLock<'a, T>,
         mut new_entry: AccountMapEntry<T>,
-        reclaims: &mut SlotList<T>,
     ) -> (Option<Pubkey>, AccountMapsWriteLock<'a, T>) {
+        // caller does not need to know whether the item existed already or not
+        w_account_maps.update_or_insert_async(pubkey, new_entry);
+        (None, w_account_maps)
+        /*
+
         let allow_vacant = true;
         let mut result =
             WriteAccountMapEntry::new_with_lock(&pubkey, w_account_maps, allow_vacant).unwrap();
@@ -1277,6 +1297,7 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
             let r = result.insert(new_entry);
             (None, r)
         }
+        */
     }
 
     pub fn handle_dead_keys(
@@ -1614,8 +1635,6 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
         let duplicate_keys = binned
             .into_iter()
             .map(|(pubkey_bin, items)| {
-                let mut _reclaims = SlotList::new();
-
                 // big enough so not likely to re-allocate, small enough to not over-allocate by too much
                 // this assumes 10% of keys are duplicates. This vector will be flattened below.
                 let mut duplicate_keys = Vec::with_capacity(items.len() / 10);
@@ -1623,12 +1642,8 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
                 let mut insert_time = Measure::start("insert_into_primary_index");
                 // for loop because of capture of w_account_maps
                 for (pubkey, new_item) in items.into_iter() {
-                    let (already_exists, returned_lock) = self.upsert_with_lock_pubkey_result(
-                        pubkey,
-                        w_account_maps,
-                        new_item,
-                        &mut _reclaims,
-                    );
+                    let (already_exists, returned_lock) =
+                        self.upsert_with_lock_pubkey_result(pubkey, w_account_maps, new_item);
                     w_account_maps = returned_lock; // re-use the lock
                     if let Some(pubkey) = already_exists {
                         duplicate_keys.push(pubkey);
@@ -1672,7 +1687,13 @@ impl<T: 'static + Clone + IsCached + ZeroLamport + std::marker::Sync + std::mark
         let new_item = WriteAccountMapEntry::new_entry_after_update(slot, account_info);
         {
             let w_account_maps = self.get_account_maps_read_lock(pubkey);
-            WriteAccountMapEntry::upsert(w_account_maps, pubkey, new_item, reclaims, reclaims_must_be_empty);
+            WriteAccountMapEntry::upsert(
+                w_account_maps,
+                pubkey,
+                new_item,
+                reclaims,
+                reclaims_must_be_empty,
+            );
         }
         self.update_secondary_indexes(pubkey, account_owner, account_data, account_indexes);
     }
@@ -1961,20 +1982,19 @@ pub mod tests {
         }
         fn get_info2(info: &SlotList<Self>) -> SlotList<AccountInfo> {
             panic!("");
-    vec![]
+            vec![]
         }
         fn get_copy2(info: &SlotList<AccountInfo>) -> SlotList<Self> {
             panic!("");
             vec![]
         }
     }
-    
+
     impl IsCached for i8 {
         fn is_cached(&self) -> bool {
             true
         }
     }
-
 
     impl Guts for i8 {
         fn get_info(&self) -> AccountInfo {
@@ -1987,7 +2007,7 @@ pub mod tests {
         }
         fn get_info2(info: &SlotList<Self>) -> SlotList<AccountInfo> {
             panic!("");
-    vec![]
+            vec![]
         }
         fn get_copy2(info: &SlotList<AccountInfo>) -> SlotList<Self> {
             panic!("");
@@ -2770,6 +2790,8 @@ pub mod tests {
         assert!(index.include_key(&pk2));
     }
 
+    const UPSERT_RECLAIMS_MUST_BE_EMPTY_FALSE: bool = false;
+
     #[test]
     fn test_insert_no_ancestors() {
         let key = Keypair::new();
@@ -2783,6 +2805,7 @@ pub mod tests {
             &AccountSecondaryIndexes::default(),
             true,
             &mut gc,
+            UPSERT_RECLAIMS_MUST_BE_EMPTY_FALSE,
         );
         assert!(gc.is_empty());
 
@@ -2793,6 +2816,74 @@ pub mod tests {
         let mut num = 0;
         index.unchecked_scan_accounts("", &ancestors, |_pubkey, _index| num += 1);
         assert_eq!(num, 0);
+    }
+
+    #[test]
+    fn test_insert_perf() {
+        solana_logger::setup();
+        let index = AccountsIndex::<AccountInfo>::default();
+        let threads: usize = 16;
+        let count = 1_000_000;
+        let bins = index.account_maps.len();
+        let mut sum = 0;
+        let per = count * threads;
+
+        let mut i = 0;
+        loop {
+            let mut m0 = Measure::start("");
+            (0..threads).into_par_iter().for_each(|_| {
+                let data = (0..count)
+                    .into_par_iter()
+                    .map(|_| {
+                        let key = Pubkey::new_rand();
+                        let info = AccountInfo::default();
+                        (key, info)
+                    })
+                    .collect::<Vec<_>>();
+                index.insert_new_if_missing_into_primary_index(0, data.len(), data.into_iter());
+            });
+            m0.stop();
+
+            let mut m1 = Measure::start("");
+            info!("flushing");
+            let count = AtomicUsize::new(0);
+            let cache_entries = (0..threads)
+                .into_par_iter()
+                .map(|_| {
+                    let mut size = 0;
+                    loop {
+                        let old = count.fetch_add(1, Ordering::Relaxed);
+                        if old >= bins {
+                            break;
+                        }
+                        size += index.account_maps[old].read().unwrap().flush();
+                    }
+                    size
+                })
+                .sum::<usize>();
+            m1.stop();
+            sum += per;
+            index
+                .account_maps
+                .first()
+                .unwrap()
+                .read()
+                .unwrap()
+                .dump_metrics();
+            datapoint_info!(
+                "test_insert_perf",
+                ("sum", sum, i64),
+                ("add_time_us", m0.as_us() as i64, i64),
+                ("flush_time_us", m1.as_us() as i64, i64),
+                ("cache_entries", cache_entries as i64, i64),
+            );
+            //error!("{} {} {} {} {} {}", sum, m0.as_ms(), m1.as_ms(), m0.as_ns() / per as u64, m1.as_ns() / per as u64, cache_entries);
+
+            i += 1;
+            if i > 3 {
+                //break;
+            }
+        }
     }
 
     type AccountInfoTest = f64;
@@ -2923,6 +3014,7 @@ pub mod tests {
                 &AccountSecondaryIndexes::default(),
                 account_infos[0].clone(),
                 &mut gc,
+                UPSERT_RECLAIMS_MUST_BE_EMPTY_FALSE,
             );
         } else {
             let items = vec![(key, account_infos[0].clone())];
@@ -2951,6 +3043,7 @@ pub mod tests {
                 &AccountSecondaryIndexes::default(),
                 account_infos[1].clone(),
                 &mut gc,
+                UPSERT_RECLAIMS_MUST_BE_EMPTY_FALSE,
             );
         } else {
             let items = vec![(key, account_infos[1].clone())];
@@ -3014,9 +3107,10 @@ pub mod tests {
         let r_account_maps = index.get_account_maps_read_lock(&key.pubkey());
         WriteAccountMapEntry::upsert(
             r_account_maps,
-            key.pubkey(),
+            &key.pubkey(),
             new_entry,
             &mut SlotList::default(),
+            false,
         );
         assert_eq!(1, account_maps_len_expensive(&index));
 
@@ -3046,6 +3140,7 @@ pub mod tests {
             &AccountSecondaryIndexes::default(),
             true,
             &mut gc,
+            UPSERT_RECLAIMS_MUST_BE_EMPTY_FALSE,
         );
         assert!(gc.is_empty());
 
@@ -3070,6 +3165,7 @@ pub mod tests {
             &AccountSecondaryIndexes::default(),
             true,
             &mut gc,
+            UPSERT_RECLAIMS_MUST_BE_EMPTY_FALSE,
         );
         assert!(gc.is_empty());
 
@@ -3104,6 +3200,7 @@ pub mod tests {
                 &AccountSecondaryIndexes::default(),
                 true,
                 &mut vec![],
+                UPSERT_RECLAIMS_MUST_BE_EMPTY_FALSE,
             );
             new_pubkey
         })
@@ -3120,6 +3217,7 @@ pub mod tests {
                 &AccountSecondaryIndexes::default(),
                 true,
                 &mut vec![],
+                UPSERT_RECLAIMS_MUST_BE_EMPTY_FALSE,
             );
         }
 
@@ -3151,9 +3249,14 @@ pub mod tests {
 
         let ancestors = Ancestors::default();
         let mut scanned_keys = HashSet::new();
-        index.range_scan_accounts("run_test_range", &ancestors, pubkey_range, |pubkey, _index| {
-            scanned_keys.insert(*pubkey);
-        });
+        index.range_scan_accounts(
+            "run_test_range",
+            &ancestors,
+            pubkey_range,
+            |pubkey, _index| {
+                scanned_keys.insert(*pubkey);
+            },
+        );
 
         let mut expected_len = 0;
         for key in &pubkeys[index_start..index_end] {
@@ -3239,11 +3342,11 @@ pub mod tests {
     fn test_scan_accounts() {
         solana_logger::setup();
         {
-        run_test_scan_accounts(0);
-        run_test_scan_accounts(1);
-        run_test_scan_accounts(ITER_BATCH_SIZE * 10);
-        run_test_scan_accounts(ITER_BATCH_SIZE * 10 - 1);
-        run_test_scan_accounts(ITER_BATCH_SIZE * 10 + 1);
+            run_test_scan_accounts(0);
+            run_test_scan_accounts(1);
+            run_test_scan_accounts(ITER_BATCH_SIZE * 10);
+            run_test_scan_accounts(ITER_BATCH_SIZE * 10 - 1);
+            run_test_scan_accounts(ITER_BATCH_SIZE * 10 + 1);
         }
     }
 
@@ -3261,6 +3364,7 @@ pub mod tests {
             &AccountSecondaryIndexes::default(),
             true,
             &mut gc,
+            UPSERT_RECLAIMS_MUST_BE_EMPTY_FALSE,
         );
         assert!(iter.next().is_none());
     }
@@ -3286,6 +3390,7 @@ pub mod tests {
             &AccountSecondaryIndexes::default(),
             true,
             &mut gc,
+            UPSERT_RECLAIMS_MUST_BE_EMPTY_FALSE,
         );
         assert!(gc.is_empty());
 
@@ -3401,6 +3506,7 @@ pub mod tests {
             &AccountSecondaryIndexes::default(),
             true,
             &mut gc,
+            UPSERT_RECLAIMS_MUST_BE_EMPTY_FALSE,
         );
         assert!(gc.is_empty());
         let key = &key.pubkey();
@@ -3417,6 +3523,7 @@ pub mod tests {
             &AccountSecondaryIndexes::default(),
             false,
             &mut gc,
+            UPSERT_RECLAIMS_MUST_BE_EMPTY_FALSE,
         );
         assert_eq!(gc, vec![(0, true)]);
         let (list, idx) = index.get(key, Some(&ancestors), None).unwrap();
@@ -3439,6 +3546,7 @@ pub mod tests {
             &AccountSecondaryIndexes::default(),
             true,
             &mut gc,
+            UPSERT_RECLAIMS_MUST_BE_EMPTY_FALSE,
         );
         assert!(gc.is_empty());
         index.upsert(
@@ -3449,6 +3557,7 @@ pub mod tests {
             &AccountSecondaryIndexes::default(),
             false,
             &mut gc,
+            UPSERT_RECLAIMS_MUST_BE_EMPTY_FALSE,
         );
         assert!(gc.is_empty());
         let (list, idx) = index.get(key, Some(&ancestors), None).unwrap();
@@ -3472,6 +3581,7 @@ pub mod tests {
             &AccountSecondaryIndexes::default(),
             true,
             &mut gc,
+            UPSERT_RECLAIMS_MUST_BE_EMPTY_FALSE,
         );
         assert!(gc.is_empty());
         index.upsert(
@@ -3482,6 +3592,7 @@ pub mod tests {
             &AccountSecondaryIndexes::default(),
             false,
             &mut gc,
+            UPSERT_RECLAIMS_MUST_BE_EMPTY_FALSE,
         );
         index.upsert(
             2,
@@ -3491,6 +3602,7 @@ pub mod tests {
             &AccountSecondaryIndexes::default(),
             true,
             &mut gc,
+            UPSERT_RECLAIMS_MUST_BE_EMPTY_FALSE,
         );
         index.upsert(
             3,
@@ -3500,6 +3612,7 @@ pub mod tests {
             &AccountSecondaryIndexes::default(),
             true,
             &mut gc,
+            UPSERT_RECLAIMS_MUST_BE_EMPTY_FALSE,
         );
         index.add_root(0, false);
         index.add_root(1, false);
@@ -3512,6 +3625,7 @@ pub mod tests {
             &AccountSecondaryIndexes::default(),
             true,
             &mut gc,
+            UPSERT_RECLAIMS_MUST_BE_EMPTY_FALSE,
         );
 
         // Updating index should not purge older roots, only purges
@@ -3569,6 +3683,7 @@ pub mod tests {
             &AccountSecondaryIndexes::default(),
             12,
             &mut gc,
+            UPSERT_RECLAIMS_MUST_BE_EMPTY_FALSE,
         );
         assert_eq!(1, account_maps_len_expensive(&index));
 
@@ -3580,6 +3695,7 @@ pub mod tests {
             &AccountSecondaryIndexes::default(),
             10,
             &mut gc,
+            UPSERT_RECLAIMS_MUST_BE_EMPTY_FALSE,
         );
         assert_eq!(1, account_maps_len_expensive(&index));
 
@@ -3599,6 +3715,7 @@ pub mod tests {
             &AccountSecondaryIndexes::default(),
             9,
             &mut gc,
+            UPSERT_RECLAIMS_MUST_BE_EMPTY_FALSE,
         );
         assert_eq!(1, account_maps_len_expensive(&index));
     }
@@ -3674,6 +3791,7 @@ pub mod tests {
                 secondary_indexes,
                 true,
                 &mut vec![],
+                UPSERT_RECLAIMS_MUST_BE_EMPTY_FALSE,
             );
         }
 
@@ -3846,6 +3964,7 @@ pub mod tests {
             &secondary_indexes,
             true,
             &mut vec![],
+            UPSERT_RECLAIMS_MUST_BE_EMPTY_FALSE,
         );
         assert!(secondary_index.index.is_empty());
         assert!(secondary_index.reverse_index.is_empty());
@@ -3859,6 +3978,7 @@ pub mod tests {
             &secondary_indexes,
             true,
             &mut vec![],
+            UPSERT_RECLAIMS_MUST_BE_EMPTY_FALSE,
         );
         assert!(secondary_index.index.is_empty());
         assert!(secondary_index.reverse_index.is_empty());
@@ -3981,6 +4101,7 @@ pub mod tests {
             secondary_indexes,
             true,
             &mut vec![],
+            UPSERT_RECLAIMS_MUST_BE_EMPTY_FALSE,
         );
 
         // Now write a different mint index for the same account
@@ -3992,6 +4113,7 @@ pub mod tests {
             secondary_indexes,
             true,
             &mut vec![],
+            UPSERT_RECLAIMS_MUST_BE_EMPTY_FALSE,
         );
 
         // Both pubkeys will now be present in the index
@@ -4011,6 +4133,7 @@ pub mod tests {
             secondary_indexes,
             true,
             &mut vec![],
+            UPSERT_RECLAIMS_MUST_BE_EMPTY_FALSE,
         );
         assert_eq!(secondary_index.get(&secondary_key1), vec![account_key]);
 

@@ -18,7 +18,7 @@ use std::ops::{Range, RangeBounds};
 use std::str::FromStr;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use std::sync::RwLock;
+use std::sync::{RwLock, RwLockWriteGuard};
 use std::time::Instant;
 
 type K = Pubkey;
@@ -350,11 +350,16 @@ pub struct BucketMapWriteHolder<V> {
     pub update_cache_us: AtomicU64,
     pub write_cache_flushes: AtomicU64,
     pub bucket_flush_calls: AtomicU64,
+    pub startup: AtomicBool,
     pub get_purges: AtomicU64,
     pub gets_from_disk: AtomicU64,
     pub gets_from_disk_empty: AtomicU64,
     pub gets_from_cache: AtomicU64,
     pub updates: AtomicU64,
+    pub flush0: AtomicU64,
+    pub flush1: AtomicU64,
+    pub flush2: AtomicU64,
+    pub flush3: AtomicU64,
     pub using_empty_get: AtomicU64,
     pub insert_without_lookup: AtomicU64,
     pub updates_in_cache: AtomicU64,
@@ -372,7 +377,44 @@ pub struct BucketMapWriteHolder<V> {
     pub unified_backing: bool,
 }
 
-impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
+impl<V: 'static + Clone + Copy + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
+    pub fn update_or_insert_async(&self, ix: usize, key: Pubkey, new_value: AccountMapEntry<V>) {
+        // if in cache, update now in cache
+        // if known not present, insert into cache
+        // if not in cache, put in cache, with flag saying we need to update later
+        let mut wc = &mut self.write_cache[ix].write().unwrap();
+        let mut m1 = Measure::start("");
+        let res = wc.entry(key);
+        match res {
+            HashMapEntry::Occupied(occupied) => {
+                // already in cache, so call update_static function
+                let reclaims_must_be_empty = true;
+                let mut reclaims = Vec::default();
+                self.upsert_item_in_cache(
+                    occupied.get(),
+                    new_value,
+                    &mut reclaims,
+                    reclaims_must_be_empty,
+                    m1,
+                );
+                return;
+            }
+            HashMapEntry::Vacant(vacant) => {
+                let must_do_lookup_from_disk = true;
+                let confirmed_not_on_disk = false;
+                // not in cache - may or may not be on disk
+                vacant.insert(self.allocate(
+                    &new_value.slot_list,
+                    new_value.ref_count,
+                    true,
+                    true,
+                    must_do_lookup_from_disk,
+                    confirmed_not_on_disk,
+                ));
+            }
+        }
+    }
+
     pub fn set_account_index_db(&self, mut db: Arc<Box<dyn Rox>>) {
         if use_trait {
             assert!(use_rox || use_sled);
@@ -394,7 +436,12 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
         age.wrapping_add(inc)
     }
 
+    pub fn dump_metrics(&self) {
+        self.distribution2();
+    }
+
     pub fn bg_flusher(&self, exit: Arc<AtomicBool>) {
+        return;
         let mut found_one = false;
         let mut last = Instant::now();
         let mut aging = Instant::now();
@@ -420,7 +467,7 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
             }
             found_one = false;
             for ix in 0..self.bins {
-                if self.flush(ix, true, age) {
+                if self.flush(ix, true, age).0 {
                     found_one = true;
                 }
             }
@@ -440,6 +487,7 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
         let write_cache_flushes = AtomicU64::new(0);
         let bucket_flush_calls = AtomicU64::new(0);
         let get_purges = AtomicU64::new(0);
+        let startup = AtomicBool::new(false);
         let gets_from_disk = AtomicU64::new(0);
         let gets_from_disk_empty = AtomicU64::new(0);
         let using_empty_get = AtomicU64::new(0);
@@ -448,6 +496,11 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
         let updates_in_cache = AtomicU64::new(0);
         let inserts_without_checking_disk = AtomicU64::new(0);
         let updates = AtomicU64::new(0);
+        let flush0 = AtomicU64::new(0);
+        let flush1 = AtomicU64::new(0);
+        let flush2 = AtomicU64::new(0);
+        let flush3 = AtomicU64::new(0);
+
         let inserts = AtomicU64::new(0);
         let deletes = AtomicU64::new(0);
         let mut write_cache = vec![];
@@ -478,11 +531,16 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
             write_cache_flushes,
             updates,
             inserts,
+            flush0,
+            flush1,
+            flush2,
+            flush3,
             db,
             binner,
             unified_backing,
             get_purges,
             bucket_flush_calls,
+            startup,
             get_disk_us,
             update_dist_us,
             get_cache_us,
@@ -493,14 +551,18 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
             keys,
         }
     }
-    pub fn flush(&self, ix: usize, bg: bool, age: Option<u8>) -> bool {
+    pub fn set_startup(&self, startup: bool) {
+        self.startup.store(startup, Ordering::Relaxed);
+    }
+    pub fn flush(&self, ix: usize, bg: bool, age: Option<u8>) -> (bool, usize) {
         //error!("start flusha: {}", ix);
         let read_lock = self.write_cache[ix].read().unwrap();
         //error!("start flusha: {}", ix);
         let mut had_dirty = false;
         if read_lock.is_empty() {
-            return false;
+            return (false, 0);
         }
+        let startup = self.startup.load(Ordering::Relaxed);
 
         //error!("start flush: {}", ix);
         let (age_comp, do_age, next_age) = age
@@ -512,10 +574,13 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
         let mut delete_keys = Vec::with_capacity(len);
         let mut flushed = 0;
         let mut get_purges = 0;
+        let mut m0 = Measure::start("");
         for (k, mut v) in read_lock.iter() {
             let mut instance = v.instance.read().unwrap();
-            let mut flush = instance.dirty;
-            if bg && (Self::in_cache(&instance.data.slot_list) || instance.data.slot_list.len() > 1) {
+            let dirty = instance.dirty;
+            let mut flush = dirty;
+            let mut keep_this_in_cache = Self::in_cache(&instance.data.slot_list); // || instance.data.slot_list.len() > 1);
+            if bg && keep_this_in_cache {
                 // for all account indexes that are in the write cache instead of storage, don't write them to disk yet - they will be updated soon
                 flush = false;
             }
@@ -523,52 +588,122 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
                 flush_keys.push(*k);
                 had_dirty = true;
             }
-            if do_age {
-                if instance.age == age_comp {
+            let mut delete_key = (do_age && !dirty) || startup;
+            let mut purging_non_cached_insert = false;
+            if !delete_key && !keep_this_in_cache && !instance.insert && instance.dirty {
+                error!("not an insert");
+            }
+            if !instance.insert && !instance.dirty && instance.confirmed_not_on_disk {
+                error!("confirmed not on disk2: {}", k);
+            }
+            if !delete_key && !keep_this_in_cache && instance.insert {
+                delete_key = true;
+                // get rid of non-cached inserts from the write cache asap - we won't need them again any sooner than any other account
+                purging_non_cached_insert = true;
+            }
+            if delete_key {
+                if purging_non_cached_insert
+                    || startup
+                    || (instance.age == age_comp && !keep_this_in_cache)
+                {
                     // clear the cache of things that have aged out
                     delete_keys.push(*k);
                     get_purges += 1;
 
                     // if we should age this key out, then go ahead and flush it
-                    if !flush && instance.dirty {
+                    if !flush && dirty {
                         flush_keys.push(*k);
                     }
+                } else {
+                    //error!("not delete_key2: {:?}, {}", instance, k);
                 }
+            } else {
+                //error!("not delete_key: {:?}", instance);
             }
         }
-        drop(read_lock);
+        m0.stop();
 
+        let mut m3 = Measure::start("");
+        /*
+        // time how long just to get everything from disk
+        for (k, mut v) in read_lock.iter() {
+            self.disk.get(k);
+        }
+        */
+        drop(read_lock);
+        m3.stop();
+
+        let mut m1 = Measure::start("");
         {
             let mut wc = &mut self.write_cache[ix].write().unwrap(); // maybe get lock for each item?
             for k in flush_keys.into_iter() {
                 match wc.entry(k) {
                     HashMapEntry::Occupied(occupied) => {
-                        //error!("mid flush: {}, {}", ix, line!());
                         let mut instance = occupied.get().instance.write().unwrap();
                         if instance.dirty {
-                            //error!("mid flush: {}, {}", ix, line!());
+                            let merged_value = RwLock::new(None);
+                            let lookup = instance.must_do_lookup_from_disk;
                             self.update_no_cache(
-                                occupied.key(),
-                                |_current| {
-                                    Some((
-                                        instance.data.slot_list.clone(),
-                                        instance.data.ref_count,
-                                    ))
+                                &k,
+                                |current| {
+                                    if lookup {
+                                        // we have data to insert or update
+                                        // we have been unaware if there was anything on disk with this pubkey so far
+                                        // so, we may have to merge here
+                                        if let Some((slot_list, mut ref_count)) = current {
+                                            let mut slot_list = slot_list.to_vec();
+                                            Self::merge_slot_lists(
+                                                &mut slot_list,
+                                                &mut ref_count,
+                                                &instance,
+                                            );
+                                            *merged_value.write().unwrap() =
+                                                Some((slot_list.clone(), ref_count));
+                                            return Some((slot_list, ref_count));
+                                        }
+                                        // else, we didn't know if there was anything on disk, but there was nothing, so we are done
+                                    }
+                                    // write what is in our cache - it has been merged if necessary
+                                    Some((instance.data.slot_list.clone(), instance.data.ref_count))
                                 },
                                 None,
                                 true,
                             );
-                            //error!("mid flush: {}, {}", ix, line!());
-                            instance.age = next_age; // keep newly updated stuff around
+                            if lookup {
+                                // we did a lookup, so put the merged value back into the cache
+                                if let Some((slot_list, ref_count)) =
+                                    merged_value.into_inner().unwrap()
+                                {
+                                    instance.data.slot_list = slot_list;
+                                    instance.data.ref_count = ref_count;
+                                }
+                                instance.must_do_lookup_from_disk = false;
+                            }
+                            let mut keep_this_in_cache = true;
+                            if instance.insert {
+                                keep_this_in_cache = Self::in_cache(&instance.data.slot_list);
+                                // || instance.data.slot_list.len() > 1);
+                            }
+                            if keep_this_in_cache {
+                                instance.age = next_age; // keep newly updated stuff around
+                            }
                             instance.dirty = false;
+                            instance.insert = false;
+                            if !keep_this_in_cache {
+                                // delete immediately to avoid a race condition
+                                drop(instance);
+                                occupied.remove();
+                            }
                             flushed += 1;
                         }
                     }
-                    HashMapEntry::Vacant(vacant) => { // do nothing, item is no longer in cache somehow, so obviously not dirty
-                    }
+                    _ => {}
                 }
             }
         }
+        m1.stop();
+
+        let mut m2 = Measure::start("");
         {
             let mut wc = &mut self.write_cache[ix].write().unwrap(); // maybe get lock for each item?
             for k in delete_keys.iter() {
@@ -577,7 +712,11 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
                     let instance = item.instance.write().unwrap();
                     //error!("mid flush: {}, {}", ix, line!());
                     // if someone else dirtied it or aged it newer, so re-insert it into the cache
-                    if instance.dirty || (do_age && instance.age != age_comp) {
+                    if instance.dirty
+                        || (do_age && instance.age != age_comp)
+                        || instance.must_do_lookup_from_disk
+                    {
+                        panic!("re-adding: {}, {:?}, age: {}", k, instance, do_age);
                         drop(instance);
                         wc.insert(*k, item);
                     }
@@ -585,6 +724,15 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
                 }
             }
         }
+        m2.stop();
+        let mut wc = &mut self.write_cache[ix].read().unwrap(); // maybe get lock for each item?
+        let len = wc.len();
+        drop(wc);
+
+        self.flush0.fetch_add(m0.as_us(), Ordering::Relaxed);
+        self.flush1.fetch_add(m1.as_us(), Ordering::Relaxed);
+        self.flush2.fetch_add(m2.as_us(), Ordering::Relaxed);
+        self.flush3.fetch_add(m3.as_us(), Ordering::Relaxed);
 
         if flushed != 0 {
             self.write_cache_flushes
@@ -596,7 +744,7 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
         }
         //error!("end flush: {}", ix);
 
-        had_dirty
+        (had_dirty, len)
     }
     pub fn bucket_len(&self, ix: usize) -> u64 {
         self.disk.bucket_len(ix)
@@ -670,7 +818,9 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
         self.disk.num_buckets()
     }
 
-    fn update_lazy_from_disk(pubkey: &Pubkey,        entry: &WriteCacheEntryArc<V>,
+    fn update_lazy_from_disk(
+        pubkey: &Pubkey,
+        entry: &WriteCacheEntryArc<V>,
         mut new_value: AccountMapEntry<V>,
         reclaims: &mut SlotList<V>,
         reclaims_must_be_empty: bool,
@@ -678,7 +828,6 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
         // we have 1 entry for this pubkey. it was previously inserted, but we haven't checked to see if there is more info for this pubkey on disk already
         // todo
     }
-
 
     fn upsert_item_in_cache(
         &self,
@@ -691,8 +840,10 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
         let mut instance = entry.instance.write().unwrap();
 
         if instance.must_do_lookup_from_disk {
-            // todo
-            
+            // this item exists in the cache, but we don't know if it exists on disk or not
+            assert!(!instance.confirmed_not_on_disk);
+            // we can call update on the item as it is. same slot will result in reclaims, different slot will result in slot list growing
+            // must_do_lookup_from_disk should remain
         }
 
         instance.age = self.set_age_to_future();
@@ -746,7 +897,13 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
             let res = wc.get(&key);
             if let Some(occupied) = res {
                 // already in cache, so call update_static function
-                self.upsert_item_in_cache(occupied, new_value, reclaims, reclaims_must_be_empty, m1);
+                self.upsert_item_in_cache(
+                    occupied,
+                    new_value,
+                    reclaims,
+                    reclaims_must_be_empty,
+                    m1,
+                );
                 return;
             }
         }
@@ -758,20 +915,33 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
         match res {
             HashMapEntry::Occupied(occupied) => {
                 // already in cache, so call update_static function
-                self.upsert_item_in_cache(occupied.get(), new_value, reclaims, reclaims_must_be_empty, m1);
+                self.upsert_item_in_cache(
+                    occupied.get(),
+                    new_value,
+                    reclaims,
+                    reclaims_must_be_empty,
+                    m1,
+                );
                 return;
             }
             HashMapEntry::Vacant(vacant) => {
                 if !reclaims_must_be_empty {
                     if 1000 <= self.insert_without_lookup.fetch_add(1, Ordering::Relaxed) {
-                        panic!("upsert without reclaims");
+                        //panic!("upsert without reclaims");
+                        /*
+                        2: solana_runtime::accounts_index::AccountsIndex<T>::upsert
+                        3: solana_runtime::accounts_db::AccountsDb::store_accounts_frozen
+                        4: solana_runtime::accounts_db::AccountsDb::shrink_candidate_slots
+                                             */
                     }
                 }
-                if reclaims_must_be_empty && false { // todo
+                if reclaims_must_be_empty && false {
+                    // todo
                     // we don't have to go to disk to look this thing up yet
                     // not on disk, not in cache, so add to cache
                     let must_do_lookup_from_disk = true;
-                    self.inserts_without_checking_disk.fetch_add(1, Ordering::Relaxed);
+                    self.inserts_without_checking_disk
+                        .fetch_add(1, Ordering::Relaxed);
                     vacant.insert(self.allocate(
                         &new_value.slot_list,
                         new_value.ref_count,
@@ -798,7 +968,14 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
                     if addref {
                         current.0 += 1;
                     }
-                    vacant.insert(self.allocate(&current.1, current.0, true, false, must_do_lookup_from_disk, confirmed_not_on_disk,));
+                    vacant.insert(self.allocate(
+                        &current.1,
+                        current.0,
+                        true,
+                        false,
+                        must_do_lookup_from_disk,
+                        confirmed_not_on_disk,
+                    ));
                     m1.stop();
                     self.update_cache_us
                         .fetch_add(m1.as_ns(), Ordering::Relaxed);
@@ -820,6 +997,27 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
 
     fn in_cache(slot_list: &SlotList<V>) -> bool {
         slot_list.iter().any(|(slot, info)| info.is_cached())
+    }
+
+    fn merge_slot_lists<'a>(
+        slot_list: &'a mut SlotList<V>,
+        ref_count: &'a mut RefCount,
+        instance: &'a RwLockWriteGuard<'a, WriteCacheEntry<V>>,
+    ) {
+        let reclaims_must_be_empty = false;
+        let mut _reclaims = Vec::default();
+        for (slot, new_entry) in instance.data.slot_list.iter() {
+            let addref = WriteAccountMapEntry::update_static(
+                slot_list,
+                *slot,
+                new_entry.clone(),
+                &mut _reclaims,
+                reclaims_must_be_empty,
+            );
+            if addref {
+                *ref_count += 1;
+            }
+        }
     }
 
     pub fn update_no_cache<F>(
@@ -863,7 +1061,17 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
                     // stick this in the write cache and flush it later
                     let ix = self.bucket_ix(key);
                     let wc = &mut self.write_cache[ix].write().unwrap();
-                    wc.insert(key.clone(), self.allocate(&result.0, result.1, true, true, must_do_lookup_from_disk, confirmed_not_on_disk));
+                    wc.insert(
+                        key.clone(),
+                        self.allocate(
+                            &result.0,
+                            result.1,
+                            true,
+                            true,
+                            must_do_lookup_from_disk,
+                            confirmed_not_on_disk,
+                        ),
+                    );
                 } else {
                     panic!("should have returned a value from updatefn");
                 }
@@ -907,7 +1115,7 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
                     slot_list: slot_list.clone(),
                     ref_count,
                 },
-                dirty: dirty,                                 //AtomicBool::new(dirty),
+                dirty: dirty, //AtomicBool::new(dirty),
                 age: self.set_age_to_future(),
                 insert,
                 must_do_lookup_from_disk,
@@ -933,10 +1141,42 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
             match wc.entry(key.clone()) {
                 HashMapEntry::Occupied(mut occupied) => {
                     let mut gm = occupied.get_mut();
-                    *gm = self.allocate(&result.0, result.1, true, false, must_do_lookup_from_disk, confirmed_not_on_disk);
+                    let insert = gm.instance.read().unwrap().confirmed_not_on_disk;
+                    if insert {
+                        //error!("insert");
+                    } else {
+                        error!("not an insert1");
+                    }
+                    *gm = self.allocate(
+                        &result.0,
+                        result.1,
+                        true,
+                        insert,
+                        must_do_lookup_from_disk,
+                        confirmed_not_on_disk,
+                    );
+                    drop(gm);
+                    assert_eq!(occupied.get().instance.read().unwrap().insert, insert);
+                    assert_eq!(
+                        occupied
+                            .get()
+                            .instance
+                            .read()
+                            .unwrap()
+                            .confirmed_not_on_disk,
+                        confirmed_not_on_disk
+                    );
                 }
                 HashMapEntry::Vacant(vacant) => {
-                    vacant.insert(self.allocate(&result.0, result.1, true, true, must_do_lookup_from_disk, confirmed_not_on_disk));
+                    error!("not an insert2");
+                    vacant.insert(self.allocate(
+                        &result.0,
+                        result.1,
+                        true,
+                        true,
+                        must_do_lookup_from_disk,
+                        confirmed_not_on_disk,
+                    ));
                     self.wait.notify_all(); // we have put something in the write cache that needs to be flushed sometime
                 }
             }
@@ -1002,6 +1242,33 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
         Self::add_age(current_age, default_age)
     }
 
+    fn get_caching(
+        &self,
+        instance: &RwLock<WriteCacheEntry<V>>,
+        key: &Pubkey,
+    ) -> Option<(u64, Vec<SlotT<V>>)> {
+        let mut instance = instance.write().unwrap();
+        instance.age = self.set_age_to_future();
+        self.gets_from_cache.fetch_add(1, Ordering::Relaxed);
+        if instance.confirmed_not_on_disk {
+            return None; // does not really exist
+        }
+        if instance.must_do_lookup_from_disk {
+            // we have inserted or updated this item, but we have never reconciled with the disk, so we have to do that now since a caller is requesting the complete item
+            let r = self.get_no_cache(key);
+            if let Some((mut ref_count, mut slot_list)) = r {
+                Self::merge_slot_lists(&mut slot_list, &mut ref_count, &instance);
+                instance.data.ref_count = ref_count;
+                instance.data.slot_list = slot_list;
+            }
+            // else, we now know we were the only info that exists for this account, so we have all we need
+            instance.must_do_lookup_from_disk = false;
+        }
+
+        let r = Some((instance.data.ref_count, instance.data.slot_list.clone()));
+        return r;
+    }
+
     pub fn get(&self, key: &Pubkey) -> Option<(u64, Vec<SlotT<V>>)> {
         /*
         let k = Pubkey::from_str("5x3NHJ4VEu2abiZJ5EHEibTc2iqW22Lc245Z3fCwCxRS").unwrap();
@@ -1019,16 +1286,9 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
             m1.stop();
             if let Some(mut res) = res {
                 if get_caching {
-                    let mut instance = res.instance.write().unwrap();
-                    instance.age = self.set_age_to_future();
-                    self.gets_from_cache.fetch_add(1, Ordering::Relaxed);
-                    if instance.confirmed_not_on_disk {
-                        return None; // does not really exist
-                    }
-
-                    let r = Some((instance.data.ref_count, instance.data.slot_list.clone()));
+                    let res = self.get_caching(&res.instance, key);
                     self.get_cache_us.fetch_add(m1.as_ns(), Ordering::Relaxed);
-                    return r;
+                    return res;
                 } else {
                     let mut instance = res.instance.read().unwrap();
                     self.gets_from_cache.fetch_add(1, Ordering::Relaxed);
@@ -1046,26 +1306,34 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
             let res = wc.entry(key.clone());
             match res {
                 HashMapEntry::Occupied(occupied) => {
-                    let mut instance = occupied.get().instance.write().unwrap();
-                    instance.age = self.set_age_to_future();
-                    if instance.confirmed_not_on_disk {
-                        return None; // does not really exist
-                    }
-                    self.gets_from_cache.fetch_add(1, Ordering::Relaxed);
-                    m1.stop();
-                    self.update_cache_us
-                        .fetch_add(m1.as_ns(), Ordering::Relaxed);
-                    return Some((instance.data.ref_count, instance.data.slot_list.clone()));
+                    let res = self.get_caching(&occupied.get().instance, key);
+                    self.get_cache_us.fetch_add(m1.as_ns(), Ordering::Relaxed);
+                    return res;
                 }
                 HashMapEntry::Vacant(vacant) => {
                     let r = self.get_no_cache(key);
                     if let Some(loaded) = &r {
-                        vacant.insert(self.allocate(&loaded.1, loaded.0, false, false, must_do_lookup_from_disk, confirmed_not_on_disk));
-                    }
-                    else {
+                        //error!("loaded: {}", key);
+                        vacant.insert(self.allocate(
+                            &loaded.1,
+                            loaded.0,
+                            false,
+                            false,
+                            must_do_lookup_from_disk,
+                            confirmed_not_on_disk,
+                        ));
+                    } else {
                         // we looked this up. it does not exist. let's insert a marker in the cache saying it doesn't exist. otherwise, we have to look it up again on insert!
                         confirmed_not_on_disk = true;
-                        vacant.insert(self.allocate(&SlotList::default(), RefCount::MAX, false, false, must_do_lookup_from_disk, confirmed_not_on_disk));
+                        //error!("confirmed not on disk3: {}", key);
+                        vacant.insert(self.allocate(
+                            &SlotList::default(),
+                            RefCount::MAX,
+                            false,
+                            false,
+                            must_do_lookup_from_disk,
+                            confirmed_not_on_disk,
+                        ));
                     }
                     m1.stop();
                     self.update_cache_us
@@ -1151,11 +1419,20 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
         let mut sum = 0;
         let mut min = usize::MAX;
         let mut max = 0;
-        for d in &dist {
+        for d in &dist.0 {
             let d = *d;
             sum += d;
             min = std::cmp::min(min, d);
             max = std::cmp::max(max, d);
+        }
+        let mut sumd = 0;
+        let mut mind = usize::MAX;
+        let mut maxd = 0;
+        for d in &dist.1 {
+            let d = *d;
+            sumd += d;
+            mind = std::cmp::min(min, d);
+            maxd = std::cmp::max(max, d);
         }
         datapoint_info!(
             "accounts_index",
@@ -1163,15 +1440,49 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
             ("min", min, i64),
             ("max", max, i64),
             ("sum", sum, i64),
-            //("updates_not_in_cache", self.updates.swap(0, Ordering::Relaxed), i64),
-            ("updates_not_in_cache", self.updates.load(Ordering::Relaxed), i64),
-            ("updates_in_cache", self.updates_in_cache.swap(0, Ordering::Relaxed), i64),
+            ("index_bytes_allocated", dist.2, i64),
+            ("mind", mind, i64),
+            ("maxd", maxd, i64),
+            ("sumd", sumd, i64),
+            ("data_bytes_allocated", dist.3, i64),
+            ("data_q0", dist.4 .0, i64),
+            ("data_q1", dist.4 .1, i64),
+            ("data_q2", dist.4 .2, i64),
+            ("data_q3", dist.4 .3, i64),
+            (
+                "updates_not_in_cache",
+                self.updates.swap(0, Ordering::Relaxed),
+                i64
+            ),
+            ("flush0", self.flush0.swap(0, Ordering::Relaxed), i64),
+            ("flush1", self.flush1.swap(0, Ordering::Relaxed), i64),
+            ("flush2", self.flush2.swap(0, Ordering::Relaxed), i64),
+            ("flush3", self.flush3.swap(0, Ordering::Relaxed), i64),
+            //("updates_not_in_cache", self.updates.load(Ordering::Relaxed), i64),
+            (
+                "updates_in_cache",
+                self.updates_in_cache.swap(0, Ordering::Relaxed),
+                i64
+            ),
             ("inserts", self.inserts.swap(0, Ordering::Relaxed), i64),
-            ("inserts_without_checking_disk", self.inserts_without_checking_disk.swap(0, Ordering::Relaxed), i64),
+            (
+                "inserts_without_checking_disk",
+                self.inserts_without_checking_disk
+                    .swap(0, Ordering::Relaxed),
+                i64
+            ),
             ("deletes", self.deletes.swap(0, Ordering::Relaxed), i64),
-            ("using_empty_get", self.using_empty_get.swap(0, Ordering::Relaxed), i64),
-            //("insert_without_lookup", self.insert_without_lookup.swap(0, Ordering::Relaxed), i64),
-            ("insert_without_lookup", self.insert_without_lookup.load(Ordering::Relaxed), i64),
+            (
+                "using_empty_get",
+                self.using_empty_get.swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "insert_without_lookup",
+                self.insert_without_lookup.swap(0, Ordering::Relaxed),
+                i64
+            ),
+            //("insert_without_lookup", self.insert_without_lookup.load(Ordering::Relaxed), i64),
             (
                 "gets_from_disk_empty",
                 self.gets_from_disk_empty.swap(0, Ordering::Relaxed),
@@ -1203,6 +1514,25 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
                 i64
             ),
             (
+                "bucket_index_new_file_us",
+                self.disk.stats.index.new_file_us.swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "bucket_flush_file_us_us",
+                self.disk
+                    .stats
+                    .index
+                    .flush_file_us
+                    .swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "bucket_mmap_us",
+                self.disk.stats.index.mmap_us.swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
                 "bucket_data_resizes",
                 self.disk.stats.data.resizes.swap(0, Ordering::Relaxed),
                 i64
@@ -1215,6 +1545,11 @@ impl<V: 'static + Clone + IsCached + Debug + Guts> BucketMapWriteHolder<V> {
             (
                 "bucket_data_max",
                 *self.disk.stats.data.max_size.lock().unwrap(),
+                i64
+            ),
+            (
+                "bucket_data_new_file_us",
+                self.disk.stats.data.new_file_us.swap(0, Ordering::Relaxed),
                 i64
             ),
             (
@@ -1464,13 +1799,14 @@ impl<V: 'static + Clone + Debug + IsCached + Guts> HybridBTreeMap<V> {
         Arc::new(BucketMapWriteHolder::new(BucketMap::new_buckets(buckets)))
     }
 
-    pub fn flush(&self) {
+    pub fn flush(&self) -> usize {
         let num_buckets = self.disk.num_buckets();
         let mystart = num_buckets * self.bin_index / self.bins;
         let myend = num_buckets * (self.bin_index + 1) / self.bins;
-        (mystart..myend).for_each(|ix| {
-            self.disk.flush(ix, false, None);
-        });
+        assert_eq!(myend - mystart, 1, "{}", self.bin_index);
+        (mystart..myend)
+            .map(|ix| self.disk.flush(ix, false, None).1)
+            .sum()
 
         /*
         {
@@ -1613,7 +1949,8 @@ impl<V: 'static + Clone + Debug + IsCached + Guts> HybridBTreeMap<V> {
         reclaims: &mut SlotList<V>,
         reclaims_must_be_empty: bool,
     ) {
-        self.disk.upsert(pubkey, new_value, reclaims, reclaims_must_be_empty);
+        self.disk
+            .upsert(pubkey, new_value, reclaims, reclaims_must_be_empty);
     }
 
     pub fn entry(&mut self, key: K) -> HybridEntry<'_, V> {
@@ -1633,7 +1970,7 @@ impl<V: 'static + Clone + Debug + IsCached + Guts> HybridBTreeMap<V> {
         }
     }
 
-    pub fn insert(&mut self, key: K, value: V2<V>) {
+    pub fn insert2(&mut self, key: K, value: V2<V>) {
         match self.entry(key) {
             HybridEntry::Occupied(occupied) => {
                 panic!("");
@@ -1672,5 +2009,17 @@ impl<V: 'static + Clone + Debug + IsCached + Guts> HybridBTreeMap<V> {
     }
     pub fn remove(&mut self, key: &K) {
         self.disk.delete_key(key); //.map(|x| x.entry)
+    }
+
+    pub fn set_startup(&self, startup: bool) {
+        self.disk.set_startup(startup);
+    }
+
+    pub fn update_or_insert_async(&self, pubkey: Pubkey, new_entry: AccountMapEntry<V>) {
+        self.disk
+            .update_or_insert_async(self.bin_index, pubkey, new_entry);
+    }
+    pub fn dump_metrics(&self) {
+        self.disk.dump_metrics();
     }
 }
