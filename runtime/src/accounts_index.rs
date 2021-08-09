@@ -2804,8 +2804,8 @@ pub mod tests {
     fn test_insert_perf() {
         solana_logger::setup();
         let index = AccountsIndex::<AccountInfo>::default();
-        let threads: usize = 16;
-        let count = 1_000_000;
+        let threads: usize = 8;
+        let count = 500_000;
         let bins = index.account_maps.len();
         let mut sum = 0;
         let per = count * threads;
