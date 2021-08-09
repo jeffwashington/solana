@@ -614,7 +614,7 @@ impl<T: Clone + Copy> Bucket<T> {
                     self.drives.clone(),
                     1,
                     std::mem::size_of::<IndexEntry>() as u64,
-                    self.index.capacity + i * 2,
+                    self.index.capacity + i, // * 2,
                     self.stats.index.clone(),
                 );
                 let random = thread_rng().gen();
