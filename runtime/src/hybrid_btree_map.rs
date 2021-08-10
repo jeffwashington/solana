@@ -11,6 +11,7 @@ use std::fmt::Debug;
 use std::ops::Bound;
 use std::ops::{Range, RangeBounds};
 use std::sync::Arc;
+use log::*;
 
 type K = Pubkey;
 
