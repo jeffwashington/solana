@@ -33,7 +33,7 @@ use std::{
 use thiserror::Error;
 
 pub const ITER_BATCH_SIZE: usize = 1000;
-pub const BINS_DEFAULT: usize = 8192;
+pub const BINS_DEFAULT: usize = 16384;
 pub const BINS_FOR_TESTING: usize = 2;
 pub const BINS_FOR_BENCHMARKS: usize = 2;
 pub type ScanResult<T> = Result<T, ScanError>;
