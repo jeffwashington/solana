@@ -835,6 +835,7 @@ impl<T: IsCached> AccountsIndex<T> {
         Option<JoinHandle<()>>,
     ) {
         let bins = bins.unwrap_or(BINS_DEFAULT);
+        info!("allocating buckets: {}", bins);
         let exit = Arc::new(AtomicBool::new(false));
         let exit_ = exit.clone();
         let bucket_map = HybridBTreeMap::new_bucket_map(bins);
