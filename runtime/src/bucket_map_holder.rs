@@ -196,7 +196,7 @@ impl<V: IsCached> BucketMapWriteHolder<V> {
         }
     }
     pub fn new(bucket_map: BucketMap<SlotT<V>>) -> Self {
-        let in_mem_only = false;
+        let in_mem_only = true;
         let current_age = AtomicU8::new(0);
         let get_disk_us = AtomicU64::new(0);
         let update_dist_us = AtomicU64::new(0);
