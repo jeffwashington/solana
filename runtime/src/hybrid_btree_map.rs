@@ -276,9 +276,9 @@ impl<V: IsCached> HybridBTreeMap<V> {
             _ => unbounded,
         }
     }
-    pub fn range<R>(&self, range: Option<R>) -> Vec<(Pubkey, SlotList<V>)>
+    pub fn range<R>(&self, range: Option<R>) -> Vec<Pubkey>
     where
-        R: RangeBounds<Pubkey>,
+        R: RangeBounds<Pubkey> + Debug,
     {
         //self.disk.range.fetch_add(1, Ordering::Relaxed);
 
@@ -297,8 +297,8 @@ impl<V: IsCached> HybridBTreeMap<V> {
             let end_bound = Self::bound(range.end_bound(), &max);
             end = std::cmp::min(num_buckets, 1 + self.disk.bucket_ix(end_bound)); // ugly
             assert!(
-                start_bound <= end_bound,
-                "range start is greater than range end"
+                start_bound.as_ref() <= end_bound.as_ref(),
+                "range start is greater than range end, {}, {}", start_bound, end_bound,
             );
         }
         let len = (start..end)
@@ -315,7 +315,7 @@ impl<V: IsCached> HybridBTreeMap<V> {
             let mut ks = self.disk.range(ix, range.as_ref());
             keys.append(&mut ks);
         });
-        keys.sort_unstable_by(|a, b| a.0.cmp(&b.0));
+        keys.sort_unstable();
         keys
     }
 

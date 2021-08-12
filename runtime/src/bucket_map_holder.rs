@@ -929,20 +929,43 @@ impl<V: IsCached> BucketMapWriteHolder<V> {
         return r;
     }
 
-    pub fn range<R>(&self, ix: usize, range: Option<&R>) -> Vec<(Pubkey, SlotList<V>)>
+    pub fn range<R>(&self, ix: usize, range: Option<&R>) -> Vec<Pubkey>
     where
         R: RangeBounds<Pubkey>,
     {
         if !self.in_mem_only {
             self.flush(ix, false, None);
-            self.disk.range(ix, range).unwrap_or_default()
+            let r = self.disk.range(ix, range).unwrap_or_default();
+            let mut keys = Vec::with_capacity(r.len());
+
+            let mut wc = self.write_cache[ix].write().unwrap();
+            let must_do_lookup_from_disk = false;
+            let confirmed_not_on_disk = false;
+            for (k, v) in r {
+                match wc.entry(k.clone()) {
+                    HashMapEntry::Occupied(_occupied) => {
+                        // do nothing - already in cache
+                    }
+                    HashMapEntry::Vacant(vacant) => {
+                        vacant.insert(self.allocate(
+                            &v.1,
+                            v.0,
+                            false,
+                            false,
+                            must_do_lookup_from_disk,
+                            confirmed_not_on_disk,
+                        ));
+                    }
+                }
+                keys.push(k);
+            }
+            keys
         } else {
             let wc = self.write_cache[ix].read().unwrap();
             let mut result = Vec::with_capacity(wc.len());
-            for (k, v) in wc.iter() {
-                let slot_list = &v.instance.read().unwrap().data.slot_list;
-                if !slot_list.is_empty() {
-                    result.push((*k, slot_list.clone()));
+            for (k, _v) in wc.iter() {
+                if range.map(|r| r.contains(k)).unwrap_or(true) {
+                    result.push(*k);
                 }
             }
             result

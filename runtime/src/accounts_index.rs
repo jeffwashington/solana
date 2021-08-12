@@ -32,8 +32,10 @@ use std::{
 };
 use thiserror::Error;
 
-pub const ITER_BATCH_SIZE: usize = 1000;
-pub const BINS_DEFAULT: usize = 8192;
+//pub type FnMut(&Pubkey, (&T, Slot), Option<ReadAccountMapEntry<'a, T>>) = dyn FnMut(&Pubkey, (&T, Slot), Option<ReadAccountMapEntry<'a, T>>);
+
+pub const ITER_BATCH_SIZE: usize = 2;
+pub const BINS_DEFAULT: usize = 2;
 pub const BINS_FOR_TESTING: usize = 2;
 pub const BINS_FOR_BENCHMARKS: usize = 2;
 pub type ScanResult<T> = Result<T, ScanError>;
@@ -133,7 +135,7 @@ pub enum AccountIndexGetResultInternal<'a, T: 'static + Clone + IsCached + std::
 #[self_referencing]
 pub struct ReadAccountMapEntry<'a, T: 'static + Clone + IsCached + std::fmt::Debug> {
     lock: AccountMapsReadLock<'a, T>,
-    pubkey: &'a Pubkey,
+    pubkey: Pubkey,
     #[borrows(lock, pubkey)]
     #[covariant]
     owned_entry: Option<AccountMapEntry<T>>, // used to be: &'this
@@ -141,7 +143,7 @@ pub struct ReadAccountMapEntry<'a, T: 'static + Clone + IsCached + std::fmt::Deb
 
 impl<'a, T: Clone + std::fmt::Debug + IsCached> ReadAccountMapEntry<'a, T> {
     pub fn new_with_lock(
-        pubkey: &'a Pubkey,
+        pubkey: Pubkey,
         lock: AccountMapsReadLock<'a, T>,
     ) -> AccountIndexGetResultInternal<'a, T> {
         let result = ReadAccountMapEntryBuilder {
@@ -711,7 +713,7 @@ impl<'a, T: Clone + std::fmt::Debug + IsCached> AccountsIndexIterator<'a, T> {
 }
 
 impl<'a, T: IsCached> Iterator for AccountsIndexIterator<'a, T> {
-    type Item = Vec<(Pubkey, SlotList<T>)>;
+    type Item = Vec<Pubkey>;
     fn next(&mut self) -> Option<Self::Item> {
         if self.is_finished {
             return None;
@@ -737,7 +739,7 @@ impl<'a, T: IsCached> Iterator for AccountsIndexIterator<'a, T> {
             return None;
         }
 
-        self.start_bound = Excluded(chunk.last().unwrap().0);
+        self.start_bound = Excluded(*chunk.last().unwrap());
         Some(chunk)
     }
 }
@@ -862,8 +864,8 @@ impl<T: IsCached> AccountsIndex<T> {
         AccountsIndexIterator::new(self, range)
     }
 
-    fn do_checked_scan_accounts<F, R>(
-        &self,
+    fn do_checked_scan_accounts<'a, F, R>(
+        &'a self,
         metric_name: &'static str,
         ancestors: &Ancestors,
         scan_bank_id: BankId,
@@ -871,7 +873,7 @@ impl<T: IsCached> AccountsIndex<T> {
         scan_type: ScanTypes<R>,
     ) -> Result<(), ScanError>
     where
-        F: FnMut(&Pubkey, (&T, Slot)),
+        F: FnMut(&Pubkey, (&T, Slot), Option<ReadAccountMapEntry<'a, T>>),
         R: RangeBounds<Pubkey> + Debug,
     {
         {
@@ -1079,14 +1081,14 @@ impl<T: IsCached> AccountsIndex<T> {
         }
     }
 
-    fn do_unchecked_scan_accounts<F, R>(
-        &self,
+    fn do_unchecked_scan_accounts<'a, F, R>(
+        &'a self,
         metric_name: &'static str,
         ancestors: &Ancestors,
         func: F,
         range: Option<R>,
     ) where
-        F: FnMut(&Pubkey, (&T, Slot)),
+        F: FnMut(&Pubkey, (&T, Slot), Option<ReadAccountMapEntry<'a, T>>),
         R: RangeBounds<Pubkey> + Debug,
     {
         self.do_scan_accounts(metric_name, ancestors, func, range, None);
@@ -1095,15 +1097,15 @@ impl<T: IsCached> AccountsIndex<T> {
     // Scan accounts and return latest version of each account that is either:
     // 1) rooted or
     // 2) present in ancestors
-    fn do_scan_accounts<F, R>(
-        &self,
+    fn do_scan_accounts<'a, F, R>(
+        &'a self,
         metric_name: &'static str,
         ancestors: &Ancestors,
         mut func: F,
         range: Option<R>,
         max_root: Option<Slot>,
     ) where
-        F: FnMut(&Pubkey, (&T, Slot)),
+        F: FnMut(&Pubkey, (&T, Slot), Option<ReadAccountMapEntry<'a, T>>),
         R: RangeBounds<Pubkey> + Debug,
     {
         //error!("do_scan_accounts, {}, {}, {}, range: {:?}", file!(), line!(), metric_name, range);
@@ -1129,18 +1131,25 @@ impl<T: IsCached> AccountsIndex<T> {
         for pubkey_list in self.iter(range) {
             iterator_timer.stop();
             iterator_elapsed += iterator_timer.as_us();
-            for (pubkey, slot_list) in pubkey_list {
+            let l = pubkey_list.len();
+            for pubkey in pubkey_list {
                 //error!("pubkey: {}", pubkey);
                 num_keys_iterated += 1;
-                let ix = self.latest_slot(Some(ancestors), &slot_list[..], max_root);
-                if let Some(ix) = ix {
-                    let result = slot_list[ix];
+                let lock = ReadAccountMapEntry::new_with_lock(pubkey, self.get_account_maps_read_lock(&pubkey));
+                match lock {
+                    AccountIndexGetResultInternal::Found(item) => {
+                        let ix = self.latest_slot(Some(ancestors), &item.slot_list()[..], max_root);
+                        if let Some(ix) = ix {
+                            let result = item.slot_list()[ix];
 
-                    let mut load_account_timer = Measure::start("load_account");
-                    //let list_item = &slot_list[index];
-                    func(&pubkey, (&result.1, result.0));
-                    load_account_timer.stop();
-                    load_account_elapsed += load_account_timer.as_us();
+                            let mut load_account_timer = Measure::start("load_account");
+                            //let list_item = &slot_list[index];
+                                func(&pubkey, (&result.1, result.0), Some(item));
+                            load_account_timer.stop();
+                            load_account_elapsed += load_account_timer.as_us();
+                        }
+                    }
+                    _ => {}
                 }
             }
             iterator_timer = Measure::start("iterator_elapsed");
@@ -1160,18 +1169,18 @@ impl<T: IsCached> AccountsIndex<T> {
         }
     }
 
-    fn do_scan_secondary_index<
+    fn do_scan_secondary_index<'a,
         F,
         SecondaryIndexEntryType: SecondaryIndexEntry + Default + Sync + Send,
     >(
-        &self,
+        &'a self,
         ancestors: &Ancestors,
         mut func: F,
         index: &SecondaryIndex<SecondaryIndexEntryType>,
         index_key: &Pubkey,
         max_root: Option<Slot>,
     ) where
-        F: FnMut(&Pubkey, (&T, Slot)),
+        F: FnMut(&Pubkey, (&T, Slot), Option<ReadAccountMapEntry<'a, T>>),
     {
         for pubkey in index.get(index_key) {
             // Maybe these reads from the AccountsIndex can be batched every time it
@@ -1182,6 +1191,7 @@ impl<T: IsCached> AccountsIndex<T> {
                 func(
                     &pubkey,
                     (&list_r.slot_list()[index].1, list_r.slot_list()[index].0),
+                    None
                 );
             }
         }
@@ -1203,7 +1213,7 @@ impl<T: IsCached> AccountsIndex<T> {
         pubkey: &'a Pubkey,
         lock: AccountMapsReadLock<'a, T>,
     ) -> AccountIndexGetResultInternal<'a, T> {
-        ReadAccountMapEntry::new_with_lock(pubkey, lock)
+        ReadAccountMapEntry::new_with_lock(*pubkey, lock)
     }
 
     pub fn get_account_write_entry<'a, 'b>(
@@ -1277,14 +1287,14 @@ impl<T: IsCached> AccountsIndex<T> {
     }
 
     /// call func with every pubkey and index visible from a given set of ancestors
-    pub(crate) fn scan_accounts<F>(
-        &self,
+    pub(crate) fn scan_accounts<'a, F>(
+        &'a self,
         ancestors: &Ancestors,
         scan_bank_id: BankId,
         func: F,
     ) -> Result<(), ScanError>
     where
-        F: FnMut(&Pubkey, (&T, Slot)),
+        F: FnMut(&Pubkey, (&T, Slot), Option<ReadAccountMapEntry<'a, T>>),
     {
         // Pass "" not to log metrics, so RPC doesn't get spammy
         self.do_checked_scan_accounts(
@@ -1296,26 +1306,26 @@ impl<T: IsCached> AccountsIndex<T> {
         )
     }
 
-    pub(crate) fn unchecked_scan_accounts<F>(
-        &self,
+    pub(crate) fn unchecked_scan_accounts<'a, F>(
+        &'a self,
         metric_name: &'static str,
         ancestors: &Ancestors,
         func: F,
     ) where
-        F: FnMut(&Pubkey, (&T, Slot)),
+        F: FnMut(&Pubkey, (&T, Slot), Option<ReadAccountMapEntry<'a, T>>),
     {
         self.do_unchecked_scan_accounts(metric_name, ancestors, func, None::<Range<Pubkey>>);
     }
 
     /// call func with every pubkey and index visible from a given set of ancestors with range
-    pub(crate) fn range_scan_accounts<F, R>(
-        &self,
+    pub(crate) fn range_scan_accounts<'a, F, R>(
+        &'a self,
         metric_name: &'static str,
         ancestors: &Ancestors,
         range: R,
         func: F,
     ) where
-        F: FnMut(&Pubkey, (&T, Slot)),
+        F: FnMut(&Pubkey, (&T, Slot), Option<ReadAccountMapEntry<'a, T>>),
         R: RangeBounds<Pubkey> + Debug,
     {
         // Only the rent logic should be calling this, which doesn't need the safety checks
@@ -1323,15 +1333,15 @@ impl<T: IsCached> AccountsIndex<T> {
     }
 
     /// call func with every pubkey and index visible from a given set of ancestors
-    pub(crate) fn index_scan_accounts<F>(
-        &self,
+    pub(crate) fn index_scan_accounts<'a, F>(
+        &'a self,
         ancestors: &Ancestors,
         scan_bank_id: BankId,
         index_key: IndexKey,
         func: F,
     ) -> Result<(), ScanError>
     where
-        F: FnMut(&Pubkey, (&T, Slot)),
+        F: FnMut(&Pubkey, (&T, Slot), Option<ReadAccountMapEntry<'a, T>>),
     {
         // Pass "" not to log metrics, so RPC doesn't get spammy
         self.do_checked_scan_accounts(
@@ -2680,7 +2690,7 @@ pub mod tests {
         assert!(index.get(key, None, None).is_none());
 
         let mut num = 0;
-        index.unchecked_scan_accounts("", &ancestors, |_pubkey, _index| num += 1);
+        index.unchecked_scan_accounts("", &ancestors, |_pubkey, _index, _| num += 1);
         assert_eq!(num, 0);
     }
 
@@ -2753,7 +2763,7 @@ pub mod tests {
         assert!(index.get(&key.pubkey(), None, None).is_none());
 
         let mut num = 0;
-        index.unchecked_scan_accounts("", &ancestors, |_pubkey, _index| num += 1);
+        index.unchecked_scan_accounts("", &ancestors, |_pubkey, _index, _| num += 1);
         assert_eq!(num, 0);
     }
 
@@ -2856,12 +2866,12 @@ pub mod tests {
         assert!(index.get(pubkey, None, None).is_none());
 
         let mut num = 0;
-        index.unchecked_scan_accounts("", &ancestors, |_pubkey, _index| num += 1);
+        index.unchecked_scan_accounts("", &ancestors, |_pubkey, _index, _| num += 1);
         assert_eq!(num, 0);
         ancestors.insert(slot, 0);
         assert!(index.get(pubkey, Some(&ancestors), None).is_some());
         assert_eq!(index.ref_count_from_storage(pubkey), 1);
-        index.unchecked_scan_accounts("", &ancestors, |_pubkey, _index| num += 1);
+        index.unchecked_scan_accounts("", &ancestors, |_pubkey, _index, _| num += 1);
         assert_eq!(num, 1);
 
         // not zero lamports
@@ -2875,12 +2885,12 @@ pub mod tests {
         assert!(index.get(pubkey, None, None).is_none());
 
         let mut num = 0;
-        index.unchecked_scan_accounts("", &ancestors, |_pubkey, _index| num += 1);
+        index.unchecked_scan_accounts("", &ancestors, |_pubkey, _index, _| num += 1);
         assert_eq!(num, 0);
         ancestors.insert(slot, 0);
         assert!(index.get(pubkey, Some(&ancestors), None).is_some());
         assert_eq!(index.ref_count_from_storage(pubkey), 0); // cached, so 0
-        index.unchecked_scan_accounts("", &ancestors, |_pubkey, _index| num += 1);
+        index.unchecked_scan_accounts("", &ancestors, |_pubkey, _index, _| num += 1);
         assert_eq!(num, 1);
     }
 
@@ -3051,11 +3061,11 @@ pub mod tests {
         assert!(index.get(&key.pubkey(), None, None).is_none());
 
         let mut num = 0;
-        index.unchecked_scan_accounts("", &ancestors, |_pubkey, _index| num += 1);
+        index.unchecked_scan_accounts("", &ancestors, |_pubkey, _index, _| num += 1);
         assert_eq!(num, 0);
         ancestors.insert(slot, 0);
         assert!(index.get(&key.pubkey(), Some(&ancestors), None).is_some());
-        index.unchecked_scan_accounts("", &ancestors, |_pubkey, _index| num += 1);
+        index.unchecked_scan_accounts("", &ancestors, |_pubkey, _index, _| num += 1);
         assert_eq!(num, 1);
     }
 
@@ -3080,7 +3090,7 @@ pub mod tests {
         assert!(index.get(&key.pubkey(), Some(&ancestors), None).is_none());
 
         let mut num = 0;
-        index.unchecked_scan_accounts("", &ancestors, |_pubkey, _index| num += 1);
+        index.unchecked_scan_accounts("", &ancestors, |_pubkey, _index, _| num += 1);
         assert_eq!(num, 0);
     }
 
@@ -3108,7 +3118,7 @@ pub mod tests {
 
         let mut num = 0;
         let mut found_key = false;
-        index.unchecked_scan_accounts("", &ancestors, |pubkey, _index| {
+        index.unchecked_scan_accounts("", &ancestors, |pubkey, _index, _| {
             if pubkey == key {
                 found_key = true
             };
@@ -3181,7 +3191,7 @@ pub mod tests {
 
         let ancestors = Ancestors::default();
         let mut scanned_keys = HashSet::new();
-        index.range_scan_accounts("", &ancestors, pubkey_range, |pubkey, _index| {
+        index.range_scan_accounts("", &ancestors, pubkey_range, |pubkey, _index, _| {
             scanned_keys.insert(*pubkey);
         });
 
@@ -3252,7 +3262,7 @@ pub mod tests {
         let ancestors = Ancestors::default();
 
         let mut scanned_keys = HashSet::new();
-        index.unchecked_scan_accounts("", &ancestors, |pubkey, _index| {
+        index.unchecked_scan_accounts("", &ancestors, |pubkey, _index, _| {
             scanned_keys.insert(*pubkey);
         });
         assert_eq!(scanned_keys.len(), num_pubkeys);
@@ -3553,7 +3563,7 @@ pub mod tests {
 
         let mut num = 0;
         let mut found_key = false;
-        index.unchecked_scan_accounts("", &Ancestors::default(), |pubkey, _index| {
+        index.unchecked_scan_accounts("", &Ancestors::default(), |pubkey, _index, _| {
             if pubkey == key {
                 found_key = true;
                 assert_eq!(_index, (&true, 3));
