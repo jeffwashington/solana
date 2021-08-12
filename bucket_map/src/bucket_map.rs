@@ -94,10 +94,10 @@ impl<T: Clone + Copy + std::fmt::Debug> BucketMap<T> {
             data_sizes.push(size);
         }
         data_items_allocated.sort_unstable();
-        let q0 = data_items_allocated[len / 4];
-        let q1 = data_items_allocated[len / 2];
-        let q2 = data_items_allocated[len * 3 / 4];
-        let q3 = data_items_allocated[len - 1];
+        let q0 = data_items_allocated.get(len / 4).cloned().unwrap_or_default();
+        let q1 = data_items_allocated.get(len / 2).cloned().unwrap_or_default();
+        let q2 = data_items_allocated.get(len * 3 / 4).cloned().unwrap_or_default();
+        let q3 = data_items_allocated.get(len - 1).cloned().unwrap_or_default();
         (sizes, data_sizes, index_bytes_allocated as usize, data_bytes_allocated as usize, (q0 as usize, q1 as usize, q2 as usize, q3 as usize))
     }
 
