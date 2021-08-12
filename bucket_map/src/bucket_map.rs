@@ -120,12 +120,12 @@ impl<T: Clone + Copy + std::fmt::Debug> BucketMap<T> {
     }
 
     pub fn default_drives() -> Arc<Vec<PathBuf>> {
-        let tmpdir2 = PathBuf::from("accounts_index_buckets");
+        let tmpdir21 = PathBuf::from("accounts_index_buckets");
         let random = PathBuf::from(format!("folder{}", thread_rng().gen::<usize>()));
-        let tmpdir2 = random.join(tmpdir2);
+        let tmpdir2 = random.join(tmpdir21.clone());
         let tmpdir3 = PathBuf::from("accounts_index_buckets");
         let random = PathBuf::from(format!("/mnt/data/folder{}", thread_rng().gen::<usize>()));
-        let tmpdir3 = random.join(tmpdir2);
+        let tmpdir3 = random.join(tmpdir21);
         
         let paths: Vec<PathBuf> = [tmpdir2, tmpdir3]
             .iter()
