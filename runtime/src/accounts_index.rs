@@ -2811,13 +2811,28 @@ pub mod tests {
         let per = count * threads;
 
         let mut i = 0;
+        let mut bin_section_index = 0;
+        let mut bin_sections = bins / 64;
+        let bin_range = bins / bin_sections;
+        let binner = crate::pubkey_bins::PubkeyBinCalculator16::new(bins);
         loop {
+            bin_section_index += 1;
+            bin_section_index = bin_section_index % bin_sections;
+            let target_bin_start = bin_section_index * bin_range;
+            let target_bin_end = (bin_section_index + 1) * bin_range;
             let mut m0 = Measure::start("");
             (0..threads).into_par_iter().for_each(|_| {
                 let data = (0..count)
                     .into_par_iter()
                     .map(|_| {
-                        let key = Pubkey::new_rand();
+                        let mut key;
+                        loop {
+                            key = Pubkey::new_rand();
+                            let bin = binner.bin_from_pubkey(&key);
+                            if bin < target_bin_start || bin >= target_bin_end {
+                                continue;
+                            }
+                        }
                         let info = AccountInfo::default();
                         (key, info)
                     })
