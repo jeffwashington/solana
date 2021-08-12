@@ -35,7 +35,7 @@ use thiserror::Error;
 //pub type FnMut(&Pubkey, (&T, Slot), Option<ReadAccountMapEntry<'a, T>>) = dyn FnMut(&Pubkey, (&T, Slot), Option<ReadAccountMapEntry<'a, T>>);
 
 pub const ITER_BATCH_SIZE: usize = 1000;
-pub const BINS_DEFAULT: usize = 4096;
+pub const BINS_DEFAULT: usize = 32768;
 pub const BINS_FOR_TESTING: usize = 2;
 pub const BINS_FOR_BENCHMARKS: usize = 2;
 pub type ScanResult<T> = Result<T, ScanError>;
