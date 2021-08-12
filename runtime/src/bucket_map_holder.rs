@@ -275,6 +275,26 @@ impl<V: IsCached> BucketMapWriteHolder<V> {
     pub fn set_startup(&self, startup: bool) {
         self.startup.store(startup, Ordering::Relaxed);
     }
+
+    pub fn slot_list_mut<RT>(
+        &self,
+        ix: usize,
+        pubkey: &Pubkey,
+        user: impl for<'a> FnOnce(&mut SlotList<V>) -> RT,
+    ) -> Option<RT> {
+        let g = self.get(pubkey);
+        g.and_then(|_| {
+            let wc = &mut self.write_cache[ix].read().unwrap(); // maybe get lock for each item?
+            let g = wc.get(pubkey);
+            g.and_then(|mut item| {
+                let mut instance = item.instance.write().unwrap();
+                let r = Some(user(&mut instance.data.slot_list));
+                instance.dirty = true;
+                r
+            })
+        })
+    }
+
     pub fn flush(&self, ix: usize, bg: bool, age: Option<u8>) -> (bool, usize) {
         if self.in_mem_only {
             return (false, 0);

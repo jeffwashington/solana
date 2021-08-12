@@ -1127,12 +1127,7 @@ impl<T: IsCached> AccountsIndex<T> {
             .write()
             .unwrap();
 
-        if let Entry::Occupied(mut index_entry) = read_lock.entry(*pubkey) {
-            Some(index_entry.slot_list_mut(user))
-        }
-        else {
-            None
-        }
+        read_lock.slot_list_mut(pubkey, user)            
     }
 
     pub fn handle_dead_keys(
