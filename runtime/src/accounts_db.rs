@@ -2528,11 +2528,12 @@ impl AccountsDb {
 
         // This can error out if the slots being scanned over are aborted
         self.accounts_index
-            .scan_accounts(ancestors, bank_id, |pubkey, (account_info, slot)| {
+            .scan_accounts(ancestors, bank_id, |pubkey, (account_info, slot), lock| {
                 let account_slot = self
                     .get_account_accessor(slot, pubkey, account_info.store_id, account_info.offset)
                     .get_loaded_account()
                     .map(|loaded_account| (pubkey, loaded_account.take_account(), slot));
+                drop(lock);
                 scan_func(&mut collector, account_slot)
             })?;
 
@@ -2553,11 +2554,12 @@ impl AccountsDb {
         self.accounts_index.unchecked_scan_accounts(
             metric_name,
             ancestors,
-            |pubkey, (account_info, slot)| {
+            |pubkey, (account_info, slot), lock| {
                 if let Some(loaded_account) = self
                     .get_account_accessor(slot, pubkey, account_info.store_id, account_info.offset)
                     .get_loaded_account()
                 {
+                    drop(lock);
                     scan_func(&mut collector, (pubkey, loaded_account, slot));
                 }
             },
@@ -2582,7 +2584,7 @@ impl AccountsDb {
             metric_name,
             ancestors,
             range,
-            |pubkey, (account_info, slot)| {
+            |pubkey, (account_info, slot), lock| {
                 // unlike other scan fns, this is called from Bank::collect_rent_eagerly(),
                 // which is on-consensus processing in the banking/replaying stage.
                 // This requires infallible and consistent account loading.
@@ -2597,6 +2599,7 @@ impl AccountsDb {
                     .get_loaded_account()
                     .map(|loaded_account| (pubkey, loaded_account.take_account(), slot))
                     .unwrap();
+                drop(lock);
                 scan_func(&mut collector, Some(account_slot))
             },
         );
@@ -2631,11 +2634,12 @@ impl AccountsDb {
             ancestors,
             bank_id,
             index_key,
-            |pubkey, (account_info, slot)| {
+            |pubkey, (account_info, slot), lock| {
                 let account_slot = self
                     .get_account_accessor(slot, pubkey, account_info.store_id, account_info.offset)
                     .get_loaded_account()
                     .map(|loaded_account| (pubkey, loaded_account.take_account(), slot));
+                drop(lock);
                 scan_func(&mut collector, account_slot)
             },
         )?;
@@ -4497,18 +4501,16 @@ impl AccountsDb {
 
     fn calculate_accounts_hash(
         &self,
-        _slot: Slot,
-        _ancestors: &Ancestors,
-        _check_hash: bool,
+        slot: Slot,
+        ancestors: &Ancestors,
+        check_hash: bool,
     ) -> Result<(Hash, u64), BankHashVerificationError> {
-        //use BankHashVerificationError::*;
-        let mut _collect = Measure::start("collect");
+        use BankHashVerificationError::*;
+        let mut collect = Measure::start("collect");
         // maybe required at some point:
         self.accounts_index.account_maps.par_iter().for_each(|i| {
             i.write().unwrap().flush();
         });
-panic!("");
-/*
         let keys: Vec<_> = self
             .accounts_index
             .account_maps
@@ -4517,7 +4519,7 @@ panic!("");
                 btree
                     .read()
                     .unwrap()
-                    .range(None::<Range<Pubkey>>)
+                    .keys2()
                     .into_iter()
                     .collect::<Vec<_>>()
             })
@@ -4620,7 +4622,6 @@ panic!("");
             ("collect", collect.as_us(), i64),
         );
         Ok((accumulated_hash, total_lamports))
-        */
     }
 
     pub fn get_accounts_hash(&self, slot: Slot) -> Hash {
@@ -8119,7 +8120,7 @@ pub mod tests {
         let bank_id = 0;
         accounts
             .accounts_index
-            .index_scan_accounts(&Ancestors::default(), bank_id, index_key, |key, _| {
+            .index_scan_accounts(&Ancestors::default(), bank_id, index_key, |key, _, _| {
                 found_accounts.insert(*key);
             })
             .unwrap();
@@ -8191,7 +8192,7 @@ pub mod tests {
                 &Ancestors::default(),
                 bank_id,
                 IndexKey::SplTokenMint(mint_key),
-                |key, _| found_accounts.push(*key),
+                |key, _, _| found_accounts.push(*key),
             )
             .unwrap();
         assert_eq!(found_accounts, vec![pubkey2]);
@@ -10772,6 +10773,7 @@ pub mod tests {
 
     #[test]
     fn test_scan_flush_accounts_cache_then_clean_drop() {
+        solana_logger::setup();
         let caching_enabled = true;
         let db = Arc::new(AccountsDb::new_with_config_for_tests(
             Vec::new(),

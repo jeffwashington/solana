@@ -178,7 +178,7 @@ impl<T: Clone + Copy + std::fmt::Debug> BucketMap<T> {
             .unwrap_or_default()
     }
 
-    pub fn range<R>(&self, ix: usize, range: Option<&R>) -> Option<Vec<(Pubkey, Vec<T>)>>
+    pub fn range<R>(&self, ix: usize, range: Option<&R>) -> Option<Vec<(Pubkey, (u64, Vec<T>))>>
     where
         R: RangeBounds<Pubkey>,
     {
@@ -438,7 +438,7 @@ impl<T: Clone + Copy> Bucket<T> {
         rv
     }
 
-    pub fn range<R>(&self, range: Option<&R>) -> Vec<(Pubkey, Vec<T>)>
+    pub fn range<R>(&self, range: Option<&R>) -> Vec<(Pubkey, (u64, Vec<T>))>
     where
         R: RangeBounds<Pubkey>,
     {
@@ -452,7 +452,9 @@ impl<T: Clone + Copy> Bucket<T> {
             let key = ix.key;
             if range.map(|r| r.contains(&key)).unwrap_or(true) {
                 let val = ix.read_value(self);
-                result.push((key, val.map(|(v, _ref_count)| v.to_vec()).unwrap_or_default()));
+                if let Some((v, ref_count)) = val {
+                    result.push((key, (ref_count, v.to_vec())));
+                }
             }
         }
         result
