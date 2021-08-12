@@ -188,6 +188,7 @@ impl ExecuteTimings {
         self.p7 += other.p7;
         self.p8 += other.p8;
         self.p9 += other.p9;
+        self.check_us += other.check_us;
         self.load_us += other.load_us;
         self.execute_us += other.execute_us;
         self.store_us += other.store_us;
