@@ -2805,14 +2805,14 @@ pub mod tests {
         solana_logger::setup();
         let index = AccountsIndex::<AccountInfo>::default();
         let threads: usize = 16;
-        let count = 100_000;
+        let count = 1_000_000;
         let bins = index.account_maps.len();
         let mut sum = 0;
         let per = count * threads;
 
         let mut i = 0;
         let mut bin_section_index = 0;
-        let mut bin_sections = bins / 64;
+        let mut bin_sections = bins / 128;
         let bin_range = bins / bin_sections;
         let binner = crate::pubkey_bins::PubkeyBinCalculator16::new(bins);
         loop {
@@ -2821,8 +2821,9 @@ pub mod tests {
             let target_bin_start = bin_section_index * bin_range;
             let target_bin_end = (bin_section_index + 1) * bin_range;
             let mut m0 = Measure::start("");
-            (0..threads).into_par_iter().for_each(|_| {
-                let data = (0..count)
+            let factor = 4;
+            (0..threads*factor).into_par_iter().for_each(|_| {
+                let data = (0..count/factor)
                     .into_iter()
                     .map(|_| {
                         let mut key;
