@@ -179,6 +179,16 @@ pub struct ExecuteTimings {
 }
 impl ExecuteTimings {
     pub fn accumulate(&mut self, other: &ExecuteTimings) {
+        self.check_us = self.check_us.saturating_add(other.check_us);
+        self.load_us = self.load_us.saturating_add(other.load_us);
+        self.execute_us = self.execute_us.saturating_add(other.execute_us);
+        self.store_us = self.store_us.saturating_add(other.store_us);
+        self.total_batches_len = self
+            .total_batches_len
+            .saturating_add(other.total_batches_len);
+        self.num_execute_batches = self
+            .num_execute_batches
+            .saturating_add(other.num_execute_batches);
         self.p1 += other.p1;
         self.p2 += other.p2;
         self.p3 += other.p3;
