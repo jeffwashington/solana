@@ -244,7 +244,8 @@ impl DataBucket {
     fn new_map(drives: &[PathBuf], cell_size: usize, capacity: u8, stats: &mut Arc<BucketStats>) -> (MmapMut, PathBuf) {
         let mut m0 = Measure::start("");
         let capacity = 1u64 << capacity;
-        let r = thread_rng().gen_range(0, drives.len());
+        let r = thread_rng().gen_range(0, 10);
+        let r = if r > 5 {1 } else {0}; // 60% cvhance of going to bucket 0
         let drive = &drives[r];
         let pos = format!("{}", thread_rng().gen_range(0, u128::MAX),);
         let file = drive.join(pos);
