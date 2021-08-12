@@ -2805,7 +2805,7 @@ pub mod tests {
         solana_logger::setup();
         let index = AccountsIndex::<AccountInfo>::default();
         let threads: usize = 16;
-        let count = 1_000_000;
+        let count = 100_000;
         let bins = index.account_maps.len();
         let mut sum = 0;
         let per = count * threads;
@@ -2823,7 +2823,7 @@ pub mod tests {
             let mut m0 = Measure::start("");
             (0..threads).into_par_iter().for_each(|_| {
                 let data = (0..count)
-                    .into_par_iter()
+                    .into_iter()
                     .map(|_| {
                         let mut key;
                         loop {
