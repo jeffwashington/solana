@@ -2829,8 +2829,8 @@ pub mod tests {
                         loop {
                             key = Pubkey::new_rand();
                             let bin = binner.bin_from_pubkey(&key);
-                            if bin < target_bin_start || bin >= target_bin_end {
-                                continue;
+                            if bin >= target_bin_start && bin < target_bin_end {
+                                break;
                             }
                         }
                         let info = AccountInfo::default();
