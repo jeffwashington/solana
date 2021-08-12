@@ -188,6 +188,11 @@ impl ExecuteTimings {
         self.p7 += other.p7;
         self.p8 += other.p8;
         self.p9 += other.p9;
+        self.load_us += other.load_us;
+        self.execute_us += other.execute_us;
+        self.store_us += other.store_us;
+        self.total_batches_len += other.total_batches_len;
+        self.num_execute_batches += other.num_execute_batches;
         self.details.accumulate(&other.details);
     }
 }
