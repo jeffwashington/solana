@@ -127,7 +127,7 @@ impl<T: Clone + Copy + std::fmt::Debug> BucketMap<T> {
         let random = PathBuf::from(format!("/mnt/data/folder{}", thread_rng().gen::<usize>()));
         let tmpdir3 = random.join(tmpdir21);
         
-        let paths: Vec<PathBuf> = [tmpdir2, tmpdir3]
+        let paths: Vec<PathBuf> = [tmpdir2]//, tmpdir3]
             .iter()
             .filter(|x| std::fs::create_dir_all(x).is_ok())
             .cloned()
