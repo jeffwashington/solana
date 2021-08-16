@@ -2475,7 +2475,8 @@ impl Bank {
         clean.stop();
 
         let mut shrink = Measure::start("shrink");
-        self.shrink_all_slots(false);
+        let is_startup = true; // act like we're startup
+        self.shrink_all_slots(is_startup);
         shrink.stop();
 
         info!(
