@@ -2476,6 +2476,7 @@ impl Bank {
 
         let mut shrink = Measure::start("shrink");
         let is_startup = true; // act like we're startup
+        info!("exhaustively_free_unused_resource::shrink");
         self.shrink_all_slots(is_startup);
         shrink.stop();
 
@@ -4944,7 +4945,7 @@ impl Bank {
             self.slot(),
             can_cached_slot_be_unflushed,
             debug_verify,
-            Some(self.capitalization())
+            Some(self.capitalization()),
         )
     }
 
