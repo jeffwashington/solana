@@ -483,6 +483,8 @@ pub mod tests {
         }
         m0.stop();
 
+        error!("data generated: {:?}", a_storage_path);
+
         let bin_calculator = PubkeyBinCalculator16::new(bins);
         let pre_existing_cache_files = RwLock::new(
             a_storage_path
