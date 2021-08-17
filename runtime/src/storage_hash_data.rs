@@ -95,8 +95,7 @@ impl CacheHashData {
         let (cache, file_name) = Self::directory(storage_file);
         let secs = if debug {
             123
-        }
-        else {
+        } else {
             let amod = std::fs::metadata(storage_file)?.modified()?;
             amod.duration_since(UNIX_EPOCH).unwrap().as_secs()
         };
@@ -456,6 +455,7 @@ pub mod tests {
         let max_slot = 5 as Slot;
         let bin_ranges = 1_usize;
         let bins = 16_usize;
+        let sample_data_count = (800_0_usize / max_slot as usize / bin_ranges / bins) as usize;
         let tmpdir = std::env::temp_dir().join("test_read_write_many");
         let mut generated_data = vec![];
         for _slot in 0..max_slot {
@@ -501,7 +501,17 @@ pub mod tests {
                     end: bins,
                 };
                 let mut data = vec![vec![]; bins];
-                CacheHashData::load(slot, &storage_file, &bin_range, &mut data, start_bin_index, &bin_calculator, &pre_existing_cache_files, true).unwrap();
+                CacheHashData::load(
+                    slot,
+                    &storage_file,
+                    &bin_range,
+                    &mut data,
+                    start_bin_index,
+                    &bin_calculator,
+                    &pre_existing_cache_files,
+                    true,
+                )
+                .unwrap();
             }
         }
         m1.stop();
