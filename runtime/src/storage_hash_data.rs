@@ -454,9 +454,9 @@ pub mod tests {
     fn test_read_write_many() {
         solana_logger::setup();
         let max_slot = 5 as Slot;
-        let bin_ranges = 1;
-        let bins = 32768;
-        let sample_data_count = (80_000_000 / max_slot) as usize;
+        let bin_ranges = 1_usize;
+        let bins = 32768_usize;
+        let sample_data_count = (80_000_000_usize / max_slot as usize / bin_ranges / bins) as usize;
         let tmpdir = std::env::temp_dir().join("test_read_write_many");
         let mut generated_data = vec![];
         for _slot in 0..max_slot {
