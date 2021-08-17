@@ -5065,6 +5065,7 @@ impl AccountsDb {
                         bin_range.start,
                         &bin_calculator,
                         &pre_existing_cache_files,
+                        false,
                     );
                     if let Ok((_cached_data, mut stats)) = cached_data {
                         stats.loaded_from_cache += 1;
@@ -5083,6 +5084,7 @@ impl AccountsDb {
                     &storages.first().unwrap().accounts.get_path(),
                     per_slot_data,
                     bin_range,
+                    false,
                 )
                 .unwrap();
 

@@ -90,10 +90,16 @@ impl CacheHashData {
     fn calc_path<P: AsRef<Path>>(
         storage_file: &P,
         bin_range: &Range<usize>,
+        debug: bool,
     ) -> Result<(PathBuf, String), std::io::Error> {
         let (cache, file_name) = Self::directory(storage_file);
-        let amod = std::fs::metadata(storage_file)?.modified()?;
-        let secs = amod.duration_since(UNIX_EPOCH).unwrap().as_secs();
+        let secs = if debug {
+            123
+        }
+        else {
+            let amod = std::fs::metadata(storage_file)?.modified()?;
+            amod.duration_since(UNIX_EPOCH).unwrap().as_secs()
+        };
         let file_name = format!(
             "{}.{}.{}",
             file_name,
@@ -195,12 +201,13 @@ impl CacheHashData {
         start_bin_index: usize,
         bin_calculator: &PubkeyBinCalculator16,
         preexisting: &RwLock<PreExistingCacheFiles>,
+        debug: bool,
     ) -> Result<(SavedType, CacheHashDataStats), std::io::Error> {
         let mut m = Measure::start("overall");
         let create = false;
         let mut timings = CacheHashDataStats::default();
         let mut m0 = Measure::start("");
-        let (path, file_name) = Self::calc_path(storage_file, bin_range)?;
+        let (path, file_name) = Self::calc_path(storage_file, bin_range, debug)?;
         m0.stop();
         timings.calc_path_us += m0.as_us();
         let file_len = std::fs::metadata(path.clone())?.len();
@@ -302,12 +309,13 @@ impl CacheHashData {
         storage_file: &P,
         data: &mut SavedType,
         bin_range: &Range<usize>,
+        debug: bool,
     ) -> Result<CacheHashDataStats, std::io::Error> {
         let mut m = Measure::start("save");
         let mut stats;
         //error!("raw path: {:?}", storage_file);
         let mut m0 = Measure::start("");
-        let (cache_path, _) = Self::calc_path(storage_file, bin_range)?;
+        let (cache_path, _) = Self::calc_path(storage_file, bin_range, debug)?;
         m0.stop();
         stats = CacheHashDataStats {
             ..CacheHashDataStats::default()
@@ -423,22 +431,79 @@ impl CacheHashData {
 pub mod tests {
     use super::*;
 
+    fn generate_test_data(count: usize, bins: usize) -> SavedType {
+        let mut rng = rand::thread_rng();
+        (0..count)
+            .into_iter()
+            .map(|x| {
+                (0..bins)
+                    .into_iter()
+                    .map(|_| {
+                        CalculateHashIntermediate::new_without_slot(
+                            solana_sdk::hash::new_rand(&mut rng),
+                            x as u64,
+                            solana_sdk::pubkey::new_rand(),
+                        )
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>()
+    }
+
     #[test]
     fn test_read_write_many() {
         solana_logger::setup();
-        let max_slot = 5;
+        let max_slot = 5 as Slot;
         let bin_ranges = 1;
-        let bins = 32;
+        let bins = 32768;
+        let sample_data_count = (80_000_000 / max_slot) as usize;
+        let tmpdir = std::env::temp_dir().join("test_read_write_many");
+        let mut generated_data = vec![];
+        for _slot in 0..max_slot {
+            for _bin in 0..bin_ranges {
+                let data = generate_test_data(sample_data_count, bins);
+                generated_data.push(data);
+            }
+        }
+
+        let mut a_storage_path = None;
+        let mut m0 = Measure::start("");
         for slot in 0..max_slot {
             for _bin in 0..bin_ranges {
-                let storage_file = format!("{}.{}", slot, slot);
+                let storage_file = format!("{}/{}.{}", tmpdir.to_str().unwrap(), slot, slot);
+                a_storage_path = Some(storage_file.clone());
                 let bin_range = Range {
                     start: 0,
                     end: bins,
                 };
-                let mut data = vec![];
-                CacheHashData::save2(slot, &storage_file, &mut data, &bin_range).unwrap();
+                error!("{} {} {:?}", file!(), line!(), storage_file);
+                let mut data = generated_data.pop().unwrap();
+                CacheHashData::save2(slot, &storage_file, &mut data, &bin_range, true).unwrap();
             }
         }
+        m0.stop();
+
+        let bin_calculator = PubkeyBinCalculator16::new(bins);
+        let pre_existing_cache_files = RwLock::new(
+            a_storage_path
+                .map(|s| CacheHashData::get_cache_files(&s))
+                .unwrap_or_default(),
+        );
+
+        let mut m1 = Measure::start("");
+        for slot in 0..max_slot {
+            for _bin in 0..bin_ranges {
+                let storage_file = format!("{}/{}.{}", tmpdir.to_str().unwrap(), slot, slot);
+                let start_bin_index = 0;
+                let bin_range = Range {
+                    start: 0,
+                    end: bins,
+                };
+                let mut data = vec![vec![]; bins];
+                CacheHashData::load(slot, &storage_file, &bin_range, &mut data, start_bin_index, &bin_calculator, &pre_existing_cache_files, true).unwrap();
+            }
+        }
+        m1.stop();
+        error!("save: {}, load: {}", m0.as_ms(), m1.as_ms());
     }
 }
