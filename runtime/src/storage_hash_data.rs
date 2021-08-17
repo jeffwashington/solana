@@ -433,10 +433,10 @@ pub mod tests {
 
     fn generate_test_data(count: usize, bins: usize) -> SavedType {
         let mut rng = rand::thread_rng();
-        (0..count)
+        (0..bins)
             .into_iter()
             .map(|x| {
-                (0..bins)
+                (0..count)
                     .into_iter()
                     .map(|_| {
                         CalculateHashIntermediate::new_without_slot(
@@ -455,8 +455,7 @@ pub mod tests {
         solana_logger::setup();
         let max_slot = 5 as Slot;
         let bin_ranges = 1_usize;
-        let bins = 32768_usize;
-        let sample_data_count = (80_000_000_usize / max_slot as usize / bin_ranges / bins) as usize;
+        let bins = 16_usize;
         let tmpdir = std::env::temp_dir().join("test_read_write_many");
         let mut generated_data = vec![];
         for _slot in 0..max_slot {
