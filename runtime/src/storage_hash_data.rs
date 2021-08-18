@@ -85,6 +85,7 @@ impl CacheHashData {
         let parent_parent = parent.parent().unwrap();
         let parent_parent_parent = parent_parent.parent().unwrap();
         let cache = parent_parent_parent.join("calculate_cache_hash");
+        error!("dir of storage file: {:?}, {:?}", storage_file, cache);
         (cache, file_name.to_str().unwrap().to_string())
     }
     fn calc_path<P: AsRef<Path>>(
