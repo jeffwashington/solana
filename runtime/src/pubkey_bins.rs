@@ -1,4 +1,5 @@
 use solana_sdk::pubkey::Pubkey;
+use std::convert::TryInto;
 
 #[derive(Debug)]
 pub struct PubkeyBinCalculator16 {
@@ -28,7 +29,14 @@ impl PubkeyBinCalculator16 {
         }
     }
 
+    fn read_be_u16(input: &[u8]) -> u16 {
+        u16::from_be_bytes(input[0..std::mem::size_of::<u16>()].try_into().unwrap())
+    }
     pub fn bin_from_pubkey(&self, pubkey: &Pubkey) -> usize {
+        let as_ref = pubkey.as_ref();
+        ((Self::read_be_u16(as_ref) as usize) >> self.shift_bits) as usize
+    }
+    pub fn bin_from_pubkey2(&self, pubkey: &Pubkey) -> usize {
         let as_ref = pubkey.as_ref();
         ((as_ref[0] as usize * 256 + as_ref[1] as usize) as usize) >> self.shift_bits
     }
@@ -37,6 +45,27 @@ impl PubkeyBinCalculator16 {
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use solana_measure::measure::Measure;
+
+    #[test]
+    fn test_perf() {
+        solana_logger::setup();
+        let x = 1_000_000;
+        let mut sum = 0;
+        let mut m0 = Measure::start("");
+        for i in 0..x {
+            let d = [i % 256, i / 256 % 256, 1, 2];
+            sum = bin_from_pubkey(&d);
+        }
+        m0.stop();
+        let mut m1 = Measure::start("");
+        for i in 0..x {
+            let d = [i % 256, i / 256 % 256, 1, 2];
+            sum = bin_from_pubkey2(&d);
+        }
+        m1.stop();
+        error!("{}, {}", m0.as_ms(), m1.as_ms());
+    }
 
     #[test]
     fn test_pubkey_bins_log2() {
