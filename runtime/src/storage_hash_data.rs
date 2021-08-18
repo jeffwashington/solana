@@ -461,7 +461,7 @@ pub mod tests {
         let bin_ranges = 1_usize;
         let bins = 16_usize;
         let sample_data_count = (800_0_usize / max_slot as usize / bin_ranges / bins) as usize;
-        let tmpdir = std::env::temp_dir().join("test_read_write_many");
+        let tmpdir = std::env::temp_dir().join("test_read_write_many/sub1/sub2");
         let mut generated_data = vec![];
         for _slot in 0..max_slot {
             for _bin in 0..bin_ranges {
