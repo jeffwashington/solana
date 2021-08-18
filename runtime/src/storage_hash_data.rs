@@ -457,7 +457,7 @@ pub mod tests {
     #[test]
     fn test_read_write_many() {
         solana_logger::setup();
-        let max_slot = 5 as Slot;
+        let max_slot = 40000 as Slot;
         let bin_ranges = 1_usize;
         let bins = 32768_usize;
         let sample_data_count = (80_000_000_usize / max_slot as usize / bin_ranges / bins) as usize;
@@ -469,6 +469,7 @@ pub mod tests {
                 generated_data.push(data);
             }
         }
+        let mut timings = CacheHashDataStats::default();
 
         let mut a_storage_path = None;
         let mut m0 = Measure::start("");
@@ -482,7 +483,8 @@ pub mod tests {
                 };
                 //error!("{} {} {:?}", file!(), line!(), storage_file);
                 let mut data = generated_data.pop().unwrap();
-                CacheHashData::save2(slot, &storage_file, &mut data, &bin_range, true).unwrap();
+                let timings2 = CacheHashData::save2(slot, &storage_file, &mut data, &bin_range, true).unwrap();
+                timings.merge(&timings2);
             }
         }
         m0.stop();
@@ -506,7 +508,7 @@ pub mod tests {
                     end: bins,
                 };
                 let mut data = vec![vec![]; bins];
-                CacheHashData::load(
+                let (_, timings2) = CacheHashData::load(
                     slot,
                     &storage_file,
                     &bin_range,
@@ -517,9 +519,11 @@ pub mod tests {
                     true,
                 )
                 .unwrap();
+                timings.merge(&timings2);
             }
         }
         m1.stop();
         error!("save: {}, load: {}", m0.as_ms(), m1.as_ms());
+        error!("{:?}", timings);
     }
 }
