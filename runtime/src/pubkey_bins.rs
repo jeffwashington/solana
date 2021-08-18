@@ -56,14 +56,14 @@ pub mod tests {
         let pf = PubkeyBinCalculator16::new(8);
         let mut m0 = Measure::start("");
         for i in 0..x {
-            let d = [i % 256, i / 256 % 256, 1, 2];
-            sum = pf.bin_from_pubkey(&d);
+            let pk = Pubkey::new(&[i%256; 32]);
+            sum = pf.bin_from_pubkey(&pk);
         }
         m0.stop();
         let mut m1 = Measure::start("");
         for i in 0..x {
-            let d = [i % 256, i / 256 % 256, 1, 2];
-            sum = pf.bin_from_pubkey2(&d);
+            let pk = Pubkey::new(&[i%256; 32]);
+            sum = pf.bin_from_pubkey2(&pk);
         }
         m1.stop();
         error!("{}, {}", m0.as_ms(), m1.as_ms());
