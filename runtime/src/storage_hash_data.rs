@@ -467,7 +467,7 @@ pub mod tests {
     #[test]
     fn test_read_write_many() {
         solana_logger::setup();
-        let max_slot = 400_000 as Slot;
+        let max_slot = 200_000 as Slot;
         let bin_ranges = 1_usize;
         let bins = 32768_usize;
         let sample_data_count = (80_000_usize / max_slot as usize / bin_ranges) as usize;
