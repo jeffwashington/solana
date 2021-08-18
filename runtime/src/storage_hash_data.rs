@@ -471,6 +471,8 @@ pub mod tests {
         }
         let mut timings = CacheHashDataStats::default();
 
+        error!("saving");
+
         let mut a_storage_path = None;
         let mut m0 = Measure::start("");
         for slot in 0..max_slot {
