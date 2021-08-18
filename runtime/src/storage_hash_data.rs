@@ -510,6 +510,7 @@ pub mod tests {
         );
 
         let mut m1 = Measure::start("");
+        let mut entries_read = 0;
         for slot in 0..max_slot {
             for _bin in 0..bin_ranges {
                 let storage_file = format!("{}/{}.{}", tmpdir.to_str().unwrap(), slot, slot);
@@ -519,7 +520,7 @@ pub mod tests {
                     end: bins,
                 };
                 let mut data = vec![vec![]; bins];
-                let (_, timings2) = CacheHashData::load(
+                let (data, timings2) = CacheHashData::load(
                     slot,
                     &storage_file,
                     &bin_range,
@@ -530,11 +531,14 @@ pub mod tests {
                     true,
                 )
                 .unwrap();
+                for i in data {
+                    entries_read += i.len();
+                }
                 timings.merge(&timings2);
             }
         }
         m1.stop();
-        error!("save: {}, load: {}", save_time, m1.as_ms());
+        error!("save: {}, load: {}, entries read: {}", save_time, m1.as_ms(), entries_read);
         error!("{:?}", timings);
     }
 }
