@@ -322,7 +322,11 @@ impl CacheHashData {
 
         stats.calc_path_us += m0.as_us();
         let parent = cache_path.parent().unwrap();
-        std::fs::create_dir_all(parent)?;
+        let dir = std::fs::create_dir_all(parent);
+        if dir.is_err() {
+            error!("error creating dir: {:?}", parent);
+        }
+        dir;
         let create = true;
         if create {
             let _ignored = remove_file(&cache_path);
