@@ -46,22 +46,24 @@ impl PubkeyBinCalculator16 {
 pub mod tests {
     use super::*;
     use solana_measure::measure::Measure;
+    use log::*;
 
     #[test]
     fn test_perf() {
         solana_logger::setup();
         let x = 1_000_000;
         let mut sum = 0;
+        let pf = PubkeyBinCalculator16::new(8);
         let mut m0 = Measure::start("");
         for i in 0..x {
             let d = [i % 256, i / 256 % 256, 1, 2];
-            sum = bin_from_pubkey(&d);
+            sum = pf.bin_from_pubkey(&d);
         }
         m0.stop();
         let mut m1 = Measure::start("");
         for i in 0..x {
             let d = [i % 256, i / 256 % 256, 1, 2];
-            sum = bin_from_pubkey2(&d);
+            sum = pf.bin_from_pubkey2(&d);
         }
         m1.stop();
         error!("{}, {}", m0.as_ms(), m1.as_ms());
