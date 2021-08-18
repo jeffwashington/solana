@@ -485,6 +485,7 @@ pub mod tests {
                 };
                 //error!("{} {} {:?}", file!(), line!(), storage_file);
                 let mut data = generated_data.pop().unwrap();
+                assert!(generated_data.is_empty());
                 let timings2 =
                     CacheHashData::save2(slot, &storage_file, &mut data, &bin_range, true).unwrap();
                 timings.merge(&timings2);
