@@ -533,19 +533,19 @@ pub mod tests {
                     start: 0,
                     end: bins,
                 };
-                let mut data = vec![vec![]; bins];
-                let (data, timings2) = CacheHashData::load(
+                let mut accum = vec![vec![]; bins];
+                let (_, timings2) = CacheHashData::load(
                     slot,
                     &storage_file,
                     &bin_range,
-                    &mut data,
+                    &mut accum,
                     start_bin_index,
                     &bin_calculator,
                     &pre_existing_cache_files,
                     true,
                 )
                 .unwrap();
-                for i in data {
+                for i in accum {
                     entries_read += i.len();
                 }
                 timings.merge(&timings2);
