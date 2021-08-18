@@ -434,22 +434,28 @@ impl CacheHashData {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-
+    use rand::Rng;
     fn generate_test_data(count: usize, bins: usize) -> SavedType {
         let mut rng = rand::thread_rng();
         (0..bins)
             .into_iter()
             .map(|x| {
-                (0..std::cmp::max(1,(count / bins)))
-                    .into_iter()
-                    .map(|_| {
-                        CalculateHashIntermediate::new_without_slot(
-                            solana_sdk::hash::new_rand(&mut rng),
-                            x as u64,
-                            solana_sdk::pubkey::new_rand(),
-                        )
-                    })
-                    .collect::<Vec<_>>()
+                let rnd = rng.gen::<u64>() % (bins as u64);
+                if rnd < count as u64 {
+                    (0..std::cmp::max(1,count / bins))
+                        .into_iter()
+                        .map(|_| {
+                            CalculateHashIntermediate::new_without_slot(
+                                solana_sdk::hash::new_rand(&mut rng),
+                                x as u64,
+                                solana_sdk::pubkey::new_rand(),
+                            )
+                        })
+                        .collect::<Vec<_>>()
+                    }
+                    else {
+                        vec![]
+                    }
             })
             .collect::<Vec<_>>()
     }
