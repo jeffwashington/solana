@@ -440,7 +440,7 @@ pub mod tests {
         (0..bins)
             .into_iter()
             .map(|x| {
-                (0..std::max(1,(count / bins)))
+                (0..std::cmp::max(1,(count / bins)))
                     .into_iter()
                     .map(|_| {
                         CalculateHashIntermediate::new_without_slot(
