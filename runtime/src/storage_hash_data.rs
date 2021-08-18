@@ -85,7 +85,7 @@ impl CacheHashData {
         let parent_parent = parent.parent().unwrap();
         let parent_parent_parent = parent_parent.parent().unwrap();
         let cache = parent_parent_parent.join("calculate_cache_hash");
-        error!("dir of storage file: {:?}, {:?}", storage_file, cache);
+        //error!("dir of storage file: {:?}, {:?}", storage_file, cache);
         (cache, file_name.to_str().unwrap().to_string())
     }
     fn calc_path<P: AsRef<Path>>(
@@ -459,8 +459,8 @@ pub mod tests {
         solana_logger::setup();
         let max_slot = 5 as Slot;
         let bin_ranges = 1_usize;
-        let bins = 16_usize;
-        let sample_data_count = (800_0_usize / max_slot as usize / bin_ranges / bins) as usize;
+        let bins = 32768_usize;
+        let sample_data_count = (80_000_000_usize / max_slot as usize / bin_ranges / bins) as usize;
         let tmpdir = std::env::temp_dir().join("test_read_write_many/sub1/sub2");
         let mut generated_data = vec![];
         for _slot in 0..max_slot {
@@ -480,7 +480,7 @@ pub mod tests {
                     start: 0,
                     end: bins,
                 };
-                error!("{} {} {:?}", file!(), line!(), storage_file);
+                //error!("{} {} {:?}", file!(), line!(), storage_file);
                 let mut data = generated_data.pop().unwrap();
                 CacheHashData::save2(slot, &storage_file, &mut data, &bin_range, true).unwrap();
             }
