@@ -473,7 +473,6 @@ pub mod tests {
         for slot in 0..max_slot {
             for _bin in 0..bin_ranges {
                 let data = generate_test_data(sample_data_count, bins);
-                error!("{}, {}", data.len(), data[0].len());
                 generated_data.push(data);
             }
             let mut m0 = Measure::start("");
