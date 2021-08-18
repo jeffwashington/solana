@@ -51,7 +51,7 @@ pub mod tests {
     #[test]
     fn test_perf() {
         solana_logger::setup();
-        let x = 1_000_000;
+        let x = 100_000_000;
         let mut sum = 0;
         let pf = PubkeyBinCalculator16::new(8);
         let mut m0 = Measure::start("");
