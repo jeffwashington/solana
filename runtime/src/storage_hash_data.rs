@@ -440,7 +440,7 @@ pub mod tests {
         (0..bins)
             .into_iter()
             .map(|x| {
-                (0..count)
+                (0..(count / bins))
                     .into_iter()
                     .map(|_| {
                         CalculateHashIntermediate::new_without_slot(
