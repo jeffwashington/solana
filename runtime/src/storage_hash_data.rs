@@ -435,29 +435,33 @@ impl CacheHashData {
 pub mod tests {
     use super::*;
     use rand::Rng;
-    fn generate_test_data(count: usize, bins: usize) -> SavedType {
+    fn generate_test_data(count: usize, bins: usize) -> (SavedType, usize) {
         let mut rng = rand::thread_rng();
-        (0..bins)
-            .into_iter()
-            .map(|x| {
-                let rnd = rng.gen::<u64>() % (bins as u64);
-                if rnd < count as u64 {
-                    (0..std::cmp::max(1,count / bins))
-                        .into_iter()
-                        .map(|_| {
-                            CalculateHashIntermediate::new_without_slot(
-                                solana_sdk::hash::new_rand(&mut rng),
-                                x as u64,
-                                solana_sdk::pubkey::new_rand(),
-                            )
-                        })
-                        .collect::<Vec<_>>()
-                    }
-                    else {
+        let mut ct = 0;
+        (
+            (0..bins)
+                .into_iter()
+                .map(|x| {
+                    let rnd = rng.gen::<u64>() % (bins as u64);
+                    if rnd < count as u64 {
+                        (0..std::cmp::max(1, count / bins))
+                            .into_iter()
+                            .map(|_| {
+                                ct += 1;
+                                CalculateHashIntermediate::new_without_slot(
+                                    solana_sdk::hash::new_rand(&mut rng),
+                                    x as u64,
+                                    solana_sdk::pubkey::new_rand(),
+                                )
+                            })
+                            .collect::<Vec<_>>()
+                    } else {
                         vec![]
                     }
-            })
-            .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>(),
+            ct,
+        )
     }
 
     #[test]
@@ -476,9 +480,11 @@ pub mod tests {
         let mut save_time = 0;
         let mut timings = CacheHashDataStats::default();
         let mut a_storage_path = None;
+        let mut big_ct = 0;
         for slot in 0..max_slot {
             for _bin in 0..bin_ranges {
-                let data = generate_test_data(sample_data_count, bins);
+                let (data, ct) = generate_test_data(sample_data_count, bins);
+                big_ct += ct;
                 generated_data.push(data);
             }
             let mut m0 = Measure::start("");
@@ -500,7 +506,15 @@ pub mod tests {
             save_time += m0.as_ms();
         }
 
-        error!("data generated: {:?}", a_storage_path);
+        error!(
+            "data generated: {:?}, {} items, rnd: {}",
+            a_storage_path,
+            big_ct,
+            {
+                let mut rng = rand::thread_rng();
+                rng.gen::<u64>()
+            }
+        );
 
         let bin_calculator = PubkeyBinCalculator16::new(bins);
         let pre_existing_cache_files = RwLock::new(
@@ -538,7 +552,12 @@ pub mod tests {
             }
         }
         m1.stop();
-        error!("save: {}, load: {}, entries read: {}", save_time, m1.as_ms(), entries_read);
+        error!(
+            "save: {}, load: {}, entries read: {}",
+            save_time,
+            m1.as_ms(),
+            entries_read
+        );
         error!("{:?}", timings);
     }
 }
