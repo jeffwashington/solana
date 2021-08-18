@@ -463,6 +463,7 @@ pub mod tests {
         let sample_data_count = (80_000_000_usize / max_slot as usize / bin_ranges) as usize;
         let tmpdir = std::env::temp_dir().join("test_read_write_many/sub1/sub2");
         let mut generated_data = vec![];
+        error!("generating: {} slots, {} items, {} bins", max_slot, sample_data_count, bins);
         for _slot in 0..max_slot {
             for _bin in 0..bin_ranges {
                 let data = generate_test_data(sample_data_count, bins);
