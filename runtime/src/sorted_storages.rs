@@ -5,7 +5,7 @@ use solana_sdk::clock::Slot;
 use std::ops::Range;
 
 pub struct SortedStorages<'a> {
-    range: Range<Slot>,
+    pub range: Range<Slot>,
     storages: Vec<Option<&'a SnapshotStorage>>,
     slot_count: usize,
 }
