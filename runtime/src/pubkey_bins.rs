@@ -56,13 +56,13 @@ pub mod tests {
         let pf = PubkeyBinCalculator16::new(8);
         let mut m0 = Measure::start("");
         for i in 0..x {
-            let pk = Pubkey::new(&[i%256; 32]);
+            let pk = Pubkey::new(&[i%256 as u8; 32]);
             sum = pf.bin_from_pubkey(&pk);
         }
         m0.stop();
         let mut m1 = Measure::start("");
         for i in 0..x {
-            let pk = Pubkey::new(&[i%256; 32]);
+            let pk = Pubkey::new(&[i%256 as u8; 32]);
             sum = pf.bin_from_pubkey2(&pk);
         }
         m1.stop();
