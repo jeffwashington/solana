@@ -463,21 +463,20 @@ pub mod tests {
         let sample_data_count = (80_000_000_usize / max_slot as usize / bin_ranges) as usize;
         let tmpdir = std::env::temp_dir().join("test_read_write_many/sub1/sub2");
         let mut generated_data = vec![];
-        error!("generating: {} slots, {} items, {} bins", max_slot, sample_data_count, bins);
-        for _slot in 0..max_slot {
+        error!(
+            "generating: {} slots, {} items, {} bins",
+            max_slot, sample_data_count, bins
+        );
+        let mut save_time = 0;
+        let mut timings = CacheHashDataStats::default();
+        let mut a_storage_path = None;
+        for slot in 0..max_slot {
             for _bin in 0..bin_ranges {
                 let data = generate_test_data(sample_data_count, bins);
                 error!("{}, {}", data.len(), data[0].len());
                 generated_data.push(data);
             }
-        }
-        let mut timings = CacheHashDataStats::default();
-
-        error!("saving");
-
-        let mut a_storage_path = None;
-        let mut m0 = Measure::start("");
-        for slot in 0..max_slot {
+            let mut m0 = Measure::start("");
             for _bin in 0..bin_ranges {
                 let storage_file = format!("{}/{}.{}", tmpdir.to_str().unwrap(), slot, slot);
                 a_storage_path = Some(storage_file.clone());
@@ -487,11 +486,13 @@ pub mod tests {
                 };
                 //error!("{} {} {:?}", file!(), line!(), storage_file);
                 let mut data = generated_data.pop().unwrap();
-                let timings2 = CacheHashData::save2(slot, &storage_file, &mut data, &bin_range, true).unwrap();
+                let timings2 =
+                    CacheHashData::save2(slot, &storage_file, &mut data, &bin_range, true).unwrap();
                 timings.merge(&timings2);
             }
+            m0.stop();
+            save_time += m0.as_ms();
         }
-        m0.stop();
 
         error!("data generated: {:?}", a_storage_path);
 
@@ -527,7 +528,7 @@ pub mod tests {
             }
         }
         m1.stop();
-        error!("save: {}, load: {}", m0.as_ms(), m1.as_ms());
+        error!("save: {}, load: {}", save_time, m1.as_ms());
         error!("{:?}", timings);
     }
 }
