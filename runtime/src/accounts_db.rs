@@ -4789,14 +4789,41 @@ impl AccountsDb {
         // Without chunks, we end up with 1 output vec for each outer snapshot storage.
         // This results in too many vectors to be efficient.
         const MAX_ITEMS_PER_CHUNK: Slot = 5_000;
-        let chunks = 1 + (snapshot_storages.range_width() as Slot / MAX_ITEMS_PER_CHUNK);
+        let width = snapshot_storages.range_width();
+        let chunks = 2 + (width as Slot / MAX_ITEMS_PER_CHUNK);
+        let range = snapshot_storages.range();
+        let slot0 = range.start;
+        let first_boundary = ((slot0 + MAX_ITEMS_PER_CHUNK) / MAX_ITEMS_PER_CHUNK) * MAX_ITEMS_PER_CHUNK;
         (0..chunks)
             .into_par_iter()
             .map(|chunk| {
+                // calculate start, end
+                let (start, end) = if chunk == 0 {
+                    if slot0 == first_boundary {
+                        return vec![]; // we evenly divide, so nothing for special first chunk to do
+                    }
+                    // otherwise first chunk is not 'full'
+                    (slot0, first_boundary)
+                }
+                else {
+                    let start = first_boundary + MAX_ITEMS_PER_CHUNK * (chunk - 1);
+                    let end = start + MAX_ITEMS_PER_CHUNK;
+                    (start, end)
+                };
+                end = std::cmp::min(end, range.end);
+                if start == end {
+                    return vec![];
+                }
+
                 let mut retval = B::default();
                 let mut per_slot_data = B::default();
-                let start = snapshot_storages.range().start + chunk * MAX_ITEMS_PER_CHUNK;
-                let end = std::cmp::min(start + MAX_ITEMS_PER_CHUNK, snapshot_storages.range().end);
+
+                /*
+                for slot in start..end {
+                    let sub_storages = snapshot_storages.get(slot);
+                }
+                */
+
                 for slot in start..end {
                     let sub_storages = snapshot_storages.get(slot);
                     let valid_slot = sub_storages.is_some();
