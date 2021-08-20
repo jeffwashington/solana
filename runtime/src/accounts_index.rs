@@ -1602,8 +1602,22 @@ impl<T: IsCached> AccountsIndex<T> {
     }
 
     pub fn unref_from_storage(&self, pubkey: &Pubkey) {
+        use std::str::FromStr;        
+        let pk1 = Pubkey::from_str("9r96BQDNY7iWfHwc6KuyDKVqg5xSp8Lsu4t4gZuZmWVi").unwrap();
+        let pk2 = Pubkey::from_str("2UpmLn2Rvp1dcf5iyH1UeQ6qDJgijVw81cnYtYPp2rJo").unwrap();
+        let pk3 = Pubkey::from_str("2UpsvnqzQ5TNsceUNi4sRDt9sbhXpEg9jUxSm9855Aen").unwrap();
+        
         if let Some(locked_entry) = self.get_account_read_entry(pubkey) {
-            locked_entry.unref2();
+            if pubkey == &pk1 || pubkey == &pk2 || pubkey == &pk3 {
+                error!("{} {} unref_from_storage", file!(), line!(), pubkey);
+            }
+                locked_entry.unref2();
+        }
+        else {
+            if pubkey == &pk1 || pubkey == &pk2 || pubkey == &pk3 {
+                error!("{} {} unref_from_storage NOT FOUND!", file!(), line!(), pubkey);
+            }
+    
         }
     }
 
