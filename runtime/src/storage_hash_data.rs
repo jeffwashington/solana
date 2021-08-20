@@ -307,13 +307,13 @@ impl CacheHashData {
     }
 
     pub fn save2<P: AsRef<Path> + std::fmt::Debug>(
-        slot: Slot,
+        _slot: Slot,
         storage_file: &P,
         data: &mut SavedType,
         bin_range: &Range<usize>,
         debug: bool,
     ) -> Result<CacheHashDataStats, std::io::Error> {
-        error!("saving...{:?}", slot);
+        //error!("saving...{:?}", slot);
         let mut m = Measure::start("save");
         let mut stats;
         //error!("raw path: {:?}", storage_file);

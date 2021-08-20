@@ -52,7 +52,7 @@ use solana_sdk::{
     account::{AccountSharedData, ReadableAccount},
     clock::{BankId, Epoch, Slot},
     genesis_config::ClusterType,
-    hash::{Hash, Hasher},
+    hash::{Hash, Hasher as SolanaHasher},
     pubkey::Pubkey,
     timing::AtomicInterval,
 };
@@ -62,6 +62,7 @@ use std::{
     boxed::Box,
     collections::{hash_map::Entry, BTreeSet, HashMap, HashSet},
     convert::TryFrom,
+    hash::{Hash as StdHash, Hasher as StdHasher},
     io::{Error as IoError, Result as IoResult},
     ops::{Range, RangeBounds},
     path::{Path, PathBuf},
@@ -3904,7 +3905,7 @@ impl AccountsDb {
     }
 
     fn hash_frozen_account_data(account: &AccountSharedData) -> Hash {
-        let mut hasher = Hasher::default();
+        let mut hasher = SolanaHasher::default();
 
         hasher.hash(account.data());
         hasher.hash(account.owner().as_ref());
@@ -4777,6 +4778,7 @@ impl AccountsDb {
         after_func: F2,
         prior_to_slot: F3,
         after_slot: F4,
+        bin_range: &Range<usize>,
     ) -> Vec<C>
     where
         F: Fn(LoadedAccount, &mut B, Slot, bool) + Send + Sync,
@@ -4788,7 +4790,7 @@ impl AccountsDb {
     {
         // Without chunks, we end up with 1 output vec for each outer snapshot storage.
         // This results in too many vectors to be efficient.
-        const MAX_ITEMS_PER_CHUNK: Slot = 5_000;
+        const MAX_ITEMS_PER_CHUNK: Slot = 50_000;
         let width = snapshot_storages.range_width();
         let chunks = 2 + (width as Slot / MAX_ITEMS_PER_CHUNK);
         let range = snapshot_storages.range();
@@ -4818,13 +4820,43 @@ impl AccountsDb {
 
                 let mut per_slot_data = B::default();
 
-                /*
                 if accounts_cache_and_ancestors.is_none() {
+                    let mut slow_way = false;
+                    let mut hasher = std::collections::hash_map::DefaultHasher::new(); // wrong one?
+                    
                     for slot in start..end {
-                    let sub_storages = snapshot_storages.get(slot);
-                    if let Some((cache, ancestors, accounts_index)) = accounts_cache_and_ancestors {
+                        let sub_storages = snapshot_storages.get(slot);
+                        bin_range.start.hash(&mut hasher);
+                        bin_range.end.hash(&mut hasher);
+                        if let Some(sub_storages) = sub_storages {
+                            if sub_storages.len() > 1 {
+                                slow_way = true;
+                                break;
+                            }
+                            let storage_file = sub_storages.first().unwrap().accounts.get_path();
+                            slot.hash(&mut hasher);
+                            storage_file.hash(&mut hasher);
+                            // check alive_bytes, etc. here?
+                            let amod = std::fs::metadata(storage_file);
+                            if amod.is_err() {
+                                slow_way = true;
+                                break;
+                            }
+                            let amod = amod.unwrap().modified();
+                            if amod.is_err() {
+                                slow_way = true;
+                                break;
+                            }
+                            let amod = amod.unwrap().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
+                            amod.hash(&mut hasher);
+                        }
+                    }
+                    let r = hasher.finish();
+                    error!("chunk: {}, {}-{}, hash: {}", chunk, start, end, r);
+                    if !slow_way {
+                        return after_func(retval);
+                    }
                 }
-                */
 
                 for slot in start..end {
                     let sub_storages = snapshot_storages.get(slot);
@@ -5129,6 +5161,7 @@ impl AccountsDb {
                 big_stats.lock().unwrap().merge(&stats);
                 per_slot_data.clear();
             },
+            bin_range,
         );
 
         error!("cache stats: {:?}", big_stats.lock().unwrap());
@@ -5231,7 +5264,7 @@ impl AccountsDb {
             // higher passes = slower total time, lower dynamic memory usage
             // lower passes = faster total time, higher dynamic memory usage
             // passes=2 cuts dynamic memory usage in approximately half.
-            error!("saving...{:?}", storages.range);
+            //error!("saving...{:?}", storages.range);
             let bins_per_pass = PUBKEY_BINS_FOR_CALCULATING_HASHES / NUM_SCAN_PASSES;
             assert_eq!(
                 bins_per_pass * NUM_SCAN_PASSES,
