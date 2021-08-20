@@ -4790,14 +4790,14 @@ impl AccountsDb {
     {
         // Without chunks, we end up with 1 output vec for each outer snapshot storage.
         // This results in too many vectors to be efficient.
-        const MAX_ITEMS_PER_CHUNK: Slot = 100_000;
+        const MAX_ITEMS_PER_CHUNK: Slot = 200_000;
         let width = snapshot_storages.range_width();
         let chunks = 2 + (width as Slot / MAX_ITEMS_PER_CHUNK);
         let range = snapshot_storages.range();
         let slot0 = range.start;
         let first_boundary = ((slot0 + MAX_ITEMS_PER_CHUNK) / MAX_ITEMS_PER_CHUNK) * MAX_ITEMS_PER_CHUNK;
         (0..chunks)
-            .into_par_iter()
+            .into_iter()
             .map(|chunk| {
                 let mut retval = B::default();
                 // calculate start, end
@@ -4820,7 +4820,8 @@ impl AccountsDb {
 
                 let mut per_slot_data = B::default();
 
-                if accounts_cache_and_ancestors.is_none() {
+                let mut file_name = String::default();
+                if accounts_cache_and_ancestors.is_none() && (end - start) == MAX_ITEMS_PER_CHUNK {
                     let mut slow_way = false;
                     let mut hasher = std::collections::hash_map::DefaultHasher::new(); // wrong one?
                     
@@ -4851,8 +4852,22 @@ impl AccountsDb {
                             amod.hash(&mut hasher);
                         }
                     }
-                    let r = hasher.finish();
-                    error!("chunk: {}, {}-{}, hash: {}", chunk, start, end, r);
+                    // we have a hash value for all the storages in this slot
+                    // so, build a file name:
+                    let hash = hasher.finish();
+                    file_name = format!("{}.{}.{}.{}.{}", start, end, bin_range.start, bin_range.end, hash);
+
+                    let amod = std::fs::metadata(file_name.clone());
+                    error!("chunk: {}, {}-{}, hash: {}, file: {}", chunk, start, end, hash, file_name);
+                    slow_way = true;
+                    if amod.is_ok() {
+                        let amod = amod.unwrap().modified();
+                        if amod.is_ok() {
+                            error!("found file!");
+                            slow_way = false;
+                        }
+                    }
+
                     if !slow_way {
                         //return after_func(retval);
                     }
@@ -4906,7 +4921,12 @@ impl AccountsDb {
                         }
                     }
                 }
-                after_func(retval)
+                let r = after_func(retval);
+                if !file_name.is_empty() {
+                    error!("creating: {}", file_name);
+                    std::fs::File::create(file_name).unwrap();
+                }
+                r
             })
             .collect()
     }
