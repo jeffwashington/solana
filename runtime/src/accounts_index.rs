@@ -1666,7 +1666,7 @@ impl<T: IsCached> AccountsIndex<T> {
                 Self::can_purge_older_entries(max_clean_root, newest_root_in_slot_list, *slot)
                     && !value.is_cached();
             if should_purge {
-                if pubkey == &pk1 {//} || slot == 73977800 {
+                if pubkey == &pk1 {//} || slot == 73909101 {
                     error!("{} {} purge_older_root_entries {}, reclaims, max_clean_root: {:?}", file!(), line!(), pubkey, max_clean_root);
                 }
                 reclaims.push((*slot, value.clone()));
