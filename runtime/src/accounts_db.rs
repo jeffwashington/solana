@@ -4845,6 +4845,7 @@ impl AccountsDb {
                 // calculate start, end
                 let (start, mut end) = if chunk == 0 {
                     if slot0 == first_boundary {
+                        error!("slot 0 skipped: {}, {}", slot0, first_boundary);
                         return after_func(retval); // we evenly divide, so nothing for special first chunk to do
                     }
                     // otherwise first chunk is not 'full'
