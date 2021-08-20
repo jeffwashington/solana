@@ -4797,10 +4797,11 @@ impl AccountsDb {
         (0..chunks)
             .into_par_iter()
             .map(|chunk| {
+                let mut retval = B::default();
                 // calculate start, end
-                let (start, end) = if chunk == 0 {
+                let (start, mut end) = if chunk == 0 {
                     if slot0 == first_boundary {
-                        return vec![]; // we evenly divide, so nothing for special first chunk to do
+                        return after_func(retval); // we evenly divide, so nothing for special first chunk to do
                     }
                     // otherwise first chunk is not 'full'
                     (slot0, first_boundary)
@@ -4812,15 +4813,16 @@ impl AccountsDb {
                 };
                 end = std::cmp::min(end, range.end);
                 if start == end {
-                    return vec![];
+                    return after_func(retval);
                 }
 
-                let mut retval = B::default();
                 let mut per_slot_data = B::default();
 
                 /*
-                for slot in start..end {
+                if accounts_cache_and_ancestors.is_none() {
+                    for slot in start..end {
                     let sub_storages = snapshot_storages.get(slot);
+                    if let Some((cache, ancestors, accounts_index)) = accounts_cache_and_ancestors {
                 }
                 */
 
