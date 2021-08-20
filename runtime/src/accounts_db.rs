@@ -4945,7 +4945,6 @@ impl AccountsDb {
                         }
 
                         if !slow_way {
-                            error!("calc slow way");
                             if retval.is_empty() {
                                 let range = bin_range.end - bin_range.start;
                                 retval.append(&mut vec![Vec::new(); range]);
@@ -4960,7 +4959,9 @@ impl AccountsDb {
                                 CacheHashDataStats::default()
                             )
                             .unwrap();
+                            return retval;
         
+                            error!("calc slow way");
                             //return after_func(retval);
                         }
                     }
