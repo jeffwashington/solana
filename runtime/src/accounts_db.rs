@@ -1607,6 +1607,7 @@ impl AccountsDb {
                 no_delete
             };
             if no_delete {
+                use std::str::FromStr;
                 let pk1 = Pubkey::from_str("PkimpSks8R9KLHsTAupcHyBgYDitaE2PXk697urr3xP").unwrap();
                 let mut pending_store_ids: HashSet<usize> = HashSet::new();
                 for (_bank_id, account_info) in account_infos {
