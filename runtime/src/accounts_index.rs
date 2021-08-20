@@ -1637,8 +1637,11 @@ impl<T: IsCached> AccountsIndex<T> {
         slot_list: &mut SlotList<T>,
         reclaims: &mut SlotList<T>,
         max_clean_root: Option<Slot>,
+        pubkey: &Pubkey,
     ) {
         let roots_tracker = &self.roots_tracker.read().unwrap();
+        use std::str::FromStr;
+        let pk1 = Pubkey::from_str("9r96BQDNY7iWfHwc6KuyDKVqg5xSp8Lsu4t4gZuZmWVi").unwrap();
         let newest_root_in_slot_list =
             Self::get_newest_root_in_slot_list(&roots_tracker.roots, slot_list, max_clean_root);
         let max_clean_root = max_clean_root.unwrap_or(roots_tracker.max_root);
@@ -1648,6 +1651,9 @@ impl<T: IsCached> AccountsIndex<T> {
                 Self::can_purge_older_entries(max_clean_root, newest_root_in_slot_list, *slot)
                     && !value.is_cached();
             if should_purge {
+                if pubkey == &pk1 {//} || slot == 73977800 {
+                    error!("{} {} purge_older_root_entries {}, reclaims", file!(), line!(), pubkey);
+                }
                 reclaims.push((*slot, value.clone()));
             }
             !should_purge
@@ -1663,7 +1669,7 @@ impl<T: IsCached> AccountsIndex<T> {
         let mut is_slot_list_empty = false;
         if let Some(mut locked_entry) = self.get_account_write_entry(pubkey) {
             locked_entry.slot_list_mut(|slot_list| {
-                self.purge_older_root_entries(slot_list, reclaims, max_clean_root);
+                self.purge_older_root_entries(slot_list, reclaims, max_clean_root, pubkey);
                 is_slot_list_empty = slot_list.is_empty();
             });
         }
