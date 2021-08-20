@@ -152,7 +152,7 @@ impl<T: Clone> ReadAccountMapEntry<T> {
     }
 
     pub fn unref2(&self) {
-        panic!("unrefing");
+        //panic!("unrefing");
         self.borrow_owned_entry()
             .ref_count
             .fetch_sub(1, Ordering::Relaxed);
