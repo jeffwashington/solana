@@ -5038,6 +5038,18 @@ impl Bank {
         if self.slot() > 0 {
             self.clean_accounts(true, true, last_full_snapshot_slot);
         }
+        info!("cleaning2..");
+        if self.slot() > 0 {
+            self.clean_accounts(true, true, last_full_snapshot_slot);
+        }
+        info!("cleaning3..");
+        if self.slot() > 0 {
+            self.clean_accounts(true, true, last_full_snapshot_slot);
+        }
+        info!("cleaning4..");
+        if self.slot() > 0 {
+            self.clean_accounts(true, true, last_full_snapshot_slot);
+        }
         clean_time.stop();
 
         let mut shrink_all_slots_time = Measure::start("shrink_all_slots");
