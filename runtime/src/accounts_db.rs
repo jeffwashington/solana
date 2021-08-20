@@ -4798,7 +4798,7 @@ impl AccountsDb {
         let slot0 = range.start;
         let first_boundary = ((slot0 + MAX_ITEMS_PER_CHUNK) / MAX_ITEMS_PER_CHUNK) * MAX_ITEMS_PER_CHUNK;
         (0..chunks)
-            .into_iter()
+            .into_par_iter()
             .map(|chunk| {
                 let mut retval = B::default();
                 // calculate start, end
