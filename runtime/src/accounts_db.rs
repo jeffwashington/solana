@@ -5797,7 +5797,7 @@ impl AccountsDb {
         if dead_slots.contains(&73977800) {
             error!("{} {} clean_stored_dead_slots {}", file!(), line!(), 73977800);
         }
-        error!("{} {} clean_stored_dead_slots {} slots: {}", file!(), line!(), dead_slots.len());
+        error!("{} {} clean_stored_dead_slots {}", file!(), line!(), dead_slots.len());
 
         let purged_slot_pubkeys: HashSet<(Slot, Pubkey)> = {
             self.thread_pool_clean.install(|| {
