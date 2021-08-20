@@ -4806,7 +4806,7 @@ impl AccountsDb {
                 }
             }
         }
-        if slot <= old {
+        if slot == 73365341 { //old {
             error!("slot: {}, count: {}", slot, ct);
         }
     }
