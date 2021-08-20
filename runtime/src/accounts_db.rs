@@ -3715,6 +3715,7 @@ impl AccountsDb {
         pubkey_to_slot_set: Vec<(Pubkey, Slot)>,
         is_dead: bool,
     ) {
+        panic!("");
         // Slot purged from cache should not exist in the backing store
         assert!(self.storage.get_slot_stores(purged_slot).is_none());
         let num_purged_keys = pubkey_to_slot_set.len();
@@ -5738,7 +5739,7 @@ impl AccountsDb {
                     .entry(pubkey)
                     .or_default()
                     .insert(slot);
-                if pubkey == pk1 || slot == 73977800 {
+                if pubkey == pk1 || slot == 73977800 || slot == 73909101 {
                     error!("{} {} clean_dead_slots_from_accounts_index {} unref_from_storage", file!(), line!(), pubkey,);
                 }
 
@@ -5786,6 +5787,12 @@ impl AccountsDb {
                     stores.push(store.clone());
                 }
             }
+        }
+        if dead_slots.contains(&73909101) {
+            error!("{} {} clean_stored_dead_slots {}", file!(), line!(), 73909101);
+        }
+        if dead_slots.contains(&73977800) {
+            error!("{} {} clean_stored_dead_slots {}", file!(), line!(), 73977800);
         }
         let purged_slot_pubkeys: HashSet<(Slot, Pubkey)> = {
             self.thread_pool_clean.install(|| {
