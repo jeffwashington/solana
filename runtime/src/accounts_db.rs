@@ -1954,7 +1954,7 @@ impl AccountsDb {
                     .map(|slots_removed| slots_removed.contains(slot))
                     .unwrap_or(false);
                     if key == &pk1 {
-                        error!("{} {} clean2: {} purged_account_slots: {}, ref_count: {} was slot purged: {}", file!(), line!(), key, has_key, ref_count, was_slot_purged);
+                        error!("{} {} clean2: {} purged_account_slots: {}, ref_count: {} was slot purged: {}, slot: {}", file!(), line!(), key, has_key, ref_count, was_slot_purged, slot);
                     }
                 if was_slot_purged {
                     // No need to look up the slot storage below if the entire
