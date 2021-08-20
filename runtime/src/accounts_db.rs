@@ -6274,7 +6274,7 @@ impl AccountsDb {
                 }
 
                 if pubkey == pk1 {
-                    error!("loading: {} {} {:?}", slot, pubkey, stored_account.account_meta.lamports);
+                    error!("loading: {} {} {:?}, items in slot: {}", slot, pubkey, stored_account.account_meta.lamports, len);
                 }
 
                 (
