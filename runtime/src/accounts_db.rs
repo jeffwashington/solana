@@ -4849,7 +4849,7 @@ impl AccountsDb {
         let old = range.end - 432_000;
         let slot0 = range.start;
         let first_boundary = ((slot0 + MAX_ITEMS_PER_CHUNK) / MAX_ITEMS_PER_CHUNK) * MAX_ITEMS_PER_CHUNK;
-        error!("scanning: {}-{}, {}, first_boundary: {}", range.start, range.end, widthm, first_boundary);
+        error!("scanning: {}-{}, {}, first_boundary: {}", range.start, range.end, width, first_boundary);
         (0..chunks)
             .into_par_iter()
             .map(|chunk| {
@@ -5598,6 +5598,18 @@ impl AccountsDb {
 
         let aligned_bytes = Self::page_align(alive_bytes as u64);
         if Self::should_not_shrink(aligned_bytes, total_bytes, stores.len()) {
+            if slot == 73365341 {
+                error!("{} {} shrink_slot_forced ({}, {}): not able to shrink at all: alive/stored: ({} / {}) ({}b / {}b) save: {}",
+                file!(), line!(),                slot,
+                stores.len(),
+                alive_count,
+                stored_count,
+                aligned_bytes,
+                total_bytes,
+                total_bytes.saturating_sub(aligned_bytes),
+            );
+            }
+                    
             trace!(
                 "shrink_slot_forced ({}, {}): not able to shrink at all: alive/stored: ({} / {}) ({}b / {}b) save: {}",
                 slot,
