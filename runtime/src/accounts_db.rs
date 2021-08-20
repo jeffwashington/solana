@@ -4714,6 +4714,7 @@ impl AccountsDb {
         slot: Slot,
         retval: &mut B,
         alternate_collector: bool,
+        old: Slot,
     ) where
         F: Fn(LoadedAccount, &mut B, Slot, bool) + Send + Sync,
         B: Send + Default,
@@ -4733,6 +4734,7 @@ impl AccountsDb {
                 progress.push(iterator);
             }
         }
+        int mut ct = 0;
         while !progress.is_empty() {
             let mut min = current[0].0;
             let mut min_index = 0;
@@ -4744,6 +4746,7 @@ impl AccountsDb {
             }
             let mut account = (0, None);
             std::mem::swap(&mut account, &mut current[min_index]);
+            ct += 1;
             scan_func(
                 LoadedAccount::Stored(account.1.unwrap()),
                 retval,
@@ -4763,6 +4766,9 @@ impl AccountsDb {
                     len -= 1;
                 }
             }
+        }
+        if slot <= old {
+            error!("slot: {}, count: {}", slot, ct);
         }
     }
 
@@ -4794,6 +4800,7 @@ impl AccountsDb {
         let width = snapshot_storages.range_width();
         let chunks = 2 + (width as Slot / MAX_ITEMS_PER_CHUNK);
         let range = snapshot_storages.range();
+        let old = range.end - 432_000;
         error!("scanning: {}-{}, {}", range.start, range.end, width);
         let slot0 = range.start;
         let first_boundary = ((slot0 + MAX_ITEMS_PER_CHUNK) / MAX_ITEMS_PER_CHUNK) * MAX_ITEMS_PER_CHUNK;
@@ -4918,6 +4925,7 @@ impl AccountsDb {
                                 slot,
                                 data_to_use,
                                 use_per_slot_accumulator,
+                                old,
                             );
                             if use_per_slot_accumulator {
                                 after_slot(slot, sub_storages, &mut per_slot_data, &mut retval);
