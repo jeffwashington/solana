@@ -87,9 +87,9 @@ pub const DEFAULT_FILE_SIZE: u64 = PAGE_SIZE * 1024;
 pub const DEFAULT_NUM_THREADS: u32 = 8;
 pub const DEFAULT_NUM_DIRS: u32 = 4;
 
-pub const PUBKEY_BINS_FOR_CALCULATING_HASHES: usize = 2;
+pub const PUBKEY_BINS_FOR_CALCULATING_HASHES: usize = 32768;
 pub const NUM_SCAN_PASSES: usize = 1;
-pub const BINS_PER_PASS: usize = 2;
+pub const BINS_PER_PASS: usize = 32768;
 
 // A specially reserved storage id just for entries in the cache, so that
 // operations that take a storage entry can maintain a common interface
