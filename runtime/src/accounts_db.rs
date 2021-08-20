@@ -1607,6 +1607,7 @@ impl AccountsDb {
                 no_delete
             };
             if no_delete {
+                let pk1 = Pubkey::from_str("PkimpSks8R9KLHsTAupcHyBgYDitaE2PXk697urr3xP").unwrap();
                 let mut pending_store_ids: HashSet<usize> = HashSet::new();
                 for (_bank_id, account_info) in account_infos {
                     if !already_counted.contains(&account_info.store_id) {
@@ -1619,7 +1620,11 @@ impl AccountsDb {
                     if already_counted.contains(&id) {
                         continue;
                     }
-                    store_counts.get_mut(&id).unwrap().0 += 1;
+                    let mut m = store_counts.get_mut(&id).unwrap();
+                    m.0 += 1;
+                    if m.1.contains(&pk1) {
+                        error!("{} {} addrefing for some reason {}", file!(), line!(), pk1);
+                    }
                     already_counted.insert(id);
 
                     let affected_pubkeys = &store_counts.get(&id).unwrap().1;
