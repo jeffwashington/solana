@@ -1591,7 +1591,7 @@ impl AccountsDb {
                     ref_count_from_storage,
                 );
                 if pubkey == &pk1 {
-                    error!("{} {} addrefing for some reason {} no delete", file!(), line!(), pk1);
+                    error!("{} {} addrefing for some reason {} no delete, len: {}, ref: {}", file!(), line!(), pk1, account_infos.len() as u64, ref_count_from_storage);
                 }
 
                 true
