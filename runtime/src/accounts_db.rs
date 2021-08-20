@@ -4734,7 +4734,7 @@ impl AccountsDb {
                 progress.push(iterator);
             }
         }
-        int mut ct = 0;
+        let mut ct = 0;
         while !progress.is_empty() {
             let mut min = current[0].0;
             let mut min_index = 0;
