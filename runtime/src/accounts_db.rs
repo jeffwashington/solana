@@ -4969,16 +4969,16 @@ impl AccountsDb {
                 let r = after_func(retval);
                 if !file_name.is_empty() {
                     error!("creating: {}", file_name);
-                    /*
-                    let mut stats = CacheHashData::save3(
+                    
+                    let stats = CacheHashData::save3(
                         0,//slot,
                         &Path::new(&file_name),
-                        &mut r,
+                        &r,
                         CacheHashDataStats::default()
                     )
                     .unwrap();
-    */
-                    std::fs::File::create(file_name).unwrap();
+    
+                    //std::fs::File::create(file_name).unwrap();
                 }
                 r
             })
@@ -5752,7 +5752,7 @@ impl AccountsDb {
         let mut accounts_index_root_stats = AccountsIndexRootsStats::default();
         let mut rooted_cleaned_count = 0;
         let mut unrooted_cleaned_count = 0;
-        let dead_slots: Vec<_> = dead_slots_iter
+        let _dead_slots: Vec<_> = dead_slots_iter
             .map(|slot| {
                 if slot == &73977800 {
                     error!("{} {} clean_dead_slots_from_accounts_index not specific to this pk: {}, slot: {}", file!(), line!(), pk1,slot,);

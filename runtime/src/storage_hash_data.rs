@@ -309,7 +309,7 @@ impl CacheHashData {
     pub fn save3(
         _slot: Slot,
         cache_path: &Path,
-        data: &mut SavedType,
+        data: &SavedType,
         mut stats: CacheHashDataStats,
     ) -> Result<CacheHashDataStats, std::io::Error> {
         let mut m = Measure::start("");
