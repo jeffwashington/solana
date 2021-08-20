@@ -5264,6 +5264,7 @@ impl AccountsDb {
             },
             // post-scan
             |slot, storages, per_slot_data, accumulator| {
+                return;
                 let mut stats = CacheHashData::save2(
                     slot,
                     &storages.first().unwrap().accounts.get_path(),
