@@ -1549,6 +1549,7 @@ impl AccountsDb {
         let reset_accounts = false;
 
         let mut reclaim_result = ReclaimResult::default();
+        error!("{} {} clean_accounts_older_than_root", file!(), line!());
         self.handle_reclaims(
             &reclaims,
             None,
@@ -2033,6 +2034,7 @@ impl AccountsDb {
         let reset_accounts = false;
         let mut reclaim_result = ReclaimResult::default();
         let reclaim_result = Some(&mut reclaim_result);
+        error!("{} {} clean_accounts_older_than_root", file!(), line!());
         self.handle_reclaims(
             &reclaims,
             None,
@@ -3775,6 +3777,7 @@ impl AccountsDb {
         let mut handle_reclaims_elapsed = Measure::start("handle_reclaims_elapsed");
         // Slot should be dead after removing all its account entries
         let expected_dead_slot = Some(remove_slot);
+        error!("{} {} clean_accounts_older_than_root", file!(), line!());
         self.handle_reclaims(
             &reclaims,
             expected_dead_slot,
@@ -4805,7 +4808,7 @@ impl AccountsDb {
     }
 
     /// Scan through all the account storage in parallel
-    fn scan_account_storage_no_bank<F, F2, F3, F4, B>(
+    fn scan_account_storage_no_bank<F, F2, F3, F4>(
         accounts_cache_and_ancestors: Option<(
             &AccountsCache,
             &Ancestors,
@@ -4819,11 +4822,10 @@ impl AccountsDb {
         bin_range: &Range<usize>,
     ) -> Vec<Vec<Vec<CalculateHashIntermediate>>>
     where
-        F: Fn(LoadedAccount, &mut B, Slot, bool) + Send + Sync,
-        F2: Fn(B) -> Vec<Vec<CalculateHashIntermediate>> + Send + Sync,
-        F3: Fn(Slot, &[Arc<AccountStorageEntry>], &mut B, bool) -> (bool, bool) + Send + Sync,
-        F4: Fn(Slot, &[Arc<AccountStorageEntry>], &mut B, &mut B) + Send + Sync,
-        B: Send + Default,
+        F: Fn(LoadedAccount, &mut Vec<Vec<CalculateHashIntermediate>>, Slot, bool) + Send + Sync,
+        F2: Fn(Vec<Vec<CalculateHashIntermediate>>) -> Vec<Vec<CalculateHashIntermediate>> + Send + Sync,
+        F3: Fn(Slot, &[Arc<AccountStorageEntry>], &mut Vec<Vec<CalculateHashIntermediate>>, bool) -> (bool, bool) + Send + Sync,
+        F4: Fn(Slot, &[Arc<AccountStorageEntry>], &mut Vec<Vec<CalculateHashIntermediate>>, &mut Vec<Vec<CalculateHashIntermediate>>) + Send + Sync,
     {
         // Without chunks, we end up with 1 output vec for each outer snapshot storage.
         // This results in too many vectors to be efficient.
@@ -4838,7 +4840,7 @@ impl AccountsDb {
         (0..chunks)
             .into_par_iter()
             .map(|chunk| {
-                let mut retval = B::default();
+                let mut retval = vec![];
                 // calculate start, end
                 let (start, mut end) = if chunk == 0 {
                     if slot0 == first_boundary {
@@ -4857,7 +4859,7 @@ impl AccountsDb {
                     return after_func(retval);
                 }
 
-                let mut per_slot_data = B::default();
+                let mut per_slot_data = vec![];
 
                 let mut file_name = String::default();
                 if accounts_cache_and_ancestors.is_none() && (end - start) == MAX_ITEMS_PER_CHUNK {
