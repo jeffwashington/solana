@@ -2297,8 +2297,8 @@ impl AccountsDb {
                     i.store_id == stored_account.store_id
                         && i.offset == stored_account.account.offset
                 });
-                if pubkey == &pk1 {//} || slot == 73977800 {
-                    error!("{} {} do_shrink_slot_stores {}, alive: {}", file!(), line!(), pubkey,is_alive);
+                if pubkey == &pk1 || slot == 73977800 {
+                    error!("{} {} do_shrink_slot_stores {}, alive: {}, slot: {}", file!(), line!(), pubkey,is_alive, slot);
                 }
                 if !is_alive {
                     // This pubkey was found in the storage, but no longer exists in the index.
@@ -4804,7 +4804,7 @@ impl AccountsDb {
     }
 
     /// Scan through all the account storage in parallel
-    fn scan_account_storage_no_bank<F, F2, F3, F4, B, C>(
+    fn scan_account_storage_no_bank<F, F2, F3, F4, B>(
         accounts_cache_and_ancestors: Option<(
             &AccountsCache,
             &Ancestors,
@@ -4816,14 +4816,13 @@ impl AccountsDb {
         prior_to_slot: F3,
         after_slot: F4,
         bin_range: &Range<usize>,
-    ) -> Vec<C>
+    ) -> Vec<Vec<Vec<CalculateHashIntermediate>>>
     where
         F: Fn(LoadedAccount, &mut B, Slot, bool) + Send + Sync,
-        F2: Fn(B) -> C + Send + Sync,
+        F2: Fn(B) -> Vec<Vec<CalculateHashIntermediate>> + Send + Sync,
         F3: Fn(Slot, &[Arc<AccountStorageEntry>], &mut B, bool) -> (bool, bool) + Send + Sync,
         F4: Fn(Slot, &[Arc<AccountStorageEntry>], &mut B, &mut B) + Send + Sync,
         B: Send + Default,
-        C: Send + Default,
     {
         // Without chunks, we end up with 1 output vec for each outer snapshot storage.
         // This results in too many vectors to be efficient.
@@ -5752,6 +5751,9 @@ impl AccountsDb {
         let mut unrooted_cleaned_count = 0;
         let dead_slots: Vec<_> = dead_slots_iter
             .map(|slot| {
+                if slot == &73977800 {
+                    error!("{} {} clean_dead_slots_from_accounts_index not specific to this pk: {}, slot: {}", file!(), line!(), pk1,slot,);
+                }
                 if let Some(latest) = self.accounts_index.clean_dead_slot(*slot) {
                     rooted_cleaned_count += 1;
                     accounts_index_root_stats = latest;
