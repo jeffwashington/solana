@@ -4870,6 +4870,7 @@ impl AccountsDb {
                 };
                 end = std::cmp::min(end, range.end);
                 if start == end {
+                    error!("chunk {} skipped: {}, {}", chunk, slot0, first_boundary);
                     return after_func(retval);
                 }
 
