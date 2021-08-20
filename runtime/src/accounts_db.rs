@@ -1866,6 +1866,9 @@ impl AccountsDb {
                                 AccountIndexGetResult::Found(locked_entry, index) => {
                                     let slot_list = locked_entry.slot_list();
                                     let (slot, account_info) = &slot_list[index];
+                                    if pubkey == &pk1 {
+                                        error!("{} {} clean_accounts {}, slot list: {:?}, info: {:?}", file!(), line!(), pubkey, slot_list, account_info);
+                                    }
                                     if account_info.lamports == 0 {
                                         purges_zero_lamports.insert(
                                             *pubkey,
