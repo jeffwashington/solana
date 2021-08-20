@@ -306,25 +306,15 @@ impl CacheHashData {
         }
     }
 
-    pub fn save2<P: AsRef<Path> + std::fmt::Debug>(
+    pub fn save3(
         _slot: Slot,
-        storage_file: &P,
+        cache_path: &Path,
         data: &mut SavedType,
-        bin_range: &Range<usize>,
-        debug: bool,
+        mut stats: CacheHashDataStats,
     ) -> Result<CacheHashDataStats, std::io::Error> {
-        //error!("saving...{:?}", slot);
-        let mut m = Measure::start("save");
-        let mut stats;
-        //error!("raw path: {:?}", storage_file);
-        let mut m0 = Measure::start("");
-        let (cache_path, _) = Self::calc_path(storage_file, bin_range, debug)?;
-        m0.stop();
-        stats = CacheHashDataStats {
-            ..CacheHashDataStats::default()
-        };
-
-        stats.calc_path_us += m0.as_us();
+        let mut m = Measure::start("");
+        let cache_path = cache_path.clone();
+        //let cache_path = cache_path.to_path_buf();
         let parent = cache_path.parent().unwrap();
         let dir = std::fs::create_dir_all(parent);
         if dir.is_err() {
@@ -430,7 +420,28 @@ impl CacheHashData {
         file.write_all(&encoded)?;
         drop(file);
         */
-        Ok(stats)
+        Ok(stats)        
+    }
+    pub fn save2<P: AsRef<Path> + std::fmt::Debug>(
+        slot: Slot,
+        storage_file: &P,
+        data: &mut SavedType,
+        bin_range: &Range<usize>,
+        debug: bool,
+    ) -> Result<CacheHashDataStats, std::io::Error> {
+        //error!("saving...{:?}", slot);
+        let mut stats;
+        //error!("raw path: {:?}", storage_file);
+        let mut m0 = Measure::start("");
+        let (cache_path, _) = Self::calc_path(storage_file, bin_range, debug)?;
+        m0.stop();
+        stats = CacheHashDataStats {
+            ..CacheHashDataStats::default()
+        };
+
+        stats.calc_path_us += m0.as_us();
+        Self::save3(slot, &Path::new(&cache_path), data, stats)
+
     }
 }
 
