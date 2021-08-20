@@ -5755,7 +5755,7 @@ impl AccountsDb {
         let mut unrooted_cleaned_count = 0;
         let _dead_slots: Vec<_> = dead_slots_iter
             .map(|slot| {
-                if slot == &73977800 {
+                if slot == &73977800 || slot == 73909101 {
                     error!("{} {} clean_dead_slots_from_accounts_index not specific to this pk: {}, slot: {}", file!(), line!(), pk1,slot,);
                 }
                 if let Some(latest) = self.accounts_index.clean_dead_slot(*slot) {
@@ -6330,7 +6330,7 @@ impl AccountsDb {
                     );
                 }
 
-                if pubkey == pk1 || slot == &73977800 {
+                if pubkey == pk1 || slot == &73977800 || slot == 73909101 {
                     error!("loading: {} {} {:?}, items in slot: {}", slot, pubkey, stored_account.account_meta.lamports, len);
                 }
 
