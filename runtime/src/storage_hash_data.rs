@@ -88,7 +88,7 @@ impl CacheHashData {
         //error!("dir of storage file: {:?}, {:?}", storage_file, cache);
         (cache, file_name.to_str().unwrap().to_string())
     }
-    fn calc_path<P: AsRef<Path>>(
+    pub fn calc_path<P: AsRef<Path>>(
         storage_file: &P,
         bin_range: &Range<usize>,
         debug: bool,
