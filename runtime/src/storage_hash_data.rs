@@ -209,10 +209,10 @@ impl CacheHashData {
         let (path, file_name) = Self::calc_path(storage_file, bin_range, debug)?;
         m0.stop();
         timings.calc_path_us += m0.as_us();
-        Self::load2(_slot, &path, accumulator, start_bin_index, bin_calculator, preexisting)
+        Self::load2(_slot, &path, accumulator, start_bin_index, bin_calculator, preexisting, timings)
     }
 
-    pub fn load2<P: AsRef<Path>>(
+    pub fn load2<P: AsRef<Path> + std::fmt::Debug>(
         _slot: Slot,
         path: &P,
         accumulator: &mut Vec<Vec<CalculateHashIntermediate>>,
@@ -262,8 +262,8 @@ impl CacheHashData {
         stats.read_us = m1.as_us();
         stats.cache_file_size += capacity as usize;
 
-        let found = preexisting.write().unwrap().remove(&file_name);
-        if !found {
+        //let found = preexisting.write().unwrap().remove(&file_name);
+        /*if !found {
             /*
             error!(
                 "tried to mark {:?} as used, but it wasn't in the set: {:?}",
@@ -271,7 +271,7 @@ impl CacheHashData {
                 preexisting.read().unwrap().iter().next()
             );
             */
-        }
+        }*/
 
         stats.entries_loaded_from_cache += sum;
         let mut m2 = Measure::start("");
