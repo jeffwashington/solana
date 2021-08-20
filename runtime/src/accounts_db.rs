@@ -4847,9 +4847,9 @@ impl AccountsDb {
         let chunks = 2 + (width as Slot / MAX_ITEMS_PER_CHUNK);
         let range = snapshot_storages.range();
         let old = range.end - 432_000;
-        error!("scanning: {}-{}, {}", range.start, range.end, width);
         let slot0 = range.start;
         let first_boundary = ((slot0 + MAX_ITEMS_PER_CHUNK) / MAX_ITEMS_PER_CHUNK) * MAX_ITEMS_PER_CHUNK;
+        error!("scanning: {}-{}, {}, first_boundary: {}", range.start, range.end, widthm, first_boundary);
         (0..chunks)
             .into_par_iter()
             .map(|chunk| {
