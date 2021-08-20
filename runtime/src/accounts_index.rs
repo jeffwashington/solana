@@ -1652,7 +1652,7 @@ impl<T: IsCached> AccountsIndex<T> {
                     && !value.is_cached();
             if should_purge {
                 if pubkey == &pk1 {//} || slot == 73977800 {
-                    error!("{} {} purge_older_root_entries {}, reclaims", file!(), line!(), pubkey);
+                    error!("{} {} purge_older_root_entries {}, reclaims, max_clean_root: {:?}", file!(), line!(), pubkey, max_clean_root);
                 }
                 reclaims.push((*slot, value.clone()));
             }
