@@ -4930,6 +4930,10 @@ impl AccountsDb {
 
                         if !slow_way {
                             error!("calc slow way");
+                            if retval.is_empty() {
+                                let range = bin_range.end - bin_range.start;
+                                retval.append(&mut vec![Vec::new(); range]);
+                            }
                             let stats = CacheHashData::load2(
                                 0,//slot,
                                 &Path::new(&file_name),
@@ -6355,7 +6359,7 @@ impl AccountsDb {
         }
         use std::str::FromStr;
         let pk1 = Pubkey::from_str("PkimpSks8R9KLHsTAupcHyBgYDitaE2PXk697urr3xP").unwrap();
-        let pk2 = Pubkey::from_str("FFcc8gPDaPTEhj9YYUETN4V9gk2TjzTwzBTXGQq8VXQe").unwrap();
+        let pk2 = Pubkey::from_str("GYULshLW5CvHAnGnUsgxHDrR3veRzMhFcNr4BYqQa3TM").unwrap();
 
         let secondary = !self.account_indexes.is_empty();
 
