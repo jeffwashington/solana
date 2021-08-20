@@ -1867,7 +1867,9 @@ impl AccountsDb {
                                     let slot_list = locked_entry.slot_list();
                                     let (slot, account_info) = &slot_list[index];
                                     if pubkey == &pk1 || slot == &73977800 {
-                                        error!("{} {} clean_accounts {}, slot list: {:?}, info: {:?}", file!(), line!(), pubkey, slot_list, account_info);
+                                        error!("{} {} clean_accounts {}, slot list: {:?}, info: {:?}, roots and refcounts: {:?}", file!(), line!(), pubkey, slot_list, account_info,
+                                        self.accounts_index
+                                        .roots_and_ref_count(&locked_entry, max_clean_root)                                    );
                                     }
                                     if account_info.lamports == 0 {
                                         purges_zero_lamports.insert(
