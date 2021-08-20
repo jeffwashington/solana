@@ -1549,7 +1549,7 @@ impl AccountsDb {
         let reset_accounts = false;
 
         let mut reclaim_result = ReclaimResult::default();
-        error!("{} {} clean_accounts_older_than_root", file!(), line!());
+        //error!("{} {} clean_accounts_older_than_root", file!(), line!());
         self.handle_reclaims(
             &reclaims,
             None,
@@ -2034,7 +2034,7 @@ impl AccountsDb {
         let reset_accounts = false;
         let mut reclaim_result = ReclaimResult::default();
         let reclaim_result = Some(&mut reclaim_result);
-        error!("{} {} clean_accounts_older_than_root", file!(), line!());
+        //error!("{} {} clean_accounts_older_than_root", file!(), line!());
         self.handle_reclaims(
             &reclaims,
             None,
@@ -3790,7 +3790,7 @@ impl AccountsDb {
         let mut handle_reclaims_elapsed = Measure::start("handle_reclaims_elapsed");
         // Slot should be dead after removing all its account entries
         let expected_dead_slot = Some(remove_slot);
-        error!("{} {} clean_accounts_older_than_root", file!(), line!());
+        //error!("{} {} clean_accounts_older_than_root", file!(), line!());
         self.handle_reclaims(
             &reclaims,
             expected_dead_slot,
