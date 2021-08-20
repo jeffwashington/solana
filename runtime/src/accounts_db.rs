@@ -1938,14 +1938,20 @@ impl AccountsDb {
         // Then purge if we can
         let mut store_counts: HashMap<AppendVecId, (usize, HashSet<Pubkey>)> = HashMap::new();
         for (key, (account_infos, ref_count)) in purges_zero_lamports.iter_mut() {
+            let mut has_key = false;
             if purged_account_slots.contains_key(key) {
                 *ref_count = self.accounts_index.ref_count_from_storage(key);
+                has_key = true;
+            }
+            if key == &pk1 {
+                error!("{} {} clean2: {} purged_account_slots: {}, ref_count: {}", file!(), line!(), key, has_key, ref_count);
             }
             account_infos.retain(|(slot, account_info)| {
                 let was_slot_purged = purged_account_slots
                     .get(key)
                     .map(|slots_removed| slots_removed.contains(slot))
                     .unwrap_or(false);
+                error!("{} {} clean2: {} purged_account_slots: {}, ref_count: {} was slot purged: {}", file!(), line!(), key, has_key, ref_count, was_slot_purged);
                 if was_slot_purged {
                     // No need to look up the slot storage below if the entire
                     // slot was purged
@@ -1957,12 +1963,14 @@ impl AccountsDb {
                     .get(&account_info.store_id)
                     .map(|store_removed| store_removed.contains(&account_info.offset))
                     .unwrap_or(false);
+                error!("{} {} clean2: {} purged_account_slots: {}, ref_count: {} was_reclaimed: {}", file!(), line!(), key, has_key, ref_count, was_reclaimed);
                 if was_reclaimed {
                     return false;
                 }
                 if let Some(store_count) = store_counts.get_mut(&account_info.store_id) {
                     store_count.0 -= 1;
                     store_count.1.insert(*key);
+                    error!("{} {} clean2: {} purged_account_slots: {}, ref_count: {} store_count: {}, counts: {:?}", file!(), line!(), key, has_key, ref_count, store_count.0, store_count.1);
                 } else {
                     let mut key_set = HashSet::new();
                     key_set.insert(*key);
