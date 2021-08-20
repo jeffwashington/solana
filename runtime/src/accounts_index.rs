@@ -1609,13 +1609,13 @@ impl<T: IsCached> AccountsIndex<T> {
         
         if let Some(locked_entry) = self.get_account_read_entry(pubkey) {
             if pubkey == &pk1 || pubkey == &pk2 || pubkey == &pk3 {
-                error!("{} {} unref_from_storage", file!(), line!(), pubkey);
+                error!("{} {} unref_from_storage: {}", file!(), line!(), pubkey);
             }
                 locked_entry.unref2();
         }
         else {
             if pubkey == &pk1 || pubkey == &pk2 || pubkey == &pk3 {
-                error!("{} {} unref_from_storage NOT FOUND!", file!(), line!(), pubkey);
+                error!("{} {} unref_from_storage NOT FOUND!: {}", file!(), line!(), pubkey);
             }
     
         }
