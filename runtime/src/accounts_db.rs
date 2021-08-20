@@ -5580,7 +5580,8 @@ impl AccountsDb {
     }
 
     fn should_not_shrink(aligned_bytes: u64, total_bytes: u64, num_stores: usize) -> bool {
-        aligned_bytes + PAGE_SIZE > total_bytes && num_stores == 1
+        //aligned_bytes + PAGE_SIZE > total_bytes && num_stores == 1
+        false
     }
 
     fn is_shrinking_productive(slot: Slot, stores: &[Arc<AccountStorageEntry>]) -> bool {
