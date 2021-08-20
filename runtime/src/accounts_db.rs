@@ -1866,7 +1866,7 @@ impl AccountsDb {
                                 AccountIndexGetResult::Found(locked_entry, index) => {
                                     let slot_list = locked_entry.slot_list();
                                     let (slot, account_info) = &slot_list[index];
-                                    if pubkey == &pk1 {
+                                    if pubkey == &pk1 || slot == &73977800 {
                                         error!("{} {} clean_accounts {}, slot list: {:?}, info: {:?}", file!(), line!(), pubkey, slot_list, account_info);
                                     }
                                     if account_info.lamports == 0 {
@@ -6294,7 +6294,7 @@ impl AccountsDb {
                     );
                 }
 
-                if pubkey == pk1 {
+                if pubkey == pk1 || slot == &73977800 {
                     error!("loading: {} {} {:?}, items in slot: {}", slot, pubkey, stored_account.account_meta.lamports, len);
                 }
 
