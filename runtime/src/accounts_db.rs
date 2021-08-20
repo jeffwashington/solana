@@ -4852,24 +4852,27 @@ impl AccountsDb {
                             amod.hash(&mut hasher);
                         }
                     }
-                    // we have a hash value for all the storages in this slot
-                    // so, build a file name:
-                    let hash = hasher.finish();
-                    file_name = format!("{}.{}.{}.{}.{}", start, end, bin_range.start, bin_range.end, hash);
-
-                    let amod = std::fs::metadata(file_name.clone());
-                    error!("chunk: {}, {}-{}, hash: {}, file: {}", chunk, start, end, hash, file_name);
-                    slow_way = true;
-                    if amod.is_ok() {
-                        let amod = amod.unwrap().modified();
-                        if amod.is_ok() {
-                            error!("found file!");
-                            slow_way = false;
-                        }
-                    }
-
                     if !slow_way {
-                        //return after_func(retval);
+                        // we have a hash value for all the storages in this slot
+                        // so, build a file name:
+                        let hash = hasher.finish();
+                        file_name = format!("{}.{}.{}.{}.{}", start, end, bin_range.start, bin_range.end, hash);
+
+                        let amod = std::fs::metadata(file_name.clone());
+                        error!("chunk: {}, {}-{}, hash: {}, file: {}", chunk, start, end, hash, file_name);
+                        slow_way = true;
+                        if amod.is_ok() {
+                            let amod = amod.unwrap().modified();
+                            if amod.is_ok() {
+                                error!("found file!");
+                                slow_way = false;
+                            }
+                        }
+
+                        if !slow_way {
+                            error!("calc slow way");
+                            //return after_func(retval);
+                        }
                     }
                 }
 
