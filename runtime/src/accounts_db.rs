@@ -2251,6 +2251,9 @@ impl AccountsDb {
     where
         I: Iterator<Item = &'a Arc<AccountStorageEntry>>,
     {
+        if slot == 73365341 {
+            error!("{} {} do_shrink_slot_stores {}", file!(), line!(), slot);
+        }
         struct FoundStoredAccount<'a> {
             pub account: StoredAccountMeta<'a>,
             pub store_id: AppendVecId,
