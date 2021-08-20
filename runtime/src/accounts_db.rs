@@ -2221,7 +2221,9 @@ impl AccountsDb {
             return;
         }
         let mut clean_dead_slots = Measure::start("reclaims::clean_dead_slots");
-        error!("{} {} process_dead_slots {}", file!(), line!(), purged_account_slots.as_ref().map(|x| x.len()).unwrap_or_default());
+        if purged_account_slots.as_ref().map(|x| x.len()).unwrap_or_default() != 0 {
+            error!("{} {} process_dead_slots {}", file!(), line!(), purged_account_slots.as_ref().map(|x| x.len()).unwrap_or_default());
+        }
         self.clean_stored_dead_slots(dead_slots, purged_account_slots);
         clean_dead_slots.stop();
 
