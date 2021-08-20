@@ -4861,7 +4861,7 @@ impl AccountsDb {
     {
         // Without chunks, we end up with 1 output vec for each outer snapshot storage.
         // This results in too many vectors to be efficient.
-        const MAX_ITEMS_PER_CHUNK: Slot = 400_000;
+        const MAX_ITEMS_PER_CHUNK: Slot = 10_000;
         let width = snapshot_storages.range_width();
         let chunks = 2 + (width as Slot / MAX_ITEMS_PER_CHUNK);
         let range = snapshot_storages.range();
@@ -4934,12 +4934,12 @@ impl AccountsDb {
                         file_name = format!("hash_cache/{}.{}.{}.{}.{}", start, end, bin_range.start, bin_range.end, hash);
 
                         let amod = std::fs::metadata(file_name.clone());
-                        error!("chunk: {}, {}-{}, hash: {}, file: {}", chunk, start, end, hash, file_name);
+                        //error!("chunk: {}, {}-{}, hash: {}, file: {}", chunk, start, end, hash, file_name);
                         slow_way = true;
                         if amod.is_ok() {
                             let amod = amod.unwrap().modified();
                             if amod.is_ok() {
-                                error!("found file!");
+                                //error!("found file!");
                                 slow_way = false;
                             }
                         }
