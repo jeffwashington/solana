@@ -2288,6 +2288,8 @@ impl AccountsDb {
 
         let mut alive_accounts: Vec<_> = Vec::with_capacity(stored_accounts.len());
         let mut unrefed_pubkeys = vec![];
+        use std::str::FromStr;
+        let pk1 = Pubkey::from_str("9r96BQDNY7iWfHwc6KuyDKVqg5xSp8Lsu4t4gZuZmWVi").unwrap();
         for (pubkey, stored_account) in &stored_accounts {
             let lookup = self.accounts_index.get_account_read_entry(pubkey);
             if let Some(locked_entry) = lookup {
@@ -2295,13 +2297,16 @@ impl AccountsDb {
                     i.store_id == stored_account.store_id
                         && i.offset == stored_account.account.offset
                 });
+                if pubkey == &pk1 {//} || slot == 73977800 {
+                    error!("{} {} do_shrink_slot_stores {}, alive: {}", file!(), line!(), pubkey,is_alive);
+                }
                 if !is_alive {
                     // This pubkey was found in the storage, but no longer exists in the index.
                     // It would have had a ref to the storage from the initial store, but it will
                     // not exist in the re-written slot. Unref it to keep the index consistent with
                     // rewriting the storage entries.
                     unrefed_pubkeys.push(pubkey);
-                    locked_entry.unref()
+                    locked_entry.unref2()
                 } else {
                     alive_accounts.push((pubkey, stored_account));
                     alive_total += stored_account.account_size;
@@ -4962,6 +4967,15 @@ impl AccountsDb {
                 let r = after_func(retval);
                 if !file_name.is_empty() {
                     error!("creating: {}", file_name);
+                    /*
+                    let mut stats = CacheHashData::save3(
+                        0,//slot,
+                        &Path::new(&file_name),
+                        &mut r,
+                        CacheHashDataStats::default()
+                    )
+                    .unwrap();
+    */
                     std::fs::File::create(file_name).unwrap();
                 }
                 r

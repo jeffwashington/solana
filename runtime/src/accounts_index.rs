@@ -151,7 +151,7 @@ impl<T: Clone> ReadAccountMapEntry<T> {
         self.borrow_owned_entry().ref_count.load(Ordering::Relaxed)
     }
 
-    pub fn unref(&self) {
+    pub fn unref2(&self) {
         self.borrow_owned_entry()
             .ref_count
             .fetch_sub(1, Ordering::Relaxed);
@@ -1602,7 +1602,7 @@ impl<T: IsCached> AccountsIndex<T> {
 
     pub fn unref_from_storage(&self, pubkey: &Pubkey) {
         if let Some(locked_entry) = self.get_account_read_entry(pubkey) {
-            locked_entry.unref();
+            locked_entry.unref2();
         }
     }
 
