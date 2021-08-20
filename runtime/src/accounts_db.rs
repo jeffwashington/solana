@@ -1944,7 +1944,7 @@ impl AccountsDb {
                 has_key = true;
             }
             if key == &pk1 {
-                error!("{} {} clean2: {} purged_account_slots: {}, ref_count: {}", file!(), line!(), key, has_key, ref_count);
+                error!("{} {} clean2: {} purged_account_slots: {}, ref_count: {}, has_key: {}", file!(), line!(), key, has_key, ref_count, has_key);
             }
             account_infos.retain(|(slot, account_info)| {
                 let was_slot_purged = purged_account_slots
