@@ -1848,7 +1848,7 @@ impl AccountsDb {
             &mut key_timings,
         );
         use std::str::FromStr;
-        let pk1 = Pubkey::from_str("9r96BQDNY7iWfHwc6KuyDKVqg5xSp8Lsu4t4gZuZmWVi").unwrap();
+        let pk1 = Pubkey::from_str("PkimpSks8R9KLHsTAupcHyBgYDitaE2PXk697urr3xP").unwrap();
         let total_keys_count = pubkeys.len();
         let mut accounts_scan = Measure::start("accounts_scan");
         // parallel scan the index.
@@ -2295,7 +2295,7 @@ impl AccountsDb {
         let mut alive_accounts: Vec<_> = Vec::with_capacity(stored_accounts.len());
         let mut unrefed_pubkeys = vec![];
         use std::str::FromStr;
-        let pk1 = Pubkey::from_str("9r96BQDNY7iWfHwc6KuyDKVqg5xSp8Lsu4t4gZuZmWVi").unwrap();
+        let pk1 = Pubkey::from_str("PkimpSks8R9KLHsTAupcHyBgYDitaE2PXk697urr3xP").unwrap();
         for (pubkey, stored_account) in &stored_accounts {
             let lookup = self.accounts_index.get_account_read_entry(pubkey);
             if let Some(locked_entry) = lookup {
@@ -4833,6 +4833,9 @@ impl AccountsDb {
         prior_to_slot: F3,
         after_slot: F4,
         bin_range: &Range<usize>,
+        start_bin_index: usize,
+        bin_calculator: &PubkeyBinCalculator16,
+        preexisting: &RwLock<crate::storage_hash_data::PreExistingCacheFiles>,
     ) -> Vec<Vec<Vec<CalculateHashIntermediate>>>
     where
         F: Fn(LoadedAccount, &mut Vec<Vec<CalculateHashIntermediate>>, Slot, bool) + Send + Sync,
@@ -4927,6 +4930,17 @@ impl AccountsDb {
 
                         if !slow_way {
                             error!("calc slow way");
+                            let stats = CacheHashData::load2(
+                                0,//slot,
+                                &Path::new(&file_name),
+                                &mut retval,
+                                start_bin_index,
+                                bin_calculator,
+                                preexisting,
+                                CacheHashDataStats::default()
+                            )
+                            .unwrap();
+        
                             //return after_func(retval);
                         }
                     }
@@ -5251,7 +5265,10 @@ impl AccountsDb {
                 per_slot_data.clear();
             },
             bin_range,
-        );
+            bin_range.start,
+            &bin_calculator,
+            &pre_existing_cache_files,
+            );
 
         error!("cache stats: {:?}", big_stats.lock().unwrap());
         error!(
@@ -5765,7 +5782,7 @@ impl AccountsDb {
         purged_stored_account_slots: Option<&mut AccountSlots>,
     ) {
         use std::str::FromStr;        
-        let pk1 = Pubkey::from_str("9r96BQDNY7iWfHwc6KuyDKVqg5xSp8Lsu4t4gZuZmWVi").unwrap();
+        let pk1 = Pubkey::from_str("PkimpSks8R9KLHsTAupcHyBgYDitaE2PXk697urr3xP").unwrap();
         if let Some(purged_stored_account_slots) = purged_stored_account_slots {
             for (slot, pubkey) in purged_slot_pubkeys {
                 purged_stored_account_slots
@@ -6337,7 +6354,7 @@ impl AccountsDb {
             return 0;
         }
         use std::str::FromStr;
-        let pk1 = Pubkey::from_str("9r96BQDNY7iWfHwc6KuyDKVqg5xSp8Lsu4t4gZuZmWVi").unwrap();
+        let pk1 = Pubkey::from_str("PkimpSks8R9KLHsTAupcHyBgYDitaE2PXk697urr3xP").unwrap();
         let pk2 = Pubkey::from_str("FFcc8gPDaPTEhj9YYUETN4V9gk2TjzTwzBTXGQq8VXQe").unwrap();
 
         let secondary = !self.account_indexes.is_empty();
