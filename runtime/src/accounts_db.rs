@@ -4747,6 +4747,9 @@ impl AccountsDb {
             let mut account = (0, None);
             std::mem::swap(&mut account, &mut current[min_index]);
             ct += 1;
+            if slot == 73977800 {
+                error!("{} {}", slot, account.1.as_ref().unwrap().meta.pubkey);
+            }
             scan_func(
                 LoadedAccount::Stored(account.1.unwrap()),
                 retval,
