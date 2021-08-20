@@ -5717,7 +5717,7 @@ impl AccountsDb {
         // Should only be `Some` for non-cached slots
         purged_stored_account_slots: Option<&mut AccountSlots>,
     ) {
-        
+        use std::str::FromStr;        
         let pk1 = Pubkey::from_str("9r96BQDNY7iWfHwc6KuyDKVqg5xSp8Lsu4t4gZuZmWVi").unwrap();
         if let Some(purged_stored_account_slots) = purged_stored_account_slots {
             for (slot, pubkey) in purged_slot_pubkeys {
@@ -5725,8 +5725,8 @@ impl AccountsDb {
                     .entry(pubkey)
                     .or_default()
                     .insert(slot);
-                if pubkey == &pk1 || slot == &73977800 {
-                    error!("{} {} clean_dead_slots_from_accounts_index {} unref_from_storage", file!(), line!(), pubkey,
+                if pubkey == pk1 || slot == 73977800 {
+                    error!("{} {} clean_dead_slots_from_accounts_index {} unref_from_storage", file!(), line!(), pubkey,);
                 }
 
                 self.accounts_index.unref_from_storage(&pubkey);
