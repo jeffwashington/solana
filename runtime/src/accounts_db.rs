@@ -2500,16 +2500,25 @@ impl AccountsDb {
     // then create a minimum AppendVec filled with the alive.
     fn shrink_slot_forced(&self, slot: Slot, is_startup: bool) -> usize {
         debug!("shrink_slot_forced: slot: {}", slot);
+        if slot == 73365341 {
+            error!("{} {} shrink_slot_forced {}", file!(), line!(), slot);
+        }
 
         if let Some(stores_lock) = self.storage.get_slot_stores(slot) {
             let stores: Vec<Arc<AccountStorageEntry>> =
                 stores_lock.read().unwrap().values().cloned().collect();
             if !Self::is_shrinking_productive(slot, &stores) {
-                return 0;
+                if slot == 73365341 {
+                    error!("{} {} shrink_slot_forced {}, !productive", file!(), line!(), slot);
+                }
+                        return 0;
             }
             self.do_shrink_slot_stores(slot, stores.iter(), is_startup)
         } else {
-            0
+            if slot == 73365341 {
+                error!("{} {} shrink_slot_forced not found {}", file!(), line!(), slot);
+            }
+                0
         }
     }
 
