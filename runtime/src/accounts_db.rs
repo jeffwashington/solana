@@ -6249,6 +6249,8 @@ impl AccountsDb {
         if accounts_map.is_empty() {
             return 0;
         }
+        use std::str::FromStr;
+        let pk1 = Pubkey::from_str("9r96BQDNY7iWfHwc6KuyDKVqg5xSp8Lsu4t4gZuZmWVi").unwrap();
 
         let secondary = !self.account_indexes.is_empty();
 
@@ -6269,6 +6271,10 @@ impl AccountsDb {
                         stored_account.data,
                         &self.account_indexes,
                     );
+                }
+
+                if pubkey == pk1 {
+                    error!("loading: {} {} {:?}", slot, pubkey, stored_account.account_meta.lamports);
                 }
 
                 (
