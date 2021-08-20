@@ -1867,7 +1867,7 @@ impl AccountsDb {
                                 AccountIndexGetResult::Found(locked_entry, index) => {
                                     let slot_list = locked_entry.slot_list();
                                     let (slot, account_info) = &slot_list[index];
-                                    if pubkey == &pk1 || slot == &73909101 {
+                                    if pubkey == &pk1 || slot == &73365341 {
                                         error!("{} {} clean_accounts {}, slot list: {:?}, info: {:?}, roots and refcounts: {:?}", file!(), line!(), pubkey, slot_list, account_info,
                                         self.accounts_index
                                         .roots_and_ref_count(&locked_entry, max_clean_root)                                    );
@@ -2300,7 +2300,7 @@ impl AccountsDb {
                     i.store_id == stored_account.store_id
                         && i.offset == stored_account.account.offset
                 });
-                if pubkey == &pk1 || slot == 73909101 {
+                if pubkey == &pk1 || slot == 73365341 {
                     error!("{} {} do_shrink_slot_stores {}, alive: {}, slot: {}", file!(), line!(), pubkey,is_alive, slot);
                 }
                 if !is_alive {
@@ -4780,7 +4780,7 @@ impl AccountsDb {
             let mut account = (0, None);
             std::mem::swap(&mut account, &mut current[min_index]);
             ct += 1;
-            if slot == 73909101 {
+            if slot == 73365341 {
                 error!("{} {}", slot, account.1.as_ref().unwrap().meta.pubkey);
             }
             scan_func(
@@ -5742,7 +5742,7 @@ impl AccountsDb {
                     .entry(pubkey)
                     .or_default()
                     .insert(slot);
-                if pubkey == pk1 || slot == 73909101 || slot == 73909101 {
+                if pubkey == pk1 || slot == 73365341 || slot == 73365341 {
                     error!("{} {} clean_dead_slots_from_accounts_index {} unref_from_storage", file!(), line!(), pubkey,);
                 }
 
@@ -5755,7 +5755,7 @@ impl AccountsDb {
         let mut unrooted_cleaned_count = 0;
         let _dead_slots: Vec<_> = dead_slots_iter
             .map(|slot| {
-                if slot == &73909101 || slot == &73909101 {
+                if slot == &73365341 || slot == &73365341 {
                     error!("{} {} clean_dead_slots_from_accounts_index not specific to this pk: {}, slot: {}", file!(), line!(), pk1,slot,);
                 }
                 if let Some(latest) = self.accounts_index.clean_dead_slot(*slot) {
@@ -5791,11 +5791,11 @@ impl AccountsDb {
                 }
             }
         }
-        if dead_slots.contains(&73909101) {
-            error!("{} {} clean_stored_dead_slots {}", file!(), line!(), 73909101);
+        if dead_slots.contains(&73365341) {
+            error!("{} {} clean_stored_dead_slots {}", file!(), line!(), 73365341);
         }
-        if dead_slots.contains(&73909101) {
-            error!("{} {} clean_stored_dead_slots {}", file!(), line!(), 73909101);
+        if dead_slots.contains(&73365341) {
+            error!("{} {} clean_stored_dead_slots {}", file!(), line!(), 73365341);
         }
         error!("{} {} clean_stored_dead_slots {}", file!(), line!(), dead_slots.len());
 
@@ -6331,7 +6331,7 @@ impl AccountsDb {
                     );
                 }
 
-                if pubkey == pk1 || pubkey == pk2 || slot == &73909101 || slot == &73909101 {
+                if pubkey == pk1 || pubkey == pk2 || slot == &73365341 || slot == &73365341 {
                     error!("loading: {} {} {:?}, items in slot: {}", slot, pubkey, stored_account.account_meta.lamports, len);
                 }
 

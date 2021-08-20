@@ -193,6 +193,7 @@ impl CacheHashData {
         }
         items
     }
+
     pub fn load<P: AsRef<Path>>(
         _slot: Slot,
         storage_file: &P,
@@ -203,13 +204,25 @@ impl CacheHashData {
         preexisting: &RwLock<PreExistingCacheFiles>,
         debug: bool,
     ) -> Result<(SavedType, CacheHashDataStats), std::io::Error> {
-        let mut m = Measure::start("overall");
-        let create = false;
         let mut timings = CacheHashDataStats::default();
         let mut m0 = Measure::start("");
         let (path, file_name) = Self::calc_path(storage_file, bin_range, debug)?;
         m0.stop();
         timings.calc_path_us += m0.as_us();
+        Self::load2(_slot, &path, accumulator, start_bin_index, bin_calculator, preexisting)
+    }
+
+    pub fn load2<P: AsRef<Path>>(
+        _slot: Slot,
+        path: &P,
+        accumulator: &mut Vec<Vec<CalculateHashIntermediate>>,
+        start_bin_index: usize,
+        bin_calculator: &PubkeyBinCalculator16,
+        preexisting: &RwLock<PreExistingCacheFiles>,
+        mut timings: CacheHashDataStats,
+    ) -> Result<(SavedType, CacheHashDataStats), std::io::Error> {
+            let mut m = Measure::start("overall");
+        let create = false;
         let file_len = std::fs::metadata(path.clone())?.len();
         let mut m1 = Measure::start("");
         let file = OpenOptions::new()
