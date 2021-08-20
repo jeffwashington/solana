@@ -1574,6 +1574,8 @@ impl AccountsDb {
         // Another pass to check if there are some filtered accounts which
         // do not match the criteria of deleting all appendvecs which contain them
         // then increment their storage count.
+        use std::str::FromStr;
+        let pk1 = Pubkey::from_str("PkimpSks8R9KLHsTAupcHyBgYDitaE2PXk697urr3xP").unwrap();
         let mut already_counted = HashSet::new();
         for (pubkey, (account_infos, ref_count_from_storage)) in purges.iter() {
             let no_delete = if account_infos.len() as u64 != *ref_count_from_storage {
@@ -1588,6 +1590,10 @@ impl AccountsDb {
                     account_infos.len(),
                     ref_count_from_storage,
                 );
+                if pubkey == &pk1 {
+                    error!("{} {} addrefing for some reason {} no delete", file!(), line!(), pk1);
+                }
+
                 true
             } else {
                 let mut no_delete = false;
@@ -1601,14 +1607,16 @@ impl AccountsDb {
                     );
                     if store_counts.get(&account_info.store_id).unwrap().0 != 0 {
                         no_delete = true;
+                        if pubkey == &pk1 {
+                            error!("{} {} addrefing for some reason {} no delete2", file!(), line!(), pk1);
+                        }
+        
                         break;
                     }
                 }
                 no_delete
             };
             if no_delete {
-                use std::str::FromStr;
-                let pk1 = Pubkey::from_str("PkimpSks8R9KLHsTAupcHyBgYDitaE2PXk697urr3xP").unwrap();
                 let mut pending_store_ids: HashSet<usize> = HashSet::new();
                 for (_bank_id, account_info) in account_infos {
                     if !already_counted.contains(&account_info.store_id) {
