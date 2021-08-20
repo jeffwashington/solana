@@ -1846,7 +1846,8 @@ impl AccountsDb {
             last_full_snapshot_slot,
             &mut key_timings,
         );
-
+        use std::str::FromStr;
+        let pk1 = Pubkey::from_str("9r96BQDNY7iWfHwc6KuyDKVqg5xSp8Lsu4t4gZuZmWVi").unwrap();
         let total_keys_count = pubkeys.len();
         let mut accounts_scan = Measure::start("accounts_scan");
         // parallel scan the index.
@@ -1858,6 +1859,9 @@ impl AccountsDb {
                         let mut purges_zero_lamports = HashMap::new();
                         let mut purges_old_accounts = Vec::new();
                         for pubkey in pubkeys {
+                            if pubkey == &pk1 {
+                                error!("{} {} clean_accounts {}", file!(), line!(), pubkey);
+                            }
                             match self.accounts_index.get(pubkey, None, max_clean_root) {
                                 AccountIndexGetResult::Found(locked_entry, index) => {
                                     let slot_list = locked_entry.slot_list();
