@@ -1951,7 +1951,9 @@ impl AccountsDb {
                     .get(key)
                     .map(|slots_removed| slots_removed.contains(slot))
                     .unwrap_or(false);
-                error!("{} {} clean2: {} purged_account_slots: {}, ref_count: {} was slot purged: {}", file!(), line!(), key, has_key, ref_count, was_slot_purged);
+                    if key == &pk1 {
+                        error!("{} {} clean2: {} purged_account_slots: {}, ref_count: {} was slot purged: {}", file!(), line!(), key, has_key, ref_count, was_slot_purged);
+                    }
                 if was_slot_purged {
                     // No need to look up the slot storage below if the entire
                     // slot was purged
@@ -1963,14 +1965,18 @@ impl AccountsDb {
                     .get(&account_info.store_id)
                     .map(|store_removed| store_removed.contains(&account_info.offset))
                     .unwrap_or(false);
-                error!("{} {} clean2: {} purged_account_slots: {}, ref_count: {} was_reclaimed: {}", file!(), line!(), key, has_key, ref_count, was_reclaimed);
+                    if key == &pk1 {
+                        error!("{} {} clean2: {} purged_account_slots: {}, ref_count: {} was_reclaimed: {}", file!(), line!(), key, has_key, ref_count, was_reclaimed);
+                    }
                 if was_reclaimed {
                     return false;
                 }
                 if let Some(store_count) = store_counts.get_mut(&account_info.store_id) {
                     store_count.0 -= 1;
                     store_count.1.insert(*key);
-                    error!("{} {} clean2: {} purged_account_slots: {}, ref_count: {} store_count: {}, counts: {:?}", file!(), line!(), key, has_key, ref_count, store_count.0, store_count.1);
+                    if key == &pk1 {
+                        error!("{} {} clean2: {} purged_account_slots: {}, ref_count: {} store_count: {}, counts: {:?}", file!(), line!(), key, has_key, ref_count, store_count.0, store_count.1);
+                    }
                 } else {
                     let mut key_set = HashSet::new();
                     key_set.insert(*key);
