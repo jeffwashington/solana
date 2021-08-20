@@ -4898,7 +4898,7 @@ impl AccountsDb {
                         // we have a hash value for all the storages in this slot
                         // so, build a file name:
                         let hash = hasher.finish();
-                        file_name = format!("{}.{}.{}.{}.{}", start, end, bin_range.start, bin_range.end, hash);
+                        file_name = format!("hash_cache/{}.{}.{}.{}.{}", start, end, bin_range.start, bin_range.end, hash);
 
                         let amod = std::fs::metadata(file_name.clone());
                         error!("chunk: {}, {}-{}, hash: {}, file: {}", chunk, start, end, hash, file_name);
