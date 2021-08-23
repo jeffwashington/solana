@@ -33,7 +33,7 @@ pub struct HashStats {
     pub max_bin_size: usize,
 }
 impl HashStats {
-    fn log(&mut self) {
+    pub fn log(&mut self) {
         let total_time_us = self.scan_time_total_us
             + self.zeros_time_total_us
             + self.hash_time_total_us

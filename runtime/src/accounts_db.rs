@@ -4727,6 +4727,19 @@ impl AccountsDb {
         _can_cached_slot_be_unflushed: bool,
     ) -> Result<(Hash, u64), BankHashVerificationError> {
         if !use_index {
+            let total_items = self
+                .accounts_index
+                .account_maps
+                .iter()
+                .map(|map_bin| {
+                    let len = map_bin.read().unwrap().len();
+                    len
+                })
+                .sum();
+            let mut stats = HashStats::default();
+            stats.hash_total = total_items;
+            stats.log();
+
             Ok((Hash::default(), 1))
             /*
             let accounts_cache_and_ancestors = if can_cached_slot_be_unflushed {
