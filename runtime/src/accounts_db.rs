@@ -3667,6 +3667,30 @@ impl AccountsDb {
         if !use_index {
             let combined_maps = self.get_snapshot_storages(slot);
 
+            let mut slots = vec![];
+            let mut max = 0;
+            for s in combined_maps.iter() {
+                let slot = s.first().unwrap().slot();
+                max = std::cmp::max(max, slot);
+                slots.push((slot, s.first().unwrap().clone()));
+            }
+            slots.sort_unstable_by(|a,b| a.0.cmp(&b.0));
+            let first_expected_slot = max - 432_000;
+            error!("range before scan: {}", max - slots.first().map(|slot| slot.0).unwrap_or_default());
+            for (slot, store) in slots {
+                if slot >= first_expected_slot {
+                    break;
+                }
+    
+                error!("unexpected old root: {}, count_and_status: {:?}, alive_bytes: {}", slot, store.count_and_status.read().unwrap(), store.alive_bytes.load(Ordering::Relaxed));
+                let accounts = store.accounts.accounts(0);
+                accounts.into_iter().for_each(|stored_account| {
+                    let la = LoadedAccount::Stored(stored_account);
+                    error!("accounts_in_store:{},{}, ref_count_from_storage: {}, index value: {:?}", la.pubkey(), la.lamports(), self.accounts_index.ref_count_from_storage(la.pubkey()), self.accounts_index.account_maps.read().unwrap().get(la.pubkey()));
+                });
+            }
+    
+
             Self::calculate_accounts_hash_without_index(
                 &combined_maps,
                 Some(&self.thread_pool_clean),
@@ -3708,31 +3732,6 @@ impl AccountsDb {
         mut stats: &mut crate::accounts_hash::HashStats,
         bins: usize,
     ) -> Vec<Vec<Vec<CalculateHashIntermediate>>> {
-
-        let mut slots = vec![];
-        let mut max = 0;
-        for s in storage {
-            let slot = s.first().unwrap().slot();
-            max = std::cmp::max(max, slot);
-            slots.push((slot, s.first().unwrap().clone()));
-        }
-        slots.sort_unstable_by(|a,b| a.0.cmp(&b.0));
-        let first_expected_slot = max - 432_000;
-        error!("range before scan: {}", max - slots.first().map(|slot| slot.0).unwrap_or_default());
-        for (slot, store) in slots {
-            if slot >= first_expected_slot {
-                break;
-            }
-
-            error!("unexpected old root: {}, count_and_status: {:?}, alive_bytes: {}", slot, store.count_and_status.read().unwrap(), store.alive_bytes.load(Ordering::Relaxed));
-            let accounts = store.accounts.accounts(0);
-            accounts.into_iter().for_each(|stored_account| {
-                let la = LoadedAccount::Stored(stored_account);
-                error!("accounts_in_store:{},{}", la.pubkey(), la.lamports());
-            });
-        }
-
-
         let max_plus_1 = std::u8::MAX as usize + 1;
         assert!(bins <= max_plus_1 && bins > 0);
         let mut time = Measure::start("scan all accounts");
