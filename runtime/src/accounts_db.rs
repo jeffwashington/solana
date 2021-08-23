@@ -1872,6 +1872,7 @@ impl AccountsDb {
         );
         use std::str::FromStr;
         let pk1 = Pubkey::from_str("7iXK9c9MSE1FwmGbNYqV8i3XxUDQ9JaY6EkjrbRrREvC").unwrap();
+        let pk2 = Pubkey::from_str("2e6MWfq2ZuMg1hPPozqKcvmmC4Ux2CdupJVDUAPLv8v1").unwrap();        
         let total_keys_count = pubkeys.len();
         let mut accounts_scan = Measure::start("accounts_scan");
         // parallel scan the index.
@@ -1883,14 +1884,14 @@ impl AccountsDb {
                         let mut purges_zero_lamports = HashMap::new();
                         let mut purges_old_accounts = Vec::new();
                         for pubkey in pubkeys {
-                            if pubkey == &pk1 {
+                            if pubkey == &pk1 || pubkey == &pk2 {
                                 error!("{} {} clean_accounts {}", file!(), line!(), pubkey);
                             }
                             match self.accounts_index.get(pubkey, None, max_clean_root) {
                                 AccountIndexGetResult::Found(locked_entry, index) => {
                                     let slot_list = locked_entry.slot_list();
                                     let (slot, account_info) = &slot_list[index];
-                                    if pubkey == &pk1 || slot == &73365341 {
+                                    if pubkey == &pk1 || pubkey == &pk2 || slot == &73365341 {
                                         error!("{} {} clean_accounts {}, slot list: {:?}, info: {:?}, roots and refcounts: {:?}", file!(), line!(), pubkey, slot_list, account_info,
                                         self.accounts_index
                                         .roots_and_ref_count(&locked_entry, max_clean_root)                                    );
@@ -1969,7 +1970,7 @@ impl AccountsDb {
                 *ref_count = self.accounts_index.ref_count_from_storage(key);
                 has_key = true;
             }
-            if key == &pk1 {
+            if key == &pk1 || key == &pk2 {
                 error!("{} {} clean2: {} purged_account_slots: {}, ref_count: {}, has_key: {}", file!(), line!(), key, has_key, ref_count, has_key);
             }
             account_infos.retain(|(slot, account_info)| {
@@ -1977,7 +1978,7 @@ impl AccountsDb {
                     .get(key)
                     .map(|slots_removed| slots_removed.contains(slot))
                     .unwrap_or(false);
-                    if key == &pk1 {
+                    if key == &pk1 || key == &pk2 {
                         error!("{} {} clean2: {} purged_account_slots: {}, ref_count: {} was slot purged: {}, slot: {}", file!(), line!(), key, has_key, ref_count, was_slot_purged, slot);
                     }
                 if was_slot_purged {
@@ -1991,7 +1992,7 @@ impl AccountsDb {
                     .get(&account_info.store_id)
                     .map(|store_removed| store_removed.contains(&account_info.offset))
                     .unwrap_or(false);
-                    if key == &pk1 {
+                    if key == &pk1 || key == &pk2 {
                         error!("{} {} clean2: {} purged_account_slots: {}, ref_count: {} was_reclaimed: {}", file!(), line!(), key, has_key, ref_count, was_reclaimed);
                     }
                 if was_reclaimed {
@@ -2000,7 +2001,7 @@ impl AccountsDb {
                 if let Some(store_count) = store_counts.get_mut(&account_info.store_id) {
                     store_count.0 -= 1;
                     store_count.1.insert(*key);
-                    if key == &pk1 {
+                    if key == &pk1 || key == &pk2 {
                         error!("{} {} clean2: {} purged_account_slots: {}, ref_count: {} store_count: {}, counts: {:?}", file!(), line!(), key, has_key, ref_count, store_count.0, store_count.1);
                     }
                 } else {
