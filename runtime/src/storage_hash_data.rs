@@ -190,8 +190,8 @@ impl CacheHashData {
                     }
                 }
             }
-            error!("{} items in hash calc cache: {:?}", items.len(), cache);
         }
+        error!("{} items in hash calc cache: {:?}", items.len(), cache);
         items
     }
 
