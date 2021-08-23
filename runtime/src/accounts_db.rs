@@ -5247,7 +5247,7 @@ impl AccountsDb {
         error!(
             "pre-existing cache files that were unused: {}, {:?}",
             pre_existing_cache_files.read().unwrap().len(),
-            pre_existing_cache_files.read().unwrap().iter().first()
+            pre_existing_cache_files.read().unwrap().iter().next()
         );
         let a_storage_path = storage
             .get(storage.range().start)
