@@ -5033,9 +5033,9 @@ impl Bank {
         accounts_db_skip_shrink: bool,
         last_full_snapshot_slot: Option<Slot>,
     ) -> bool {
-        let mut clean_time;
-        let mut verify_time;
-        let mut shrink_all_slots_time;
+        let mut clean_time: Measure = Measure::start("shrink_all_slots");
+        let mut verify_time: Measure = Measure::start("shrink_all_slots");
+        let mut shrink_all_slots_time: Measure = Measure::start("shrink_all_slots");
         for i in 0..5 {
             info!("cleaning..");
             clean_time = Measure::start("clean");
@@ -5044,14 +5044,14 @@ impl Bank {
             }
             clean_time.stop();
 
-            let mut shrink_all_slots_time = Measure::start("shrink_all_slots");
+            shrink_all_slots_time = Measure::start("shrink_all_slots");
             if !accounts_db_skip_shrink && self.slot() > 0 {
                 info!("shrinking..");
                 self.shrink_all_slots(true, last_full_snapshot_slot);
             }
             shrink_all_slots_time.stop();
             info!("verify_bank_hash..");
-            let mut verify_time = Measure::start("verify_bank_hash");
+            verify_time = Measure::start("verify_bank_hash");
             let _ = self.verify_bank_hash(test_hash_calculation);
         }
 
