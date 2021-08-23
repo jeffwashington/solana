@@ -5069,6 +5069,7 @@ impl Bank {
         // Order and short-circuiting is significant; verify_hash requires a valid bank hash
         verify = verify && self.verify_hash();
         verify2_time.stop();
+        panic!("done");
 
         datapoint_info!(
             "verify_snapshot_bank",
