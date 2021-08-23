@@ -4900,7 +4900,7 @@ impl AccountsDb {
                                 CacheHashDataStats::default()
                             )
                             .unwrap();
-                            stats.loaded_from_cache += 1;
+                            stats.1.loaded_from_cache += 1;
 
                             big_stats.lock().unwrap().merge(&stats.1);                            
                             return retval;
