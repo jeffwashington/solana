@@ -5033,33 +5033,24 @@ impl Bank {
         accounts_db_skip_shrink: bool,
         last_full_snapshot_slot: Option<Slot>,
     ) -> bool {
-        info!("cleaning..");
-        let mut clean_time = Measure::start("clean");
-        if self.slot() > 0 {
-            self.clean_accounts(true, true, last_full_snapshot_slot);
-        }
-        /*
-        info!("cleaning2..");
-        if self.slot() > 0 {
-            self.clean_accounts(true, true, last_full_snapshot_slot);
-        }
-        info!("cleaning3..");
-        if self.slot() > 0 {
-            self.clean_accounts(true, true, last_full_snapshot_slot);
-        }
-        info!("cleaning4..");
-        if self.slot() > 0 {
-            self.clean_accounts(true, true, last_full_snapshot_slot);
-        }
-        */
-        clean_time.stop();
+        for i in 0..5 {
+            info!("cleaning..");
+            let mut clean_time = Measure::start("clean");
+            if self.slot() > 0 {
+                self.clean_accounts(true, true, last_full_snapshot_slot);
+            }
+            clean_time.stop();
 
-        let mut shrink_all_slots_time = Measure::start("shrink_all_slots");
-        if !accounts_db_skip_shrink && self.slot() > 0 {
-            info!("shrinking..");
-            self.shrink_all_slots(true, last_full_snapshot_slot);
+            let mut shrink_all_slots_time = Measure::start("shrink_all_slots");
+            if !accounts_db_skip_shrink && self.slot() > 0 {
+                info!("shrinking..");
+                self.shrink_all_slots(true, last_full_snapshot_slot);
+            }
+            shrink_all_slots_time.stop();
+            info!("verify_bank_hash..");
+            let mut verify_time = Measure::start("verify_bank_hash");
+            let _ = self.verify_bank_hash(test_hash_calculation);
         }
-        shrink_all_slots_time.stop();
 
         info!("verify_bank_hash..");
         let mut verify_time = Measure::start("verify_bank_hash");
