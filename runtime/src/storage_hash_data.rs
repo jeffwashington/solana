@@ -271,6 +271,7 @@ impl CacheHashData {
 
         let file_name: String = path.as_ref().file_name().unwrap().to_str().unwrap().to_string();
 
+        error!("Found: {:?}, items: {:?}", file_name, preexisting.write().unwrap());
         let found = preexisting.write().unwrap().remove(&file_name);
         if !found {
             /*
