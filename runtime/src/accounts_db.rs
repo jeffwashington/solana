@@ -3718,7 +3718,7 @@ impl AccountsDb {
         }
         slots.sort_unstable_by(|a,b| a.0.cmp(&b.0));
         let first_expected_slot = max - 432_000;
-        error("range before scan: {}", max - slots.first().map(|slot| slot).unwrap_or_default());
+        error("range before scan: {}", max - slots.first().map(|slot| slot.0).unwrap_or_default());
         for (slot, store) in slots {
             if slot >= first_expected_slot {
                 break;
