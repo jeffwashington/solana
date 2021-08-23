@@ -1761,6 +1761,7 @@ pub fn process_accounts_package(
     if let Some(expected_hash) = accounts_package.hash_for_testing {
         let sorted_storages = SortedStorages::new(&accounts_package.storages);
         let (hash, lamports) = AccountsDb::calculate_accounts_hash_without_index(
+            &accounts_package.snapshot_output_dir,
             &sorted_storages,
             thread_pool,
             crate::accounts_hash::HashStats::default(),
