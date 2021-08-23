@@ -1575,7 +1575,7 @@ impl AccountsDb {
         // do not match the criteria of deleting all appendvecs which contain them
         // then increment their storage count.
         use std::str::FromStr;
-        let pk1 = Pubkey::from_str("PkimpSks8R9KLHsTAupcHyBgYDitaE2PXk697urr3xP").unwrap();
+        let pk1 = Pubkey::from_str("7iXK9c9MSE1FwmGbNYqV8i3XxUDQ9JaY6EkjrbRrREvC").unwrap();
         let mut already_counted = HashSet::new();
         for (pubkey, (account_infos, ref_count_from_storage)) in purges.iter() {
             let no_delete = if account_infos.len() as u64 != *ref_count_from_storage {
@@ -1862,7 +1862,7 @@ impl AccountsDb {
             &mut key_timings,
         );
         use std::str::FromStr;
-        let pk1 = Pubkey::from_str("PkimpSks8R9KLHsTAupcHyBgYDitaE2PXk697urr3xP").unwrap();
+        let pk1 = Pubkey::from_str("7iXK9c9MSE1FwmGbNYqV8i3XxUDQ9JaY6EkjrbRrREvC").unwrap();
         let total_keys_count = pubkeys.len();
         let mut accounts_scan = Measure::start("accounts_scan");
         // parallel scan the index.
@@ -2311,7 +2311,7 @@ impl AccountsDb {
         let mut alive_accounts: Vec<_> = Vec::with_capacity(stored_accounts.len());
         let mut unrefed_pubkeys = vec![];
         use std::str::FromStr;
-        let pk1 = Pubkey::from_str("PkimpSks8R9KLHsTAupcHyBgYDitaE2PXk697urr3xP").unwrap();
+        let pk1 = Pubkey::from_str("7iXK9c9MSE1FwmGbNYqV8i3XxUDQ9JaY6EkjrbRrREvC").unwrap();
         for (pubkey, stored_account) in &stored_accounts {
             let lookup = self.accounts_index.get_account_read_entry(pubkey);
             if let Some(locked_entry) = lookup {
@@ -5804,7 +5804,7 @@ impl AccountsDb {
         purged_stored_account_slots: Option<&mut AccountSlots>,
     ) {
         use std::str::FromStr;        
-        let pk1 = Pubkey::from_str("PkimpSks8R9KLHsTAupcHyBgYDitaE2PXk697urr3xP").unwrap();
+        let pk1 = Pubkey::from_str("7iXK9c9MSE1FwmGbNYqV8i3XxUDQ9JaY6EkjrbRrREvC").unwrap();
         if let Some(purged_stored_account_slots) = purged_stored_account_slots {
             for (slot, pubkey) in purged_slot_pubkeys {
                 purged_stored_account_slots
@@ -6376,7 +6376,7 @@ impl AccountsDb {
             return 0;
         }
         use std::str::FromStr;
-        let pk1 = Pubkey::from_str("PkimpSks8R9KLHsTAupcHyBgYDitaE2PXk697urr3xP").unwrap();
+        let pk1 = Pubkey::from_str("7iXK9c9MSE1FwmGbNYqV8i3XxUDQ9JaY6EkjrbRrREvC").unwrap();
         let pk2 = Pubkey::from_str("GYULshLW5CvHAnGnUsgxHDrR3veRzMhFcNr4BYqQa3TM").unwrap();
 
         let secondary = !self.account_indexes.is_empty();
