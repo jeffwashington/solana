@@ -4872,7 +4872,7 @@ impl AccountsDb {
                         // so, build a file name:
                         let hash = hasher.finish();
                         let root = CacheHashData::get_cache_root_path(&ledger_path);
-                        file_name = format!("{}/hash_cache/{}.{}.{}.{}.{}", root.to_str().unwrap(), start, end, bin_range.start, bin_range.end, hash);
+                        file_name = format!("{}/{}.{}.{}.{}.{}", root.to_str().unwrap(), start, end, bin_range.start, bin_range.end, hash);
 
                         let amod = std::fs::metadata(file_name.clone());
                         //error!("chunk: {}, {}-{}, hash: {}, file: {}", chunk, start, end, hash, file_name);
