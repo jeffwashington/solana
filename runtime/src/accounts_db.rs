@@ -1605,9 +1605,10 @@ impl AccountsDb {
                         account_info.store_id,
                         store_counts.get(&account_info.store_id).unwrap().0,
                     );
-                    if store_counts.get(&account_info.store_id).unwrap().0 != 0 {
+                    let sc = store_counts.get(&account_info.store_id).unwrap();
+                    if sc.0 != 0 {
                         no_delete = true;
-                        if pubkey == &pk1 {
+                        if pubkey == &pk1 || sc.1.contains(&pk1) {
                             error!("{} {} addrefing for some reason {} no delete2", file!(), line!(), pk1);
                         }
         
@@ -1632,7 +1633,7 @@ impl AccountsDb {
                     let mut m = store_counts.get_mut(&id).unwrap();
                     m.0 += 1;
                     if m.1.contains(&pk1) {
-                        error!("{} {} addrefing for some reason {}", file!(), line!(), pk1);
+                        error!("{} {} calc_delete_dependencies: addrefing for some reason {}", file!(), line!(), pk1);
                     }
                     already_counted.insert(id);
 
