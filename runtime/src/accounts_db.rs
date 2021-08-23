@@ -365,7 +365,7 @@ pub struct AccountStorageEntry {
     ///  any accounts in it
     /// status corresponding to the storage, lets us know that
     ///  the append_vec, once maxed out, then emptied, can be reclaimed
-    count_and_status: RwLock<(usize, AccountStorageStatus)>,
+    pub count_and_status: RwLock<(usize, AccountStorageStatus)>,
 
     /// This is the total number of accounts stored ever since initialized to keep
     /// track of lifetime count of all store operations. And this differs from
@@ -3708,6 +3708,30 @@ impl AccountsDb {
         mut stats: &mut crate::accounts_hash::HashStats,
         bins: usize,
     ) -> Vec<Vec<Vec<CalculateHashIntermediate>>> {
+
+        let mut slots = vec![];
+        let mut max = 0;
+        for s in storage {
+            let slot = s.first().unwrap().slot();
+            max = std::cmp::max(max, slot);
+            slots.push((slot, s.first().unwrap().clone()));
+        }
+        slots.sort_unstable_by(|a,b| a.0.cmp(&b.0));
+        let first_expected_slot = max;// hack - 432_000;
+        for (slot, store) in slots {
+            if slot >= first_expected_slot {
+                break;
+            }
+
+            error!("unexpected old root: {}, count_and_status: {:?}, alive_bytes: {}", slot, store.count_and_status.read().unwrap(), store.alive_bytes.load(Ordering::Relaxed));
+            let accounts = store.accounts.accounts(0);
+            accounts.into_iter().for_each(|stored_account| {
+                let la = LoadedAccount::Stored(stored_account);
+                error!("accounts_in_store:{},{}", la.pubkey(), la.lamports());
+            });
+        }
+
+
         let max_plus_1 = std::u8::MAX as usize + 1;
         assert!(bins <= max_plus_1 && bins > 0);
         let mut time = Measure::start("scan all accounts");
