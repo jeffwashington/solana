@@ -269,6 +269,8 @@ impl CacheHashData {
         stats.read_us = m1.as_us();
         stats.cache_file_size += capacity as usize;
 
+        let file_name: String = path.as_ref().file_name().unwrap().to_str().unwrap().to_string();
+
         let found = preexisting.write().unwrap().remove(&file_name);
         if !found {
             /*
