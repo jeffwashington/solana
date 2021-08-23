@@ -1590,10 +1590,11 @@ impl AccountsDb {
                     account_infos.len(),
                     ref_count_from_storage,
                 );
-                if pubkey == &pk1 {
-                    error!("{} {} addrefing for some reason {} no delete, len: {}, ref: {}", file!(), line!(), pk1, account_infos.len() as u64, ref_count_from_storage);
+                for (_bank_id, account_info) in account_infos {
+                    if pubkey == &pk1 ||                    store_counts.get(&account_info.store_id).unwrap().1.contains(&pk1) {
+                        error!("{} {} addrefing for some reason {} no delete, len: {}, ref: {}", file!(), line!(), pk1, account_infos.len() as u64, ref_count_from_storage);
+                    }
                 }
-
                 true
             } else {
                 let mut no_delete = false;
