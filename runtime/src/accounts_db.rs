@@ -3686,7 +3686,15 @@ impl AccountsDb {
                 let accounts = store.accounts.accounts(0);
                 accounts.into_iter().for_each(|stored_account| {
                     let la = LoadedAccount::Stored(stored_account);
-                    error!("accounts_in_store:{},{}, ref_count_from_storage: {}, index value: {:?}", la.pubkey(), la.lamports(), self.accounts_index.ref_count_from_storage(la.pubkey()), self.accounts_index.account_maps.read().unwrap().get(la.pubkey()));
+                    let key = la.pubkey();
+                    let read = self.accounts_index.account_maps.read().unwrap();
+                    let v = read.get(key);
+                    error!("accounts_in_store:{},{}, ref_count_from_storage: {}, index rc: {}", la.pubkey(), la.lamports(), self.accounts_index.ref_count_from_storage(la.pubkey()), v.map(|x| x.ref_count()).unwrap_or_default());
+                    if let Some(v) = v {
+                        for i in v.slot_list.read().unwrap().iter() {
+                            error!("accounts_index: {:?}", i);
+                        }
+                    }
                 });
             }
     
