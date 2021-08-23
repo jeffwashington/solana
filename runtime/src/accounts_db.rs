@@ -4890,7 +4890,7 @@ impl AccountsDb {
                                 let range = bin_range.end - bin_range.start;
                                 retval.append(&mut vec![Vec::new(); range]);
                             }
-                            let stats = CacheHashData::load2(
+                            let mut stats = CacheHashData::load2(
                                 0,//slot,
                                 &Path::new(&file_name),
                             &mut retval,
@@ -4900,6 +4900,8 @@ impl AccountsDb {
                                 CacheHashDataStats::default()
                             )
                             .unwrap();
+                            stats.loaded_from_cache += 1;
+
                             big_stats.lock().unwrap().merge(&stats.1);                            
                             return retval;
         
