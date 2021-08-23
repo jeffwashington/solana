@@ -6386,7 +6386,7 @@ impl AccountsDb {
         }
         use std::str::FromStr;
         let pk1 = Pubkey::from_str("7iXK9c9MSE1FwmGbNYqV8i3XxUDQ9JaY6EkjrbRrREvC").unwrap();
-        let pk2 = Pubkey::from_str("GYULshLW5CvHAnGnUsgxHDrR3veRzMhFcNr4BYqQa3TM").unwrap();
+        let pk2 = Pubkey::from_str("2e6MWfq2ZuMg1hPPozqKcvmmC4Ux2CdupJVDUAPLv8v1").unwrap();
 
         let secondary = !self.account_indexes.is_empty();
 
