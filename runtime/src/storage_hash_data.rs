@@ -269,8 +269,8 @@ impl CacheHashData {
         stats.read_us = m1.as_us();
         stats.cache_file_size += capacity as usize;
 
-        //let found = preexisting.write().unwrap().remove(&file_name);
-        /*if !found {
+        let found = preexisting.write().unwrap().remove(&file_name);
+        if !found {
             /*
             error!(
                 "tried to mark {:?} as used, but it wasn't in the set: {:?}",
@@ -278,7 +278,7 @@ impl CacheHashData {
                 preexisting.read().unwrap().iter().next()
             );
             */
-        }*/
+        }
 
         stats.entries_loaded_from_cache += sum;
         let mut m2 = Measure::start("");
