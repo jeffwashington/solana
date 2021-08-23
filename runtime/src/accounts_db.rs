@@ -2002,7 +2002,7 @@ impl AccountsDb {
                     store_count.0 -= 1;
                     store_count.1.insert(*key);
                     if key == &pk1 || key == &pk2 {
-                        error!("{} {} clean2: {} purged_account_slots: {}, ref_count: {} store_count: {}, counts: {:?}", file!(), line!(), key, has_key, ref_count, store_count.0, store_count.1);
+                        error!("{} {} clean2: {} purged_account_slots: {}, ref_count: {} store_count: {}, key_set: {:?}", file!(), line!(), key, has_key, ref_count, store_count.0, store_count.1);
                     }
                 } else {
                     let mut key_set = HashSet::new();
@@ -2016,6 +2016,9 @@ impl AccountsDb {
                         "store_counts, inserting slot: {}, store id: {}, count: {}",
                         slot, account_info.store_id, count
                     );
+                    if key == &pk1 || key == &pk2 {
+                        error!("{} {} clean2: {} purged_account_slots: {}, ref_count: {} store_count: {}, key_set: {:?}", file!(), line!(), key, has_key, ref_count, count, key_set);
+                    }
                     store_counts.insert(account_info.store_id, (count, key_set));
                 }
                 true
