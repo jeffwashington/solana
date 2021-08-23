@@ -5033,9 +5033,12 @@ impl Bank {
         accounts_db_skip_shrink: bool,
         last_full_snapshot_slot: Option<Slot>,
     ) -> bool {
+        let mut clean_time;
+        let mut verify_time;
+        let mut shrink_all_slots_time;
         for i in 0..5 {
             info!("cleaning..");
-            let mut clean_time = Measure::start("clean");
+            clean_time = Measure::start("clean");
             if self.slot() > 0 {
                 self.clean_accounts(true, true, last_full_snapshot_slot);
             }
