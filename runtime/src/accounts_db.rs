@@ -4960,7 +4960,7 @@ impl AccountsDb {
                     }
                 let r = after_func(retval);
                 if !file_name.is_empty() {
-                    //error!("creating: {}", file_name);
+                    error!("creating: {}", file_name);
                     
                     let stats = CacheHashData::save3(
                         0,//slot,
