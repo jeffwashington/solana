@@ -1593,7 +1593,7 @@ impl AccountsDb {
                 );
                 for (_bank_id, account_info) in account_infos {
                     if pubkey == &pk1 ||                    store_counts.get(&account_info.store_id).unwrap().1.contains(&pk1) {
-                        error!("{} {} addrefing for some reason {} no delete, len: {}, ref: {}, causing pubkey: {}", file!(), line!(), pk1, account_infos.len() as u64, ref_count_from_storage,pubkey);
+                        error!("{} {} addrefing for some reason {} no delete, len: {}, ref: {}, causing pubkey: {}, account_infos: {:?}", file!(), line!(), pk1, account_infos.len() as u64, ref_count_from_storage,pubkey, account_infos);
                     }
                 }
                 true
