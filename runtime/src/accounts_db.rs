@@ -1610,7 +1610,7 @@ impl AccountsDb {
                     if sc.0 != 0 {
                         no_delete = true;
                         if pubkey == &pk1 || sc.1.contains(&pk1) {
-                            error!("{} {} addrefing for some reason {} no delete2", file!(), line!(), pk1);
+                            error!("{} {} addrefing for some reason {} no delete: store_id: {}, sc.0: {}, causing pubkey: {}", file!(), line!(), pk1, account_info.store_id, sc.0, pubkey);
                         }
         
                         break;
