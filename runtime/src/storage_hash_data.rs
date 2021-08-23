@@ -271,16 +271,14 @@ impl CacheHashData {
 
         let file_name: String = path.as_ref().file_name().unwrap().to_str().unwrap().to_string();
 
-        error!("Found: {:?}, items: {:?}", file_name, preexisting.write().unwrap());
+        //error!("Found: {:?}, items: {:?}", file_name, preexisting.write().unwrap());
         let found = preexisting.write().unwrap().remove(&file_name);
         if !found {
-            /*
             error!(
                 "tried to mark {:?} as used, but it wasn't in the set: {:?}",
                 file_name,
                 preexisting.read().unwrap().iter().next()
             );
-            */
         }
 
         stats.entries_loaded_from_cache += sum;
