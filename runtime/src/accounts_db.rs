@@ -1577,7 +1577,8 @@ impl AccountsDb {
         use std::str::FromStr;
         let pk1 = Pubkey::from_str("7iXK9c9MSE1FwmGbNYqV8i3XxUDQ9JaY6EkjrbRrREvC").unwrap();
         let mut already_counted = HashSet::new();
-        for (pubkey, (account_infos, ref_count_from_storage)) in purges.iter() {
+        let mut afn = |x: (&Pubkey, &(SlotList<AccountInfo>, u64))| {
+            let (pubkey, (account_infos, ref_count_from_storage)) = x;
             let no_delete = if account_infos.len() as u64 != *ref_count_from_storage {
                 debug!(
                     "calc_delete_dependencies(),
@@ -1648,6 +1649,12 @@ impl AccountsDb {
                     }
                 }
             }
+
+        };
+        let x = purges.get(&pk1);
+        x.map(|x| afn((&pk1, x)));
+        for x in purges.iter() {
+            afn(x);
         }
     }
 
