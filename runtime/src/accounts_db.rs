@@ -5703,6 +5703,10 @@ impl AccountsDb {
     ) -> HashSet<Slot> {
         let mut dead_slots = HashSet::new();
         let mut new_shrink_candidates: ShrinkCandidates = HashMap::new();
+        use std::str::FromStr;        
+        let pk1 = Pubkey::from_str("7iXK9c9MSE1FwmGbNYqV8i3XxUDQ9JaY6EkjrbRrREvC").unwrap();
+        let pk2 = Pubkey::from_str("2e6MWfq2ZuMg1hPPozqKcvmmC4Ux2CdupJVDUAPLv8v1").unwrap();
+
         for (slot, account_info) in reclaims {
             // No cached accounts should make it here
             assert_ne!(account_info.store_id, CACHE_VIRTUAL_STORAGE_ID);
@@ -5724,6 +5728,10 @@ impl AccountsDb {
                     "AccountDB::accounts_index corrupted. Storage pointed to: {}, expected: {}, should only point to one slot",
                     store.slot(), *slot
                 );
+                let pk = store.get_stored_account_meta(account_info.offset).map(|x| x.meta.pubkey).unwrap_or_default();
+                if pk1 == pk || pk2 == pk {
+                    error!("remove_dead_accounts: {}", pk);
+                }
                 let count = store.remove_account(account_info.stored_size, reset_accounts);
                 if count == 0 {
                     self.dirty_stores
