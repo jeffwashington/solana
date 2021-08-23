@@ -1996,7 +1996,7 @@ impl AccountsDb {
                         error!("{} {} clean2: {} purged_account_slots: {}, ref_count: {} was_reclaimed: {}", file!(), line!(), key, has_key, ref_count, was_reclaimed);
                     }
                 if was_reclaimed {
-                    *ref_count -= 1; // since we are excluding this account info, we also want to reduce the refcount so they match
+                    //*ref_count -= 1; // since we are excluding this account info, we also want to reduce the refcount so they match
                     return false;
                 }
                 if let Some(store_count) = store_counts.get_mut(&account_info.store_id) {
