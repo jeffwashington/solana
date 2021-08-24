@@ -173,6 +173,7 @@ impl CacheHashData {
         file_names: &PreExistingCacheFiles,
     ) {
         let (cache, _) = Self::directory(storage_path);
+        error!("deleting unused cache files: {}", file_names.len());
         for file_name in file_names {
             let result = cache.join(file_name);
             let _ = fs::remove_file(result);
