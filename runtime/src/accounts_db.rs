@@ -4051,7 +4051,7 @@ impl AccountsDb {
         for slot in dead_slots.iter() {
             if let Some(slot_storage) = self.storage.get_slot_stores(*slot) {
                 for store in slot_storage.read().unwrap().values() {
-                    error!("clean_stored_dead_slots: {:?}", dead_slots);
+                    error!("clean_stored_dead_slots: {:?}", store.slot());
                     let already_unrefd = store.unref_done.swap(true, Ordering::Relaxed);
                     assert!(!already_unrefd);
 
