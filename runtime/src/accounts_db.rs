@@ -1423,6 +1423,10 @@ impl AccountsDb {
     pub fn clean_accounts(&self, max_clean_root: Option<Slot>) {
         let max_clean_root = self.max_clean_root(max_clean_root);
 
+        let bad_slot = 73977800;
+        use std::str::FromStr;
+                let pk1 = Pubkey::from_str("9r96BQDNY7iWfHwc6KuyDKVqg5xSp8Lsu4t4gZuZmWVi").unwrap();
+
         // hold a lock to prevent slot shrinking from running because it might modify some rooted
         // slot storages which can not happen as long as we're cleaning accounts because we're also
         // modifying the rooted slot storages!
@@ -1449,6 +1453,10 @@ impl AccountsDb {
                                 let slot_list = locked_entry.slot_list();
                                 let (slot, account_info) = &slot_list[index];
                                 if account_info.lamports == 0 {
+                                    if pubkey == &pk1 {
+                                        error!("{} {} clean_accounts {} {:?}", file!(), line!(), pubkey, self.accounts_index
+                                        .roots_and_ref_count(&locked_entry, max_clean_root));
+                                    }
                                     purges.insert(
                                         *pubkey,
                                         self.accounts_index
@@ -1521,6 +1529,10 @@ impl AccountsDb {
             if purged_account_slots.contains_key(&key) {
                 *ref_count = self.accounts_index.ref_count_from_storage(&key);
             }
+            if key == &pk1 {
+                error!("{} {} clean_accounts2 {} {:?}", file!(), line!(), key, (&account_infos, &ref_count));
+            }
+
             account_infos.retain(|(slot, account_info)| {
                 let was_slot_purged = purged_account_slots
                     .get(&key)
