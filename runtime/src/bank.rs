@@ -2113,17 +2113,19 @@ impl Bank {
         self.force_flush_accounts_cache();
         flush.stop();
 
-        let mut clean = Measure::start("clean");
-        // Don't clean the slot we're snapshotting because it may have zero-lamport
-        // accounts that were included in the bank delta hash when the bank was frozen,
-        // and if we clean them here, any newly created snapshot's hash for this bank
-        // may not match the frozen hash.
-        self.clean_accounts(true);
-        clean.stop();
+        for i in 0..5 {
+            let mut clean = Measure::start("clean");
+            // Don't clean the slot we're snapshotting because it may have zero-lamport
+            // accounts that were included in the bank delta hash when the bank was frozen,
+            // and if we clean them here, any newly created snapshot's hash for this bank
+            // may not match the frozen hash.
+            self.clean_accounts(true);
+            clean.stop();
 
-        let mut shrink = Measure::start("shrink");
-        self.shrink_all_slots();
-        shrink.stop();
+            let mut shrink = Measure::start("shrink");
+            self.shrink_all_slots();
+            shrink.stop();
+        }
 
         info!(
             "exhaustively_free_unused_resource() {} {} {}",
