@@ -2623,6 +2623,7 @@ impl AccountsDb {
         }
         remove_storages_elapsed.stop();
 
+        error!("do_purge_slots_from_cache_and_store: {:?}", all_removed_slot_storages);
         for s in &all_removed_slot_storages {
             for (_store_id, store) in s.read().unwrap().iter() {
                 if !store.unref_done.swap(true, Ordering::Relaxed) {
@@ -4050,6 +4051,7 @@ impl AccountsDb {
         for slot in dead_slots.iter() {
             if let Some(slot_storage) = self.storage.get_slot_stores(*slot) {
                 for store in slot_storage.read().unwrap().values() {
+                    error!("clean_stored_dead_slots: {:?}", dead_slots);
                     let already_unrefd = store.unref_done.swap(true, Ordering::Relaxed);
                     assert!(!already_unrefd);
 
