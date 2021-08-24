@@ -1541,6 +1541,10 @@ impl AccountsDb {
                     .map(|slots_removed| slots_removed.contains(slot))
                     .unwrap_or(false);
                 if was_slot_purged {
+                    if key == &pk1 {
+                        error!("{} {} clean_accounts2 {} {:?}, was_slot_purged", file!(), line!(), key, (&account_info, &slot));
+                    }
+        
                     // No need to look up the slot storage below if the entire
                     // slot was purged
                     return false;
@@ -1552,6 +1556,9 @@ impl AccountsDb {
                     .map(|store_removed| store_removed.contains(&account_info.offset))
                     .unwrap_or(false);
                 if was_reclaimed {
+                    if key == &pk1 {
+                        error!("{} {} clean_accounts2 {} {:?}, was_reclaimed", file!(), line!(), key, (&account_info, &slot));
+                    }
                     return false;
                 }
                 if let Some(store_count) = store_counts.get_mut(&account_info.store_id) {

@@ -2125,13 +2125,13 @@ impl Bank {
             let mut shrink = Measure::start("shrink");
             self.shrink_all_slots();
             shrink.stop();
-        }
 
         info!(
             "exhaustively_free_unused_resource() {} {} {}",
             flush, clean, shrink,
         );
     }
+}
 
     pub fn epoch_schedule(&self) -> &EpochSchedule {
         &self.epoch_schedule
