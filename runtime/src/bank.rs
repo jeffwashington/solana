@@ -2114,6 +2114,7 @@ impl Bank {
         flush.stop();
 
         for i in 0..5 {
+            error!("clean, then shrink");
             let mut clean = Measure::start("clean");
             // Don't clean the slot we're snapshotting because it may have zero-lamport
             // accounts that were included in the bank delta hash when the bank was frozen,
