@@ -1967,7 +1967,12 @@ impl AccountsDb {
         for (key, (account_infos, ref_count)) in purges_zero_lamports.iter_mut() {
             let mut has_key = false;
             if purged_account_slots.contains_key(key) {
-                *ref_count = self.accounts_index.ref_count_from_storage(key);
+                if let Some(locked_entry) = self.accounts_index.get_account_read_entry(key) {
+                    let updated = self.accounts_index
+                        .roots_and_ref_count(&locked_entry, max_clean_root);
+                    *account_infos = updated.0;
+                    *ref_count = updated.1;
+                }
                 has_key = true;
             }
             if key == &pk1 || key == &pk2 {
@@ -1996,6 +2001,7 @@ impl AccountsDb {
                         error!("{} {} clean2: {} purged_account_slots: {}, ref_count: {} was_reclaimed: {}", file!(), line!(), key, has_key, ref_count, was_reclaimed);
                     }
                 if was_reclaimed {
+                    // what if was reclaimed, but is still holding store in memory
                     //*ref_count -= 1; // since we are excluding this account info, we also want to reduce the refcount so they match
                     return false;
                 }
@@ -6422,7 +6428,7 @@ impl AccountsDb {
                     );
                 }
 
-                if pubkey == pk1 || pubkey == pk2 || slot == &73365341 || slot == &73365341 {
+                if pubkey == pk1 || pubkey == pk2 || slot == &73365341 || slot == &73365033 {
                     error!("loading: {} {} {:?}, items in slot: {}", slot, pubkey, stored_account.account_meta.lamports, len);
                 }
 
