@@ -4,6 +4,7 @@ use crate::{
     secondary_index::*,
 };
 use dashmap::DashSet;
+use log::*;
 use ouroboros::self_referencing;
 use solana_measure::measure::Measure;
 use solana_sdk::{
@@ -981,7 +982,11 @@ impl<T: 'static + Clone + IsCached + ZeroLamport> AccountsIndex<T> {
 
     pub fn unref_from_storage(&self, pubkey: &Pubkey) {
         if let Some(locked_entry) = self.get_account_read_entry(pubkey) {
+            error!("{} {} unref_from_storage: {}, rc old: {}", file!(), line!(), pubkey, locked_entry.ref_count().load(Ordering::Relaxed));
             locked_entry.unref();
+        }
+        else {
+            error!("{} {} unref_from_storage: {} not found!", file!(), line!(), pubkey);
         }
     }
 

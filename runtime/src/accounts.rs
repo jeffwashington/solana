@@ -894,6 +894,7 @@ impl Accounts {
     /// Purge a slot if it is not a root
     /// Root slots cannot be purged
     pub fn purge_slot(&self, slot: Slot) {
+        error!("{} {} purge_slot", file!(), line!());
         self.accounts_db.purge_slot(slot);
     }
 

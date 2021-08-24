@@ -300,7 +300,7 @@ impl AccountStorage {
             .and_then(|storage_map| storage_map.read().unwrap().get(&store_id).cloned())
     }
 
-    fn get_slot_stores(&self, slot: Slot) -> Option<SlotStores> {
+    pub fn get_slot_stores(&self, slot: Slot) -> Option<SlotStores> {
         self.0.get(&slot).map(|result| result.value().clone())
     }
 
@@ -376,6 +376,8 @@ pub struct AccountStorageEntry {
     approx_store_count: AtomicUsize,
 
     alive_bytes: AtomicUsize,
+
+    pub(crate) unref_done: AtomicBool,
 }
 
 impl AccountStorageEntry {
@@ -391,6 +393,7 @@ impl AccountStorageEntry {
             count_and_status: RwLock::new((0, AccountStorageStatus::Available)),
             approx_store_count: AtomicUsize::new(0),
             alive_bytes: AtomicUsize::new(0),
+            unref_done: AtomicBool::new(false),
         }
     }
 
@@ -407,6 +410,7 @@ impl AccountStorageEntry {
             count_and_status: RwLock::new((0, AccountStorageStatus::Available)),
             approx_store_count: AtomicUsize::new(num_accounts),
             alive_bytes: AtomicUsize::new(0),
+            unref_done: AtomicBool::new(false),
         }
     }
 
@@ -1184,6 +1188,7 @@ impl AccountsDb {
         purges_in_root: Vec<Pubkey>,
         max_clean_root: Option<Slot>,
     ) -> ReclaimResult {
+        error!("{} {} clean_old_rooted_accounts: {:?}", file!(), line!(), purges_in_root);
         if purges_in_root.is_empty() {
             return (HashMap::new(), HashMap::new());
         }
@@ -1661,6 +1666,7 @@ impl AccountsDb {
         reclaim_result: Option<&mut ReclaimResult>,
         reset_accounts: bool,
     ) {
+        error!("{} {} handle_reclaims: {:?}", file!(), line!(), reclaims);
         if reclaims.is_empty() {
             return;
         }
@@ -1694,16 +1700,19 @@ impl AccountsDb {
         dead_slots: &HashSet<Slot>,
         purged_account_slots: Option<&mut AccountSlots>,
     ) {
+        error!("{} {} process_dead_slots: {:?}", file!(), line!(), dead_slots);
         if dead_slots.is_empty() {
             return;
         }
         let mut clean_dead_slots = Measure::start("reclaims::clean_dead_slots");
         self.clean_stored_dead_slots(&dead_slots, purged_account_slots);
         clean_dead_slots.stop();
+        error!("{} {} process_dead_slots", file!(), line!());
 
         let mut purge_removed_slots = Measure::start("reclaims::purge_removed_slots");
         self.purge_storage_slots(&dead_slots);
         purge_removed_slots.stop();
+        error!("{} {} process_dead_slots", file!(), line!());
 
         // If the slot is dead, remove the need to shrink the storages as
         // the storage entries will be purged.
@@ -2533,6 +2542,7 @@ impl AccountsDb {
     }
 
     pub fn purge_slot(&self, slot: Slot) {
+        error!("{} {} purge_slot", file!(), line!());
         let mut slots = HashSet::new();
         slots.insert(slot);
         self.purge_slots(&slots);
@@ -2572,13 +2582,17 @@ impl AccountsDb {
         removed_slots: impl Iterator<Item = &'a Slot>,
         purge_stats: &PurgeStats,
     ) {
+        //panic!("");
+        error!("{} {} do_purge_slots_from_cache_and_store", file!(), line!());
         let mut remove_storages_elapsed = Measure::start("remove_storages_elapsed");
         let mut all_removed_slot_storages = vec![];
         let mut num_cached_slots_removed = 0;
         let mut total_removed_cached_bytes = 0;
         let mut total_removed_storage_entries = 0;
         let mut total_removed_stored_bytes = 0;
+        let mut removed_slots_accum = vec![];
         for remove_slot in removed_slots {
+            removed_slots_accum.push(remove_slot);
             if let Some(slot_cache) = self.accounts_cache.remove_slot(*remove_slot) {
                 // If the slot is still in the cache, remove the backing storages for
                 // the slot and from the Accounts Index
@@ -2596,6 +2610,7 @@ impl AccountsDb {
                 // confident that the entire state for this slot has been flushed to the storage
                 // already.
 
+                error!("{} {} not in cache", file!(), line!());
                 // Note this only cleans up the storage entries. The accounts index cleaning
                 // (removing from the slot list, decrementing the account ref count), is handled in
                 // clean_accounts() -> purge_older_root_entries()
@@ -2619,6 +2634,26 @@ impl AccountsDb {
         }
         remove_storages_elapsed.stop();
 
+        error!("{} {} removed_slots_accum, {:?}", file!(), line!(), removed_slots_accum);
+        error!("{} {} do_purge_slots_from_cache_and_store, {:?}", file!(), line!(), all_removed_slot_storages);
+        //panic!("");
+        let mut pubkeys = vec![];
+
+        for s in &all_removed_slot_storages {
+            for (_store_id, store) in s.read().unwrap().iter() {
+                if !store.unref_done.swap(true, Ordering::Relaxed) {
+                    for a in store.accounts.accounts(0) {
+                        error!("{} {} should unref_from_storage?, {:?}, index: {:?}", file!(), line!(), a.meta.pubkey, self.accounts_index.get_account_read_entry(&a.meta.pubkey).map(|x| format!("{:?} {}", x.slot_list(), x.ref_count().load(Ordering::Relaxed))).unwrap_or(format!("")));
+                        pubkeys.push(a.meta.pubkey);
+                        self.accounts_index.unref_from_storage(&a.meta.pubkey);
+                    }
+                }
+                else {
+                    error!("skipping unref because it already happened");
+                }
+            }
+        }
+
         let num_stored_slots_removed = all_removed_slot_storages.len();
 
         let recycle_stores_write_elapsed =
@@ -2629,6 +2664,11 @@ impl AccountsDb {
         // of any locks
         drop(all_removed_slot_storages);
         drop_storage_entries_elapsed.stop();
+        error!("{} {} after drop storages: {:?}", file!(), line!(), pubkeys);
+        for p in pubkeys {
+            error!("{} {} should unref_from_storage?, {:?}, index: {:?}", file!(), line!(), p, self.accounts_index.get_account_read_entry(&p).map(|x| format!("{:?} {}", x.slot_list(), x.ref_count().load(Ordering::Relaxed))).unwrap_or(format!("")));
+        }
+
 
         purge_stats
             .remove_storages_elapsed
@@ -2667,6 +2707,7 @@ impl AccountsDb {
             .purge_stats
             .safety_checks_elapsed
             .fetch_add(safety_checks_elapsed.as_us(), Ordering::Relaxed);
+        error!("{} {} purge_storage_slots calling do_purge_slots_from_cache_and_store", file!(), line!());
         self.do_purge_slots_from_cache_and_store(
             false,
             removed_slots.iter(),
@@ -2675,6 +2716,7 @@ impl AccountsDb {
     }
 
     fn purge_slot_cache(&self, purged_slot: Slot, slot_cache: SlotCache) {
+        error!("{} {} purge_slot_cache, {:?}", file!(), line!(), purged_slot);
         let mut purged_slot_pubkeys: HashSet<(Slot, Pubkey)> = HashSet::new();
         let pubkey_to_slot_set: Vec<(Pubkey, Slot)> = slot_cache
             .iter()
@@ -2693,6 +2735,7 @@ impl AccountsDb {
         pubkey_to_slot_set: Vec<(Pubkey, Slot)>,
         is_dead: bool,
     ) {
+        error!("{} {} purge_slot_cache_pubkeys", file!(), line!());
         // Slot purged from cache should not exist in the backing store
         assert!(self.storage.get_slot_stores(purged_slot).is_none());
         let num_purged_keys = pubkey_to_slot_set.len();
@@ -2708,6 +2751,7 @@ impl AccountsDb {
     }
 
     fn purge_slots(&self, slots: &HashSet<Slot>) {
+        error!("{} {} purge_slots", file!(), line!());
         // `add_root()` should be called first
         let mut safety_checks_elapsed = Measure::start("safety_checks_elapsed");
         let non_roots: Vec<&Slot> = slots
@@ -3069,6 +3113,10 @@ impl AccountsDb {
             .purge_stats
             .recycle_stores_write_elapsed
             .fetch_add(recycle_stores_write_elapsed.as_us(), Ordering::Relaxed);
+    }
+
+    pub fn flush_accounts_cache_slot(&self, slot: Slot) {
+        self.flush_slot_cache(slot, None::<&mut fn(&_, &_) -> bool>);
     }
 
     // `force_flush` flushes all the cached roots `<= requested_flush_root`. It also then
@@ -3988,6 +4036,7 @@ impl AccountsDb {
         // Should only be `Some` for non-cached slots
         purged_stored_account_slots: Option<&mut AccountSlots>,
     ) {
+        error!("{} {} finalize_dead_slot_removal, calling unref", file!(), line!());
         if let Some(purged_stored_account_slots) = purged_stored_account_slots {
             for (slot, pubkey) in purged_slot_pubkeys {
                 purged_stored_account_slots
@@ -3997,6 +4046,7 @@ impl AccountsDb {
                 self.accounts_index.unref_from_storage(&pubkey);
             }
         }
+        error!("{} {} finalize_dead_slot_removal, done calling unref", file!(), line!());
 
         let mut accounts_index_root_stats = AccountsIndexRootsStats::default();
         let dead_slots: Vec<_> = dead_slots_iter
@@ -4008,7 +4058,7 @@ impl AccountsDb {
                 *slot
             })
             .collect();
-        info!("finalize_dead_slot_removal: slots {:?}", dead_slots);
+            error!("finalize_dead_slot_removal: slots {:?}", dead_slots);
 
         self.clean_accounts_stats
             .latest_accounts_index_roots_stats
@@ -4027,11 +4077,15 @@ impl AccountsDb {
         dead_slots: &HashSet<Slot>,
         purged_account_slots: Option<&mut AccountSlots>,
     ) {
+        error!("{} {} clean_stored_dead_slots: {:?}", file!(), line!(), dead_slots);
         let mut measure = Measure::start("clean_stored_dead_slots-ms");
         let mut stores: Vec<Arc<AccountStorageEntry>> = vec![];
         for slot in dead_slots.iter() {
             if let Some(slot_storage) = self.storage.get_slot_stores(*slot) {
                 for store in slot_storage.read().unwrap().values() {
+                    let already_unrefd = store.unref_done.swap(true, Ordering::Relaxed);
+                    assert!(!already_unrefd);
+
                     stores.push(store.clone());
                 }
             }
@@ -4538,7 +4592,7 @@ impl AccountsDb {
         info!("recycle_stores:");
         let recycle_stores = self.recycle_stores.read().unwrap();
         for (recycled_time, entry) in recycle_stores.iter() {
-            info!(
+            error!(
                 "  slot: {} id: {} count_and_status: {:?} approx_store_count: {} len: {} capacity: {} (recycled: {:?})",
                 entry.slot(),
                 entry.append_vec_id(),
@@ -4555,10 +4609,10 @@ impl AccountsDb {
         let mut roots: Vec<_> = self.accounts_index.all_roots();
         #[allow(clippy::stable_sort_primitive)]
         roots.sort();
-        info!("{}: accounts_index roots: {:?}", label, roots,);
+        error!("{}: accounts_index roots: {:?}", label, roots,);
         for (pubkey, account_entry) in self.accounts_index.account_maps.read().unwrap().iter() {
-            info!("  key: {} ref_count: {}", pubkey, account_entry.ref_count(),);
-            info!(
+            error!("  key: {} ref_count: {}", pubkey, account_entry.ref_count(),);
+            error!(
                 "      slots: {:?}",
                 *account_entry.slot_list.read().unwrap()
             );
@@ -5848,7 +5902,7 @@ pub mod tests {
             }
         }
 
-        fn ref_count_for_pubkey(&self, pubkey: &Pubkey) -> RefCount {
+        pub fn ref_count_for_pubkey(&self, pubkey: &Pubkey) -> RefCount {
             self.accounts_index.ref_count_from_storage(&pubkey)
         }
     }
