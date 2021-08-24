@@ -4826,9 +4826,8 @@ impl AccountsDb {
         check_hash: bool,
         can_cached_slot_be_unflushed: bool,
     ) -> Result<(Hash, u64), BankHashVerificationError> {
-
         {
-            let combined_maps = self.get_snapshot_storages(slot, None, None);
+            let combined_maps = self.get_snapshot_storages(slot, None, None).0;
 
             let mut slots = vec![];
             let mut max = 0;
@@ -4837,22 +4836,41 @@ impl AccountsDb {
                 max = std::cmp::max(max, slot);
                 slots.push((slot, s.first().unwrap().clone()));
             }
-            slots.sort_unstable_by(|a,b| a.0.cmp(&b.0));
+            slots.sort_unstable_by(|a, b| a.0.cmp(&b.0));
             let first_expected_slot = max - 432_000;
-            error!("range before scan: {}", max - slots.first().map(|slot| slot.0).unwrap_or_default());
+            error!(
+                "range before scan: {}",
+                max - slots.first().map(|slot| slot.0).unwrap_or_default()
+            );
             for (slot, store) in slots {
                 if slot >= first_expected_slot {
                     break;
                 }
 
-                error!("unexpected old root: {}, count_and_status: {:?}, alive_bytes: {}", slot, store.count_and_status.read().unwrap(), store.alive_bytes.load(Ordering::Relaxed));
+                error!(
+                    "unexpected old root: {}, count_and_status: {:?}, alive_bytes: {}",
+                    slot,
+                    store.count_and_status.read().unwrap(),
+                    store.alive_bytes.load(Ordering::Relaxed)
+                );
                 let accounts = store.accounts.accounts(0);
                 accounts.into_iter().for_each(|stored_account| {
                     let la = LoadedAccount::Stored(stored_account);
                     let key = la.pubkey();
-                    let read = self.accounts_index.account_maps.read().unwrap();
+                    let read = self.accounts_index.account_maps[self
+                        .accounts_index
+                        .bin_calculator
+                        .bin_from_pubkey(la.pubkey())]
+                    .read()
+                    .unwrap();
                     let v = read.get(key);
-                    error!("accounts_in_store:{},{}, ref_count_from_storage: {}, index rc: {}", la.pubkey(), la.lamports(), self.accounts_index.ref_count_from_storage(la.pubkey()), v.map(|x| x.ref_count()).unwrap_or_default());
+                    error!(
+                        "accounts_in_store:{},{}, ref_count_from_storage: {}, index rc: {}",
+                        la.pubkey(),
+                        la.lamports(),
+                        self.accounts_index.ref_count_from_storage(la.pubkey()),
+                        v.map(|x| x.ref_count()).unwrap_or_default()
+                    );
                     if let Some(v) = v {
                         for i in v.slot_list.read().unwrap().iter() {
                             error!("accounts_index: {:?}", i);
@@ -4860,7 +4878,7 @@ impl AccountsDb {
                     }
                 });
             }
-        }        
+        }
         if !use_index {
             let accounts_cache_and_ancestors = if can_cached_slot_be_unflushed {
                 Some((&self.accounts_cache, ancestors, &self.accounts_index))
