@@ -4801,7 +4801,7 @@ impl AccountsDb {
     {
         // Without chunks, we end up with 1 output vec for each outer snapshot storage.
         // This results in too many vectors to be efficient.
-        const MAX_ITEMS_PER_CHUNK: Slot = 100_000;
+        const MAX_ITEMS_PER_CHUNK: Slot = 100;
         let width = snapshot_storages.range_width();
         let chunks = 2 + (width as Slot / MAX_ITEMS_PER_CHUNK);
         let range = snapshot_storages.range();
@@ -5255,8 +5255,10 @@ impl AccountsDb {
             .map(|s| s.get_path());
         let pre_existing_cache_files = pre_existing_cache_files.read().unwrap();
         if !pre_existing_cache_files.is_empty() {
+            let root = CacheHashData::get_cache_root_path(&ledger_path);
+
             CacheHashData::delete_old_cache_files(
-                &a_storage_path.unwrap(),
+                &root,
                 &pre_existing_cache_files,
         );
         }
