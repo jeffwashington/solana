@@ -4511,6 +4511,15 @@ impl Bank {
         }
         shrink_all_slots_time.stop();
 
+        for i in 0..5 {
+            if self.slot() > 0 {
+                self.clean_accounts(true);
+            }
+            if self.slot() > 0 {
+                self.shrink_all_slots();
+            }
+        }
+
         let mut verify_time = Measure::start("verify_bank_hash");
         let mut verify = self.verify_bank_hash();
         verify_time.stop();
