@@ -4119,7 +4119,7 @@ impl AccountsDb {
                 *slot
             })
             .collect();
-        info!("finalize_dead_slot_removal: slots {:?}", dead_slots);
+        //info!("finalize_dead_slot_removal: slots {:?}", dead_slots);
 
         self.clean_accounts_stats
             .latest_accounts_index_roots_stats
@@ -4582,6 +4582,10 @@ impl AccountsDb {
                     );
                 })
             });
+            let bad_slot = 73977800;
+            use std::str::FromStr;
+                    let pk1 = Pubkey::from_str("9r96BQDNY7iWfHwc6KuyDKVqg5xSp8Lsu4t4gZuZmWVi").unwrap();
+    
             // Need to restore indexes even with older write versions which may
             // be shielding other accounts. When they are then purged, the
             // original non-shielded account value will be visible when the account
@@ -4598,6 +4602,10 @@ impl AccountsDb {
                             stored_size: stored_account.stored_size,
                             lamports: stored_account.account_meta.lamports,
                         };
+                        if slot == &bad_slot || pubkey == pk1 {
+                            error!("{} {} loading {} {:?} {}", file!(), line!(), pubkey, slot, stored_account.account_meta.lamports);
+                            
+                        }
                         self.accounts_index.insert_new_if_missing(
                             *slot,
                             &pubkey,
