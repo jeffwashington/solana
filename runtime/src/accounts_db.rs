@@ -1526,11 +1526,13 @@ impl AccountsDb {
         // Then purge if we can
         let mut store_counts: HashMap<AppendVecId, (usize, HashSet<Pubkey>)> = HashMap::new();
         for (key, (account_infos, ref_count)) in purges.iter_mut() {
+            let mut purged_account_slots_found = false;
             if purged_account_slots.contains_key(&key) {
                 *ref_count = self.accounts_index.ref_count_from_storage(&key);
+                purged_account_slots_found = true;
             }
             if key == &pk1 {
-                error!("{} {} clean_accounts2 {} {:?}", file!(), line!(), key, (&account_infos, &ref_count));
+                error!("{} {} clean_accounts2 {} {:?}, purged_account_slots_found: {}", file!(), line!(), key, (&account_infos, &ref_count), purged_account_slots_found);
             }
 
             account_infos.retain(|(slot, account_info)| {
@@ -1555,6 +1557,10 @@ impl AccountsDb {
                 if let Some(store_count) = store_counts.get_mut(&account_info.store_id) {
                     store_count.0 -= 1;
                     store_count.1.insert(*key);
+                    if key == &pk1 {
+                        error!("{} {} clean_accounts3 {:?}", file!(), line!(), (&store_count.0, &store_count.1));
+                    }
+                            
                 } else {
                     let mut key_set = HashSet::new();
                     key_set.insert(*key);
@@ -1567,6 +1573,10 @@ impl AccountsDb {
                         "store_counts, inserting slot: {}, store id: {}, count: {}",
                         slot, account_info.store_id, count
                     );
+                    if key == &pk1 {
+                        error!("{} {} clean_accounts3 {:?}", file!(), line!(), (&count, &key_set));
+                    }
+
                     store_counts.insert(account_info.store_id, (count, key_set));
                 }
                 true
@@ -4583,6 +4593,7 @@ impl AccountsDb {
                 })
             });
             let bad_slot = 73977800;
+            let other = 73909101;
             use std::str::FromStr;
                     let pk1 = Pubkey::from_str("9r96BQDNY7iWfHwc6KuyDKVqg5xSp8Lsu4t4gZuZmWVi").unwrap();
     
@@ -4602,7 +4613,7 @@ impl AccountsDb {
                             stored_size: stored_account.stored_size,
                             lamports: stored_account.account_meta.lamports,
                         };
-                        if slot == &bad_slot || pubkey == pk1 {
+                        if slot == &bad_slot || pubkey == pk1 || slot == &other {
                             error!("{} {} loading {} {:?} {}", file!(), line!(), pubkey, slot, stored_account.account_meta.lamports);
                             
                         }
