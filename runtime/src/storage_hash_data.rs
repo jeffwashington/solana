@@ -169,13 +169,13 @@ impl CacheHashData {
     }
     */
     pub fn delete_old_cache_files<P: AsRef<Path>>(
-        storage_path: &P,
+        cache_path: &P,
         file_names: &PreExistingCacheFiles,
     ) {
-        let (cache, _) = Self::directory(storage_path);
         error!("deleting unused cache files: {}", file_names.len());
+        let cache_path = cache_path.as_ref().clone();
         for file_name in file_names {
-            let result = cache.join(file_name);
+            let result = cache_path.join(file_name);
             let _ = fs::remove_file(result);
         }
     }
