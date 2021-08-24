@@ -4828,7 +4828,7 @@ impl AccountsDb {
     ) -> Result<(Hash, u64), BankHashVerificationError> {
 
         {
-            let combined_maps = self.get_snapshot_storages(slot);
+            let combined_maps = self.get_snapshot_storages(slot, None, None);
 
             let mut slots = vec![];
             let mut max = 0;
