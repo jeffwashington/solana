@@ -4726,6 +4726,8 @@ impl AccountsDb {
                 }
                 count_old += 1;
 
+                // add all old
+                self.dirty_stores.insert((slot, store.id.load(Ordering::Relaxed)), store.clone());
 
                 error!(
                     "unexpected old root: {}, count_and_status: {:?}, alive_bytes: {}",
