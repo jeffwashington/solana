@@ -1381,7 +1381,10 @@ impl AccountsDb {
         Self::default_with_accounts_index(AccountInfoAccountsIndex::default_for_tests(), None)
     }
 
-    fn default_with_accounts_index(accounts_index: AccountInfoAccountsIndex, ledger_path: Option<PathBuf>) -> Self {
+    fn default_with_accounts_index(
+        accounts_index: AccountInfoAccountsIndex,
+        ledger_path: Option<PathBuf>,
+    ) -> Self {
         let num_threads = get_thread_count();
         const MAX_READ_ONLY_CACHE_DATA_SIZE: usize = 200_000_000;
 
@@ -4899,7 +4902,7 @@ impl AccountsDb {
                                 let range = bin_range.end - bin_range.start;
                                 retval.append(&mut vec![Vec::new(); range]);
                             }
-                            let mut stats = CacheHashData::load2(
+                            let mut stats = CacheHashData::load(
                                 0, //slot,
                                 &Path::new(&file_name),
                                 &mut retval,
@@ -4955,7 +4958,7 @@ impl AccountsDb {
                 let r = after_func(retval);
                 if !file_name.is_empty() {
                     // error!("creating: {}", file_name);
-                    let stats = CacheHashData::save3(
+                    let stats = CacheHashData::save(
                         0, //slot,
                         Path::new(&file_name),
                         &r,
