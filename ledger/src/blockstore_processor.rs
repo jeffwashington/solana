@@ -490,6 +490,7 @@ pub fn process_blockstore(
 
     // Setup bank for slot 0
     let bank0 = Bank::new_with_paths(
+        Some(blockstore.ledger_path().to_path_buf()),
         genesis_config,
         account_paths,
         &opts.frozen_accounts,

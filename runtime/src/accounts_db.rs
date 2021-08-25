@@ -923,6 +923,12 @@ pub struct AccountsDb {
     /// Set of storage paths to pick from
     pub(crate) paths: Vec<PathBuf>,
 
+    ledger_path: PathBuf,
+
+    // used by tests
+    // holds this until we are dropped
+    temp_ledger_path: Option<TempDir>,
+
     pub shrink_paths: RwLock<Option<Vec<PathBuf>>>,
 
     /// Directory of paths this accounts_db needs to hold/remove
@@ -1372,12 +1378,18 @@ type GenerateIndexAccountsMap<'a> = HashMap<Pubkey, IndexAccountMapEntry<'a>>;
 
 impl AccountsDb {
     pub fn default_for_tests() -> Self {
-        Self::default_with_accounts_index(AccountInfoAccountsIndex::default_for_tests())
+        Self::default_with_accounts_index(AccountInfoAccountsIndex::default_for_tests(), None)
     }
 
-    fn default_with_accounts_index(accounts_index: AccountInfoAccountsIndex) -> Self {
+    fn default_with_accounts_index(accounts_index: AccountInfoAccountsIndex, ledger_path: Option<PathBuf>) -> Self {
         let num_threads = get_thread_count();
         const MAX_READ_ONLY_CACHE_DATA_SIZE: usize = 200_000_000;
+
+        let mut temp_ledger_path = None;
+        let ledger_path = ledger_path.unwrap_or_else(|| {
+            temp_ledger_path = Some(TempDir::new().unwrap());
+            temp_ledger_path.as_ref().unwrap().path().to_path_buf()
+        });
 
         let mut bank_hashes = HashMap::new();
         bank_hashes.insert(0, BankHashInfo::default());
@@ -1394,6 +1406,8 @@ impl AccountsDb {
             shrink_candidate_slots: Mutex::new(HashMap::new()),
             write_version: AtomicU64::new(0),
             paths: vec![],
+            ledger_path,
+            temp_ledger_path,
             shrink_paths: RwLock::new(None),
             temp_paths: None,
             file_size: DEFAULT_FILE_SIZE,
@@ -1427,6 +1441,7 @@ impl AccountsDb {
 
     pub fn new_for_tests(paths: Vec<PathBuf>, cluster_type: &ClusterType) -> Self {
         AccountsDb::new_with_config(
+            None,
             paths,
             cluster_type,
             AccountSecondaryIndexes::default(),
@@ -1437,6 +1452,7 @@ impl AccountsDb {
     }
 
     pub fn new_with_config(
+        ledger_path: Option<PathBuf>,
         paths: Vec<PathBuf>,
         cluster_type: &ClusterType,
         account_indexes: AccountSecondaryIndexes,
@@ -1453,7 +1469,7 @@ impl AccountsDb {
                 account_indexes,
                 caching_enabled,
                 shrink_ratio,
-                ..Self::default_with_accounts_index(accounts_index)
+                ..Self::default_with_accounts_index(accounts_index, ledger_path)
             }
         } else {
             // Create a temporary set of accounts directories, used primarily
@@ -1466,7 +1482,7 @@ impl AccountsDb {
                 account_indexes,
                 caching_enabled,
                 shrink_ratio,
-                ..Self::default_with_accounts_index(accounts_index)
+                ..Self::default_with_accounts_index(accounts_index, ledger_path)
             }
         };
 
@@ -6490,6 +6506,7 @@ impl AccountsDb {
         shrink_ratio: AccountShrinkThreshold,
     ) -> Self {
         Self::new_with_config(
+            None,
             paths,
             cluster_type,
             account_indexes,

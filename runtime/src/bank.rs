@@ -1174,6 +1174,7 @@ impl Bank {
         debug_do_not_add_builtins: bool,
     ) -> Self {
         Self::new_with_paths(
+            None,
             genesis_config,
             paths,
             frozen_account_pubkeys,
@@ -1199,6 +1200,7 @@ impl Bank {
         debug_do_not_add_builtins: bool,
     ) -> Self {
         Self::new_with_paths(
+            None,
             genesis_config,
             paths,
             frozen_account_pubkeys,
@@ -1214,6 +1216,7 @@ impl Bank {
 
     #[allow(clippy::too_many_arguments)]
     pub fn new_with_paths(
+        ledger_path: Option<PathBuf>,
         genesis_config: &GenesisConfig,
         paths: Vec<PathBuf>,
         frozen_account_pubkeys: &[Pubkey],
@@ -1226,6 +1229,7 @@ impl Bank {
         accounts_index_config: Option<AccountsIndexConfig>,
     ) -> Self {
         let accounts = Accounts::new_with_config(
+            ledger_path,
             paths,
             &genesis_config.cluster_type,
             account_indexes,
