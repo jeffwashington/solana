@@ -109,6 +109,7 @@ impl CacheHashData {
         let cache_path = cache_path.as_ref();
         for file_name in file_names {
             let result = cache_path.join(file_name);
+            error!("deleting: {:?}", result);
             let _ = fs::remove_file(result);
         }
     }
