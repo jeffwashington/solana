@@ -1216,6 +1216,7 @@ impl CleanAccountsStats {
 #[derive(Debug, Default)]
 struct ShrinkStats {
     last_report: AtomicInterval,
+    slots_shrunk: Mutex<Vec<Slot>>,
     num_slots_shrunk: AtomicUsize,
     storage_read_elapsed: AtomicU64,
     index_read_elapsed: AtomicU64,
@@ -1237,6 +1238,10 @@ struct ShrinkStats {
 impl ShrinkStats {
     fn report(&self) {
         if self.last_report.should_update(1000) {
+            let mut slots = vec![];
+            std::mem::swap(&mut slots, &mut *self.slots_shrunk.lock().unwrap());
+            slots.sort_unstable();
+            error!("slots shrunk: {:?}", slots);
             datapoint_info!(
                 "shrink_stats",
                 (
@@ -2430,6 +2435,7 @@ impl AccountsDb {
         self.shrink_stats
             .num_slots_shrunk
             .fetch_add(1, Ordering::Relaxed);
+        self.shrink_stats.slots_shrunk.lock().unwrap().push(slot);
         self.shrink_stats
             .index_read_elapsed
             .fetch_add(index_read_elapsed.as_us(), Ordering::Relaxed);
