@@ -4843,26 +4843,29 @@ impl AccountsDb {
                     let mut slow_way = false;
                     let mut hasher = std::collections::hash_map::DefaultHasher::new(); // wrong one?
 
+                    bin_range.start.hash(&mut hasher);
+                    bin_range.end.hash(&mut hasher);
                     for slot in start..end {
                         let sub_storages = snapshot_storages.get(slot);
-                        bin_range.start.hash(&mut hasher);
-                        bin_range.end.hash(&mut hasher);
                         if let Some(sub_storages) = sub_storages {
+                            let storage_file = sub_storages.first().unwrap().accounts.get_path();
                             if sub_storages.len() > 1 {
+                                error!("more than one storage: {:?}", storage_file);
                                 slow_way = true;
                                 break;
                             }
-                            let storage_file = sub_storages.first().unwrap().accounts.get_path();
                             slot.hash(&mut hasher);
                             storage_file.hash(&mut hasher);
                             // check alive_bytes, etc. here?
                             let amod = std::fs::metadata(storage_file);
                             if amod.is_err() {
+                                error!("failed to get mod of: {:?}", storage_file);
                                 slow_way = true;
                                 break;
                             }
                             let amod = amod.unwrap().modified();
                             if amod.is_err() {
+                                error!("failed to get mod2 of: {:?}", storage_file);
                                 slow_way = true;
                                 break;
                             }
