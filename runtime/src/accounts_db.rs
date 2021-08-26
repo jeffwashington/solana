@@ -4857,7 +4857,7 @@ impl AccountsDb {
                             slot.hash(&mut hasher);
                             storage_file.hash(&mut hasher);
                             // check alive_bytes, etc. here?
-                            let amod = std::fs::metadata(storage_file);
+                            let amod = std::fs::metadata(storage_file.clone());
                             if amod.is_err() {
                                 error!("failed to get mod of: {:?}", storage_file);
                                 slow_way = true;
