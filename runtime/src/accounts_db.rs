@@ -6767,9 +6767,7 @@ pub mod tests {
             let temp_dir = TempDir::new().unwrap();
             let ledger_path = temp_dir.path();
             Self::scan_snapshot_stores_with_cache(
-                ledger_path,
-                &RwLock::new(CacheHashData::get_cache_files(&ledger_path)),
-                Arc::new(Mutex::new(CacheHashDataStats::default())),
+                &CacheHashData::new(&ledger_path),
                 storage,
                 stats,
                 bins,
@@ -7191,8 +7189,7 @@ pub mod tests {
         let temp_dir = TempDir::new().unwrap();
         let ledger_path = temp_dir.path();
         let result = AccountsDb::scan_account_storage_no_bank(
-            ledger_path,
-            Arc::new(Mutex::new(CacheHashDataStats::default())),
+            &CacheHashData::new(&ledger_path),
             None,
             &get_storage_refs(&storages),
             |loaded_account: LoadedAccount,
@@ -7211,7 +7208,6 @@ pub mod tests {
             &Range { start: 0, end: 1 },
             0,
             &PubkeyBinCalculator16::new(1),
-            &RwLock::new(CacheHashData::get_cache_files(&ledger_path)),
         );
         assert_eq!(calls.load(Ordering::Relaxed), 1);
         assert_eq!(
