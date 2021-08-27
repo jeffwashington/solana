@@ -123,6 +123,7 @@ impl AccountsHashVerifier {
         if let Some(expected_hash) = accounts_package.hash_for_testing {
             let sorted_storages = SortedStorages::new(&accounts_package.snapshot_storages);
             let (hash, lamports) = AccountsDb::calculate_accounts_hash_without_index(
+                &accounts_package.snapshot_archives_dir,
                 &sorted_storages,
                 thread_pool,
                 HashStats::default(),

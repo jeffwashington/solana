@@ -135,6 +135,7 @@ impl Accounts {
         shrink_ratio: AccountShrinkThreshold,
     ) -> Self {
         Self::new_with_config(
+            None,
             paths,
             cluster_type,
             account_indexes,
@@ -152,6 +153,7 @@ impl Accounts {
         shrink_ratio: AccountShrinkThreshold,
     ) -> Self {
         Self::new_with_config(
+            None,
             paths,
             cluster_type,
             account_indexes,
@@ -162,6 +164,7 @@ impl Accounts {
     }
 
     pub fn new_with_config(
+        ledger_path: Option<PathBuf>,
         paths: Vec<PathBuf>,
         cluster_type: &ClusterType,
         account_indexes: AccountSecondaryIndexes,
@@ -171,6 +174,7 @@ impl Accounts {
     ) -> Self {
         Self {
             accounts_db: Arc::new(AccountsDb::new_with_config(
+                ledger_path,
                 paths,
                 cluster_type,
                 account_indexes,
