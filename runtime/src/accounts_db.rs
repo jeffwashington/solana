@@ -4852,7 +4852,7 @@ impl AccountsDb {
                     // Only try to cache full chunks, otherwise if we add another slot(s) next iteration, we'll surely miss anyway.
                     // Partial chunks occur at the beginning and end of the overall slot range.
                     let mut load_from_cache = range_this_chunk == MAX_ITEMS_PER_CHUNK;
-                    if load_from_cache {
+                    if !load_from_cache {
                         // we are not going to try to cache this chunk because it isn't full
                         cache_hash_data
                             .stats
