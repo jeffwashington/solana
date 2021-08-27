@@ -3955,9 +3955,9 @@ impl Bank {
                     }
                     partition
                 } else {
-                    let start = partition.0 * divisions + (chunk * range * divisions / divisions);
+                    let start = partition.0 * divisions + (chunk * range * divisions / num_threads);
                     let end_inclusive =
-                        partition.0 * divisions + ((chunk + 1) * range * divisions / divisions);
+                        partition.0 * divisions + ((chunk + 1) * range * divisions / num_threads);
                     let end_inclusive = if chunk + 1 < num_threads {
                         let mut end = end_inclusive;
                         if range > 0 {
