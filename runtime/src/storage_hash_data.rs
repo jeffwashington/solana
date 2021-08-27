@@ -5,6 +5,7 @@ use log::*;
 use memmap2::MmapMut;
 use serde::{Deserialize, Serialize};
 use solana_measure::measure::Measure;
+use solana_sdk::clock::Slot;
 use std::collections::HashSet;
 use std::fs::{self};
 use std::fs::{remove_file, OpenOptions};
@@ -105,6 +106,9 @@ pub struct CacheHashDataStats {
     pub failed_to_load_count: u64,
     pub unused_cache_files: usize,
     pub one_cache_miss_range_percent: usize,
+    pub start_slot: Slot,
+    pub end_slot: Slot,
+    pub slots_outside_cache_range: Slot,
 }
 
 impl CacheHashDataStats {
@@ -125,7 +129,9 @@ impl CacheHashDataStats {
         self.failed_to_save_count += other.failed_to_save_count;
         self.failed_to_load_count += other.failed_to_load_count;
         self.unused_cache_files += other.unused_cache_files;
+        self.slots_outside_cache_range += other.slots_outside_cache_range;
         self.one_cache_miss_range_percent = other.one_cache_miss_range_percent; // not an add - we just want one of them
+                                                                                // not merged: end_slot, start_slot
     }
 
     pub fn report(&self) {
@@ -151,6 +157,13 @@ impl CacheHashDataStats {
             ("failed_to_save_count", self.failed_to_save_count, i64),
             ("failed_to_load_count", self.failed_to_load_count, i64),
             ("unused_cache_files", self.unused_cache_files, i64),
+            (
+                "slots_outside_cache_range",
+                self.slots_outside_cache_range,
+                i64
+            ),
+            ("start_slot", self.start_slot, i64),
+            ("end_slot", self.end_slot, i64),
             (
                 "one_cache_miss_range_percent",
                 self.one_cache_miss_range_percent,

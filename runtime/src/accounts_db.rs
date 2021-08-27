@@ -4816,16 +4816,12 @@ impl AccountsDb {
         // This results in too many vectors to be efficient.
         const MAX_ITEMS_PER_CHUNK: Slot = 2500;
         let width = snapshot_storages.range_width();
-        // 2 is for 2 special chunks - unaligned slots at the beginning and end
+        // 2 is for 2 special chunks: unaligned (with MAX_ITEMS_PER_CHUNK) slot chunks at the beginning and end of the slot range
         let chunks = 2 + (width as Slot / MAX_ITEMS_PER_CHUNK);
         let range = snapshot_storages.range();
         let slot0 = range.start;
         let first_boundary =
             ((slot0 + MAX_ITEMS_PER_CHUNK) / MAX_ITEMS_PER_CHUNK) * MAX_ITEMS_PER_CHUNK;
-        error!(
-            "scanning: {}-{}, {}, first_boundary: {}",
-            range.start, range.end, width, first_boundary
-        );
         (0..chunks)
             .into_par_iter()
             .map(|chunk| {
@@ -4849,39 +4845,53 @@ impl AccountsDb {
                 }
 
                 let mut file_name = String::default();
-                if accounts_cache_and_ancestors.is_none() && (end - start) == MAX_ITEMS_PER_CHUNK {
-                    let mut load_from_cache = true;
+                // we can't easily cache storages on disk if we are considering the accounts cache, too
+                if accounts_cache_and_ancestors.is_none() {
                     let mut hasher = std::collections::hash_map::DefaultHasher::new(); // wrong one?
+                    let range_this_chunk = end - start;
+                    // Only try to cache full chunks, otherwise if we add another slot(s) next iteration, we'll surely miss anyway.
+                    // Partial chunks occur at the beginning and end of the overall slot range.
+                    let mut load_from_cache = range_this_chunk == MAX_ITEMS_PER_CHUNK;
+                    if load_from_cache {
+                        // we are not going to try to cache this chunk because it isn't full
+                        cache_hash_data
+                            .stats
+                            .lock()
+                            .unwrap()
+                            .slots_outside_cache_range += range_this_chunk;
+                    } else {
 
-                    for slot in start..end {
-                        let sub_storages = snapshot_storages.get(slot);
-                        bin_range.start.hash(&mut hasher);
-                        bin_range.end.hash(&mut hasher);
-                        if let Some(sub_storages) = sub_storages {
-                            if sub_storages.len() > 1 {
-                                load_from_cache = false;
-                                break;
+                        for slot in start..end {
+                            let sub_storages = snapshot_storages.get(slot);
+                            bin_range.start.hash(&mut hasher);
+                            bin_range.end.hash(&mut hasher);
+                            if let Some(sub_storages) = sub_storages {
+                                if sub_storages.len() > 1 {
+                                    load_from_cache = false;
+                                    break;
+                                }
+                                let storage_file =
+                                    sub_storages.first().unwrap().accounts.get_path();
+                                slot.hash(&mut hasher);
+                                storage_file.hash(&mut hasher);
+                                // check alive_bytes, etc. here?
+                                let amod = std::fs::metadata(storage_file);
+                                if amod.is_err() {
+                                    load_from_cache = false;
+                                    break;
+                                }
+                                let amod = amod.unwrap().modified();
+                                if amod.is_err() {
+                                    load_from_cache = false;
+                                    break;
+                                }
+                                let amod = amod
+                                    .unwrap()
+                                    .duration_since(std::time::UNIX_EPOCH)
+                                    .unwrap()
+                                    .as_secs();
+                                amod.hash(&mut hasher);
                             }
-                            let storage_file = sub_storages.first().unwrap().accounts.get_path();
-                            slot.hash(&mut hasher);
-                            storage_file.hash(&mut hasher);
-                            // check alive_bytes, etc. here?
-                            let amod = std::fs::metadata(storage_file);
-                            if amod.is_err() {
-                                load_from_cache = false;
-                                break;
-                            }
-                            let amod = amod.unwrap().modified();
-                            if amod.is_err() {
-                                load_from_cache = false;
-                                break;
-                            }
-                            let amod = amod
-                                .unwrap()
-                                .duration_since(std::time::UNIX_EPOCH)
-                                .unwrap()
-                                .as_secs();
-                            amod.hash(&mut hasher);
                         }
                     }
                     if load_from_cache {
@@ -4953,7 +4963,8 @@ impl AccountsDb {
                         .stats
                         .lock()
                         .unwrap()
-                        .one_cache_miss_range_percent = (chunk * 100 / chunks.saturating_sub(1)) as usize;
+                        .one_cache_miss_range_percent =
+                        (chunk * 100 / chunks.saturating_sub(1)) as usize;
 
                     if result.is_err() {
                         error!(
@@ -5278,6 +5289,13 @@ impl AccountsDb {
                 );
                 previous_pass = for_next_pass;
                 final_result = (hash, lamports);
+            }
+
+            {
+                let range = storages.range();
+                let mut stats = cache_hash_data.stats.lock().unwrap();
+                stats.start_slot = range.start;
+                stats.end_slot = range.end;
             }
 
             Ok(final_result)
