@@ -1177,6 +1177,7 @@ impl Bank {
         debug_do_not_add_builtins: bool,
     ) -> Self {
         Self::new_with_paths(
+            None,
             genesis_config,
             paths,
             frozen_account_pubkeys,
@@ -1202,6 +1203,7 @@ impl Bank {
         debug_do_not_add_builtins: bool,
     ) -> Self {
         Self::new_with_paths(
+            None,
             genesis_config,
             paths,
             frozen_account_pubkeys,
@@ -1217,6 +1219,7 @@ impl Bank {
 
     #[allow(clippy::too_many_arguments)]
     pub fn new_with_paths(
+        ledger_path: Option<PathBuf>,
         genesis_config: &GenesisConfig,
         paths: Vec<PathBuf>,
         frozen_account_pubkeys: &[Pubkey],
@@ -1229,6 +1232,7 @@ impl Bank {
         accounts_index_config: Option<AccountsIndexConfig>,
     ) -> Self {
         let accounts = Accounts::new_with_config(
+            ledger_path,
             paths,
             &genesis_config.cluster_type,
             account_indexes,
@@ -5130,7 +5134,11 @@ impl Bank {
 
         info!("verify_bank_hash..");
         let mut verify_time = Measure::start("verify_bank_hash");
-        let mut verify = self.verify_bank_hash(test_hash_calculation);
+        let _ = self.verify_bank_hash(test_hash_calculation);
+        info!("verify_bank_hash..2");
+        let _ = self.verify_bank_hash(test_hash_calculation); // temporarily run multiple times
+        info!("verify_bank_hash..3");
+        let mut verify = self.verify_bank_hash(test_hash_calculation); // temporarily run multiple times
         verify_time.stop();
 
         info!("verify_hash..");
