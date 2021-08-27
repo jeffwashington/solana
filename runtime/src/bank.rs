@@ -3897,7 +3897,7 @@ impl Bank {
 
         let mut measure = Measure::start("collect_rent_eagerly-ms");
         self.rent_collection_partitions()
-            .into_par_iter()
+            .into_iter()
             .for_each(|partition| {
                 self.collect_rent_in_partition(partition);
             });
@@ -3940,6 +3940,7 @@ impl Bank {
 
     fn collect_rent_in_partition(&self, partition: Partition) {
         let num_threads = std::cmp::max(2, num_cpus::get() / 4) as Slot;
+        error!("partition: {:?}", partition);
         let subrange_full = Self::pubkey_range_from_partition(partition.clone());
 
         let range = partition.1 - partition.0;
@@ -3977,6 +3978,8 @@ impl Bank {
                     };
                     (start, end_inclusive, partition.2 * num_threads)
                 };
+
+                error!("sub-partition: {} {:?}", chunk, partition);
 
                 let subrange = Self::pubkey_range_from_partition(partition);
 
@@ -4080,7 +4083,7 @@ impl Bank {
 
         start_pubkey[0..PREFIX_SIZE].copy_from_slice(&start_key_prefix.to_be_bytes());
         end_pubkey[0..PREFIX_SIZE].copy_from_slice(&end_key_prefix.to_be_bytes());
-        trace!(
+        info!(
             "pubkey_range_from_partition: ({}-{})/{} [{}]: {}-{}",
             start_index,
             end_index,
