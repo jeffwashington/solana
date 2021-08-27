@@ -3940,13 +3940,14 @@ impl Bank {
 
     fn collect_rent_in_partition(&self, partition: Partition) {
         let num_threads = std::cmp::max(2, num_cpus::get() / 4) as Slot;
+        let divisions = num_threads * 2;
         error!("partition: {:?}", partition);
         let subrange_full = Self::pubkey_range_from_partition(partition.clone());
 
         let range = partition.1 - partition.0;
         // divide the range into num_threads smaller ranges and process in parallel
         let account_count: usize = (0..num_threads)
-            .into_iter()
+            .into_iter() // par here
             .map(|chunk| {
                 let partition = if partition.0 == 0 && partition.1 == 0 {
                     if chunk != 0 {
@@ -3954,43 +3955,30 @@ impl Bank {
                     }
                     partition
                 } else {
-                    let start = partition.0 * num_threads + (chunk * range * num_threads / num_threads);
-                    let end_inclusive = partition.0 * num_threads + ((chunk + 1) * range * num_threads / num_threads);
+                    let start = partition.0 * divisions + (chunk * range * divisions / divisions);
+                    let end_inclusive =
+                        partition.0 * divisions + ((chunk + 1) * range * divisions / divisions);
                     let end_inclusive = if chunk + 1 < num_threads {
                         let mut end = end_inclusive;
-                        if partition.0 == 0 && range == 0 {
-                            if chunk == 0 {
-                                // first chunk must be 0..=1 instead of 0..=0, which is a special value
-                                end = 1;
-                            }
-                            else if chunk == 1 {
-                                return 0; // ignore special case of first chunk needing to be 0..=0 for the outer partition of 0..1
-                            }
-                        }
-                        else {
-                            if range > 0 {
-                                end -= 1;
-                            }
+                        if range > 0 {
+                            end -= 1;
                         }
                         end
                     } else {
-                        partition.1 * num_threads
+                        partition.1 * divisions
                     };
-                    (start, end_inclusive, partition.2 * num_threads)
+                    (start, end_inclusive, partition.2 * divisions)
                 };
 
                 error!("sub-partition: {} {:?}", chunk, partition);
 
                 let subrange = Self::pubkey_range_from_partition(partition);
 
-                let subrange: RangeInclusive<Pubkey> =
-                if chunk == 0 {
+                let subrange: RangeInclusive<Pubkey> = if chunk == 0 {
                     *subrange_full.start()..=*subrange.end()
-                }
-                else if chunk + 1 == num_threads {
+                } else if chunk + 1 == num_threads {
                     *subrange.start()..=*subrange_full.end()
-                }
-                else {
+                } else {
                     subrange
                 };
 
@@ -7127,6 +7115,8 @@ pub(crate) mod tests {
 
     #[test]
     fn test_rent_eager_across_epoch_with_gap_under_multi_epoch_cycle() {
+        solana_logger::setup();
+
         let leader_pubkey = solana_sdk::pubkey::new_rand();
         let leader_lamports = 3;
         let mut genesis_config =
@@ -11700,7 +11690,8 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn test_add_native_program() {
+    fn test_add_native_program2() {
+        solana_logger::setup();
         let (mut genesis_config, _mint_keypair) = create_genesis_config(100_000);
         activate_all_features(&mut genesis_config);
 
