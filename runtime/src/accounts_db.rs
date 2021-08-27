@@ -4953,7 +4953,7 @@ impl AccountsDb {
                         .stats
                         .lock()
                         .unwrap()
-                        .one_cache_miss_range_percent = (chunk * 100 / chunks) as usize;
+                        .one_cache_miss_range_percent = (chunk * 100 / (chunks.saturating_sub(1)) as usize;
 
                     if result.is_err() {
                         error!(

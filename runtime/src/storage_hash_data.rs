@@ -151,7 +151,11 @@ impl CacheHashDataStats {
             ("failed_to_save_count", self.failed_to_save_count, i64),
             ("failed_to_load_count", self.failed_to_load_count, i64),
             ("unused_cache_files", self.unused_cache_files, i64),
-            ("one_cache_miss_range_percent", self.one_cache_miss_range_percent, i64),
+            (
+                "one_cache_miss_range_percent",
+                self.one_cache_miss_range_percent,
+                i64
+            ),
         );
     }
 }
@@ -192,11 +196,8 @@ impl CacheHashData {
         let pre_existing_cache_files = self.pre_existing_cache_files.lock().unwrap();
         if !pre_existing_cache_files.is_empty() {
             self.stats.lock().unwrap().unused_cache_files += pre_existing_cache_files.len();
-            error!(
-                "deleting unused cache files: {}",
-                pre_existing_cache_files.len()
-            );
             for file_name in pre_existing_cache_files.iter() {
+                error!("deleting unused cache file: {:?}", file_name,);
                 let result = self.cache_folder.join(file_name);
                 let _ = fs::remove_file(result);
             }
