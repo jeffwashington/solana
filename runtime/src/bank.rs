@@ -3935,35 +3935,88 @@ impl Bank {
     }
 
     fn collect_rent_in_partition(&self, partition: Partition) {
-        let subrange = Self::pubkey_range_from_partition(partition);
+        let num_threads = std::cmp::max(2, num_cpus::get() / 4) as Slot;
+        let subrange_full = Self::pubkey_range_from_partition(partition.clone());
 
-        let accounts = self
-            .rc
-            .accounts
-            .load_to_collect_rent_eagerly(&self.ancestors, subrange);
-        let account_count = accounts.len();
+        let range = partition.1 - partition.0;
+        // divide the range into num_threads smaller ranges and process in parallel
+        let account_count: usize = (0..num_threads)
+            .into_iter()
+            .map(|chunk| {
+                let partition = if partition.0 == 0 && partition.1 == 0 {
+                    if chunk != 0 {
+                        return 0; // ignore special case of 0, 0 for all threads but first one
+                    }
+                    partition
+                } else {
+                    let start = partition.0 * num_threads + (chunk * range * num_threads / num_threads);
+                    let end_inclusive = partition.0 * num_threads + ((chunk + 1) * range * num_threads / num_threads);
+                    let end_inclusive = if chunk + 1 < num_threads {
+                        let mut end = end_inclusive;
+                        if partition.0 == 0 && range == 0 {
+                            if chunk == 0 {
+                                // first chunk must be 0..=1 instead of 0..=0, which is a special value
+                                end = 1;
+                            }
+                            else if chunk == 1 {
+                                return 0; // ignore special case of first chunk needing to be 0..=0 for the outer partition of 0..1
+                            }
+                        }
+                        else {
+                            if range > 0 {
+                                end -= 1;
+                            }
+                        }
+                        end
+                    } else {
+                        partition.1 * num_threads
+                    };
+                    (start, end_inclusive, partition.2 * num_threads)
+                };
 
-        // parallelize?
-        let rent_for_sysvars = self.rent_for_sysvars();
-        let mut total_rent = 0;
-        let mut rent_debits = RentDebits::default();
-        for (pubkey, mut account) in accounts {
-            let rent = self.rent_collector.collect_from_existing_account(
-                &pubkey,
-                &mut account,
-                rent_for_sysvars,
-            );
-            total_rent += rent;
-            // Store all of them unconditionally to purge old AppendVec,
-            // even if collected rent is 0 (= not updated).
-            // Also, there's another subtle side-effect from this: this
-            // ensures we verify the whole on-chain state (= all accounts)
-            // via the account delta hash slowly once per an epoch.
-            self.store_account(&pubkey, &account);
-            rent_debits.push(&pubkey, rent, account.lamports());
-        }
-        self.collected_rent.fetch_add(total_rent, Relaxed);
-        self.rewards.write().unwrap().append(&mut rent_debits.0);
+                let subrange = Self::pubkey_range_from_partition(partition);
+
+                let subrange: RangeInclusive<Pubkey> =
+                if chunk == 0 {
+                    *subrange_full.start()..=*subrange.end()
+                }
+                else if chunk + 1 == num_threads {
+                    *subrange.start()..=*subrange_full.end()
+                }
+                else {
+                    subrange
+                };
+
+                let accounts = self
+                    .rc
+                    .accounts
+                    .load_to_collect_rent_eagerly(&self.ancestors, subrange);
+                let account_count = accounts.len();
+
+                // parallelize?
+                let rent_for_sysvars = self.rent_for_sysvars();
+                let mut total_rent = 0;
+                let mut rent_debits = RentDebits::default();
+                for (pubkey, mut account) in accounts {
+                    let rent = self.rent_collector.collect_from_existing_account(
+                        &pubkey,
+                        &mut account,
+                        rent_for_sysvars,
+                    );
+                    total_rent += rent;
+                    // Store all of them unconditionally to purge old AppendVec,
+                    // even if collected rent is 0 (= not updated).
+                    // Also, there's another subtle side-effect from this: this
+                    // ensures we verify the whole on-chain state (= all accounts)
+                    // via the account delta hash slowly once per an epoch.
+                    self.store_account(&pubkey, &account);
+                    rent_debits.push(&pubkey, rent, account.lamports());
+                }
+                self.collected_rent.fetch_add(total_rent, Relaxed);
+                self.rewards.write().unwrap().append(&mut rent_debits.0);
+                account_count
+            })
+            .sum();
 
         datapoint_info!("collect_rent_eagerly", ("accounts", account_count, i64));
     }
