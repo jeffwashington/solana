@@ -134,6 +134,7 @@ fn initialize_from_snapshot(
         false,
         process_options.verify_index,
         process_options.accounts_index_config,
+        None,
     )
     .unwrap();
 

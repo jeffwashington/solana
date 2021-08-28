@@ -727,6 +727,7 @@ pub fn bank_from_snapshot_archives(
     accounts_db_skip_shrink: bool,
     verify_index: bool,
     accounts_index_config: Option<AccountsIndexConfig>,
+    ledger_path: Option<PathBuf>,
 ) -> Result<(Bank, BankFromArchiveTimings)> {
     check_are_snapshots_compatible(
         full_snapshot_archive_info,
@@ -791,6 +792,7 @@ pub fn bank_from_snapshot_archives(
         shrink_ratio,
         verify_index,
         accounts_index_config,
+        ledger_path,
     )?;
     measure_rebuild.stop();
     info!("{}", measure_rebuild);
@@ -837,6 +839,7 @@ pub fn bank_from_latest_snapshot_archives(
     accounts_db_skip_shrink: bool,
     verify_index: bool,
     accounts_index_config: Option<AccountsIndexConfig>,
+    ledger_path: Option<PathBuf>,
 ) -> Result<(Bank, BankFromArchiveTimings)> {
     let full_snapshot_archive_info = get_highest_full_snapshot_archive_info(&snapshot_archives_dir)
         .ok_or(SnapshotError::NoSnapshotArchives)?;
@@ -875,6 +878,7 @@ pub fn bank_from_latest_snapshot_archives(
         accounts_db_skip_shrink,
         verify_index,
         accounts_index_config,
+        ledger_path,
     )?;
 
     verify_bank_against_expected_slot_hash(
@@ -1375,6 +1379,7 @@ fn rebuild_bank_from_snapshots(
     shrink_ratio: AccountShrinkThreshold,
     verify_index: bool,
     accounts_index_config: Option<AccountsIndexConfig>,
+    ledger_path: Option<PathBuf>,
 ) -> Result<Bank> {
     let (full_snapshot_version, full_snapshot_root_paths) =
         verify_unpacked_snapshots_dir_and_version(
@@ -1423,6 +1428,7 @@ fn rebuild_bank_from_snapshots(
                     shrink_ratio,
                     verify_index,
                     accounts_index_config,
+                    ledger_path,
                 ),
             }?,
         )
@@ -2435,6 +2441,7 @@ mod tests {
             false,
             false,
             Some(crate::accounts_index::ACCOUNTS_INDEX_CONFIG_FOR_TESTING),
+            None,
         )
         .unwrap();
 
@@ -2525,6 +2532,7 @@ mod tests {
             false,
             false,
             Some(crate::accounts_index::ACCOUNTS_INDEX_CONFIG_FOR_TESTING),
+            None,
         )
         .unwrap();
 
@@ -2633,6 +2641,7 @@ mod tests {
             false,
             false,
             Some(crate::accounts_index::ACCOUNTS_INDEX_CONFIG_FOR_TESTING),
+            None,
         )
         .unwrap();
 
@@ -2730,6 +2739,7 @@ mod tests {
             false,
             false,
             Some(crate::accounts_index::ACCOUNTS_INDEX_CONFIG_FOR_TESTING),
+            None,
         )
         .unwrap();
 
@@ -2869,6 +2879,7 @@ mod tests {
             false,
             false,
             Some(crate::accounts_index::ACCOUNTS_INDEX_CONFIG_FOR_TESTING),
+            None,
         )
         .unwrap();
         assert_eq!(
@@ -2930,6 +2941,7 @@ mod tests {
             false,
             false,
             Some(crate::accounts_index::ACCOUNTS_INDEX_CONFIG_FOR_TESTING),
+            None,
         )
         .unwrap();
         assert_eq!(
