@@ -198,6 +198,7 @@ pub(crate) fn bank_from_streams<R>(
     shrink_ratio: AccountShrinkThreshold,
     verify_index: bool,
     accounts_index_config: Option<AccountsIndexConfig>,
+    ledger_path: Option<PathBuf>,
 ) -> std::result::Result<Bank, Error>
 where
     R: Read,
@@ -236,6 +237,7 @@ where
                 shrink_ratio,
                 verify_index,
                 accounts_index_config,
+                ledger_path,
             )?;
             Ok(bank)
         }};
@@ -329,6 +331,7 @@ fn reconstruct_bank_from_fields<E>(
     shrink_ratio: AccountShrinkThreshold,
     verify_index: bool,
     accounts_index_config: Option<AccountsIndexConfig>,
+    ledger_path: Option<PathBuf>,
 ) -> Result<Bank, Error>
 where
     E: SerializableStorage + std::marker::Sync,
@@ -344,6 +347,7 @@ where
         shrink_ratio,
         verify_index,
         accounts_index_config,
+        ledger_path,
     )?;
     accounts_db.freeze_accounts(
         &Ancestors::from(&bank_fields.ancestors),
@@ -396,11 +400,13 @@ fn reconstruct_accountsdb_from_fields<E>(
     shrink_ratio: AccountShrinkThreshold,
     verify_index: bool,
     accounts_index_config: Option<AccountsIndexConfig>,
+    ledger_path: Option<PathBuf>,
 ) -> Result<AccountsDb, Error>
 where
     E: SerializableStorage + std::marker::Sync,
 {
     let mut accounts_db = AccountsDb::new_with_config(
+        ledger_path,
         account_paths.to_vec(),
         cluster_type,
         account_secondary_indexes,

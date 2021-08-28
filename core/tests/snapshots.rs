@@ -206,6 +206,7 @@ mod tests {
             false,
             false,
             Some(solana_runtime::accounts_index::ACCOUNTS_INDEX_CONFIG_FOR_TESTING),
+            None,
         )
         .unwrap();
 
@@ -835,6 +836,7 @@ mod tests {
             false,
             false,
             Some(solana_runtime::accounts_index::ACCOUNTS_INDEX_CONFIG_FOR_TESTING),
+            None,
         )?;
 
         assert_eq!(bank, &deserialized_bank);
@@ -1013,6 +1015,7 @@ mod tests {
             false,
             false,
             Some(solana_runtime::accounts_index::ACCOUNTS_INDEX_CONFIG_FOR_TESTING),
+            None,
         )
         .unwrap();
 

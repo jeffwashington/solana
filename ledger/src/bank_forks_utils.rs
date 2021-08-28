@@ -133,6 +133,7 @@ fn load_from_snapshot(
         process_options.accounts_db_skip_shrink,
         process_options.verify_index,
         process_options.accounts_index_config,
+        Some(blockstore.ledger_path().to_path_buf()),
     )
     .expect("Load from snapshot failed");
 
