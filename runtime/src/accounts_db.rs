@@ -4949,7 +4949,7 @@ impl AccountsDb {
                 // we can't easily cache storages on disk if we are considering the accounts cache, too
                 if accounts_cache_and_ancestors.is_none() {
                     let mut hasher = std::collections::hash_map::DefaultHasher::new(); // wrong one?
-                    let range_this_chunk = end - start;
+                    let range_this_chunk = end.saturating_sub(start);
                     // Only try to cache full chunks, otherwise if we add another slot(s) next iteration, we'll surely miss anyway.
                     // Partial chunks occur at the beginning and end of the overall slot range.
                     let mut load_from_cache = range_this_chunk == MAX_ITEMS_PER_CHUNK;
