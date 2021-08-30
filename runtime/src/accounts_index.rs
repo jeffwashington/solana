@@ -1219,12 +1219,11 @@ impl<T: IsCached> AccountsIndex<T> {
                 } else {
                     continue;
                 }
-                drop(list_r);
                 let result = result.unwrap();
 
                 let mut load_account_timer = Measure::start("load_account");
-                //let list_item = &slot_list[index];
                 func(&pubkey, (&result.1, result.0));
+                drop(list_r);
                 load_account_timer.stop();
                 load_account_elapsed += load_account_timer.as_us();
             }
