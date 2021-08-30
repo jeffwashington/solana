@@ -103,7 +103,7 @@ pub const BINS_PER_PASS: usize = PUBKEY_BINS_FOR_CALCULATING_HASHES / NUM_SCAN_P
 // If this is too big, we don't get enough parallelism of scanning storages.
 // If this is too small, then we produce too many output vectors to iterate.
 // Metrics indicate a sweet spot in the 2.5k-5k range for mnb.
-const MAX_ITEMS_PER_CHUNK: Slot = 2_500;
+const MAX_ITEMS_PER_CHUNK: Slot = 1_000;
 
 // A specially reserved storage id just for entries in the cache, so that
 // operations that take a storage entry can maintain a common interface
