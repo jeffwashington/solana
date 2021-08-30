@@ -1,6 +1,6 @@
 use crate::accounts_index::AccountMapEntry;
 use crate::accounts_index::{IsCached, RefCount, SlotList, ACCOUNTS_INDEX_CONFIG_FOR_TESTING};
-use crate::bucket_map_holder::{BucketMapWriteHolder};
+use crate::bucket_map_holder::BucketMapWriteHolder;
 
 use crate::pubkey_bins::PubkeyBinCalculator16;
 use solana_bucket_map::bucket_map::BucketMap;
@@ -231,7 +231,8 @@ impl<V: IsCached> HybridBTreeMap<V> {
     }
 
     pub fn new_for_testing() -> Self {
-        let map = Self::new_bucket_map(ACCOUNTS_INDEX_CONFIG_FOR_TESTING);
+        let bins = ACCOUNTS_INDEX_CONFIG_FOR_TESTING.bins.unwrap();
+        let map = Self::new_bucket_map(bins);
         Self::new2(&map, 0, 1)
     }
 
@@ -276,7 +277,7 @@ impl<V: IsCached> HybridBTreeMap<V> {
             _ => unbounded,
         }
     }
-    pub fn range<R>(&self, range: Option<R>) -> Vec<(Pubkey, SlotList<V>)>
+    pub fn range<R>(&self, range: Option<R>, all_and_unsorted: bool) -> Vec<(Pubkey, SlotList<V>)>
     where
         R: RangeBounds<Pubkey>,
     {
@@ -315,7 +316,9 @@ impl<V: IsCached> HybridBTreeMap<V> {
             let mut ks = self.disk.range(ix, range.as_ref());
             keys.append(&mut ks);
         });
-        keys.sort_unstable_by(|a, b| a.0.cmp(&b.0));
+        if !all_and_unsorted {
+            keys.sort_unstable_by(|a, b| a.0.cmp(&b.0));
+        }
         keys
     }
 
@@ -441,7 +444,10 @@ impl<V: IsCached> HybridBTreeMap<V> {
         self.disk.delete_key(key); //.map(|x| x.entry)
     }
     pub fn len(&self) -> usize {
-        self.disk.keys3(self.bin_index, None::<&Range<Pubkey>>).map(|x| x.len()).unwrap_or_default()
+        self.disk
+            .keys3(self.bin_index, None::<&Range<Pubkey>>)
+            .map(|x| x.len())
+            .unwrap_or_default()
     }
 
     pub fn set_startup(&self, startup: bool) {
