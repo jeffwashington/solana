@@ -4814,7 +4814,7 @@ impl AccountsDb {
     {
         // Without chunks, we end up with 1 output vec for each outer snapshot storage.
         // This results in too many vectors to be efficient.
-        const MAX_ITEMS_PER_CHUNK: Slot = 2500;
+        const MAX_ITEMS_PER_CHUNK: Slot = 1000;
         let width = snapshot_storages.range_width();
         // 2 is for 2 special chunks: unaligned (with MAX_ITEMS_PER_CHUNK) slot chunks at the beginning and end of the slot range
         let chunks = 2 + (width as Slot / MAX_ITEMS_PER_CHUNK);
