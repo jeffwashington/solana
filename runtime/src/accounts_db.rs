@@ -98,7 +98,7 @@ pub const BINS_PER_PASS: usize = 8192; // PUBKEY_BINS_FOR_CALCULATING_HASHES / N
 //  has a storage that changed since the last scan.
 // If this is too small, then we have to load 432k/MAX_ITEMS_PER_CHUNK files to calculate the hash.
 //  Each file load is expensive.
-const MAX_ITEMS_PER_CHUNK: Slot = 2500;
+const MAX_ITEMS_PER_CHUNK: Slot = 1000;
 
 // A specially reserved storage id just for entries in the cache, so that
 // operations that take a storage entry can maintain a common interface
