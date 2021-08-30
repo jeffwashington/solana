@@ -2323,14 +2323,15 @@ impl AccountsDb {
 
         let total_starting_accounts = stored_accounts.len();
         let total_accounts_after_shrink = alive_accounts.len();
-        debug!(
-            "shrinking: slot: {}, accounts: ({} => {}) bytes: ({} ; aligned to: {}) original: {}",
+        info!(
+            "shrinking: slot: {}, accounts: ({} => {}) bytes: ({} ; aligned to: {}) original: {}, min_root: {}",
             slot,
             total_starting_accounts,
             total_accounts_after_shrink,
             alive_total,
             aligned_total,
             original_bytes,
+            self.accounts_index.roots_tracker.read().unwrap().min_root().unwrap_or_default(),
         );
 
         let mut rewrite_elapsed = Measure::start("rewrite_elapsed");
@@ -4861,7 +4862,6 @@ impl AccountsDb {
                             .unwrap()
                             .slots_outside_cache_range += range_this_chunk;
                     } else {
-
                         for slot in start..end {
                             let sub_storages = snapshot_storages.get(slot);
                             bin_range.start.hash(&mut hasher);
