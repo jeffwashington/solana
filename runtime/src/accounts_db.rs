@@ -88,8 +88,8 @@ pub const DEFAULT_NUM_THREADS: u32 = 8;
 pub const DEFAULT_NUM_DIRS: u32 = 4;
 
 pub const PUBKEY_BINS_FOR_CALCULATING_HASHES: usize = 65536;
-pub const NUM_SCAN_PASSES: usize = 2;
-pub const BINS_PER_PASS: usize = 32768; // PUBKEY_BINS_FOR_CALCULATING_HASHES / NUM_SCAN_PASSES
+pub const NUM_SCAN_PASSES: usize = 8;
+pub const BINS_PER_PASS: usize = 8192; // PUBKEY_BINS_FOR_CALCULATING_HASHES / NUM_SCAN_PASSES
 
 // A specially reserved storage id just for entries in the cache, so that
 // operations that take a storage entry can maintain a common interface
@@ -4816,7 +4816,7 @@ impl AccountsDb {
     {
         // Without chunks, we end up with 1 output vec for each outer snapshot storage.
         // This results in too many vectors to be efficient.
-        const MAX_ITEMS_PER_CHUNK: Slot = 1000;
+        const MAX_ITEMS_PER_CHUNK: Slot = 5000;
         let width = snapshot_storages.range_width();
         // 2 is for 2 special chunks: unaligned (with MAX_ITEMS_PER_CHUNK) slot chunks at the beginning and end of the slot range
         let chunks = 2 + (width as Slot / MAX_ITEMS_PER_CHUNK);
