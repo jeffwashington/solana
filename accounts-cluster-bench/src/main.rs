@@ -111,6 +111,7 @@ fn make_create_message(
     balance: u64,
     maybe_space: Option<u64>,
     mint: Option<Pubkey>,
+    randomize_keys: bool,
 ) -> Message {
     let space = maybe_space.unwrap_or_else(|| thread_rng().gen_range(0, 1000));
 
@@ -122,18 +123,35 @@ fn make_create_message(
             } else {
                 system_program::id()
             };
-            let seed = max_created_seed.fetch_add(1, Ordering::Relaxed).to_string();
-            let to_pubkey =
-                Pubkey::create_with_seed(&base_keypair.pubkey(), &seed, &program_id).unwrap();
-            let mut instructions = vec![system_instruction::create_account_with_seed(
-                &keypair.pubkey(),
-                &to_pubkey,
-                &base_keypair.pubkey(),
-                &seed,
-                balance,
-                space,
-                &program_id,
-            )];
+            let (to_pubkey, mut instructions) = if randomize_keys {
+                let to_keypair = Keypair::new();
+                (
+                    to_keypair.pubkey(),
+                    vec![system_instruction::create_account(
+                        &keypair.pubkey(),
+                        &to_keypair.pubkey(),
+                        balance,
+                        space,
+                        &program_id,
+                    )],
+                )
+            } else {
+                let seed = max_created_seed.fetch_add(1, Ordering::Relaxed).to_string();
+                let to_pubkey =
+                    Pubkey::create_with_seed(&base_keypair.pubkey(), &seed, &program_id).unwrap();
+                (
+                    to_pubkey,
+                    vec![system_instruction::create_account_with_seed(
+                        &keypair.pubkey(),
+                        &to_pubkey,
+                        &base_keypair.pubkey(),
+                        &seed,
+                        balance,
+                        space,
+                        &program_id,
+                    )],
+                )
+            };
             if let Some(mint_address) = mint {
                 instructions.push(spl_token_instruction(
                     spl_token::instruction::initialize_account(
@@ -329,6 +347,7 @@ fn run_accounts_bench(
                                     min_balance,
                                     maybe_space,
                                     mint,
+                                    close_nth_batch > 0,
                                 );
                                 let signers: Vec<&Keypair> = vec![keypair, &base_keypair];
                                 Transaction::new(&signers, message, blockhash)
