@@ -4389,6 +4389,23 @@ impl Bank {
         }
     }
 
+    fn load_next_rent_in_bg(&self, mut partition: Partition) {
+        // start, end, total
+        let range = partition.1 - partition.0;
+        partition.0 = partition.1;
+        partition.1 += range;
+        if partition.0 >= partition.2 || partition.1 >= partition.2 {
+            return;
+        }
+        let ancestors = self.ancestors.clone();
+        let accounts = self.rc.accounts.clone();
+        rayon::spawn(move || {
+            let subrange = Self::pubkey_range_from_partition(partition);
+
+            accounts.load_to_collect_rent_eagerly(&ancestors, subrange);
+        })
+    }
+
     fn collect_rent_from_accounts(&self, accounts: Vec<(Pubkey, AccountSharedData)>) {
         let rent_for_sysvars = self.rent_for_sysvars();
         let mut total_rent = 0;
@@ -4415,6 +4432,7 @@ impl Bank {
 
     fn collect_rent_in_partition(&self, partition: Partition) -> usize {
         let subrange_full = Self::pubkey_range_from_partition(partition);
+        self.load_next_rent_in_bg(partition);
         self.rc.accounts.hold_range_in_memory(&subrange_full, true);
         let num_threads = std::cmp::max(2, num_cpus::get() / 4) as Slot;
         // divide the range into num_threads smaller ranges and process in parallel
