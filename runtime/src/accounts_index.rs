@@ -1666,7 +1666,7 @@ impl<T: IsCached> AccountsIndex<T> {
         previous_slot_entry_was_cached: bool,
     ) {
         // We don't atomically update both primary index and secondary index together.
-        // This certainly creates small time window with inconsistent state across the two indexes.
+        // This certainly creates a small time window with inconsistent state across the two indexes.
         // However, this is acceptable because:
         //
         //  - A strict consistent view at any given moment of time is not necessary, because the only
