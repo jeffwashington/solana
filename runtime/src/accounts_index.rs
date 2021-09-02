@@ -129,7 +129,8 @@ impl<T: IsCached> AccountMapEntryInner<T> {
     }
 
     pub fn set_ref_count(&self, ref_count: RefCount) {
-        self.ref_count.store(ref_count, Ordering::Relaxed)
+        self.ref_count.store(ref_count, Ordering::Relaxed);
+        self.set_dirty(true);
     }
 
     pub fn add_un_ref(&self, add: bool) {
@@ -138,6 +139,7 @@ impl<T: IsCached> AccountMapEntryInner<T> {
         } else {
             self.ref_count.fetch_sub(1, Ordering::Relaxed);
         }
+        self.set_dirty(true);
     }
 
     fn load(item: &AtomicBool) -> bool {

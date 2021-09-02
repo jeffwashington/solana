@@ -5928,13 +5928,6 @@ impl AccountsDb {
 
     pub fn report_store_timings(&self) {
         if self.stats.last_store_report.should_update(1000) {
-            self.accounts_index
-                .account_maps
-                .first()
-                .unwrap()
-                .read()
-                .unwrap()
-                .distribution();
             let (read_only_cache_hits, read_only_cache_misses) =
                 self.read_only_accounts_cache.get_and_reset_stats();
             datapoint_info!(

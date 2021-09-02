@@ -67,9 +67,6 @@ impl<V: IsCached> InMemAccountsIndex<V> {
         Arc::new(BucketMapHolder::new(BucketMap::new_buckets(buckets)))
     }
 
-    pub fn distribution(&self) {
-        self.disk.distribution();
-    }
     /*
     todo:
     fn bound<'a, T>(bound: Bound<&'a T>, unbounded: &'a T) -> &'a T {
@@ -170,10 +167,10 @@ impl<V: IsCached> InMemAccountsIndex<V> {
     }
 
     pub fn get(&self, key: &K) -> Option<V2<V>> {
-        self.disk.get(key)
+        self.disk.get(self.bin_index, key)
     }
     pub fn remove(&mut self, key: &K) {
-        self.disk.delete_key(key);
+        self.disk.delete_key(self.bin_index, key);
     }
     // This is expensive. We could use a counter per bucket to keep track of adds/deletes.
     // But, this is only used for metrics.
