@@ -70,7 +70,6 @@ pub struct BucketMapHolder<V: IsCached> {
     pub flush0: AtomicU64,
     pub flush1: AtomicU64,
     pub flush2: AtomicU64,
-    pub flush3: AtomicU64,
     pub using_empty_get: AtomicU64,
     pub insert_without_lookup: AtomicU64,
     pub updates_in_cache: AtomicU64,
@@ -95,13 +94,14 @@ impl<V: IsCached> BucketMapHolder<V> {
         // if known not present, insert into cache
         // if not in cache, put in cache, with flag saying we need to update later
         let wc = &mut self.write_cache[ix].write().unwrap();
-        let m1 = Measure::start("");
+        let m1 = Measure::start("update_or_insert_async");
         let res = wc.entry(key);
         match res {
             HashMapEntry::Occupied(occupied) => {
                 // already in cache, so call update_static function
                 let previous_slot_entry_was_cached = true;
                 let mut reclaims = Vec::default();
+                // maybe this, except this case is exactly what we're trying to avoid for perf...self.get_caching(occupied, key); // updates from disk if necessary
                 self.upsert_item_in_cache(
                     occupied.get(),
                     new_value,
@@ -112,12 +112,11 @@ impl<V: IsCached> BucketMapHolder<V> {
             }
             HashMapEntry::Vacant(vacant) => {
                 let must_do_lookup_from_disk = true;
-                let confirmed_not_on_disk = false;
                 // not in cache - may or may not be on disk
                 new_value.set_dirty(true);
                 new_value.set_insert(true);
                 new_value.set_must_do_lookup_from_disk(must_do_lookup_from_disk);
-                new_value.set_confirmed_not_on_disk(confirmed_not_on_disk);
+                assert!(!new_value.confirmed_not_on_disk());
                 vacant.insert(new_value);
             }
         }
@@ -195,7 +194,6 @@ impl<V: IsCached> BucketMapHolder<V> {
         let flush0 = AtomicU64::new(0);
         let flush1 = AtomicU64::new(0);
         let flush2 = AtomicU64::new(0);
-        let flush3 = AtomicU64::new(0);
 
         let inserts = AtomicU64::new(0);
         let deletes = AtomicU64::new(0);
@@ -228,7 +226,6 @@ impl<V: IsCached> BucketMapHolder<V> {
             flush0,
             flush1,
             flush2,
-            flush3,
             binner,
             unified_backing,
             get_purges,
@@ -286,7 +283,7 @@ impl<V: IsCached> BucketMapHolder<V> {
         let mut delete_keys = Vec::with_capacity(len);
         let mut flushed = 0;
         let mut get_purges = 0;
-        let mut m0 = Measure::start("");
+        let mut m0 = Measure::start("flush1");
         for (k, v) in read_lock.iter() {
             let dirty = v.dirty();
             let mut flush = dirty;
@@ -322,25 +319,19 @@ impl<V: IsCached> BucketMapHolder<V> {
             }
         }
         m0.stop();
-
-        let mut m3 = Measure::start("");
-        /*
-        // time how long just to get everything from disk
-        for (k, mut v) in read_lock.iter() {
-            self.disk.get(k);
-        }
-        */
         drop(read_lock);
-        m3.stop();
 
-        let mut m1 = Measure::start("");
+        let mut m1 = Measure::start("flush_action");
         {
             let wc = &mut self.write_cache[ix].write().unwrap(); // maybe get lock for each item?
             for k in flush_keys.into_iter() {
                 if let HashMapEntry::Occupied(occupied) = wc.entry(k) {
                     let v = occupied.get();
                     if v.dirty() {
-                        let merged_value = RwLock::new(None);
+                        if Arc::strong_count(v) > 1 {
+                            // only work on dirty things when there are no outstanding refs to the value
+                            continue;
+                        }
                         let lookup = v.must_do_lookup_from_disk();
                         self.update_no_cache(
                             &k,
@@ -353,38 +344,27 @@ impl<V: IsCached> BucketMapHolder<V> {
                                         let slot_list = slot_list.to_vec();
                                         Self::update_cache_from_disk(
                                             &Arc::new(AccountMapEntryInner {
-                                                slot_list: RwLock::new(slot_list.clone()),
+                                                slot_list: RwLock::new(slot_list),
                                                 ref_count: AtomicU64::new(ref_count),
                                                 ..AccountMapEntryInner::default()
                                             }),
                                             v,
                                         );
-                                        *merged_value.write().unwrap() =
-                                            Some((slot_list.clone(), ref_count));
-                                        return Some((slot_list, ref_count));
                                     }
-                                    // else, we didn't know if there was anything on disk, but there was nothing, so we are done
+                                    // else, we didn't know if there was anything on disk, but there was nothing, so cache is already up to date
                                 }
                                 // write what is in our cache - it has been merged if necessary
-                                let v = occupied.get();
                                 Some((v.slot_list.read().unwrap().clone(), v.ref_count()))
                             },
                             None,
                             true,
                         );
                         if lookup {
-                            // we did a lookup, so put the merged value back into the cache
-                            if let Some((slot_list, ref_count)) = merged_value.into_inner().unwrap()
-                            {
-                                *v.slot_list.write().unwrap() = slot_list;
-                                v.ref_count.store(ref_count, Ordering::Relaxed);
-                            }
                             v.set_must_do_lookup_from_disk(false);
                         }
                         let mut keep_this_in_cache = true;
                         if v.insert() {
                             keep_this_in_cache = Self::in_cache(&v.slot_list.read().unwrap());
-                            // || slot_list.len() > 1);
                         }
                         if keep_this_in_cache {
                             v.set_age(next_age); // keep newly updated stuff around
@@ -402,7 +382,7 @@ impl<V: IsCached> BucketMapHolder<V> {
         }
         m1.stop();
 
-        let mut m2 = Measure::start("");
+        let mut m2 = Measure::start("flush_delete");
         {
             let wc = &mut self.write_cache[ix].write().unwrap(); // maybe get lock for each item?
             for key in delete_keys.into_iter() {
@@ -429,7 +409,6 @@ impl<V: IsCached> BucketMapHolder<V> {
         self.flush0.fetch_add(m0.as_us(), Ordering::Relaxed);
         self.flush1.fetch_add(m1.as_us(), Ordering::Relaxed);
         self.flush2.fetch_add(m2.as_us(), Ordering::Relaxed);
-        self.flush3.fetch_add(m3.as_us(), Ordering::Relaxed);
 
         if flushed != 0 {
             self.write_cache_flushes
@@ -468,14 +447,16 @@ impl<V: IsCached> BucketMapHolder<V> {
                     HashMapEntry::Occupied(occupied) => {
                         // key already exists, so we're fine
                         occupied.get().set_age(self.set_age_to_future());
+                        assert!(!occupied.get().confirmed_not_on_disk());
                     }
                     HashMapEntry::Vacant(vacant) => {
+                        let must_do_lookup_from_disk = true;
                         vacant.insert(self.allocate(
                             SlotList::default(),
                             RefCount::MAX,
                             false,
                             false,
-                            true,
+                            must_do_lookup_from_disk,
                             false,
                         ));
                     }
@@ -542,14 +523,36 @@ impl<V: IsCached> BucketMapHolder<V> {
     }
 
     pub fn remove_if_slot_list_empty(&self, index: usize, key: &Pubkey) -> bool {
-        let mut w_index = self.write_cache[index].write().unwrap();
-        if let Entry::Occupied(index_entry) = w_index.entry(*key) {
-            if index_entry.get().slot_list.read().unwrap().is_empty() {
-                index_entry.remove();
-                if !self.in_mem_only {
-                    self.disk.delete_key(key);
+        // this causes the item to be updated from disk - we need the full slot list here
+        let get_result = self.get(index, key); // hold this open so we have a ref to the arc
+        match &get_result {
+            Some(item) => {
+                if !item.slot_list.read().unwrap().is_empty() {
+                    // not empty slot list
+                    return false;
                 }
-                return true;
+            }
+            None => {
+                return false; // not in accounts index at all - should this be a true?
+            }
+        }
+        assert!(Arc::strong_count(get_result.as_ref().unwrap()) > 1);
+
+        // if we made it here, the item is fully loaded in the cache
+        let mut w_index = self.write_cache[index].write().unwrap();
+        match w_index.entry(*key) {
+            Entry::Occupied(index_entry) => {
+                assert!(!index_entry.get().must_do_lookup_from_disk());
+                if index_entry.get().slot_list.read().unwrap().is_empty() {
+                    index_entry.remove();
+                    if !self.in_mem_only {
+                        self.disk.delete_key(key);
+                    }
+                    return true;
+                }
+            }
+            Entry::Vacant(_) => {
+                panic!("item was purged from cache - should not be possible since we have a refcount to the arc");
             }
         }
         false
@@ -570,14 +573,16 @@ impl<V: IsCached> BucketMapHolder<V> {
         */
 
         let ix = self.bucket_ix(key);
+        /*
+        // maybe to eliminate race conditions, we have to have a write lock?
         // try read lock first
         {
-            let m1 = Measure::start("");
+            let m1 = Measure::start("upsert");
             let wc = &mut self.write_cache[ix].read().unwrap();
             let res = wc.get(key);
             if let Some(occupied) = res {
                 // already in cache, so call update_static function
-                // this may only be tehcnically necessary if !previous_slot_entry_was_cached, where we have to return reclaims
+                // this may only be technically necessary if !previous_slot_entry_was_cached, where we have to return reclaims
                 self.get_caching(occupied, key); // updates from disk if necessary
                 self.upsert_item_in_cache(
                     occupied,
@@ -589,16 +594,19 @@ impl<V: IsCached> BucketMapHolder<V> {
                 return;
             }
         }
+        */
 
         // try write lock
-        let mut m1 = Measure::start("");
+        let mut m1 = Measure::start("upsert_write");
         let wc = &mut self.write_cache[ix].write().unwrap();
         let res = wc.entry(*key);
         match res {
             HashMapEntry::Occupied(occupied) => {
-                // already in cache, so call update_static function
+                let item = occupied.get();
+                self.get_caching(item, key); // updates from disk if necessary
+                                             // already in cache, so call update_static function
                 self.upsert_item_in_cache(
-                    occupied.get(),
+                    item,
                     new_value,
                     reclaims,
                     previous_slot_entry_was_cached,
@@ -628,6 +636,7 @@ impl<V: IsCached> BucketMapHolder<V> {
                 }*/
                 let r = self.get_no_cache(key); // maybe move this outside lock - but race conditions unclear
                 if let Some(current) = r {
+                    // not in cache, on disk
                     let (slot, new_entry) = new_value.slot_list.write().unwrap().remove(0);
                     let mut slot_list = current.slot_list.write().unwrap();
                     let addref = WriteAccountMapEntry::update_slot_list(
@@ -823,7 +832,8 @@ impl<V: IsCached> BucketMapHolder<V> {
             self.inserts.fetch_add(1, Ordering::Relaxed);
         } else {
             if VERIFY_GET_ON_INSERT {
-                assert!(self.get(key).is_some());
+                let ix = self.bucket_ix(key);
+                assert!(self.get(ix, key).is_some());
             }
             // if we have a previous value, then that item is currently open and locked, so it could not have been changed. Thus, this is an in-cache update as long as we are caching gets.
             self.updates_in_cache.fetch_add(1, Ordering::Relaxed);
@@ -840,7 +850,7 @@ impl<V: IsCached> BucketMapHolder<V> {
     }
 
     pub fn get_no_cache(&self, key: &Pubkey) -> Option<V2<V>> {
-        let mut m1 = Measure::start("");
+        let mut m1 = Measure::start("get_no_cache");
         if self.in_mem_only {
             return None;
         }
@@ -894,7 +904,7 @@ impl<V: IsCached> BucketMapHolder<V> {
     where
         R: RangeBounds<Pubkey>,
     {
-        let mut m = Measure::start("");
+        let mut m = Measure::start("range");
         let r = if !self.in_mem_only {
             self.flush(ix, false, None);
             self.disk
@@ -928,17 +938,12 @@ impl<V: IsCached> BucketMapHolder<V> {
         r
     }
 
-    pub fn get(&self, key: &Pubkey) -> Option<V2<V>> {
-        /*
-        let k = Pubkey::from_str("5x3NHJ4VEu2abiZJ5EHEibTc2iqW22Lc245Z3fCwCxRS").unwrap();
-        if key == &k {
-            error!("{} {} get {}", file!(), line!(), key);
-        }
-        */
+    pub fn get(&self, ix: usize, key: &Pubkey) -> Option<V2<V>> {
         let must_do_lookup_from_disk = false;
-        let ix = self.bucket_ix(key);
+        /*
+        require write lock to update from disk
         {
-            let mut m1 = Measure::start("");
+            let mut m1 = Measure::start("get");
             let wc = &mut self.write_cache[ix].read().unwrap();
             let res = wc.get(key);
             m1.stop();
@@ -947,16 +952,17 @@ impl<V: IsCached> BucketMapHolder<V> {
                 return self.get_caching(res, key).map(|_| res.clone());
             }
         }
+        */
         // get caching
         {
-            let mut m1 = Measure::start("");
+            let mut m1 = Measure::start("get2");
             let wc = &mut self.write_cache[ix].write().unwrap();
             let res = wc.entry(*key);
             match res {
                 HashMapEntry::Occupied(occupied) => {
-                    let res = Some(occupied.get());
+                    let res = occupied.get();
                     self.get_cache_us.fetch_add(m1.as_ns(), Ordering::Relaxed);
-                    res.cloned()
+                    self.get_caching(res, key).map(|_| res.clone())
                 }
                 HashMapEntry::Vacant(vacant) => {
                     let r = self.get_no_cache(key);
@@ -983,57 +989,16 @@ impl<V: IsCached> BucketMapHolder<V> {
             }
         }
     }
-    fn addunref(&self, key: &Pubkey, _ref_count: RefCount, _slot_list: &[SlotT<V>], add: bool) {
-        // todo: measure this and unref
-        let ix = self.bucket_ix(key);
-        let mut m1 = Measure::start("");
-        let wc = &mut self.write_cache[ix].write().unwrap();
-
-        let res = wc.entry(*key);
-        m1.stop();
-        self.get_cache_us.fetch_add(m1.as_ns(), Ordering::Relaxed);
-        match res {
-            HashMapEntry::Occupied(mut occupied) => {
-                self.gets_from_cache.fetch_add(1, Ordering::Relaxed);
-                let gm = occupied.get_mut();
-                if !gm.confirmed_not_on_disk() {
-                    gm.add_un_ref(add);
-                }
-            }
-            HashMapEntry::Vacant(_vacant) => {
-                if !self.in_mem_only {
-                    self.gets_from_disk.fetch_add(1, Ordering::Relaxed);
-                    if add {
-                        self.disk.addref(key);
-                    } else {
-                        self.disk.unref(key);
-                    }
-                }
-            }
-        }
-    }
-    pub fn addref(&self, key: &Pubkey, ref_count: RefCount, slot_list: &[SlotT<V>]) {
-        self.addrefs.fetch_add(1, Ordering::Relaxed);
-        self.addunref(key, ref_count, slot_list, true);
-    }
-
-    pub fn unref(&self, key: &Pubkey, ref_count: RefCount, slot_list: &[SlotT<V>]) {
-        self.unrefs.fetch_add(1, Ordering::Relaxed);
-        self.addunref(key, ref_count, slot_list, false);
-    }
-    pub fn delete_key(&self, key: &Pubkey) {
+    pub fn delete_key(&self, ix: usize, key: &Pubkey) {
         self.deletes.fetch_add(1, Ordering::Relaxed);
-        let ix = self.bucket_ix(key);
         {
             let wc = &mut self.write_cache[ix].write().unwrap();
             wc.remove(key);
-            //error!("remove: {}", key);
         }
         if !self.in_mem_only {
             self.disk.delete_key(key)
         }
     }
-    pub fn distribution(&self) {}
     pub fn distribution2(&self) {
         let mut ct = 0;
         for i in 0..self.bins {
@@ -1092,8 +1057,6 @@ impl<V: IsCached> BucketMapHolder<V> {
             ("flush0", self.flush0.swap(0, Ordering::Relaxed), i64),
             ("flush1", self.flush1.swap(0, Ordering::Relaxed), i64),
             ("flush2", self.flush2.swap(0, Ordering::Relaxed), i64),
-            ("flush3", self.flush3.swap(0, Ordering::Relaxed), i64),
-            //("updates_not_in_cache", self.updates.load(Ordering::Relaxed), i64),
             (
                 "updates_in_cache",
                 self.updates_in_cache.swap(0, Ordering::Relaxed),
