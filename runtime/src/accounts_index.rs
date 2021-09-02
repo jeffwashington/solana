@@ -112,7 +112,7 @@ impl AccountSecondaryIndexes {
 }
 
 #[derive(Debug, Default)]
-pub struct AccountMapEntryInner<T: IsCached> {
+pub struct AccountMapEntryInner<T> {
     pub ref_count: AtomicU64,
     pub slot_list: RwLock<SlotList<T>>,
 
@@ -123,7 +123,7 @@ pub struct AccountMapEntryInner<T: IsCached> {
     pub confirmed_not_on_disk: AtomicBool,
 }
 
-impl<T: IsCached> AccountMapEntryInner<T> {
+impl<T> AccountMapEntryInner<T> {
     pub fn ref_count(&self) -> RefCount {
         self.ref_count.load(Ordering::Relaxed)
     }
