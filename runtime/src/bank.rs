@@ -4453,10 +4453,6 @@ impl Bank {
         }
     }
 
-    pub fn report_store_timings(&self) {
-        self.rc.accounts.accounts_db.report_store_timings();
-    }
-
     pub fn force_flush_accounts_cache(&self) {
         self.rc
             .accounts
@@ -12870,7 +12866,6 @@ pub(crate) mod tests {
                 u64,
             ) + std::marker::Send,
     {
-        solana_logger::setup();
         // Set up initial bank
         let mut genesis_config = create_genesis_config_with_leader(
             10,

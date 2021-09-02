@@ -28,11 +28,6 @@ impl PubkeyBinCalculator16 {
         }
     }
 
-    pub fn bin_from_pubkey_static(bins: usize, pubkey: &Pubkey) -> usize {
-        let as_ref = pubkey.as_ref();
-        ((as_ref[0] as usize * 256 + as_ref[1] as usize) as usize) * bins / 65536
-    }
-
     pub fn bin_from_pubkey(&self, pubkey: &Pubkey) -> usize {
         let as_ref = pubkey.as_ref();
         ((as_ref[0] as usize * 256 + as_ref[1] as usize) as usize) >> self.shift_bits
