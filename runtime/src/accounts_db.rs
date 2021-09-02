@@ -96,7 +96,7 @@ pub const PUBKEY_BINS_FOR_CALCULATING_HASHES: usize = 65536;
 // higher passes = slower total time, lower dynamic memory usage
 // lower passes = faster total time, higher dynamic memory usage
 // passes=2 cuts dynamic memory usage in approximately half.
-pub const NUM_SCAN_PASSES: usize = 2;
+pub const NUM_SCAN_PASSES: usize = 8;
 pub const BINS_PER_PASS: usize = PUBKEY_BINS_FOR_CALCULATING_HASHES / NUM_SCAN_PASSES;
 
 // Without chunks, we end up with 1 output vec for each outer snapshot storage.
