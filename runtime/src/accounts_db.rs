@@ -88,8 +88,8 @@ pub const DEFAULT_NUM_THREADS: u32 = 8;
 pub const DEFAULT_NUM_DIRS: u32 = 4;
 
 pub const PUBKEY_BINS_FOR_CALCULATING_HASHES: usize = 65536;
-pub const NUM_SCAN_PASSES: usize = 2;
-pub const BINS_PER_PASS: usize = 32768; // PUBKEY_BINS_FOR_CALCULATING_HASHES / NUM_SCAN_PASSES
+pub const NUM_SCAN_PASSES: usize = 8;
+pub const BINS_PER_PASS: usize = 8192; // PUBKEY_BINS_FOR_CALCULATING_HASHES / NUM_SCAN_PASSES
 
 // Without chunks, we end up with 1 output vec for each outer snapshot storage.
 // This results in too many vectors to be efficient.
