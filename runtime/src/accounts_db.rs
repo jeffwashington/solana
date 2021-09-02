@@ -88,8 +88,8 @@ pub const DEFAULT_NUM_THREADS: u32 = 8;
 pub const DEFAULT_NUM_DIRS: u32 = 4;
 
 pub const PUBKEY_BINS_FOR_CALCULATING_HASHES: usize = 65536;
-pub const NUM_SCAN_PASSES: usize = 2;
-pub const BINS_PER_PASS: usize = 32768; // PUBKEY_BINS_FOR_CALCULATING_HASHES / NUM_SCAN_PASSES
+pub const NUM_SCAN_PASSES: usize = 8;
+pub const BINS_PER_PASS: usize = 8192; // PUBKEY_BINS_FOR_CALCULATING_HASHES / NUM_SCAN_PASSES
 
 // A specially reserved storage id just for entries in the cache, so that
 // operations that take a storage entry can maintain a common interface
