@@ -871,6 +871,27 @@ impl<V: IsCached> BucketMapHolder<V> {
         Self::add_age(current_age, DEFAULT_AGE)
     }
 
+    fn maybe_merge_disk_into_cache<F>(
+        &self,
+        item_in_cache: &WriteCacheEntryArc<V>,
+        get_item_on_disk: F,
+    ) where
+        F: FnOnce() -> Option<V2<V>>,
+    {
+        if item_in_cache.must_do_lookup_from_disk() {
+            // we have inserted or updated this item, but we have never reconciled with the disk, so we have to do that now since a caller is requesting the complete item
+            if let Some(disk_v) = get_item_on_disk() {
+                assert!(!self.in_mem_only);
+                // we now found the item on disk, so we need to update the disk state with cache changes, then we need to update the cache to be the new dirty state
+                Self::update_cache_from_disk(&disk_v, item_in_cache);
+            }
+            // else, we now know the cache entry was the only info that exists for this account, so we have all we need already
+            item_in_cache.set_must_do_lookup_from_disk(false);
+            //item_in_cache.set_confirmed_not_on_disk(true); not sure about this - items we inserted that are not on disk are ok
+            assert!(!item_in_cache.slot_list.read().unwrap().is_empty()); // get rid of eventually
+        }
+    }
+
     fn get_caching<'b>(
         &self,
         item_in_cache: &'b WriteCacheEntryArc<V>,
@@ -881,21 +902,7 @@ impl<V: IsCached> BucketMapHolder<V> {
         if item_in_cache.confirmed_not_on_disk() {
             return None; // does not really exist
         }
-        if item_in_cache.must_do_lookup_from_disk() {
-            // we have inserted or updated this item, but we have never reconciled with the disk, so we have to do that now since a caller is requesting the complete item
-            let disk = self.get_no_cache(key);
-            if let Some(disk_v) = disk {
-                assert!(!self.in_mem_only);
-                // we now found the item on disk, so we need to update the disk state with cache changes, then we need to update the cache to be the new dirty state
-                Self::update_cache_from_disk(&disk_v, item_in_cache);
-                item_in_cache.set_must_do_lookup_from_disk(false);
-                return Some(());
-            }
-            // else, we now know the cache entry was the only info that exists for this account, so we have all we need already
-            item_in_cache.set_must_do_lookup_from_disk(false);
-            //item_in_cache.set_confirmed_not_on_disk(true); not sure about this - items we inserted that are not on disk are ok
-            assert!(!item_in_cache.slot_list.read().unwrap().is_empty()); // get rid of eventually
-        }
+        self.maybe_merge_disk_into_cache(item_in_cache, || self.get_no_cache(key));
 
         Some(())
     }
@@ -905,37 +912,42 @@ impl<V: IsCached> BucketMapHolder<V> {
         R: RangeBounds<Pubkey>,
     {
         let mut m = Measure::start("range");
-        let r = if !self.in_mem_only {
-            self.flush(ix, false, None);
-            self.disk
-                .range(ix, range)
-                .map(|x| {
-                    x.into_iter()
-                        .map(
+        let mut wc = self.write_cache[ix].write().unwrap();
+        if !self.in_mem_only {
+            self.disk.range(ix, range).map(|x| {
+                x.into_iter().for_each(
                             |BucketMapKeyValue {
                                  pubkey,
                                  ref_count,
                                  slot_list,
                              }| {
-                                (pubkey, Self::disk_to_cache_entry(ref_count, slot_list))
+                        let get_item_on_disk =
+                            || Some(Self::disk_to_cache_entry(ref_count, slot_list));
+                        match wc.entry(pubkey) {
+                            HashMapEntry::Occupied(occupied) => {
+                                // make sure cache is up to date
+                                let v = occupied.get();
+                                assert!(!v.confirmed_not_on_disk());
+                                self.maybe_merge_disk_into_cache(&v, get_item_on_disk);
+                                v.set_age(self.set_age_to_future());
+                            }
+                            HashMapEntry::Vacant(vacant) => {
+                                vacant.insert(get_item_on_disk().unwrap());
+                            }
+                        }
                             },
                         )
-                        .collect()
-                })
-                .unwrap_or_default()
-        } else {
-            let wc = self.write_cache[ix].read().unwrap();
+            });
+        }
             let mut result = Vec::with_capacity(wc.len());
             for (k, v) in wc.iter() {
                 if range.map(|range| range.contains(k)).unwrap_or(true) {
                     result.push((*k, v.clone()));
                 }
             }
-            result
-        };
         m.stop();
         self.range_us.fetch_add(m.as_us(), Ordering::Relaxed);
-        r
+        result
     }
 
     pub fn get(&self, ix: usize, key: &Pubkey) -> Option<V2<V>> {
