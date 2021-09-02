@@ -6424,11 +6424,12 @@ impl AccountsDb {
         roots.sort();
         info!("{}: accounts_index roots: {:?}", label, roots,);
         self.accounts_index.account_maps.iter().for_each(|map| {
-            for pubkey in map.read().unwrap().iter(None::<&Range<Pubkey>>) {
-                if let Some(account_entry) = self.accounts_index.get_account_read_entry(&pubkey) {
-                    info!("  key: {} ref_count: {}", pubkey, account_entry.ref_count(),);
-                    info!("      slots: {:?}", *account_entry.slot_list());
-                }
+            for (pubkey, account_entry) in map.read().unwrap().iter(None::<&Range<Pubkey>>) {
+                info!("  key: {} ref_count: {}", pubkey, account_entry.ref_count(),);
+                info!(
+                    "      slots: {:?}",
+                    *account_entry.slot_list.read().unwrap()
+                );
             }
         });
     }

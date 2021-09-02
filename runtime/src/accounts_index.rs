@@ -652,13 +652,13 @@ impl<'a, T: IsCached> AccountsIndexIterator<'a, T> {
         map: &'b AccountMapsReadLock<'b, T>,
         range: R,
         collect_all_unsorted: bool,
-    ) -> Vec<Pubkey>
+    ) -> Vec<(Pubkey, AccountMapEntry<T>)>
     where
         R: RangeBounds<Pubkey>,
     {
         let mut result = map.iter(Some(&range));
         if !collect_all_unsorted {
-            result.sort_unstable();
+            result.sort_unstable_by(|a, b| a.0.cmp(&b.0));
         }
         result
     }
@@ -728,7 +728,7 @@ impl<'a, T: IsCached> AccountsIndexIterator<'a, T> {
 }
 
 impl<'a, T: IsCached> Iterator for AccountsIndexIterator<'a, T> {
-    type Item = Vec<Pubkey>;
+    type Item = Vec<(Pubkey, AccountMapEntry<T>)>;
     fn next(&mut self) -> Option<Self::Item> {
         if self.is_finished {
             return None;
@@ -736,21 +736,18 @@ impl<'a, T: IsCached> Iterator for AccountsIndexIterator<'a, T> {
         let (start_bin, bin_range) = self.bin_start_and_range();
         let mut chunk = Vec::with_capacity(ITER_BATCH_SIZE);
         'outer: for i in self.account_maps.iter().skip(start_bin).take(bin_range) {
-            for pubkey in Self::range(
+            for (pubkey, account_map_entry) in Self::range(
                 &i.read().unwrap(),
                 (self.start_bound, self.end_bound),
                 self.collect_all_unsorted,
-            )
-            .into_iter()
-            {
+            ) {
                 if chunk.len() >= ITER_BATCH_SIZE && !self.collect_all_unsorted {
                     break 'outer;
                 }
-                let item = pubkey;
+                let item = (pubkey, account_map_entry.clone());
                 chunk.push(item);
             }
         }
-
         if chunk.is_empty() {
             self.is_finished = true;
             return None;
@@ -758,7 +755,7 @@ impl<'a, T: IsCached> Iterator for AccountsIndexIterator<'a, T> {
             self.is_finished = true;
         }
 
-        self.start_bound = Excluded(*chunk.last().unwrap());
+        self.start_bound = Excluded(chunk.last().unwrap().0);
         Some(chunk)
     }
 }
@@ -1152,6 +1149,7 @@ impl<T: IsCached> AccountsIndex<T> {
         // instead of scanning the entire range
         let mut total_elapsed_timer = Measure::start("total");
         let mut num_keys_iterated = 0;
+        let mut latest_slot_elapsed = 0;
         let mut load_account_elapsed = 0;
         let mut read_lock_elapsed = 0;
         let mut iterator_elapsed = 0;
@@ -1159,28 +1157,30 @@ impl<T: IsCached> AccountsIndex<T> {
         for pubkey_list in self.iter(range, collect_all_unsorted) {
             iterator_timer.stop();
             iterator_elapsed += iterator_timer.as_us();
-            for pubkey in pubkey_list {
+            for (pubkey, list) in pubkey_list {
                 num_keys_iterated += 1;
                 let mut read_lock_timer = Measure::start("read_lock");
-                let get = self.get(&pubkey, Some(ancestors), max_root);
+                let list_r = &list.slot_list.read().unwrap();
                 read_lock_timer.stop();
                 read_lock_elapsed += read_lock_timer.as_us();
-                if let AccountIndexGetResult::Found(list_r, index) = get {
+                let mut latest_slot_timer = Measure::start("latest_slot");
+                if let Some(index) = self.latest_slot(Some(ancestors), list_r, max_root) {
+                    latest_slot_timer.stop();
+                    latest_slot_elapsed += latest_slot_timer.as_us();
                     let mut load_account_timer = Measure::start("load_account");
-                    let list = list_r.slot_list()[index];
-                    func(&pubkey, (&list.1, list.0));
+                    func(&pubkey, (&list_r[index].1, list_r[index].0));
                     load_account_timer.stop();
                     load_account_elapsed += load_account_timer.as_us();
                 }
             }
             iterator_timer = Measure::start("iterator_elapsed");
         }
-
         total_elapsed_timer.stop();
         if !metric_name.is_empty() {
             datapoint_info!(
                 metric_name,
                 ("total_elapsed", total_elapsed_timer.as_us(), i64),
+                ("latest_slot_elapsed", latest_slot_elapsed, i64),
                 ("read_lock_elapsed", read_lock_elapsed, i64),
                 ("load_account_elapsed", load_account_elapsed, i64),
                 ("iterator_elapsed", iterator_elapsed, i64),

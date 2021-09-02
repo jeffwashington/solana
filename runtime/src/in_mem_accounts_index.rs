@@ -123,11 +123,11 @@ impl<V: IsCached> InMemAccountsIndex<V> {
     }
     */
 
-    pub fn iter<R>(&self, range: Option<&R>) -> Vec<K>
+    pub fn iter<R>(&self, range: Option<&R>) -> Vec<(K, V2<V>)>
     where
         R: RangeBounds<Pubkey>,
     {
-        self.disk.keys(self.bin_index, range).unwrap_or_default()
+        self.disk.range(self.bin_index, range)
     }
 
     pub fn keys(&self) -> Keys {
