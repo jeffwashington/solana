@@ -7074,7 +7074,7 @@ pub mod tests {
     fn test_accountsdb_scan_snapshot_stores_2nd_chunk() {
         // enough stores to get to 2nd chunk
         let bins = 1;
-        const MAX_ITEMS_PER_CHUNK: usize = 5_000;
+        const MAX_ITEMS_PER_CHUNK: usize = 1_000;
         let slot = MAX_ITEMS_PER_CHUNK as Slot;
         let (storages, raw_expected) = sample_storages_and_account_in_slot(slot);
         let storage_data = vec![(&storages[0], slot)];
@@ -7190,7 +7190,7 @@ pub mod tests {
         // enough stores to get to 2nd chunk
         // range is for only 1 bin out of 256.
         let bins = 256;
-        const MAX_ITEMS_PER_CHUNK: usize = 5_000;
+        const MAX_ITEMS_PER_CHUNK: usize = 1_000;
         let slot = MAX_ITEMS_PER_CHUNK as Slot;
         let (storages, raw_expected) = sample_storages_and_account_in_slot(slot);
         let storage_data = vec![(&storages[0], slot)];
