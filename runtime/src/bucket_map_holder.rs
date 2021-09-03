@@ -477,6 +477,9 @@ impl<V: IsCached> BucketMapHolder<V> {
                         }
                         v.set_dirty(false);
                         v.set_insert(false);
+                        if self.startup.load(Ordering::Relaxed) {
+                            occupied.remove(); // if we're at startup, then we want to get things out of the cache as soon as possible
+                        }
                         flushed += 1;
                     }
                 }
