@@ -219,7 +219,7 @@ impl<V: IsCached> BucketMapHolder<V> {
         age.wrapping_add(inc)
     }
 
-    pub fn bg_flusher(&self, exit: Arc<AtomicBool>) {
+    pub fn bg_flusher(&self, exit: Arc<AtomicBool>, exit_when_idle: bool) {
         let mut found_one = false;
         let mut last = Instant::now();
         let mut aging = Instant::now();
@@ -235,7 +235,7 @@ impl<V: IsCached> BucketMapHolder<V> {
         loop {
             maybe_report();
             let mut age = None;
-            if !self.in_mem_only && aging.elapsed().as_millis() as usize > AGE_MS {
+            if !exit_when_idle && !self.in_mem_only && aging.elapsed().as_millis() as usize > AGE_MS {
                 // time of 1 slot
                 current_age = Self::add_age(current_age, 1); // % DEFAULT_AGE; // no reason to pass by something too often if we accidentally miss it...
                 self.current_age.store(current_age, Ordering::Relaxed);
@@ -245,8 +245,13 @@ impl<V: IsCached> BucketMapHolder<V> {
             if exit.load(Ordering::Relaxed) {
                 break;
             }
-            if age.is_none() && !found_one && self.wait.wait_timeout(Duration::from_millis(500)) {
-                continue;
+            if age.is_none() && !found_one {
+                if exit_when_idle && !self.startup.load(Ordering::Relaxed) {
+                    break;
+                }
+                if self.wait.wait_timeout(Duration::from_millis(200)) {
+                    continue;
+                }
             }
             found_one = false;
             for ix in 0..self.bins {

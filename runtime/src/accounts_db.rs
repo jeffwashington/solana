@@ -180,6 +180,7 @@ struct GenerateIndexTimings {
     pub storage_size_accounts_map_us: u64,
     pub storage_size_storages_us: u64,
     pub storage_size_accounts_map_flatten_us: u64,
+    pub disk_flush_us: u64,
 }
 
 #[derive(Default, Debug, PartialEq)]
@@ -212,6 +213,11 @@ impl GenerateIndexTimings {
             (
                 "storage_size_accounts_map_flatten_us",
                 self.storage_size_accounts_map_flatten_us as i64,
+                i64
+            ),
+            (
+                "disk_flush_us",
+                self.disk_flush_us as i64,
                 i64
             ),
         );
@@ -4961,7 +4967,6 @@ impl AccountsDb {
                             .unwrap()
                             .slots_outside_cache_range += range_this_chunk;
                     } else {
-
                         for slot in start..end {
                             let sub_storages = snapshot_storages.get(slot);
                             bin_range.start.hash(&mut hasher);
@@ -6389,6 +6394,19 @@ impl AccountsDb {
         // verify checks that all the expected items are in the accounts index and measures how long it takes to look them all up
         let passes = if verify { 2 } else { 1 };
         for pass in 0..passes {
+            let flushers = if pass == 0 {
+                let num_threads = std::cmp::max(2, num_cpus::get() / 4);
+                (0..num_threads)
+                    .into_iter()
+                    .map(|_| {
+                        AccountsIndex::create_bg_flusher(&self.accounts_index.account_maps, true)
+                            .1
+                            .unwrap()
+                    })
+                    .collect()
+            } else {
+                vec![]
+            };
             let storage_info = StorageSizeAndCountMap::default();
             let total_processed_slots_across_all_threads = AtomicU64::new(0);
             let outer_slots_len = slots.len();
@@ -6477,8 +6495,13 @@ impl AccountsDb {
 
             let storage_info_timings = storage_info_timings.into_inner().unwrap();
 
+            let mut disk_flush_us = Measure::start("flushers");
+            flushers.into_iter().for_each(|join| join.join().unwrap());
+            disk_flush_us.stop();
+
             let mut timings = GenerateIndexTimings {
                 scan_time,
+                disk_flush_us: disk_flush_us.as_us(),
                 index_time: index_time.as_us(),
                 insertion_time_us: insertion_time_us.load(Ordering::Relaxed),
                 min_bin_size,
@@ -6498,6 +6521,7 @@ impl AccountsDb {
 
                 self.set_storage_count_and_alive_bytes(storage_info, &mut timings);
             }
+
             timings.report();
         }
         self.set_startup(false);
