@@ -216,17 +216,16 @@ impl<V: IsCached> BucketMapHolder<V> {
         age.wrapping_add(inc)
     }
 
+    fn maybe_report_stats(&self) -> bool {
+        self.stats
+        .report_stats(self.in_mem_only, &self.disk, &self.cache)
+    }
+
     pub fn bg_flusher(&self, exit: Arc<AtomicBool>, exit_when_idle: bool) {
         let id = self.thread_id.fetch_add(1, Ordering::Relaxed);
         let mut found_one = false;
         let mut current_age: u8 = 0;
         let mut check_for_startup_mode = true;
-        let maybe_report = || {
-            if self.stats
-                .report_stats(self.in_mem_only, &self.disk, &self.cache) {
-                    error!("thread {} updated stats", id);
-                }
-        };
 
         let mut awake = if (self.stats.active_flush_threads.load(Ordering::Relaxed) as usize) < self.get_desired_threads() {
             self.stats
@@ -257,7 +256,7 @@ impl<V: IsCached> BucketMapHolder<V> {
                 continue;
             }
 
-            maybe_report();
+            self.maybe_report_stats();
             let mut age = None;
             if !exit_when_idle && !self.in_mem_only && self.age_interval.should_update(AGE_MS)
             {
@@ -308,7 +307,7 @@ impl<V: IsCached> BucketMapHolder<V> {
                             check_for_startup_mode = false;
                         }
                     }
-                    maybe_report();
+                    self.maybe_report_stats();
                     found_one = true;
                 }
                 if self.check_throughput() {
