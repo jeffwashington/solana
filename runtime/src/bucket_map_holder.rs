@@ -224,7 +224,6 @@ impl<V: IsCached> BucketMapHolder<V> {
     pub fn bg_flusher(&self, exit: Arc<AtomicBool>, exit_when_idle: bool) {
         let id = self.thread_id.fetch_add(1, Ordering::Relaxed);
         let mut found_one = false;
-        let mut current_age: u8 = 0;
         let mut check_for_startup_mode = true;
 
         let mut awake = if (self.stats.active_flush_threads.load(Ordering::Relaxed) as usize) < self.get_desired_threads() {
@@ -265,9 +264,8 @@ impl<V: IsCached> BucketMapHolder<V> {
             if !exit_when_idle && !self.in_mem_only && self.age_interval.should_update(AGE_MS) && !awakened
             {
                 // increment age to get rid of some older things in cache
-                current_age = Self::add_age(current_age, 1);
+                let current_age = 1 + self.current_age.fetch_add(1, Ordering::Relaxed);
                 self.stats.age.store(current_age as u64, Ordering::Relaxed);
-                self.current_age.store(current_age, Ordering::Relaxed);
                 age = Some(current_age);
             }
             if age.is_none() && !found_one && !awakened {
