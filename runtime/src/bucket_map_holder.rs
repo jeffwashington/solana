@@ -263,6 +263,7 @@ impl<V: IsCached> BucketMapHolder<V> {
             let mut age = None;
             if !exit_when_idle && !self.in_mem_only && self.age_interval.should_update(AGE_MS) && !awakened
             {
+                self.stats.age_incs.fetch_add(1, Ordering::Relaxed);
                 // increment age to get rid of some older things in cache
                 let current_age = 1 + self.current_age.fetch_add(1, Ordering::Relaxed);
                 self.stats.age.store(current_age as u64, Ordering::Relaxed);
