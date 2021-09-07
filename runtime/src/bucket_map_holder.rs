@@ -316,6 +316,7 @@ impl<V: IsCached> BucketMapHolder<V> {
                 }
                 if self.check_throughput() {
                     // put this to sleep
+                    assert!(awake);
                     error!("putting to sleep: {}", id);
                     awake = false;
                     self.stats
