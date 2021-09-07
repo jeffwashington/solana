@@ -6,7 +6,7 @@ use solana_sdk::timing::AtomicInterval;
 use std::fmt::Debug;
 use std::sync::atomic::Ordering;
 
-use std::sync::atomic::{AtomicBool, AtomicU64};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize};
 
 #[derive(Debug, Default)]
 pub struct BucketMapHolderStats {
@@ -18,6 +18,7 @@ pub struct BucketMapHolderStats {
     pub cache_flushes: AtomicU64,
     pub bg_flush_cycles: AtomicU64,
     pub bucket_flush_calls: AtomicU64,
+    pub desired_threads: AtomicUsize,
     pub get_purges: AtomicU64,
     pub gets_from_disk: AtomicU64,
     pub gets_from_disk_empty: AtomicU64,
@@ -140,6 +141,8 @@ impl BucketMapHolderStats {
                     .swap(0, Ordering::Relaxed),
                 i64
             ),
+            
+            ("desired_threads", self.desired_threads.load(Ordering::Relaxed), i64),
             ("deletes", self.deletes.swap(0, Ordering::Relaxed), i64),
             (
                 "using_empty_get",

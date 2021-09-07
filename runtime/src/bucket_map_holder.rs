@@ -93,7 +93,7 @@ pub struct BucketMapHolder<V: IsCached> {
 
     // keep track of progress and whether we need more flushers or less
     pub bins_scanned_this_period: AtomicUsize,
-    pub desired_threads: AtomicUsize,
+    //pub desired_threads: AtomicUsize,
     pub bins_scanned_period_start: AtomicInterval,
 }
 
@@ -247,7 +247,7 @@ impl<V: IsCached> BucketMapHolder<V> {
                 let timeout = self.thread_pool_wait.wait_timeout(Duration::from_millis(200));
                 if !timeout {
                     let active_threads = self.stats.active_flush_threads.load(Ordering::Relaxed);
-                    if (active_threads as usize) < self.desired_threads.load(Ordering::Relaxed) {
+                    if (active_threads as usize) < self.stats.desired_threads.load(Ordering::Relaxed) {
                         if self.stats.active_flush_threads.compare_exchange(active_threads, active_threads + 1, Ordering::Acquire, Ordering::Relaxed).is_ok() {
                             error!("waking up: {}", id);
                             awakened = true;
@@ -362,31 +362,31 @@ impl<V: IsCached> BucketMapHolder<V> {
     }
 
     fn get_desired_threads(&self) -> usize {
-        self.desired_threads.load(Ordering::Relaxed)
+        self.stats.desired_threads.load(Ordering::Relaxed)
     }
 
     fn set_desired_threads(&self, increment: bool, expected_threads: usize) -> bool {
         error!("change threads: increment: {}, previous: {}", increment, expected_threads);
         if increment {
-            if expected_threads == self.desired_threads.fetch_add(1, Ordering::Relaxed) {
+            if expected_threads == self.stats.desired_threads.fetch_add(1, Ordering::Relaxed) {
                 self.thread_pool_wait.notify_all();
                 true
             }
             else {
-                self.desired_threads.fetch_sub(1, Ordering::Relaxed);
+                self.stats.desired_threads.fetch_sub(1, Ordering::Relaxed);
                 error!("accidentally incremented too much");
                 false
             }
         }
         else {
-            if expected_threads == self.desired_threads.fetch_sub(1, Ordering::Relaxed) {
+            if expected_threads == self.stats.desired_threads.fetch_sub(1, Ordering::Relaxed) {
                 if expected_threads == 1 {
                     panic!("nope");
                 }
                 true
             }
             else {
-                self.desired_threads.fetch_add(1, Ordering::Relaxed);
+                self.stats.desired_threads.fetch_add(1, Ordering::Relaxed);
                 error!("accidentally decremented too much");
                 false
             }
@@ -451,7 +451,7 @@ impl<V: IsCached> BucketMapHolder<V> {
             thread_id: AtomicUsize::default(),
             bins_scanned_this_period: AtomicUsize::default(),
             bins_scanned_period_start: AtomicInterval::default(),
-            desired_threads: AtomicUsize::new(1),
+            //desired_threads: AtomicUsize::new(1),
         }
     }
     pub fn set_startup(&self, startup: bool) {
