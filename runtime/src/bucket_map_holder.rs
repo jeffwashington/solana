@@ -380,6 +380,9 @@ impl<V: IsCached> BucketMapHolder<V> {
         }
         else {
             if expected_threads == self.desired_threads.fetch_sub(1, Ordering::Relaxed) {
+                if expected_threads == 1 {
+                    panic!("nope");
+                }
                 true
             }
             else {
