@@ -93,7 +93,7 @@ pub struct BucketMapHolder<V: IsCached> {
 
     // keep track of progress and whether we need more flushers or less
     pub bins_scanned_this_period: AtomicUsize,
-    //pub desired_threads: AtomicUsize,
+    pub desired_threads: AtomicUsize,
     pub bins_scanned_period_start: AtomicInterval,
 }
 
@@ -247,9 +247,9 @@ impl<V: IsCached> BucketMapHolder<V> {
                 let timeout = self.thread_pool_wait.wait_timeout(Duration::from_millis(200));
                 if !timeout {
                     let active_threads = self.stats.active_flush_threads.load(Ordering::Relaxed);
-                    if (active_threads as usize) < self.stats.desired_threads.load(Ordering::Relaxed) {
+                    if (active_threads as usize) < self.desired_threads.load(Ordering::Relaxed) {
                         if self.stats.active_flush_threads.compare_exchange(active_threads, active_threads + 1, Ordering::Acquire, Ordering::Relaxed).is_ok() {
-                            error!("waking up: {}", id);
+                            // error!("waking up: {}", id);
                             awakened = true;
                             awake = true;
                         }
@@ -317,7 +317,7 @@ impl<V: IsCached> BucketMapHolder<V> {
                 if self.check_throughput() {
                     // put this to sleep
                     assert!(awake);
-                    error!("putting to sleep: {}", id);
+                    // error!("putting to sleep: {}", id);
                     awake = false;
                     self.stats
                         .active_flush_threads
@@ -364,32 +364,32 @@ impl<V: IsCached> BucketMapHolder<V> {
     }
 
     fn get_desired_threads(&self) -> usize {
-        self.stats.desired_threads.load(Ordering::Relaxed)
+        self.desired_threads.load(Ordering::Relaxed)
     }
 
     fn set_desired_threads(&self, increment: bool, expected_threads: usize) -> bool {
-        error!("change threads: increment: {}, previous: {}", increment, expected_threads);
+        //error!("change threads: increment: {}, previous: {}", increment, expected_threads);
         if increment {
-            if expected_threads == self.stats.desired_threads.fetch_add(1, Ordering::Relaxed) {
+            if expected_threads == self.desired_threads.fetch_add(1, Ordering::Relaxed) {
                 self.thread_pool_wait.notify_all();
                 true
             }
             else {
-                self.stats.desired_threads.fetch_sub(1, Ordering::Relaxed);
-                error!("accidentally incremented too much");
+                self.desired_threads.fetch_sub(1, Ordering::Relaxed);
+                //error!("accidentally incremented too much");
                 false
             }
         }
         else {
-            if expected_threads == self.stats.desired_threads.fetch_sub(1, Ordering::Relaxed) {
+            if expected_threads == self.desired_threads.fetch_sub(1, Ordering::Relaxed) {
                 if expected_threads == 1 {
-                    panic!("nope");
+                    //panic!("nope");
                 }
                 true
             }
             else {
-                self.stats.desired_threads.fetch_add(1, Ordering::Relaxed);
-                error!("accidentally decremented too much");
+                self.desired_threads.fetch_add(1, Ordering::Relaxed);
+                //error!("accidentally decremented too much");
                 false
             }
         }
@@ -433,7 +433,7 @@ impl<V: IsCached> BucketMapHolder<V> {
             .collect::<Vec<_>>();
         assert_eq!(bins, bucket_map.num_buckets());
 
-        let r = Self {
+        Self {
             stats: BucketMapHolderStats::default(),
             stop_flush,
             range_start_per_bin,
@@ -452,10 +452,8 @@ impl<V: IsCached> BucketMapHolder<V> {
             thread_id: AtomicUsize::default(),
             bins_scanned_this_period: AtomicUsize::default(),
             bins_scanned_period_start: AtomicInterval::default(),
-            //desired_threads: AtomicUsize::new(1),
-        };
-        r.stats.desired_threads.store(1, Ordering::Relaxed);
-        r
+            desired_threads: AtomicUsize::new(1),
+        }
     }
     pub fn set_startup(&self, startup: bool) {
         self.startup.store(startup, Ordering::Relaxed);
