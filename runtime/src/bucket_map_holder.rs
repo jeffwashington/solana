@@ -217,20 +217,21 @@ impl<V: IsCached> BucketMapHolder<V> {
 
     fn maybe_report_stats(&self) -> bool {
         self.stats
-        .report_stats(self.in_mem_only, &self.disk, &self.cache)
+            .report_stats(self.in_mem_only, &self.disk, &self.cache)
     }
 
     pub fn bg_flusher(&self, exit: Arc<AtomicBool>, exit_when_idle: bool) {
         let mut found_one = false;
         let mut check_for_startup_mode = true;
 
-        let mut awake = if (self.stats.active_flush_threads.load(Ordering::Relaxed) as usize) < self.get_desired_threads() {
+        let mut awake = if (self.stats.active_flush_threads.load(Ordering::Relaxed) as usize)
+            < self.get_desired_threads()
+        {
             self.stats
-            .active_flush_threads
-            .fetch_add(1, Ordering::Relaxed);
+                .active_flush_threads
+                .fetch_add(1, Ordering::Relaxed);
             true
-        }
-        else {
+        } else {
             false
         };
 
@@ -241,15 +242,25 @@ impl<V: IsCached> BucketMapHolder<V> {
             }
             if !awake {
                 // unused threads sleep until they are needed
-                let timeout = self.thread_pool_wait.wait_timeout(Duration::from_millis(200));
+                let timeout = self
+                    .thread_pool_wait
+                    .wait_timeout(Duration::from_millis(200));
                 if !timeout {
                     let active_threads = self.stats.active_flush_threads.load(Ordering::Relaxed);
-                    if (active_threads as usize) < self.desired_threads.load(Ordering::Relaxed) {
-                        if self.stats.active_flush_threads.compare_exchange(active_threads, active_threads + 1, Ordering::Acquire, Ordering::Relaxed).is_ok() {
-                            // error!("waking up: {}", id);
-                            awakened = true;
-                            awake = true;
-                        }
+                    if (active_threads as usize) < self.desired_threads.load(Ordering::Relaxed)
+                        && self
+                            .stats
+                            .active_flush_threads
+                            .compare_exchange(
+                                active_threads,
+                                active_threads + 1,
+                                Ordering::Acquire,
+                                Ordering::Relaxed,
+                            )
+                            .is_ok()
+                    {
+                        awakened = true;
+                        awake = true;
                     }
                 }
                 if !awakened {
@@ -259,15 +270,18 @@ impl<V: IsCached> BucketMapHolder<V> {
 
             self.maybe_report_stats();
             let mut age = None;
-            if !exit_when_idle && !self.in_mem_only && !self.aging.load(Ordering::Relaxed) && self.age_interval.should_update(AGE_MS) && !awakened
+            if !exit_when_idle
+                && !self.in_mem_only
+                && !self.aging.load(Ordering::Relaxed)
+                && self.age_interval.should_update(AGE_MS)
+                && !awakened
+                && !self.aging.swap(true, Ordering::Relaxed)
             {
-                if !self.aging.swap(true, Ordering::Relaxed) {
-                    self.stats.age_incs.fetch_add(1, Ordering::Relaxed);
-                    // increment age to get rid of some older things in cache
-                    let current_age = 1 + self.current_age.fetch_add(1, Ordering::Relaxed);
-                    self.stats.age.store(current_age as u64, Ordering::Relaxed);
-                    age = Some(current_age);
-                }
+                self.stats.age_incs.fetch_add(1, Ordering::Relaxed);
+                // increment age to get rid of some older things in cache
+                let current_age = 1 + self.current_age.fetch_add(1, Ordering::Relaxed);
+                self.stats.age.store(current_age as u64, Ordering::Relaxed);
+                age = Some(current_age);
             }
             if age.is_none() && !found_one && !awakened {
                 let mut m = Measure::start("idle");
@@ -298,7 +312,8 @@ impl<V: IsCached> BucketMapHolder<V> {
                 }
                 self.stats.active_flushes.fetch_add(1, Ordering::Relaxed);
                 let found_dirty = self.flush(ix, true, age).0;
-                self.bins_scanned_this_period.fetch_add(1, Ordering::Relaxed);
+                self.bins_scanned_this_period
+                    .fetch_add(1, Ordering::Relaxed);
 
                 self.stats.active_flushes.fetch_sub(1, Ordering::Relaxed);
                 if found_dirty {
@@ -329,11 +344,14 @@ impl<V: IsCached> BucketMapHolder<V> {
             }
             m.stop();
             if age.is_some() {
-                self.stats.age_elapsed_us.fetch_add(m.as_us(), Ordering::Relaxed);
+                self.stats
+                    .age_elapsed_us
+                    .fetch_add(m.as_us(), Ordering::Relaxed);
                 self.aging.store(false, Ordering::Relaxed);
-            }
-            else {
-                self.stats.non_age_elapsed_us.fetch_add(m.as_us(), Ordering::Relaxed);
+            } else {
+                self.stats
+                    .non_age_elapsed_us
+                    .fetch_add(m.as_us(), Ordering::Relaxed);
             }
         }
 
@@ -345,7 +363,10 @@ impl<V: IsCached> BucketMapHolder<V> {
     }
 
     fn check_throughput(&self, can_put_thread_to_sleep: bool) -> bool {
-        if let Some(elapsed_ms) = self.bins_scanned_period_start.elapsed(THROUGHPUT_POLL_MS, true) {
+        if let Some(elapsed_ms) = self
+            .bins_scanned_period_start
+            .elapsed(THROUGHPUT_POLL_MS, true)
+        {
             let bins_scanned = self.bins_scanned_this_period.swap(0, Ordering::Relaxed);
             let one_thousand_seconds = 1_000;
             let ms_per_s = 1_000;
@@ -356,13 +377,10 @@ impl<V: IsCached> BucketMapHolder<V> {
             if can_put_thread_to_sleep && ratio > FULL_FLUSHES_PER_1000_S {
                 // decrease
                 let threads = self.get_desired_threads();
-                if threads > 1 {
-                    if self.set_desired_threads(false, threads) {
-                        return true; // put this thread to sleep
-                    }
+                if threads > 1 && self.set_desired_threads(false, threads) {
+                    return true; // put this thread to sleep
                 }
-            }
-            else if ratio < FULL_FLUSHES_PER_1000_S {
+            } else if ratio < FULL_FLUSHES_PER_1000_S {
                 // increase
                 let threads = self.get_desired_threads();
                 if threads < MAX_THREADS {
@@ -383,25 +401,20 @@ impl<V: IsCached> BucketMapHolder<V> {
             if expected_threads == self.desired_threads.fetch_add(1, Ordering::Relaxed) {
                 self.thread_pool_wait.notify_all();
                 true
-            }
-            else {
+            } else {
                 self.desired_threads.fetch_sub(1, Ordering::Relaxed);
                 //error!("accidentally incremented too much");
                 false
             }
-        }
-        else {
-            if expected_threads == self.desired_threads.fetch_sub(1, Ordering::Relaxed) {
-                if expected_threads == 1 {
-                    //panic!("nope");
-                }
-                true
+        } else if expected_threads == self.desired_threads.fetch_sub(1, Ordering::Relaxed) {
+            if expected_threads == 1 {
+                //panic!("nope");
             }
-            else {
-                self.desired_threads.fetch_add(1, Ordering::Relaxed);
-                //error!("accidentally decremented too much");
-                false
-            }
+            true
+        } else {
+            self.desired_threads.fetch_add(1, Ordering::Relaxed);
+            //error!("accidentally decremented too much");
+            false
         }
     }
 
@@ -412,7 +425,11 @@ impl<V: IsCached> BucketMapHolder<V> {
                 return ix;
             }
             // we need to wrap around
-            if self.next_flush_index.compare_exchange(ix + 1, 1, Ordering::Relaxed, Ordering::Relaxed).is_ok() {
+            if self
+                .next_flush_index
+                .compare_exchange(ix + 1, 1, Ordering::Relaxed, Ordering::Relaxed)
+                .is_ok()
+            {
                 return 0; // we got 0 since we reset it to 0
             }
             // otherwise, some other thread swapped it first, so start over by adding to get the next index
@@ -945,7 +962,8 @@ impl<V: IsCached> BucketMapHolder<V> {
         slot_list_cache.clear();
         slot_list_cache.append(&mut slot_list_disk);
         cache_entry_to_update.set_dirty(true);
-        cache_entry_to_update.set_likely_has_cached_info(AccountMapEntryInner::<V>::in_cache(&slot_list_cache));
+        cache_entry_to_update
+            .set_likely_has_cached_info(AccountMapEntryInner::<V>::in_cache(&slot_list_cache));
         // race conditions here - if someone else already has a ref to the arc, it is difficult to make the refcounts work out right
         // but this is internal only - no 'get' should have returned the account data prior to us reconciling with disk
     }

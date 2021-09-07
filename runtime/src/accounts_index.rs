@@ -918,7 +918,7 @@ impl<T: IsCached> AccountsIndex<T> {
         (account_maps, bin_calculator, exit, flusher)
     }
 
-    pub fn create_bg_flusher(maps: &LockMapType<T>, exit_when_idle: bool) -> (Arc<AtomicBool>, Option<JoinHandle<()>>) {
+    pub fn create_bg_flusher(maps: &LockMapTypeSlice<T>, exit_when_idle: bool) -> (Arc<AtomicBool>, Option<JoinHandle<()>>) {
         if let Some(map) = maps.first() {
             return map.read().unwrap().create_bg_flusher(exit_when_idle);
         }

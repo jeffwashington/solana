@@ -13,7 +13,10 @@ use std::ops::RangeBounds;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::RwLock;
-use std::{fs, sync::atomic::{AtomicUsize, Ordering}};
+use std::{
+    fs,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 type RefCount = u64;
 
 pub struct BucketMapKeyValue<T> {
@@ -175,7 +178,9 @@ impl<T: Clone + Copy + std::fmt::Debug> BucketMap<T> {
     }
 
     pub fn set_expected_capacity(&self, ix: usize, count: usize) {
-        self.buckets[ix].read().unwrap().as_ref().map(|bucket| bucket.set_expected_capacity(count));
+        if let Some(bucket) = self.buckets[ix].read().unwrap().as_ref() {
+            bucket.set_expected_capacity(count)
+        }
     }
 
     pub fn num_buckets(&self) -> usize {
@@ -692,12 +697,11 @@ impl<T: Clone + Copy> Bucket<T> {
             let mut increment = 1;
             let count = self.expected_count.load(Ordering::Relaxed);
             if count > 0 {
-                let new_capacity = (count as f64).log2().ceil() as u8; // use int log here?                
+                let new_capacity = (count as f64).log2().ceil() as u8; // use int log here?
                 if new_capacity > self.index.capacity {
                     increment = new_capacity - self.index.capacity; // at least get closer to where we'd like to be
                 }
             }
-            
 
             for i in increment.. {
                 //increasing the capacity by ^4 reduces the
