@@ -374,6 +374,7 @@ impl<V: IsCached> BucketMapHolder<V> {
             }
             else {
                 self.desired_threads.fetch_sub(1, Ordering::Relaxed);
+                error!("accidentally incremented too much");
                 false
             }
         }
@@ -383,6 +384,7 @@ impl<V: IsCached> BucketMapHolder<V> {
             }
             else {
                 self.desired_threads.fetch_add(1, Ordering::Relaxed);
+                error!("accidentally decremented too much");
                 false
             }
         }
