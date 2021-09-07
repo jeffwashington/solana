@@ -96,6 +96,7 @@ pub struct BucketMapHolder<V: IsCached> {
     pub bins_scanned_this_period: AtomicUsize,
     pub desired_threads: AtomicUsize,
     pub bins_scanned_period_start: AtomicInterval,
+    pub threads_to_put_asleep: AtomicUsize,
 }
 
 impl<V: IsCached> BucketMapHolder<V> {
@@ -330,7 +331,17 @@ impl<V: IsCached> BucketMapHolder<V> {
                     }
                     else {
                         // otherwise, some other thread needs to go to sleep since we're aging right now
+                        self.threads_to_put_asleep.fetch_add(1, Ordering::Relaxed);
                     }
+                }
+                else if age.is_none() {
+                    // figure out race condiitons and locking behavior here
+                    /*
+                    let sleep = self.threads_to_put_asleep.swap(0, Ordering::Relaxed);
+                    if sleep > 0 {
+                        self.threads_to_put_asleep.swap(sleep - 1, Ordering::Relaxed);
+                    }
+                    */
                 }
             }
             m.stop();
