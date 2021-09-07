@@ -315,8 +315,10 @@ impl<V: IsCached> BucketMapHolder<V> {
                             check_for_startup_mode = false;
                         }
                     }
-                    self.maybe_report_stats();
                     found_one = true;
+                }
+                if age.is_none() {
+                    self.maybe_report_stats();
                 }
                 if self.check_throughput() {
                     if age.is_none() {

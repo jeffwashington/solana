@@ -2,6 +2,7 @@ use crate::accounts_index::IsCached;
 use crate::bucket_map_holder::{BucketMapWithEntryType, CacheSlice};
 use log::*;
 use solana_bucket_map::bucket_map::BucketMapDistribution;
+use solana_measure::measure::Measure;
 use solana_sdk::timing::AtomicInterval;
 use std::fmt::Debug;
 use std::sync::atomic::Ordering;
@@ -49,6 +50,7 @@ pub struct BucketMapHolderStats {
     pub age: AtomicU64,
     pub age_incs: AtomicU64,
     pub age_elapsed_us: AtomicU64,
+    pub stats_elapsed_us: AtomicU64,
     pub non_age_elapsed_us: AtomicU64,
 }
 
@@ -65,6 +67,7 @@ impl BucketMapHolderStats {
         if !self.last_report.should_update(1000) {
             return false;
         }
+        let mut m = Measure::start("stats");
         self.gathering_stats.store(true, Ordering::Relaxed);
 
         let ct = cache.iter().map(|x| x.read().unwrap().len()).sum::<usize>();
@@ -298,7 +301,10 @@ impl BucketMapHolderStats {
             ("age_incs", self.age_incs.swap(0, Ordering::Relaxed), i64),
             ("age_elapsed_us", self.age_elapsed_us.swap(0, Ordering::Relaxed), i64),
             ("non_age_elapsed_us", self.age_elapsed_us.swap(0, Ordering::Relaxed), i64),
+            ("stats_elapsed_us", self.stats_elapsed_us.swap(0, Ordering::Relaxed), i64),
         );
+        m.stop();
+        self.stats_elapsed_us.fetch_add(m.as_us(), Ordering::Relaxed);
         self.gathering_stats.store(false, Ordering::Relaxed);
         true
     }
