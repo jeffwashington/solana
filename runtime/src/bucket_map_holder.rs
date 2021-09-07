@@ -247,7 +247,7 @@ impl<V: IsCached> BucketMapHolder<V> {
                 if !timeout {
                     let active_threads = self.stats.active_flush_threads.load(Ordering::Relaxed);
                     if (active_threads as usize) < self.desired_threads.load(Ordering::Relaxed) {
-                        if self.stats.active_flush_threads.compare_exchange(active_threads, active_threads + 1, Ordering::Relaxed, Ordering::Relaxed).is_ok() {
+                        if self.stats.active_flush_threads.compare_exchange(active_threads, active_threads + 1, Ordering::Acquire, Ordering::Relaxed).is_ok() {
                             error!("waking up: {}", id);
                             awake = true;
                         }
