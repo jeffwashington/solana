@@ -48,6 +48,8 @@ pub struct BucketMapHolderStats {
     pub strong_count_no_purge: AtomicU64,
     pub age: AtomicU64,
     pub age_incs: AtomicU64,
+    pub age_elapsed_us: AtomicU64,
+    pub non_age_elapsed_us: AtomicU64,
 }
 
 impl BucketMapHolderStats {
@@ -294,6 +296,8 @@ impl BucketMapHolderStats {
             ),
             ("age", self.age.load(Ordering::Relaxed), i64),
             ("age_incs", self.age_incs.swap(0, Ordering::Relaxed), i64),
+            ("age_elapsed_us", self.age_elapsed_us.swap(0, Ordering::Relaxed), i64),
+            ("non_age_elapsed_us", self.age_elapsed_us.swap(0, Ordering::Relaxed), i64),
         );
         self.gathering_stats.store(false, Ordering::Relaxed);
         true

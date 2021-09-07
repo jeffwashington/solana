@@ -88,6 +88,7 @@ pub struct BucketMapHolder<V: IsCached> {
     pub in_mem_only: bool,
     pub range_start_per_bin: Vec<Pubkey>,
     pub stats: BucketMapHolderStats,
+    pub aging: AtomicBool,
     pub next_flush_index: AtomicUsize,
     pub thread_id: AtomicUsize,
 
@@ -261,13 +262,15 @@ impl<V: IsCached> BucketMapHolder<V> {
 
             self.maybe_report_stats();
             let mut age = None;
-            if !exit_when_idle && !self.in_mem_only && self.age_interval.should_update(AGE_MS) && !awakened
+            if !exit_when_idle && !self.in_mem_only && !self.aging.load(Ordering::Relaxed) && self.age_interval.should_update(AGE_MS) && !awakened
             {
-                self.stats.age_incs.fetch_add(1, Ordering::Relaxed);
-                // increment age to get rid of some older things in cache
-                let current_age = 1 + self.current_age.fetch_add(1, Ordering::Relaxed);
-                self.stats.age.store(current_age as u64, Ordering::Relaxed);
-                age = Some(current_age);
+                if !self.aging.swap(true, Ordering::Relaxed) {
+                    self.stats.age_incs.fetch_add(1, Ordering::Relaxed);
+                    // increment age to get rid of some older things in cache
+                    let current_age = 1 + self.current_age.fetch_add(1, Ordering::Relaxed);
+                    self.stats.age.store(current_age as u64, Ordering::Relaxed);
+                    age = Some(current_age);
+                }
             }
             if age.is_none() && !found_one && !awakened {
                 let mut m = Measure::start("idle");
@@ -290,6 +293,7 @@ impl<V: IsCached> BucketMapHolder<V> {
                 self.stats.bg_flush_cycles.fetch_add(1, Ordering::Relaxed);
             }
             found_one = false;
+            let mut m = Measure::start("flush_cycle");
             for _iteration in 0..self.bins {
                 let ix = self.get_next_bucket_to_flush();
                 if !exit_when_idle {
@@ -314,15 +318,28 @@ impl<V: IsCached> BucketMapHolder<V> {
                     found_one = true;
                 }
                 if self.check_throughput() {
-                    // put this to sleep
-                    assert!(awake);
-                    // error!("putting to sleep: {}", id);
-                    awake = false;
-                    self.stats
-                        .active_flush_threads
-                        .fetch_sub(1, Ordering::Relaxed);
-                    break;
+                    if age.is_none() {
+                        // put this to sleep, unless we are responsible for aging
+                        assert!(awake);
+                        // error!("putting to sleep: {}", id);
+                        awake = false;
+                        self.stats
+                            .active_flush_threads
+                            .fetch_sub(1, Ordering::Relaxed);
+                        break;
+                    }
+                    else {
+                        // otherwise, some other thread needs to go to sleep since we're aging right now
+                    }
                 }
+            }
+            m.stop();
+            if age.is_some() {
+                self.stats.age_elapsed_us.fetch_add(m.as_us(), Ordering::Relaxed);
+                self.aging.store(false, Ordering::Relaxed);
+            }
+            else {
+                self.stats.non_age_elapsed_us.fetch_add(m.as_us(), Ordering::Relaxed);
             }
         }
 
@@ -448,6 +465,7 @@ impl<V: IsCached> BucketMapHolder<V> {
             startup,
             in_mem_only,
             next_flush_index: AtomicUsize::default(),
+            aging: AtomicBool::default(),
             thread_id: AtomicUsize::default(),
             bins_scanned_this_period: AtomicUsize::default(),
             bins_scanned_period_start: AtomicInterval::default(),
