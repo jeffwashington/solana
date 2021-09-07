@@ -5,14 +5,14 @@ use crate::in_mem_accounts_index::{SlotT, V2};
 use crate::pubkey_bins::PubkeyBinCalculator16;
 use solana_bucket_map::bucket_map::{BucketMap, BucketMapKeyValue};
 use solana_measure::measure::Measure;
-use solana_sdk::pubkey::Pubkey;
+use solana_sdk::{pubkey::Pubkey, timing::AtomicInterval};
 use std::collections::hash_map::Entry;
 use std::fmt::Debug;
 use std::ops::{Bound, RangeBounds, RangeInclusive};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use log::*;
 use std::sync::{RwLock, RwLockWriteGuard};
-use std::time::Instant;
 pub type K = Pubkey;
 
 use std::collections::{hash_map::Entry as HashMapEntry, HashMap, HashSet};
@@ -22,6 +22,12 @@ pub type WriteCache<V> = HashMap<Pubkey, V, MyBuildHasher>;
 use crate::waitable_condvar::WaitableCondvar;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicU8, AtomicUsize};
 use std::time::Duration;
+
+// how many times should we be able to iterate the entire cache and complete a flush in 1000s
+// 1000 = 1 iteration/second
+const FULL_FLUSHES_PER_1000_S: usize = 1000;
+const MAX_THREADS: usize = 8;
+const THROUGHPUT_POLL_MS: u64 = 200;
 
 use std::hash::{BuildHasherDefault, Hasher};
 #[derive(Debug, Default)]
@@ -33,7 +39,7 @@ pub type BucketMapWithEntryType<V> = BucketMap<SlotT<V>>;
 
 type CacheWriteLock<'a, T> = RwLockWriteGuard<'a, WriteCache<V2<T>>>;
 
-pub const AGE_MS: usize = 400; // # of ms for age to advance by 1
+pub const AGE_MS: u64 = 400; // # of ms for age to advance by 1
 
 // When something is intending to remain in the cache for a while, then:WriteCacheEntryArc
 //  add current age + DEFAULT_AGE_INCREMENT to specify when this item should be thrown out of the cache.
@@ -67,6 +73,8 @@ pub type CacheSlice<'a, V> = &'a [CacheBin<V>];
 #[derive(Debug)]
 pub struct BucketMapHolder<V: IsCached> {
     pub current_age: AtomicU8,
+    pub age_interval: AtomicInterval,
+
     pub disk: BucketMapWithEntryType<V>,
     pub cache: Cache<V>,
     pub cache_ranges_held: Vec<RwLock<Vec<Option<RangeInclusive<Pubkey>>>>>,
@@ -75,11 +83,17 @@ pub struct BucketMapHolder<V: IsCached> {
 
     pub bins: usize,
     pub wait: WaitableCondvar,
+    pub thread_pool_wait: WaitableCondvar,
     binner: PubkeyBinCalculator16,
     pub in_mem_only: bool,
     pub range_start_per_bin: Vec<Pubkey>,
     pub stats: BucketMapHolderStats,
     pub next_flush_index: AtomicUsize,
+
+    // keep track of progress and whether we need more flushers or less
+    pub bins_scanned_this_period: AtomicUsize,
+    pub desired_threads: AtomicUsize,
+    pub bins_scanned_period_start: AtomicInterval,
 }
 
 impl<V: IsCached> BucketMapHolder<V> {
@@ -203,8 +217,8 @@ impl<V: IsCached> BucketMapHolder<V> {
 
     pub fn bg_flusher(&self, exit: Arc<AtomicBool>, exit_when_idle: bool) {
         let mut found_one = false;
-        let mut aging = Instant::now();
         let mut current_age: u8 = 0;
+        let mut awake = true;
 
         let mut check_for_startup_mode = true;
         let maybe_report = || {
@@ -217,19 +231,32 @@ impl<V: IsCached> BucketMapHolder<V> {
             .fetch_add(1, Ordering::Relaxed);
 
         loop {
+            if !exit_when_idle && exit.load(Ordering::Relaxed) {
+                break;
+            }
+            if !awake {
+                // unused threads sleep until they are needed
+                let timeout = self.thread_pool_wait.wait_timeout(Duration::from_millis(200));
+                if !timeout {
+                    let active_threads = self.stats.active_flush_threads.load(Ordering::Relaxed);
+                    if (active_threads as usize) < self.desired_threads.load(Ordering::Relaxed) {
+                        if self.stats.active_flush_threads.compare_exchange(active_threads, active_threads + 1, Ordering::Relaxed, Ordering::Relaxed).is_ok() {
+                            awake = true;
+                        }
+                    }
+                }
+                continue;
+            }
+
             maybe_report();
             let mut age = None;
-            if !exit_when_idle && !self.in_mem_only && aging.elapsed().as_millis() as usize > AGE_MS
+            if !exit_when_idle && !self.in_mem_only && self.age_interval.should_update(AGE_MS)
             {
                 // increment age to get rid of some older things in cache
                 current_age = Self::add_age(current_age, 1);
                 self.stats.age.store(current_age as u64, Ordering::Relaxed);
                 self.current_age.store(current_age, Ordering::Relaxed);
                 age = Some(current_age);
-                aging = Instant::now();
-            }
-            if !exit_when_idle && exit.load(Ordering::Relaxed) {
-                break;
             }
             if age.is_none() && !found_one {
                 let mut m = Measure::start("idle");
@@ -273,12 +300,62 @@ impl<V: IsCached> BucketMapHolder<V> {
                     maybe_report();
                     found_one = true;
                 }
+                if self.check_throughput() {
+                    // put this to sleep
+                    awake = false;
+                    self.stats
+                        .active_flush_threads
+                        .fetch_sub(1, Ordering::Relaxed);
+                }
             }
         }
 
-        self.stats
-            .active_flush_threads
-            .fetch_sub(1, Ordering::Relaxed);
+        if awake {
+            self.stats
+                .active_flush_threads
+                .fetch_sub(1, Ordering::Relaxed);
+        }
+    }
+
+    fn check_throughput(&self) -> bool {
+        if let Some(elapsed_ms) = self.bins_scanned_period_start.elapsed(THROUGHPUT_POLL_MS, true) {
+            let bins_scanned = self.bins_scanned_this_period.swap(0, Ordering::Relaxed);
+            let one_thousand_seconds = 1_000;
+            let ms_per_s = 1_000;
+            let elapsed_per_1000_s_factor = one_thousand_seconds * ms_per_s / (elapsed_ms as usize);
+            let ratio = bins_scanned * elapsed_per_1000_s_factor / self.bins;
+            if ratio > FULL_FLUSHES_PER_1000_S {
+                // decrease
+                let threads = self.get_desired_threads();
+                if threads > 1 {
+                    self.set_desired_threads(false);
+                    return true; // put this thread to sleep
+                }
+            }
+            else if ratio < FULL_FLUSHES_PER_1000_S {
+                // increase
+                let threads = self.get_desired_threads();
+                if threads < MAX_THREADS {
+                    self.set_desired_threads(true);
+                }
+            }
+        }
+        false
+    }
+
+    fn get_desired_threads(&self) -> usize {
+        self.desired_threads.load(Ordering::Relaxed)
+    }
+
+    fn set_desired_threads(&self, increment: bool) {
+        error!("change threads: increment: {}", increment);
+        if increment {
+            self.desired_threads.fetch_add(1, Ordering::Relaxed);
+            self.thread_pool_wait.notify_all();
+        }
+        else {
+            self.desired_threads.fetch_sub(1, Ordering::Relaxed);
+        }
     }
 
     fn get_next_bucket_to_flush(&self) -> usize {
@@ -324,6 +401,8 @@ impl<V: IsCached> BucketMapHolder<V> {
             stop_flush,
             range_start_per_bin,
             current_age,
+            age_interval: AtomicInterval::default(),
+            thread_pool_wait: WaitableCondvar::default(),
             cache_ranges_held,
             disk: bucket_map,
             cache,
@@ -333,6 +412,9 @@ impl<V: IsCached> BucketMapHolder<V> {
             startup,
             in_mem_only,
             next_flush_index: AtomicUsize::default(),
+            bins_scanned_this_period: AtomicUsize::default(),
+            bins_scanned_period_start: AtomicInterval::default(),
+            desired_threads: AtomicUsize::new(1),
         }
     }
     pub fn set_startup(&self, startup: bool) {

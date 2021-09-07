@@ -6228,7 +6228,7 @@ impl AccountsDb {
         let passes = if verify { 2 } else { 1 };
         for pass in 0..passes {
             let flushers = if pass == 0 {
-                let num_threads = std::cmp::max(2, num_cpus::get() / 2);
+                let num_threads = 0;// std::cmp::max(2, num_cpus::get() / 2);
                 (0..num_threads)
                     .into_iter()
                     .map(|_| {

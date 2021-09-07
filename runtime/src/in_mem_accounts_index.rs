@@ -11,6 +11,7 @@ use std::ops::{Range, RangeBounds};
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::thread::{Builder, JoinHandle};
+use rayon::prelude::*;
 
 pub type V2<T> = AccountMapEntry<T>;
 pub type SlotT<T> = (Slot, T);
@@ -70,6 +71,7 @@ impl<V: IsCached> InMemAccountsIndex<V> {
     }
 
     pub fn create_bg_flusher(&self, exit_when_idle: bool) -> (Arc<AtomicBool>, Option<JoinHandle<()>>) {
+        let worker_threads = 8;
         let bucket_map_ = self.disk.clone();
         let exit = Arc::new(AtomicBool::new(false));
         let exit_ = exit.clone();
@@ -77,7 +79,9 @@ impl<V: IsCached> InMemAccountsIndex<V> {
             Builder::new()
                 .name("solana-index-flusher".to_string())
                 .spawn(move || {
-                    bucket_map_.bg_flusher(exit_, exit_when_idle);
+                    (0..worker_threads).into_par_iter().for_each(|_| {
+                        bucket_map_.bg_flusher(exit_.clone(), exit_when_idle);
+                    });
                 })
                 .unwrap(),
         );
