@@ -6,7 +6,7 @@ use std::fmt::Debug;
 use log::*;
 use std::sync::atomic::Ordering;
 
-use std::sync::atomic::AtomicU64;
+use std::sync::atomic::{AtomicBool, AtomicU64};
 
 #[derive(Debug, Default)]
 pub struct BucketMapHolderStats {
@@ -33,6 +33,7 @@ pub struct BucketMapHolderStats {
     pub unrefs: AtomicU64,
     pub range: AtomicU64,
     pub range_us: AtomicU64,
+    pub gathering_stats: AtomicBool,
     pub keys: AtomicU64,
     pub inserts: AtomicU64,
     pub inserts_without_checking_disk: AtomicU64,
@@ -53,9 +54,13 @@ impl BucketMapHolderStats {
         disk: &BucketMapWithEntryType<V>,
         cache: CacheSlice<V>,
     ) -> bool{
+        if self.gathering_stats.load(Ordering::Relaxed) {
+            return false;
+        }
         if !self.last_report.should_update(2000) {
             return false;
         }
+        self.gathering_stats.store(true, Ordering::Relaxed);
 
         error!("report_stats");
 
@@ -284,6 +289,7 @@ impl BucketMapHolderStats {
                 i64
             ),
         );
+        self.gathering_stats.store(false, Ordering::Relaxed);
         true
     }
 }

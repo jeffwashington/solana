@@ -82,7 +82,6 @@ impl AtomicInterval {
                 == Ok(last))
             && !(skip_first && last == 0)
         {
-            error!("now, last: {}, {}", now, last);
             Some(elapsed)
         } else {
             None
