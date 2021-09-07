@@ -78,7 +78,7 @@ impl AtomicInterval {
         if elapsed > interval_time
             && (self
                 .last_update
-                .compare_exchange(last, now, Ordering::Relaxed, Ordering::Relaxed)
+                .compare_exchange(last, now, Ordering::Acquire, Ordering::Relaxed)
                 == Ok(last))
             && !(skip_first && last == 0)
         {
