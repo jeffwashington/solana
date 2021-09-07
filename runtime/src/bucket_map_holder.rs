@@ -631,6 +631,7 @@ impl<V: IsCached> BucketMapHolder<V> {
                         self.stats
                             .strong_count_no_purge
                             .fetch_add(1, Ordering::Relaxed);
+                        continue;
                     }
 
                     if self.stop_flush(ix) {
