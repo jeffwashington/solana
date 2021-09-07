@@ -320,30 +320,15 @@ impl<V: IsCached> BucketMapHolder<V> {
                 if age.is_none() {
                     self.maybe_report_stats();
                 }
-                if self.check_throughput() {
-                    if age.is_none() {
-                        // put this to sleep, unless we are responsible for aging
-                        assert!(awake);
-                        // error!("putting to sleep: {}", id);
-                        awake = false;
-                        self.stats
-                            .active_flush_threads
-                            .fetch_sub(1, Ordering::Relaxed);
-                        break;
-                    }
-                    else {
-                        // otherwise, some other thread needs to go to sleep since we're aging right now
-                        self.threads_to_put_asleep.fetch_add(1, Ordering::Relaxed);
-                    }
-                }
-                else if age.is_none() {
-                    // figure out race condiitons and locking behavior here
-                    /*
-                    let sleep = self.threads_to_put_asleep.swap(0, Ordering::Relaxed);
-                    if sleep > 0 {
-                        self.threads_to_put_asleep.swap(sleep - 1, Ordering::Relaxed);
-                    }
-                    */
+                if self.check_throughput(age.is_some()) {
+                    // put this to sleep, unless we are responsible for aging
+                    assert!(awake);
+                    // error!("putting to sleep: {}", id);
+                    awake = false;
+                    self.stats
+                        .active_flush_threads
+                        .fetch_sub(1, Ordering::Relaxed);
+                    break;
                 }
             }
             m.stop();
@@ -363,7 +348,7 @@ impl<V: IsCached> BucketMapHolder<V> {
         }
     }
 
-    fn check_throughput(&self) -> bool {
+    fn check_throughput(&self, can_put_thread_to_sleep: bool) -> bool {
         if let Some(elapsed_ms) = self.bins_scanned_period_start.elapsed(THROUGHPUT_POLL_MS, true) {
             let bins_scanned = self.bins_scanned_this_period.swap(0, Ordering::Relaxed);
             let one_thousand_seconds = 1_000;
@@ -372,7 +357,7 @@ impl<V: IsCached> BucketMapHolder<V> {
             let ratio = bins_scanned * elapsed_per_1000_s_factor / self.bins;
             //error!("throughput: bins scanned: {}, elapsed: {}ms, {}", bins_scanned, elapsed_ms, ratio);
             self.stats.throughput.store(ratio as u64, Ordering::Relaxed);
-            if ratio > FULL_FLUSHES_PER_1000_S {
+            if can_put_thread_to_sleep && ratio > FULL_FLUSHES_PER_1000_S {
                 // decrease
                 let threads = self.get_desired_threads();
                 if threads > 1 {
