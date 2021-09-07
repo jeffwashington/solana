@@ -430,9 +430,8 @@ impl<V: IsCached> BucketMapHolder<V> {
             })
             .collect::<Vec<_>>();
         assert_eq!(bins, bucket_map.num_buckets());
-        error!("new bucket map holder");
 
-        Self {
+        let mut r = Self {
             stats: BucketMapHolderStats::default(),
             stop_flush,
             range_start_per_bin,
@@ -452,7 +451,9 @@ impl<V: IsCached> BucketMapHolder<V> {
             bins_scanned_this_period: AtomicUsize::default(),
             bins_scanned_period_start: AtomicInterval::default(),
             //desired_threads: AtomicUsize::new(1),
-        }
+        };
+        r.stats.desired_threads.store(1, Ordering::Relaxed);
+        r
     }
     pub fn set_startup(&self, startup: bool) {
         self.startup.store(startup, Ordering::Relaxed);
