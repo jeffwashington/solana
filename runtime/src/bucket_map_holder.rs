@@ -89,6 +89,7 @@ pub struct BucketMapHolder<V: IsCached> {
     pub range_start_per_bin: Vec<Pubkey>,
     pub stats: BucketMapHolderStats,
     pub next_flush_index: AtomicUsize,
+    pub thread_id: AtomicUsize,
 
     // keep track of progress and whether we need more flushers or less
     pub bins_scanned_this_period: AtomicUsize,
@@ -216,12 +217,15 @@ impl<V: IsCached> BucketMapHolder<V> {
     }
 
     pub fn bg_flusher(&self, exit: Arc<AtomicBool>, exit_when_idle: bool) {
+        let id = self.thread_id.fetch_add(0, Ordering::Relaxed);
         let mut found_one = false;
         let mut current_age: u8 = 0;
         let mut check_for_startup_mode = true;
         let maybe_report = || {
-            self.stats
-                .report_stats(self.in_mem_only, &self.disk, &self.cache);
+            if self.stats
+                .report_stats(self.in_mem_only, &self.disk, &self.cache) {
+                    error!("thread {} updated stats", id);
+                }
         };
 
         let mut awake = if (self.stats.active_flush_threads.load(Ordering::Relaxed) as usize) < self.get_desired_threads() {
@@ -245,6 +249,7 @@ impl<V: IsCached> BucketMapHolder<V> {
                     let active_threads = self.stats.active_flush_threads.load(Ordering::Relaxed);
                     if (active_threads as usize) < self.desired_threads.load(Ordering::Relaxed) {
                         if self.stats.active_flush_threads.compare_exchange(active_threads, active_threads + 1, Ordering::Relaxed, Ordering::Relaxed).is_ok() {
+                            error!("waking up: {}", id);
                             awake = true;
                         }
                     }
@@ -290,6 +295,8 @@ impl<V: IsCached> BucketMapHolder<V> {
                 }
                 self.stats.active_flushes.fetch_add(1, Ordering::Relaxed);
                 let found_dirty = self.flush(ix, true, age).0;
+                self.bins_scanned_this_period.fetch_add(1, Ordering::Relaxed);
+
                 self.stats.active_flushes.fetch_sub(1, Ordering::Relaxed);
                 if found_dirty {
                     // this bin reported finding something dirty
@@ -306,6 +313,7 @@ impl<V: IsCached> BucketMapHolder<V> {
                 }
                 if self.check_throughput() {
                     // put this to sleep
+                    error!("putting to sleep: {}", id);
                     awake = false;
                     self.stats
                         .active_flush_threads
@@ -417,6 +425,7 @@ impl<V: IsCached> BucketMapHolder<V> {
             startup,
             in_mem_only,
             next_flush_index: AtomicUsize::default(),
+            thread_id: AtomicUsize::default(),
             bins_scanned_this_period: AtomicUsize::default(),
             bins_scanned_period_start: AtomicInterval::default(),
             desired_threads: AtomicUsize::new(1),

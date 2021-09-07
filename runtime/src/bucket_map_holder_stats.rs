@@ -51,9 +51,9 @@ impl BucketMapHolderStats {
         in_mem_only: bool,
         disk: &BucketMapWithEntryType<V>,
         cache: CacheSlice<V>,
-    ) {
+    ) -> bool{
         if !self.last_report.should_update(1000) {
-            return;
+            return false;
         }
 
         let ct = cache.iter().map(|x| x.read().unwrap().len()).sum::<usize>();
@@ -281,5 +281,6 @@ impl BucketMapHolderStats {
                 i64
             ),
         );
+        true
     }
 }
