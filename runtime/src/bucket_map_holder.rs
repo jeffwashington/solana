@@ -27,7 +27,7 @@ use std::time::Duration;
 // 1000 = 1 iteration/second
 const FULL_FLUSHES_PER_1000_S: usize = 1000;
 const MAX_THREADS: usize = 8;
-const THROUGHPUT_POLL_MS: u64 = 2000;
+const THROUGHPUT_POLL_MS: u64 = 200;
 
 use std::hash::{BuildHasherDefault, Hasher};
 #[derive(Debug, Default)]

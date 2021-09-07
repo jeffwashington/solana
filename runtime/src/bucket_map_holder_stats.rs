@@ -1,9 +1,9 @@
 use crate::accounts_index::IsCached;
 use crate::bucket_map_holder::{BucketMapWithEntryType, CacheSlice};
+use log::*;
 use solana_bucket_map::bucket_map::BucketMapDistribution;
 use solana_sdk::timing::AtomicInterval;
 use std::fmt::Debug;
-use log::*;
 use std::sync::atomic::Ordering;
 
 use std::sync::atomic::{AtomicBool, AtomicU64};
@@ -53,11 +53,11 @@ impl BucketMapHolderStats {
         in_mem_only: bool,
         disk: &BucketMapWithEntryType<V>,
         cache: CacheSlice<V>,
-    ) -> bool{
+    ) -> bool {
         if self.gathering_stats.load(Ordering::Relaxed) {
             return false;
         }
-        if !self.last_report.should_update(2000) {
+        if !self.last_report.should_update(1000) {
             return false;
         }
         self.gathering_stats.store(true, Ordering::Relaxed);
@@ -72,20 +72,24 @@ impl BucketMapHolderStats {
         let mut mind = usize::MAX;
         let mut maxd = 0;
         let dist = if !in_mem_only {
-            let dist = disk.distribution();
-            for d in &dist.sizes {
-                let d = *d;
-                sum += d;
-                min = std::cmp::min(min, d);
-                max = std::cmp::max(max, d);
+            if false {
+                let dist = disk.distribution();
+                for d in &dist.sizes {
+                    let d = *d;
+                    sum += d;
+                    min = std::cmp::min(min, d);
+                    max = std::cmp::max(max, d);
+                }
+                for d in &dist.data_sizes {
+                    let d = *d;
+                    sumd += d;
+                    mind = std::cmp::min(min, d);
+                    maxd = std::cmp::max(max, d);
+                }
+                dist
+            } else {
+                BucketMapDistribution::default()
             }
-            for d in &dist.data_sizes {
-                let d = *d;
-                sumd += d;
-                mind = std::cmp::min(min, d);
-                maxd = std::cmp::max(max, d);
-            }
-            dist
         } else {
             for d in cache {
                 let d = d.read().unwrap().len();
@@ -283,11 +287,7 @@ impl BucketMapHolderStats {
                 self.strong_count_no_purge.swap(0, Ordering::Relaxed),
                 i64
             ),
-            (
-                "age",
-                self.age.load(Ordering::Relaxed),
-                i64
-            ),
+            ("age", self.age.load(Ordering::Relaxed), i64),
         );
         self.gathering_stats.store(false, Ordering::Relaxed);
         true
