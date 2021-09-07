@@ -218,17 +218,21 @@ impl<V: IsCached> BucketMapHolder<V> {
     pub fn bg_flusher(&self, exit: Arc<AtomicBool>, exit_when_idle: bool) {
         let mut found_one = false;
         let mut current_age: u8 = 0;
-        let mut awake = true;
-
         let mut check_for_startup_mode = true;
         let maybe_report = || {
             self.stats
                 .report_stats(self.in_mem_only, &self.disk, &self.cache);
         };
 
-        self.stats
+        let mut awake = if (self.stats.active_flush_threads.load(Ordering::Relaxed) as usize) < self.get_desired_threads() {
+            self.stats
             .active_flush_threads
             .fetch_add(1, Ordering::Relaxed);
+            true
+        }
+        else {
+            false
+        };
 
         loop {
             if !exit_when_idle && exit.load(Ordering::Relaxed) {
@@ -324,6 +328,7 @@ impl<V: IsCached> BucketMapHolder<V> {
             let ms_per_s = 1_000;
             let elapsed_per_1000_s_factor = one_thousand_seconds * ms_per_s / (elapsed_ms as usize);
             let ratio = bins_scanned * elapsed_per_1000_s_factor / self.bins;
+            error!("throughput: {}, {}", bins_scanned, ratio);
             if ratio > FULL_FLUSHES_PER_1000_S {
                 // decrease
                 let threads = self.get_desired_threads();
