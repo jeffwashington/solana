@@ -25,7 +25,7 @@ use std::time::Duration;
 
 // how many times should we be able to iterate the entire cache and complete a flush in 1000s
 // 1000 = 1 iteration/second
-const FULL_FLUSHES_PER_1000_S: usize = 100;
+const FULL_FLUSHES_PER_1000_S: usize = 1000;
 const MAX_THREADS: usize = 8;
 const THROUGHPUT_POLL_MS: u64 = 200;
 
@@ -374,10 +374,10 @@ impl<V: IsCached> BucketMapHolder<V> {
         }
         else {
             if expected_threads == self.desired_threads.fetch_sub(1, Ordering::Relaxed) {
-                self.desired_threads.fetch_add(1, Ordering::Relaxed);
                 true
             }
             else {
+                self.desired_threads.fetch_add(1, Ordering::Relaxed);
                 false
             }
         }
