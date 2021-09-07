@@ -217,7 +217,7 @@ impl<V: IsCached> BucketMapHolder<V> {
     }
 
     pub fn bg_flusher(&self, exit: Arc<AtomicBool>, exit_when_idle: bool) {
-        let id = self.thread_id.fetch_add(0, Ordering::Relaxed);
+        let id = self.thread_id.fetch_add(1, Ordering::Relaxed);
         let mut found_one = false;
         let mut current_age: u8 = 0;
         let mut check_for_startup_mode = true;

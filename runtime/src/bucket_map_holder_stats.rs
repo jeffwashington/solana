@@ -56,6 +56,8 @@ impl BucketMapHolderStats {
             return false;
         }
 
+        error!("report_stats");
+
         let ct = cache.iter().map(|x| x.read().unwrap().len()).sum::<usize>();
         let mut sum = 0;
         let mut min = usize::MAX;
