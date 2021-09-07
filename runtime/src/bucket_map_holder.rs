@@ -433,7 +433,7 @@ impl<V: IsCached> BucketMapHolder<V> {
             .collect::<Vec<_>>();
         assert_eq!(bins, bucket_map.num_buckets());
 
-        let mut r = Self {
+        let r = Self {
             stats: BucketMapHolderStats::default(),
             stop_flush,
             range_start_per_bin,

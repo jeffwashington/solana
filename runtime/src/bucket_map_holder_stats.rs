@@ -11,6 +11,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize};
 #[derive(Debug, Default)]
 pub struct BucketMapHolderStats {
     last_report: AtomicInterval,
+    full_report: AtomicInterval,
     pub get_disk_us: AtomicU64,
     pub update_dist_us: AtomicU64,
     pub get_cache_us: AtomicU64,
@@ -72,7 +73,8 @@ impl BucketMapHolderStats {
         let mut mind = usize::MAX;
         let mut maxd = 0;
         let dist = if !in_mem_only {
-            if false {
+            // only request the disk stats once per 10s
+            if self.full_report.should_update(10_000) {
                 let dist = disk.distribution();
                 for d in &dist.sizes {
                     let d = *d;
