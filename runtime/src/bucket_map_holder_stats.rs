@@ -53,7 +53,7 @@ impl BucketMapHolderStats {
         disk: &BucketMapWithEntryType<V>,
         cache: CacheSlice<V>,
     ) -> bool{
-        if !self.last_report.should_update(1000) {
+        if !self.last_report.should_update(2000) {
             return false;
         }
 
