@@ -3,6 +3,7 @@ use crate::bucket_map_holder::{BucketMapWithEntryType, CacheSlice};
 use solana_bucket_map::bucket_map::BucketMapDistribution;
 use solana_sdk::timing::AtomicInterval;
 use std::fmt::Debug;
+use log::*;
 use std::sync::atomic::Ordering;
 
 use std::sync::atomic::AtomicU64;
