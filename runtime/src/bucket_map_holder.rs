@@ -238,6 +238,7 @@ impl<V: IsCached> BucketMapHolder<V> {
         };
 
         loop {
+            let mut awakened = false;
             if !exit_when_idle && exit.load(Ordering::Relaxed) {
                 break;
             }
@@ -249,16 +250,19 @@ impl<V: IsCached> BucketMapHolder<V> {
                     if (active_threads as usize) < self.desired_threads.load(Ordering::Relaxed) {
                         if self.stats.active_flush_threads.compare_exchange(active_threads, active_threads + 1, Ordering::Acquire, Ordering::Relaxed).is_ok() {
                             error!("waking up: {}", id);
+                            awakened = true;
                             awake = true;
                         }
                     }
                 }
-                continue;
+                if !awakened {
+                    continue;
+                }
             }
 
             self.maybe_report_stats();
             let mut age = None;
-            if !exit_when_idle && !self.in_mem_only && self.age_interval.should_update(AGE_MS)
+            if !exit_when_idle && !self.in_mem_only && self.age_interval.should_update(AGE_MS) && !awakened
             {
                 // increment age to get rid of some older things in cache
                 current_age = Self::add_age(current_age, 1);
@@ -266,7 +270,7 @@ impl<V: IsCached> BucketMapHolder<V> {
                 self.current_age.store(current_age, Ordering::Relaxed);
                 age = Some(current_age);
             }
-            if age.is_none() && !found_one {
+            if age.is_none() && !found_one && !awakened {
                 let mut m = Measure::start("idle");
                 let timeout = self.wait.wait_timeout(Duration::from_millis(200));
                 m.stop();
@@ -335,7 +339,8 @@ impl<V: IsCached> BucketMapHolder<V> {
             let ms_per_s = 1_000;
             let elapsed_per_1000_s_factor = one_thousand_seconds * ms_per_s / (elapsed_ms as usize);
             let ratio = bins_scanned * elapsed_per_1000_s_factor / self.bins;
-            error!("throughput: bins scanned: {}, elapsed: {}ms, {}", bins_scanned, elapsed_ms, ratio);
+            //error!("throughput: bins scanned: {}, elapsed: {}ms, {}", bins_scanned, elapsed_ms, ratio);
+            self.stats.throughput.store(ratio as u64, Ordering::Relaxed);
             if ratio > FULL_FLUSHES_PER_1000_S {
                 // decrease
                 let threads = self.get_desired_threads();

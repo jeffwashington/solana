@@ -32,6 +32,7 @@ pub struct BucketMapHolderStats {
     pub addrefs: AtomicU64,
     pub unrefs: AtomicU64,
     pub range: AtomicU64,
+    pub throughput: AtomicU64,
     pub range_us: AtomicU64,
     pub gathering_stats: AtomicBool,
     pub keys: AtomicU64,
@@ -132,6 +133,8 @@ impl BucketMapHolderStats {
                 self.updates_in_cache.swap(0, Ordering::Relaxed),
                 i64
             ),
+            ("throughput", self.throughput.load(Ordering::Relaxed), i64),
+
             ("inserts", self.inserts.swap(0, Ordering::Relaxed), i64),
             (
                 "inserts_without_checking_disk",
