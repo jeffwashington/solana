@@ -320,7 +320,7 @@ impl<V: IsCached> BucketMapHolder<V> {
                 if age.is_none() {
                     self.maybe_report_stats();
                 }
-                if self.check_throughput(age.is_some()) {
+                if self.check_throughput(age.is_none()) {
                     // put this to sleep, unless we are responsible for aging
                     assert!(awake);
                     // error!("putting to sleep: {}", id);
