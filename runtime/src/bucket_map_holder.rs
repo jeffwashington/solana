@@ -335,7 +335,7 @@ impl<V: IsCached> BucketMapHolder<V> {
             let ms_per_s = 1_000;
             let elapsed_per_1000_s_factor = one_thousand_seconds * ms_per_s / (elapsed_ms as usize);
             let ratio = bins_scanned * elapsed_per_1000_s_factor / self.bins;
-            error!("throughput: {}, {}", bins_scanned, ratio);
+            error!("throughput: bins scanned: {}, elapsed: {}ms, {}", bins_scanned, elapsed_ms, ratio);
             if ratio > FULL_FLUSHES_PER_1000_S {
                 // decrease
                 let threads = self.get_desired_threads();
