@@ -461,6 +461,7 @@ impl<V: IsCached> BucketMapHolder<V> {
         assert_eq!(bins, bucket_map.num_buckets());
 
         Self {
+            threads_to_put_asleep: AtomicUsize::default(),
             stats: BucketMapHolderStats::default(),
             stop_flush,
             range_start_per_bin,
