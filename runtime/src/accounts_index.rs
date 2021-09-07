@@ -361,7 +361,6 @@ impl<T: IsCached> WriteAccountMapEntry<T> {
     // the new item.
     pub fn update(&mut self, slot: Slot, account_info: T, reclaims: &mut SlotList<T>) {
         let mut addref = !account_info.is_cached();
-        let mut cached = false;
         self.slot_list_mut(|list| {
             addref = Self::update_slot_list(list, slot, account_info, reclaims, false);
         });

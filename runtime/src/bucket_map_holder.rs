@@ -1,5 +1,5 @@
 use crate::accounts_index::{AccountMapEntry, AccountMapEntryInner, AccountMapEntryInnerMeta};
-use crate::accounts_index::{IsCached, RefCount, SlotList, SlotSlice, WriteAccountMapEntry};
+use crate::accounts_index::{IsCached, RefCount, SlotList, WriteAccountMapEntry};
 use crate::bucket_map_holder_stats::BucketMapHolderStats;
 use crate::in_mem_accounts_index::{SlotT, V2};
 use crate::pubkey_bins::PubkeyBinCalculator16;
@@ -11,7 +11,6 @@ use std::fmt::Debug;
 use std::ops::{Bound, RangeBounds, RangeInclusive};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use log::*;
 use std::sync::{RwLock, RwLockWriteGuard};
 pub type K = Pubkey;
 
@@ -90,13 +89,11 @@ pub struct BucketMapHolder<V: IsCached> {
     pub stats: BucketMapHolderStats,
     pub aging: AtomicBool,
     pub next_flush_index: AtomicUsize,
-    pub thread_id: AtomicUsize,
 
     // keep track of progress and whether we need more flushers or less
     pub bins_scanned_this_period: AtomicUsize,
     pub desired_threads: AtomicUsize,
     pub bins_scanned_period_start: AtomicInterval,
-    pub threads_to_put_asleep: AtomicUsize,
 }
 
 impl<V: IsCached> BucketMapHolder<V> {
@@ -224,7 +221,6 @@ impl<V: IsCached> BucketMapHolder<V> {
     }
 
     pub fn bg_flusher(&self, exit: Arc<AtomicBool>, exit_when_idle: bool) {
-        let id = self.thread_id.fetch_add(1, Ordering::Relaxed);
         let mut found_one = false;
         let mut check_for_startup_mode = true;
 
@@ -448,7 +444,6 @@ impl<V: IsCached> BucketMapHolder<V> {
         assert_eq!(bins, bucket_map.num_buckets());
 
         Self {
-            threads_to_put_asleep: AtomicUsize::default(),
             stats: BucketMapHolderStats::default(),
             stop_flush,
             range_start_per_bin,
@@ -465,7 +460,6 @@ impl<V: IsCached> BucketMapHolder<V> {
             in_mem_only,
             next_flush_index: AtomicUsize::default(),
             aging: AtomicBool::default(),
-            thread_id: AtomicUsize::default(),
             bins_scanned_this_period: AtomicUsize::default(),
             bins_scanned_period_start: AtomicInterval::default(),
             desired_threads: AtomicUsize::new(1),

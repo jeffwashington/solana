@@ -1,13 +1,12 @@
 use crate::accounts_index::IsCached;
 use crate::bucket_map_holder::{BucketMapWithEntryType, CacheSlice};
-use log::*;
 use solana_bucket_map::bucket_map::BucketMapDistribution;
 use solana_measure::measure::Measure;
 use solana_sdk::timing::AtomicInterval;
 use std::fmt::Debug;
 use std::sync::atomic::Ordering;
 
-use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize};
+use std::sync::atomic::{AtomicBool, AtomicU64};
 
 #[derive(Debug, Default)]
 pub struct BucketMapHolderStats {
