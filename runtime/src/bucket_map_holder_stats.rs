@@ -293,7 +293,7 @@ impl BucketMapHolderStats {
                 i64
             ),
             ("age", self.age.load(Ordering::Relaxed), i64),
-            ("age_incs", self.age_incs.load(Ordering::Relaxed), i64),
+            ("age_incs", self.age_incs.swap(0, Ordering::Relaxed), i64),
         );
         self.gathering_stats.store(false, Ordering::Relaxed);
         true
