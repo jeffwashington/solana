@@ -2311,6 +2311,11 @@ impl AccountsDb {
         let len = stored_accounts.len();
         let alive_accounts_collect = Mutex::new(Vec::with_capacity(len));
         let unrefed_pubkeys_collect = Mutex::new(Vec::with_capacity(len));
+        datapoint_info!(
+            "do_shrink_slot_stores",
+            // we cannot accurately measure index insertion time because of many threads and lock contention
+            ("accounts_len", len, i64),);
+
         self.thread_pool.install(|| {
             let chunk_size = 50; // # accounts/thread
             let chunks = len / chunk_size + 1;
