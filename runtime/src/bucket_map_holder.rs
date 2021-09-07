@@ -321,6 +321,7 @@ impl<V: IsCached> BucketMapHolder<V> {
                     self.stats
                         .active_flush_threads
                         .fetch_sub(1, Ordering::Relaxed);
+                    break;
                 }
             }
         }
