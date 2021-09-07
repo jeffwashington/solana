@@ -340,15 +340,16 @@ impl<V: IsCached> BucketMapHolder<V> {
                 // decrease
                 let threads = self.get_desired_threads();
                 if threads > 1 {
-                    self.set_desired_threads(false);
-                    return true; // put this thread to sleep
+                    if self.set_desired_threads(false, threads) {
+                        return true; // put this thread to sleep
+                    }
                 }
             }
             else if ratio < FULL_FLUSHES_PER_1000_S {
                 // increase
                 let threads = self.get_desired_threads();
                 if threads < MAX_THREADS {
-                    self.set_desired_threads(true);
+                    self.set_desired_threads(true, threads);
                 }
             }
         }
@@ -359,14 +360,26 @@ impl<V: IsCached> BucketMapHolder<V> {
         self.desired_threads.load(Ordering::Relaxed)
     }
 
-    fn set_desired_threads(&self, increment: bool) {
+    fn set_desired_threads(&self, increment: bool, expected_threads: usize) -> bool {
         error!("change threads: increment: {}", increment);
         if increment {
-            self.desired_threads.fetch_add(1, Ordering::Relaxed);
-            self.thread_pool_wait.notify_all();
+            if expected_threads == self.desired_threads.fetch_add(1, Ordering::Relaxed) {
+                self.thread_pool_wait.notify_all();
+                true
+            }
+            else {
+                self.desired_threads.fetch_sub(1, Ordering::Relaxed);
+                false
+            }
         }
         else {
-            self.desired_threads.fetch_sub(1, Ordering::Relaxed);
+            if expected_threads == self.desired_threads.fetch_sub(1, Ordering::Relaxed) {
+                self.desired_threads.fetch_add(1, Ordering::Relaxed);
+                true
+            }
+            else {
+                false
+            }
         }
     }
 
