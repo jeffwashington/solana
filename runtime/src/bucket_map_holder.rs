@@ -408,6 +408,7 @@ impl<V: IsCached> BucketMapHolder<V> {
             })
             .collect::<Vec<_>>();
         assert_eq!(bins, bucket_map.num_buckets());
+        error!("new bucket map holder");
 
         Self {
             stats: BucketMapHolderStats::default(),

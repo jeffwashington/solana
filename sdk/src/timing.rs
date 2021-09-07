@@ -2,6 +2,7 @@
 use crate::unchecked_div_by_const;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use log::*;
 
 pub fn duration_as_ns(d: &Duration) -> u64 {
     d.as_secs()
@@ -75,12 +76,13 @@ impl AtomicInterval {
         let last = self.last_update.load(Ordering::Relaxed);
         let elapsed = now.saturating_sub(last);
         if elapsed > interval_time
-            && self
+            && (self
                 .last_update
                 .compare_exchange(last, now, Ordering::Relaxed, Ordering::Relaxed)
-                == Ok(last)
+                == Ok(last))
             && !(skip_first && last == 0)
         {
+            error!("now, last: {}, {}", now, last);
             Some(elapsed)
         } else {
             None
