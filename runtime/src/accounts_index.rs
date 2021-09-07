@@ -112,18 +112,23 @@ impl AccountSecondaryIndexes {
 }
 
 #[derive(Debug, Default)]
-pub struct AccountMapEntryInner<T> {
-    pub ref_count: AtomicU64,
-    pub slot_list: RwLock<SlotList<T>>,
-
+pub struct AccountMapEntryInnerMeta {
     pub age: AtomicU8,
     pub dirty: AtomicBool,
     pub insert: AtomicBool,
     pub must_do_lookup_from_disk: AtomicBool,
     pub confirmed_not_on_disk: AtomicBool,
+    pub likely_has_cached_info: AtomicBool,
 }
 
-impl<T> AccountMapEntryInner<T> {
+#[derive(Debug, Default)]
+pub struct AccountMapEntryInner<T> {
+    pub ref_count: AtomicU64,
+    pub slot_list: RwLock<SlotList<T>>,
+    pub meta: AccountMapEntryInnerMeta,
+}
+
+impl<T: IsCached> AccountMapEntryInner<T> {
     pub fn ref_count(&self) -> RefCount {
         self.ref_count.load(Ordering::Relaxed)
     }
@@ -147,44 +152,56 @@ impl<T> AccountMapEntryInner<T> {
     }
 
     pub fn age(&self) -> u8 {
-        self.age.load(Ordering::Relaxed)
+        self.meta.age.load(Ordering::Relaxed)
     }
 
     pub fn set_age(&self, value: u8) {
-        self.age.store(value, Ordering::Relaxed);
+        self.meta.age.store(value, Ordering::Relaxed);
     }
 
     pub fn dirty(&self) -> bool {
-        Self::load(&self.dirty)
+        Self::load(&self.meta.dirty)
+    }
+
+    pub fn in_cache(slot_list: SlotSlice<T>) -> bool {
+        slot_list.iter().any(|(_slot, info)| info.is_cached())
     }
 
     pub fn insert(&self) -> bool {
-        Self::load(&self.insert)
+        Self::load(&self.meta.insert)
+    }
+
+    pub fn likely_has_cached_info(&self) -> bool {
+        Self::load(&self.meta.likely_has_cached_info)
+    }
+
+    pub fn set_likely_has_cached_info(&self, value: bool) {
+        self.meta.likely_has_cached_info.store(value, Ordering::Relaxed);
     }
 
     pub fn set_dirty(&self, value: bool) {
-        self.dirty.store(value, Ordering::Relaxed);
+        self.meta.dirty.store(value, Ordering::Relaxed);
     }
 
     pub fn set_insert(&self, value: bool) {
-        self.insert.store(value, Ordering::Relaxed);
+        self.meta.insert.store(value, Ordering::Relaxed);
     }
 
     pub fn set_must_do_lookup_from_disk(&self, value: bool) {
-        self.must_do_lookup_from_disk
+        self.meta.must_do_lookup_from_disk
             .store(value, Ordering::Relaxed);
     }
 
     pub fn set_confirmed_not_on_disk(&self, value: bool) {
-        self.confirmed_not_on_disk.store(value, Ordering::Relaxed);
+        self.meta.confirmed_not_on_disk.store(value, Ordering::Relaxed);
     }
 
     pub fn must_do_lookup_from_disk(&self) -> bool {
-        Self::load(&self.must_do_lookup_from_disk)
+        Self::load(&self.meta.must_do_lookup_from_disk)
     }
 
     pub fn confirmed_not_on_disk(&self) -> bool {
-        Self::load(&self.confirmed_not_on_disk)
+        Self::load(&self.meta.confirmed_not_on_disk)
     }
 }
 
@@ -259,7 +276,14 @@ impl<T: IsCached> WriteAccountMapEntry<T> {
         &mut self,
         user: impl for<'this> FnOnce(&mut RwLockWriteGuard<'this, SlotList<T>>) -> RT,
     ) -> RT {
-        let r = self.with_slot_list_guard_mut(user);
+        let mut cached = false;
+        let r = self.with_slot_list_guard_mut(|list| {
+            let result = user(list);
+            cached = AccountMapEntryInner::<T>::in_cache(list);
+            result
+        });
+        self.borrow_owned_entry().set_likely_has_cached_info(cached);
+
         self.borrow_owned_entry().set_dirty(true);
         r
     }
@@ -273,11 +297,15 @@ impl<T: IsCached> WriteAccountMapEntry<T> {
     // 2. update(slot, account_info)
     // This code is called when the first entry [ie. (slot,account_info)] for a pubkey is inserted into the index.
     pub fn new_entry_after_update(slot: Slot, account_info: T) -> AccountMapEntry<T> {
-        let ref_count = if account_info.is_cached() { 0 } else { 1 };
+        let is_cached = account_info.is_cached();
+        let ref_count = if is_cached { 0 } else { 1 };
         Arc::new(AccountMapEntryInner {
             ref_count: AtomicU64::new(ref_count),
             slot_list: RwLock::new(vec![(slot, account_info)]),
-            ..AccountMapEntryInner::default()
+            meta: AccountMapEntryInnerMeta {
+                likely_has_cached_info: AtomicBool::new(is_cached),
+                ..AccountMapEntryInnerMeta::default()
+            }
         })
     }
 
@@ -333,6 +361,7 @@ impl<T: IsCached> WriteAccountMapEntry<T> {
     // the new item.
     pub fn update(&mut self, slot: Slot, account_info: T, reclaims: &mut SlotList<T>) {
         let mut addref = !account_info.is_cached();
+        let mut cached = false;
         self.slot_list_mut(|list| {
             addref = Self::update_slot_list(list, slot, account_info, reclaims, false);
         });

@@ -1,4 +1,4 @@
-use crate::accounts_index::{AccountMapEntry, AccountMapEntryInner};
+use crate::accounts_index::{AccountMapEntry, AccountMapEntryInner, AccountMapEntryInnerMeta};
 use crate::accounts_index::{IsCached, RefCount, SlotList, SlotSlice, WriteAccountMapEntry};
 use crate::bucket_map_holder_stats::BucketMapHolderStats;
 use crate::in_mem_accounts_index::{SlotT, V2};
@@ -522,7 +522,7 @@ impl<V: IsCached> BucketMapHolder<V> {
             }
             let mut flush = dirty;
             // could add: || slot_list.len() > 1); // theory is that anything with a len > 1 will be dealt with fairly soon - it is 'hot'
-            let keep_this_in_cache = Self::in_cache(&v.slot_list.read().unwrap());
+            let keep_this_in_cache = v.likely_has_cached_info();
             if bg && keep_this_in_cache {
                 // for all account indexes that are in the write cache instead of storage, don't write them to disk yet - they will be updated soon
                 flush = false;
@@ -606,7 +606,7 @@ impl<V: IsCached> BucketMapHolder<V> {
                         if lookup {
                             v.set_must_do_lookup_from_disk(false);
                         }
-                        let keep_this_in_cache = Self::in_cache(&v.slot_list.read().unwrap());
+                        let keep_this_in_cache = v.likely_has_cached_info();
                         if keep_this_in_cache {
                             v.set_age(next_age); // keep newly updated stuff around
                         }
@@ -925,10 +925,6 @@ impl<V: IsCached> BucketMapHolder<V> {
         }
     }
 
-    fn in_cache(slot_list: SlotSlice<V>) -> bool {
-        slot_list.iter().any(|(_slot, info)| info.is_cached())
-    }
-
     fn update_cache_from_disk<'a>(
         disk_entry: &'a AccountMapEntry<V>,
         cache_entry_to_update: &'a WriteCacheEntry<V>,
@@ -955,6 +951,7 @@ impl<V: IsCached> BucketMapHolder<V> {
         slot_list_cache.clear();
         slot_list_cache.append(&mut slot_list_disk);
         cache_entry_to_update.set_dirty(true);
+        cache_entry_to_update.set_likely_has_cached_info(AccountMapEntryInner::<V>::in_cache(&slot_list_cache));
         // race conditions here - if someone else already has a ref to the arc, it is difficult to make the refcounts work out right
         // but this is internal only - no 'get' should have returned the account data prior to us reconciling with disk
     }
@@ -1014,14 +1011,20 @@ impl<V: IsCached> BucketMapHolder<V> {
         confirmed_not_on_disk: bool,
     ) -> WriteCacheEntryArc<V> {
         assert!(!(insert && !dirty));
-        Arc::new(AccountMapEntryInner {
-            slot_list: RwLock::new(slot_list),
-            ref_count: AtomicU64::new(ref_count),
+        let likely_has_cached_info = AccountMapEntryInner::<V>::in_cache(&slot_list);
+
+        let meta = AccountMapEntryInnerMeta {
             dirty: AtomicBool::new(dirty),
             age: AtomicU8::new(self.set_age_to_future()),
             insert: AtomicBool::new(insert),
             must_do_lookup_from_disk: AtomicBool::new(must_do_lookup_from_disk),
             confirmed_not_on_disk: AtomicBool::new(confirmed_not_on_disk),
+            likely_has_cached_info: AtomicBool::new(likely_has_cached_info),
+        };
+        Arc::new(AccountMapEntryInner {
+            slot_list: RwLock::new(slot_list),
+            ref_count: AtomicU64::new(ref_count),
+            meta,
         })
     }
 
