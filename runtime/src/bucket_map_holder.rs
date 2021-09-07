@@ -361,7 +361,7 @@ impl<V: IsCached> BucketMapHolder<V> {
     }
 
     fn set_desired_threads(&self, increment: bool, expected_threads: usize) -> bool {
-        error!("change threads: increment: {}", increment);
+        error!("change threads: increment: {}, previous: {}", increment, expected_threads);
         if increment {
             if expected_threads == self.desired_threads.fetch_add(1, Ordering::Relaxed) {
                 self.thread_pool_wait.notify_all();
