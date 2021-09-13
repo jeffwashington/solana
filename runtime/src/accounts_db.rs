@@ -2009,9 +2009,13 @@ impl AccountsDb {
                 } else {
                     let mut key_set = HashSet::new();
                     key_set.insert(*key);
-                    let count = self
-                        .storage
-                        .slot_store_count(*slot, account_info.store_id)
+                    let st = self
+                    .storage
+                    .slot_store_count(*slot, account_info.store_id);
+                    if st.is_none() {
+                        panic!("welp, we hit it: info: {:?}, slot: {}, slot stores: {:?}", account_info, slot, self.storage.get_slot_stores(*slot).map(|x| x.read().unwrap().len()));
+                    }
+                    let count = st
                         .unwrap()
                         - 1;
                     debug!(

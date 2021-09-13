@@ -1257,6 +1257,7 @@ fn load_frozen_forks(
             }
         }
     }
+    panic!("would have kept going");
 
     Ok(initial_forks.values().cloned().collect::<Vec<_>>())
 }
