@@ -1883,12 +1883,14 @@ fn main() {
             }
         }
         ("verify", Some(arg_matches)) => {
-            let accounts_index_config = value_t!(arg_matches, "accounts_index_bins", usize)
+            let mut accounts_index_config = AccountsIndexConfig::default();
+            value_t!(arg_matches, "accounts_index_bins", usize)
                 .ok()
-                .map(|bins| AccountsIndexConfig { bins: Some(bins) });
+                .map(|bins| accounts_index_config.bins = Some(bins));
+            accounts_index_config.drives = Some(vec![ledger_path.clone()]);
 
             let accounts_db_config = Some(AccountsDbConfig {
-                index: accounts_index_config,
+                index: Some(accounts_index_config),
                 ledger_path: Some(ledger_path.clone()),
             });
 
