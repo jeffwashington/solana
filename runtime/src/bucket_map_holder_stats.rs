@@ -101,7 +101,8 @@ impl BucketMapHolderStats {
     }
 
     pub fn remaining_until_next_interval(&self) -> u64 {
-        self.last_time.remaining_until_next_interval(STATS_INTERVAL_MS)        
+        self.last_time
+            .remaining_until_next_interval(STATS_INTERVAL_MS)
     }
 
     pub fn report_stats<T: IndexValue>(&self, storage: &BucketMapHolder<T>) {
@@ -214,6 +215,11 @@ impl BucketMapHolderStats {
             (
                 "active_threads",
                 self.active_threads.load(Ordering::Relaxed),
+                i64
+            ),
+            (
+                "desired_threads",
+                storage.desired_threads.load(Ordering::Relaxed),
                 i64
             ),
             ("items", self.items.swap(0, Ordering::Relaxed), i64),
