@@ -30,6 +30,14 @@ pub struct BucketMapHolder<T: IndexValue> {
     next_bucket_to_flush: Mutex<usize>,
     bins: usize,
 
+    // thread throttling
+    throughput_interval: AtomicInterval,
+    count_bucket_scans_complete: AtomicUsize,
+    pub wait_thread_throttling: WaitableCondvar,
+    pub desired_threads: AtomicUsize,
+    pub active_threads: AtomicUsize,
+    threads: usize,
+
     // how much mb are we allowed to keep in the in-mem index?
     // Rest goes to disk.
     pub mem_budget_mb: Option<usize>,
@@ -40,7 +48,6 @@ pub struct BucketMapHolder<T: IndexValue> {
     /// and writing to disk in parallel are.
     /// Note startup is an optimization and is not required for correctness.
     startup: AtomicBool,
-    _phantom: std::marker::PhantomData<T>,
 }
 
 impl<T: IndexValue> Debug for BucketMapHolder<T> {
@@ -88,12 +95,18 @@ impl<T: IndexValue> BucketMapHolder<T> {
 
     pub(crate) fn wait_for_idle(&self) {
         use log::*;
-        error!("wait for idle starting. items in mem: {}", self.stats.count_in_mem.load(Ordering::Relaxed));
+        error!(
+            "wait for idle starting. items in mem: {}",
+            self.stats.count_in_mem.load(Ordering::Relaxed)
+        );
         assert!(self.get_startup());
         loop {
             if self.stats.count_in_mem.load(Ordering::Relaxed) == 0 {
                 // all in_mem buckets are empty, so we flushed correctly
-                error!("wait for idle quitting. items in mem: {}", self.stats.count_in_mem.load(Ordering::Relaxed));
+                error!(
+                    "wait for idle quitting. items in mem: {}",
+                    self.stats.count_in_mem.load(Ordering::Relaxed)
+                );
                 break;
             }
             std::thread::sleep(Duration::from_millis(100));
@@ -109,6 +122,11 @@ impl<T: IndexValue> BucketMapHolder<T> {
         self.maybe_advance_age();
     }
 
+    pub fn bucket_scan_complete(&self) {
+        self.count_bucket_scans_complete
+            .fetch_add(1, Ordering::Acquire);
+    }
+
     // have all buckets been flushed at the current age?
     pub fn all_buckets_flushed_at_current_age(&self) -> bool {
         self.count_ages_flushed() >= self.bins
@@ -120,7 +138,10 @@ impl<T: IndexValue> BucketMapHolder<T> {
 
     pub fn maybe_advance_age(&self) -> bool {
         // check has_age_interval_elapsed last as calling it modifies state on success
-        if self.all_buckets_flushed_at_current_age() && !self.get_startup() && self.has_age_interval_elapsed() {
+        if self.all_buckets_flushed_at_current_age()
+            && !self.get_startup()
+            && self.has_age_interval_elapsed()
+        {
             self.increment_age();
             true
         } else {
@@ -128,7 +149,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
         }
     }
 
-    pub fn new(bins: usize, config: &Option<AccountsIndexConfig>) -> Self {
+    pub fn new(bins: usize, config: &Option<AccountsIndexConfig>, threads: usize) -> Self {
         const DEFAULT_AGE_TO_STAY_IN_CACHE: Age = 5;
         let ages_to_stay_in_cache = config
             .as_ref()
@@ -141,11 +162,13 @@ impl<T: IndexValue> BucketMapHolder<T> {
         // only allocate if mem_budget_mb is Some
         // actually, allocate by default
         let disk = Some(BucketMap::new(bucket_config));
+        const INITIAL_DESIRED_THREADS: usize = 1;
 
         Self {
             disk,
             ages_to_stay_in_cache,
             count_ages_flushed: AtomicUsize::default(),
+            count_bucket_scans_complete: AtomicUsize::default(),
             age: AtomicU8::default(),
             stats: BucketMapHolderStats::new(bins),
             wait_dirty_or_aged: WaitableCondvar::default(),
@@ -154,8 +177,101 @@ impl<T: IndexValue> BucketMapHolder<T> {
             bins,
             startup: AtomicBool::default(),
             mem_budget_mb,
-            _phantom: std::marker::PhantomData::<T>::default(),
             advancing_time_abnormally: AtomicBool::default(),
+            wait_thread_throttling: WaitableCondvar::default(),
+            desired_threads: AtomicUsize::new(INITIAL_DESIRED_THREADS),
+            active_threads: AtomicUsize::default(),
+            throughput_interval: AtomicInterval::default(),
+            threads,
+        }
+    }
+
+    // calculate whether we need to add or reduce # threads
+    pub fn evaluate_thread_throttling(&self) {
+        const MS_PER_S: u64 = 1000;
+        let desired_throughput_bins_per_s = (self.bins as u64) * MS_PER_S / AGE_MS;
+        const THROUGHTPUT_INTERVAL_MS: u64 = 100;
+        if self
+            .throughput_interval
+            .should_update(THROUGHTPUT_INTERVAL_MS)
+        {
+            // time to determine whether to increase or decrease desired threads
+            let elapsed_s = THROUGHTPUT_INTERVAL_MS * MS_PER_S; // this is an approximation, real value is >= this
+            let bins_scanned = self.count_bucket_scans_complete.swap(0, Ordering::Relaxed) as u64;
+            let progress = bins_scanned / elapsed_s;
+            let slop = desired_throughput_bins_per_s / 2;
+            if progress < desired_throughput_bins_per_s - slop {
+                // increment desired threads
+                let desired = self.desired_threads.load(Ordering::Relaxed);
+                if desired < self.threads
+                    && self
+                        .desired_threads
+                        .compare_exchange(
+                            desired,
+                            desired + 1,
+                            Ordering::Acquire,
+                            Ordering::Relaxed,
+                        )
+                        .is_ok()
+                {
+                    self.wait_thread_throttling.notify_one();
+                }
+            } else if progress < desired_throughput_bins_per_s + slop {
+                // decrement desired threads
+                let desired = self.desired_threads.load(Ordering::Relaxed);
+                if desired > 1 {
+                    // after updating this, an active thread will figure out it needs to go to sleep
+                    let _ = self.desired_threads.compare_exchange(
+                        desired,
+                        desired - 1,
+                        Ordering::Acquire,
+                        Ordering::Relaxed,
+                    );
+                }
+            }
+        }
+    }
+
+    // return true if this thread should go to sleep by calling throttle_thread
+    pub fn should_throttle_thread(&self) -> bool {
+        let desired = self.desired_threads.load(Ordering::Relaxed);
+        let active = self.active_threads.load(Ordering::Relaxed);
+        if active > desired
+            && self
+                .active_threads
+                .compare_exchange(active, active - 1, Ordering::Acquire, Ordering::Relaxed)
+                .is_ok()
+        {
+            return true; // this thread went to sleep to satisfy 'desired'
+        }
+        false
+    }
+
+    // returns when this thread should become active, otherwise wait
+    pub fn throttle_thread(&self) {
+        loop {
+            let desired = self.desired_threads.load(Ordering::Relaxed);
+            loop {
+                let active = self.active_threads.load(Ordering::Relaxed);
+                if active >= desired {
+                    break;
+                }
+                if self
+                    .active_threads
+                    .compare_exchange(active, active + 1, Ordering::Acquire, Ordering::Relaxed)
+                    .is_ok()
+                {
+                    return; // this thread became active to satisfy 'desired'
+                }
+            }
+
+            // otherwise, this thread should sleep
+            if !self
+                .wait_thread_throttling
+                .wait_timeout(Duration::from_millis(1000))
+            {
+                break; // wait was triggered, so return
+            }
         }
     }
 
@@ -171,7 +287,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
     }
 
     // intended to execute in a bg thread
-    pub fn background(&self, exit: Arc<AtomicBool>, in_mem: Vec<Arc<InMemAccountsIndex<T>>>, total_threads: usize) {
+    pub fn background(&self, exit: Arc<AtomicBool>, in_mem: Vec<Arc<InMemAccountsIndex<T>>>) {
         let bins = in_mem.len();
         let flush = self.disk.is_some();
         let mut interval = AtomicInterval::default();
@@ -183,14 +299,20 @@ impl<T: IndexValue> BucketMapHolder<T> {
             );
 
             let mut m = Measure::start("wait");
-            // this will transition to waits and thread throttling
-            let timeout = self.wait_dirty_or_aged
-                .wait_timeout(Duration::from_millis(wait));
+            let timeout = if self.should_throttle_thread() {
+                self.stats.active_threads.fetch_sub(1, Ordering::Relaxed);
+                self.throttle_thread();
+                self.stats.active_threads.fetch_add(1, Ordering::Relaxed);
+                false
+            } else {
+                self.wait_dirty_or_aged
+                    .wait_timeout(Duration::from_millis(wait));
+                true
+            };
             m.stop();
             self.stats
                 .bg_waiting_us
                 .fetch_add(m.as_us(), Ordering::Relaxed);
-
             if exit.load(Ordering::Relaxed) {
                 break;
             }
@@ -206,7 +328,8 @@ impl<T: IndexValue> BucketMapHolder<T> {
                             for _ in current..bins {
                                 self.bucket_flushed_at_current_age();
                             }
-                            self.advancing_time_abnormally.store(false, Ordering::Release);
+                            self.advancing_time_abnormally
+                                .store(false, Ordering::Release);
                         }
                     }
                 }
@@ -214,10 +337,11 @@ impl<T: IndexValue> BucketMapHolder<T> {
             }
 
             self.stats.active_threads.fetch_add(1, Ordering::Relaxed);
-            for _ in 0..=(bins / total_threads) {
+            for _ in 0..=(bins / self.desired_threads.load(Ordering::Relaxed)) {
                 if flush {
                     let index = self.next_bucket_to_flush();
                     in_mem[index].flush();
+                    self.evaluate_thread_throttling();
                 }
                 self.stats.report_stats(self);
             }

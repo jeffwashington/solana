@@ -33,6 +33,7 @@ impl<T: IndexValue> Debug for AccountsIndexStorage<T> {
 impl<T: IndexValue> Drop for AccountsIndexStorage<T> {
     fn drop(&mut self) {
         self.exit.store(true, Ordering::Relaxed);
+        self.storage.wait_thread_throttling.notify_all();
         self.storage.wait_dirty_or_aged.notify_all();
         if let Some(handles) = self.handles.take() {
             handles
@@ -44,18 +45,17 @@ impl<T: IndexValue> Drop for AccountsIndexStorage<T> {
 
 impl<T: IndexValue> AccountsIndexStorage<T> {
     pub fn new(bins: usize, config: &Option<AccountsIndexConfig>) -> AccountsIndexStorage<T> {
-        let storage = Arc::new(BucketMapHolder::new(bins, config));
-
-        let in_mem = (0..bins)
-            .into_iter()
-            .map(|bin| Arc::new(InMemAccountsIndex::new(&storage, bin)))
-            .collect::<Vec<_>>();
-
         let num_threads = std::cmp::max(2, num_cpus::get() / 4);
         let threads = config
             .as_ref()
             .and_then(|config| config.flush_threads)
             .unwrap_or(num_threads);
+        let storage = Arc::new(BucketMapHolder::new(bins, config, threads));
+
+        let in_mem = (0..bins)
+            .into_iter()
+            .map(|bin| Arc::new(InMemAccountsIndex::new(&storage, bin)))
+            .collect::<Vec<_>>();
 
         let exit = Arc::new(AtomicBool::default());
         let handles = Some(
@@ -70,7 +70,7 @@ impl<T: IndexValue> AccountsIndexStorage<T> {
                     Builder::new()
                         .name("solana-idx-flusher".to_string())
                         .spawn(move || {
-                            storage_.background(exit_, in_mem_, threads);
+                            storage_.background(exit_, in_mem_);
                         })
                         .unwrap()
                 })
