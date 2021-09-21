@@ -651,6 +651,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                 self.set_has_aged(current_age);
             }
         }
+        self.storage.bucket_scan_complete(); // keep track of this for thread throttling
     }
 
     // remove keys in 'removes' from in-mem cache due to age
