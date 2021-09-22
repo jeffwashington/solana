@@ -2,6 +2,7 @@ use crate::accounts_index::{AccountsIndexConfig, IndexValue};
 use crate::bucket_map_holder_stats::BucketMapHolderStats;
 use crate::in_mem_accounts_index::{InMemAccountsIndex, SlotT};
 use crate::waitable_condvar::WaitableCondvar;
+use log::*;
 use solana_bucket_map::bucket_map::{BucketMap, BucketMapConfig};
 use solana_measure::measure::Measure;
 use solana_sdk::clock::SLOT_MS;
@@ -20,6 +21,7 @@ pub struct BucketMapHolder<T: IndexValue> {
     pub count_ages_flushed: AtomicUsize,
     pub age: AtomicU8,
     pub stats: BucketMapHolderStats,
+    advancing_time_abnormally: AtomicBool,
 
     age_timer: AtomicInterval,
 
@@ -154,6 +156,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
             startup: AtomicBool::default(),
             mem_budget_mb,
             _threads: threads,
+            advancing_time_abnormally: AtomicBool::default(),
         }
     }
 
@@ -172,6 +175,8 @@ impl<T: IndexValue> BucketMapHolder<T> {
     pub fn background(&self, exit: Arc<AtomicBool>, in_mem: Vec<Arc<InMemAccountsIndex<T>>>, total_threads: usize) {
         let bins = in_mem.len();
         let flush = self.disk.is_some();
+        let mut interval = AtomicInterval::default();
+        let mut last_age = self.current_age();
         loop {
             let wait = std::cmp::min(
                 self.age_timer.remaining_until_next_interval(AGE_MS),
@@ -193,7 +198,20 @@ impl<T: IndexValue> BucketMapHolder<T> {
             if timeout && !self.get_startup() {
                 self.maybe_advance_age();
                 self.stats.report_stats(self);
-                continue;
+
+                if interval.should_update(AGE_MS * 10) {
+                    if !self.advancing_time_abnormally.swap(true, Ordering::Release) {
+                        if last_age == self.current_age() {
+                            let current = self.count_ages_flushed();
+                            error!("time did not advance: buckets updated: {}, advancing age",  current);
+                            for _ in current..bins {
+                                self.bucket_flushed_at_current_age();
+                            }
+                            self.advancing_time_abnormally.store(false, Ordering::Release);
+                        }
+                    }
+                }
+                // continue;
             }
 
             self.stats.active_threads.fetch_add(1, Ordering::Relaxed);
@@ -205,6 +223,12 @@ impl<T: IndexValue> BucketMapHolder<T> {
                 self.stats.report_stats(self);
             }
             self.stats.active_threads.fetch_sub(1, Ordering::Relaxed);
+
+            let age = self.current_age();
+            if age != last_age {
+                interval = AtomicInterval::default();
+            }
+            last_age = age;
         }
     }
 }
