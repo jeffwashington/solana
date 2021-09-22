@@ -172,11 +172,15 @@ impl<T: IndexValue> BucketMapHolder<T> {
         let bins = in_mem.len();
         let flush = self.disk.is_some();
         loop {
+            let wait = std::cmp::min(
+                self.age_timer.remaining_until_next_interval(AGE_MS),
+                self.stats.remaining_until_next_interval(),
+            );
+
             let mut m = Measure::start("wait");
             // this will transition to waits and thread throttling
-            let timeout = self
-                .wait_dirty_or_aged
-                .wait_timeout(Duration::from_millis(AGE_MS));
+            let timeout = self.wait_dirty_or_aged
+                .wait_timeout(Duration::from_millis(wait));
             m.stop();
             self.stats
                 .bg_waiting_us
