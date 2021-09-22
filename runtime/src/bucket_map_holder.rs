@@ -85,6 +85,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
     }
 
     pub(crate) fn wait_for_idle(&self) {
+        use log::*;
         error!("wait for idle starting. items in mem: {}", self.stats.count_in_mem.load(Ordering::Relaxed));
         assert!(self.get_startup());
         for i in 0..120 {
