@@ -1535,12 +1535,21 @@ impl<T: IndexValue> AccountsIndex<T> {
         let random_offset = thread_rng().gen_range(0, bins);
         let mut binned = (0..bins)
             .into_iter()
-            .map(|pubkey_bin| ((pubkey_bin + random_offset) % bins, Vec::with_capacity(expected_items_per_bin)))
+            .map(|mut pubkey_bin| {
+                // opposite of (pubkey_bin + random_offset) % bins
+                pubkey_bin = if pubkey_bin < random_offset {
+                    pubkey_bin + bins - random_offset
+                }
+                else {
+                    pubkey_bin - random_offset
+                };
+                (pubkey_bin, Vec::with_capacity(expected_items_per_bin))
+            })
             .collect::<Vec<_>>();
         let mut dirty_pubkeys = items
             .filter_map(|(pubkey, account_info)| {
-                let bin = self.bin_calculator.bin_from_pubkey(&pubkey);
-                let bin = (bin + random_offset) % bins;
+                let pubkey_bin = self.bin_calculator.bin_from_pubkey(&pubkey);
+                let binned_index = (pubkey_bin + random_offset) % bins;
                 // this value is equivalent to what update() below would have created if we inserted a new item
                 let is_zero_lamport = account_info.is_zero_lamport();
                 let result = if is_zero_lamport { Some(pubkey) } else { None };
@@ -1550,7 +1559,7 @@ impl<T: IndexValue> AccountsIndex<T> {
                     account_info,
                     &self.storage.storage,
                 );
-                binned[bin].1.push((pubkey, info));
+                binned[binned_index].1.push((pubkey, info));
                 result
             })
             .collect::<Vec<_>>();
