@@ -216,7 +216,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
                     if !self.advancing_time_abnormally.swap(true, Ordering::Release) {
                         if last_age == self.current_age() {
                             let current = self.count_ages_flushed();
-                            error!("time did not advance: buckets updated: {}, advancing age",  current);
+                            error!("time did not advance: buckets updated: {}, advancing age, active threads: {}",  current, self.stats.active_threads.load(Ordering::Relaxed));
                             for _ in current..bins {
                                 self.bucket_flushed_at_current_age();
                             }
