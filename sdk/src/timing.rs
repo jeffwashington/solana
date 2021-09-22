@@ -80,6 +80,13 @@ impl AtomicInterval {
                 == Ok(last)
             && !(skip_first && last == 0)
     }
+
+    /// return ms until the interval_time will have elapsed
+    pub fn remaining_until_next_interval(&self, interval_time: u64) -> u64 {
+        let now = timestamp();
+        let last = self.last_update.load(Ordering::Relaxed);
+        interval_time.saturating_sub(now.saturating_sub(last))
+    }
 }
 
 #[cfg(test)]
