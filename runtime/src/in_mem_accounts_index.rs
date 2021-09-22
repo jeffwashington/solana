@@ -629,8 +629,10 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
 
         if iterate_for_age {
             // completed iteration of the buckets at the current age
-            assert_eq!(current_age, self.storage.current_age());
-            self.set_has_aged(current_age);
+            if current_age == self.storage.current_age() {
+                //assert_eq!(current_age, self.storage.current_age());
+                self.set_has_aged(current_age);
+            }
         }
     }
 
