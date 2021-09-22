@@ -27,6 +27,7 @@ pub struct BucketMapHolderStats {
     pub count_in_mem: AtomicU64,
     pub per_bucket_count: Vec<AtomicU64>,
     pub flush_entries_updated_on_disk: AtomicU64,
+    pub flush_entries_removed_from_mem: AtomicU64,
     pub active_threads: AtomicU64,
     pub get_range_us: AtomicU64,
     last_age: AtomicU8,
@@ -302,6 +303,12 @@ impl BucketMapHolderStats {
             (
                 "flush_entries_updated_on_disk",
                 self.flush_entries_updated_on_disk
+                    .swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "flush_entries_removed_from_mem",
+                self.flush_entries_removed_from_mem
                     .swap(0, Ordering::Relaxed),
                 i64
             ),
