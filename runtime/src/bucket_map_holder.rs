@@ -94,6 +94,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
             std::thread::sleep(Duration::from_millis(1000));
             if self.stats.count_in_mem.load(Ordering::Relaxed) == 0 {
                 // all in_mem buckets are empty, so we flushed correctly
+                error!("wait for idle quitting. items in mem: {}", self.stats.count_in_mem.load(Ordering::Relaxed));
                 return;
             }
         }
