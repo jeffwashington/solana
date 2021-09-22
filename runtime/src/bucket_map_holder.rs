@@ -88,6 +88,13 @@ impl<T: IndexValue> BucketMapHolder<T> {
 
     pub(crate) fn wait_for_idle(&self) {
         assert!(self.get_startup());
+        loop {
+            std::thread::sleep(Duration::from_millis(100));
+            if self.stats.count_in_mem.load(Ordering::Relaxed) == 0 {
+                // all in_mem buckets are empty, so we flushed correctly
+                break;
+            }
+        }
     }
 
     pub fn current_age(&self) -> Age {
