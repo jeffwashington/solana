@@ -70,7 +70,7 @@ impl<T: IndexValue> AccountsIndexStorage<T> {
                     Builder::new()
                         .name("solana-idx-flusher".to_string())
                         .spawn(move || {
-                            storage_.background(exit_, in_mem_);
+                            storage_.background(exit_, in_mem_, threads);
                         })
                         .unwrap()
                 })
