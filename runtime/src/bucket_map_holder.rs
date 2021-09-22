@@ -178,7 +178,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
     }
 
     // intended to execute in a bg thread
-    pub fn background(&self, exit: Arc<AtomicBool>, in_mem: Vec<Arc<InMemAccountsIndex<T>>>) {
+    pub fn background(&self, exit: Arc<AtomicBool>, in_mem: Vec<Arc<InMemAccountsIndex<T>>>, total_threads: usize) {
         let bins = in_mem.len();
         let flush = self.disk.is_some();
         loop {
@@ -210,7 +210,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
             }
 
             self.stats.active_threads.fetch_add(1, Ordering::Relaxed);
-            for _ in 0..bins {
+            for _ in 0..=(bins / total_threads) {
                 if flush {
                     let index = self.next_bucket_to_flush();
                     in_mem[index].flush();
