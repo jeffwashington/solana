@@ -19,6 +19,7 @@ pub struct BucketMapHolderStats {
     pub load_disk_missing_count: AtomicU64,
     pub load_disk_missing_us: AtomicU64,
     pub updates_in_mem: AtomicU64,
+    pub flush_updates_do_disk: AtomicU64,
     pub items: AtomicU64,
     pub keys: AtomicU64,
     pub deletes: AtomicU64,
@@ -35,6 +36,9 @@ pub struct BucketMapHolderStats {
     pub flush_scan_us: AtomicU64,
     pub flush_update_us: AtomicU64,
     pub flush_remove_us: AtomicU64,
+    pub remove_aborted_strong_count: AtomicU64,
+    pub remove_aborted_dirty_or_age: AtomicU64,
+    pub remove_arborted_range: AtomicU64,
     last_time: AtomicInterval,
 }
 
@@ -310,6 +314,21 @@ impl BucketMapHolderStats {
                 "flush_entries_removed_from_mem",
                 self.flush_entries_removed_from_mem
                     .swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "remove_aborted_strong_count",
+                self.remove_aborted_strong_count.swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "remove_aborted_dirty_or_age",
+                self.remove_aborted_dirty_or_age.swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "remove_arborted_range",
+                self.remove_arborted_range.swap(0, Ordering::Relaxed),
                 i64
             ),
         );
