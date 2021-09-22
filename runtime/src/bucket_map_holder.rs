@@ -174,6 +174,8 @@ impl<T: IndexValue> BucketMapHolder<T> {
                 break;
             }
             if timeout && !self.get_startup() {
+                self.maybe_advance_age();
+                self.stats.report_stats(self);
                 continue;
             }
 
