@@ -162,7 +162,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
         loop {
             let mut m = Measure::start("wait");
             // this will transition to waits and thread throttling
-            self.wait_dirty_or_aged
+            let timeout = self.wait_dirty_or_aged
                 .wait_timeout(Duration::from_millis(AGE_MS));
             m.stop();
             self.stats
@@ -171,6 +171,9 @@ impl<T: IndexValue> BucketMapHolder<T> {
 
             if exit.load(Ordering::Relaxed) {
                 break;
+            }
+            if timeout {
+                continue;
             }
 
             self.stats.active_threads.fetch_add(1, Ordering::Relaxed);
