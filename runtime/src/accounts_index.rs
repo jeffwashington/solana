@@ -11,6 +11,8 @@ use crate::{
 use bv::BitVec;
 use log::*;
 use ouroboros::self_referencing;
+use rand::Rng;
+use rand::thread_rng;
 use solana_measure::measure::Measure;
 use solana_sdk::{
     clock::{BankId, Slot},
@@ -1544,13 +1546,17 @@ impl<T: IndexValue> AccountsIndex<T> {
         // this assumes the largest bin contains twice the expected amount of the average size per bin
         let bins = self.bins();
         let expected_items_per_bin = item_len * 2 / bins;
+        // offset bin 0 in the 'binned' array by a random amount.
+        // This results in calls to insert_new_entry_if_missing_with_lock from different threads starting at different bins.
+        let random_offset = thread_rng().gen_range(0, bins);
         let mut binned = (0..bins)
             .into_iter()
-            .map(|pubkey_bin| (pubkey_bin, Vec::with_capacity(expected_items_per_bin)))
+            .map(|pubkey_bin| ((pubkey_bin + random_offset) % bins, Vec::with_capacity(expected_items_per_bin)))
             .collect::<Vec<_>>();
         let mut dirty_pubkeys = items
             .filter_map(|(pubkey, account_info)| {
                 let bin = self.bin_calculator.bin_from_pubkey(&pubkey);
+                let bin = (bin + random_offset) % bins;
                 // this value is equivalent to what update() below would have created if we inserted a new item
                 let is_zero_lamport = account_info.is_zero_lamport();
                 let result = if is_zero_lamport { Some(pubkey) } else { None };
