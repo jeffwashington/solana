@@ -642,6 +642,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
             return false; // range said to hold 'all', so not completed
         }
         let mut map = self.map().write().unwrap();
+        let mut items_removed = 0;
         for k in removes {
             if let Entry::Occupied(occupied) = map.entry(k) {
                 let v = occupied.get();
@@ -673,10 +674,12 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                 }
 
                 // all conditions for removing succeeded, so really remove item from in-mem cache
+                items_removed += 1;
                 self.stats().insert_or_delete_mem(false, self.bin);
                 occupied.remove();
             }
         }
+        Self::update_stat(&self.stats().flush_entries_removed_from_mem, items_removed);
         completed_scan
     }
 
