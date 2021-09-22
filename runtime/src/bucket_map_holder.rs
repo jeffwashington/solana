@@ -82,8 +82,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
         self.startup.store(value, Ordering::Release);
         // now that we are not startup, get the system moving normally
         self.maybe_advance_age();
-        self.wait_dirty_or_aged
-            .wait_timeout(Duration::from_millis(AGE_MS));
+        self.wait_dirty_or_aged.notify_all();
     }
 
     pub(crate) fn wait_for_idle(&self) {
