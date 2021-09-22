@@ -87,12 +87,18 @@ impl<T: IndexValue> BucketMapHolder<T> {
 
     pub(crate) fn wait_for_idle(&self) {
         use log::*;
-        error!("wait for idle starting. items in mem: {}", self.stats.count_in_mem.load(Ordering::Relaxed));
+        error!(
+            "wait for idle starting. items in mem: {}",
+            self.stats.count_in_mem.load(Ordering::Relaxed)
+        );
         assert!(self.get_startup());
         loop {
             if self.stats.count_in_mem.load(Ordering::Relaxed) == 0 {
                 // all in_mem buckets are empty, so we flushed correctly
-                error!("wait for idle quitting. items in mem: {}", self.stats.count_in_mem.load(Ordering::Relaxed));
+                error!(
+                    "wait for idle quitting. items in mem: {}",
+                    self.stats.count_in_mem.load(Ordering::Relaxed)
+                );
                 break;
             }
             std::thread::sleep(Duration::from_millis(100));
@@ -119,7 +125,10 @@ impl<T: IndexValue> BucketMapHolder<T> {
 
     pub fn maybe_advance_age(&self) -> bool {
         // check has_age_interval_elapsed last as calling it modifies state on success
-        if self.all_buckets_flushed_at_current_age() && !self.get_startup() && self.has_age_interval_elapsed() {
+        if self.all_buckets_flushed_at_current_age()
+            && !self.get_startup()
+            && self.has_age_interval_elapsed()
+        {
             self.increment_age();
             true
         } else {
@@ -174,10 +183,14 @@ impl<T: IndexValue> BucketMapHolder<T> {
         let flush = self.disk.is_some();
         loop {
             let timeout = if self.all_buckets_flushed_at_current_age() {
+                let wait = std::cmp::min(
+                    self.age_timer.remaining_until_next_interval(AGE_MS),
+                    self.stats.remaining_until_next_interval(),
+                );
                 let mut m = Measure::start("wait");
                 let timeout = self
                     .wait_dirty_or_aged
-                    .wait_timeout(Duration::from_millis(AGE_MS));
+                    .wait_timeout(Duration::from_millis(wait));
                 m.stop();
                 self.stats
                     .bg_waiting_us
