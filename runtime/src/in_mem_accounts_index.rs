@@ -659,6 +659,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                 if Arc::strong_count(v) > 1 {
                     // someone is holding the value arc's ref count and could modify it, so do not remove this from in-mem cache
                     completed_scan = false;
+                    Self::update_stat(&self.stats().remove_aborted_strong_count, 1);
                     continue;
                 }
 
@@ -666,6 +667,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                     // marked dirty or bumped in age after we looked above
                     // these will be handled in later passes
                     // but, at startup, everything is ready to age out if it isn't dirty
+                    Self::update_stat(&self.stats().remove_aborted_dirty_or_age, 1);
                     continue;
                 }
 
@@ -677,6 +679,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                 }) {
                     // this item is held in mem by range, so don't remove
                     completed_scan = false;
+                    Self::update_stat(&self.stats().remove_arborted_range, 1);
                     continue;
                 }
 
