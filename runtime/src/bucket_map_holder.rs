@@ -173,6 +173,9 @@ impl<T: IndexValue> BucketMapHolder<T> {
             if exit.load(Ordering::Relaxed) {
                 break;
             }
+            if timeout {
+                continue;
+            }
 
             self.stats.active_threads.fetch_add(1, Ordering::Relaxed);
             for _ in 0..bins {
