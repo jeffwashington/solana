@@ -173,7 +173,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
             if exit.load(Ordering::Relaxed) {
                 break;
             }
-            if timeout {
+            if timeout && !self.get_startup() {
                 continue;
             }
 
