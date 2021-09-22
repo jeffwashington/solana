@@ -159,10 +159,13 @@ impl<T: IndexValue> BucketMapHolder<T> {
         let flush = self.disk.is_some();
         loop {
             // this will transition to waits and thread throttling
-            self.wait_dirty_or_aged
+            let timeout = self.wait_dirty_or_aged
                 .wait_timeout(Duration::from_millis(AGE_MS));
             if exit.load(Ordering::Relaxed) {
                 break;
+            }
+            if timeout {
+                continue;
             }
 
             self.stats.active_threads.fetch_add(1, Ordering::Relaxed);
