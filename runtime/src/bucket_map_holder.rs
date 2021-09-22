@@ -88,15 +88,12 @@ impl<T: IndexValue> BucketMapHolder<T> {
         use log::*;
         error!("wait for idle starting. items in mem: {}", self.stats.count_in_mem.load(Ordering::Relaxed));
         assert!(self.get_startup());
-        for _ in 0..120 {
-            std::thread::sleep(Duration::from_millis(1000));
-            if self.stats.count_in_mem.load(Ordering::Relaxed) == 0 {
-                // all in_mem buckets are empty, so we flushed correctly
-                error!("wait for idle quitting. items in mem: {}", self.stats.count_in_mem.load(Ordering::Relaxed));
-                return;
-            }
+        if self.stats.count_in_mem.load(Ordering::Relaxed) == 0 {
+            // all in_mem buckets are empty, so we flushed correctly
+            error!("wait for idle quitting. items in mem: {}", self.stats.count_in_mem.load(Ordering::Relaxed));
+            break;
         }
-        error!("wait for idle quitting. items in mem: {}", self.stats.count_in_mem.load(Ordering::Relaxed));
+        std::thread::sleep(Duration::from_millis(100));
     }
 
     pub fn current_age(&self) -> Age {
