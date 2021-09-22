@@ -584,8 +584,9 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         let current_age = self.storage.current_age();
         let mut iterate_for_age = self.get_should_age(current_age);
         let startup = self.storage.get_startup();
-        if !was_dirty && !iterate_for_age {
+        if !was_dirty && !iterate_for_age && !startup {
             // wasn't dirty and no need to age, so no need to flush this bucket
+            // at startup, we visit the entire bucket
             return;
         }
 
