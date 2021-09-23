@@ -2029,6 +2029,7 @@ pub mod tests {
             let meta = AccountMapEntryMeta {
                 dirty: AtomicBool::new(self.entry.dirty()),
                 age: AtomicU8::new(self.entry.age()),
+                verified_missing_on_disk::new(self.entry.verified_missing_on_disk()),
             };
             PreAllocatedAccountMapEntry::new_internal(slot, info, meta)
         }
