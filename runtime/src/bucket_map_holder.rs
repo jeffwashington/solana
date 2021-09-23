@@ -190,7 +190,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
     pub fn evaluate_thread_throttling(&self) {
         const MS_PER_S: u64 = 1000;
         let desired_throughput_bins_per_s = (self.bins as u64) * MS_PER_S / AGE_MS;
-        const THROUGHTPUT_INTERVAL_MS: u64 = 100;
+        const THROUGHTPUT_INTERVAL_MS: u64 = 400;
         let elapsed_ms = self.throughput_interval.elapsed_ms();
         if elapsed_ms >= THROUGHTPUT_INTERVAL_MS {
             // reset the interval timer
