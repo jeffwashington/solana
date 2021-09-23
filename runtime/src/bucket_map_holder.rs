@@ -139,12 +139,26 @@ impl<T: IndexValue> BucketMapHolder<T> {
 
     pub fn maybe_advance_age(&self) -> bool {
         // check has_age_interval_elapsed last as calling it modifies state on success
-        if self.all_buckets_flushed_at_current_age()
-            && !self.get_startup()
-            && self.has_age_interval_elapsed()
-        {
-            self.increment_age();
-            true
+        if self.all_buckets_flushed_at_current_age() && !self.get_startup() {
+            if self.has_age_interval_elapsed() {
+                self.increment_age();
+                true
+            } else {
+                // age interval hasn't elapsed, but we finished, so we can calculate progress here to throttle threads
+                let elapsed_ms = self.age_timer.elapsed_ms();
+                if elapsed_ms > 0 {
+                    let percent = (AGE_MS * 100 / elapsed_ms) as usize;
+                    if percent > 125 {
+                        let desired = self.desired_threads.load(Ordering::Relaxed);
+                        let target = desired * 100 / percent;
+                        if target < desired {
+                            let reduce = desired - target;
+                            self.inc_dec_desired_threads(reduce, false);
+                        }
+                    }
+                }
+                false
+            }
         } else {
             false
         }
@@ -199,8 +213,12 @@ impl<T: IndexValue> BucketMapHolder<T> {
                 .should_update(THROUGHTPUT_INTERVAL_MS);
             // time to determine whether to increase or decrease desired threads
             let bins_scanned = self.count_bucket_scans_complete.swap(0, Ordering::Relaxed) as u64;
-            self.stats.throughput_bins_scanned.store(bins_scanned, Ordering::Relaxed);
-            self.stats.throughput_elapsed_ms.store(elapsed_ms, Ordering::Relaxed);
+            self.stats
+                .throughput_bins_scanned
+                .store(bins_scanned, Ordering::Relaxed);
+            self.stats
+                .throughput_elapsed_ms
+                .store(elapsed_ms, Ordering::Relaxed);
             let progress = bins_scanned * MS_PER_S / elapsed_ms;
             let slop = desired_throughput_bins_per_s / 2;
             self.stats
@@ -211,33 +229,34 @@ impl<T: IndexValue> BucketMapHolder<T> {
                 .store(desired_throughput_bins_per_s, Ordering::Relaxed);
             if progress < desired_throughput_bins_per_s - slop {
                 // increment desired threads
-                let desired = self.desired_threads.load(Ordering::Relaxed);
-                if desired < self.threads
-                    && self
-                        .desired_threads
-                        .compare_exchange(
-                            desired,
-                            desired + 1,
-                            Ordering::Acquire,
-                            Ordering::Relaxed,
-                        )
-                        .is_ok()
+                self.inc_dec_desired_threads(1, true);
+            } else if progress > desired_throughput_bins_per_s + slop {
+                // decrement desired threads
+                self.inc_dec_desired_threads(1, false);
+            }
+        }
+    }
+
+    fn inc_dec_desired_threads(&self, amount: usize, inc: bool) {
+        let desired = self.desired_threads.load(Ordering::Relaxed);
+        if inc {
+            if desired + amount < self.threads {
+                if self
+                    .desired_threads
+                    .compare_exchange(desired, desired + amount, Ordering::Acquire, Ordering::Relaxed)
+                    .is_ok()
                 {
                     self.wait_thread_throttling.notify_one();
                 }
-            } else if progress > desired_throughput_bins_per_s + slop {
-                // decrement desired threads
-                let desired = self.desired_threads.load(Ordering::Relaxed);
-                if desired > 1 {
-                    // after updating this, an active thread will figure out it needs to go to sleep
-                    let _ = self.desired_threads.compare_exchange(
-                        desired,
-                        desired - 1,
-                        Ordering::Acquire,
-                        Ordering::Relaxed,
-                    );
-                }
             }
+        } else if desired > amount {
+            // after updating this, an active thread will figure out it needs to go to sleep
+            let _ = self.desired_threads.compare_exchange(
+                desired,
+                desired - amount,
+                Ordering::Acquire,
+                Ordering::Relaxed,
+            );
         }
     }
 
