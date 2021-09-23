@@ -333,7 +333,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
                     if !self.advancing_time_abnormally.swap(true, Ordering::Release) {
                         if last_age == self.current_age() {
                             let current = self.count_ages_flushed();
-                            error!("time did not advance: buckets updated: {}, advancing age, active threads: {}",  current, self.stats.active_threads.load(Ordering::Relaxed));
+                            error!("time did not advance: buckets updated: {}, advancing age, active threads: {}, current age: {}",  current, self.stats.active_threads.load(Ordering::Relaxed), self.current_age());
                             for _ in current..bins {
                                 self.bucket_flushed_at_current_age();
                             }
@@ -345,11 +345,14 @@ impl<T: IndexValue> BucketMapHolder<T> {
                 // continue;
             }
 
-            for _ in 0..=(bins / self.desired_threads.load(Ordering::Relaxed)) {
+            for _ in 0..=bins {
                 if flush {
                     let index = self.next_bucket_to_flush();
                     in_mem[index].flush();
                     self.evaluate_thread_throttling();
+                    if self.all_buckets_flushed_at_current_age() {
+                        break;
+                    }
                 }
                 self.stats.report_stats(self);
                 if self.all_buckets_flushed_at_current_age() {
