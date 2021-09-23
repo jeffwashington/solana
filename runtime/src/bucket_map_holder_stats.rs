@@ -25,6 +25,8 @@ pub struct BucketMapHolderStats {
     pub flush_updates_do_disk: AtomicU64,
     pub throughput_bins_scanned: AtomicU64,
     pub throughput_elapsed_ms: AtomicU64,
+    pub upsert_with_read_lock: AtomicU64,
+    pub upsert_with_write_lock: AtomicU64,
     pub upsert_with_prev_entry_cached: AtomicU64,
     pub upsert_without_prev_entry_cached: AtomicU64,
     pub items: AtomicU64,
@@ -218,6 +220,8 @@ impl BucketMapHolderStats {
                 self.get_range_us.swap(0, Ordering::Relaxed),
                 i64
             ),
+            ("upsert_with_read_lock", self.upsert_with_read_lock.swap(0, Ordering::Relaxed), i64),
+            ("upsert_with_write_lock", self.upsert_with_write_lock.swap(0, Ordering::Relaxed), i64),
             ("upsert_with_prev_entry_cached", self.upsert_with_prev_entry_cached.swap(0, Ordering::Relaxed), i64),
             ("upsert_without_prev_entry_cached", self.upsert_without_prev_entry_cached.swap(0, Ordering::Relaxed), i64),
             ("inserts", self.inserts.swap(0, Ordering::Relaxed), i64),

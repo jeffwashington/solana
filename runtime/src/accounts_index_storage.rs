@@ -1,5 +1,6 @@
 use crate::accounts_index::{AccountsIndexConfig, IndexValue};
 use crate::bucket_map_holder::BucketMapHolder;
+use crate::bucket_map_holder_stats::BucketMapHolderStats;
 use crate::in_mem_accounts_index::InMemAccountsIndex;
 use std::fmt::Debug;
 use std::{
@@ -83,5 +84,9 @@ impl<T: IndexValue> AccountsIndexStorage<T> {
             storage,
             in_mem,
         }
+    }
+
+    pub fn stats(&self) -> &BucketMapHolderStats {
+        &self.storage.stats
     }
 }
