@@ -200,6 +200,8 @@ impl<T: IndexValue> BucketMapHolder<T> {
             let bins_scanned = self.count_bucket_scans_complete.swap(0, Ordering::Relaxed) as u64;
             let progress = bins_scanned / elapsed_s;
             let slop = desired_throughput_bins_per_s / 2;
+            self.stats.throttling_progress.store(progress, Ordering::Relaxed);
+            self.stats.throttling_target.store(desired_throughput_bins_per_s, Ordering::Relaxed);
             if progress < desired_throughput_bins_per_s - slop {
                 // increment desired threads
                 let desired = self.desired_threads.load(Ordering::Relaxed);
