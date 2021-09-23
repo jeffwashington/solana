@@ -1582,8 +1582,7 @@ impl<T: IndexValue> AccountsIndex<T> {
                 let is_zero_lamport = account_info.is_zero_lamport();
                 let result = if is_zero_lamport { Some(pubkey) } else { None };
 
-                let info = WriteAccountMapEntry::new_entry_after_update(
-                    slot,
+                let info = PreAllocatedAccountMapEntry::new(slot,
                     account_info,
                     &self.storage.storage,
                 );
