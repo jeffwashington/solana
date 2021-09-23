@@ -350,7 +350,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
                     in_mem[index].flush();
                     self.evaluate_thread_throttling();
                     if self.all_buckets_flushed_at_current_age() {
-                        break;
+                        //break;
                     }
                 }
                 self.stats.report_stats(self);
