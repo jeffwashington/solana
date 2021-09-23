@@ -190,12 +190,11 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                     {
                         if CONFIRMED_MISSING {
                             Self::update_stat(&self.stats().missing_get_added_in_mem, 1);
-                            Arc::new(AccountMapEntryInner::new_verified_missing_on_disk(
+                            vacant.insert(Arc::new(AccountMapEntryInner::new_verified_missing_on_disk(
                                 &self.storage,
-                            ))
-                        } else {
-                            return None; // not found, will not store 'verified missing' in cache
+                            )));
                         }
+                        return None;
                     }
                 }
             }
