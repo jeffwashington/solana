@@ -43,6 +43,8 @@ pub struct BucketMapHolderStats {
     pub remove_aborted_strong_count: AtomicU64,
     pub remove_aborted_dirty_or_age: AtomicU64,
     pub remove_arborted_range: AtomicU64,
+    pub throttling_progress: AtomicU64,
+    pub throttling_target: AtomicU64,
     pub last_time: AtomicInterval,
 }
 
@@ -216,6 +218,16 @@ impl BucketMapHolderStats {
             (
                 "desired_threads",
                 storage.desired_threads.load(Ordering::Relaxed),
+                i64
+            ),
+            (
+                "throttling_target",
+                self.throttling_target.swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "throttling_progress",
+                self.throttling_progress.swap(0, Ordering::Relaxed),
                 i64
             ),
             ("items", self.items.swap(0, Ordering::Relaxed), i64),
