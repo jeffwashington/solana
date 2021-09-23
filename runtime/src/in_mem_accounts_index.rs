@@ -16,7 +16,7 @@ type K = Pubkey;
 type CacheRangesHeld = RwLock<Vec<Option<RangeInclusive<Pubkey>>>>;
 pub type SlotT<T> = (Slot, T);
 
-const CONFIRMED_MISSING: bool = false;
+const CONFIRMED_MISSING: bool = true;
 
 #[allow(dead_code)] // temporary during staging
                     // one instance of this represents one bin of the accounts index.
