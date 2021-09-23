@@ -152,6 +152,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
                         let target = desired * 100 / percent;
                         if target < desired {
                             let reduce = desired - target;
+                            error!("reducing threads by: {}", reduce);
                             self.inc_dec_desired_threads(reduce, false);
                         }
                     }
@@ -226,10 +227,12 @@ impl<T: IndexValue> BucketMapHolder<T> {
                 .throttling_target
                 .store(desired_throughput_bins_per_s, Ordering::Relaxed);
             if progress < desired_throughput_bins_per_s - slop {
+                error!("increasing desired: progress: {}, target: {}, slop: {}", progress, desired_throughput_bins_per_s - slop, slop);
                 // increment desired threads
                 self.inc_dec_desired_threads(1, true);
             } else if progress > desired_throughput_bins_per_s + slop {
                 // decrement desired threads
+                error!("decreasing desired: progress: {}, target: {}", progress, desired_throughput_bins_per_s - slop);
                 self.inc_dec_desired_threads(1, false);
             }
         }
@@ -238,7 +241,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
     fn inc_dec_desired_threads(&self, amount: usize, inc: bool) {
         let desired = self.desired_threads.load(Ordering::Relaxed);
         if inc {
-            if desired + amount < self.threads {
+            if desired + amount <= self.threads {
                 if self
                     .desired_threads
                     .compare_exchange(
