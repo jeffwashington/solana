@@ -652,7 +652,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
 
         let ranges = self.cache_ranges_held.read().unwrap().clone();
         if ranges.iter().any(|range| range.is_none()) {
-            Self::update_stat(&self.stats().remove_aborted_range, removes.len());
+            Self::update_stat(&self.stats().remove_aborted_range, removes.len() as u64);
             return false; // range said to hold 'all', so not completed
         }
         let mut map = self.map().write().unwrap();
