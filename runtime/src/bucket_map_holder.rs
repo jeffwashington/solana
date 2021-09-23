@@ -284,6 +284,13 @@ impl<T: IndexValue> BucketMapHolder<T> {
                 self.active_threads.load(Ordering::Acquire)
             );
         }
+        else {
+            error!(
+                "skipped throttle thread down, failed: {}, {}",
+                desired,
+                active,
+            );
+        }
         false
     }
 
