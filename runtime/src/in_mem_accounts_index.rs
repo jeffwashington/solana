@@ -16,6 +16,8 @@ type K = Pubkey;
 type CacheRangesHeld = RwLock<Vec<Option<RangeInclusive<Pubkey>>>>;
 pub type SlotT<T> = (Slot, T);
 
+const CONFIRMED_MISSING: bool = false;
+
 #[allow(dead_code)] // temporary during staging
                     // one instance of this represents one bin of the accounts index.
 pub struct InMemAccountsIndex<T: IndexValue> {
@@ -182,10 +184,13 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                     Some(new_entry) => Arc::clone(vacant.insert(new_entry)),
                     None =>
                     // still not in cache, not found on disk either, so note it was verified missing
-                    {
+                    if CONFIRMED_MISSING {
                         Arc::new(AccountMapEntryInner::new_verified_missing_on_disk(
                             &self.storage,
                         ))
+                    }
+                    else {
+                        return None; // not found, will not store 'verified missing' in cache
                     }
                 }
             }
