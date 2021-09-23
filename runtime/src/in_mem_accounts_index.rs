@@ -92,6 +92,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         let mut result = Vec::with_capacity(map.len());
         map.iter().for_each(|(k, v)| {
             if v.verified_missing_on_disk() {
+                Self::update_stat(&self.stats().missing_found_in_mem_none, 1);
                 return;
             }
             if range.map(|range| range.contains(k)).unwrap_or(true) {
@@ -153,6 +154,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
 
         if let Some(entry) = result.as_ref() {
             if entry.verified_missing_on_disk() {
+                Self::update_stat(&self.stats().missing_found_in_mem_none, 1);
                 return None;
             }
 
@@ -168,6 +170,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
             Entry::Occupied(occupied) => {
                 let entry = occupied.get();
                 if entry.verified_missing_on_disk() {
+                    Self::update_stat(&self.stats().missing_found_in_mem_none, 1);
                     assert!(
                         new_entry.is_none(),
                         "confirmed not on disk. But item is on disk: {}",
@@ -186,6 +189,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                     // still not in cache, not found on disk either, so note it was verified missing
                     {
                         if CONFIRMED_MISSING {
+                            Self::update_stat(&self.stats().missing_get_added_in_mem, 1);
                             Arc::new(AccountMapEntryInner::new_verified_missing_on_disk(
                                 &self.storage,
                             ))
@@ -219,6 +223,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
             Entry::Occupied(occupied) => {
                 let entry = occupied.get();
                 if entry.verified_missing_on_disk() {
+                    Self::update_stat(&self.stats().missing_found_in_mem_none, 1);
                     return false;
                 }
                 let result = self.remove_if_slot_list_empty_value(&entry.slot_list.read().unwrap());
@@ -304,6 +309,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
             Entry::Occupied(mut occupied) => {
                 let current = occupied.get_mut();
                 if current.verified_missing_on_disk() {
+                    Self::update_stat(&self.stats().missing_found_in_mem, 1);
                     // same as insert in this case - overwrite what is in the cache
                     let new_value: AccountMapEntry<T> = new_value.into();
                     assert!(new_value.dirty());
@@ -463,6 +469,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
             Entry::Occupied(mut occupied) => {
                 let entry = occupied.get();
                 if entry.verified_missing_on_disk() {
+                    Self::update_stat(&self.stats().missing_found_in_mem, 1);
                     let new_entry: AccountMapEntry<T> = new_entry.into();
                     assert!(new_entry.dirty());
                     *occupied.get_mut() = new_entry;

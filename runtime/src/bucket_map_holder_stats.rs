@@ -26,6 +26,9 @@ pub struct BucketMapHolderStats {
     pub throughput_bins_scanned: AtomicU64,
     pub throughput_elapsed_ms: AtomicU64,
     pub upsert_with_read_lock: AtomicU64,
+    pub missing_found_in_mem_none: AtomicU64,
+    pub missing_get_added_in_mem: AtomicU64,
+    pub missing_found_in_mem: AtomicU64,
     pub upsert_with_write_lock: AtomicU64,
     pub upsert_with_prev_entry_cached: AtomicU64,
     pub upsert_without_prev_entry_cached: AtomicU64,
@@ -147,8 +150,16 @@ impl BucketMapHolderStats {
             ),
             ("min_in_bin", min, i64),
             ("max_in_bin", max, i64),
-            ("throughput_bins_scanned", self.throughput_bins_scanned.load(Ordering::Relaxed), i64),
-            ("throughput_elapsed_ms", self.throughput_elapsed_ms.load(Ordering::Relaxed), i64),
+            (
+                "throughput_bins_scanned",
+                self.throughput_bins_scanned.load(Ordering::Relaxed),
+                i64
+            ),
+            (
+                "throughput_elapsed_ms",
+                self.throughput_elapsed_ms.load(Ordering::Relaxed),
+                i64
+            ),
             ("count_from_bins", ct, i64),
             (
                 "gets_from_mem",
@@ -220,10 +231,43 @@ impl BucketMapHolderStats {
                 self.get_range_us.swap(0, Ordering::Relaxed),
                 i64
             ),
-            ("upsert_with_read_lock", self.upsert_with_read_lock.swap(0, Ordering::Relaxed), i64),
-            ("upsert_with_write_lock", self.upsert_with_write_lock.swap(0, Ordering::Relaxed), i64),
-            ("upsert_with_prev_entry_cached", self.upsert_with_prev_entry_cached.swap(0, Ordering::Relaxed), i64),
-            ("upsert_without_prev_entry_cached", self.upsert_without_prev_entry_cached.swap(0, Ordering::Relaxed), i64),
+            (
+                "missing_found_in_mem_none",
+                self.missing_found_in_mem_none.swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "missing_get_added_in_mem",
+                self.missing_get_added_in_mem.swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "missing_found_in_mem",
+                self.missing_found_in_mem.swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "upsert_with_read_lock",
+                self.upsert_with_read_lock.swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "upsert_with_write_lock",
+                self.upsert_with_write_lock.swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "upsert_with_prev_entry_cached",
+                self.upsert_with_prev_entry_cached
+                    .swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "upsert_without_prev_entry_cached",
+                self.upsert_without_prev_entry_cached
+                    .swap(0, Ordering::Relaxed),
+                i64
+            ),
             ("inserts", self.inserts.swap(0, Ordering::Relaxed), i64),
             ("deletes", self.deletes.swap(0, Ordering::Relaxed), i64),
             (
