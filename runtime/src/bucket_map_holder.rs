@@ -281,7 +281,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
             let desired = self.desired_threads.load(Ordering::Relaxed);
             loop {
                 let active = self.active_threads.load(Ordering::Relaxed);
-                if active >= desired {
+                if active <= desired {
                     break;
                 }
                 if self
