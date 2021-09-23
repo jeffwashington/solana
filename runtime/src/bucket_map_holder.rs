@@ -191,17 +191,21 @@ impl<T: IndexValue> BucketMapHolder<T> {
         const MS_PER_S: u64 = 1000;
         let desired_throughput_bins_per_s = (self.bins as u64) * MS_PER_S / AGE_MS;
         const THROUGHTPUT_INTERVAL_MS: u64 = 100;
-        if self
-            .throughput_interval
-            .should_update(THROUGHTPUT_INTERVAL_MS)
-        {
+        let elapsed_ms = self.throughput_interval.elapsed_ms();
+        if elapsed_ms >= THROUGHTPUT_INTERVAL_MS {
+            // reset the interval timer
+            self.throughput_interval
+                .should_update(THROUGHTPUT_INTERVAL_MS);
             // time to determine whether to increase or decrease desired threads
-            let elapsed_ms = THROUGHTPUT_INTERVAL_MS; // this is an approximation, real value is >= this
             let bins_scanned = self.count_bucket_scans_complete.swap(0, Ordering::Relaxed) as u64;
             let progress = bins_scanned * MS_PER_S / elapsed_ms;
             let slop = desired_throughput_bins_per_s / 2;
-            self.stats.throttling_progress.store(progress, Ordering::Relaxed);
-            self.stats.throttling_target.store(desired_throughput_bins_per_s, Ordering::Relaxed);
+            self.stats
+                .throttling_progress
+                .store(progress, Ordering::Relaxed);
+            self.stats
+                .throttling_target
+                .store(desired_throughput_bins_per_s, Ordering::Relaxed);
             if progress < desired_throughput_bins_per_s - slop {
                 // increment desired threads
                 let desired = self.desired_threads.load(Ordering::Relaxed);
