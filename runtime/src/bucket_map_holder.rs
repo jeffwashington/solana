@@ -36,7 +36,6 @@ pub struct BucketMapHolder<T: IndexValue> {
     count_bucket_scans_complete: AtomicUsize,
     pub wait_thread_throttling: WaitableCondvar,
     pub desired_threads: AtomicUsize,
-    pub active_threads: AtomicUsize,
 
     // how much mb are we allowed to keep in the in-mem index?
     // Rest goes to disk.
@@ -196,7 +195,6 @@ impl<T: IndexValue> BucketMapHolder<T> {
             advancing_time_abnormally: AtomicBool::default(),
             wait_thread_throttling: WaitableCondvar::default(),
             desired_threads: AtomicUsize::new(INITIAL_DESIRED_THREADS),
-            active_threads: AtomicUsize::default(),
             throughput_interval: AtomicInterval::default(),
         }
     }
@@ -268,28 +266,16 @@ impl<T: IndexValue> BucketMapHolder<T> {
     // return true if this thread should go to sleep by calling throttle_thread
     pub fn should_throttle_thread(&self) -> bool {
         let desired = self.desired_threads.load(Ordering::Acquire);
-        let active = self.active_threads.load(Ordering::Acquire);
-        if active > desired {
+        let active = self.stats.active_threads.load(Ordering::Acquire);
+        if active as usize > desired {
             if self
+                .stats
                 .active_threads
                 .compare_exchange(active, active - 1, Ordering::Acquire, Ordering::Relaxed)
                 .is_ok()
             {
                 return true; // this thread went to sleep to satisfy 'desired'
             }
-            error!(
-                "tried to throttle thread down, failed: {}, {}, {}",
-                desired,
-                active,
-                self.active_threads.load(Ordering::Acquire)
-            );
-        }
-        else {
-            error!(
-                "skipped throttle thread down, failed: {}, {}",
-                desired,
-                active,
-            );
         }
         false
     }
@@ -299,12 +285,13 @@ impl<T: IndexValue> BucketMapHolder<T> {
         loop {
             loop {
                 let desired = self.desired_threads.load(Ordering::Acquire);
-                let active = self.active_threads.load(Ordering::Acquire);
-                if active > desired {
+                let active = self.stats.active_threads.load(Ordering::Acquire);
+                if active as usize > desired {
                     // more are active than need to be, so put this thread to sleep
                     break;
                 }
                 if self
+                    .stats
                     .active_threads
                     .compare_exchange(active, active + 1, Ordering::Acquire, Ordering::Relaxed)
                     .is_ok()
