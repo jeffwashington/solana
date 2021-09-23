@@ -90,6 +90,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
         self.startup.store(value, Ordering::Release);
         // now that we are not startup, get the system moving normally
         self.maybe_advance_age();
+        self.desired_threads.store(1, Ordering::Release); // reset desired threads to 1 for steady state
         self.wait_dirty_or_aged.notify_all();
     }
 
