@@ -282,9 +282,9 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
     ) {
         Self::update_stat(
             if previous_slot_entry_was_cached {
-                self.stats().upsert_with_prev_entry_cached
+                &self.stats().upsert_with_prev_entry_cached
             } else {
-                self.stats().upsert_without_prev_entry_cached
+                &self.stats().upsert_without_prev_entry_cached
             },
             1,
         );
