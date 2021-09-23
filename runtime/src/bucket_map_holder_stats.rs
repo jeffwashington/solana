@@ -23,6 +23,8 @@ pub struct BucketMapHolderStats {
     pub load_disk_missing_us: AtomicU64,
     pub updates_in_mem: AtomicU64,
     pub flush_updates_do_disk: AtomicU64,
+    pub throughput_bins_scanned: AtomicU64,
+    pub throughput_elapsed_ms: AtomicU64,
     pub items: AtomicU64,
     pub keys: AtomicU64,
     pub deletes: AtomicU64,
@@ -141,6 +143,8 @@ impl BucketMapHolderStats {
             ),
             ("min_in_bin", min, i64),
             ("max_in_bin", max, i64),
+            ("throughput_bins_scanned", self.throughput_bins_scanned.load(Ordering::Relaxed), i64),
+            ("throughput_elapsed_ms", self.throughput_elapsed_ms.load(Ordering::Relaxed), i64),
             ("count_from_bins", ct, i64),
             (
                 "gets_from_mem",
