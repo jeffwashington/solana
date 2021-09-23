@@ -262,8 +262,8 @@ impl<T: IndexValue> BucketMapHolder<T> {
 
     // return true if this thread should go to sleep by calling throttle_thread
     pub fn should_throttle_thread(&self) -> bool {
-        let desired = self.desired_threads.load(Ordering::Relaxed);
-        let active = self.active_threads.load(Ordering::Relaxed);
+        let desired = self.desired_threads.load(Ordering::Acquire);
+        let active = self.active_threads.load(Ordering::Acquire);
         if active > desired
             && self
                 .active_threads
@@ -278,10 +278,11 @@ impl<T: IndexValue> BucketMapHolder<T> {
     // returns when this thread should become active, otherwise wait
     pub fn throttle_thread(&self) {
         loop {
-            let desired = self.desired_threads.load(Ordering::Relaxed);
             loop {
-                let active = self.active_threads.load(Ordering::Relaxed);
-                if active <= desired {
+                let desired = self.desired_threads.load(Ordering::Acquire);
+                let active = self.active_threads.load(Ordering::Acquire);
+                if active > desired {
+                    // more are active than need to be, so put this thread to sleep
                     break;
                 }
                 if self
