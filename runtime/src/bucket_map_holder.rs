@@ -207,33 +207,46 @@ impl<T: IndexValue> BucketMapHolder<T> {
         const THROUGHTPUT_INTERVAL_MS: u64 = 400;
         let elapsed_ms = self.throughput_interval.elapsed_ms();
         if elapsed_ms >= THROUGHTPUT_INTERVAL_MS {
-            // reset the interval timer
-            self.throughput_interval
-                .should_update(THROUGHTPUT_INTERVAL_MS);
-            // time to determine whether to increase or decrease desired threads
-            let bins_scanned = self.count_bucket_scans_complete.swap(0, Ordering::Relaxed) as u64;
-            self.stats
-                .throughput_bins_scanned
-                .store(bins_scanned, Ordering::Relaxed);
-            self.stats
-                .throughput_elapsed_ms
-                .store(elapsed_ms, Ordering::Relaxed);
-            let progress = bins_scanned * MS_PER_S / elapsed_ms;
-            let slop = desired_throughput_bins_per_s / 2;
-            self.stats
-                .throttling_progress
-                .store(progress, Ordering::Relaxed);
-            self.stats
-                .throttling_target
-                .store(desired_throughput_bins_per_s, Ordering::Relaxed);
-            if progress < desired_throughput_bins_per_s - slop {
-                error!("increasing desired: progress: {}, target: {}, slop: {}", progress, desired_throughput_bins_per_s - slop, slop);
-                // increment desired threads
-                self.inc_dec_desired_threads(1, true);
-            } else if progress > desired_throughput_bins_per_s + slop {
-                // decrement desired threads
-                error!("decreasing desired: progress: {}, target: {}", progress, desired_throughput_bins_per_s - slop);
-                self.inc_dec_desired_threads(1, false);
+            if self
+                .throughput_interval
+                .should_update(THROUGHTPUT_INTERVAL_MS)
+            {
+                // reset the interval timer
+                // time to determine whether to increase or decrease desired threads
+                let bins_scanned =
+                    self.count_bucket_scans_complete.swap(0, Ordering::Relaxed) as u64;
+                self.stats
+                    .throughput_bins_scanned
+                    .store(bins_scanned, Ordering::Relaxed);
+                self.stats
+                    .throughput_elapsed_ms
+                    .store(elapsed_ms, Ordering::Relaxed);
+                let progress = bins_scanned * MS_PER_S / elapsed_ms;
+                let slop = desired_throughput_bins_per_s / 2;
+                self.stats
+                    .throttling_progress
+                    .store(progress, Ordering::Relaxed);
+                self.stats
+                    .throttling_target
+                    .store(desired_throughput_bins_per_s, Ordering::Relaxed);
+                if progress < desired_throughput_bins_per_s - slop {
+                    error!(
+                        "increasing desired: progress: {}, target: {}, slop: {}",
+                        progress,
+                        desired_throughput_bins_per_s - slop,
+                        slop
+                    );
+                    // increment desired threads
+                    self.inc_dec_desired_threads(1, true);
+                } else if progress > desired_throughput_bins_per_s + slop {
+                    // decrement desired threads
+                    error!(
+                        "decreasing desired: progress: {}, target: {}",
+                        progress,
+                        desired_throughput_bins_per_s - slop
+                    );
+                    self.inc_dec_desired_threads(1, false);
+                }
             }
         }
     }
