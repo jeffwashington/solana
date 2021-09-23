@@ -662,6 +662,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
 
         let ranges = self.cache_ranges_held.read().unwrap().clone();
         if ranges.iter().any(|range| range.is_none()) {
+            Self::update_stat(&self.stats().remove_aborted_range, removes.len());
             return false; // range said to hold 'all', so not completed
         }
         let mut map = self.map().write().unwrap();
@@ -691,7 +692,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                 }) {
                     // this item is held in mem by range, so don't remove
                     completed_scan = false;
-                    Self::update_stat(&self.stats().remove_arborted_range, 1);
+                    Self::update_stat(&self.stats().remove_aborted_range, 1);
                     continue;
                 }
 

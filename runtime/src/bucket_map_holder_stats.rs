@@ -42,7 +42,7 @@ pub struct BucketMapHolderStats {
     pub flush_remove_us: AtomicU64,
     pub remove_aborted_strong_count: AtomicU64,
     pub remove_aborted_dirty_or_age: AtomicU64,
-    pub remove_arborted_range: AtomicU64,
+    pub remove_aborted_range: AtomicU64,
     pub throttling_progress: AtomicU64,
     pub throttling_target: AtomicU64,
     pub last_time: AtomicInterval,
@@ -271,8 +271,8 @@ impl BucketMapHolderStats {
                 i64
             ),
             (
-                "remove_arborted_range",
-                self.remove_arborted_range.swap(0, Ordering::Relaxed),
+                "remove_aborted_range",
+                self.remove_aborted_range.swap(0, Ordering::Relaxed),
                 i64
             ),
             (
