@@ -122,7 +122,7 @@ impl<T: Clone + Copy + Debug> BucketMap<T> {
     }
 
     /// Get the items for bucket `ix` in `range`
-    pub fn items_in_range<R>(&self, ix: usize, range: Option<&R>) -> Vec<BucketItem<T>>
+    pub fn items_in_range<R>(&self, ix: usize, range: &Option<&R>) -> Vec<BucketItem<T>>
     where
         R: RangeBounds<Pubkey>,
     {

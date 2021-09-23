@@ -11,8 +11,8 @@ use crate::{
 use bv::BitVec;
 use log::*;
 use ouroboros::self_referencing;
-use rand::Rng;
 use rand::thread_rng;
+use rand::Rng;
 use solana_measure::measure::Measure;
 use solana_sdk::{
     clock::{BankId, Slot},
@@ -137,13 +137,15 @@ impl AccountSecondaryIndexes {
 pub struct AccountMapEntryMeta {
     pub dirty: AtomicBool,
     pub age: AtomicU8,
+    pub verified_missing_on_disk: AtomicBool,
 }
 
 impl AccountMapEntryMeta {
-    pub fn new_dirty<T: IndexValue>(storage: &Arc<BucketMapHolder<T>>) -> Self {
+    pub fn new_dirty<T: IndexValue>(storage: &BucketMapHolder<T>) -> Self {
         AccountMapEntryMeta {
             dirty: AtomicBool::new(true),
             age: AtomicU8::new(storage.future_age_to_flush()),
+            verified_missing_on_disk: AtomicBool::default(),
         }
     }
 }
@@ -156,6 +158,18 @@ pub struct AccountMapEntryInner<T> {
 }
 
 impl<T: IndexValue> AccountMapEntryInner<T> {
+    pub fn new_verified_missing_on_disk(storage: &BucketMapHolder<T>) -> Self {
+        Self {
+            slot_list: RwLock::new(Vec::default()),
+            ref_count: AtomicU64::new(0),
+            meta: AccountMapEntryMeta {
+                dirty: AtomicBool::new(false),
+                age: AtomicU8::new(storage.future_age_to_flush()),
+                verified_missing_on_disk: AtomicBool::new(true), // verified missing
+            },
+        }
+    }
+
     pub fn new(slot_list: SlotList<T>, ref_count: RefCount, meta: AccountMapEntryMeta) -> Self {
         Self {
             slot_list: RwLock::new(slot_list),
@@ -182,6 +196,16 @@ impl<T: IndexValue> AccountMapEntryInner<T> {
 
     pub fn set_dirty(&self, value: bool) {
         self.meta.dirty.store(value, Ordering::Release)
+    }
+
+    pub fn verified_missing_on_disk(&self) -> bool {
+        self.meta.verified_missing_on_disk.load(Ordering::Acquire)
+    }
+
+    pub fn set_verified_missing_on_disk(&self, value: bool) {
+        self.meta
+            .verified_missing_on_disk
+            .store(value, Ordering::Release)
     }
 
     pub fn age(&self) -> Age {
@@ -1567,8 +1591,7 @@ impl<T: IndexValue> AccountsIndex<T> {
                 // opposite of (pubkey_bin + random_offset) % bins
                 pubkey_bin = if pubkey_bin < random_offset {
                     pubkey_bin + bins - random_offset
-                }
-                else {
+                } else {
                     pubkey_bin - random_offset
                 };
                 (pubkey_bin, Vec::with_capacity(expected_items_per_bin))
@@ -1582,10 +1605,8 @@ impl<T: IndexValue> AccountsIndex<T> {
                 let is_zero_lamport = account_info.is_zero_lamport();
                 let result = if is_zero_lamport { Some(pubkey) } else { None };
 
-                let info = PreAllocatedAccountMapEntry::new(slot,
-                    account_info,
-                    &self.storage.storage,
-                );
+                let info =
+                    PreAllocatedAccountMapEntry::new(slot, account_info, &self.storage.storage);
                 binned[binned_index].1.push((pubkey, info));
                 result
             })
