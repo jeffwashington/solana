@@ -243,7 +243,12 @@ impl<T: IndexValue> BucketMapHolder<T> {
             if desired + amount < self.threads {
                 if self
                     .desired_threads
-                    .compare_exchange(desired, desired + amount, Ordering::Acquire, Ordering::Relaxed)
+                    .compare_exchange(
+                        desired,
+                        desired + amount,
+                        Ordering::Acquire,
+                        Ordering::Relaxed,
+                    )
                     .is_ok()
                 {
                     self.wait_thread_throttling.notify_one();
@@ -264,13 +269,20 @@ impl<T: IndexValue> BucketMapHolder<T> {
     pub fn should_throttle_thread(&self) -> bool {
         let desired = self.desired_threads.load(Ordering::Acquire);
         let active = self.active_threads.load(Ordering::Acquire);
-        if active > desired
-            && self
+        if active > desired {
+            if self
                 .active_threads
                 .compare_exchange(active, active - 1, Ordering::Acquire, Ordering::Relaxed)
                 .is_ok()
-        {
-            return true; // this thread went to sleep to satisfy 'desired'
+            {
+                return true; // this thread went to sleep to satisfy 'desired'
+            }
+            error!(
+                "tried to throttle thread down, failed: {}, {}, {}",
+                desired,
+                active,
+                self.active_threads.load(Ordering::Acquire)
+            );
         }
         false
     }
