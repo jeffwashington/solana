@@ -184,13 +184,14 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                     Some(new_entry) => Arc::clone(vacant.insert(new_entry)),
                     None =>
                     // still not in cache, not found on disk either, so note it was verified missing
-                    if CONFIRMED_MISSING {
-                        Arc::new(AccountMapEntryInner::new_verified_missing_on_disk(
-                            &self.storage,
-                        ))
-                    }
-                    else {
-                        return None; // not found, will not store 'verified missing' in cache
+                    {
+                        if CONFIRMED_MISSING {
+                            Arc::new(AccountMapEntryInner::new_verified_missing_on_disk(
+                                &self.storage,
+                            ))
+                        } else {
+                            return None; // not found, will not store 'verified missing' in cache
+                        }
                     }
                 }
             }
@@ -279,6 +280,14 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         reclaims: &mut SlotList<T>,
         previous_slot_entry_was_cached: bool,
     ) {
+        Self::update_stat(
+            if previous_slot_entry_was_cached {
+                self.stats.upsert_with_prev_entry_cached
+            } else {
+                self.stats.upsert_without_prev_entry_cached
+            },
+            1,
+        );
         let m = Measure::start("entry");
         let mut map = self.map().write().unwrap();
         // note: an optimization is to use read lock and use get here instead of write lock entry
