@@ -218,7 +218,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
                 {
                     self.wait_thread_throttling.notify_one();
                 }
-            } else if progress < desired_throughput_bins_per_s + slop {
+            } else if progress > desired_throughput_bins_per_s + slop {
                 // decrement desired threads
                 let desired = self.desired_threads.load(Ordering::Relaxed);
                 if desired > 1 {
