@@ -307,9 +307,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
                 );
                 let mut m = Measure::start("wait");
                 let timeout = if self.should_throttle_thread() {
-                    self.stats.active_threads.fetch_sub(1, Ordering::Relaxed);
                     self.throttle_thread();
-                    self.stats.active_threads.fetch_add(1, Ordering::Relaxed);
                     false
                 } else {
                     self.wait_dirty_or_aged
