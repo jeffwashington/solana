@@ -73,7 +73,7 @@ impl AtomicInterval {
     pub fn should_update_ext(&self, interval_time: u64, skip_first: bool) -> bool {
         let now = timestamp();
         let last = self.last_update.load(Ordering::Relaxed);
-        now.saturating_sub(last) > interval_time
+        now.saturating_sub(last) > interval_time // wrapping somehow?
             && self
                 .last_update
                 .compare_exchange(last, now, Ordering::Relaxed, Ordering::Relaxed)
@@ -81,11 +81,15 @@ impl AtomicInterval {
             && !(skip_first && last == 0)
     }
 
-    /// return ms until the interval_time will have elapsed
-    pub fn remaining_until_next_interval(&self, interval_time: u64) -> u64 {
+    pub fn elapsed_ms(&self) -> u64 {
         let now = timestamp();
         let last = self.last_update.load(Ordering::Relaxed);
-        interval_time.saturating_sub(now.saturating_sub(last))
+        now.saturating_sub(last) // wrapping somehow?
+    }
+
+    /// return ms until the interval_time will have elapsed
+    pub fn remaining_until_next_interval(&self, interval_time: u64) -> u64 {
+        interval_time.saturating_sub(self.elapsed_ms())
     }
 }
 
