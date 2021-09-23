@@ -294,6 +294,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
         let flush = self.disk.is_some();
         let mut interval = AtomicInterval::default();
         let mut last_age = self.current_age();
+        self.stats.active_threads.fetch_add(1, Ordering::Relaxed);
         loop {
             let wait = std::cmp::min(
                 self.age_timer.remaining_until_next_interval(AGE_MS),
@@ -338,7 +339,6 @@ impl<T: IndexValue> BucketMapHolder<T> {
                 // continue;
             }
 
-            self.stats.active_threads.fetch_add(1, Ordering::Relaxed);
             for _ in 0..=(bins / self.desired_threads.load(Ordering::Relaxed)) {
                 if flush {
                     let index = self.next_bucket_to_flush();
@@ -347,7 +347,6 @@ impl<T: IndexValue> BucketMapHolder<T> {
                 }
                 self.stats.report_stats(self);
             }
-            self.stats.active_threads.fetch_sub(1, Ordering::Relaxed);
 
             let age = self.current_age();
             if age != last_age {
