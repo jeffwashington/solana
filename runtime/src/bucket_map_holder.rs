@@ -196,7 +196,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
             .should_update(THROUGHTPUT_INTERVAL_MS)
         {
             // time to determine whether to increase or decrease desired threads
-            let elapsed_s = THROUGHTPUT_INTERVAL_MS * MS_PER_S; // this is an approximation, real value is >= this
+            let elapsed_s = THROUGHTPUT_INTERVAL_MS / MS_PER_S; // this is an approximation, real value is >= this
             let bins_scanned = self.count_bucket_scans_complete.swap(0, Ordering::Relaxed) as u64;
             let progress = bins_scanned / elapsed_s;
             let slop = desired_throughput_bins_per_s / 2;
