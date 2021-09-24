@@ -76,6 +76,15 @@ impl<T: IndexValue> BucketMapHolder<T> {
         self.current_age().wrapping_add(self.ages_to_stay_in_cache)
     }
 
+    fn age_interval(&self) -> u64 {
+        if !self.startup() {
+            AGE_MS
+        }
+        else {
+            AGE_MS / 10 // faster by a lot to avoid idle time but not 0 so as not peg threads
+        }
+    }
+
     fn has_age_interval_elapsed(&self) -> bool {
         // note that when this returns true, state of age_timer is modified
         self.age_timer.should_update(AGE_MS)
