@@ -37,6 +37,7 @@ pub struct BucketMapHolder<T: IndexValue> {
     pub wait_thread_throttling: WaitableCondvar,
     pub desired_threads: AtomicUsize,
     age_advance_throughput_interval: AtomicU8,
+    in_idle_age: AtomicBool,
 
     // how much mb are we allowed to keep in the in-mem index?
     // Rest goes to disk.
@@ -67,6 +68,8 @@ impl<T: IndexValue> BucketMapHolder<T> {
         self.age.fetch_add(1, Ordering::Release);
         assert!(previous >= self.bins); // we should not have increased age before previous age was fully flushed
         self.wait_dirty_or_aged.notify_all(); // notify all because we can age scan in parallel
+        self.in_idle_age.store(false, Ordering::Relaxed);
+        // reset timer for idle here
     }
 
     pub fn future_age_to_flush(&self) -> Age {
@@ -145,17 +148,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
                 true
             } else {
                 // age interval hasn't elapsed, but we finished, so we can calculate progress here to throttle threads
-                let age = self.current_age();
-                if self
-                    .age_advance_throughput_interval
-                    .compare_exchange(
-                        age,
-                        age.wrapping_add(1),
-                        Ordering::Acquire,
-                        Ordering::Relaxed,
-                    )
-                    .is_ok()
-                {
+                if !self.in_idle_age.swap(true, Ordering::Relaxed) {
                     let elapsed_ms = self.age_timer.elapsed_ms();
                     if elapsed_ms > 0 {
                         let percent = (AGE_MS * 100 / elapsed_ms) as usize;
@@ -164,7 +157,11 @@ impl<T: IndexValue> BucketMapHolder<T> {
                             let target = std::cmp::max(1, desired * 100 / percent);
                             if target < desired {
                                 let reduce = desired - target;
-                                error!("reducing threads by: {}", reduce);
+                                error!(
+                                    "reducing threads by: {}, age: {}",
+                                    reduce,
+                                    self.current_age()
+                                );
                                 self.inc_dec_desired_threads(reduce, false);
                             }
                         }
@@ -211,6 +208,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
             desired_threads: AtomicUsize::new(INITIAL_DESIRED_THREADS),
             throughput_interval: AtomicInterval::default(),
             age_advance_throughput_interval: AtomicU8::default(),
+            in_idle_age: AtomicBool::default(),
         }
     }
 
@@ -218,12 +216,13 @@ impl<T: IndexValue> BucketMapHolder<T> {
     pub fn evaluate_thread_throttling(&self) {
         const MS_PER_S: u64 = 1000;
         let desired_throughput_bins_per_s = (self.bins as u64) * MS_PER_S / AGE_MS;
-        const THROUGHTPUT_INTERVAL_MS: u64 = 400;
+        const THROUGHTPUT_INTERVAL_MS: u64 = 50;
         let elapsed_ms = self.throughput_interval.elapsed_ms();
         if elapsed_ms >= THROUGHTPUT_INTERVAL_MS {
             if self
                 .throughput_interval
                 .should_update(THROUGHTPUT_INTERVAL_MS)
+                && !self.in_idle_age.load(Ordering::Relaxed)
             {
                 // reset the interval timer
                 // time to determine whether to increase or decrease desired threads
@@ -314,7 +313,9 @@ impl<T: IndexValue> BucketMapHolder<T> {
     pub fn throttle_thread(&self, exit: &AtomicBool) {
         loop {
             loop {
-                self.stats.bg_throttle_visits.fetch_add(1, Ordering::Relaxed);
+                self.stats
+                    .bg_throttle_visits
+                    .fetch_add(1, Ordering::Relaxed);
                 let desired = self.desired_threads.load(Ordering::Acquire);
                 let active = self.stats.active_threads.load(Ordering::Acquire);
                 if active as usize > desired {
