@@ -216,6 +216,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
                 if timeout {
                     // the system may have been waiting for age time interval to elapse
                     self.maybe_advance_age();
+                    self.stats.report_stats(self);
                 }
             }
 
