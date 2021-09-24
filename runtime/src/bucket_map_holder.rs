@@ -322,8 +322,8 @@ impl<T: IndexValue> BucketMapHolder<T> {
                     .fetch_add(1, Ordering::Relaxed);
                 let desired = self.desired_threads.load(Ordering::Acquire);
                 let active = self.stats.active_threads.load(Ordering::Acquire);
-                if active as usize > desired {
-                    // more are active than need to be, so put this thread to sleep
+                if active as usize >= desired {
+                    // more are active than need to be, so sleep until more threads are called for
                     break;
                 }
                 if self
@@ -375,8 +375,12 @@ impl<T: IndexValue> BucketMapHolder<T> {
                 self.throttle_thread(&exit);
                 false // act like we didn't time out, because this thread just woke up
             } else {
-                self.wait_dirty_or_aged
-                    .wait_timeout(Duration::from_millis(wait))
+                let timeout = self.wait_dirty_or_aged
+                    .wait_timeout(Duration::from_millis(wait));
+                if !timeout {
+                    self.stats.awakened_count.fetch_add(1, Ordering::Relaxed);
+                }
+                timeout
             };
             m.stop();
             self.stats
@@ -404,7 +408,6 @@ impl<T: IndexValue> BucketMapHolder<T> {
                 }
                 continue;
             }
-            self.stats.awakened_count.fetch_add(1, Ordering::Relaxed);
 
             for _ in 0..bins {
                 if flush {

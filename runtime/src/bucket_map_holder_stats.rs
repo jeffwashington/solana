@@ -142,15 +142,23 @@ impl BucketMapHolderStats {
 
         datapoint_info!(
             "accounts_index",
+            ("age", storage.current_age(), i64),
             (
                 "count_in_mem",
                 self.count_in_mem.load(Ordering::Relaxed),
                 i64
             ),
             ("count", self.count.load(Ordering::Relaxed), i64),
-            ("awakened_count", self.awakened_count.swap(0, Ordering::Relaxed), i64),
-            ("throttle_thread_count", self.throttle_thread_count.swap(0, Ordering::Relaxed), i64),
-                        
+            (
+                "awakened_count",
+                self.awakened_count.swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "throttle_thread_count",
+                self.throttle_thread_count.swap(0, Ordering::Relaxed),
+                i64
+            ),
             (
                 "bg_waiting_us",
                 self.bg_waiting_us.swap(0, Ordering::Relaxed),
@@ -266,8 +274,7 @@ impl BucketMapHolderStats {
             ),
             (
                 "hold_range_in_mem_count",
-                self.hold_range_in_mem_count
-                    .swap(0, Ordering::Relaxed),
+                self.hold_range_in_mem_count.swap(0, Ordering::Relaxed),
                 i64
             ),
             (
@@ -282,8 +289,16 @@ impl BucketMapHolderStats {
                     .swap(0, Ordering::Relaxed),
                 i64
             ),
-            ("bg_bin_visits", self.bg_bin_visits.swap(0, Ordering::Relaxed), i64),
-            ("bg_throttle_visits", self.bg_throttle_visits.swap(0, Ordering::Relaxed), i64),
+            (
+                "bg_bin_visits",
+                self.bg_bin_visits.swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "bg_throttle_visits",
+                self.bg_throttle_visits.swap(0, Ordering::Relaxed),
+                i64
+            ),
             ("inserts", self.inserts.swap(0, Ordering::Relaxed), i64),
             ("deletes", self.deletes.swap(0, Ordering::Relaxed), i64),
             (
