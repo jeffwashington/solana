@@ -79,8 +79,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
     fn age_interval(&self) -> u64 {
         if !self.get_startup() {
             AGE_MS
-        }
-        else {
+        } else {
             AGE_MS / 10 // faster by a lot to avoid idle time but not 0 so as not peg threads
         }
     }
@@ -100,7 +99,10 @@ impl<T: IndexValue> BucketMapHolder<T> {
             self.wait_for_idle();
         }
         self.startup.store(value, Ordering::Release);
-        if !value {
+        if value {
+            self.set_desired_threads(self.threads);
+            self.wait_thread_throttling.notify_all();
+        } else {
             // now that we are not startup, get the system moving normally
             self.maybe_advance_age();
             self.set_desired_threads(MIN_DESIRED_THREADS); // reset desired threads to min for steady state
@@ -109,9 +111,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
     }
 
     fn set_desired_threads(&self, value: usize) {
-        self.desired_threads
-        .store(value, Ordering::Release); // reset desired threads to 1 for steady state
-    
+        self.desired_threads.store(value, Ordering::Release); // reset desired threads to 1 for steady state
     }
 
     pub fn get_active_threads(&self) -> u64 {
