@@ -163,7 +163,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
                             let desired = self.desired_threads.load(Ordering::Relaxed);
                             let target = desired * 100 / percent;
                             if target < desired {
-                                let reduce = std::max(self.threads - 1, desired - target);
+                                let reduce = std::cmp::max(self.threads - 1, desired - target);
                                 if reduce > 0 {
                                     error!("reducing threads by: {}", reduce);
                                     self.inc_dec_desired_threads(reduce, false);
