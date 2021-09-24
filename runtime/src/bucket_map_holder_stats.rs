@@ -22,6 +22,7 @@ pub struct BucketMapHolderStats {
     pub load_disk_missing_count: AtomicU64,
     pub load_disk_missing_us: AtomicU64,
     pub updates_in_mem: AtomicU64,
+    pub throttle_thread_count: AtomicU64,
     pub flush_updates_do_disk: AtomicU64,
     pub throughput_bins_scanned: AtomicU64,
     pub throughput_elapsed_ms: AtomicU64,
@@ -29,6 +30,7 @@ pub struct BucketMapHolderStats {
     pub missing_found_in_mem_none: AtomicU64,
     pub missing_get_added_in_mem: AtomicU64,
     pub missing_found_in_mem: AtomicU64,
+    pub hold_range_in_mem_count: AtomicU64,
     pub upsert_with_write_lock: AtomicU64,
     pub upsert_with_prev_entry_cached: AtomicU64,
     pub upsert_without_prev_entry_cached: AtomicU64,
@@ -36,6 +38,7 @@ pub struct BucketMapHolderStats {
     pub keys: AtomicU64,
     pub deletes: AtomicU64,
     pub inserts: AtomicU64,
+    pub awakened_count: AtomicU64,
     pub count: AtomicU64,
     pub bg_waiting_us: AtomicU64,
     pub count_in_mem: AtomicU64,
@@ -145,6 +148,9 @@ impl BucketMapHolderStats {
                 i64
             ),
             ("count", self.count.load(Ordering::Relaxed), i64),
+            ("awakened_count", self.awakened_count.swap(0, Ordering::Relaxed), i64),
+            ("throttle_thread_count", self.throttle_thread_count.swap(0, Ordering::Relaxed), i64),
+                        
             (
                 "bg_waiting_us",
                 self.bg_waiting_us.swap(0, Ordering::Relaxed),
@@ -256,6 +262,12 @@ impl BucketMapHolderStats {
             (
                 "upsert_with_write_lock",
                 self.upsert_with_write_lock.swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "hold_range_in_mem_count",
+                self.hold_range_in_mem_count
+                    .swap(0, Ordering::Relaxed),
                 i64
             ),
             (

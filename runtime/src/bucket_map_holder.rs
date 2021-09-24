@@ -60,6 +60,7 @@ impl<T: IndexValue> Debug for BucketMapHolder<T> {
 #[allow(clippy::mutex_atomic)]
 impl<T: IndexValue> BucketMapHolder<T> {
     pub fn increment_age(&self) {
+        assert!(!self.startup.load(Ordering::Relaxed));
         // since we are about to change age, there are now 0 buckets that have been flushed at this age
         // this should happen before the age.fetch_add
         let previous = self.count_ages_flushed.swap(0, Ordering::Acquire);
@@ -370,6 +371,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
 
             let mut m = Measure::start("wait");
             let timeout = if self.should_throttle_thread() {
+                self.stats.throttle_thread_count.fetch_add(1, Ordering::Relaxed);
                 self.throttle_thread(&exit);
                 false // act like we didn't time out, because this thread just woke up
             } else {
@@ -402,6 +404,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
                 }
                 continue;
             }
+            self.stats.awakened_count.fetch_add(1, Ordering::Relaxed);
 
             for _ in 0..bins {
                 if flush {
