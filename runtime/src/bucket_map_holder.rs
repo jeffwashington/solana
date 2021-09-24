@@ -77,7 +77,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
     }
 
     fn age_interval(&self) -> u64 {
-        if !self.startup() {
+        if !self.get_startup() {
             AGE_MS
         }
         else {
@@ -87,7 +87,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
 
     fn has_age_interval_elapsed(&self) -> bool {
         // note that when this returns true, state of age_timer is modified
-        self.age_timer.should_update(AGE_MS)
+        self.age_timer.should_update(self.age_interval())
     }
 
     /// used by bg processes to determine # active threads and how aggressively to flush
@@ -172,10 +172,10 @@ impl<T: IndexValue> BucketMapHolder<T> {
                 true
             } else {
                 // age interval hasn't elapsed, but we finished, so we can calculate progress here to throttle threads
-                if !self.startup() && !self.in_idle_age.swap(true, Ordering::Relaxed) {
+                if !self.get_startup() && !self.in_idle_age.swap(true, Ordering::Relaxed) {
                     let elapsed_ms = self.age_timer.elapsed_ms();
                     if elapsed_ms > 0 {
-                        let percent = (AGE_MS * 100 / elapsed_ms) as usize;
+                        let percent = (self.age_interval() * 100 / elapsed_ms) as usize;
                         if percent > 125 {
                             let desired = self.desired_threads.load(Ordering::Relaxed);
                             let target =
@@ -239,7 +239,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
     // calculate whether we need to add or reduce # threads
     pub fn evaluate_thread_throttling(&self) {
         const MS_PER_S: u64 = 1000;
-        let desired_throughput_bins_per_s = (self.bins as u64) * MS_PER_S / AGE_MS;
+        let desired_throughput_bins_per_s = (self.bins as u64) * MS_PER_S / self.age_interval();
         const THROUGHTPUT_INTERVAL_MS: u64 = 50;
         let elapsed_ms = self.throughput_interval.elapsed_ms();
         if elapsed_ms >= THROUGHTPUT_INTERVAL_MS {
@@ -421,7 +421,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
                 self.stats.report_stats(self);
                 let mut cont = true;
 
-                if interval.should_update(AGE_MS * 10) {
+                if interval.should_update(self.age_interval() * 10) {
                     if !self.advancing_time_abnormally.swap(true, Ordering::Release) {
                         if last_age == self.current_age()
                             && self.stats.count.load(Ordering::Relaxed) > 0
