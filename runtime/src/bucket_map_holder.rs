@@ -99,11 +99,16 @@ impl<T: IndexValue> BucketMapHolder<T> {
         self.wait_dirty_or_aged.notify_all();
     }
 
+    pub fn get_active_threads(&self) -> u64 {
+        self.stats.active_threads.load(Ordering::Acquire)
+    }
+
     pub(crate) fn wait_for_idle(&self) {
         use log::*;
         error!(
-            "wait for idle starting. items in mem: {}",
-            self.stats.count_in_mem.load(Ordering::Relaxed)
+            "wait for idle starting. items in mem: {}, threads: {}",
+            self.stats.count_in_mem.load(Ordering::Relaxed),
+            self.get_active_threads(),
         );
         assert!(self.get_startup());
         loop {
@@ -300,7 +305,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
     // return true if this thread should go to sleep by calling throttle_thread
     pub fn should_throttle_thread(&self) -> bool {
         let desired = self.desired_threads.load(Ordering::Acquire);
-        let active = self.stats.active_threads.load(Ordering::Acquire);
+        let active = self.get_active_threads();
         if active as usize > desired && active > 1 {
             if self
                 .stats
@@ -322,7 +327,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
                     .bg_throttle_visits
                     .fetch_add(1, Ordering::Relaxed);
                 let desired = self.desired_threads.load(Ordering::Acquire);
-                let active = self.stats.active_threads.load(Ordering::Acquire);
+                let active = self.get_active_threads();
                 if active as usize >= desired {
                     // more are active than need to be, so sleep until more threads are called for
                     break;
@@ -379,7 +384,8 @@ impl<T: IndexValue> BucketMapHolder<T> {
                 false // act like we didn't time out, because this thread just woke up
             } else {
                 let timeout = if self.all_buckets_flushed_at_current_age() {
-                    let timeout = self.wait_dirty_or_aged
+                    let timeout = self
+                        .wait_dirty_or_aged
                         .wait_timeout(Duration::from_millis(wait));
                     if !timeout {
                         self.stats.awakened_count.fetch_add(1, Ordering::Relaxed);
@@ -410,13 +416,13 @@ impl<T: IndexValue> BucketMapHolder<T> {
                         {
                             let current = self.count_ages_flushed();
                             error!("time did not advance: buckets updated: {}, advancing age, active threads: {}, current age: {}, all buckets flushed: {}, age interval_elapsed_ms: {}",
-                                current, self.stats.active_threads.load(Ordering::Relaxed), self.current_age(), self.all_buckets_flushed_at_current_age(), self.age_timer.elapsed_ms());
+                                current, self.get_active_threads(), self.current_age(), self.all_buckets_flushed_at_current_age(), self.age_timer.elapsed_ms());
                             for _ in current..bins {
                                 self.bucket_flushed_at_current_age();
                             }
                             let current = self.count_ages_flushed();
                             error!("time did not advance (after flushing buckets): buckets updated: {}, advancing age, active threads: {}, current age: {}, all buckets flushed: {}, age interval_elapsed_ms: {}",
-                                current, self.stats.active_threads.load(Ordering::Relaxed), self.current_age(), self.all_buckets_flushed_at_current_age(), self.age_timer.elapsed_ms());
+                                current, self.get_active_threads(), self.current_age(), self.all_buckets_flushed_at_current_age(), self.age_timer.elapsed_ms());
                             assert_ne!(last_age, self.current_age());
                             cont = false;
                         }
@@ -425,7 +431,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
                     } else {
                         let current = self.count_ages_flushed();
                         error!("time did NOT advance: buckets updated: {}, advancing age, active threads: {}, current age: {}, all buckets flushed: {}, age interval_elapsed_ms: {}, count: {}",
-                        current, self.stats.active_threads.load(Ordering::Relaxed), self.current_age(), self.all_buckets_flushed_at_current_age(), self.age_timer.elapsed_ms(), self.stats.count.load(Ordering::Relaxed));
+                        current, self.get_active_threads(), self.current_age(), self.all_buckets_flushed_at_current_age(), self.age_timer.elapsed_ms(), self.stats.count.load(Ordering::Relaxed));
                     }
                 }
                 if cont {

@@ -5,7 +5,7 @@ use std::fmt::Debug;
 use std::sync::atomic::{AtomicU64, AtomicU8, Ordering};
 
 // stats log interval
-const STATS_INTERVAL_MS: u64 = 1_000;
+const STATS_INTERVAL_MS: u64 = 10_000;
 
 #[derive(Debug, Default)]
 pub struct BucketMapHolderStats {
@@ -303,7 +303,7 @@ impl BucketMapHolderStats {
             ("deletes", self.deletes.swap(0, Ordering::Relaxed), i64),
             (
                 "active_threads",
-                self.active_threads.load(Ordering::Relaxed),
+                storage.get_active_threads(),
                 i64
             ),
             (
