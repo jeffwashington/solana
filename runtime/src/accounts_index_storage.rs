@@ -58,13 +58,6 @@ impl<T: IndexValue> AccountsIndexStorage<T> {
             .map(|bin| Arc::new(InMemAccountsIndex::new(&storage, bin)))
             .collect::<Vec<_>>();
 
-        let storage = Arc::new(BucketMapHolder::new(bins, config, threads));
-
-        let in_mem = (0..bins)
-            .into_iter()
-            .map(|bin| Arc::new(InMemAccountsIndex::new(&storage, bin)))
-            .collect::<Vec<_>>();
-
         let exit = Arc::new(AtomicBool::default());
         let handles = Some(
             (0..threads)
