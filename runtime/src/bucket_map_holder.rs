@@ -163,9 +163,11 @@ impl<T: IndexValue> BucketMapHolder<T> {
                             let desired = self.desired_threads.load(Ordering::Relaxed);
                             let target = desired * 100 / percent;
                             if target < desired {
-                                let reduce = desired - target;
-                                error!("reducing threads by: {}", reduce);
-                                self.inc_dec_desired_threads(reduce, false);
+                                let reduce = std::max(self.threads - 1, desired - target);
+                                if reduce > 0 {
+                                    error!("reducing threads by: {}", reduce);
+                                    self.inc_dec_desired_threads(reduce, false);
+                                }
                             }
                         }
                     }
@@ -282,7 +284,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
                     self.wait_thread_throttling.notify_one();
                 }
             }
-        } else if desired > amount {
+        } else if desired > amount && desired - amount > 0 {
             // after updating this, an active thread will figure out it needs to go to sleep
             let _ = self.desired_threads.compare_exchange(
                 desired,
@@ -297,7 +299,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
     pub fn should_throttle_thread(&self) -> bool {
         let desired = self.desired_threads.load(Ordering::Acquire);
         let active = self.stats.active_threads.load(Ordering::Acquire);
-        if active as usize > desired {
+        if active as usize > desired && active > 1 {
             if self
                 .stats
                 .active_threads
