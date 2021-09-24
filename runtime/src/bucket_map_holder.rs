@@ -268,19 +268,21 @@ impl<T: IndexValue> BucketMapHolder<T> {
                     .store(desired_throughput_bins_per_s, Ordering::Relaxed);
                 if progress < desired_throughput_bins_per_s - slop {
                     error!(
-                        "increasing desired: progress: {}, target: {}, slop: {}",
+                        "increasing desired: progress: {}, target: {}, slop: {}, threads: {}",
                         progress,
                         desired_throughput_bins_per_s - slop,
-                        slop
+                        slop,
+                        self.get_active_threads(),
                     );
                     // increment desired threads
                     self.inc_dec_desired_threads(1, true);
                 } else if progress > desired_throughput_bins_per_s + slop {
                     // decrement desired threads
                     error!(
-                        "decreasing desired: progress: {}, target: {}",
+                        "decreasing desired: progress: {}, target: {}, threads: {}",
                         progress,
-                        desired_throughput_bins_per_s - slop
+                        desired_throughput_bins_per_s - slop,
+                        self.get_active_threads(),
                     );
                     self.inc_dec_desired_threads(1, false);
                 }
