@@ -37,7 +37,6 @@ pub struct BucketMapHolder<T: IndexValue> {
     count_bucket_scans_complete: AtomicUsize,
     pub wait_thread_throttling: WaitableCondvar,
     pub desired_threads: AtomicUsize,
-    age_advance_throughput_interval: AtomicU8,
     in_idle_age: AtomicBool,
 
     // how much mb are we allowed to keep in the in-mem index?
@@ -95,7 +94,8 @@ impl<T: IndexValue> BucketMapHolder<T> {
         self.startup.store(value, Ordering::Release);
         // now that we are not startup, get the system moving normally
         self.maybe_advance_age();
-        self.desired_threads.store(MIN_DESIRED_THREADS, Ordering::Release); // reset desired threads to 1 for steady state
+        self.desired_threads
+            .store(MIN_DESIRED_THREADS, Ordering::Release); // reset desired threads to 1 for steady state
         self.wait_dirty_or_aged.notify_all();
     }
 
@@ -115,6 +115,10 @@ impl<T: IndexValue> BucketMapHolder<T> {
                 );
                 break;
             }
+            error!(
+                "wait for idle. items in mem: {}",
+                self.stats.count_in_mem.load(Ordering::Relaxed)
+            );
             std::thread::sleep(Duration::from_millis(100));
         }
     }
@@ -159,7 +163,8 @@ impl<T: IndexValue> BucketMapHolder<T> {
                         let percent = (AGE_MS * 100 / elapsed_ms) as usize;
                         if percent > 125 {
                             let desired = self.desired_threads.load(Ordering::Relaxed);
-                            let target = std::cmp::max(MIN_DESIRED_THREADS, desired * 100 / percent);
+                            let target =
+                                std::cmp::max(MIN_DESIRED_THREADS, desired * 100 / percent);
                             if target < desired {
                                 let reduce = desired - target;
                                 error!(
@@ -212,7 +217,6 @@ impl<T: IndexValue> BucketMapHolder<T> {
             wait_thread_throttling: WaitableCondvar::default(),
             desired_threads: AtomicUsize::new(initial_desired_threads),
             throughput_interval: AtomicInterval::default(),
-            age_advance_throughput_interval: AtomicU8::default(),
             in_idle_age: AtomicBool::default(),
         }
     }
@@ -372,15 +376,23 @@ impl<T: IndexValue> BucketMapHolder<T> {
 
             let mut m = Measure::start("wait");
             let timeout = if self.should_throttle_thread() {
-                self.stats.throttle_thread_count.fetch_add(1, Ordering::Relaxed);
+                self.stats
+                    .throttle_thread_count
+                    .fetch_add(1, Ordering::Relaxed);
                 self.throttle_thread(&exit);
                 false // act like we didn't time out, because this thread just woke up
             } else {
-                let timeout = self.wait_dirty_or_aged
-                    .wait_timeout(Duration::from_millis(wait));
-                if !timeout {
-                    self.stats.awakened_count.fetch_add(1, Ordering::Relaxed);
-                }
+                let timeout = if self.all_buckets_flushed_at_current_age() {
+                    let timeout = self.wait_dirty_or_aged
+                        .wait_timeout(Duration::from_millis(wait));
+                    if !timeout {
+                        self.stats.awakened_count.fetch_add(1, Ordering::Relaxed);
+                    }
+                    timeout
+                } else {
+                    // pretend like we were awakened
+                    false
+                };
                 timeout
             };
             m.stop();
@@ -393,21 +405,36 @@ impl<T: IndexValue> BucketMapHolder<T> {
             if timeout && !self.get_startup() {
                 self.maybe_advance_age();
                 self.stats.report_stats(self);
+                let mut cont = true;
 
                 if interval.should_update(AGE_MS * 10) {
                     if !self.advancing_time_abnormally.swap(true, Ordering::Release) {
-                        if last_age == self.current_age() {
+                        if last_age == self.current_age()
+                            && self.stats.count.load(Ordering::Relaxed) > 0
+                        {
                             let current = self.count_ages_flushed();
-                            error!("time did not advance: buckets updated: {}, advancing age, active threads: {}, current age: {}, all buckets flushed: {}, age interval_elapsed_ms: {}",  current, self.stats.active_threads.load(Ordering::Relaxed), self.current_age(), self.all_buckets_flushed_at_current_age(), self.age_timer.elapsed_ms());
+                            error!("time did not advance: buckets updated: {}, advancing age, active threads: {}, current age: {}, all buckets flushed: {}, age interval_elapsed_ms: {}",
+                                current, self.stats.active_threads.load(Ordering::Relaxed), self.current_age(), self.all_buckets_flushed_at_current_age(), self.age_timer.elapsed_ms());
                             for _ in current..bins {
                                 self.bucket_flushed_at_current_age();
                             }
+                            let current = self.count_ages_flushed();
+                            error!("time did not advance (after flushing buckets): buckets updated: {}, advancing age, active threads: {}, current age: {}, all buckets flushed: {}, age interval_elapsed_ms: {}",
+                                current, self.stats.active_threads.load(Ordering::Relaxed), self.current_age(), self.all_buckets_flushed_at_current_age(), self.age_timer.elapsed_ms());
+                            assert_ne!(last_age, self.current_age());
+                            cont = false;
                         }
                         self.advancing_time_abnormally
-                        .store(false, Ordering::Release);
+                            .store(false, Ordering::Release);
+                    } else {
+                        let current = self.count_ages_flushed();
+                        error!("time did NOT advance: buckets updated: {}, advancing age, active threads: {}, current age: {}, all buckets flushed: {}, age interval_elapsed_ms: {}, count: {}",
+                        current, self.stats.active_threads.load(Ordering::Relaxed), self.current_age(), self.all_buckets_flushed_at_current_age(), self.age_timer.elapsed_ms(), self.stats.count.load(Ordering::Relaxed));
                     }
                 }
-                continue;
+                if cont {
+                    continue;
+                }
             }
 
             for _ in 0..bins {
