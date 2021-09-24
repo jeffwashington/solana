@@ -142,7 +142,10 @@ impl<T: IndexValue> BucketMapHolder<T> {
 
     pub fn maybe_advance_age(&self) -> bool {
         // check has_age_interval_elapsed last as calling it modifies state on success
-        if self.all_buckets_flushed_at_current_age() && !self.get_startup() {
+        if self.get_startup() {
+            return false;
+        }
+        if self.all_buckets_flushed_at_current_age() {
             if self.has_age_interval_elapsed() {
                 self.increment_age();
                 true
@@ -368,7 +371,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
             let mut m = Measure::start("wait");
             let timeout = if self.should_throttle_thread() {
                 self.throttle_thread(&exit);
-                false
+                false // act like we didn't time out, because this thread just woke up
             } else {
                 self.wait_dirty_or_aged
                     .wait_timeout(Duration::from_millis(wait))
