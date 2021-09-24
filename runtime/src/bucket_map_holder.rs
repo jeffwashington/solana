@@ -311,7 +311,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
     }
 
     // returns when this thread should become active, otherwise wait
-    pub fn throttle_thread(&self) {
+    pub fn throttle_thread(&self, exit: &AtomicBool) {
         loop {
             loop {
                 let desired = self.desired_threads.load(Ordering::Acquire);
@@ -330,13 +330,12 @@ impl<T: IndexValue> BucketMapHolder<T> {
                 }
             }
 
-            // otherwise, this thread should sleep
-            if !self
-                .wait_thread_throttling
-                .wait_timeout(Duration::from_millis(1000))
-            {
-                break; // wait was triggered, so return
+            if exit.load(Ordering::Relaxed) {
+                return;
             }
+            // otherwise, this thread should sleep
+            self.wait_thread_throttling
+                .wait_timeout(Duration::from_millis(1000));
         }
     }
 
@@ -366,7 +365,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
 
             let mut m = Measure::start("wait");
             let timeout = if self.should_throttle_thread() {
-                self.throttle_thread();
+                self.throttle_thread(&exit);
                 false
             } else {
                 self.wait_dirty_or_aged
@@ -402,6 +401,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
 
             for _ in 0..=bins {
                 if flush {
+                    self.stats.bg_bin_visits.fetch_add(1, Ordering::Relaxed);
                     let index = self.next_bucket_to_flush();
                     in_mem[index].flush();
                     self.evaluate_thread_throttling();
