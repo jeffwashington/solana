@@ -102,6 +102,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
         if value {
             self.set_desired_threads(self.threads);
             self.wait_thread_throttling.notify_all();
+            error!("entering startup");
         } else {
             // now that we are not startup, get the system moving normally
             self.maybe_advance_age();
@@ -304,7 +305,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
                     )
                     .is_ok()
                 {
-                    self.wait_thread_throttling.notify_one();
+                    self.wait_thread_throttling.notify_all();
                 }
             }
         } else if desired > amount && desired - amount >= MIN_DESIRED_THREADS {
