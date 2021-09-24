@@ -60,7 +60,6 @@ impl<T: IndexValue> Debug for BucketMapHolder<T> {
 #[allow(clippy::mutex_atomic)]
 impl<T: IndexValue> BucketMapHolder<T> {
     pub fn increment_age(&self) {
-        assert!(!self.startup.load(Ordering::Relaxed));
         // since we are about to change age, there are now 0 buckets that have been flushed at this age
         // this should happen before the age.fetch_add
         let previous = self.count_ages_flushed.swap(0, Ordering::Acquire);
@@ -149,9 +148,6 @@ impl<T: IndexValue> BucketMapHolder<T> {
 
     pub fn maybe_advance_age(&self) -> bool {
         // check has_age_interval_elapsed last as calling it modifies state on success
-        if self.get_startup() {
-            return false;
-        }
         if self.all_buckets_flushed_at_current_age() {
             if self.has_age_interval_elapsed() {
                 self.increment_age();
