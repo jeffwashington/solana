@@ -398,10 +398,10 @@ impl<T: IndexValue> BucketMapHolder<T> {
                         }
                     }
                 }
-                // continue;
+                continue;
             }
 
-            for _ in 0..=bins {
+            for _ in 0..bins {
                 if flush {
                     self.stats.bg_bin_visits.fetch_add(1, Ordering::Relaxed);
                     let index = self.next_bucket_to_flush();
