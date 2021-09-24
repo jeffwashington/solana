@@ -314,6 +314,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
     pub fn throttle_thread(&self, exit: &AtomicBool) {
         loop {
             loop {
+                self.stats.bg_throttle_visits.fetch_add(1, Ordering::Relaxed);
                 let desired = self.desired_threads.load(Ordering::Acquire);
                 let active = self.stats.active_threads.load(Ordering::Acquire);
                 if active as usize > desired {
