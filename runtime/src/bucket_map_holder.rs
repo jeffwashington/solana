@@ -371,8 +371,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
                 false
             } else {
                 self.wait_dirty_or_aged
-                    .wait_timeout(Duration::from_millis(wait));
-                true
+                    .wait_timeout(Duration::from_millis(wait))
             };
             m.stop();
             self.stats
