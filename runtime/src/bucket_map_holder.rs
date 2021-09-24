@@ -91,11 +91,18 @@ impl<T: IndexValue> BucketMapHolder<T> {
             self.wait_for_idle();
         }
         self.startup.store(value, Ordering::Release);
-        // now that we are not startup, get the system moving normally
-        self.maybe_advance_age();
+        if !value {
+            // now that we are not startup, get the system moving normally
+            self.maybe_advance_age();
+            self.set_desired_threads(MIN_DESIRED_THREADS); // reset desired threads to min for steady state
+            self.wait_dirty_or_aged.notify_all();
+        }
+    }
+
+    fn set_desired_threads(&self, value: usize) {
         self.desired_threads
-            .store(MIN_DESIRED_THREADS, Ordering::Release); // reset desired threads to 1 for steady state
-        self.wait_dirty_or_aged.notify_all();
+        .store(value, Ordering::Release); // reset desired threads to 1 for steady state
+    
     }
 
     pub fn get_active_threads(&self) -> u64 {
@@ -103,6 +110,8 @@ impl<T: IndexValue> BucketMapHolder<T> {
     }
 
     pub(crate) fn wait_for_idle(&self) {
+        // maybe even spin up more threads here to get through the work since we're waiting
+        self.set_desired_threads(self.threads);
         use log::*;
         error!(
             "wait for idle starting. items in mem: {}, threads: {}",
@@ -154,7 +163,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
                 true
             } else {
                 // age interval hasn't elapsed, but we finished, so we can calculate progress here to throttle threads
-                if !self.in_idle_age.swap(true, Ordering::Relaxed) {
+                if !self.startup() && !self.in_idle_age.swap(true, Ordering::Relaxed) {
                     let elapsed_ms = self.age_timer.elapsed_ms();
                     if elapsed_ms > 0 {
                         let percent = (AGE_MS * 100 / elapsed_ms) as usize;
