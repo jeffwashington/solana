@@ -115,10 +115,6 @@ impl<T: IndexValue> BucketMapHolder<T> {
                 );
                 break;
             }
-            error!(
-                "wait for idle. items in mem: {}",
-                self.stats.count_in_mem.load(Ordering::Relaxed)
-            );
             std::thread::sleep(Duration::from_millis(100));
         }
     }
@@ -290,7 +286,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
                     self.wait_thread_throttling.notify_one();
                 }
             }
-        } else if desired > amount && desired - amount > MIN_DESIRED_THREADS {
+        } else if desired > amount && desired - amount >= MIN_DESIRED_THREADS {
             // after updating this, an active thread will figure out it needs to go to sleep
             let _ = self.desired_threads.compare_exchange(
                 desired,
