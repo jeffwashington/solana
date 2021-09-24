@@ -1,5 +1,6 @@
 use crate::accounts_index::{AccountsIndexConfig, IndexValue};
 use crate::bucket_map_holder::BucketMapHolder;
+use crate::bucket_map_holder_stats::BucketMapHolderStats;
 use crate::in_mem_accounts_index::InMemAccountsIndex;
 use std::fmt::Debug;
 use std::{
@@ -33,6 +34,7 @@ impl<T: IndexValue> Debug for AccountsIndexStorage<T> {
 impl<T: IndexValue> Drop for AccountsIndexStorage<T> {
     fn drop(&mut self) {
         self.exit.store(true, Ordering::Relaxed);
+        self.storage.wait_thread_throttling.notify_all();
         self.storage.wait_dirty_or_aged.notify_all();
         if let Some(handles) = self.handles.take() {
             handles
@@ -44,12 +46,11 @@ impl<T: IndexValue> Drop for AccountsIndexStorage<T> {
 
 impl<T: IndexValue> AccountsIndexStorage<T> {
     pub fn new(bins: usize, config: &Option<AccountsIndexConfig>) -> AccountsIndexStorage<T> {
-        const DEFAULT_THREADS: usize = 1; // soon, this will be a cpu calculation
+        let num_threads = std::cmp::max(2, num_cpus::get() / 4);
         let threads = config
             .as_ref()
             .and_then(|config| config.flush_threads)
-            .unwrap_or(DEFAULT_THREADS);
-
+            .unwrap_or(num_threads);
         let storage = Arc::new(BucketMapHolder::new(bins, config, threads));
 
         let in_mem = (0..bins)
@@ -83,5 +84,9 @@ impl<T: IndexValue> AccountsIndexStorage<T> {
             storage,
             in_mem,
         }
+    }
+
+    pub fn stats(&self) -> &BucketMapHolderStats {
+        &self.storage.stats
     }
 }

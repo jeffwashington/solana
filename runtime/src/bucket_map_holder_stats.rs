@@ -4,6 +4,9 @@ use solana_sdk::timing::{timestamp, AtomicInterval};
 use std::fmt::Debug;
 use std::sync::atomic::{AtomicU64, AtomicU8, Ordering};
 
+// stats log interval
+const STATS_INTERVAL_MS: u64 = 10_000;
+
 #[derive(Debug, Default)]
 pub struct BucketMapHolderStats {
     pub get_mem_us: AtomicU64,
@@ -19,23 +22,44 @@ pub struct BucketMapHolderStats {
     pub load_disk_missing_count: AtomicU64,
     pub load_disk_missing_us: AtomicU64,
     pub updates_in_mem: AtomicU64,
+    pub throttle_thread_count: AtomicU64,
+    pub flush_updates_do_disk: AtomicU64,
+    pub throughput_bins_scanned: AtomicU64,
+    pub throughput_elapsed_ms: AtomicU64,
+    pub upsert_with_read_lock: AtomicU64,
+    pub missing_found_in_mem_none: AtomicU64,
+    pub missing_get_added_in_mem: AtomicU64,
+    pub missing_found_in_mem: AtomicU64,
+    pub hold_range_in_mem_count: AtomicU64,
+    pub upsert_with_write_lock: AtomicU64,
+    pub upsert_with_prev_entry_cached: AtomicU64,
+    pub upsert_without_prev_entry_cached: AtomicU64,
     pub items: AtomicU64,
     pub keys: AtomicU64,
     pub deletes: AtomicU64,
     pub inserts: AtomicU64,
+    pub awakened_count: AtomicU64,
     pub count: AtomicU64,
     pub bg_waiting_us: AtomicU64,
     pub count_in_mem: AtomicU64,
     pub per_bucket_count: Vec<AtomicU64>,
     pub flush_entries_updated_on_disk: AtomicU64,
+    pub flush_entries_removed_from_mem: AtomicU64,
     pub active_threads: AtomicU64,
     pub get_range_us: AtomicU64,
+    pub bg_throttle_visits: AtomicU64,
+    pub bg_bin_visits: AtomicU64,
     last_age: AtomicU8,
     last_age_time: AtomicU64,
     pub flush_scan_us: AtomicU64,
     pub flush_update_us: AtomicU64,
     pub flush_remove_us: AtomicU64,
-    last_time: AtomicInterval,
+    pub remove_aborted_strong_count: AtomicU64,
+    pub remove_aborted_dirty_or_age: AtomicU64,
+    pub remove_aborted_range: AtomicU64,
+    pub throttling_progress: AtomicU64,
+    pub throttling_target: AtomicU64,
+    pub last_time: AtomicInterval,
 }
 
 impl BucketMapHolderStats {
@@ -92,9 +116,13 @@ impl BucketMapHolderStats {
         }
     }
 
+    pub fn remaining_until_next_interval(&self) -> u64 {
+        self.last_time
+            .remaining_until_next_interval(STATS_INTERVAL_MS)
+    }
+
     pub fn report_stats<T: IndexValue>(&self, storage: &BucketMapHolder<T>) {
-        // account index stats every 10 s
-        if !self.last_time.should_update(10_000) {
+        if !self.last_time.should_update(STATS_INTERVAL_MS) {
             return;
         }
 
@@ -114,6 +142,7 @@ impl BucketMapHolderStats {
 
         datapoint_info!(
             "accounts_index",
+            ("age", storage.current_age(), i64),
             (
                 "count_in_mem",
                 self.count_in_mem.load(Ordering::Relaxed),
@@ -121,12 +150,32 @@ impl BucketMapHolderStats {
             ),
             ("count", self.count.load(Ordering::Relaxed), i64),
             (
+                "awakened_count",
+                self.awakened_count.swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "throttle_thread_count",
+                self.throttle_thread_count.swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
                 "bg_waiting_us",
                 self.bg_waiting_us.swap(0, Ordering::Relaxed),
                 i64
             ),
             ("min_in_bin", min, i64),
             ("max_in_bin", max, i64),
+            (
+                "throughput_bins_scanned",
+                self.throughput_bins_scanned.load(Ordering::Relaxed),
+                i64
+            ),
+            (
+                "throughput_elapsed_ms",
+                self.throughput_elapsed_ms.load(Ordering::Relaxed),
+                i64
+            ),
             ("count_from_bins", ct, i64),
             (
                 "gets_from_mem",
@@ -198,11 +247,78 @@ impl BucketMapHolderStats {
                 self.get_range_us.swap(0, Ordering::Relaxed),
                 i64
             ),
+            (
+                "missing_found_in_mem_none",
+                self.missing_found_in_mem_none.swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "missing_get_added_in_mem",
+                self.missing_get_added_in_mem.swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "missing_found_in_mem",
+                self.missing_found_in_mem.swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "upsert_with_read_lock",
+                self.upsert_with_read_lock.swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "upsert_with_write_lock",
+                self.upsert_with_write_lock.swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "hold_range_in_mem_count",
+                self.hold_range_in_mem_count.swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "upsert_with_prev_entry_cached",
+                self.upsert_with_prev_entry_cached
+                    .swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "upsert_without_prev_entry_cached",
+                self.upsert_without_prev_entry_cached
+                    .swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "bg_bin_visits",
+                self.bg_bin_visits.swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "bg_throttle_visits",
+                self.bg_throttle_visits.swap(0, Ordering::Relaxed),
+                i64
+            ),
             ("inserts", self.inserts.swap(0, Ordering::Relaxed), i64),
             ("deletes", self.deletes.swap(0, Ordering::Relaxed), i64),
             (
                 "active_threads",
-                self.active_threads.load(Ordering::Relaxed),
+                storage.get_active_threads(),
+                i64
+            ),
+            (
+                "desired_threads",
+                storage.desired_threads.load(Ordering::Relaxed),
+                i64
+            ),
+            (
+                "throttling_target",
+                self.throttling_target.swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "throttling_progress",
+                self.throttling_progress.swap(0, Ordering::Relaxed),
                 i64
             ),
             ("items", self.items.swap(0, Ordering::Relaxed), i64),
@@ -309,6 +425,109 @@ impl BucketMapHolderStats {
                 "flush_entries_updated_on_disk",
                 self.flush_entries_updated_on_disk
                     .swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "flush_entries_removed_from_mem",
+                self.flush_entries_removed_from_mem
+                    .swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "remove_aborted_strong_count",
+                self.remove_aborted_strong_count.swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "remove_aborted_dirty_or_age",
+                self.remove_aborted_dirty_or_age.swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "remove_aborted_range",
+                self.remove_aborted_range.swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "disk_index_resizes",
+                disk.map(|disk| disk.stats.index.resizes.swap(0, Ordering::Relaxed))
+                    .unwrap_or_default(),
+                i64
+            ),
+            (
+                "disk_index_max_size",
+                disk.map(|disk| {
+                    let mut lock = disk.stats.index.max_size.lock().unwrap();
+                    let value = *lock;
+                    *lock = 0;
+                    value
+                })
+                .unwrap_or_default(),
+                i64
+            ),
+            (
+                "disk_index_new_file_us",
+                disk.map(|disk| disk.stats.index.new_file_us.swap(0, Ordering::Relaxed))
+                    .unwrap_or_default(),
+                i64
+            ),
+            (
+                "disk_index_resize_us",
+                disk.map(|disk| disk.stats.index.resize_us.swap(0, Ordering::Relaxed))
+                    .unwrap_or_default(),
+                i64
+            ),
+            (
+                "disk_index_flush_file_us",
+                disk.map(|disk| disk.stats.index.flush_file_us.swap(0, Ordering::Relaxed))
+                    .unwrap_or_default(),
+                i64
+            ),
+            (
+                "disk_index_flush_mmap_us",
+                disk.map(|disk| disk.stats.index.mmap_us.swap(0, Ordering::Relaxed))
+                    .unwrap_or_default(),
+                i64
+            ),
+            (
+                "disk_data_resizes",
+                disk.map(|disk| disk.stats.data.resizes.swap(0, Ordering::Relaxed))
+                    .unwrap_or_default(),
+                i64
+            ),
+            (
+                "disk_data_max_size",
+                disk.map(|disk| {
+                    let mut lock = disk.stats.data.max_size.lock().unwrap();
+                    let value = *lock;
+                    *lock = 0;
+                    value
+                })
+                .unwrap_or_default(),
+                i64
+            ),
+            (
+                "disk_data_new_file_us",
+                disk.map(|disk| disk.stats.data.new_file_us.swap(0, Ordering::Relaxed))
+                    .unwrap_or_default(),
+                i64
+            ),
+            (
+                "disk_data_resize_us",
+                disk.map(|disk| disk.stats.data.resize_us.swap(0, Ordering::Relaxed))
+                    .unwrap_or_default(),
+                i64
+            ),
+            (
+                "disk_data_flush_file_us",
+                disk.map(|disk| disk.stats.data.flush_file_us.swap(0, Ordering::Relaxed))
+                    .unwrap_or_default(),
+                i64
+            ),
+            (
+                "disk_data_flush_mmap_us",
+                disk.map(|disk| disk.stats.data.mmap_us.swap(0, Ordering::Relaxed))
+                    .unwrap_or_default(),
                 i64
             ),
         );
