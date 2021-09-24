@@ -13,6 +13,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 pub type Age = u8;
 
+pub const MIN_DESIRED_THREADS: usize = 1;
 pub const AGE_MS: u64 = SLOT_MS; // match one age per slot time
 
 pub struct BucketMapHolder<T: IndexValue> {
@@ -94,7 +95,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
         self.startup.store(value, Ordering::Release);
         // now that we are not startup, get the system moving normally
         self.maybe_advance_age();
-        self.desired_threads.store(1, Ordering::Release); // reset desired threads to 1 for steady state
+        self.desired_threads.store(MIN_DESIRED_THREADS, Ordering::Release); // reset desired threads to 1 for steady state
         self.wait_dirty_or_aged.notify_all();
     }
 
@@ -158,7 +159,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
                         let percent = (AGE_MS * 100 / elapsed_ms) as usize;
                         if percent > 125 {
                             let desired = self.desired_threads.load(Ordering::Relaxed);
-                            let target = std::cmp::max(1, desired * 100 / percent);
+                            let target = std::cmp::max(MIN_DESIRED_THREADS, desired * 100 / percent);
                             if target < desired {
                                 let reduce = desired - target;
                                 error!(
@@ -285,7 +286,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
                     self.wait_thread_throttling.notify_one();
                 }
             }
-        } else if desired > amount && desired - amount > 0 {
+        } else if desired > amount && desired - amount > MIN_DESIRED_THREADS {
             // after updating this, an active thread will figure out it needs to go to sleep
             let _ = self.desired_threads.compare_exchange(
                 desired,
