@@ -36,6 +36,7 @@ pub struct BucketMapHolder<T: IndexValue> {
     count_bucket_scans_complete: AtomicUsize,
     pub wait_thread_throttling: WaitableCondvar,
     pub desired_threads: AtomicUsize,
+    age_advance_throughput_interval: AtomicU8,
 
     // how much mb are we allowed to keep in the in-mem index?
     // Rest goes to disk.
@@ -144,16 +145,28 @@ impl<T: IndexValue> BucketMapHolder<T> {
                 true
             } else {
                 // age interval hasn't elapsed, but we finished, so we can calculate progress here to throttle threads
-                let elapsed_ms = self.age_timer.elapsed_ms();
-                if elapsed_ms > 0 {
-                    let percent = (AGE_MS * 100 / elapsed_ms) as usize;
-                    if percent > 125 {
-                        let desired = self.desired_threads.load(Ordering::Relaxed);
-                        let target = desired * 100 / percent;
-                        if target < desired {
-                            let reduce = desired - target;
-                            error!("reducing threads by: {}", reduce);
-                            self.inc_dec_desired_threads(reduce, false);
+                let age = self.current_age();
+                if self
+                    .age_advance_throughput_interval
+                    .compare_exchange(
+                        age,
+                        age.wrapping_add(1),
+                        Ordering::Acquire,
+                        Ordering::Relaxed,
+                    )
+                    .is_ok()
+                {
+                    let elapsed_ms = self.age_timer.elapsed_ms();
+                    if elapsed_ms > 0 {
+                        let percent = (AGE_MS * 100 / elapsed_ms) as usize;
+                        if percent > 125 {
+                            let desired = self.desired_threads.load(Ordering::Relaxed);
+                            let target = desired * 100 / percent;
+                            if target < desired {
+                                let reduce = desired - target;
+                                error!("reducing threads by: {}", reduce);
+                                self.inc_dec_desired_threads(reduce, false);
+                            }
                         }
                     }
                 }
@@ -197,6 +210,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
             wait_thread_throttling: WaitableCondvar::default(),
             desired_threads: AtomicUsize::new(INITIAL_DESIRED_THREADS),
             throughput_interval: AtomicInterval::default(),
+            age_advance_throughput_interval: AtomicU8::default(),
         }
     }
 
