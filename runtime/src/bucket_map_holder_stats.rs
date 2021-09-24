@@ -44,6 +44,8 @@ pub struct BucketMapHolderStats {
     pub flush_entries_removed_from_mem: AtomicU64,
     pub active_threads: AtomicU64,
     pub get_range_us: AtomicU64,
+    pub bg_throttle_visits: AtomicU64,
+    pub bg_bin_visits: AtomicU64,
     last_age: AtomicU8,
     last_age_time: AtomicU64,
     pub flush_scan_us: AtomicU64,
@@ -268,6 +270,8 @@ impl BucketMapHolderStats {
                     .swap(0, Ordering::Relaxed),
                 i64
             ),
+            ("bg_bin_visits", self.bg_bin_visits.swap(0, Ordering::Relaxed), i64),
+            ("bg_throttle_visits", self.bg_throttle_visits.swap(0, Ordering::Relaxed), i64),
             ("inserts", self.inserts.swap(0, Ordering::Relaxed), i64),
             ("deletes", self.deletes.swap(0, Ordering::Relaxed), i64),
             (
