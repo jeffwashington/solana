@@ -564,6 +564,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
     where
         R: RangeBounds<Pubkey> + Debug,
     {
+        Self::update_stat(&self.stats().hold_range_in_mem_count, 1);
         self.start_stop_flush(true);
 
         if start_holding {
