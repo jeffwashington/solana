@@ -187,7 +187,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
         // only allocate if mem_budget_mb is Some
         // actually, allocate by default
         let disk = Some(BucketMap::new(bucket_config));
-        const INITIAL_DESIRED_THREADS: usize = 1;
+        let initial_desired_threads = threads;
 
         Self {
             disk,
@@ -205,7 +205,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
             threads,
             advancing_time_abnormally: AtomicBool::default(),
             wait_thread_throttling: WaitableCondvar::default(),
-            desired_threads: AtomicUsize::new(INITIAL_DESIRED_THREADS),
+            desired_threads: AtomicUsize::new(initial_desired_threads),
             throughput_interval: AtomicInterval::default(),
             age_advance_throughput_interval: AtomicU8::default(),
             in_idle_age: AtomicBool::default(),
