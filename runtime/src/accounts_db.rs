@@ -2778,7 +2778,8 @@ impl AccountsDb {
         const OUTER_CHUNK_SIZE: usize = 2000;
         if is_startup && self.caching_enabled {
             let slots = self.all_slots_in_storage();
-            let inner_chunk_size = std::cmp::max(1 + OUTER_CHUNK_SIZE / get_thread_count(), 1);
+            let threads = num_cpus::get();
+            let inner_chunk_size = std::cmp::max(OUTER_CHUNK_SIZE / threads, 1);
             slots.chunks(OUTER_CHUNK_SIZE).for_each(|chunk| {
                 chunk.par_chunks(inner_chunk_size).for_each(|slots| {
                     for slot in slots {
@@ -12328,7 +12329,7 @@ pub mod tests {
         let db = Arc::new(db);
         let num_cached_slots = 100;
 
-        let num_trials = 100000;
+        let num_trials = 100;
         let (new_trial_start_sender, new_trial_start_receiver) = unbounded();
         let (flush_done_sender, flush_done_receiver) = unbounded();
         // Start up a thread to flush the accounts cache
