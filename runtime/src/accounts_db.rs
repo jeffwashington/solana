@@ -12329,7 +12329,7 @@ pub mod tests {
         let db = Arc::new(db);
         let num_cached_slots = 100;
 
-        let num_trials = 100;
+        let num_trials = 100000;
         let (new_trial_start_sender, new_trial_start_receiver) = unbounded();
         let (flush_done_sender, flush_done_receiver) = unbounded();
         // Start up a thread to flush the accounts cache
