@@ -90,7 +90,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         let mut result = Vec::with_capacity(map.len());
         map.iter().for_each(|(k, v)| {
             if range.map(|range| range.contains(k)).unwrap_or(true) {
-                result.push((*k, v.clone()));
+                result.push((*k, Arc::clone(v)));
             }
         });
         self.start_stop_flush(false);
