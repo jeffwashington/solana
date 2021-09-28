@@ -2,6 +2,7 @@ use crate::accounts_index::{AccountsIndexConfig, IndexValue};
 use crate::bucket_map_holder_stats::BucketMapHolderStats;
 use crate::in_mem_accounts_index::{InMemAccountsIndex, SlotT};
 use crate::waitable_condvar::WaitableCondvar;
+use log::*;
 use solana_bucket_map::bucket_map::{BucketMap, BucketMapConfig};
 use solana_measure::measure::Measure;
 use solana_sdk::clock::SLOT_MS;
