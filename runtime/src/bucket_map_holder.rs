@@ -170,53 +170,21 @@ impl<T: IndexValue> BucketMapHolder<T> {
         AGE_MS
     }
 
-    /// Check progress this age.
-    /// Return ms to wait to get closer to the wait target and spread out work over the entire age interval.
-    /// Goal is to avoid cpu spikes at beginning of age interval.
-    fn throttling_wait_ms(&self) -> Option<u64> {
-        let interval_ms = self.age_interval_ms();
-        let elapsed_ms = self.age_timer.elapsed_ms();
-        let target_percent = 90; // aim to finish in 90% of the allocated time
-        let remaining_ms = elapsed_ms.saturating_sub(interval_ms * target_percent / 100);
-        let bins_flushed = self.count_ages_flushed() as u64;
-        let remaining_bins = bins_flushed.saturating_sub(self.bins as u64);
-        if remaining_bins == 0 || remaining_ms == 0 || elapsed_ms == 0 || bins_flushed == 0 {
-            return None;
-        }
-        let ms_per_s = 1_000;
-        let rate_bins_per_s = bins_flushed * ms_per_s / elapsed_ms;
-        let expected_bins_processed_in_remaining_time = rate_bins_per_s * remaining_ms / ms_per_s;
-        if expected_bins_processed_in_remaining_time > remaining_bins {
-            // wait
-            Some(1)
-        } else {
-            None
-        }
-    }
-
     // intended to execute in a bg thread
     pub fn background(&self, exit: Arc<AtomicBool>, in_mem: Vec<Arc<InMemAccountsIndex<T>>>) {
         let bins = in_mem.len();
         let flush = self.disk.is_some();
-        let mut throttling_wait_ms = None;
         loop {
             if !flush {
                 self.wait_dirty_or_aged.wait_timeout(Duration::from_millis(
                     self.stats.remaining_until_next_interval(),
                 ));
-            } else if self.all_buckets_flushed_at_current_age() && throttling_wait_ms.is_none() {
-                let mut wait = std::cmp::min(
+            } else if self.all_buckets_flushed_at_current_age() {
+                let wait = std::cmp::min(
                     self.age_timer
                         .remaining_until_next_interval(self.age_interval_ms()),
                     self.stats.remaining_until_next_interval(),
                 );
-                if let Some(throttling_wait_ms) = throttling_wait_ms {
-                    self.stats
-                        .bg_throttling_wait_us
-                        .fetch_add(throttling_wait_ms * 1000, Ordering::Relaxed);
-                    wait = std::cmp::min(throttling_wait_ms, wait);
-                }
-                throttling_wait_ms = None;
 
                 let mut m = Measure::start("wait");
                 self.wait_dirty_or_aged
@@ -241,10 +209,6 @@ impl<T: IndexValue> BucketMapHolder<T> {
                 }
                 self.stats.report_stats(self);
                 if self.all_buckets_flushed_at_current_age() {
-                    break;
-                }
-                throttling_wait_ms = self.throttling_wait_ms();
-                if throttling_wait_ms.is_some() {
                     break;
                 }
             }
