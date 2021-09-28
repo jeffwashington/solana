@@ -87,13 +87,13 @@ impl<T: IndexValue> BucketMapHolder<T> {
         assert!(self.get_startup());
         // when age has incremented twice, we know that we have made it through scanning all bins, so we are 'idle'
         let end_age = self.current_age().wrapping_add(2);
+        error!("end age: {}, current: {}", end_age, self.current_age());
         loop {
             self.wait_dirty_or_aged
                 .wait_timeout(Duration::from_millis(self.age_interval_ms()));
             if end_age == self.current_age() {
                 break;
             }
-            error!("end age: {}, current: {}", end_age, self.current_age());
         }
     }
 
@@ -176,6 +176,8 @@ impl<T: IndexValue> BucketMapHolder<T> {
     pub fn background(&self, exit: Arc<AtomicBool>, in_mem: Vec<Arc<InMemAccountsIndex<T>>>) {
         let bins = in_mem.len();
         let flush = self.disk.is_some();
+        error!("flush: {}", flush);
+
         loop {
             if !flush {
                 self.wait_dirty_or_aged.wait_timeout(Duration::from_millis(
