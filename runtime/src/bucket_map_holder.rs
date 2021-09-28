@@ -92,6 +92,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
             if end_age == self.current_age() {
                 break;
             }
+            error!("end age: {}, current: {}", end_age, self.current_age());
         }
     }
 
@@ -116,9 +117,11 @@ impl<T: IndexValue> BucketMapHolder<T> {
     pub fn maybe_advance_age(&self) -> bool {
         // check has_age_interval_elapsed last as calling it modifies state on success
         if self.all_buckets_flushed_at_current_age() && self.has_age_interval_elapsed() {
+            error!("increment age");
             self.increment_age();
             true
         } else {
+            error!("all_buckets_flushed_at_current_age: {}", self.all_buckets_flushed_at_current_age());
             false
         }
     }
