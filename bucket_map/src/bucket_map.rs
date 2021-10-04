@@ -71,7 +71,7 @@ impl<T: Clone + Copy + Debug> BucketMap<T> {
         );
         let stats = Arc::new(BucketMapStats::default());
         // this should be <= 1 << DEFAULT_CAPACITY or we end up searching the same items over and over - probably not a big deal since it is so small anyway
-        const MAX_SEARCH: MaxSearch = 32;
+        const MAX_SEARCH: MaxSearch = 64;
         let max_search = config.max_search.unwrap_or(MAX_SEARCH);
 
         if let Some(drives) = config.drives.as_ref() {
