@@ -308,6 +308,10 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                 );
                 Self::update_stat(&self.stats().updates_in_mem, 1);
             } else {
+                // not in cache, look on disk
+                // do this outside of write lock on in mem acct idx
+                let disk_entry = self.load_account_entry_from_disk(pubkey);
+
                 let mut m = Measure::start("entry");
                 let mut map = self.map().write().unwrap();
                 let entry = map.entry(*pubkey);
@@ -326,8 +330,6 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                         Self::update_stat(&self.stats().updates_in_mem, 1);
                     }
                     Entry::Vacant(vacant) => {
-                        // not in cache, look on disk
-                        let disk_entry = self.load_account_entry_from_disk(vacant.key());
                         let new_value = if let Some(disk_entry) = disk_entry {
                             // on disk, so merge new_value with what was on disk
                             Self::lock_and_update_slot_list(
