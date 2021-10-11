@@ -2648,6 +2648,7 @@ impl AccountsDb {
                 Some(&hashes),
                 Some(Box::new(move |_, _| shrunken_store.clone())),
                 Some(Box::new(write_versions.into_iter())),
+                Some(&self.thread_pool_clean), // assumption is this is only called during bg, except during startup
             );
 
             // `store_accounts_frozen()` above may have purged accounts from some
@@ -4639,6 +4640,7 @@ impl AccountsDb {
                 Some(&hashes),
                 Some(Box::new(move |_, _| flushed_store.clone())),
                 None,
+                Some(&self.thread_pool_clean), // assumption is this is only called by bg threads
             );
             // If the above sizing function is correct, just one AppendVec is enough to hold
             // all the data for the slot
@@ -5761,28 +5763,43 @@ impl AccountsDb {
 
     // previous_slot_entry_was_cached = true means we just need to assert that after this update is complete
     //  that there are no items we would have put in reclaims that are not cached
-    fn update_index(
+    fn update_index<T: ReadableAccount + Sync>(
         &self,
         slot: Slot,
         infos: Vec<AccountInfo>,
-        accounts: &[(&Pubkey, &impl ReadableAccount)],
+        accounts: &[(&Pubkey, &T)],
         previous_slot_entry_was_cached: bool,
+        thread_pool: Option<&ThreadPool>,
     ) -> SlotList<AccountInfo> {
-        let mut reclaims = SlotList::<AccountInfo>::with_capacity(infos.len() * 2);
-        for (info, pubkey_account) in infos.into_iter().zip(accounts.iter()) {
-            let pubkey = pubkey_account.0;
-            self.accounts_index.upsert(
-                slot,
-                pubkey,
-                pubkey_account.1.owner(),
-                pubkey_account.1.data(),
-                &self.account_indexes,
-                info,
-                &mut reclaims,
-                previous_slot_entry_was_cached,
-            );
+        let update = || {
+            let chunk_size = 50; // # pubkeys/thread
+            infos
+                .par_chunks(chunk_size)
+                .zip(accounts.par_chunks(chunk_size))
+                .map(|(infos_chunk, accounts_chunk)| {
+                    let mut reclaims = Vec::with_capacity(infos_chunk.len() / 2);
+                    for (info, pubkey_account) in infos_chunk.iter().zip(accounts_chunk.iter()) {
+                        let pubkey = pubkey_account.0;
+                        self.accounts_index.upsert(
+                            slot,
+                            pubkey,
+                            pubkey_account.1.owner(),
+                            pubkey_account.1.data(),
+                            &self.account_indexes,
+                            *info,
+                            &mut reclaims,
+                            previous_slot_entry_was_cached,
+                        );
+                    }
+                    reclaims
+                })
+                .flatten()
+                .collect::<Vec<_>>()
+        };
+        match thread_pool {
+            Some(thread_pool) => thread_pool.install(update),
+            None => update(),
         }
-        reclaims
     }
 
     fn should_not_shrink(aligned_bytes: u64, total_bytes: u64, num_stores: usize) -> bool {
@@ -6115,7 +6132,12 @@ impl AccountsDb {
     }
 
     pub fn store_cached(&self, slot: Slot, accounts: &[(&Pubkey, &AccountSharedData)]) {
-        self.store(slot, accounts, self.caching_enabled);
+        self.store(
+            slot,
+            accounts,
+            self.caching_enabled,
+            Some(&self.thread_pool), // assumption is this is always fg
+        );
 
         if let Some(accounts_update_notifier) = &self.accounts_update_notifier {
             let notifier = &accounts_update_notifier.read().unwrap();
@@ -6129,11 +6151,18 @@ impl AccountsDb {
     }
 
     /// Store the account update.
+    /// only called by tests
     pub fn store_uncached(&self, slot: Slot, accounts: &[(&Pubkey, &AccountSharedData)]) {
-        self.store(slot, accounts, false);
+        self.store(slot, accounts, false, None);
     }
 
-    fn store(&self, slot: Slot, accounts: &[(&Pubkey, &AccountSharedData)], is_cached_store: bool) {
+    fn store(
+        &self,
+        slot: Slot,
+        accounts: &[(&Pubkey, &AccountSharedData)],
+        is_cached_store: bool,
+        thread_pool: Option<&ThreadPool>,
+    ) {
         // If all transactions in a batch are errored,
         // it's possible to get a store with no accounts.
         if accounts.is_empty() {
@@ -6159,7 +6188,7 @@ impl AccountsDb {
         slot_info.stats.merge(&stats);
 
         // we use default hashes for now since the same account may be stored to the cache multiple times
-        self.store_accounts_unfrozen(slot, accounts, None, is_cached_store);
+        self.store_accounts_unfrozen(slot, accounts, None, is_cached_store, thread_pool);
         self.report_store_timings();
     }
 
@@ -6280,6 +6309,7 @@ impl AccountsDb {
         accounts: &[(&Pubkey, &AccountSharedData)],
         hashes: Option<&[&Hash]>,
         is_cached_store: bool,
+        thread_pool: Option<&ThreadPool>,
     ) {
         // This path comes from a store to a non-frozen slot.
         // If a store is dead here, then a newer update for
@@ -6297,16 +6327,18 @@ impl AccountsDb {
             None::<Box<dyn Iterator<Item = u64>>>,
             is_cached_store,
             reset_accounts,
+            thread_pool,
         );
     }
 
-    fn store_accounts_frozen<'a>(
+    fn store_accounts_frozen<'a, T: ReadableAccount + Sync>(
         &'a self,
         slot: Slot,
-        accounts: &[(&Pubkey, &impl ReadableAccount)],
+        accounts: &[(&Pubkey, &T)],
         hashes: Option<&[impl Borrow<Hash>]>,
         storage_finder: Option<StorageFinder<'a>>,
         write_version_producer: Option<Box<dyn Iterator<Item = StoredMetaWriteVersion>>>,
+        thread_pool: Option<&ThreadPool>,
     ) -> StoreAccountsTiming {
         // stores on a frozen slot should not reset
         // the append vec so that hashing could happen on the store
@@ -6321,18 +6353,20 @@ impl AccountsDb {
             write_version_producer,
             is_cached_store,
             reset_accounts,
+            thread_pool,
         )
     }
 
-    fn store_accounts_custom<'a>(
+    fn store_accounts_custom<'a, T: ReadableAccount + Sync>(
         &'a self,
         slot: Slot,
-        accounts: &[(&Pubkey, &impl ReadableAccount)],
+        accounts: &[(&Pubkey, &T)],
         hashes: Option<&[impl Borrow<Hash>]>,
         storage_finder: Option<StorageFinder<'a>>,
         write_version_producer: Option<Box<dyn Iterator<Item = u64>>>,
         is_cached_store: bool,
         reset_accounts: bool,
+        thread_pool: Option<&ThreadPool>,
     ) -> StoreAccountsTiming {
         let storage_finder: StorageFinder<'a> = storage_finder
             .unwrap_or_else(|| Box::new(move |slot, size| self.find_storage_candidate(slot, size)));
@@ -6371,7 +6405,13 @@ impl AccountsDb {
         // after the account are stored by the above `store_accounts_to`
         // call and all the accounts are stored, all reads after this point
         // will know to not check the cache anymore
-        let mut reclaims = self.update_index(slot, infos, accounts, previous_slot_entry_was_cached);
+        let mut reclaims = self.update_index(
+            slot,
+            infos,
+            accounts,
+            previous_slot_entry_was_cached,
+            thread_pool,
+        );
 
         // For each updated account, `reclaims` should only have at most one
         // item (if the account was previously updated in this slot).
@@ -6714,7 +6754,14 @@ impl AccountsDb {
                         .map(|key| (key, &account))
                         .collect::<Vec<_>>();
                     let hashes = (0..filler_entries).map(|_| hash).collect::<Vec<_>>();
-                    self.store_accounts_frozen(*slot, &add[..], Some(&hashes[..]), None, None);
+                    self.store_accounts_frozen(
+                        *slot,
+                        &add[..],
+                        Some(&hashes[..]),
+                        None,
+                        None,
+                        None,
+                    );
                 })
             });
             self.accounts_index.set_startup(false);
@@ -9758,6 +9805,7 @@ pub mod tests {
             &[(&key, &account)],
             Some(&[&Hash::default()]),
             false,
+            None,
         );
         db.add_root(some_slot);
         let check_hash = true;
@@ -9919,7 +9967,7 @@ pub mod tests {
         }
         // provide bogus account hashes
         let some_hash = Hash::new(&[0xca; HASH_BYTES]);
-        db.store_accounts_unfrozen(some_slot, accounts, Some(&[&some_hash]), false);
+        db.store_accounts_unfrozen(some_slot, accounts, Some(&[&some_hash]), false, None);
         db.add_root(some_slot);
         assert_matches!(
             db.verify_bank_hash_and_lamports(some_slot, &ancestors, 1, true),
