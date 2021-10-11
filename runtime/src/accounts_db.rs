@@ -5385,8 +5385,8 @@ impl AccountsDb {
                     let computed_hash = loaded_account.compute_hash(slot, pubkey);
                     if computed_hash != source_item.hash {
                         info!(
-                            "hash mismatch found: computed: {}, loaded: {}, pubkey: {}",
-                            computed_hash, source_item.hash, pubkey
+                            "hash mismatch found: computed: {}, loaded: {}, pubkey: {}, filler: {:?}, pubkey: {:?}, filler: {:?}",
+                            computed_hash, source_item.hash, pubkey, filler_account_suffix, pubkey.as_ref(), filler_account_suffix.map(|x| x.as_ref()).unwrap_or_default()
                         );
                         mismatch_found.fetch_add(1, Ordering::Relaxed);
                     }
