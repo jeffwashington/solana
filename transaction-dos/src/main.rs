@@ -367,7 +367,7 @@ fn run_transactions_dos(
                             num_instructions,
                             program_id,
                             num_program_iterations as u8,
-                            account_metas[x*account_group_size.. x*account_group_size + account_group_size].to_vec(),
+                            account_metas[(x%account_groups)*account_group_size.. (x%account_groups)*account_group_size + account_group_size].to_vec(),
                         );
                         let signers: Vec<&Keypair> = vec![keypair];
                         let tx = Transaction::new(&signers, message, blockhash);
