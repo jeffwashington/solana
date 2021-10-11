@@ -3,6 +3,7 @@ use crate::bucket_map_holder::BucketMapHolder;
 use solana_sdk::timing::{timestamp, AtomicInterval};
 use std::fmt::Debug;
 use std::sync::atomic::{AtomicU64, AtomicU8, Ordering};
+use std::sync::Mutex;
 
 // stats logged every 10 s
 const STATS_INTERVAL_MS: u64 = 10_000;
@@ -42,6 +43,7 @@ pub struct BucketMapHolderStats {
     pub flush_remove_us: AtomicU64,
     pub flush_grow_us: AtomicU64,
     last_time: AtomicInterval,
+    pub max_in_upsert: Mutex<u64>,
 }
 
 impl BucketMapHolderStats {
@@ -264,6 +266,15 @@ impl BucketMapHolderStats {
             (
                 "flush_scan_update_us",
                 self.flush_scan_update_us.swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "max_in_upsert",
+                {
+                    let mut value = 0;
+                    std::mem::swap(&mut value, &mut self.max_in_upsert.lock().unwrap());
+                    value
+                },
                 i64
             ),
             (

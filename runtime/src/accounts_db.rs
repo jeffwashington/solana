@@ -5681,6 +5681,17 @@ impl AccountsDb {
         previous_slot_entry_was_cached: bool,
     ) -> SlotList<AccountInfo> {
         let mut reclaims = SlotList::<AccountInfo>::with_capacity(infos.len() * 2);
+        {
+            let mut lock = self
+                .accounts_index
+                .storage
+                .storage
+                .stats
+                .max_in_upsert
+                .lock()
+                .unwrap();
+            *lock = std::cmp::max(*lock, infos.len() as u64);
+        }
         for (info, pubkey_account) in infos.into_iter().zip(accounts.iter()) {
             let pubkey = pubkey_account.0;
             self.accounts_index.upsert(
