@@ -5673,14 +5673,14 @@ impl AccountsDb {
 
     // previous_slot_entry_was_cached = true means we just need to assert that after this update is complete
     //  that there are no items we would have put in reclaims that are not cached
-    fn update_index(
+    fn update_index<T: ReadableAccount + Sync>(
         &self,
         slot: Slot,
-        infos: Vec<AccountInfo>,
-        accounts: &[(&Pubkey, &impl ReadableAccount)],
+        mut infos: Vec<AccountInfo>,
+        accounts: &[(&Pubkey, &T)],
         previous_slot_entry_was_cached: bool,
+        is_startup: bool,
     ) -> SlotList<AccountInfo> {
-        let mut reclaims = SlotList::<AccountInfo>::with_capacity(infos.len() * 2);
         {
             let mut lock = self
                 .accounts_index
@@ -5692,20 +5692,40 @@ impl AccountsDb {
                 .unwrap();
             *lock = std::cmp::max(*lock, infos.len() as u64);
         }
-        for (info, pubkey_account) in infos.into_iter().zip(accounts.iter()) {
-            let pubkey = pubkey_account.0;
-            self.accounts_index.upsert(
-                slot,
-                pubkey,
-                pubkey_account.1.owner(),
-                pubkey_account.1.data(),
-                &self.account_indexes,
-                info,
-                &mut reclaims,
-                previous_slot_entry_was_cached,
-            );
+        let mut update = || {
+            let chunk_size = 50; // # pubkeys/thread
+            infos
+                .par_chunks_mut(chunk_size)
+                .zip(accounts.par_chunks(chunk_size))
+                .map(|(infos_chunk, accounts_chunk)| {
+                    let mut reclaims = Vec::with_capacity(infos_chunk.len() / 2);
+                    for (info, pubkey_account) in
+                        infos_chunk.into_iter().zip(accounts_chunk.into_iter())
+                    {
+                        let pubkey = pubkey_account.0;
+                        let mut info_use = AccountInfo::default();
+                        std::mem::swap(info, &mut info_use);
+                        self.accounts_index.upsert(
+                            slot,
+                            pubkey,
+                            pubkey_account.1.owner(),
+                            pubkey_account.1.data(),
+                            &self.account_indexes,
+                            info_use,
+                            &mut reclaims,
+                            previous_slot_entry_was_cached,
+                        );
+                    }
+                    reclaims
+                })
+                .flatten()
+                .collect::<Vec<_>>()
+        };
+        if is_startup {
+            update()
+        } else {
+            self.thread_pool.install(update)
         }
-        reclaims
     }
 
     fn should_not_shrink(aligned_bytes: u64, total_bytes: u64, num_stores: usize) -> bool {
@@ -6212,10 +6232,10 @@ impl AccountsDb {
         );
     }
 
-    fn store_accounts_frozen<'a>(
+    fn store_accounts_frozen<'a, T: ReadableAccount + Sync>(
         &'a self,
         slot: Slot,
-        accounts: &[(&Pubkey, &impl ReadableAccount)],
+        accounts: &[(&Pubkey, &T)],
         hashes: Option<&[impl Borrow<Hash>]>,
         storage_finder: Option<StorageFinder<'a>>,
         write_version_producer: Option<Box<dyn Iterator<Item = StoredMetaWriteVersion>>>,
@@ -6236,16 +6256,17 @@ impl AccountsDb {
         )
     }
 
-    fn store_accounts_custom<'a>(
+    fn store_accounts_custom<'a, T: ReadableAccount + Sync>(
         &'a self,
         slot: Slot,
-        accounts: &[(&Pubkey, &impl ReadableAccount)],
+        accounts: &[(&Pubkey, &T)],
         hashes: Option<&[impl Borrow<Hash>]>,
         storage_finder: Option<StorageFinder<'a>>,
         write_version_producer: Option<Box<dyn Iterator<Item = u64>>>,
         is_cached_store: bool,
         reset_accounts: bool,
     ) -> StoreAccountsTiming {
+        let is_startup = true; // hack
         let storage_finder: StorageFinder<'a> = storage_finder
             .unwrap_or_else(|| Box::new(move |slot, size| self.find_storage_candidate(slot, size)));
 
@@ -6283,7 +6304,7 @@ impl AccountsDb {
         // after the account are stored by the above `store_accounts_to`
         // call and all the accounts are stored, all reads after this point
         // will know to not check the cache anymore
-        let mut reclaims = self.update_index(slot, infos, accounts, previous_slot_entry_was_cached);
+        let mut reclaims = self.update_index(slot, infos, accounts, previous_slot_entry_was_cached, is_startup);
 
         // For each updated account, `reclaims` should only have at most one
         // item (if the account was previously updated in this slot).
