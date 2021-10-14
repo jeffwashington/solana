@@ -673,6 +673,9 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
             if slot_list.len() != 1 {
                 if update_stats {
                     Self::update_stat(&self.stats().held_in_mem_slot_list_len, 1);
+                    if slot_list.len() == 0 {
+                        Self::update_stat(&self.stats().held_in_mem_slot_list_len_zero, 1);
+                    }
                 }
                 false // keep 0 and > 1 slot lists in mem. They will be cleaned or shrunk soon.
             } else {
