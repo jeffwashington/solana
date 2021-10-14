@@ -673,7 +673,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
             if slot_list.len() != 1 {
                 if update_stats {
                     Self::update_stat(&self.stats().held_in_mem_slot_list_len, 1);
-                    if slot_list.len() == 0 {
+                    if slot_list.len() == 2 {
                         Self::update_stat(&self.stats().held_in_mem_slot_list_len_zero, 1);
                     }
                 }
