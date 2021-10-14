@@ -5,7 +5,7 @@ use std::fmt::Debug;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicU8, Ordering};
 
 // stats logged every 10 s
-const STATS_INTERVAL_MS: u64 = 10_000;
+const STATS_INTERVAL_MS: u64 = 1_000;
 
 #[derive(Debug, Default)]
 pub struct BucketMapHolderStats {
