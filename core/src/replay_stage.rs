@@ -3715,6 +3715,7 @@ pub mod tests {
 
     #[test]
     fn test_write_persist_transaction_status() {
+        loop {
         let GenesisConfigInfo {
             genesis_config,
             mint_keypair,
@@ -3770,6 +3771,7 @@ pub mod tests {
             }
         }
         Blockstore::destroy(&ledger_path).unwrap();
+    }
     }
 
     #[test]
