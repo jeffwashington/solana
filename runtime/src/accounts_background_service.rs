@@ -106,6 +106,7 @@ impl SnapshotRequestHandler {
                     status_cache_slot_deltas,
                 } = snapshot_request;
 
+                error!("{} {} handle_snapshot_requests", file!(), line!());
                 let previous_hash = if test_hash_calculation {
                     // We have to use the index version here.
                     // We cannot calculate the non-index way because cache has not been flushed and stores don't match reality.
@@ -114,6 +115,7 @@ impl SnapshotRequestHandler {
                     Hash::default()
                 };
 
+                error!("{} {} handle_snapshot_requests", file!(), line!());
                 let mut shrink_time = Measure::start("shrink_time");
                 if !accounts_db_caching_enabled {
                     snapshot_root_bank
@@ -121,6 +123,7 @@ impl SnapshotRequestHandler {
                 }
                 shrink_time.stop();
 
+                error!("{} {} handle_snapshot_requests", file!(), line!());
                 let mut flush_accounts_cache_time = Measure::start("flush_accounts_cache_time");
                 if accounts_db_caching_enabled {
                     // Forced cache flushing MUST flush all roots <= snapshot_root_bank.slot().
@@ -142,6 +145,7 @@ impl SnapshotRequestHandler {
                     );
                 }
                 flush_accounts_cache_time.stop();
+                error!("{} {} handle_snapshot_requests", file!(), line!());
 
                 let mut hash_time = Measure::start("hash_time");
                 let this_hash = snapshot_root_bank.update_accounts_hash_with_index_option(
@@ -158,6 +162,7 @@ impl SnapshotRequestHandler {
                 };
                 hash_time.stop();
 
+                error!("{} {} handle_snapshot_requests", file!(), line!());
                 let mut clean_time = Measure::start("clean_time");
                 // Don't clean the slot we're snapshotting because it may have zero-lamport
                 // accounts that were included in the bank delta hash when the bank was frozen,
@@ -165,12 +170,14 @@ impl SnapshotRequestHandler {
                 // the frozen hash.
                 snapshot_root_bank.clean_accounts(true, false, *last_full_snapshot_slot);
                 clean_time.stop();
+                error!("{} {} handle_snapshot_requests", file!(), line!());
 
                 if accounts_db_caching_enabled {
                     shrink_time = Measure::start("shrink_time");
                     snapshot_root_bank.shrink_candidate_slots();
                     shrink_time.stop();
                 }
+                error!("{} {} handle_snapshot_requests", file!(), line!());
 
                 let block_height = snapshot_root_bank.block_height();
                 let snapshot_type = if snapshot_utils::should_take_full_snapshot(
@@ -191,6 +198,7 @@ impl SnapshotRequestHandler {
                 } else {
                     None
                 };
+                error!("{} {} handle_snapshot_requests", file!(), line!());
 
                 // Snapshot the bank and send over an accounts package
                 let mut snapshot_time = Measure::start("snapshot_time");
@@ -205,6 +213,7 @@ impl SnapshotRequestHandler {
                     hash_for_testing,
                     snapshot_type,
                 );
+                error!("{} {} handle_snapshot_requests", file!(), line!());
                 if let Err(e) = result {
                     warn!(
                         "Error taking bank snapshot. slot: {}, snapshot type: {:?}, err: {:?}",
@@ -230,6 +239,7 @@ impl SnapshotRequestHandler {
                 snapshot_utils::purge_old_bank_snapshots(&self.snapshot_config.bank_snapshots_dir);
                 purge_old_snapshots_time.stop();
                 total_time.stop();
+                error!("{} {} handle_snapshot_requests", file!(), line!());
 
                 datapoint_info!(
                     "handle_snapshot_requests-timing",
