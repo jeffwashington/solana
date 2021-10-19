@@ -1019,6 +1019,7 @@ impl ReplayStage {
                             .map(|b| b.hash())
                     },
                 );
+                error!("{} {} cluster_slot_state_verifier.rs", file!(), line!());
                 check_slot_agrees_with_cluster(
                     epoch_slots_frozen_slot,
                     root,
@@ -1190,6 +1191,7 @@ impl ReplayStage {
                     || progress.is_dead(confirmed_slot).unwrap_or(false),
                     || bank_forks.read().unwrap().bank_hash(confirmed_slot),
                 );
+                error!("{} {} cluster_slot_state_verifier.rs", file!(), line!());
                 check_slot_agrees_with_cluster(
                     confirmed_slot,
                     root,
@@ -1259,6 +1261,7 @@ impl ReplayStage {
                 || progress.is_dead(duplicate_slot).unwrap_or(false),
                 || bank_hash,
             );
+            error!("{} {} cluster_slot_state_verifier.rs", file!(), line!());
             check_slot_agrees_with_cluster(
                 duplicate_slot,
                 root_slot,
@@ -1574,6 +1577,7 @@ impl ReplayStage {
             heaviest_subtree_fork_choice,
             epoch_slots_frozen_slots,
         );
+        error!("{} {} cluster_slot_state_verifier.rs", file!(), line!());
         check_slot_agrees_with_cluster(
             slot,
             root,
@@ -2105,6 +2109,7 @@ impl ReplayStage {
                     heaviest_subtree_fork_choice,
                     epoch_slots_frozen_slots,
                 );
+                error!("{} {} cluster_slot_state_verifier.rs", file!(), line!());
                 check_slot_agrees_with_cluster(
                     bank.slot(),
                     bank_forks.read().unwrap().root(),
@@ -2652,6 +2657,7 @@ impl ReplayStage {
                     || false,
                     || Some(*frozen_hash),
                 );
+                error!("{} {} cluster_slot_state_verifier.rs", file!(), line!());
                 check_slot_agrees_with_cluster(
                     *slot,
                     root_slot,
