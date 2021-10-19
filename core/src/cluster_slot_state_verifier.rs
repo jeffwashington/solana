@@ -162,6 +162,7 @@ impl DuplicateConfirmedState {
         is_dead: impl Fn() -> bool,
         get_hash: impl Fn() -> Option<Hash>,
     ) -> Self {
+        error!("{} {} cluster_slot_state_verifier.rs", file!(), line!());
         let bank_status = BankStatus::new(is_dead, get_hash);
         Self::new(duplicate_confirmed_hash, bank_status)
     }
@@ -189,6 +190,7 @@ impl DuplicateState {
         is_dead: impl Fn() -> bool,
         get_hash: impl Fn() -> Option<Hash>,
     ) -> Self {
+        error!("{} {} cluster_slot_state_verifier.rs", file!(), line!());
         let bank_status = BankStatus::new(is_dead, get_hash);
 
         // We can only skip marking duplicate if this slot has already been
@@ -229,6 +231,7 @@ impl EpochSlotsFrozenState {
         get_hash: impl Fn() -> Option<Hash>,
     ) -> Self {
         let bank_status = BankStatus::new(is_dead, get_hash);
+        error!("{} {} cluster_slot_state_verifier.rs", file!(), line!());
         let duplicate_confirmed_hash = get_duplicate_confirmed_hash_from_state(
             slot,
             gossip_duplicate_confirmed_slots,
