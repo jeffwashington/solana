@@ -43,11 +43,13 @@ impl BankStatus {
     fn new_from_hash(hash: Option<Hash>) -> Self {
         if let Some(hash) = hash {
             if hash == Hash::default() {
+                error!("hash is default, {} {}", file!(), line!());
                 BankStatus::Unprocessed
             } else {
                 BankStatus::Frozen(hash)
             }
         } else {
+            error!("hash is missing, {} {}", file!(), line!());
             BankStatus::Unprocessed
         }
     }
