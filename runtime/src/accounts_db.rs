@@ -3158,6 +3158,7 @@ impl AccountsDb {
     }
 
     pub fn set_hash(&self, slot: Slot, parent_slot: Slot) {
+        error!("set_hash, slot: {}, {} {} cluster_slot_state_verifier", slot, file!(), line!());
         let mut bank_hashes = self.bank_hashes.write().unwrap();
         if bank_hashes.get(&slot).is_some() {
             error!(
@@ -5701,6 +5702,7 @@ impl AccountsDb {
                 Err(MismatchedBankHash)
             }
         } else {
+            error!("missing bank hash, slot: {}, {} {} cluster_slot_state_verifier", slot, file!(), line!());
             Err(MissingBankHash)
         }
     }
@@ -6024,6 +6026,8 @@ impl AccountsDb {
         {
             let mut bank_hashes = self.bank_hashes.write().unwrap();
             for slot in dead_slots_iter {
+                error!("remove_dead_slots_metadata, slot: {}, {} {} cluster_slot_state_verifier", slot, file!(), line!());
+
                 bank_hashes.remove(slot);
             }
         }

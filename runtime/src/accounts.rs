@@ -187,6 +187,7 @@ impl Accounts {
 
     pub fn new_from_parent(parent: &Accounts, slot: Slot, parent_slot: Slot) -> Self {
         let accounts_db = parent.accounts_db.clone();
+        error!("new_from_parent, slot: {}, {} {} cluster_slot_state_verifier", slot, file!(), line!());
         accounts_db.set_hash(slot, parent_slot);
         Self {
             accounts_db,
