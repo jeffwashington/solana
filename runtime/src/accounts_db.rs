@@ -5405,6 +5405,21 @@ impl AccountsDb {
                     });
                 }
             }
+            let acceptable_straggler_slot_count = 1000; // do nothing special for these old stores which will likely get cleaned up shortly
+            let sub = slots_per_epoch + acceptable_straggler_slot_count;
+            let in_epoch_range_start = max.saturating_sub(sub);
+            for slot in storages.range().start..in_epoch_range_start {
+                if let Some(storages) = storages.get(slot) {
+                    storages.iter().for_each(|store| {
+                        store.accounts.accounts(0).iter().for_each(|account| {
+                            let pk = account.meta.pubkey;
+                            if self.is_filler_account(&pk) {
+                                error!("old: slot: {}, pubkey: {}", slot, pk);
+                            }
+                        });
+                    });
+                }
+            }
         }
     }
 
