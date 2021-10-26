@@ -4404,6 +4404,7 @@ impl Bank {
         let subrange = Self::pubkey_range_from_partition(partition);
 
         self.rc.accounts.hold_range_in_memory(&subrange, true);
+        error!("collecting rent: {}, slot: {}", subrange.start(), self.slot());
 
         let accounts = self
             .rc
