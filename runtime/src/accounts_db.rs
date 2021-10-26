@@ -5411,12 +5411,21 @@ impl AccountsDb {
             for slot in storages.range().start..in_epoch_range_start {
                 if let Some(storages) = storages.get(slot) {
                     storages.iter().for_each(|store| {
+                        let cs = (store.count(), store.status());
+                        let b = (store.alive_bytes(), store.written_bytes());
+                        let mut pk1 = None;
+                        let mut count=0;
                         store.accounts.accounts(0).iter().for_each(|account| {
                             let pk = account.meta.pubkey;
                             if self.is_filler_account(&pk) {
-                                error!("old: slot: {}, pubkey: {}", slot, pk);
+                                pk1 = Some(pk);
+                                count += 1;
                             }
                         });
+                        if let Some(pk1) = pk1 {
+                            let entries = self.accounts_index.get(&pk1, None, None);
+                            error!("old: slot: {}, pubkey: {}, count, status: {:?}, bytes: {:?}, #: {}, entries: {:?}", slot, pk1, cs, b, count, entries);
+                        }
                     });
                 }
             }

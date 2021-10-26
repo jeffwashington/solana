@@ -201,6 +201,7 @@ impl<T: IndexValue> AccountMapEntryInner<T> {
     }
 }
 
+#[derive(Debug)]
 pub enum AccountIndexGetResult<'a, T: IndexValue> {
     Found(ReadAccountMapEntry<T>, usize),
     NotFoundOnFork,

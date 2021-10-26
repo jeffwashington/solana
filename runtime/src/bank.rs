@@ -4404,8 +4404,6 @@ impl Bank {
         let subrange = Self::pubkey_range_from_partition(partition);
 
         self.rc.accounts.hold_range_in_memory(&subrange, true);
-        error!("collecting rent: {}, slot: {}", subrange.start(), self.slot());
-
         let accounts = self
             .rc
             .accounts
@@ -4417,6 +4415,10 @@ impl Bank {
         let mut total_rent = 0;
         let mut rent_debits = RentDebits::default();
         for (pubkey, mut account) in accounts {
+            if self.rc.accounts.accounts_db.is_filler_account(&pubkey) {
+                error!("collecting rent: {}, slot: {}, {}", subrange.start(), self.slot(), pubkey);
+            }
+
             let rent = self.rent_collector.collect_from_existing_account(
                 &pubkey,
                 &mut account,
