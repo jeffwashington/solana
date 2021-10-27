@@ -4414,10 +4414,14 @@ impl Bank {
         let rent_for_sysvars = self.rent_for_sysvars();
         let mut total_rent = 0;
         let mut rent_debits = RentDebits::default();
+        let mut first = true;
+        error!("collecting rent: {}, slot: {}", subrange.start(), self.slot());
         for (pubkey, mut account) in accounts {
+            /*
             if self.rc.accounts.accounts_db.is_filler_account(&pubkey) {
                 error!("collecting rent: {}, slot: {}, {}", subrange.start(), self.slot(), pubkey);
             }
+            */
 
             let rent = self.rent_collector.collect_from_existing_account(
                 &pubkey,
