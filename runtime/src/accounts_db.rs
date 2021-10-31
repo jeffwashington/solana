@@ -1726,6 +1726,7 @@ impl AccountsDb {
         // This number isn't carefully chosen; just guessed randomly such that
         // the hot loop will be the order of ~Xms.
         const INDEX_CLEAN_BULK_COUNT: usize = 4096;
+        let filler = AtomicUsize::default();
 
         let mut clean_rooted = Measure::start("clean_old_root-ms");
         let reclaim_vecs = purges
@@ -1733,6 +1734,9 @@ impl AccountsDb {
             .map(|pubkeys: &[Pubkey]| {
                 let mut reclaims = Vec::new();
                 for pubkey in pubkeys {
+                    if self.is_filler_account(pubkey) {
+                        filler.fetch_add(1, Ordering::Relaxed);
+                    }
                     self.accounts_index
                         .clean_rooted_entries(pubkey, &mut reclaims, max_clean_root);
                 }
@@ -1740,6 +1744,7 @@ impl AccountsDb {
             });
         let reclaims: Vec<_> = reclaim_vecs.flatten().collect();
         clean_rooted.stop();
+        error!("filler clean accounts: {}", filler.load(Ordering::Relaxed));
         inc_new_counter_info!("clean-old-root-par-clean-ms", clean_rooted.as_ms() as usize);
         self.clean_accounts_stats
             .clean_old_root_us
@@ -1975,9 +1980,13 @@ impl AccountsDb {
         });
         let dirty_stores_len = dirty_stores.len();
         let pubkeys = DashSet::new();
+        let mut filler = 0;
         for (_slot, store) in dirty_stores {
             for account in store.accounts.accounts(0) {
                 pubkeys.insert(account.meta.pubkey);
+                if self.is_filler_account(&account.meta.pubkey) {
+                    filler += 1;
+                }
             }
         }
         trace!(
@@ -1985,6 +1994,7 @@ impl AccountsDb {
             dirty_stores_len,
             pubkeys.len()
         );
+        error!("filler before clean: {}", filler);
         timings.dirty_pubkeys_count = pubkeys.len() as u64;
         dirty_store_processing_time.stop();
         timings.dirty_store_processing_us += dirty_store_processing_time.as_us();
@@ -2071,6 +2081,7 @@ impl AccountsDb {
         let total_keys_count = pubkeys.len();
         let mut accounts_scan = Measure::start("accounts_scan");
         let uncleaned_roots = self.accounts_index.clone_uncleaned_roots();
+        error!("clean: uncleaned roots: {:?}", uncleaned_roots);
         let uncleaned_roots_len = self.accounts_index.uncleaned_roots_len();
         let found_not_zero_accum = AtomicU64::new(0);
         let not_found_on_fork_accum = AtomicU64::new(0);
