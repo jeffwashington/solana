@@ -2135,7 +2135,7 @@ impl AccountsDb {
                                             }
                                             let slot = *slot;
 
-                                            if fa {
+                                            if fa && slot_list.len() == 2 {
                                                 error!("filler act: {}, slot: {}, filler slot list: {}, uncleaned: {}", pubkey, slot, slot_list.len(), uncleaned_roots.contains(&slot));
                                             }
 
