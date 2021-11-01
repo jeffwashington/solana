@@ -2106,7 +2106,11 @@ impl AccountsDb {
                             // return true if we want this item to remain in the cache
                             |exists, slot_list, index_in_slot_list, pubkey, ref_count| {
                                 let mut useless = true;
+                                let fa = self.is_filler_account(pubkey);
                                 if !exists {
+                                    if fa {
+                                        error!("filler exists false: {}", pubkey);
+                                    }
                                     missing += 1;
                                 } else {
                                     match index_in_slot_list {
@@ -2131,6 +2135,10 @@ impl AccountsDb {
                                             }
                                             let slot = *slot;
 
+                                            if fa {
+                                                error!("filler act: {}, slot: {}, filler slot list: {}, uncleaned: {}", pubkey, slot, slot_list.len(), uncleaned_roots.contains(&slot));
+                                            }
+
                                             if uncleaned_roots.contains(&slot) {
                                                 // Assertion enforced by `accounts_index.get()`, the latest slot
                                                 // will not be greater than the given `max_clean_root`
@@ -2148,7 +2156,10 @@ impl AccountsDb {
                                             // Also, this pubkey must have been touched by some slot since
                                             // it was in the dirty list, so we assume that the slot it was
                                             // touched in must be unrooted.
-                                            not_found_on_fork += 1;
+                                            if fa {
+                                                error!("filler none: {}", pubkey);
+                                            }
+                                                    not_found_on_fork += 1;
                                             useless = false;
                                             purges_old_accounts.push(*pubkey);
                                         }
