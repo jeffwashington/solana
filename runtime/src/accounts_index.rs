@@ -774,7 +774,7 @@ pub struct AccountsIndex<T: IndexValue> {
     // scanning the fork with that Bank at the tip is no longer possible.
     pub removed_bank_ids: Mutex<HashSet<BankId>>,
 
-    storage: AccountsIndexStorage<T>,
+    pub storage: AccountsIndexStorage<T>,
 }
 
 impl<T: IndexValue> AccountsIndex<T> {

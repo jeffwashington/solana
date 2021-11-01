@@ -5941,7 +5941,7 @@ impl AccountsDb {
                 for (info, pubkey_account) in infos_chunk.iter().zip(accounts_chunk.iter()) {
                     let pubkey = pubkey_account.0;
                     let fa = self.is_filler_account(pubkey);
-                    if fa {
+                    if fa && !self.accounts_index.storage.storage.get_startup() {
                         error!("filler update idx: {}, {}", slot, pubkey);
                     }
 
