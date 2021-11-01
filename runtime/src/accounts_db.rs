@@ -2137,8 +2137,10 @@ impl AccountsDb {
 
                                             if fa && slot_list.len() == 2 {
                                                 error!("filler act: {}, slot: {}, filler slot list: {}, uncleaned: {}", pubkey, slot, slot_list.len(), uncleaned_roots.contains(&slot));
-                                            }
-
+                                            } else if fa && slot_list.len() 
+                                        == 2 {
+                                            error!("filler act1: {}, slot: {}, filler slot list: {}, uncleaned: {}", pubkey, slot, slot_list.len(), uncleaned_roots.contains(&slot));
+                                        }
                                             if uncleaned_roots.contains(&slot) {
                                                 // Assertion enforced by `accounts_index.get()`, the latest slot
                                                 // will not be greater than the given `max_clean_root`
@@ -5938,6 +5940,11 @@ impl AccountsDb {
                 let mut reclaims = Vec::with_capacity(infos_chunk.len() / 2);
                 for (info, pubkey_account) in infos_chunk.iter().zip(accounts_chunk.iter()) {
                     let pubkey = pubkey_account.0;
+                    let fa = self.is_filler_account(pubkey);
+                    if fa {
+                        error!("filler update idx: {}, {}", slot, pubkey);
+                    }
+
                     self.accounts_index.upsert(
                         slot,
                         pubkey,
