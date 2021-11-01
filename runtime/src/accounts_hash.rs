@@ -804,6 +804,34 @@ pub mod tests {
     use std::str::FromStr;
 
     #[test]
+    fn test_zero_perf() {
+        solana_logger::setup();
+        let ct = 432000;
+        let div = 2500;
+        let chunks = ct / div + 1;
+        let accts = 400_000_000 / div;
+        let acct2 = accts / chunks;
+        let mut data = vec![];
+        for c in 0..chunks {
+            let random = (0..acct2).into_iter().map(|_| {
+                let key = Pubkey::new_rand();
+                let hash = Hash::new(&[1u8; 32]);
+                let val = CalculateHashIntermediate::new(hash, 88, key);
+                val
+            }).collect::<Vec<_>>();
+            data.push(vec![random]);
+        }
+        let ah = AccountsHash::default();
+
+        for i in 0..10 {
+        let mut m = Measure::start("");
+        ah.de_dup_accounts_in_parallel(&data[..], 0);
+        m.stop();
+        error!("time: {}", m.as_us());
+        }
+    }
+
+    #[test]
     fn test_accountsdb_div_ceil() {
         assert_eq!(AccountsHash::div_ceil(10, 3), 4);
         assert_eq!(AccountsHash::div_ceil(0, 1), 0);
