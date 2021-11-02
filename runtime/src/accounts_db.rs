@@ -1984,7 +1984,7 @@ impl AccountsDb {
                 false
             }
         });
-        error!("filler dirty_stores: {:?}", dirty_stores);
+        error!("filler dirty_stores: {:?}", dirty_stores.iter().map(|(slot, store)| slot).collect::<Vec<_>>());
         let dirty_stores_len = dirty_stores.len();
         let pubkeys = DashSet::new();
         let mut filler = 0;
@@ -5892,19 +5892,12 @@ impl AccountsDb {
             .scan_account_storage(
                 slot,
                 |loaded_account: LoadedAccount| {
-                    if self.is_filler_account(loaded_account.pubkey()) {
-                        None
-                    } else {
-                        // Cache only has one version per key, don't need to worry about versioning
-                        Some((*loaded_account.pubkey(), loaded_account.loaded_hash()))
-                    }
+                    // Cache only has one version per key, don't need to worry about versioning
+                    Some((*loaded_account.pubkey(), loaded_account.loaded_hash()))
                 },
                 |accum: &DashMap<Pubkey, (u64, Hash)>, loaded_account: LoadedAccount| {
                     let loaded_write_version = loaded_account.write_version();
                     let loaded_hash = loaded_account.loaded_hash();
-                    if self.is_filler_account(loaded_account.pubkey()) {
-                        return;
-                    }
                     // keep the latest write version for each pubkey
                     match accum.entry(*loaded_account.pubkey()) {
                         Occupied(mut occupied_entry) => {
@@ -5922,14 +5915,25 @@ impl AccountsDb {
         scan.stop();
 
         let mut accumulate = Measure::start("accumulate");
-        let hashes: Vec<_> = match scan_result {
+        let mut hashes: Vec<_> = match scan_result {
             ScanStorageResult::Cached(cached_result) => cached_result,
             ScanStorageResult::Stored(stored_result) => stored_result
                 .into_iter()
                 .map(|(pubkey, (_latest_write_version, hash))| (pubkey, hash))
                 .collect(),
         };
-        let dirty_keys = hashes.iter().map(|(pubkey, _hash)| *pubkey).collect();
+        let mut found_filler = false;
+        let dirty_keys = hashes.iter().map(|(pubkey, _hash)| {
+            if !found_filler && self.is_filler_account(pubkey) {
+                found_filler = true;
+            }
+            *pubkey}
+        ).collect();
+
+        if found_filler {
+            // filler accounts must be added to 'dirty_keys' but cannot be used to calculate hash
+            hashes.retain(|(pubkey, _hash)| !self.is_filler_account(pubkey));
+        }
 
         let ret = AccountsHash::accumulate_account_hashes(hashes);
         accumulate.stop();
