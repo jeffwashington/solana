@@ -221,13 +221,13 @@ struct GenerateIndexTimings {
     pub insertion_time_us: u64,
     pub min_bin_size: usize,
     pub max_bin_size: usize,
-    #[allow(dead_code)]
     pub total_items: usize,
     pub storage_size_accounts_map_us: u64,
     pub storage_size_storages_us: u64,
     pub storage_size_accounts_map_flatten_us: u64,
     pub index_flush_us: u64,
     pub rent_exempt: u64,
+    pub total_duplicates: u64,
 }
 
 #[derive(Default, Debug, PartialEq)]
@@ -264,6 +264,8 @@ impl GenerateIndexTimings {
             ),
             ("index_flush_us", self.index_flush_us as i64, i64),
             ("rent_exempt", self.rent_exempt as i64, i64),
+            ("total_duplicates", self.total_duplicates as i64, i64),
+            ("total_items", self.total_items as i64, i64),
         );
     }
 }
@@ -6756,9 +6758,9 @@ impl AccountsDb {
         accounts_map: GenerateIndexAccountsMap<'a>,
         slot: &Slot,
         rent_collector: &RentCollector,
-    ) -> (u64, u64) {
+    ) -> (u64, u64, u64) {
         if accounts_map.is_empty() {
-            return (0, 0);
+            return (0, 0, 0);
         }
 
         let secondary = !self.account_indexes.is_empty();
@@ -6812,7 +6814,7 @@ impl AccountsDb {
         if !dirty_pubkeys.is_empty() {
             self.uncleaned_pubkeys.insert(*slot, dirty_pubkeys);
         }
-        (insert_us, rent_exempt)
+        (insert_us, rent_exempt, len as u64)
     }
 
     fn filler_unique_id_bytes() -> usize {
@@ -6968,6 +6970,7 @@ impl AccountsDb {
             let mut index_time = Measure::start("index");
             let insertion_time_us = AtomicU64::new(0);
             let rent_exempt = AtomicU64::new(0);
+            let total_duplicates = AtomicU64::new(0);
             let storage_info_timings = Mutex::new(GenerateIndexTimings::default());
             let scan_time: u64 = slots
                 .par_chunks(chunk_size)
@@ -6996,8 +6999,9 @@ impl AccountsDb {
 
                         let insert_us = if pass == 0 {
                             // generate index
-                            let (insert_us, rent_exempt_this_slot) = self.generate_index_for_slot(accounts_map, slot, &rent_collector);
+                            let (insert_us, rent_exempt_this_slot, total_this_slot) = self.generate_index_for_slot(accounts_map, slot, &rent_collector);
                             rent_exempt.fetch_add(rent_exempt_this_slot, Ordering::Relaxed);
+                            total_duplicates.fetch_add(total_this_slot, Ordering::Relaxed);
                             insert_us
                         } else {
                             // verify index matches expected and measure the time to get all items
@@ -7070,6 +7074,8 @@ impl AccountsDb {
                 max_bin_size,
                 total_items,
                 rent_exempt: rent_exempt.load(Ordering::Relaxed),
+                total_duplicates: total_duplicates.load(Ordering::Relaxed),
+                //total_this_slot: total_this_slot.load(Ordering::Relaxed),
                 storage_size_accounts_map_us: storage_info_timings.storage_size_accounts_map_us,
                 storage_size_accounts_map_flatten_us: storage_info_timings
                     .storage_size_accounts_map_flatten_us,
