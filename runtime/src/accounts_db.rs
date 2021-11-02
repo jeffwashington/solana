@@ -1982,6 +1982,7 @@ impl AccountsDb {
                 false
             }
         });
+        error!("filler dirty_stores: {:?}", dirty_stores);
         let dirty_stores_len = dirty_stores.len();
         let pubkeys = DashSet::new();
         let mut filler = 0;
@@ -1998,11 +1999,10 @@ impl AccountsDb {
             dirty_stores_len,
             pubkeys.len()
         );
-        error!("filler before clean: {}", filler);
         timings.dirty_pubkeys_count = pubkeys.len() as u64;
         dirty_store_processing_time.stop();
         timings.dirty_store_processing_us += dirty_store_processing_time.as_us();
-
+        let filler_delta = AtomicUsize::default();
         let mut collect_delta_keys = Measure::start("key_create");
         let delta_keys = self.remove_uncleaned_slots_and_collect_pubkeys_up_to_slot(max_slot);
         collect_delta_keys.stop();
@@ -2012,10 +2012,14 @@ impl AccountsDb {
         self.thread_pool_clean.install(|| {
             delta_keys.par_iter().for_each(|keys| {
                 for key in keys {
+                    if self.is_filler_account(key) {
+                        filler_delta.fetch_add(1, Ordering::Relaxed);
+                    }
                     pubkeys.insert(*key);
                 }
             });
         });
+        error!("filler before clean: {}, max root: {:?}, filler delta: {}", filler, max_slot, filler_delta.load(Ordering::Relaxed));
         delta_insert.stop();
         timings.delta_insert_us += delta_insert.as_us();
 
@@ -2166,6 +2170,10 @@ impl AccountsDb {
                                                 }
                                                 purges_old_accounts.push(*pubkey);
                                                 useless = false;
+                                            }else {
+                                                if self.accounts_index.is_uncleaned_root(slot) {
+                                                    error!("{}{} panic {}", file!(), line!(), slot);
+                                                }
                                             }
                                         }
                                         None => {
@@ -2636,7 +2644,7 @@ impl AccountsDb {
     where
         I: Iterator<Item = &'a Arc<AccountStorageEntry>>,
     {
-        debug!("do_shrink_slot_stores: slot: {}", slot);
+        error!("do_shrink_slot_stores: slot: {}", slot);
         let mut stored_accounts: HashMap<Pubkey, FoundStoredAccount> = HashMap::new();
         let mut original_bytes = 0;
         let mut num_stores = 0;
@@ -5448,7 +5456,7 @@ impl AccountsDb {
                     });
                 }
             }
-            let acceptable_straggler_slot_count = 10000; // do nothing special for these old stores which will likely get cleaned up shortly
+            let acceptable_straggler_slot_count = 1000; // do nothing special for these old stores which will likely get cleaned up shortly
             let sub = slots_per_epoch + acceptable_straggler_slot_count;
             let in_epoch_range_start = max.saturating_sub(sub);
             for slot in storages.range().start..in_epoch_range_start {
@@ -6061,6 +6069,7 @@ impl AccountsDb {
                 );
                 let count = store.remove_account(account_info.stored_size, reset_accounts);
                 if count == 0 {
+                    error!("filler adding dirty store: {}", *slot);
                     self.dirty_stores
                         .insert((*slot, store.append_vec_id()), store.clone());
                     dead_slots.insert(*slot);
@@ -6612,6 +6621,7 @@ impl AccountsDb {
         }
         if let Some(slot_stores) = self.storage.get_slot_stores(slot) {
             for (store_id, store) in slot_stores.read().unwrap().iter() {
+                error!("adding dirty store: {}", slot);
                 self.dirty_stores.insert((slot, *store_id), store.clone());
             }
         }
