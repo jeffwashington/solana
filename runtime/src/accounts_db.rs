@@ -2142,13 +2142,13 @@ impl AccountsDb {
                                                         if i == &slot {
                                                             error!("panic {}{} {}", file!(), line!(), slot);
                                                         }
-                                                        assert_ne!(i, &slot);
+                                                        //assert_ne!(i, &slot);
                                                     }
                                                 }
                                                 if uncleaned_roots_len != uncleaned_roots.len() {
                                                     error!("panic {}{}, {} {}", file!(), line!(), uncleaned_roots_len, uncleaned_roots.len());
                                                 }
-                                                assert_eq!(uncleaned_roots_len, uncleaned_roots.len());
+                                                //assert_eq!(uncleaned_roots_len, uncleaned_roots.len());
                                                 error!("filler act: {}, slot: {}, filler slot list: {}, uncleaned: {}", pubkey, slot, slot_list.len(), uncleaned_roots.contains(&slot));
                                             } else if fa && slot_list.len() 
                                         == 2 {
