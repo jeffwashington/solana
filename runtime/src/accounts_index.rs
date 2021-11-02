@@ -1807,9 +1807,10 @@ impl<T: IndexValue> AccountsIndex<T> {
 
     pub fn add_uncleaned_roots<I>(&self, roots: I)
     where
-        I: IntoIterator<Item = Slot>,
+        I: IntoIterator<Item = Slot> + Debug,
     {
         let mut w_roots_tracker = self.roots_tracker.write().unwrap();
+        error!("add_uncleaned_roots: {:?}", roots);
         w_roots_tracker.uncleaned_roots.extend(roots);
     }
 

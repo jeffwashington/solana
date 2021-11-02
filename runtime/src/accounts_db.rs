@@ -2053,6 +2053,7 @@ impl AccountsDb {
         is_startup: bool,
         last_full_snapshot_slot: Option<Slot>,
     ) {
+        error!("filler clean_accounts");
         let mut measure_all = Measure::start("clean_accounts");
         let max_clean_root = self.max_clean_root(max_clean_root);
 
@@ -2081,8 +2082,8 @@ impl AccountsDb {
         let total_keys_count = pubkeys.len();
         let mut accounts_scan = Measure::start("accounts_scan");
         let uncleaned_roots = self.accounts_index.clone_uncleaned_roots();
-        error!("clean: uncleaned roots: {:?}", uncleaned_roots);
-        let uncleaned_roots_len = self.accounts_index.uncleaned_roots_len();
+        error!("clean: uncleaned roots: {}, {:?}", uncleaned_roots.len(), uncleaned_roots);
+        let uncleaned_roots_len = uncleaned_roots.len();
         let found_not_zero_accum = AtomicU64::new(0);
         let not_found_on_fork_accum = AtomicU64::new(0);
         let missing_accum = AtomicU64::new(0);
@@ -2136,7 +2137,13 @@ impl AccountsDb {
                                             let slot = *slot;
 
                                             if fa && slot_list.len() == 2 {
-                                                error!("filler act: {}, slot: {}, filler slot list: {}, uncleaned: {}", pubkey, slot, slot_list.len(), uncleaned_roots.contains(&slot));
+                                                if !uncleaned_roots.contains(&slot){
+                                                    for i in &uncleaned_roots {
+                                                        assert_ne!(i, &slot);
+                                                    }
+                                                }
+                                                assert_eq!(uncleaned_roots_len, uncleaned_roots.len());
+                                                error!("filler act: {}, slot: {}, filler slot list: {}, uncleaned: {}, uncleaned len: {}", pubkey, slot, slot_list.len(), uncleaned_roots.contains(&slot), uncleaned_roots.len());
                                             } else if fa && slot_list.len() 
                                         == 2 {
                                             error!("filler act1: {}, slot: {}, filler slot list: {}, uncleaned: {}", pubkey, slot, slot_list.len(), uncleaned_roots.contains(&slot));
@@ -2309,6 +2316,7 @@ impl AccountsDb {
 
         reclaims_time.stop();
         measure_all.stop();
+        error!("filler clean_accounts done");
 
         self.clean_accounts_stats.report();
         datapoint_info!(
@@ -4716,6 +4724,7 @@ impl AccountsDb {
         slot_cache: &SlotCache,
         mut should_flush_f: Option<&mut impl FnMut(&Pubkey, &AccountSharedData) -> bool>,
     ) -> FlushStats {
+        error!("filler flush slot cache: {}", slot);
         let mut num_purged = 0;
         let mut total_size = 0;
         let mut num_flushed = 0;
