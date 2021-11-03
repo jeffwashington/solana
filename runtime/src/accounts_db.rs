@@ -138,6 +138,17 @@ pub const ACCOUNTS_DB_CONFIG_FOR_BENCHMARKS: AccountsDbConfig = AccountsDbConfig
     hash_calc_num_passes: None,
 };
 
+struct CalcRentExempt {
+    slot: Slot,
+    exempt: bool,
+}
+
+impl CalcRentExempt {
+    pub fn new(slot: Slot, exempt: bool) -> Self {
+        Self { slot, exempt }
+    }
+}
+
 pub type BinnedHashData = Vec<Vec<CalculateHashIntermediate>>;
 
 #[derive(Debug, Default, Clone)]
@@ -6682,18 +6693,38 @@ impl AccountsDb {
         accounts_map
     }
 
+    /// log debug info on rent exempt calculations
+    fn log_rent_exempt(calc_rent_exempt: DashMap<Pubkey, CalcRentExempt>) {
+        let total = calc_rent_exempt.len();
+        let mut rent_exempt_count = 0;
+        for item in calc_rent_exempt {
+            if item.1.exempt {
+                rent_exempt_count += 1;
+            }
+        }
+        info!(
+            "rent_exempt: total_unique_accounts: {}, total_rent_exempt: {}, non_rent_exempt: {}",
+            total,
+            rent_exempt_count,
+            total.saturating_sub(rent_exempt_count)
+        );
+    }
+
     /// return time_us, # accts rent exempt, total # accts
     fn generate_index_for_slot<'a>(
         &self,
         accounts_map: GenerateIndexAccountsMap<'a>,
         slot: &Slot,
         rent_collector: &RentCollector,
+        calc_rent_exempt: Option<&DashMap<Pubkey, CalcRentExempt>>,
     ) -> (u64, u64, u64) {
         if accounts_map.is_empty() {
             return (0, 0, 0);
         }
 
         let secondary = !self.account_indexes.is_empty();
+
+        let do_calc_rent_exempt = calc_rent_exempt.is_some();
 
         let mut rent_exempt = 0;
         let len = accounts_map.len();
@@ -6715,11 +6746,25 @@ impl AccountsDb {
                     );
                 }
 
-                if rent_collector.no_rent(&pubkey, &stored_account, false) || {
+                let is_rent_exempt = rent_collector.no_rent(&pubkey, &stored_account, false) || {
                     let (_rent_due, exempt) = rent_collector.get_rent_due(&stored_account);
                     exempt
-                } {
+                };
+                if is_rent_exempt {
                     rent_exempt += 1;
+                };
+                if do_calc_rent_exempt {
+                    let new_entry = CalcRentExempt::new(*slot, is_rent_exempt);
+                    match calc_rent_exempt.as_ref().unwrap().entry(pubkey) {
+                        dashmap::mapref::entry::Entry::Occupied(mut occupied_entry) => {
+                            if new_entry.slot > occupied_entry.get().slot {
+                                occupied_entry.insert(new_entry);
+                            }
+                        }
+                        dashmap::mapref::entry::Entry::Vacant(vacant_entry) => {
+                            vacant_entry.insert(new_entry);
+                        }
+                    }
                 }
 
                 (
@@ -6890,6 +6935,13 @@ impl AccountsDb {
             &genesis_config.rent,
         );
 
+        let calc_rent_exempt = true;
+        let mut calc_rent_exempt = if calc_rent_exempt {
+            Some(DashMap::new())
+        } else {
+            None
+        };
+
         // pass == 0 always runs and generates the index
         // pass == 1 only runs if verify == true.
         // verify checks that all the expected items are in the accounts index and measures how long it takes to look them all up
@@ -6934,8 +6986,13 @@ impl AccountsDb {
 
                         let insert_us = if pass == 0 {
                             // generate index
-                            let (insert_us, rent_exempt_this_slot, total_this_slot) =
-                                self.generate_index_for_slot(accounts_map, slot, &rent_collector);
+                            let (insert_us, rent_exempt_this_slot, total_this_slot) = self
+                                .generate_index_for_slot(
+                                    accounts_map,
+                                    slot,
+                                    &rent_collector,
+                                    calc_rent_exempt.as_ref(),
+                                );
                             rent_exempt.fetch_add(rent_exempt_this_slot, Ordering::Relaxed);
                             total_duplicates.fetch_add(total_this_slot, Ordering::Relaxed);
                             insert_us
@@ -6975,6 +7032,11 @@ impl AccountsDb {
                 })
                 .sum();
             index_time.stop();
+
+            if let Some(calc_rent_exempt) = calc_rent_exempt {
+                Self::log_rent_exempt(calc_rent_exempt);
+            }
+            calc_rent_exempt = None;
 
             let mut min_bin_size = usize::MAX;
             let mut max_bin_size = usize::MIN;
