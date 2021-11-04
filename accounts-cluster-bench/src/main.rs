@@ -39,11 +39,11 @@ pub fn airdrop_lamports(
     desired_balance: u64,
 ) -> bool {
     let starting_balance = client.get_balance(&id.pubkey()).unwrap_or(0);
-    info!("starting balance {}", starting_balance);
+    error!("starting balance {}", starting_balance);
 
     if starting_balance < desired_balance {
         let airdrop_amount = desired_balance - starting_balance;
-        info!(
+        error!(
             "Airdropping {:?} lamports from {} for {}",
             airdrop_amount,
             faucet_addr,
@@ -80,10 +80,10 @@ pub fn airdrop_lamports(
         let current_balance = client.get_balance(&id.pubkey()).unwrap_or_else(|e| {
             panic!("airdrop error {}", e);
         });
-        info!("current balance {}...", current_balance);
+        error!("current balance {}...", current_balance);
 
         if current_balance - starting_balance != airdrop_amount {
-            info!(
+            error!(
                 "Airdrop failed? {} {} {} {}",
                 id.pubkey(),
                 current_balance,
@@ -214,7 +214,7 @@ fn run_accounts_bench(
     let client =
         RpcClient::new_socket_with_commitment(entrypoint_addr, CommitmentConfig::confirmed());
 
-    info!("Targeting {}", entrypoint_addr);
+    error!("Targeting {}", entrypoint_addr);
 
     let mut latest_blockhash = Instant::now();
     let mut last_log = Instant::now();
@@ -243,7 +243,7 @@ fn run_accounts_bench(
         max_closed: Arc::new(AtomicU64::default()),
     };
 
-    info!("Starting balance(s): {:?}", balances);
+    error!("Starting balance(s): {:?}", balances);
 
     let executor = TransactionExecutor::new(entrypoint_addr);
 
@@ -283,7 +283,7 @@ fn run_accounts_bench(
                 }
                 last_balance = Instant::now();
                 if *balance < lamports * 2 {
-                    info!(
+                    error!(
                         "Balance {} is less than needed: {}, doing aidrop...",
                         balance, lamports
                     );
@@ -305,7 +305,7 @@ fn run_accounts_bench(
         if sigs_len < batch_size {
             let num_to_create = batch_size - sigs_len;
             if num_to_create >= payer_keypairs.len() {
-                info!("creating {} new", num_to_create);
+                error!("creating {} new", num_to_create);
                 let chunk_size = num_to_create / payer_keypairs.len();
                 if chunk_size > 0 {
                     for (i, keypair) in payer_keypairs.iter().enumerate() {
@@ -326,9 +326,9 @@ fn run_accounts_bench(
                             })
                             .collect();
                         balances[i] = balances[i].saturating_sub(lamports * txs.len() as u64);
-                        info!("txs: {}", txs.len());
+                        error!("txs: {}", txs.len());
                         let new_ids = executor.push_transactions(txs);
-                        info!("ids: {}", new_ids.len());
+                        error!("ids: {}", new_ids.len());
                         tx_sent_count += new_ids.len();
                         total_accounts_created += num_instructions * new_ids.len();
                     }
@@ -358,9 +358,9 @@ fn run_accounts_bench(
                         })
                         .collect();
                     balances[0] = balances[0].saturating_sub(fee * txs.len() as u64);
-                    info!("close txs: {}", txs.len());
+                    error!("close txs: {}", txs.len());
                     let new_ids = executor.push_transactions(txs);
-                    info!("close ids: {}", new_ids.len());
+                    error!("close ids: {}", new_ids.len());
                     tx_sent_count += new_ids.len();
                     total_accounts_closed += new_ids.len() as u64;
                 }
@@ -371,7 +371,7 @@ fn run_accounts_bench(
 
         count += 1;
         if last_log.elapsed().as_millis() > 3000 {
-            info!(
+            error!(
                 "total_accounts_created: {} total_accounts_closed: {} tx_sent_count: {} loop_count: {} balance(s): {:?}",
                 total_accounts_created, total_accounts_closed, tx_sent_count, count, balances
             );
@@ -519,7 +519,7 @@ fn main() {
     }
 
     let rpc_addr = if !skip_gossip {
-        info!("Finding cluster entry: {:?}", entrypoint_addr);
+        error!("Finding cluster entry: {:?}", entrypoint_addr);
         let (gossip_nodes, _validators) = discover(
             None, // keypair
             Some(&entrypoint_addr),
@@ -536,10 +536,10 @@ fn main() {
             exit(1);
         });
 
-        info!("done found {} nodes", gossip_nodes.len());
+        error!("done found {} nodes", gossip_nodes.len());
         gossip_nodes[0].rpc
     } else {
-        info!("Using {:?} as the RPC address", entrypoint_addr);
+        error!("Using {:?} as the RPC address", entrypoint_addr);
         entrypoint_addr
     };
 
@@ -587,7 +587,7 @@ pub mod test {
         let maybe_space = Some(10_000_000);
         let batch_size = 100;
         let close_nth_batch = 100;
-        let maybe_lamports = None;
+        let maybe_lamports = Some(190560924); // min lamports to keep it alive
         let num_instructions = 2;
         let mut start = Measure::start("total accounts run");
         run_accounts_bench(
@@ -603,6 +603,6 @@ pub mod test {
             None,
         );
         start.stop();
-        info!("{}", start);
+        error!("{}", start);
     }
 }
