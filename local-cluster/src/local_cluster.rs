@@ -217,6 +217,7 @@ impl LocalCluster {
         leader_config.rpc_addrs = Some((leader_node.info.rpc, leader_node.info.rpc_pubsub));
         leader_config.account_paths = vec![leader_ledger_path.join("accounts")];
         leader_config.tower_storage = Arc::new(FileTowerStorage::new(leader_ledger_path.clone()));
+        leader_config.accounts_db_caching_enabled = true;
         let leader_keypair = Arc::new(Keypair::from_bytes(&leader_keypair.to_bytes()).unwrap());
         let leader_vote_keypair =
             Arc::new(Keypair::from_bytes(&leader_vote_keypair.to_bytes()).unwrap());
