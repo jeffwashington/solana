@@ -583,7 +583,7 @@ pub mod test {
 
         let faucet_addr = SocketAddr::from(([127, 0, 0, 1], 9900));
         let cluster = LocalCluster::new(&mut config, SocketAddrSpace::Unspecified);
-        let iterations = 10;
+        let iterations = 10_000;
         let maybe_space = Some(10_000_000);
         let batch_size = 100;
         let close_nth_batch = 100;
