@@ -20,7 +20,7 @@ usage() {
 }
 
 if [[ -z $1 ]]; then # default behavior
-  $solana-accounts-cluster-bench \
+  $solana_accounts_cluster_bench \
     --entrypoint 127.0.0.1:8001 \
     --faucet 127.0.0.1:9900 \
     --duration 90 \
@@ -28,5 +28,5 @@ if [[ -z $1 ]]; then # default behavior
     --thread-batch-sleep-ms 0 \
 
 else
-  $solana-accounts-cluster-bench "$@"
+  $solana_accounts_cluster_bench "$@"
 fi

@@ -61,6 +61,7 @@ else
   }
 fi
 
+solana_accounts_cluster_bench=$(solana_program accounts-cluster-bench)
 solana_bench_tps=$(solana_program bench-tps)
 solana_faucet=$(solana_program faucet)
 solana_validator=$(solana_program validator)
