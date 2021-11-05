@@ -79,7 +79,6 @@ use std::{
 };
 use tempfile::TempDir;
 
-#[cfg(test)]
 use std::{thread::sleep, time::Duration};
 
 const PAGE_SIZE: u64 = 4 * 1024;
@@ -6269,10 +6268,19 @@ let mut t = Measure::start("");
     }
 
     pub fn store_cached(&self, slot: Slot, accounts: &[(&Pubkey, &AccountSharedData)]) {
-        let sum= self
-        .accounts_cache.size();
+        let sum = self.accounts_cache.size();
         if sum > 10_000_000_000 {
-            sleep(Duration::from_millis(10));
+            let changes: u64 = accounts.iter().map(|x| x.1.data().len() as u64).sum();
+            const MAX_DELAY_US: u64 = 10_000;
+            const BYTES_AT_MAX_DELAY: u64 = 10_000_000;
+            let delay = std::cmp::min(MAX_DELAY_US, MAX_DELAY_US * changes / BYTES_AT_MAX_DELAY);
+            datapoint_info!(
+                "accounts_db_store_cached_stall",
+                ("num_accounts", accounts.len(), i64),
+                ("delay_us", delay, i64),
+                ("bytes", changes, i64),
+            );
+            sleep(Duration::from_micros(delay));
         }
 
         self.store(slot, accounts, self.caching_enabled);
