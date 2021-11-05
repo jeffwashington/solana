@@ -4518,12 +4518,25 @@ impl AccountsDb {
         assert!(requested_flush_root.is_some());
 
         if !force_flush && self.accounts_cache.num_slots() <= MAX_CACHE_SLOTS {
-            datapoint_info!(
-                "accounts_db-flush_accounts_cache",
-                ("not_flushed_slots", self.accounts_cache.num_slots(), i64),
-                ("MAX_CACHE_SLOTS", MAX_CACHE_SLOTS, i64),
-            );
-            return;
+            let sum= self
+            .cache
+            .iter()
+            .map(|item| {
+                let slot_cache = item.value();
+                slot_cache
+                    .unique_account_writes_size
+                    .load(Ordering::Relaxed)
+            })
+            .sum();
+            if sum < 10_000_000_000 {
+                datapoint_info!(
+                    "accounts_db-flush_accounts_cache",
+                    ("not_flushed_slots", self.accounts_cache.num_slots(), i64),
+                    ("MAX_CACHE_SLOTS", MAX_CACHE_SLOTS, i64),
+                    ("sum Gbytes", sum / 1_000_000_000, i64),
+                );
+                return;
+            }
         }
 
         // Flush only the roots <= requested_flush_root, so that snapshotting has all
@@ -4789,6 +4802,8 @@ impl AccountsDb {
         slot: Slot,
         should_flush_f: Option<&mut impl FnMut(&Pubkey, &AccountSharedData) -> bool>,
     ) -> Option<FlushStats> {
+        inc_new_counter_info!("accounts_db-flush_slot_cache", 1);
+
         let is_being_purged = {
             let mut slots_under_contention = self
                 .remove_unrooted_slots_synchronization
