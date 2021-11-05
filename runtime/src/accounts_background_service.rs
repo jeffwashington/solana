@@ -32,7 +32,7 @@ const INTERVAL_MS: u64 = 100;
 const SHRUNKEN_ACCOUNT_PER_SEC: usize = 250;
 const SHRUNKEN_ACCOUNT_PER_INTERVAL: usize =
     SHRUNKEN_ACCOUNT_PER_SEC / (1000 / INTERVAL_MS as usize);
-const CLEAN_INTERVAL_BLOCKS: u64 = 100;
+const CLEAN_INTERVAL_BLOCKS: u64 = 10;
 
 // This value is chosen to spread the dropping cost over 3 expiration checks
 // RecycleStores are fully populated almost all of its lifetime. So, otherwise
@@ -463,6 +463,8 @@ impl AccountsBackgroundService {
                         if bank.block_height() - last_cleaned_block_height
                             > (CLEAN_INTERVAL_BLOCKS + thread_rng().gen_range(0, 10))
                         {
+                            inc_new_counter_info!("AccountsBackgroundService-flush_slot_cache_count", 1);
+
                             if accounts_db_caching_enabled {
                                 // Note that the flush will do an internal clean of the
                                 // cache up to bank.slot(), so should be safe as long
