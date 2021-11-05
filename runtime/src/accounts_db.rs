@@ -4530,6 +4530,7 @@ impl AccountsDb {
                 );
                 return;
             }
+            inc_new_counter_info!("accounts_db-flushing_because_of_size", 1);
         }
 
         // Flush only the roots <= requested_flush_root, so that snapshotting has all
@@ -4562,6 +4563,7 @@ impl AccountsDb {
                 // for `should_clean`.
                 self.flush_rooted_accounts_cache(None, None)
             } else {
+                inc_new_counter_info!("accounts_db-skipping_flush", 1);
                 (0, 0)
             };
         let old_slots = self.accounts_cache.find_older_frozen_slots(MAX_CACHE_SLOTS);
@@ -4842,6 +4844,7 @@ impl AccountsDb {
                 .notify_all();
             flush_stats
         } else {
+            inc_new_counter_info!("accounts_db-flush_slot_cache-cannot_lock", 1);
             None
         }
     }
