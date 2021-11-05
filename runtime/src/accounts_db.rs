@@ -4517,8 +4517,9 @@ impl AccountsDb {
         #[cfg(not(test))]
         assert!(requested_flush_root.is_some());
 
+        let sum = 0;
         if !force_flush && self.accounts_cache.num_slots() <= MAX_CACHE_SLOTS {
-            let sum= self
+            sum= self
             .accounts_cache.size();
             if sum < 10_000_000_000 {
                 datapoint_info!(
@@ -4553,7 +4554,7 @@ impl AccountsDb {
 
         // If there are > MAX_CACHE_SLOTS, then flush the excess ones to storage
         let (total_new_excess_roots, num_excess_roots_flushed) =
-            if self.accounts_cache.num_slots() > MAX_CACHE_SLOTS {
+            if self.accounts_cache.num_slots() > MAX_CACHE_SLOTS || sum > 10_000_000_000 {
                 // Start by flushing the roots
                 //
                 // Cannot do any cleaning on roots past `requested_flush_root` because future
