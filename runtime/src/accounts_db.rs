@@ -4797,6 +4797,8 @@ impl AccountsDb {
         slot: Slot,
         should_flush_f: Option<&mut impl FnMut(&Pubkey, &AccountSharedData) -> bool>,
     ) -> Option<FlushStats> {
+
+let mut t = Measure::start("");
         inc_new_counter_info!("accounts_db-flush_slot_cache", 1);
 
         let is_being_purged = {
@@ -4842,6 +4844,9 @@ impl AccountsDb {
             self.remove_unrooted_slots_synchronization
                 .signal
                 .notify_all();
+                t.stop();
+                inc_new_counter_info!("accounts_db-flush_slot_cache_ms", t.as_ms() as usize);
+                
             flush_stats
         } else {
             inc_new_counter_info!("accounts_db-flush_slot_cache-cannot_lock", 1);
