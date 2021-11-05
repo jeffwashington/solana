@@ -6269,6 +6269,12 @@ let mut t = Measure::start("");
     }
 
     pub fn store_cached(&self, slot: Slot, accounts: &[(&Pubkey, &AccountSharedData)]) {
+        let sum= self
+        .accounts_cache.size();
+        if sum > 10_000_000_000 {
+            sleep(Duration::from_millis(10));
+        }
+
         self.store(slot, accounts, self.caching_enabled);
     }
 
