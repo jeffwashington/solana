@@ -4518,6 +4518,11 @@ impl AccountsDb {
         assert!(requested_flush_root.is_some());
 
         if !force_flush && self.accounts_cache.num_slots() <= MAX_CACHE_SLOTS {
+            datapoint_info!(
+                "accounts_db-flush_accounts_cache",
+                ("not_flushed_slots", self.accounts_cache.num_slots(), i64),
+                ("MAX_CACHE_SLOTS", MAX_CACHE_SLOTS, i64),
+            );
             return;
         }
 
