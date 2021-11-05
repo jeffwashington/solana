@@ -4519,15 +4519,7 @@ impl AccountsDb {
 
         if !force_flush && self.accounts_cache.num_slots() <= MAX_CACHE_SLOTS {
             let sum= self
-            .cache
-            .iter()
-            .map(|item| {
-                let slot_cache = item.value();
-                slot_cache
-                    .unique_account_writes_size
-                    .load(Ordering::Relaxed)
-            })
-            .sum();
+            .accounts_cache.size();
             if sum < 10_000_000_000 {
                 datapoint_info!(
                     "accounts_db-flush_accounts_cache",

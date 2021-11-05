@@ -141,7 +141,7 @@ impl CachedAccountInner {
 
 #[derive(Debug, Default)]
 pub struct AccountsCache {
-    cache: DashMap<Slot, SlotCache>,
+    pub cache: DashMap<Slot, SlotCache>,
     // Queue of potentially unflushed roots. Random eviction + cache too large
     // could have triggered a flush of this slot already
     maybe_unflushed_roots: RwLock<BTreeSet<Slot>>,
@@ -149,8 +149,8 @@ pub struct AccountsCache {
 }
 
 impl AccountsCache {
-    pub fn report_size(&self) {
-        let total_unique_writes_size: u64 = self
+    pub fn size(&self) -> u64 {
+        self
             .cache
             .iter()
             .map(|item| {
@@ -159,7 +159,9 @@ impl AccountsCache {
                     .unique_account_writes_size
                     .load(Ordering::Relaxed)
             })
-            .sum();
+            .sum()
+    }
+    pub fn report_size(&self) {
         datapoint_info!(
             "accounts_cache_size",
             (
@@ -168,7 +170,7 @@ impl AccountsCache {
                 i64
             ),
             ("num_slots", self.cache.len(), i64),
-            ("total_unique_writes_size", total_unique_writes_size, i64),
+            ("total_unique_writes_size", self.size(), i64),
         );
     }
 
