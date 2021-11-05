@@ -4525,7 +4525,7 @@ impl AccountsDb {
                     "accounts_db-flush_accounts_cache",
                     ("not_flushed_slots", self.accounts_cache.num_slots(), i64),
                     ("MAX_CACHE_SLOTS", MAX_CACHE_SLOTS, i64),
-                    ("sum Gbytes", sum / 1_000_000_000, i64),
+                    ("sum_Gbytes", sum / 1_000_000_000, i64),
                 );
                 return;
             }
