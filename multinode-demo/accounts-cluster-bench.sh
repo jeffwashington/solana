@@ -23,9 +23,12 @@ if [[ -z $1 ]]; then # default behavior
   $solana_accounts_cluster_bench \
     --entrypoint 127.0.0.1:8001 \
     --faucet 127.0.0.1:9900 \
-    --duration 90 \
-    --tx_count 50000 \
-    --thread-batch-sleep-ms 0 \
+    --identity key.json \
+    --space 10000000 \
+    --lamports 190560924 \
+    --iterations 10000 \
+    --batch-size 100 \
+
 
 else
   $solana_accounts_cluster_bench "$@"

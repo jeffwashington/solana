@@ -126,6 +126,7 @@ args+=(
   --no-poh-speed-test
   --no-os-network-limits-test
   --no-wait-for-vote-to-start-leader
+  --no-accounts-db-caching
 )
 default_arg --gossip-port 8001
 default_arg --log -
