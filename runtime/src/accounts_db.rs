@@ -4517,7 +4517,7 @@ impl AccountsDb {
         #[cfg(not(test))]
         assert!(requested_flush_root.is_some());
 
-        let sum = 0;
+        let mut sum = 0;
         if !force_flush && self.accounts_cache.num_slots() <= MAX_CACHE_SLOTS {
             sum= self
             .accounts_cache.size();
