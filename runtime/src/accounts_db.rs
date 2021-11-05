@@ -4570,6 +4570,8 @@ impl AccountsDb {
         let excess_slot_count = old_slots.len();
         let mut unflushable_unrooted_slot_count = 0;
         let max_flushed_root = self.accounts_cache.fetch_max_flush_root();
+        inc_new_counter_info!("accounts_db-flush_slot_cache_count", old_slots.len());
+
         let old_slot_flush_stats: Vec<_> = old_slots
             .into_iter()
             .filter_map(|old_slot| {
