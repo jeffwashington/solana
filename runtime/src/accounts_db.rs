@@ -4568,22 +4568,24 @@ impl AccountsDb {
             };
         let old_slots = self.accounts_cache.find_older_frozen_slots(MAX_CACHE_SLOTS);
         let excess_slot_count = old_slots.len();
-        let mut unflushable_unrooted_slot_count = 0;
+        let unflushable_unrooted_slot_count = AtomicUsize::new(0);
         let max_flushed_root = self.accounts_cache.fetch_max_flush_root();
         inc_new_counter_info!("accounts_db-flush_slot_cache_count", old_slots.len());
 
-        let old_slot_flush_stats: Vec<_> = old_slots
-            .into_iter()
+        let old_slot_flush_stats: Vec<_> = 
+        self.thread_pool.install(||
+        old_slots
+            .into_par_iter()
             .filter_map(|old_slot| {
                 // Don't flush slots that are known to be unrooted
                 if old_slot > max_flushed_root {
                     Some(self.flush_slot_cache(old_slot, None::<&mut fn(&_, &_) -> bool>))
                 } else {
-                    unflushable_unrooted_slot_count += 1;
+                    unflushable_unrooted_slot_count.fetch_add(1, Ordering::Relaxed);
                     None
                 }
             })
-            .collect();
+            .collect());
         info!(
             "req_flush_root: {:?} old_slot_flushes: {:?}",
             requested_flush_root, old_slot_flush_stats
@@ -4598,7 +4600,7 @@ impl AccountsDb {
             ("excess_slot_count", excess_slot_count, i64),
             (
                 "unflushable_unrooted_slot_count",
-                unflushable_unrooted_slot_count,
+                unflushable_unrooted_slot_count.load(Ordering::Relaxed),
                 i64
             ),
             (
