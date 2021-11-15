@@ -363,7 +363,7 @@ mod tests {
 
             error!("insert get get_missing m {}, max_search {}", m, max_search);
 
-            for _ in 0..10 {
+            for _ in 0..2 {
                 let mut config = BucketMapConfig::new(n);
                 config.max_search = Some(max_search);
                 let index = BucketMap::new(config);
