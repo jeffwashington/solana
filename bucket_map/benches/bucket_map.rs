@@ -1,7 +1,7 @@
 #![feature(test)]
 
 macro_rules! DEFINE_NxM_BENCH {
-    ($i:ident, $n:literal, $m:literal) => {
+    ($i:ident, $n:literal, $m:literal, $s:literal) => {
         mod $i {
             use super::*;
 
@@ -17,7 +17,7 @@ macro_rules! DEFINE_NxM_BENCH {
 
             #[bench]
             fn bench_insert_get_bucket_map(bencher: &mut Bencher) {
-                do_bench_insert_get_bucket_map(bencher, $n, $m);
+                do_bench_insert_get_bucket_map(bencher, $n, $m, $s);
             }
         }
     };
@@ -31,13 +31,14 @@ use std::collections::hash_map::HashMap;
 use std::sync::RwLock;
 use test::Bencher;
 
-type IndexValue = u64;
+// matches AccountInfo
+type IndexValue = (usize, usize, usize, u64);
 
-DEFINE_NxM_BENCH!(dim_01x02, 1, 2);
-DEFINE_NxM_BENCH!(dim_01x04, 1, 4);
-DEFINE_NxM_BENCH!(dim_01x08, 1, 8);
-DEFINE_NxM_BENCH!(dim_01x16, 1, 16);
-DEFINE_NxM_BENCH!(dim_01x64, 1, 64);
+DEFINE_NxM_BENCH!(dim_01x02, 1, 2, 32);
+DEFINE_NxM_BENCH!(dim_01x04, 1, 4, 32);
+DEFINE_NxM_BENCH!(dim_01x08, 1, 8, 32);
+DEFINE_NxM_BENCH!(dim_01x16, 1, 16, 32);
+DEFINE_NxM_BENCH!(dim_01x64, 1, 64, 32);
 /*
 DEFINE_NxM_BENCH!(dim_02x04, 2, 4);
 DEFINE_NxM_BENCH!(dim_04x08, 4, 8);
@@ -87,8 +88,10 @@ fn do_bench_insert_bucket_map(bencher: &mut Bencher, n: usize, m: usize) {
 }
 
 /// Benchmark insert with BucketMap with N buckets for N threads inserting M keys each
-fn do_bench_insert_get_bucket_map(bencher: &mut Bencher, n: usize, m: usize) {
-    let index = BucketMap::new(BucketMapConfig::new(n));
+fn do_bench_insert_get_bucket_map(bencher: &mut Bencher, n: usize, m: usize, max_search: u8) {
+    let mut config = BucketMapConfig::new(n);
+    config.max_search = Some(max_search);
+    let index = BucketMap::new(config);
     (0..n).into_iter().into_iter().for_each(|i| {
         let key = Pubkey::new_unique();
         index.update(&key, |_| Some((vec![(i, IndexValue::default())], 0)));
