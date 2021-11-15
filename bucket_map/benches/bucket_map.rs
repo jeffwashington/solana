@@ -37,7 +37,7 @@ type IndexValue = (usize, usize, usize, u64);
 
 DEFINE_NxM_BENCH!(dim_01x01, 1, 10, 32);
 DEFINE_NxM_BENCH!(dim_01x02a, 1, 10_000, 32);
-DEFINE_NxM_BENCH!(dim_01x02, 1, 100_000, 32);
+DEFINE_NxM_BENCH!(dim_01x02b, 1, 100_000, 32);
 DEFINE_NxM_BENCH!(dim_01x04, 1, 1000_000, 32);
 DEFINE_NxM_BENCH!(dim_01x08, 1, 1000_000, 16);
 DEFINE_NxM_BENCH!(dim_01x16, 1, 1000_000, 64);
