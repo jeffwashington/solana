@@ -101,6 +101,7 @@ fn do_bench_insert_get_bucket_map(_bencher: &mut Bencher, n: usize, m: usize, ma
             let key = Pubkey::new_unique();
             index.update(&key, |_| Some((vec![(i, IndexValue::default())], 0)));
         });
+        error!("insert get get_missing m {}, max_search {}", m, max_search);
         let mut keys = vec![];
         let mut m0 = Measure::start("");
         (0..n).into_iter().for_each(|_| {
