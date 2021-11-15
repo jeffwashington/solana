@@ -8,7 +8,7 @@ use std::io::Seek;
 use std::io::SeekFrom;
 use std::io::Write;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicU8, Ordering};
 use std::sync::Arc;
 
 /*
@@ -32,13 +32,13 @@ use std::sync::Arc;
 pub const DEFAULT_CAPACITY_POW2: u8 = 5;
 
 /// A Header UID of 0 indicates that the header is unlocked
-pub(crate) const UID_UNLOCKED: Uid = 0;
+pub(crate) const UID_UNLOCKED: u8 = 0;
 
-pub(crate) type Uid = u64;
+pub(crate) type Uid = u8;
 
 #[repr(C)]
 struct Header {
-    lock: AtomicU64,
+    lock: AtomicU8,
 }
 
 impl Header {
@@ -51,7 +51,7 @@ impl Header {
     fn unlock(&self) -> Uid {
         self.lock.swap(UID_UNLOCKED, Ordering::Release)
     }
-    fn uid(&self) -> Uid {
+    fn uid(&self) -> u8 {
         self.lock.load(Ordering::Acquire)
     }
 }
