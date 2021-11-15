@@ -345,6 +345,63 @@ mod tests {
             }
         }
     }
+    #[test]
+
+/// Benchmark insert with BucketMap with N buckets for N threads inserting M keys each
+fn do_bench_insert_get_bucket_map() {
+    use solana_measure::measure::Measure;
+    use log::*;
+    let n = 1;
+    let m = 100_000;
+    let max_search = 32;
+    solana_logger::setup();
+    type IndexValue = (usize, usize, usize, u64);
+
+    error!("insert get get_missing m {}, max_search {}", m, max_search);
+
+    for _ in 0..10 {
+    let mut config = BucketMapConfig::new(n);
+        config.max_search = Some(max_search);
+        let index = BucketMap::new(config);
+        (0..n).into_iter().into_iter().for_each(|i| {
+            let key = Pubkey::new_unique();
+            index.update(&key, |_| Some((vec![(i, IndexValue::default())], 0)));
+        });
+        error!("insert get get_missing m {}, max_search {}", m, max_search);
+        let mut keys = vec![];
+        let mut m0 = Measure::start("");
+        (0..n).into_iter().for_each(|_| {
+            let keys2 = (0..m)
+                .into_iter()
+                .map(|j| {
+                    let key = Pubkey::new_unique();
+                    index.update(&key, |_| Some((vec![(j, IndexValue::default())], 0)));
+                    key
+                })
+                .collect::<Vec<_>>();
+            keys.push(keys2);
+        });
+        m0.stop();
+        error!("insert get get_missing m {}, max_search {}", m, max_search);
+        let mut mg = Measure::start("");
+        keys.iter().for_each(|keys| {
+            keys.iter().for_each(|key| {
+                index.read_value(key);
+            })
+        });
+        mg.stop();
+        error!("insert get get_missing m {}, max_search {}", m, max_search);
+        let mut mm = Measure::start("");
+        keys.iter().for_each(|keys| {
+            keys.iter().for_each(|key| {
+                index.read_value(key);
+            })
+        });
+        mm.stop();
+        error!("{} {} {}", m0.as_us(), mg.as_us(), mm.as_us());
+    }
+}
+
 
     #[test]
     fn bucket_map_test_n_delete() {
