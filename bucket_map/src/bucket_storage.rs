@@ -32,7 +32,7 @@ use std::sync::Arc;
 pub const DEFAULT_CAPACITY_POW2: u8 = 5;
 
 pub(crate) type Uid = u64;
-pub(crate) type UidMarker = u8;
+pub(crate) type UidMarker = u64;
 
 /// A Header UID of 0 indicates that the header is unlocked
 pub(crate) const UID_UNLOCKED_MARKER: UidMarker = 0;
@@ -40,7 +40,7 @@ pub(crate) const UID_UNLOCKED: Uid = 0;
 
 #[repr(C)]
 struct Header {
-    lock: AtomicU8,
+    lock: AtomicU64,
 }
 
 pub fn map_uid_to_marker(uid: Uid) -> UidMarker {
