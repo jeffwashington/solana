@@ -31,14 +31,14 @@ use std::sync::Arc;
 */
 pub const DEFAULT_CAPACITY_POW2: u8 = 5;
 
-/// A Header UID of 0 indicates that the header is unlocked
-pub(crate) const UID_UNLOCKED: u8 = 0;
+pub(crate) type Uid = u64;
 
-pub(crate) type Uid = u8;
+/// A Header UID of 0 indicates that the header is unlocked
+pub(crate) const UID_UNLOCKED: Uid = 0;
 
 #[repr(C)]
 struct Header {
-    lock: AtomicU8,
+    lock: AtomicU64,
 }
 
 impl Header {
@@ -51,7 +51,7 @@ impl Header {
     fn unlock(&self) -> Uid {
         self.lock.swap(UID_UNLOCKED, Ordering::Release)
     }
-    fn uid(&self) -> u8 {
+    fn uid(&self) -> Uid {
         self.lock.load(Ordering::Acquire)
     }
 }
