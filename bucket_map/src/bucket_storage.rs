@@ -44,7 +44,7 @@ struct Header {
 }
 
 pub fn map_uid_to_marker(uid: Uid) -> UidMarker {
-    (uid % (UidMarker::MAX as Uid)) as UidMarker
+    ((uid % (UidMarker::MAX as Uid)) as UidMarker).max(1)
 }
 
 impl Header {
