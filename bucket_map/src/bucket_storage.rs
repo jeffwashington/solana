@@ -31,28 +31,38 @@ use std::sync::Arc;
 */
 pub const DEFAULT_CAPACITY_POW2: u8 = 5;
 
-pub(crate) type Uid = u16;
+pub(crate) type Uid = u64;
+pub(crate) type UidMarker = u8;
 
 /// A Header UID of 0 indicates that the header is unlocked
+pub(crate) const UID_UNLOCKED_MARKER: UidMarker = 0;
 pub(crate) const UID_UNLOCKED: Uid = 0;
 
 #[repr(C)]
 struct Header {
-    lock: AtomicU16,
+    lock: AtomicU8,
+}
+
+pub fn map_uid_to_marker(uid: Uid) -> UidMarker {
+    (uid % (UidMarker::MAX as Uid)) as UidMarker
 }
 
 impl Header {
     fn try_lock(&self, uid: Uid) -> bool {
-        Ok(UID_UNLOCKED)
+        Ok(UID_UNLOCKED_MARKER)
             == self
                 .lock
-                .compare_exchange(UID_UNLOCKED, uid, Ordering::AcqRel, Ordering::Relaxed)
+                .compare_exchange(UID_UNLOCKED_MARKER, map_uid_to_marker(uid), Ordering::AcqRel, Ordering::Relaxed)
     }
-    fn unlock(&self) -> Uid {
-        self.lock.swap(UID_UNLOCKED, Ordering::Release)
+    fn unlock(&self) -> UidMarker {
+        self.lock.swap(UID_UNLOCKED_MARKER, Ordering::Release)
     }
-    fn uid(&self) -> Uid {
+    fn uid(&self) -> UidMarker {
         self.lock.load(Ordering::Acquire)
+    }
+
+    fn is_uid_unlocked(&self) -> bool {
+        self.lock.load(Ordering::Acquire) == UID_UNLOCKED_MARKER
     }
 }
 
@@ -120,7 +130,7 @@ impl BucketStorage {
         )
     }
 
-    pub fn uid(&self, ix: u64) -> Uid {
+    pub fn uid(&self, ix: u64) -> UidMarker {
         assert!(ix < self.capacity(), "bad index size");
         let ix = (ix * self.cell_size) as usize;
         let hdr_slice: &[u8] = &self.mmap[ix..ix + std::mem::size_of::<Header>()];
@@ -130,16 +140,26 @@ impl BucketStorage {
         }
     }
 
-    pub fn allocate(&self, ix: u64, uid: Uid) -> Result<(), BucketStorageError> {
+    pub fn uid_unlocked(&self, ix: u64) -> bool {
+        assert!(ix < self.capacity(), "bad index size");
+        let ix = (ix * self.cell_size) as usize;
+        let hdr_slice: &[u8] = &self.mmap[ix..ix + std::mem::size_of::<Header>()];
+        unsafe {
+            let hdr = hdr_slice.as_ptr() as *const Header;
+            return hdr.as_ref().unwrap().uid() == UID_UNLOCKED_MARKER;
+        }
+    }
+
+    pub fn allocate(&self, ix: u64, uid: UidMarker) -> Result<(), BucketStorageError> {
         assert!(ix < self.capacity(), "allocate: bad index size");
-        assert!(UID_UNLOCKED != uid, "allocate: bad uid");
+        assert!(UID_UNLOCKED_MARKER != uid, "allocate: bad uid");
         let mut e = Err(BucketStorageError::AlreadyAllocated);
         let ix = (ix * self.cell_size) as usize;
         //debug!("ALLOC {} {}", ix, uid);
         let hdr_slice: &[u8] = &self.mmap[ix..ix + std::mem::size_of::<Header>()];
         unsafe {
             let hdr = hdr_slice.as_ptr() as *const Header;
-            if hdr.as_ref().unwrap().try_lock(uid) {
+            if hdr.as_ref().unwrap().try_lock(uid as Uid) {
                 e = Ok(());
                 self.used.fetch_add(1, Ordering::Relaxed);
             }
@@ -147,9 +167,9 @@ impl BucketStorage {
         e
     }
 
-    pub fn free(&self, ix: u64, uid: Uid) {
+    pub fn free(&self, ix: u64, uid: UidMarker) {
         assert!(ix < self.capacity(), "bad index size");
-        assert!(UID_UNLOCKED != uid, "free: bad uid");
+        assert!(UID_UNLOCKED_MARKER != uid, "free: bad uid");
         let ix = (ix * self.cell_size) as usize;
         //debug!("FREE {} {}", ix, uid);
         let hdr_slice: &[u8] = &self.mmap[ix..ix + std::mem::size_of::<Header>()];
