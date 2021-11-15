@@ -57,6 +57,6 @@ impl IndexEntry {
     pub fn key_uid(key: &Pubkey) -> Uid {
         let mut s = DefaultHasher::new();
         key.hash(&mut s);
-        ((s.finish() % (Uid::MAX as u64)) as Uid).max(1 as Uid)
+        ((s.finish() % (Uid::MAX as u64)) as Uid).max(1)
     }
 }
