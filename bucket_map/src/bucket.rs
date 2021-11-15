@@ -317,7 +317,7 @@ impl<T: Clone + Copy> Bucket<T> {
     }
 
     pub fn grow_index(&self, current_capacity_pow2: u8) {
-        error!("{} {}", file!(), line!());
+        error!("{} {}, cap: {}", file!(), line!(), current_capacity_pow2);
         if self.index.capacity_pow2 == current_capacity_pow2 {
             let mut m = Measure::start("grow_index");
             //debug!("GROW_INDEX: {}", current_capacity_pow2);
