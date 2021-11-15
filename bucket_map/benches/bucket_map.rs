@@ -34,11 +34,17 @@ use test::Bencher;
 type IndexValue = u64;
 
 DEFINE_NxM_BENCH!(dim_01x02, 1, 2);
+DEFINE_NxM_BENCH!(dim_01x04, 1, 4);
+DEFINE_NxM_BENCH!(dim_01x08, 1, 8);
+DEFINE_NxM_BENCH!(dim_01x16, 1, 16);
+DEFINE_NxM_BENCH!(dim_01x64, 1, 64);
+/*
 DEFINE_NxM_BENCH!(dim_02x04, 2, 4);
 DEFINE_NxM_BENCH!(dim_04x08, 4, 8);
 DEFINE_NxM_BENCH!(dim_08x16, 8, 16);
 DEFINE_NxM_BENCH!(dim_16x32, 16, 32);
 DEFINE_NxM_BENCH!(dim_32x64, 32, 64);
+*/
 
 /// Benchmark insert with Hashmap as baseline for N threads inserting M keys each
 fn do_bench_insert_baseline_hashmap(bencher: &mut Bencher, n: usize, m: usize) {
