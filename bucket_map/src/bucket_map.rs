@@ -358,7 +358,7 @@ mod tests {
         let ms1 = 16;
         let ms2 = 64;
         solana_logger::setup();
-        for (m, max_search) in [(sz0, ms0), (sz1, ms0), (sz1, ms1), (sz1, ms2)] {
+        for (m, max_search) in [(sz0, ms0), (sz1 / 2, ms0), (sz1, ms0), (sz1, ms1), (sz1, ms2)] {
             type IndexValue = (usize, usize, usize, u64);
 
             error!("insert get get_missing m {}, max_search {}", m, max_search);
