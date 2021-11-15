@@ -35,6 +35,7 @@ use test::Bencher;
 // matches AccountInfo
 type IndexValue = (usize, usize, usize, u64);
 
+DEFINE_NxM_BENCH!(dim_01x01, 1, 10, 32);
 DEFINE_NxM_BENCH!(dim_01x02, 1, 100_000, 32);
 DEFINE_NxM_BENCH!(dim_01x04, 1, 1000_000, 32);
 DEFINE_NxM_BENCH!(dim_01x08, 1, 1000_000, 16);
@@ -114,6 +115,7 @@ fn do_bench_insert_get_bucket_map(_bencher: &mut Bencher, n: usize, m: usize, ma
             keys.push(keys2);
         });
         m0.stop();
+        error!("insert get get_missing m {}, max_search {}", m, max_search);
         let mut mg = Measure::start("");
         keys.iter().for_each(|keys| {
             keys.iter().for_each(|key| {
@@ -121,6 +123,7 @@ fn do_bench_insert_get_bucket_map(_bencher: &mut Bencher, n: usize, m: usize, ma
             })
         });
         mg.stop();
+        error!("insert get get_missing m {}, max_search {}", m, max_search);
         let mut mm = Measure::start("");
         keys.iter().for_each(|keys| {
             keys.iter().for_each(|key| {
