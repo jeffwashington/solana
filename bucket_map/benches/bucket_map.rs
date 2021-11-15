@@ -35,11 +35,10 @@ use test::Bencher;
 // matches AccountInfo
 type IndexValue = (usize, usize, usize, u64);
 
-DEFINE_NxM_BENCH!(dim_01x02, 1, 1<<2, 32);
-DEFINE_NxM_BENCH!(dim_01x04, 1, 1<<4, 32);
-DEFINE_NxM_BENCH!(dim_01x08, 1, 1<<8, 32);
-DEFINE_NxM_BENCH!(dim_01x16, 1, 1<<16, 32);
-DEFINE_NxM_BENCH!(dim_01x64, 1, 1<<17, 32);
+DEFINE_NxM_BENCH!(dim_01x02, 1, 100_000, 32);
+DEFINE_NxM_BENCH!(dim_01x04, 1, 1000_000, 32);
+DEFINE_NxM_BENCH!(dim_01x08, 1, 10000_000, 32);
+DEFINE_NxM_BENCH!(dim_01x16, 1, 100000_000, 32);
 /*
 DEFINE_NxM_BENCH!(dim_02x04, 2, 4);
 DEFINE_NxM_BENCH!(dim_04x08, 4, 8);
