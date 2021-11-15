@@ -36,7 +36,9 @@ use test::Bencher;
 type IndexValue = (usize, usize, usize, u64);
 
 DEFINE_NxM_BENCH!(dim_01x01, 1, 10, 32);
-DEFINE_NxM_BENCH!(dim_01x01a, 1, 10_000, 32);
+DEFINE_NxM_BENCH!(dim_01x01a, 1, 100, 32);
+DEFINE_NxM_BENCH!(dim_01x01b, 1, 1_000, 32);
+DEFINE_NxM_BENCH!(dim_01x01c, 1, 10_000, 32);
 DEFINE_NxM_BENCH!(dim_01x02, 1, 100_000, 32);
 DEFINE_NxM_BENCH!(dim_01x04, 1, 1000_000, 32);
 DEFINE_NxM_BENCH!(dim_01x08, 1, 1000_000, 16);
