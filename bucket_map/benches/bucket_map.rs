@@ -14,6 +14,11 @@ macro_rules! DEFINE_NxM_BENCH {
             fn bench_insert_bucket_map(bencher: &mut Bencher) {
                 do_bench_insert_bucket_map(bencher, $n, $m);
             }
+
+            #[bench]
+            fn bench_insert_get_bucket_map(bencher: &mut Bencher) {
+                do_bench_insert_get_bucket_map(bencher, $n, $m);
+            }
         }
     };
 }
@@ -72,5 +77,33 @@ fn do_bench_insert_bucket_map(bencher: &mut Bencher, n: usize, m: usize) {
                 index.update(&key, |_| Some((vec![(j, IndexValue::default())], 0)));
             }
         })
+    });
+}
+
+/// Benchmark insert with BucketMap with N buckets for N threads inserting M keys each
+fn do_bench_insert_get_bucket_map(bencher: &mut Bencher, n: usize, m: usize) {
+    let index = BucketMap::new(BucketMapConfig::new(n));
+    (0..n).into_iter().into_iter().for_each(|i| {
+        let key = Pubkey::new_unique();
+        index.update(&key, |_| Some((vec![(i, IndexValue::default())], 0)));
+    });
+    let mut keys = vec![];
+    bencher.iter(|| {
+        (0..n).into_iter().for_each(|_| {
+            let keys2 = (0..m)
+                .into_iter()
+                .map(|j| {
+                    let key = Pubkey::new_unique();
+                    index.update(&key, |_| Some((vec![(j, IndexValue::default())], 0)));
+                    key
+                })
+                .collect::<Vec<_>>();
+            keys.extend(keys2.into_iter());
+        });
+    });
+    bencher.iter(|| {
+        keys.iter().for_each(|key| {
+            index.read_value(key);
+        });
     });
 }
