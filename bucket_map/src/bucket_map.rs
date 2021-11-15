@@ -371,7 +371,6 @@ mod tests {
                     let key = Pubkey::new_unique();
                     index.update(&key, |_| Some((vec![(i, IndexValue::default())], 0)));
                 });
-                error!("{} {}", file!(), line!());
                 let mut keys = vec![];
                 let mut m0 = Measure::start("");
                 (0..n).into_iter().for_each(|_| {
@@ -386,7 +385,6 @@ mod tests {
                     keys.push(keys2);
                 });
                 m0.stop();
-                error!("{} {}", file!(), line!());
                 let mut mg = Measure::start("");
                 keys.iter().for_each(|keys| {
                     keys.iter().for_each(|key| {
@@ -394,7 +392,6 @@ mod tests {
                     })
                 });
                 mg.stop();
-                error!("{} {}", file!(), line!());
                 let mut mm = Measure::start("");
                 keys.iter().for_each(|keys| {
                     keys.iter().for_each(|key| {

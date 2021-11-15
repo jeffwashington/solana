@@ -317,7 +317,6 @@ impl<T: Clone + Copy> Bucket<T> {
     }
 
     pub fn grow_index(&self, current_capacity_pow2: u8) {
-        error!("{} {}, cap: {}", file!(), line!(), current_capacity_pow2);
         if self.index.capacity_pow2 == current_capacity_pow2 {
             let mut m = Measure::start("grow_index");
             //debug!("GROW_INDEX: {}", current_capacity_pow2);
@@ -379,7 +378,6 @@ impl<T: Clone + Copy> Bucket<T> {
                 .resize_us
                 .fetch_add(m.as_us(), Ordering::Relaxed);
         }
-        error!("{} {}", file!(), line!());
     }
 
     pub fn apply_grow_index(&mut self, random: u64, index: BucketStorage) {
@@ -412,7 +410,6 @@ impl<T: Clone + Copy> Bucket<T> {
     /// grow a data bucket
     /// The application of the new bucket is deferred until the next write lock.
     pub fn grow_data(&self, data_index: u64, current_capacity_pow2: u8) {
-        error!("{} {}", file!(), line!());
         let new_bucket = BucketStorage::new_resized(
             &self.drives,
             self.index.max_search,
@@ -425,7 +422,6 @@ impl<T: Clone + Copy> Bucket<T> {
         self.reallocated.add_reallocation();
         let mut items = self.reallocated.items.lock().unwrap();
         items.data = Some((data_index, new_bucket));
-        error!("{} {}", file!(), line!());
     }
 
     fn bucket_index_ix(index: &BucketStorage, key: &Pubkey, random: u64) -> u64 {
