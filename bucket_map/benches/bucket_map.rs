@@ -1,5 +1,6 @@
 #![feature(test)]
-
+use log::*;
+use solana_measure::measure::Measure;
 macro_rules! DEFINE_NxM_BENCH {
     ($i:ident, $n:literal, $m:literal, $s:literal) => {
         mod $i {
@@ -88,16 +89,20 @@ fn do_bench_insert_bucket_map(bencher: &mut Bencher, n: usize, m: usize) {
 }
 
 /// Benchmark insert with BucketMap with N buckets for N threads inserting M keys each
-fn do_bench_insert_get_bucket_map(bencher: &mut Bencher, n: usize, m: usize, max_search: u8) {
-    let mut config = BucketMapConfig::new(n);
-    config.max_search = Some(max_search);
-    let index = BucketMap::new(config);
-    (0..n).into_iter().into_iter().for_each(|i| {
-        let key = Pubkey::new_unique();
-        index.update(&key, |_| Some((vec![(i, IndexValue::default())], 0)));
-    });
-    let mut keys = vec![];
-    bencher.iter(|| {
+fn do_bench_insert_get_bucket_map(_bencher: &mut Bencher, n: usize, m: usize, max_search: u8) {
+    solana_logger::setup();
+    error!("insert get get_missing");
+
+    for _ in 0..10 {
+        let mut config = BucketMapConfig::new(n);
+        config.max_search = Some(max_search);
+        let index = BucketMap::new(config);
+        (0..n).into_iter().into_iter().for_each(|i| {
+            let key = Pubkey::new_unique();
+            index.update(&key, |_| Some((vec![(i, IndexValue::default())], 0)));
+        });
+        let mut keys = vec![];
+        let mut m0 = Measure::start("");
         (0..n).into_iter().for_each(|_| {
             let keys2 = (0..m)
                 .into_iter()
@@ -107,12 +112,23 @@ fn do_bench_insert_get_bucket_map(bencher: &mut Bencher, n: usize, m: usize, max
                     key
                 })
                 .collect::<Vec<_>>();
-            keys.extend(keys2.into_iter());
+            keys.push(keys2);
         });
-    });
-    bencher.iter(|| {
-        keys.iter().for_each(|key| {
-            index.read_value(key);
+        m0.stop();
+        let mut mg = Measure::start("");
+        keys.iter().for_each(|keys| {
+            keys.iter().for_each(|key| {
+                index.read_value(key);
+            })
         });
-    });
+        mg.stop();
+        let mut mm = Measure::start("");
+        keys.iter().for_each(|keys| {
+            keys.iter().for_each(|key| {
+                index.read_value(key);
+            })
+        });
+        mm.stop();
+        error!("{} {} {}", m0.as_us(), mg.as_us(), mm.as_us());
+    }
 }
