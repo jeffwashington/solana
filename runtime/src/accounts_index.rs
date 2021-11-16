@@ -35,7 +35,7 @@ use std::{
 use thiserror::Error;
 
 pub const ITER_BATCH_SIZE: usize = 1000;
-pub const BINS_DEFAULT: usize = 32768;
+pub const BINS_DEFAULT: usize = 65536;
 pub const BINS_FOR_TESTING: usize = 2; // we want > 1, but each bin is a few disk files with a disk based index, so fewer is better
 pub const BINS_FOR_BENCHMARKS: usize = 2;
 pub const FLUSH_THREADS_TESTING: usize = 1;
