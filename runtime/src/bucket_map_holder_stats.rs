@@ -85,26 +85,24 @@ impl BucketMapHolderStats {
     }
 
     fn ms_per_age<T: IndexValue>(&self, storage: &BucketMapHolder<T>, elapsed_ms: u64) -> u64 {
-        if !storage.get_startup() {
-            let age_now = storage.current_age();
-            let ages_flushed = storage.count_ages_flushed() as u64;
-            let last_age = self.last_age.swap(age_now, Ordering::Relaxed) as u64;
-            let last_ages_flushed =
-                self.last_ages_flushed.swap(ages_flushed, Ordering::Relaxed) as u64;
-            let mut age_now = age_now as u64;
-            if last_age > age_now {
-                // age wrapped
-                age_now += u8::MAX as u64 + 1;
-            }
-            let age_delta = age_now.saturating_sub(last_age) as u64;
-            if age_delta > 0 {
-                return elapsed_ms / age_delta;
-            } else {
-                // did not advance an age, but probably did partial work, so report that
-                let bin_delta = ages_flushed.saturating_sub(last_ages_flushed);
-                if bin_delta > 0 {
-                    return elapsed_ms * self.bins / bin_delta;
-                }
+        let age_now = storage.current_age();
+        let ages_flushed = storage.count_ages_flushed() as u64;
+        let last_age = self.last_age.swap(age_now, Ordering::Relaxed) as u64;
+        let last_ages_flushed =
+            self.last_ages_flushed.swap(ages_flushed, Ordering::Relaxed) as u64;
+        let mut age_now = age_now as u64;
+        if last_age > age_now {
+            // age wrapped
+            age_now += u8::MAX as u64 + 1;
+        }
+        let age_delta = age_now.saturating_sub(last_age) as u64;
+        if age_delta > 0 {
+            return elapsed_ms / age_delta;
+        } else {
+            // did not advance an age, but probably did partial work, so report that
+            let bin_delta = ages_flushed.saturating_sub(last_ages_flushed);
+            if bin_delta > 0 {
+                return elapsed_ms * self.bins / bin_delta;
             }
         }
         0 // avoid crazy numbers
