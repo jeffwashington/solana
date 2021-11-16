@@ -104,7 +104,12 @@ impl<T: IndexValue> AccountsIndexStorage<T> {
         if !value {
             // shutdown the bg threads
             *self.startup_worker_threads.lock().unwrap() = None;
+            self.reset_memory();
         }
+    }
+
+    fn reset_memory(&self) {
+        self.in_mem.iter().for_each(|mem| mem.reset_memory())
     }
 
     fn num_threads() -> usize {
