@@ -98,6 +98,13 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         &self.map_internal
     }
 
+    pub fn reset_memory(&self) {
+        let mut map = self.map().write().unwrap();
+        let mut new = HashMap::<Pubkey, AccountMapEntry<T>>::default();
+        std::mem::swap(&mut *map, &mut new);
+        map.extend(new);
+    }
+
     pub fn items<R>(&self, range: &Option<&R>) -> Vec<(K, AccountMapEntry<T>)>
     where
         R: RangeBounds<Pubkey> + std::fmt::Debug,
