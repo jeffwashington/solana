@@ -104,6 +104,15 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         &self.map_internal
     }
 
+    /// Release entire in-mem hashmap to free all memory associated with it.
+    /// Idea is that during startup we needed a larger map than we need during runtime.
+    pub fn reset_memory(&self) {
+        let mut map = self.map().write().unwrap();
+        let mut new = HashMap::<Pubkey, AccountMapEntry<T>>::default();
+        std::mem::swap(&mut *map, &mut new);
+        map.extend(new);
+    }
+
     pub fn items<R>(&self, range: &Option<&R>) -> Vec<(K, AccountMapEntry<T>)>
     where
         R: RangeBounds<Pubkey> + std::fmt::Debug,
