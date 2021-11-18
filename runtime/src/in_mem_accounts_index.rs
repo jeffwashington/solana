@@ -501,6 +501,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         let mut map = self.map().write().unwrap();
         let entry = map.entry(pubkey);
         m.stop();
+        let mut direct_to_disk = false;
         let found = matches!(entry, Entry::Occupied(_));
         let result = match entry {
             Entry::Occupied(occupied) => Some(Self::insert_returner(
@@ -519,10 +520,11 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                     vacant.insert(disk_entry);
                     result
                 } else {
-                    // not on disk, so insert new thing and we're done
-                    let new_entry: AccountMapEntry<T> = new_entry.into();
-                    assert!(new_entry.dirty());
-                    vacant.insert(new_entry);
+                    if let Some(disk) = self.bucket.as_ref() {
+                        let v = vec![new_entry.into()];
+                        disk.insert(&pubkey, (&v, 1));
+                        direct_to_disk = true;
+                    }
                     None // returns None if item was created new
                 }
             }
@@ -531,7 +533,9 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         self.update_entry_stats(m, found);
         let stats = self.stats();
         if result.is_none() {
+            if !direct_to_disk {
             stats.insert_or_delete(true, self.bin);
+            }
         } else {
             Self::update_stat(&stats.updates_in_mem, 1);
         }
