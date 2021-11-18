@@ -721,9 +721,9 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
             Entry::Vacant(vacant) => {
                 // not in cache, look on disk
                 let disk_entry = self.load_account_entry_from_disk(vacant.key());
-                self.stats().insert_or_delete_mem(true, self.bin);
                 if let Some(disk_entry) = disk_entry {
                     // on disk, so insert into cache, then return cache value so caller will merge
+                    self.stats().insert_or_delete_mem(true, self.bin);
                     let result = Some(Self::insert_returner(&disk_entry, vacant.key(), new_entry));
                     assert!(disk_entry.dirty());
                     vacant.insert(disk_entry);
@@ -742,9 +742,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         self.update_entry_stats(m, found);
         let stats = self.stats();
         if result.is_none() {
-            if !direct_to_disk {
-                stats.insert_or_delete(true, self.bin);
-            }
+            stats.insert_or_delete(true, self.bin);
         } else {
             Self::update_stat(&stats.updates_in_mem, 1);
         }
