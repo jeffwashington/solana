@@ -525,6 +525,9 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                         disk.insert(&pubkey, (&v, 1));
                         direct_to_disk = true;
                     }
+                    else {
+                        panic!("unsupported");
+                    }
                     None // returns None if item was created new
                 }
             }
