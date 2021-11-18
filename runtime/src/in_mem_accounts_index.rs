@@ -90,10 +90,14 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
     }
 
     pub fn reset_memory(&self) {
+        use log::*;
         let mut map = self.map().write().unwrap();
         let mut new = HashMap::<Pubkey, AccountMapEntry<T>>::default();
+        let cap = (map.capacity(), new.capacity());
         std::mem::swap(&mut *map, &mut new);
+        let l = new.len();
         map.extend(new);
+        error!("reset, cap: {:?}, {}, {}", cap, map.capacity(), l);
     }
 
     pub fn items<R>(&self, range: &Option<&R>) -> Vec<(K, AccountMapEntry<T>)>
