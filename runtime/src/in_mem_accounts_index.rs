@@ -19,6 +19,215 @@ type K = Pubkey;
 type CacheRangesHeld = RwLock<Vec<Option<RangeInclusive<Pubkey>>>>;
 pub type SlotT<T> = (Slot, T);
 
+#[derive(Debug, Default, Clone)]
+struct testit {
+    data: u64,
+}
+impl Drop for testit {
+    fn drop(&mut self) {
+        use log::*;
+        //error!("dropping");
+    }
+}
+
+fn mem() -> u64 {
+    use log::*;
+    if let Ok(info) = sys_info::mem_info() {
+        //error!("{}", info.total - info.avail);
+        info.total - info.avail
+    } else {
+        0
+    }
+}
+use dhat::{Dhat, DhatAlloc};
+
+fn vec(szz: usize) -> Vec<u32> {
+    let mut v_inner = Vec::with_capacity(szz);
+    for j in 0..szz {
+        v_inner.push(1u32);
+    }
+v_inner
+}
+
+fn data(i: u64, szz: usize) -> Arc<Vec<(u64, (Vec<u32>, u64, testit))>> {
+    let v_inner = vec(szz);
+    Arc::new(vec![(i, (v_inner, 32u64, testit::default()))])
+}
+
+pub fn test_hash() {
+    use log::*;
+    solana_logger::setup();
+    //let _dhat = Dhat::start_ad_hoc_profiling();
+    use std::collections::hash_map::RandomState;
+    // x=500k, size = 10k does not get freed
+    let x = 50000u64;
+    let m_start = mem();
+    for x in x..(x * 2) {
+        {
+            let _dhat = Dhat::start_heap_profiling();
+            {
+                if !(x % 100 == 0) {
+                    continue;
+                }
+                let mut m = Vec::with_capacity(x as usize);
+                let szz = 5_000; //50k causes subsequent fails
+                for i in 0..x {
+                    let v = data(i, szz);
+                    m.push(v);
+                }
+                drop(m);
+                error!("{}, {}, {}", szz * x as usize, mem() - m_start, x);
+            }
+        }
+        break;
+    }
+}
+
+pub fn test_hash_old() {
+    use log::*;
+    solana_logger::setup();
+    use std::collections::hash_map::RandomState;
+    let s = RandomState::new();
+    let mut m = HashMap::with_hasher(s);
+    // x=500k, size = 10k does not get freed
+    let x = 50000u64;
+    let m_start = mem();
+    m.insert(1u32, 1u32);
+    let mut m = Vec::with_capacity(x as usize);
+    let szz = 100_000;
+    for i in 0..x {
+        let mut v_inner = Vec::with_capacity(szz);
+        for j in 0..szz {
+            v_inner.push(1u32);
+        }
+        let v = Arc::new(vec![(i, (v_inner, 32u64, 45u64, testit::default()))]);
+        if m.len() > 0 && false {
+            m[0] = v;
+        } else {
+            m.push(v);
+        }
+        /*
+        match m.entry(i) {
+            Entry::Occupied(_occupied) => {
+                assert!(false);
+            }
+            Entry::Vacant(vacant) => {
+                vacant.insert(v);
+            }
+        }
+        */
+    }
+    error!("waiting after add");
+    std::thread::sleep(std::time::Duration::from_millis(5_000));
+    mem();
+    error!("removing");
+    for i in 0..x {
+        /*
+        match m.entry(i) {
+            Entry::Occupied(occupied) => {
+                occupied.remove();
+            }
+            Entry::Vacant(_vacant) => {
+            }
+        }
+        */
+        //let r = m.remove(&i).unwrap();
+        let i = (x - i - 1) as usize;
+        if i < m.len() {
+            let r = m.remove(i);
+            assert_eq!(1, Arc::strong_count(&r));
+            assert_eq!(0, Arc::weak_count(&r));
+            let mut r = Arc::try_unwrap(r).unwrap();
+            r = vec![];
+            drop(r);
+        }
+    }
+    error!("done removing");
+    //std::thread::sleep(std::time::Duration::from_millis(5_000));
+    error!("done removing2");
+    mem();
+    std::thread::sleep(std::time::Duration::from_millis(5_000));
+    error!("drop map");
+    drop(m);
+    std::thread::sleep(std::time::Duration::from_millis(5_000));
+    error!("allocate large vector");
+    let big = 100_000_000_000;
+    let sz = big / 8;
+    let mut m: Vec<u64> = Vec::with_capacity(sz);
+    for i in 0..sz {
+        m.insert(i, i as u64);
+    }
+    /*
+    m.push(0);
+    unsafe {
+          m.set_len(sz-1);
+      }
+      m.push(0);
+      */
+    error!(
+        "done: allocate large vector, {:?}, len: {}, cap: {}",
+        (m[sz / 100], m[sz / 2], m[sz - 1]),
+        m.len(),
+        m.capacity()
+    );
+    std::thread::sleep(std::time::Duration::from_millis(5_000));
+    error!("drop large vector");
+    drop(m);
+    std::thread::sleep(std::time::Duration::from_millis(5_000));
+    mem();
+    error!("allocate large vector");
+    let sz = big / 8;
+    let mut m = Vec::with_capacity(sz);
+    for i in 0..sz {
+        m.insert(i, i as u64);
+    }
+    /*
+    m.push(0);
+    unsafe {
+          m.set_len(sz-1);
+      }
+      m.push(0);
+      */
+    let m = Arc::new(m);
+    mem();
+    error!(
+        "done: allocate large vector, {:?}, len: {}, cap: {}",
+        (m[sz / 100], m[sz / 2], m[sz - 1]),
+        m.len(),
+        m.capacity()
+    );
+    mem();
+
+    std::thread::sleep(std::time::Duration::from_millis(5_000));
+    error!("drop large vector");
+    drop(m);
+    mem();
+    std::thread::sleep(std::time::Duration::from_millis(5_000));
+    error!("create new map");
+    let s = RandomState::new();
+    let mut m = HashMap::with_hasher(s);
+    std::thread::sleep(std::time::Duration::from_millis(5_000));
+    error!("populating new map");
+    let szz = szz * 2;
+    for i in 0..x {
+        let mut v_inner = Vec::with_capacity(szz);
+        for j in 0..szz {
+            v_inner.push(1u32);
+        }
+        let v = Arc::new(vec![(i, (v_inner, 32u64, 45u64, testit::default()))]);
+        match m.entry(i) {
+            Entry::Occupied(_occupied) => {
+                assert!(false);
+            }
+            Entry::Vacant(vacant) => {
+                vacant.insert(v);
+            }
+        }
+    }
+    mem();
+    error!("waiting after populating");
+    std::thread::sleep(std::time::Duration::from_millis(5_000));
+}
 #[allow(dead_code)] // temporary during staging
                     // one instance of this represents one bin of the accounts index.
 pub struct InMemAccountsIndex<T: IndexValue> {
@@ -1059,6 +1268,204 @@ mod tests {
             bucket.hold_range_in_memory(&ranges[0].clone(), false);
             assert!(bucket.cache_ranges_held.read().unwrap().is_empty());
         }
+    }
+
+    #[derive(Debug, Default, Clone)]
+    struct testit {
+        data: u64,
+    }
+    impl Drop for testit {
+        fn drop(&mut self) {
+            use log::*;
+            //error!("dropping");
+        }
+    }
+
+    fn mem() -> u64 {
+        use log::*;
+        if let Ok(info) = sys_info::mem_info() {
+            //error!("{}", info.total - info.avail);
+            info.total - info.avail
+        } else {
+            0
+        }
+    }
+
+    #[test]
+    fn test_hash() {
+        use log::*;
+        solana_logger::setup();
+        use std::collections::hash_map::RandomState;
+        let s = RandomState::new();
+        let mut m = HashMap::with_hasher(s);
+        // x=500k, size = 10k does not get freed
+        let x = 50000u64;
+        let m_start = mem();
+        for x in [x, x, x + 1, x, x + 1, x, x] {
+            if !(x % 10 == 0) {
+                //continue;
+            }
+            m.insert(1u32, 1u32);
+            let mut m = Vec::with_capacity(x as usize);
+            let szz = 5_000; //50k causes subsequent fails
+            for i in 0..x {
+                let mut v_inner = Vec::with_capacity(szz);
+                for j in 0..szz {
+                    v_inner.push(1u32);
+                }
+                let v = Arc::new(vec![(i, (v_inner, 32u64, testit::default()))]);
+                m.push(v);
+            }
+            drop(m);
+            error!("{}, {}, {}", szz * x as usize, mem() - m_start, x);
+        }
+    }
+
+    #[test]
+    fn test_hash_old() {
+        use log::*;
+        solana_logger::setup();
+        use std::collections::hash_map::RandomState;
+        let s = RandomState::new();
+        let mut m = HashMap::with_hasher(s);
+        // x=500k, size = 10k does not get freed
+        let x = 50000u64;
+        let m_start = mem();
+        m.insert(1u32, 1u32);
+        let mut m = Vec::with_capacity(x as usize);
+        let szz = 100_000;
+        for i in 0..x {
+            let mut v_inner = Vec::with_capacity(szz);
+            for j in 0..szz {
+                v_inner.push(1u32);
+            }
+            let v = Arc::new(vec![(i, (v_inner, 32u64, 45u64, testit::default()))]);
+            if m.len() > 0 && false {
+                m[0] = v;
+            } else {
+                m.push(v);
+            }
+            /*
+            match m.entry(i) {
+                Entry::Occupied(_occupied) => {
+                    assert!(false);
+                }
+                Entry::Vacant(vacant) => {
+                    vacant.insert(v);
+                }
+            }
+            */
+        }
+        error!("waiting after add");
+        std::thread::sleep(std::time::Duration::from_millis(5_000));
+        mem();
+        error!("removing");
+        for i in 0..x {
+            /*
+            match m.entry(i) {
+                Entry::Occupied(occupied) => {
+                    occupied.remove();
+                }
+                Entry::Vacant(_vacant) => {
+                }
+            }
+            */
+            //let r = m.remove(&i).unwrap();
+            let i = (x - i - 1) as usize;
+            if i < m.len() {
+                let r = m.remove(i);
+                assert_eq!(1, Arc::strong_count(&r));
+                assert_eq!(0, Arc::weak_count(&r));
+                let mut r = Arc::try_unwrap(r).unwrap();
+                r = vec![];
+                drop(r);
+            }
+        }
+        error!("done removing");
+        //std::thread::sleep(std::time::Duration::from_millis(5_000));
+        error!("done removing2");
+        mem();
+        std::thread::sleep(std::time::Duration::from_millis(5_000));
+        error!("drop map");
+        drop(m);
+        std::thread::sleep(std::time::Duration::from_millis(5_000));
+        error!("allocate large vector");
+        let big = 100_000_000_000;
+        let sz = big / 8;
+        let mut m: Vec<u64> = Vec::with_capacity(sz);
+        for i in 0..sz {
+            m.insert(i, i as u64);
+        }
+        /*
+        m.push(0);
+        unsafe {
+              m.set_len(sz-1);
+          }
+          m.push(0);
+          */
+        error!(
+            "done: allocate large vector, {:?}, len: {}, cap: {}",
+            (m[sz / 100], m[sz / 2], m[sz - 1]),
+            m.len(),
+            m.capacity()
+        );
+        std::thread::sleep(std::time::Duration::from_millis(5_000));
+        error!("drop large vector");
+        drop(m);
+        std::thread::sleep(std::time::Duration::from_millis(5_000));
+        mem();
+        error!("allocate large vector");
+        let sz = big / 8;
+        let mut m = Vec::with_capacity(sz);
+        for i in 0..sz {
+            m.insert(i, i as u64);
+        }
+        /*
+        m.push(0);
+        unsafe {
+              m.set_len(sz-1);
+          }
+          m.push(0);
+          */
+        let m = Arc::new(m);
+        mem();
+        error!(
+            "done: allocate large vector, {:?}, len: {}, cap: {}",
+            (m[sz / 100], m[sz / 2], m[sz - 1]),
+            m.len(),
+            m.capacity()
+        );
+        mem();
+
+        std::thread::sleep(std::time::Duration::from_millis(5_000));
+        error!("drop large vector");
+        drop(m);
+        mem();
+        std::thread::sleep(std::time::Duration::from_millis(5_000));
+        error!("create new map");
+        let s = RandomState::new();
+        let mut m = HashMap::with_hasher(s);
+        std::thread::sleep(std::time::Duration::from_millis(5_000));
+        error!("populating new map");
+        let szz = szz * 2;
+        for i in 0..x {
+            let mut v_inner = Vec::with_capacity(szz);
+            for j in 0..szz {
+                v_inner.push(1u32);
+            }
+            let v = Arc::new(vec![(i, (v_inner, 32u64, 45u64, testit::default()))]);
+            match m.entry(i) {
+                Entry::Occupied(_occupied) => {
+                    assert!(false);
+                }
+                Entry::Vacant(vacant) => {
+                    vacant.insert(v);
+                }
+            }
+        }
+        mem();
+        error!("waiting after populating");
+        std::thread::sleep(std::time::Duration::from_millis(5_000));
     }
 
     #[test]
