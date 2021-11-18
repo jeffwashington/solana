@@ -10,6 +10,9 @@ homepage = "https://solana.com/"
 documentation = "https://docs.rs/solana-validator"
 default-run = "solana-validator"
 
+[profile.release]
+debug = 1
+
 [dependencies]
 chrono = { version = "0.4.11", features = ["serde"] }
 clap = "2.33.1"
@@ -50,9 +53,12 @@ solana-test-validator = { path = "../test-validator", version = "=1.9.0" }
 solana-version = { path = "../version", version = "=1.9.0" }
 solana-vote-program = { path = "../programs/vote", version = "=1.9.0" }
 symlink = "0.1.0"
+dhat = "0.2.3"
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 jemallocator = {package = "tikv-jemallocator", version = "0.4.1", features = ["unprefixed_malloc_on_supported_platforms"]}
+
+
 
 [target."cfg(unix)".dependencies]
 libc = "0.2.107"

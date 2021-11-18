@@ -1045,6 +1045,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "dhat"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4685e5f213847f016a29d207b91c9cb873abaf6a5f9a033cfacf213c80816bd4"
+dependencies = [
+ "backtrace",
+ "lazy_static",
+ "rustc-hash",
+ "serde",
+ "serde_json",
+ "thousands",
+]
+
+[[package]]
 name = "dialoguer"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5150,6 +5164,7 @@ dependencies = [
  "solana-transaction-status",
  "solana-version",
  "solana-vote-program",
+ "tikv-jemallocator",
  "tokio",
 ]
 
@@ -5644,6 +5659,7 @@ dependencies = [
  "bzip2",
  "crossbeam-channel",
  "dashmap",
+ "dhat",
  "dir-diff",
  "ed25519-dalek",
  "flate2",
@@ -5675,6 +5691,7 @@ dependencies = [
  "solana-stake-program",
  "solana-vote-program",
  "symlink",
+ "sys-info",
  "tar",
  "tempfile",
  "thiserror",
@@ -5999,6 +6016,7 @@ dependencies = [
  "clap 2.33.3",
  "console",
  "core_affinity",
+ "dhat",
  "fd-lock",
  "indicatif",
  "jsonrpc-core",
@@ -6464,6 +6482,12 @@ dependencies = [
  "quote 1.0.10",
  "syn 1.0.81",
 ]
+
+[[package]]
+name = "thousands"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3bf63baf9f5039dadc247375c29eb13706706cfde997d0330d05aa63a77d8820"
 
 [[package]]
 name = "thread-scoped"
