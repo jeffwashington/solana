@@ -482,7 +482,7 @@ impl<T: Clone + Copy> Bucket<T> {
         }
     }
 
-    pub fn update<F>(&mut self, key: &Pubkey, updatefn: F)
+    pub fn update<F>(&mut self, key: &Pubkey, mut updatefn: F)
     where
         F: Fn(Option<(&[T], RefCount)>) -> Option<(Vec<T>, RefCount)>,
     {
