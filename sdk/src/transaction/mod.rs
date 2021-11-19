@@ -125,6 +125,10 @@ pub enum TransactionError {
     /// Transaction would exceed max account limit within the block
     #[error("Transaction would exceed max account limit within the block")]
     WouldExceedMaxAccountCostLimit,
+
+    /// Transaction would exceed max account data limit within the block
+    #[error("Transaction would exceed max account data limit within the block")]
+    WouldExceedMaxAccountDataCostLimit,
 }
 
 pub type Result<T> = result::Result<T, TransactionError>;

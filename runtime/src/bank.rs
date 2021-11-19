@@ -3784,7 +3784,8 @@ impl Bank {
                     Some(index)
                 }
                 Err(TransactionError::WouldExceedMaxBlockCostLimit)
-                | Err(TransactionError::WouldExceedMaxAccountCostLimit) => Some(index),
+                | Err(TransactionError::WouldExceedMaxAccountCostLimit)
+                | Err(TransactionError::WouldExceedMaxAccountDataCostLimit) => Some(index),
                 Err(_) => None,
                 Ok(_) => None,
             })

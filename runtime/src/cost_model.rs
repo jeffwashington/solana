@@ -8,7 +8,10 @@ use crate::{
     bank::is_simple_vote_transaction, block_cost_limits::*, execute_cost_table::ExecuteCostTable,
 };
 use log::*;
-use solana_sdk::{pubkey::Pubkey, transaction::SanitizedTransaction};
+use solana_sdk::{
+    instruction::CompiledInstruction, program_utils::limited_deserialize, pubkey::Pubkey,
+    system_instruction::SystemInstruction, system_program, transaction::SanitizedTransaction,
+};
 use std::collections::HashMap;
 
 const MAX_WRITABLE_ACCOUNTS: usize = 256;
@@ -26,6 +29,7 @@ pub struct TransactionCost {
     // for example, vote tx could have weight zero to bypass cost
     // limit checking during block packing.
     pub cost_weight: u32,
+    pub account_data_size: u64,
 }
 
 impl Default for TransactionCost {
@@ -37,6 +41,7 @@ impl Default for TransactionCost {
             data_bytes_cost: 0u64,
             execution_cost: 0u64,
             cost_weight: 1u32,
+            account_data_size: 0u64,
         }
     }
 }
@@ -117,6 +122,7 @@ impl CostModel {
         tx_cost.data_bytes_cost = self.get_data_bytes_cost(transaction);
         tx_cost.execution_cost = self.get_transaction_cost(transaction);
         tx_cost.cost_weight = self.calculate_cost_weight(transaction);
+        tx_cost.account_data_size = self.calculate_account_data_size(transaction);
 
         debug!("transaction {:?} has cost {:?}", transaction, tx_cost);
         tx_cost
@@ -200,6 +206,59 @@ impl CostModel {
         }
     }
 
+    fn calculate_account_data_size_on_deserialized_system_instruction(
+        instruction: SystemInstruction,
+    ) -> u64 {
+        return match instruction {
+            SystemInstruction::CreateAccount {
+                lamports: _lamports,
+                space,
+                owner: _owner,
+            } => space,
+            SystemInstruction::CreateAccountWithSeed {
+                base: _base,
+                seed: _seed,
+                lamports: _lamports,
+                space,
+                owner: _owner,
+            } => space,
+            SystemInstruction::Allocate { space } => space,
+            SystemInstruction::AllocateWithSeed {
+                base: _base,
+                seed: _seed,
+                space,
+                owner: _owner,
+            } => space,
+            _ => 0,
+        };
+    }
+
+    fn calculate_account_data_size_on_instruction(
+        program_id: &Pubkey,
+        instruction: &CompiledInstruction,
+    ) -> u64 {
+        if program_id == &system_program::id() {
+            if let Ok(instruction) = limited_deserialize(&instruction.data) {
+                return Self::calculate_account_data_size_on_deserialized_system_instruction(
+                    instruction,
+                );
+            }
+        }
+        0
+    }
+
+    /// eventually, potentially determine account data size of all writable accounts
+    /// at the moment, calculate account data size of account creation
+    fn calculate_account_data_size(&self, transaction: &SanitizedTransaction) -> u64 {
+        transaction
+            .message()
+            .program_instructions_iter()
+            .map(|(program_id, instruction)| {
+                Self::calculate_account_data_size_on_instruction(program_id, instruction)
+            })
+            .sum()
+    }
+
     fn calculate_cost_weight(&self, transaction: &SanitizedTransaction) -> u32 {
         if is_simple_vote_transaction(transaction) {
             // vote has zero cost weight, so it bypasses block cost limit checking
@@ -265,6 +324,53 @@ mod tests {
             testee.instruction_execution_cost_table.get_mode(),
             testee.find_instruction_cost(
                 &Pubkey::from_str("unknown111111111111111111111111111111111111").unwrap()
+            )
+        );
+    }
+
+    #[test]
+    fn test_cost_model_data_len_cost() {
+        let lamports = 0;
+        let owner = Pubkey::default();
+        let seed = String::default();
+        let space = 100;
+        let base = Pubkey::default();
+        for instruction in [
+            SystemInstruction::CreateAccount {
+                lamports,
+                space,
+                owner: owner.clone(),
+            },
+            SystemInstruction::CreateAccountWithSeed {
+                base: base.clone(),
+                seed: seed.clone(),
+                lamports,
+                space,
+                owner: owner.clone(),
+            },
+            SystemInstruction::Allocate { space },
+            SystemInstruction::AllocateWithSeed {
+                base,
+                seed,
+                space,
+                owner,
+            },
+        ] {
+            assert_eq!(
+                space,
+                CostModel::calculate_account_data_size_on_deserialized_system_instruction(
+                    instruction
+                )
+            );
+        }
+        assert_eq!(
+            0,
+            CostModel::calculate_account_data_size_on_deserialized_system_instruction(
+                SystemInstruction::TransferWithSeed {
+                    lamports,
+                    from_seed: String::default(),
+                    from_owner: Pubkey::default(),
+                }
             )
         );
     }
