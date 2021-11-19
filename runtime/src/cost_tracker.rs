@@ -139,11 +139,11 @@ impl CostTracker {
 
         // check if the transaction itself is more costly than the account_cost_limit
         if *cost > self.account_cost_limit {
-            return Err(CostTrackerError::WouldExceedAccountMaxLimit);
+            //return Err(CostTrackerError::WouldExceedAccountMaxLimit);
         }
 
         if self.account_data_size.saturating_add(account_data_len) > MAX_ACCOUNT_DATA_LEN {
-            return Err(CostTrackerError::WouldExceedAccountDataMaxLimit);
+            //return Err(CostTrackerError::WouldExceedAccountDataMaxLimit);
         }
 
         // check each account against account_cost_limit,
@@ -151,7 +151,7 @@ impl CostTracker {
             match self.cost_by_writable_accounts.get(account_key) {
                 Some(chained_cost) => {
                     if chained_cost + cost > self.account_cost_limit {
-                        return Err(CostTrackerError::WouldExceedAccountMaxLimit);
+                        continue;//return Err(CostTrackerError::WouldExceedAccountMaxLimit);
                     } else {
                         continue;
                     }
