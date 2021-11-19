@@ -501,7 +501,6 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         let mut map = self.map().write().unwrap();
         let entry = map.entry(pubkey);
         m.stop();
-        let mut direct_to_disk = false;
         let found = matches!(entry, Entry::Occupied(_));
         let result = match entry {
             Entry::Occupied(occupied) => Some(Self::insert_returner(
@@ -523,7 +522,6 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                     if let Some(disk) = self.bucket.as_ref() {
                         let v = vec![new_entry.into()];
                         disk.insert(&pubkey, (&v, 1));
-                        direct_to_disk = true;
                     }
                     else {
                         panic!("unsupported");
@@ -536,9 +534,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         self.update_entry_stats(m, found);
         let stats = self.stats();
         if result.is_none() {
-            if !direct_to_disk {
-                stats.insert_or_delete(true, self.bin);
-            }
+            stats.insert_or_delete(true, self.bin);
         } else {
             Self::update_stat(&stats.updates_in_mem, 1);
         }
