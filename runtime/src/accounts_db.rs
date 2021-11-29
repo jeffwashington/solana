@@ -23,6 +23,8 @@ use crate::{
     accounts_cache::{AccountsCache, CachedAccount, SlotCache},
     accounts_hash::{AccountsHash, CalculateHashIntermediate, HashStats, PreviousPass},
     accounts_index::{
+        AccountMapEntry,
+        PreAllocatedAccountMapEntry,
         AccountIndexGetResult, AccountSecondaryIndexes, AccountsIndex, AccountsIndexConfig,
         AccountsIndexRootsStats, IndexKey, IndexValue, IsCached, RefCount, ScanConfig, ScanResult,
         SlotList, SlotSlice, ZeroLamport, ACCOUNTS_INDEX_CONFIG_FOR_BENCHMARKS,
@@ -1519,6 +1521,41 @@ type GenerateIndexAccountsMap<'a> = HashMap<Pubkey, IndexAccountMapEntry<'a>>;
 impl AccountsDb {
     pub fn default_for_tests() -> Self {
         Self::default_with_accounts_index(AccountInfoAccountsIndex::default_for_tests(), None, None)
+    }
+
+    fn sample(&self) -> AccountMapEntry<AccountInfo> {
+        let slot = thread_rng().gen_range(0, Slot::MAX);
+        let entry = PreAllocatedAccountMapEntry::new(slot, AccountInfo::default(), &self.accounts_index.storage.storage, false).into_account_map_entry(&self.accounts_index.storage.storage);
+        let rnd = thread_rng().gen_range(0, 100u64);
+        if rnd > 90 {
+            entry.slot_list.write().unwrap().push((thread_rng().gen_range(0, Slot::MAX), AccountInfo::default()));
+            if rnd >= 95 {
+                entry.slot_list.write().unwrap().push((thread_rng().gen_range(0, Slot::MAX), AccountInfo::default()));
+                entry.slot_list.write().unwrap().push((thread_rng().gen_range(0, Slot::MAX), AccountInfo::default()));
+            } 
+        }
+        entry
+}
+
+    pub fn allocator_bg(&self) {
+        let mut info = vec![];
+        let items = 100_000usize;
+        (0..items).for_each(|_| {
+            let entry =self.sample();
+            info.push(entry);
+        });
+        let mut i = 0usize;
+        loop {
+            i += 1;
+            if i % 1_000 == 0 {
+                error!("allocator_bg: {}", i);
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            for _ in 0..items*2 {
+            let idx = thread_rng().gen_range(0, info.len());
+            info[idx] = self.sample();
+            }
+        }
     }
 
     /// return (num_hash_scan_passes, bins_per_pass)

@@ -831,7 +831,7 @@ pub struct AccountsIndex<T: IndexValue> {
     // scanning the fork with that Bank at the tip is no longer possible.
     pub removed_bank_ids: Mutex<HashSet<BankId>>,
 
-    storage: AccountsIndexStorage<T>,
+    pub storage: AccountsIndexStorage<T>,
 
     /// when a scan's accumulated data exceeds this limit, abort the scan
     pub scan_results_limit_bytes: Option<usize>,
