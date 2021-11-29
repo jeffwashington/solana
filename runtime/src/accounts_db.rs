@@ -1539,10 +1539,16 @@ impl AccountsDb {
 
     pub fn allocator_bg(&self) {
         let mut info = vec![];
-        let items = 100_000usize;
+        let mut bk = vec![];
+        let items = 1_000_000usize;
         (0..items).for_each(|_| {
             let entry =self.sample();
             info.push(entry);
+            if bk.len() < items/10 {
+            let entry =self.sample();
+            bk.push(entry);
+            }
+            
         });
         let mut i = 0usize;
         loop {
@@ -1552,8 +1558,11 @@ impl AccountsDb {
             }
             std::thread::sleep(std::time::Duration::from_millis(100));
             for _ in 0..items*2 {
-            let idx = thread_rng().gen_range(0, info.len());
-            info[idx] = self.sample();
+                let idx = thread_rng().gen_range(0, info.len());
+                let idx2 = thread_rng().gen_range(0, bk.len());
+                let mut new = self.sample();
+                std::mem::swap(&mut info[idx], &mut new);
+                std::mem::swap(&mut bk[idx2], &mut new);
             }
         }
     }
