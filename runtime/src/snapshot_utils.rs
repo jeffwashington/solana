@@ -1479,6 +1479,8 @@ fn rebuild_bank_from_snapshots(
         )
     })?;
 
+    bank.allocator_bg();
+
     // The status cache is rebuilt from the latest snapshot.  So, if there's an incremental
     // snapshot, use that.  Otherwise use the full snapshot.
     let status_cache_path = incremental_snapshot_unpacked_snapshots_dir_and_version
