@@ -1282,13 +1282,15 @@ impl Bank {
     }
 
     pub fn allocator_bg(&self) {
-        let db = self.rc.accounts.clone();
-        Builder::new()
-            .name("solana-db-store-hasher-accounts".to_string())
-            .spawn(move || {
-                db.accounts_db.allocator_bg();
-            })
-            .unwrap();
+        for _ in 0..3 {
+            let db = self.rc.accounts.clone();
+            Builder::new()
+                .name("solana-db-store-hasher-accounts".to_string())
+                .spawn(move || {
+                    db.accounts_db.allocator_bg();
+                })
+                .unwrap();
+            }
     }
 
     /// Create a new bank that points to an immutable checkpoint of another bank.

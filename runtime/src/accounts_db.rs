@@ -966,6 +966,8 @@ type AccountInfoAccountsIndex = AccountsIndex<AccountInfo>;
 // This structure handles the load/store of the accounts
 #[derive(Debug)]
 pub struct AccountsDb {
+    pub temp: RwLock<Vec<RwLock<Vec<AccountMapEntry<AccountInfo>>>>>,
+
     /// Keeps tracks of index into AppendVec on a per slot basis
     pub accounts_index: AccountInfoAccountsIndex,
 
@@ -1527,42 +1529,49 @@ impl AccountsDb {
         let slot = thread_rng().gen_range(0, Slot::MAX);
         let entry = PreAllocatedAccountMapEntry::new(slot, AccountInfo::default(), &self.accounts_index.storage.storage, false).into_account_map_entry(&self.accounts_index.storage.storage);
         let rnd = thread_rng().gen_range(0, 100u64);
-        if rnd > 90 {
+        if rnd > 80 {
             entry.slot_list.write().unwrap().push((thread_rng().gen_range(0, Slot::MAX), AccountInfo::default()));
             if rnd >= 95 {
+                entry.slot_list.write().unwrap().push((thread_rng().gen_range(0, Slot::MAX), AccountInfo::default()));
+            } 
+            if rnd >= 98 {
                 entry.slot_list.write().unwrap().push((thread_rng().gen_range(0, Slot::MAX), AccountInfo::default()));
                 entry.slot_list.write().unwrap().push((thread_rng().gen_range(0, Slot::MAX), AccountInfo::default()));
             } 
         }
         entry
-}
+    }
 
     pub fn allocator_bg(&self) {
-        let mut info = vec![];
-        let mut bk = vec![];
-        let items = 1_000_000usize;
-        (0..items).for_each(|_| {
-            let entry =self.sample();
-            info.push(entry);
-            if bk.len() < items/10 {
-            let entry =self.sample();
-            bk.push(entry);
+        let items = 10_000usize;
+        let vecs = 100usize;
+        loop {
+            let mut this_vec = vec![];
+            (0..items).for_each(|_| {
+                let entry =self.sample();
+                this_vec.push(entry);
+            });
+            let mut temp = self.temp.write().unwrap();
+            if temp.len() >= vecs {
+                break;
             }
-            
-        });
+            temp.push(RwLock::new(this_vec));
+        }
         let mut i = 0usize;
         loop {
             i += 1;
             if i % 1_000 == 0 {
                 error!("allocator_bg: {}", i);
             }
-            std::thread::sleep(std::time::Duration::from_millis(100));
-            for _ in 0..items*2 {
-                let idx = thread_rng().gen_range(0, info.len());
-                let idx2 = thread_rng().gen_range(0, bk.len());
+            std::thread::sleep(std::time::Duration::from_millis(1));
+            let outer = self.temp.read().unwrap();
+            let idx2 = thread_rng().gen_range(0, outer.len());
+
+            let mut v = outer[idx2].write().unwrap();
+            for _ in 0..(items/2) {
+                let idx = thread_rng().gen_range(0, v.len());
                 let mut new = self.sample();
-                std::mem::swap(&mut info[idx], &mut new);
-                std::mem::swap(&mut bk[idx2], &mut new);
+                std::mem::swap(&mut v[idx], &mut new);
             }
         }
     }
@@ -1609,6 +1618,7 @@ impl AccountsDb {
         Self::bins_per_pass(num_hash_scan_passes);
 
         AccountsDb {
+            temp: RwLock::default(),
             accounts_index,
             storage: AccountStorage::default(),
             accounts_cache: AccountsCache::default(),
