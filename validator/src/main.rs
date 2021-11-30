@@ -500,7 +500,7 @@ fn check_os_network_limits() {
 
 pub fn main() {
     //solana_runtime::in_mem_accounts_index::test_hash();
-    solana_runtime::in_mem_accounts_index::test_hash_old();
+    //solana_runtime::in_mem_accounts_index::test_hash_old();
     let default_dynamic_port_range =
         &format!("{}-{}", VALIDATOR_PORT_RANGE.0, VALIDATOR_PORT_RANGE.1);
     let default_genesis_archive_unpacked_size = &MAX_GENESIS_ARCHIVE_UNPACKED_SIZE.to_string();
