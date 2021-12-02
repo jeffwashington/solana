@@ -1129,7 +1129,7 @@ impl<T: IndexValue> AccountsIndex<T> {
             for pubkey in pubkey_list {
                 num_keys_iterated += 1;
                 let mut read_lock_timer = Measure::start("read_lock");
-                let result = self.get2(&pubkey, Some(ancestors), max_root, |entry| {
+                let result = self.get(&pubkey, Some(ancestors), max_root, |entry| {
                     entry.map(|(locked_entry, index)| {
                         let slot_list = locked_entry.slot_list();
                         slot_list[index]
@@ -1147,7 +1147,7 @@ impl<T: IndexValue> AccountsIndex<T> {
                 }
 
                 let mut load_account_timer = Measure::start("load_account");
-                //let list_item = &slot_list[index];
+                // note this is happening outside the acct idx lock from above, so this acct could have moved in append vecs
                 func(&pubkey, (&result.1, result.0));
                 load_account_timer.stop();
                 load_account_elapsed += load_account_timer.as_us();
@@ -1185,7 +1185,7 @@ impl<T: IndexValue> AccountsIndex<T> {
         for pubkey in index.get(index_key) {
             // Maybe these reads from the AccountsIndex can be batched every time it
             // grabs the read lock as well...
-            self.get2(&pubkey, Some(ancestors), max_root, |entry| {
+            self.get(&pubkey, Some(ancestors), max_root, |entry| {
                 if let Some((list_r, index)) = entry {
                     let entry = &list_r.slot_list()[index];
                     func(&pubkey, (&entry.1, entry.0))
@@ -1197,7 +1197,7 @@ impl<T: IndexValue> AccountsIndex<T> {
         }
     }
 
-    pub fn get_function<RT>(
+    pub fn get_entry<RT>(
         &self,
         pubkey: &Pubkey,
         user: impl for<'a> FnOnce(Option<&AccountMapEntry<T>>) -> RT,
@@ -1208,7 +1208,7 @@ impl<T: IndexValue> AccountsIndex<T> {
         read_lock.get_internal(pubkey, |entry| (false, user(entry)))
     }
 
-    pub fn get_mut_function<RT>(
+    pub fn get_mut_entry<RT>(
         &self,
         pubkey: &Pubkey,
         user: impl for<'a> FnOnce(Option<&mut AccountMapEntry<T>>) -> RT,
@@ -1478,7 +1478,7 @@ impl<T: IndexValue> AccountsIndex<T> {
 
     /// Get an account
     /// The latest account that appears in `ancestors` or `roots` is returned.
-    pub(crate) fn get2<'a, RT>(
+    pub(crate) fn get<'a, RT>(
         &'a self,
         pubkey: &'a Pubkey,
         ancestors: Option<&Ancestors>,
@@ -1707,7 +1707,7 @@ impl<T: IndexValue> AccountsIndex<T> {
     }
 
     pub fn ref_count_from_storage(&self, pubkey: &Pubkey) -> RefCount {
-        self.get_function(pubkey, |entry| entry.map(|entry| entry.ref_count()))
+        self.get_entry(pubkey, |entry| entry.map(|entry| entry.ref_count()))
             .unwrap_or_default()
     }
 
@@ -2055,13 +2055,13 @@ pub mod tests {
             ancestors: Option<&Ancestors>,
             max_root: Option<Slot>,
         ) -> Option<(AccountMapEntry<T>, usize)> {
-            self.get2(pubkey, ancestors, max_root, |entry| {
+            self.get(pubkey, ancestors, max_root, |entry| {
                 entry.map(|(entry, index)| (entry.clone(), index))
             })
         }
 
         pub fn get_raw(&self, pubkey: &Pubkey) -> Option<AccountMapEntry<T>> {
-            self.get_function(pubkey, |entry| entry.cloned())
+            self.get_entry(pubkey, |entry| entry.cloned())
         }
 
         pub fn get_account_read_entry(&self, pubkey: &Pubkey) -> Option<AccountMapEntry<T>> {

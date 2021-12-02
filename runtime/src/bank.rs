@@ -8168,7 +8168,7 @@ pub(crate) mod tests {
 
     impl Bank {
         fn slots_by_pubkey(&self, pubkey: &Pubkey, ancestors: &Ancestors) -> Vec<Slot> {
-            self.rc.accounts.accounts_db.accounts_index.get2(
+            self.rc.accounts.accounts_db.accounts_index.get(
                 pubkey,
                 Some(ancestors),
                 None,
