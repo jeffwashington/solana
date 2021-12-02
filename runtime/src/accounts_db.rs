@@ -27,10 +27,9 @@ use {
         accounts_cache::{AccountsCache, CachedAccount, SlotCache},
         accounts_hash::{AccountsHash, CalculateHashIntermediate, HashStats, PreviousPass},
         accounts_index::{
-            AccountIndexGetResult, AccountSecondaryIndexes, AccountsIndex, AccountsIndexConfig,
-            AccountsIndexRootsStats, IndexKey, IndexValue, IsCached, RefCount, ScanConfig,
-            ScanResult, SlotList, SlotSlice, ZeroLamport, ACCOUNTS_INDEX_CONFIG_FOR_BENCHMARKS,
-            ACCOUNTS_INDEX_CONFIG_FOR_TESTING,
+            AccountSecondaryIndexes, AccountsIndex, AccountsIndexConfig, AccountsIndexRootsStats,
+            IndexKey, IndexValue, IsCached, RefCount, ScanConfig, ScanResult, SlotList, SlotSlice,
+            ZeroLamport, ACCOUNTS_INDEX_CONFIG_FOR_BENCHMARKS, ACCOUNTS_INDEX_CONFIG_FOR_TESTING,
         },
         accounts_update_notifier_interface::AccountsUpdateNotifier,
         ancestors::Ancestors,
@@ -2585,26 +2584,28 @@ impl AccountsDb {
         let mut alive = 0;
         let mut dead = 0;
         iter.for_each(|(pubkey, stored_account)| {
-            let lookup = self.accounts_index.get_account_read_entry(pubkey);
-            if let Some(locked_entry) = lookup {
-                let is_alive = locked_entry.slot_list().iter().any(|(_slot, i)| {
-                    i.store_id == stored_account.store_id
-                        && i.offset == stored_account.account.offset
+            self.accounts_index
+                .get_mut_function(pubkey, |locked_entry| {
+                    if let Some(locked_entry) = locked_entry {
+                        let is_alive = locked_entry.slot_list().iter().any(|(_slot, i)| {
+                            i.store_id == stored_account.store_id
+                                && i.offset == stored_account.account.offset
+                        });
+                        if !is_alive {
+                            // This pubkey was found in the storage, but no longer exists in the index.
+                            // It would have had a ref to the storage from the initial store, but it will
+                            // not exist in the re-written slot. Unref it to keep the index consistent with
+                            // rewriting the storage entries.
+                            unrefed_pubkeys.push(pubkey);
+                            locked_entry.add_un_ref(false);
+                            dead += 1;
+                        } else {
+                            alive_accounts.push((pubkey, stored_account));
+                            alive_total += stored_account.account_size;
+                            alive += 1;
+                        }
+                    }
                 });
-                if !is_alive {
-                    // This pubkey was found in the storage, but no longer exists in the index.
-                    // It would have had a ref to the storage from the initial store, but it will
-                    // not exist in the re-written slot. Unref it to keep the index consistent with
-                    // rewriting the storage entries.
-                    unrefed_pubkeys.push(pubkey);
-                    locked_entry.unref();
-                    dead += 1;
-                } else {
-                    alive_accounts.push((pubkey, stored_account));
-                    alive_total += stored_account.account_size;
-                    alive += 1;
-                }
-            }
         });
         self.shrink_stats
             .alive_accounts
@@ -2705,9 +2706,12 @@ impl AccountsDb {
                 .skipped_shrink
                 .fetch_add(1, Ordering::Relaxed);
             for pubkey in unrefed_pubkeys {
-                if let Some(locked_entry) = self.accounts_index.get_account_read_entry(pubkey) {
-                    locked_entry.addref();
-                }
+                self.accounts_index
+                    .get_mut_function(pubkey, |locked_entry| {
+                        if let Some(locked_entry) = locked_entry {
+                            locked_entry.add_un_ref(true);
+                        }
+                    })
             }
             return 0;
         }
@@ -3326,24 +3330,20 @@ impl AccountsDb {
         max_root: Option<Slot>,
         clone_in_lock: bool,
     ) -> Option<(Slot, AppendVecId, usize, Option<LoadedAccountAccessor<'a>>)> {
-        let (lock, index) = match self.accounts_index.get(pubkey, Some(ancestors), max_root) {
-            AccountIndexGetResult::Found(lock, index) => (lock, index),
-            // we bail out pretty early for missing.
-            AccountIndexGetResult::NotFoundOnFork => {
-                return None;
-            }
-            AccountIndexGetResult::Missing(_) => {
-                return None;
-            }
-        };
-
-        let slot_list = lock.slot_list();
-        let (
-            slot,
-            AccountInfo {
-                store_id, offset, ..
-            },
-        ) = slot_list[index];
+        let (slot, store_id, offset) =
+            self.accounts_index
+                .get2(pubkey, Some(ancestors), max_root, |entry| {
+                    entry.map(|(lock, index)| {
+                        let slot_list = lock.slot_list();
+                        let (
+                            slot,
+                            AccountInfo {
+                                store_id, offset, ..
+                            },
+                        ) = slot_list[index];
+                        (slot, store_id, offset)
+                    })
+                })?;
 
         let some_from_slow_path = if clone_in_lock {
             // the fast path must have failed.... so take the slower approach
@@ -5123,11 +5123,10 @@ impl AccountsDb {
                             if self.is_filler_account(pubkey) {
                                 return None;
                             }
-                            if let AccountIndexGetResult::Found(lock, index) =
-                                self.accounts_index.get(pubkey, Some(ancestors), Some(slot))
-                            {
+                            self.accounts_index.get2(pubkey, Some(ancestors), Some(slot), |entry| {
+                                entry.and_then(|(lock, index)| {
                                 let (slot, account_info) = &lock.slot_list()[index];
-                                if !account_info.is_zero_lamport() {
+                                    if account_info.lamports != 0 {
                                     // Because we're keeping the `lock' here, there is no need
                                     // to use retry_to_get_account_accessor()
                                     // In other words, flusher/shrinker/cleaner is blocked to
@@ -5147,7 +5146,7 @@ impl AccountsDb {
                                     .and_then(
                                         |loaded_account| {
                                             let loaded_hash = loaded_account.loaded_hash();
-                                            let balance = loaded_account.lamports();
+                                                let balance = account_info.lamports;
                                             if check_hash && !self.is_filler_account(pubkey) {
                                                 let computed_hash =
                                                     loaded_account.compute_hash(*slot, pubkey);
@@ -5163,13 +5162,12 @@ impl AccountsDb {
                                             Some(loaded_hash)
                                         },
                                     )
-                                } else {
-                                    None
                                 }
-                            } else {
+                                    else {
                                 None
                             }
                         })
+                        })})
                         .collect();
                     let mut total = total_lamports.lock().unwrap();
                     *total =
@@ -6960,13 +6958,15 @@ impl AccountsDb {
                             insert_us
                         } else {
                             // verify index matches expected and measure the time to get all items
+                            panic!("");
+                            /*
                             assert!(verify);
                             let mut lookup_time = Measure::start("lookup_time");
                             for account in accounts_map.into_iter() {
                                 let (key, account_info) = account;
                                 let lock = self.accounts_index.get_account_maps_read_lock(&key);
-                                let x = lock.get(&key).unwrap();
-                                let sl = x.slot_list.read().unwrap();
+                                let x = lock.get2(&key).unwrap();
+                                let sl = &x.slot_list;
                                 let mut count = 0;
                                 for (slot2, account_info2) in sl.iter() {
                                     if slot2 == slot {
@@ -6984,6 +6984,7 @@ impl AccountsDb {
                             }
                             lookup_time.stop();
                             lookup_time.as_us()
+                            */
                         };
                         insertion_time_us.fetch_add(insert_us, Ordering::Relaxed);
                     }
@@ -7079,15 +7080,18 @@ impl AccountsDb {
     fn pubkeys_to_duplicate_accounts_data_len(&self, pubkeys: &[Pubkey]) -> u64 {
         let mut accounts_data_len_from_duplicates = 0;
         pubkeys.iter().for_each(|pubkey| {
-            if let Some(entry) = self.accounts_index.get_account_read_entry(pubkey) {
-                let slot_list = entry.slot_list();
-                if slot_list.len() < 2 {
-                    return;
-                }
+            if let Some(mut slot_list) = self.accounts_index.get_function(pubkey, |entry| {
+                entry.and_then(|entry| {
+                    let slot_list = entry.slot_list();
+                    if slot_list.len() < 2 {
+                        return None;
+                    }
+                    Some(slot_list.clone())
+                })
+            }) {
                 // Only the account data len in the highest slot should be used, and the rest are
                 // duplicates.  So sort the slot list in descending slot order, skip the first
                 // item, then sum up the remaining data len, which are the duplicates.
-                let mut slot_list = slot_list.clone();
                 slot_list
                     .select_nth_unstable_by(0, |a, b| b.0.cmp(&a.0))
                     .2
@@ -7197,14 +7201,14 @@ impl AccountsDb {
         roots.sort();
         info!("{}: accounts_index roots: {:?}", label, roots,);
         self.accounts_index.account_maps.iter().for_each(|map| {
-            for (pubkey, account_entry) in
-                map.read().unwrap().items(&None::<&std::ops::Range<Pubkey>>)
-            {
-                info!("  key: {} ref_count: {}", pubkey, account_entry.ref_count(),);
-                info!(
-                    "      slots: {:?}",
-                    *account_entry.slot_list.read().unwrap()
-                );
+            for pubkey in map.read().unwrap().items(&None::<&std::ops::Range<Pubkey>>) {
+                map.read().unwrap().get_internal(&pubkey, |account_entry| {
+                    if let Some(account_entry) = account_entry {
+                        info!("  key: {} ref_count: {}", pubkey, account_entry.ref_count(),);
+                        info!("      slots: {:?}", account_entry.slot_list);
+                    }
+                    (false, ())
+                });
             }
         });
     }
@@ -7277,8 +7281,10 @@ impl AccountsDb {
 
     pub fn get_append_vec_id(&self, pubkey: &Pubkey, slot: Slot) -> Option<AppendVecId> {
         let ancestors = vec![(slot, 1)].into_iter().collect();
-        let result = self.accounts_index.get(pubkey, Some(&ancestors), None);
-        result.map(|(list, index)| list.slot_list()[index].1.store_id)
+        self.accounts_index
+            .get2(pubkey, Some(&ancestors), None, |result| {
+                result.map(|(list, index)| list.slot_list()[index].1.store_id)
+            })
     }
 
     pub fn alive_account_count_in_slot(&self, slot: Slot) -> usize {
@@ -8358,7 +8364,7 @@ pub mod tests {
             .insert(unrooted_slot, BankHashInfo::default());
         assert!(db
             .accounts_index
-            .get(&key, Some(&ancestors), None)
+            .get2(&key, Some(&ancestors), None, |entry| entry.map(|_| true))
             .is_some());
         assert_load_account(&db, unrooted_slot, key, 1);
 
@@ -8368,10 +8374,13 @@ pub mod tests {
         assert!(db.bank_hashes.read().unwrap().get(&unrooted_slot).is_none());
         assert!(db.accounts_cache.slot_cache(unrooted_slot).is_none());
         assert!(db.storage.0.get(&unrooted_slot).is_none());
-        assert!(db.accounts_index.get_account_read_entry(&key).is_none());
         assert!(db
             .accounts_index
-            .get(&key, Some(&ancestors), None)
+            .get_function(&key, |entry| entry.map(|_| true))
+            .is_none());
+        assert!(db
+            .accounts_index
+            .get2(&key, Some(&ancestors), None, |entry| entry.map(|_| true))
             .is_none());
 
         // Test we can store for the same slot again and get the right information
