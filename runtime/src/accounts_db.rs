@@ -1019,7 +1019,7 @@ pub struct AccountsDb {
 
     pub bank_hashes: RwLock<HashMap<Slot, BankHashInfo>>,
 
-    stats: AccountsStats,
+    pub stats: AccountsStats,
 
     clean_accounts_stats: CleanAccountsStats,
 
@@ -1077,13 +1077,15 @@ pub struct AccountsDb {
 }
 
 #[derive(Debug, Default)]
-struct AccountsStats {
+pub struct AccountsStats {
     delta_hash_scan_time_total_us: AtomicU64,
     delta_hash_accumulate_time_total_us: AtomicU64,
     delta_hash_num: AtomicU64,
 
     last_store_report: AtomicInterval,
     store_hash_accounts: AtomicU64,
+    pub new_data_len_transaction: AtomicU64,
+    pub new_data_len_transaction_count: AtomicU64,
     calc_stored_meta: AtomicU64,
     store_accounts: AtomicU64,
     store_update_index: AtomicU64,
@@ -6283,6 +6285,20 @@ impl AccountsDb {
                 self.read_only_accounts_cache.get_and_reset_stats();
             datapoint_info!(
                 "accounts_db_store_timings",
+                (
+                    "new_data_len_transaction_count",
+                    self.stats
+                        .new_data_len_transaction_count
+                        .swap(0, Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "new_data_len_transaction",
+                    self.stats
+                        .new_data_len_transaction
+                        .swap(0, Ordering::Relaxed),
+                    i64
+                ),
                 (
                     "hash_accounts",
                     self.stats.store_hash_accounts.swap(0, Ordering::Relaxed),

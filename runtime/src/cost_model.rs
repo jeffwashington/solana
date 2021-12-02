@@ -120,7 +120,7 @@ impl CostModel {
         tx_cost.data_bytes_cost = self.get_data_bytes_cost(transaction);
         tx_cost.execution_cost = self.get_transaction_cost(transaction);
         tx_cost.cost_weight = self.calculate_cost_weight(transaction);
-        tx_cost.account_data_size = self.calculate_account_data_size(transaction);
+        tx_cost.account_data_size = Self::calculate_account_data_size(transaction);
 
         debug!("transaction {:?} has cost {:?}", transaction, tx_cost);
         tx_cost
@@ -239,7 +239,7 @@ impl CostModel {
 
     /// eventually, potentially determine account data size of all writable accounts
     /// at the moment, calculate account data size of account creation
-    fn calculate_account_data_size(&self, transaction: &SanitizedTransaction) -> u64 {
+    pub fn calculate_account_data_size(transaction: &SanitizedTransaction) -> u64 {
         transaction
             .message()
             .program_instructions_iter()

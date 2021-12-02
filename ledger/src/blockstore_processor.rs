@@ -33,6 +33,8 @@ use solana_runtime::{
     vote_account::VoteAccount,
     vote_sender_types::ReplayVoteSender,
 };
+use std::sync::atomic::Ordering;
+
 use solana_sdk::timing;
 use solana_sdk::{
     clock::{Slot, MAX_PROCESSING_AGE},
@@ -326,22 +328,32 @@ pub fn process_entries_for_tests(
 }
 
 fn prefetch_accounts(bank: &Arc<Bank>, entries: &mut [EntryType]) {
-    let mut pubkeys = HashSet::new();
+    let mut sum = 0;
+    let mut count = 0;
     for entry in entries.iter() {
         if let EntryType::Transactions(transactions) = entry {
             for transaction in transactions.iter() {
-                for key in &transaction.transaction().message.account_keys {
-                    pubkeys.insert(*key);
+                let this_sum =
+                    solana_runtime::cost_model::CostModel::calculate_account_data_size(transaction);
+                if this_sum > 0 {
+                    sum += this_sum;
+                    count += 1;
                 }
             }
         }
     }
-    let bank_ = bank.clone();
-    rayon::spawn(move || {
-        for key in pubkeys {
-            bank_.load_accounts_into_read_only_cache(&key);
-        }
-    });
+    bank.rc
+        .accounts
+        .accounts_db
+        .stats
+        .new_data_len_transaction
+        .fetch_add(sum, Ordering::Relaxed);
+    bank.rc
+        .accounts
+        .accounts_db
+        .stats
+        .new_data_len_transaction_count
+        .fetch_add(count, Ordering::Relaxed);
 }
 
 // Note: If randomize is true this will shuffle entries' transactions in-place.
@@ -360,7 +372,7 @@ fn process_entries_with_callback(
     let mut tick_hashes = vec![];
     let mut rng = thread_rng();
 
-    self.prefetch_accounts(bank, entries);
+    prefetch_accounts(bank, entries);
 
     for entry in entries {
         match entry {
