@@ -106,7 +106,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         std::mem::swap(&mut *map, &mut new);
         let l = new.len();
         map.extend(new);
-        error!("reset, cap: {:?}, {}, {}", cap, map.capacity(), l);
+        //error!("reset, cap: {:?}, {}, {}", cap, map.capacity(), l);
     }
 
     pub fn items<R>(&self, range: &Option<&R>) -> Vec<(K, AccountMapEntry<T>)>
