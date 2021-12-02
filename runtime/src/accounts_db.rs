@@ -18,70 +18,67 @@
 //! tracks the number of commits to the entire data store. So the latest
 //! commit for each slot entry would be indexed.
 
+use crate::{
+    accounts_background_service::{DroppedSlotsSender, SendDroppedBankCallback},
+    accounts_cache::{AccountsCache, CachedAccount, SlotCache},
+    accounts_hash::{AccountsHash, CalculateHashIntermediate, HashStats, PreviousPass},
+    accounts_index::{
+        AccountSecondaryIndexes, AccountsIndex, AccountsIndexConfig, AccountsIndexRootsStats,
+        IndexKey, IndexValue, IsCached, RefCount, ScanConfig, ScanResult, SlotList, SlotSlice,
+        ZeroLamport, ACCOUNTS_INDEX_CONFIG_FOR_BENCHMARKS, ACCOUNTS_INDEX_CONFIG_FOR_TESTING,
+    },
+    accounts_update_notifier_interface::AccountsUpdateNotifier,
+    ancestors::Ancestors,
+    append_vec::{AppendVec, StoredAccountMeta, StoredMeta, StoredMetaWriteVersion},
+    cache_hash_data::CacheHashData,
+    contains::Contains,
+    pubkey_bins::PubkeyBinCalculator24,
+    read_only_accounts_cache::ReadOnlyAccountsCache,
+    rent_collector::RentCollector,
+    sorted_storages::SortedStorages,
+};
+use blake3::traits::digest::Digest;
+use crossbeam_channel::{unbounded, Receiver, Sender};
+use dashmap::{
+    mapref::entry::Entry::{Occupied, Vacant},
+    DashMap, DashSet,
+};
+use log::*;
+use rand::{prelude::SliceRandom, thread_rng, Rng};
+use rayon::{prelude::*, ThreadPool};
+use serde::{Deserialize, Serialize};
+use solana_measure::measure::Measure;
+use solana_rayon_threadlimit::get_thread_count;
+use solana_sdk::genesis_config::GenesisConfig;
+use solana_sdk::{
+    account::{AccountSharedData, ReadableAccount},
+    clock::{BankId, Epoch, Slot, SlotCount},
+    epoch_schedule::EpochSchedule,
+    genesis_config::ClusterType,
+    hash::Hash,
+    pubkey::Pubkey,
+    timing::AtomicInterval,
+};
+use solana_vote_program::vote_state::MAX_LOCKOUT_HISTORY;
+use std::{
+    borrow::{Borrow, Cow},
+    boxed::Box,
+    collections::{hash_map::Entry, BTreeSet, HashMap, HashSet},
+    convert::TryFrom,
+    hash::{Hash as StdHash, Hasher as StdHasher},
+    io::{Error as IoError, Result as IoResult},
+    ops::{Range, RangeBounds},
+    path::{Path, PathBuf},
+    str::FromStr,
+    sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
+    sync::{Arc, Condvar, Mutex, MutexGuard, RwLock},
+    thread::Builder,
+    time::Instant,
+};
+use tempfile::TempDir;
+
 #[cfg(test)]
 use std::{thread::sleep, time::Duration};
-use {
-    crate::{
-        accounts_background_service::{DroppedSlotsSender, SendDroppedBankCallback},
-        accounts_cache::{AccountsCache, CachedAccount, SlotCache},
-        accounts_hash::{AccountsHash, CalculateHashIntermediate, HashStats, PreviousPass},
-        accounts_index::{
-            AccountIndexGetResult, AccountSecondaryIndexes, AccountsIndex, AccountsIndexConfig,
-            AccountsIndexRootsStats, IndexKey, IndexValue, IsCached, RefCount, ScanConfig,
-            ScanResult, SlotList, SlotSlice, ZeroLamport, ACCOUNTS_INDEX_CONFIG_FOR_BENCHMARKS,
-            ACCOUNTS_INDEX_CONFIG_FOR_TESTING,
-        },
-        accounts_update_notifier_interface::AccountsUpdateNotifier,
-        ancestors::Ancestors,
-        append_vec::{AppendVec, StoredAccountMeta, StoredMeta, StoredMetaWriteVersion},
-        cache_hash_data::CacheHashData,
-        contains::Contains,
-        pubkey_bins::PubkeyBinCalculator24,
-        read_only_accounts_cache::ReadOnlyAccountsCache,
-        rent_collector::RentCollector,
-        sorted_storages::SortedStorages,
-    },
-    blake3::traits::digest::Digest,
-    crossbeam_channel::{unbounded, Receiver, Sender},
-    dashmap::{
-        mapref::entry::Entry::{Occupied, Vacant},
-        DashMap, DashSet,
-    },
-    log::*,
-    rand::{prelude::SliceRandom, thread_rng, Rng},
-    rayon::{prelude::*, ThreadPool},
-    serde::{Deserialize, Serialize},
-    solana_measure::measure::Measure,
-    solana_rayon_threadlimit::get_thread_count,
-    solana_sdk::{
-        account::{AccountSharedData, ReadableAccount},
-        clock::{BankId, Epoch, Slot, SlotCount},
-        epoch_schedule::EpochSchedule,
-        genesis_config::{ClusterType, GenesisConfig},
-        hash::Hash,
-        pubkey::Pubkey,
-        timing::AtomicInterval,
-    },
-    solana_vote_program::vote_state::MAX_LOCKOUT_HISTORY,
-    std::{
-        borrow::{Borrow, Cow},
-        boxed::Box,
-        collections::{hash_map::Entry, BTreeSet, HashMap, HashSet},
-        convert::TryFrom,
-        hash::{Hash as StdHash, Hasher as StdHasher},
-        io::{Error as IoError, Result as IoResult},
-        ops::{Range, RangeBounds},
-        path::{Path, PathBuf},
-        str::FromStr,
-        sync::{
-            atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
-            Arc, Condvar, Mutex, MutexGuard, RwLock,
-        },
-        thread::Builder,
-        time::Instant,
-    },
-    tempfile::TempDir,
-};
 
 const PAGE_SIZE: u64 = 4 * 1024;
 const MAX_RECYCLE_STORES: usize = 1000;
@@ -2586,26 +2583,28 @@ impl AccountsDb {
         let mut alive = 0;
         let mut dead = 0;
         iter.for_each(|(pubkey, stored_account)| {
-            let lookup = self.accounts_index.get_account_read_entry(pubkey);
-            if let Some(locked_entry) = lookup {
-                let is_alive = locked_entry.slot_list().iter().any(|(_slot, i)| {
-                    i.store_id == stored_account.store_id
-                        && i.offset == stored_account.account.offset
+            self.accounts_index
+                .get_mut_function(pubkey, |locked_entry| {
+                    if let Some(locked_entry) = locked_entry {
+                        let is_alive = locked_entry.slot_list().iter().any(|(_slot, i)| {
+                            i.store_id == stored_account.store_id
+                                && i.offset == stored_account.account.offset
+                        });
+                        if !is_alive {
+                            // This pubkey was found in the storage, but no longer exists in the index.
+                            // It would have had a ref to the storage from the initial store, but it will
+                            // not exist in the re-written slot. Unref it to keep the index consistent with
+                            // rewriting the storage entries.
+                            unrefed_pubkeys.push(pubkey);
+                            locked_entry.add_un_ref(false);
+                            dead += 1;
+                        } else {
+                            alive_accounts.push((pubkey, stored_account));
+                            alive_total += stored_account.account_size;
+                            alive += 1;
+                        }
+                    }
                 });
-                if !is_alive {
-                    // This pubkey was found in the storage, but no longer exists in the index.
-                    // It would have had a ref to the storage from the initial store, but it will
-                    // not exist in the re-written slot. Unref it to keep the index consistent with
-                    // rewriting the storage entries.
-                    unrefed_pubkeys.push(pubkey);
-                    locked_entry.unref();
-                    dead += 1;
-                } else {
-                    alive_accounts.push((pubkey, stored_account));
-                    alive_total += stored_account.account_size;
-                    alive += 1;
-                }
-            }
         });
         self.shrink_stats
             .alive_accounts
@@ -2706,9 +2705,12 @@ impl AccountsDb {
                 .skipped_shrink
                 .fetch_add(1, Ordering::Relaxed);
             for pubkey in unrefed_pubkeys {
-                if let Some(locked_entry) = self.accounts_index.get_account_read_entry(pubkey) {
-                    locked_entry.addref();
-                }
+                self.accounts_index
+                    .get_mut_function(pubkey, |locked_entry| {
+                        if let Some(locked_entry) = locked_entry {
+                            locked_entry.add_un_ref(true);
+                        }
+                    })
             }
             return 0;
         }
@@ -3327,24 +3329,20 @@ impl AccountsDb {
         max_root: Option<Slot>,
         clone_in_lock: bool,
     ) -> Option<(Slot, AppendVecId, usize, Option<LoadedAccountAccessor<'a>>)> {
-        let (lock, index) = match self.accounts_index.get(pubkey, Some(ancestors), max_root) {
-            AccountIndexGetResult::Found(lock, index) => (lock, index),
-            // we bail out pretty early for missing.
-            AccountIndexGetResult::NotFoundOnFork => {
-                return None;
-            }
-            AccountIndexGetResult::Missing(_) => {
-                return None;
-            }
-        };
-
-        let slot_list = lock.slot_list();
-        let (
-            slot,
-            AccountInfo {
-                store_id, offset, ..
-            },
-        ) = slot_list[index];
+        let (slot, store_id, offset) =
+            self.accounts_index
+                .get2(pubkey, Some(ancestors), max_root, |entry| {
+                    entry.map(|(lock, index)| {
+                        let slot_list = lock.slot_list();
+                        let (
+                            slot,
+                            AccountInfo {
+                                store_id, offset, ..
+                            },
+                        ) = slot_list[index];
+                        (slot, store_id, offset)
+                    })
+                })?;
 
         let some_from_slow_path = if clone_in_lock {
             // the fast path must have failed.... so take the slower approach
@@ -5124,53 +5122,51 @@ impl AccountsDb {
                             if self.is_filler_account(pubkey) {
                                 return None;
                             }
-                            if let AccountIndexGetResult::Found(lock, index) =
-                                self.accounts_index.get(pubkey, Some(ancestors), Some(slot))
-                            {
-                                let (slot, account_info) = &lock.slot_list()[index];
-                                if account_info.lamports != 0 {
-                                    // Because we're keeping the `lock' here, there is no need
-                                    // to use retry_to_get_account_accessor()
-                                    // In other words, flusher/shrinker/cleaner is blocked to
-                                    // cause any Accessor(None) situtation.
-                                    // Anyway this race condition concern is currently a moot
-                                    // point because calculate_accounts_hash() should not
-                                    // currently race with clean/shrink because the full hash
-                                    // is synchronous with clean/shrink in
-                                    // AccountsBackgroundService
-                                    self.get_account_accessor(
-                                        *slot,
-                                        pubkey,
-                                        account_info.store_id,
-                                        account_info.offset,
-                                    )
-                                    .get_loaded_account()
-                                    .and_then(
-                                        |loaded_account| {
-                                            let loaded_hash = loaded_account.loaded_hash();
-                                            let balance = account_info.lamports;
-                                            if check_hash && !self.is_filler_account(pubkey) {
-                                                let computed_hash =
-                                                    loaded_account.compute_hash(*slot, pubkey);
-                                                if computed_hash != loaded_hash {
-                                                    info!("hash mismatch found: computed: {}, loaded: {}, pubkey: {}", computed_hash, loaded_hash, pubkey);
-                                                    mismatch_found
-                                                        .fetch_add(1, Ordering::Relaxed);
-                                                    return None;
+                            self.accounts_index.get2(pubkey, Some(ancestors), Some(slot), |entry| {
+                                entry.and_then(|(lock, index)| {
+                                    let (slot, account_info) = &lock.slot_list()[index];
+                                    if account_info.lamports != 0 {
+                                        // Because we're keeping the `lock' here, there is no need
+                                        // to use retry_to_get_account_accessor()
+                                        // In other words, flusher/shrinker/cleaner is blocked to
+                                        // cause any Accessor(None) situtation.
+                                        // Anyway this race condition concern is currently a moot
+                                        // point because calculate_accounts_hash() should not
+                                        // currently race with clean/shrink because the full hash
+                                        // is synchronous with clean/shrink in
+                                        // AccountsBackgroundService
+                                        self.get_account_accessor(
+                                            *slot,
+                                            pubkey,
+                                            account_info.store_id,
+                                            account_info.offset,
+                                        )
+                                        .get_loaded_account()
+                                        .and_then(
+                                            |loaded_account| {
+                                                let loaded_hash = loaded_account.loaded_hash();
+                                                let balance = account_info.lamports;
+                                                if check_hash && !self.is_filler_account(pubkey) {
+                                                    let computed_hash =
+                                                        loaded_account.compute_hash(*slot, pubkey);
+                                                    if computed_hash != loaded_hash {
+                                                        info!("hash mismatch found: computed: {}, loaded: {}, pubkey: {}", computed_hash, loaded_hash, pubkey);
+                                                        mismatch_found
+                                                            .fetch_add(1, Ordering::Relaxed);
+                                                        return None;
+                                                    }
                                                 }
-                                            }
 
-                                            sum += balance as u128;
-                                            Some(loaded_hash)
-                                        },
-                                    )
-                                } else {
+                                                sum += balance as u128;
+                                                Some(loaded_hash)
+                                            },
+                                        )
+                                    }
+                                    else {
                                     None
-                                }
-                            } else {
-                                None
-                            }
-                        })
+                                    }
+                            })
+                        })})
                         .collect();
                     let mut total = total_lamports.lock().unwrap();
                     *total =
@@ -6943,13 +6939,15 @@ impl AccountsDb {
                             insert_us
                         } else {
                             // verify index matches expected and measure the time to get all items
+                            panic!("");
+                            /*
                             assert!(verify);
                             let mut lookup_time = Measure::start("lookup_time");
                             for account in accounts_map.into_iter() {
                                 let (key, account_info) = account;
                                 let lock = self.accounts_index.get_account_maps_read_lock(&key);
-                                let x = lock.get(&key).unwrap();
-                                let sl = x.slot_list.read().unwrap();
+                                let x = lock.get2(&key).unwrap();
+                                let sl = &x.slot_list;
                                 let mut count = 0;
                                 for (slot2, account_info2) in sl.iter() {
                                     if slot2 == slot {
@@ -6970,6 +6968,7 @@ impl AccountsDb {
                             }
                             lookup_time.stop();
                             lookup_time.as_us()
+                            */
                         };
                         insertion_time_us.fetch_add(insert_us, Ordering::Relaxed);
                     }
@@ -7121,14 +7120,14 @@ impl AccountsDb {
         roots.sort();
         info!("{}: accounts_index roots: {:?}", label, roots,);
         self.accounts_index.account_maps.iter().for_each(|map| {
-            for (pubkey, account_entry) in
-                map.read().unwrap().items(&None::<&std::ops::Range<Pubkey>>)
-            {
-                info!("  key: {} ref_count: {}", pubkey, account_entry.ref_count(),);
-                info!(
-                    "      slots: {:?}",
-                    *account_entry.slot_list.read().unwrap()
-                );
+            for pubkey in map.read().unwrap().items(&None::<&std::ops::Range<Pubkey>>) {
+                map.read().unwrap().get_internal(&pubkey, |account_entry| {
+                    if let Some(account_entry) = account_entry {
+                        info!("  key: {} ref_count: {}", pubkey, account_entry.ref_count(),);
+                        info!("      slots: {:?}", account_entry.slot_list);
+                    }
+                    (false, ())
+                });
             }
         });
     }
@@ -7201,8 +7200,10 @@ impl AccountsDb {
 
     pub fn get_append_vec_id(&self, pubkey: &Pubkey, slot: Slot) -> Option<AppendVecId> {
         let ancestors = vec![(slot, 1)].into_iter().collect();
-        let result = self.accounts_index.get(pubkey, Some(&ancestors), None);
-        result.map(|(list, index)| list.slot_list()[index].1.store_id)
+        self.accounts_index
+            .get2(pubkey, Some(&ancestors), None, |result| {
+                result.map(|(list, index)| list.slot_list()[index].1.store_id)
+            })
     }
 
     pub fn alive_account_count_in_slot(&self, slot: Slot) -> usize {
@@ -8282,7 +8283,7 @@ pub mod tests {
             .insert(unrooted_slot, BankHashInfo::default());
         assert!(db
             .accounts_index
-            .get(&key, Some(&ancestors), None)
+            .get2(&key, Some(&ancestors), None, |entry| entry.map(|_| true))
             .is_some());
         assert_load_account(&db, unrooted_slot, key, 1);
 
@@ -8292,10 +8293,13 @@ pub mod tests {
         assert!(db.bank_hashes.read().unwrap().get(&unrooted_slot).is_none());
         assert!(db.accounts_cache.slot_cache(unrooted_slot).is_none());
         assert!(db.storage.0.get(&unrooted_slot).is_none());
-        assert!(db.accounts_index.get_account_read_entry(&key).is_none());
         assert!(db
             .accounts_index
-            .get(&key, Some(&ancestors), None)
+            .get_function(&key, |entry| entry.map(|_| true))
+            .is_none());
+        assert!(db
+            .accounts_index
+            .get2(&key, Some(&ancestors), None, |entry| entry.map(|_| true))
             .is_none());
 
         // Test we can store for the same slot again and get the right information
