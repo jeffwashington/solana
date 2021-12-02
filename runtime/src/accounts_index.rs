@@ -895,6 +895,11 @@ impl<T: IndexValue> AccountsIndex<T> {
         AccountsIndexIterator::new(self, range, collect_all_unsorted)
     }
 
+    /// is the accounts index using disk as a backing store
+    pub fn disk_index_enabled(&self) -> bool {
+        self.storage.storage.disk.is_some()
+    }
+
     fn do_checked_scan_accounts<F, R>(
         &self,
         metric_name: &'static str,
