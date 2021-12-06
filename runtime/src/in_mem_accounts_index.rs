@@ -544,9 +544,28 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
             }
             Entry::Vacant(vacant) => {
                 // not in cache, look on disk
-                let already_existed =
-                    self.upsert_on_disk(vacant, new_entry, &mut Vec::default(), false);
-                (false, already_existed)
+                let disk_entry = self.load_account_entry_from_disk(vacant.key());
+                self.stats().insert_or_delete_mem(true, self.bin);
+                if let Some(mut disk_entry) = disk_entry {
+                    let (slot, account_info) = new_entry.into();
+                    InMemAccountsIndex::lock_and_update_slot_list(
+                        &mut disk_entry,
+                        (slot, account_info),
+                        &mut Vec::default(),
+                        false,
+                    );
+                    vacant.insert(disk_entry);
+                    (
+                        false, /* found in mem */
+                        true, /* already existed */
+                    )
+                } else {
+                    // not on disk, so insert new thing and we're done
+                    let new_entry: AccountMapEntry<T> = new_entry.into_account_map_entry(&self.storage);
+                    assert!(new_entry.dirty());
+                    vacant.insert(new_entry);
+                    (false, false)
+                }
             }
         };
         drop(map);
