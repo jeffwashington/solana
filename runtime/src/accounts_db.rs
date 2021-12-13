@@ -5126,7 +5126,7 @@ impl AccountsDb {
                             self.accounts_index.get2(pubkey, Some(ancestors), Some(slot), |entry| {
                                 entry.and_then(|(lock, index)| {
                                 let (slot, account_info) = &lock.slot_list()[index];
-                                    if account_info.lamports != 0 {
+                                if !account_info.is_zero_lamport() {
                                     // Because we're keeping the `lock' here, there is no need
                                     // to use retry_to_get_account_accessor()
                                     // In other words, flusher/shrinker/cleaner is blocked to
@@ -5146,7 +5146,7 @@ impl AccountsDb {
                                     .and_then(
                                         |loaded_account| {
                                             let loaded_hash = loaded_account.loaded_hash();
-                                                let balance = account_info.lamports;
+                                            let balance = loaded_account.lamports();
                                             if check_hash && !self.is_filler_account(pubkey) {
                                                 let computed_hash =
                                                     loaded_account.compute_hash(*slot, pubkey);
