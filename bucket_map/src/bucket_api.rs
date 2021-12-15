@@ -3,6 +3,7 @@ use {
         bucket::Bucket, bucket_item::BucketItem, bucket_map::BucketMapError,
         bucket_stats::BucketMapStats, MaxSearch, RefCount,
     },
+    solana_measure::measure::Measure,
     solana_sdk::pubkey::Pubkey,
     std::{
         ops::RangeBounds,
@@ -86,7 +87,9 @@ impl<T: Clone + Copy> BucketApi<T> {
         let mut lock_us = Measure::start("write_lock");
         let mut bucket = self.bucket.write().unwrap();
         lock_us.stop();
-        self.stats.write_lock_us.fetch_add(lock_us.as_us(), Ordering::Relaxed);
+        self.stats
+            .write_lock_us
+            .fetch_add(lock_us.as_us(), Ordering::Relaxed);
         if bucket.is_none() {
             *bucket = Some(Bucket::new(
                 Arc::clone(&self.drives),
