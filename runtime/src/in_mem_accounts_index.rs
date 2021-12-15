@@ -645,11 +645,36 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         }
     }
 
-    /// returns true iff start_holding=true and the range we're asked to hold was already being held
-    pub fn just_set_hold_range_in_memory<R>(&self, range: &R, start_holding: bool) -> bool
+    /// returns true if the range we're asked to hold was already being held
+    fn add_hold_range_in_memory_if_already_held<R>(&self, range: &R) -> bool
     where
         R: RangeBounds<Pubkey>,
     {
+        let start_holding = true;
+        let add_if_already_held = true;
+        self.just_set_hold_range_in_memory_internal(range, start_holding, add_if_already_held)
+    }
+
+    fn just_set_hold_range_in_memory<R>(&self, range: &R, start_holding: bool)
+    where
+        R: RangeBounds<Pubkey>,
+    {
+        let add_if_already_held = false;
+        let _ =
+            self.just_set_hold_range_in_memory_internal(range, start_holding, add_if_already_held);
+    }
+
+    /// returns true iff start_holding=true and the range we're asked to hold was already being held
+    fn just_set_hold_range_in_memory_internal<R>(
+        &self,
+        range: &R,
+        start_holding: bool,
+        add_if_already_held: bool,
+    ) -> bool
+    where
+        R: RangeBounds<Pubkey>,
+    {
+        assert!(!(add_if_already_held && !start_holding));
         let start = match range.start_bound() {
             Bound::Included(bound) | Bound::Excluded(bound) => *bound,
             Bound::Unbounded => Pubkey::new(&[0; 32]),
@@ -689,7 +714,9 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                 1,
             );
 
-            ranges.push(inclusive_range);
+            if already_held || !add_if_already_held {
+                ranges.push(inclusive_range);
+            }
         } else {
             // find the matching range and delete it since we don't want to hold it anymore
             for (i, r) in ranges.iter().enumerate() {
@@ -731,12 +758,14 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
     {
         self.start_stop_flush(true);
 
-        if start_holding {
-            // put everything in the cache and it will be held there
-            self.put_range_in_cache(&Some(range));
+        if !start_holding || self.add_hold_range_in_memory_if_already_held(range) {
+            if start_holding {
+                // put everything in the cache and it will be held there
+                self.put_range_in_cache(&Some(range));
+            }
+            // do this AFTER items have been put in cache - that way anyone who finds this range can know that the items are already in the cache
+            self.just_set_hold_range_in_memory(range, start_holding);
         }
-        // do this AFTER items have been put in cache - that way anyone who finds this range can know that the items are already in the cache
-        self.just_set_hold_range_in_memory(range, start_holding);
 
         self.start_stop_flush(false);
     }
