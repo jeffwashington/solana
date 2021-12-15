@@ -645,7 +645,10 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         }
     }
 
-    /// returns true if the range we're asked to hold was already being held
+    /// Look at the currently held ranges. If 'range' is already included in what is
+    ///  being held, then add 'range' to the currently held list AND return true
+    /// If 'range' is NOT already included in what is being held, then return false
+    ///  withOUT adding 'range' to the list of what is currently held
     fn add_hold_range_in_memory_if_already_held<R>(&self, range: &R) -> bool
     where
         R: RangeBounds<Pubkey>,
@@ -664,6 +667,9 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
             self.just_set_hold_range_in_memory_internal(range, start_holding, add_if_already_held);
     }
 
+    /// if 'start_holding', then caller wants to add 'range' to the list of ranges being held
+    /// if !'start_holding', then caller wants to remove 'range' to the list
+    /// if 'add_if_already_held', caller intends to only add 'range' to the list if the range is already held
     /// returns true iff start_holding=true and the range we're asked to hold was already being held
     fn just_set_hold_range_in_memory_internal<R>(
         &self,
@@ -1051,6 +1057,21 @@ mod tests {
         InMemAccountsIndex::new(&holder, bin)
     }
 
+    fn new_disk_buckets_for_test<T: IndexValue>() -> InMemAccountsIndex<T> {
+        let holder = Arc::new(BucketMapHolder::new(
+            BINS_FOR_TESTING,
+            &Some(AccountsIndexConfig {
+                index_limit_mb: Some(1),
+                ..AccountsIndexConfig::default()
+            }),
+            1,
+        ));
+        let bin = 0;
+        let bucket = InMemAccountsIndex::new(&holder, bin);
+        assert!(bucket.storage.is_disk_index_enabled());
+        bucket
+    }
+
     #[test]
     fn test_should_remove_from_mem() {
         solana_logger::setup();
@@ -1139,10 +1160,11 @@ mod tests {
 
     #[test]
     fn test_hold_range_in_memory() {
-        let bucket = new_for_test::<u64>();
+        let bucket = new_disk_buckets_for_test::<u64>();
         // 0x81 is just some other range
+        let all = Pubkey::new(&[0; 32])..=Pubkey::new(&[0xff; 32]);
         let ranges = [
-            Pubkey::new(&[0; 32])..=Pubkey::new(&[0xff; 32]),
+            all.clone(),
             Pubkey::new(&[0x81; 32])..=Pubkey::new(&[0xff; 32]),
         ];
         for range in ranges.clone() {
@@ -1152,6 +1174,10 @@ mod tests {
                 bucket.cache_ranges_held.read().unwrap().to_vec(),
                 vec![Some(range.clone())]
             );
+            {
+                assert!(bucket.add_hold_range_in_memory_if_already_held(&range));
+                bucket.hold_range_in_memory(&range, false);
+            }
             bucket.hold_range_in_memory(&range, false);
             assert!(bucket.cache_ranges_held.read().unwrap().is_empty());
             bucket.hold_range_in_memory(&range, true);
@@ -1185,6 +1211,13 @@ mod tests {
             );
             bucket.hold_range_in_memory(&ranges[0].clone(), false);
             assert!(bucket.cache_ranges_held.read().unwrap().is_empty());
+
+            // hold all in mem first
+            assert!(bucket.cache_ranges_held.read().unwrap().is_empty());
+            bucket.hold_range_in_memory(&all, true);
+            assert!(bucket.add_hold_range_in_memory_if_already_held(&range));
+            bucket.hold_range_in_memory(&range, false);
+            bucket.hold_range_in_memory(&all, false);
         }
     }
 
