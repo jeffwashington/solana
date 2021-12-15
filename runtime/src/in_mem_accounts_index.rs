@@ -696,6 +696,15 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                     }
                 }
             }
+            Self::update_stat(
+                if already_held {
+                    &self.stats().range_held_already
+                } else {
+                    &self.stats().new_range_held
+                },
+                1,
+            );
+
             if already_held || !only_add_if_already_held {
                 ranges.push(inclusive_range);
             }
