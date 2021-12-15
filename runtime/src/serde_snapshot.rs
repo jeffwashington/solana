@@ -16,7 +16,7 @@ use {
         epoch_stakes::EpochStakes,
         hardened_unpack::UnpackedAppendVecMap,
         rent_collector::RentCollector,
-        serde_snapshot::future::SerializableStorage,
+        serde_snapshot::future::{AppendVecIdSerialized, SerializableStorage},
         stakes::Stakes,
     },
     bincode::{self, config::Options, Error},
@@ -377,7 +377,7 @@ fn reconstruct_single_storage<E>(
 where
     E: SerializableStorage,
 {
-    let append_vec_id = remapped_append_vec_id.unwrap_or_else(|| storage_entry.id());
+    let append_vec_id = remapped_append_vec_id.unwrap_or_else(|| storage_entry.id() as AppendVecId);
     let (accounts, num_accounts) =
         AppendVec::new_from_file(append_vec_path, storage_entry.current_len())?;
     let u_storage_entry =
@@ -469,7 +469,7 @@ where
                     //    rename the file to this new path.
                     //    **DEVELOPER NOTE:**  Keep this check last so that it can short-circuit if
                     //    possible.
-                    if storage_entry.id() == remapped_append_vec_id
+                    if storage_entry.id() == remapped_append_vec_id as AppendVecIdSerialized
                         || std::fs::metadata(&remapped_append_vec_path).is_err()
                     {
                         break (remapped_append_vec_id, remapped_append_vec_path);
@@ -480,7 +480,7 @@ where
                     num_collisions.fetch_add(1, Ordering::Relaxed);
                 };
                 // Only rename the file if the new ID is actually different from the original.
-                if storage_entry.id() != remapped_append_vec_id {
+                if storage_entry.id() != remapped_append_vec_id as AppendVecIdSerialized {
                     std::fs::rename(append_vec_path, &remapped_append_vec_path)?;
                 }
 
