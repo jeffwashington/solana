@@ -758,7 +758,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
     {
         self.start_stop_flush(true);
 
-        if !start_holding || self.add_hold_range_in_memory_if_already_held(range) {
+        if !start_holding || !self.add_hold_range_in_memory_if_already_held(range) {
             if start_holding {
                 // put everything in the cache and it will be held there
                 self.put_range_in_cache(&Some(range));
