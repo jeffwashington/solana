@@ -17,7 +17,7 @@ use {
         ops::RangeBounds,
         path::PathBuf,
         sync::{
-            atomic::{AtomicUsize, Ordering},
+            atomic::{AtomicU64, AtomicUsize, Ordering},
             Arc, Mutex,
         },
     },
@@ -81,6 +81,7 @@ impl<T: Clone + Copy> Bucket<T> {
         drives: Arc<Vec<PathBuf>>,
         max_search: MaxSearch,
         stats: Arc<BucketMapStats>,
+        count: Arc<AtomicU64>,
     ) -> Self {
         let index = BucketStorage::new(
             Arc::clone(&drives),
@@ -88,6 +89,7 @@ impl<T: Clone + Copy> Bucket<T> {
             std::mem::size_of::<IndexEntry>() as u64,
             max_search,
             Arc::clone(&stats.index),
+            count,
         );
         Self {
             random: thread_rng().gen(),
@@ -327,6 +329,7 @@ impl<T: Clone + Copy> Bucket<T> {
                     self.index.capacity_pow2 + i, // * 2,
                     self.index.max_search,
                     Arc::clone(&self.stats.index),
+                    Arc::clone(&self.index.used),
                 );
                 let random = thread_rng().gen();
                 let mut valid = true;
@@ -391,6 +394,7 @@ impl<T: Clone + Copy> Bucket<T> {
                     Self::elem_size(),
                     self.index.max_search,
                     Arc::clone(&self.stats.data),
+                    Arc::default(),
                 ))
             }
             self.data.push(bucket);
