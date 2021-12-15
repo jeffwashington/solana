@@ -645,7 +645,8 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         }
     }
 
-    pub fn just_set_hold_range_in_memory<R>(&self, range: &R, start_holding: bool)
+    /// returns true iff start_holding=true and the range we're asked to hold was already being held
+    pub fn just_set_hold_range_in_memory<R>(&self, range: &R, start_holding: bool) -> bool
     where
         R: RangeBounds<Pubkey>,
     {
@@ -663,11 +664,34 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         // inclusive is bigger than exclusive so we may hold 1 extra item worst case
         let inclusive_range = Some(start..=end);
         let mut ranges = self.cache_ranges_held.write().unwrap();
+        let mut already_held = false;
+        let none = inclusive_range.is_none();
         if start_holding {
+            for r in ranges.iter() {
+                if r.is_none() != none {
+                    continue;
+                }
+                if !none {
+                    // neither are none, so check values
+                    let r = r.as_ref().unwrap();
+                    if r.contains(&start) && r.contains(&end) {
+                        already_held = true;
+                        break;
+                    }
+                }
+            }
+            Self::update_stat(
+                if already_held {
+                    &self.stats().range_held_already
+                } else {
+                    &self.stats().new_range_held
+                },
+                1,
+            );
+
             ranges.push(inclusive_range);
         } else {
             // find the matching range and delete it since we don't want to hold it anymore
-            let none = inclusive_range.is_none();
             for (i, r) in ranges.iter().enumerate() {
                 if r.is_none() != none {
                     continue;
@@ -689,6 +713,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                 break;
             }
         }
+        already_held
     }
 
     fn start_stop_flush(&self, stop: bool) {
