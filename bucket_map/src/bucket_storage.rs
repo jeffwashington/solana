@@ -64,7 +64,7 @@ pub struct BucketStorage {
     mmap: MmapMut,
     pub cell_size: u64,
     pub capacity_pow2: u8,
-    pub used: AtomicU64,
+    pub used: Arc<AtomicU64>,
     pub stats: Arc<BucketStats>,
     pub max_search: MaxSearch,
 }
@@ -88,6 +88,7 @@ impl BucketStorage {
         capacity_pow2: u8,
         max_search: MaxSearch,
         stats: Arc<BucketStats>,
+        used: Arc<AtomicU64>,
     ) -> Self {
         let cell_size = elem_size * num_elems + std::mem::size_of::<Header>() as u64;
         let (mmap, path) = Self::new_map(&drives, cell_size as usize, capacity_pow2, &stats);
@@ -95,7 +96,7 @@ impl BucketStorage {
             path,
             mmap,
             cell_size,
-            used: AtomicU64::new(0),
+            used,
             capacity_pow2,
             stats,
             max_search,
@@ -112,6 +113,7 @@ impl BucketStorage {
         elem_size: u64,
         max_search: MaxSearch,
         stats: Arc<BucketStats>,
+        count: Arc<AtomicU64>,
     ) -> Self {
         Self::new_with_capacity(
             drives,
@@ -120,6 +122,7 @@ impl BucketStorage {
             DEFAULT_CAPACITY_POW2,
             max_search,
             stats,
+            count,
         )
     }
 
@@ -133,7 +136,7 @@ impl BucketStorage {
         }
     }
 
-    pub fn allocate(&self, ix: u64, uid: Uid) -> Result<(), BucketStorageError> {
+    pub fn allocate(&self, ix: u64, uid: Uid, resizing: bool) -> Result<(), BucketStorageError> {
         assert!(ix < self.capacity(), "allocate: bad index size");
         assert!(UID_UNLOCKED != uid, "allocate: bad uid");
         let mut e = Err(BucketStorageError::AlreadyAllocated);
@@ -144,7 +147,9 @@ impl BucketStorage {
             let hdr = hdr_slice.as_ptr() as *const Header;
             if hdr.as_ref().unwrap().try_lock(uid) {
                 e = Ok(());
-                self.used.fetch_add(1, Ordering::Relaxed);
+                if !resizing {
+                    self.used.fetch_add(1, Ordering::Relaxed);
+                }
             }
         };
         e
@@ -324,6 +329,9 @@ impl BucketStorage {
             capacity_pow_2,
             max_search,
             Arc::clone(stats),
+            bucket
+                .map(|bucket| Arc::clone(&bucket.used))
+                .unwrap_or_default(),
         );
         if let Some(bucket) = bucket {
             new_bucket.copy_contents(bucket);
