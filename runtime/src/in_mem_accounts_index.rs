@@ -1216,7 +1216,7 @@ mod tests {
             let s = 10_000;
             let mut v_inner = Vec::with_capacity(s);
             for j in 0..s {
-            v_inner.push(1u32);
+                v_inner.push(1u32);
             }
             let v = Arc::new(vec![(i, (v_inner, 32u64, 45u64, testit::default()))]);
             if m.len() > 0 && false {
