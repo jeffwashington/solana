@@ -161,7 +161,8 @@ pub mod gate_large_block {
     solana_sdk::declare_id!("2ry7ygxiYURULZCrypHhveanvP5tzZ4toRwVp89oCNSj");
 }
 
-pub mod versioned_tx_message_enabled { // changed this id
+pub mod versioned_tx_message_enabled {
+    // changed this id
     solana_sdk::declare_id!("4KZZ6Ks1885aGBQ45fwRcPXVBCtzUvxhUTkwKMR41Tca");
 }
 
