@@ -373,6 +373,12 @@ impl BucketMapHolderStats {
                     i64
                 ),
                 (
+                    "disk_index_write_lock_us",
+                    disk.map(|disk| disk.stats.write_lock_us.swap(0, Ordering::Relaxed))
+                        .unwrap_or_default(),
+                    i64
+                ),
+                (
                     "disk_data_resizes",
                     disk.map(|disk| disk.stats.data.resizes.swap(0, Ordering::Relaxed))
                         .unwrap_or_default(),
