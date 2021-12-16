@@ -1686,6 +1686,10 @@ impl AccountsDb {
         new
     }
 
+    pub fn full_pubkey_range() -> std::ops::RangeInclusive<Pubkey> {
+        Pubkey::new(&[0; 32])..=Pubkey::new(&[0xff; 32])
+    }
+    
     pub fn set_shrink_paths(&self, paths: Vec<PathBuf>) {
         assert!(!paths.is_empty());
         let mut shrink_paths = self.shrink_paths.write().unwrap();
@@ -7200,7 +7204,7 @@ impl AccountsDb {
         roots.sort();
         info!("{}: accounts_index roots: {:?}", label, roots,);
         self.accounts_index.account_maps.iter().for_each(|map| {
-            for pubkey in map.read().unwrap().items(&None::<&std::ops::Range<Pubkey>>) {
+            for pubkey in map.read().unwrap().items(&Self::full_pubkey_range()) {
                 map.read().unwrap().get_internal(&pubkey, |account_entry| {
                     if let Some(account_entry) = account_entry {
                         info!("  key: {} ref_count: {}", pubkey, account_entry.ref_count(),);
