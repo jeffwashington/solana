@@ -1709,6 +1709,10 @@ impl AccountsDb {
         new
     }
 
+    pub fn full_pubkey_range() -> std::ops::RangeInclusive<Pubkey> {
+        Pubkey::new(&[0; 32])..=Pubkey::new(&[0xff; 32])
+    }
+    
     pub fn set_shrink_paths(&self, paths: Vec<PathBuf>) {
         assert!(!paths.is_empty());
         let mut shrink_paths = self.shrink_paths.write().unwrap();
