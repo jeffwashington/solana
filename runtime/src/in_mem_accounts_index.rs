@@ -835,9 +835,9 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
 
     fn random_chance_of_eviction() -> bool {
         // random eviction
-        const N: usize = 1000;
+        //const N: usize = 1000;
         // 1/N chance of eviction
-        thread_rng().gen_range(0, N) == 0
+        false//thread_rng().gen_range(0, N) == 0
     }
 
     /// return true if 'entry' should be removed from the in-mem index
@@ -879,6 +879,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         if !was_dirty && !iterate_for_age && !startup {
             // wasn't dirty and no need to age, so no need to flush this bucket
             // but, at startup we want to remove from buckets as fast as possible if any items exist
+            self.stats().empty_flush_calls.fetch_add(1, Ordering::Relaxed);
             return;
         }
 
@@ -938,6 +939,8 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                     if !self.flush_remove_from_cache(removes, current_age, startup, false)
                         || !self.flush_remove_from_cache(removes_random, current_age, startup, true)
                     {
+                        self.stats().restarted_flush_calls.fetch_add(1, Ordering::Relaxed);
+
                         iterate_for_age = false; // did not make it all the way through this bucket, so didn't handle age completely
                     }
                     Self::update_time_stat(&self.stats().flush_remove_us, m);

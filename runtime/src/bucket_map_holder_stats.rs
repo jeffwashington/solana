@@ -28,6 +28,8 @@ pub struct BucketMapHolderStats {
     pub load_disk_missing_us: AtomicU64,
     pub updates_in_mem: AtomicU64,
     pub items: AtomicU64,
+    pub empty_flush_calls: AtomicU64,
+    pub restarted_flush_calls: AtomicU64,
     pub items_us: AtomicU64,
     pub keys: AtomicU64,
     pub deletes: AtomicU64,
@@ -329,6 +331,16 @@ impl BucketMapHolderStats {
                 ("items", self.items.swap(0, Ordering::Relaxed), i64),
                 ("keys", self.keys.swap(0, Ordering::Relaxed), i64),
                 ("ms_per_age", ms_per_age, i64),
+                (
+                    "empty_flush_calls",
+                    self.empty_flush_calls.swap(0, Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "restarted_flush_calls",
+                    self.restarted_flush_calls.swap(0, Ordering::Relaxed),
+                    i64
+                ),
                 (
                     "flush_scan_update_us",
                     self.flush_scan_update_us.swap(0, Ordering::Relaxed),
