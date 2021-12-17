@@ -43,6 +43,8 @@ pub struct BucketMapHolderStats {
     pub flush_entries_removed_from_mem: AtomicU64,
     pub active_threads: AtomicU64,
     pub get_range_us: AtomicU64,
+    pub range_held_already: AtomicU64,
+    pub new_range_held: AtomicU64,
     last_age: AtomicU8,
     last_ages_flushed: AtomicU64,
     pub flush_scan_update_us: AtomicU64,
@@ -306,6 +308,16 @@ impl BucketMapHolderStats {
                 (
                     "get_range_us",
                     self.get_range_us.swap(0, Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "range_held_already",
+                    self.range_held_already.swap(0, Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "new_range_held",
+                    self.new_range_held.swap(0, Ordering::Relaxed),
                     i64
                 ),
                 ("inserts", self.inserts.swap(0, Ordering::Relaxed), i64),
