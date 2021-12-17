@@ -74,7 +74,11 @@ impl<T: IndexValue> BucketMapHolder<T> {
     }
 
     pub fn future_age_to_flush(&self) -> Age {
-        self.current_age().wrapping_add(self.ages_to_stay_in_cache)
+        self.future_age(self.ages_to_stay_in_cache)
+    }
+
+    pub fn future_age(&self, delta: Age) -> Age {
+        self.current_age().wrapping_add(delta)
     }
 
     fn has_age_interval_elapsed(&self) -> bool {
