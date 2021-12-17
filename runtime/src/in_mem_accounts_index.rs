@@ -997,6 +997,8 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         let mut removed = 0;
         // consider chunking these so we don't hold the write lock too long
         let mut map = self.map().write().unwrap();
+        let mut stop = false;
+        let next_age = self.storage.future_age(1);
         for k in removes {
             if let Entry::Occupied(occupied) = map.entry(k) {
                 let v = occupied.get();
@@ -1018,12 +1020,17 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
 
                 if ranges.iter().any(|range| range.contains(&k)) {
                     // this item is held in mem by range, so don't remove
-                    completed_scan = false;
+                    //completed_scan = false;
+                    // defer flushing this until next age
+                    v.set_age(next_age);
                     continue;
                 }
 
-                if self.get_stop_flush() {
-                    return false; // did NOT complete, told to stop
+                stop = stop || self.get_stop_flush();
+                if stop {
+                    // defer flushing this until next age
+                    v.set_age(next_age);
+                    continue;
                 }
 
                 // all conditions for removing succeeded, so really remove item from in-mem cache
