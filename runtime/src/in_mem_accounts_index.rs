@@ -894,8 +894,8 @@ use log::*;
             // scan and update loop
             // holds read lock
             {
-                removes = Vec::with_capacity(map.len());
                 let map = self.map().read().unwrap();
+                removes = Vec::with_capacity(map.len());
                 let m = Measure::start("flush_scan_and_update"); // we don't care about lock time in this metric - bg threads can wait
                 for (k, v) in map.iter() {
                     if self.should_remove_from_mem(current_age, v, startup, true, exceeds_budget) {
