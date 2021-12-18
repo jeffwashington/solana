@@ -681,7 +681,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
             Bound::Included(bound) | Bound::Excluded(bound) => *bound,
             Bound::Unbounded => Pubkey::new(&[0xff; 32]),
         };
-
+use log::*;
         // this becomes inclusive - that is ok - we are just roughly holding a range of items.
         // inclusive is bigger than exclusive so we may hold 1 extra item worst case
         let inclusive_range = start..=end;
@@ -705,12 +705,16 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                 1,
             );
 
+            if !already_held {
+                error!("holding_range: {}..={}, {:?}", start, end, ranges);
+            }
             if already_held || !only_add_if_already_held {
                 ranges.push(inclusive_range);
             }
         } else {
             // find the matching range and delete it since we don't want to hold it anymore
             // search backwards, assuming LIFO ordering
+            let mut found = false;
             for (i, r) in ranges.iter().enumerate().rev() {
                 if let (Bound::Included(start_found), Bound::Included(end_found)) =
                     (r.start_bound(), r.end_bound())
@@ -718,10 +722,12 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                     if start_found == &start && end_found == &end {
                         // found a match. There may be dups, that's ok, we expect another call to remove the dup.
                         ranges.remove(i);
+                        found = true;
                         break;
                     }
                 }
             }
+            assert!(found, "not found: {}..={} in {:?}", start, end, ranges);
         }
         already_held
     }
@@ -888,8 +894,8 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
             // scan and update loop
             // holds read lock
             {
-                let map = self.map().read().unwrap();
                 removes = Vec::with_capacity(map.len());
+                let map = self.map().read().unwrap();
                 let m = Measure::start("flush_scan_and_update"); // we don't care about lock time in this metric - bg threads can wait
                 for (k, v) in map.iter() {
                     if self.should_remove_from_mem(current_age, v, startup, true, exceeds_budget) {
@@ -921,6 +927,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                         }
                     }
                 }
+                drop(map);
                 Self::update_time_stat(&self.stats().flush_scan_update_us, m);
             }
             Self::update_stat(
