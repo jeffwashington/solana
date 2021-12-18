@@ -4114,6 +4114,10 @@ impl Bank {
         let mut measure = Measure::start("collect_rent_eagerly-ms");
         let partitions = self.rent_collection_partitions();
         let count = partitions.len();
+        if partitions.len() > 1 {
+            error!("partitions: {:?}", partitions);
+        }
+
         let account_count: usize = partitions
             .into_iter()
             .map(|partition| self.collect_rent_in_partition(partition))
