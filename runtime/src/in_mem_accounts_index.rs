@@ -1024,7 +1024,7 @@ use log::*;
                     continue;
                 }
 
-                if ranges.iter().any(|range| range.contains(&k)) {
+                if !stop && ranges.iter().any(|range| range.contains(&k)) {
                     // this item is held in mem by range, so don't remove
                     //completed_scan = false;
                     // defer flushing this until next age
