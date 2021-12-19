@@ -681,7 +681,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
             Bound::Included(bound) | Bound::Excluded(bound) => *bound,
             Bound::Unbounded => Pubkey::new(&[0xff; 32]),
         };
-use log::*;
+        use log::*;
         // this becomes inclusive - that is ok - we are just roughly holding a range of items.
         // inclusive is bigger than exclusive so we may hold 1 extra item worst case
         let inclusive_range = start..=end;
@@ -696,14 +696,16 @@ use log::*;
                     }
                 }
             }
-            Self::update_stat(
-                if already_held {
-                    &self.stats().range_held_already
-                } else {
-                    &self.stats().new_range_held
-                },
-                1,
-            );
+            if !(!already_held && only_add_if_already_held) {
+                Self::update_stat(
+                    if already_held {
+                        &self.stats().range_held_already
+                    } else {
+                        &self.stats().new_range_held
+                    },
+                    1,
+                );
+            }
 
             if already_held || !only_add_if_already_held {
                 ranges.push(inclusive_range);
@@ -817,7 +819,7 @@ use log::*;
         // random eviction
         //const N: usize = 1000;
         // 1/N chance of eviction
-        false//thread_rng().gen_range(0, N) == 0
+        false //thread_rng().gen_range(0, N) == 0
     }
 
     /// return true if 'entry' should be removed from the in-mem index
@@ -859,7 +861,9 @@ use log::*;
         if !was_dirty && !iterate_for_age && !startup {
             // wasn't dirty and no need to age, so no need to flush this bucket
             // but, at startup we want to remove from buckets as fast as possible if any items exist
-            self.stats().empty_flush_calls.fetch_add(1, Ordering::Relaxed);
+            self.stats()
+                .empty_flush_calls
+                .fetch_add(1, Ordering::Relaxed);
             return;
         }
 
@@ -901,7 +905,7 @@ use log::*;
                         let m = Measure::start("flush_scan_and_update"); // we don't care about lock time in this metric - bg threads can wait
                         disk_resize =
                             disk.try_write(k, (&v.slot_list.read().unwrap(), v.ref_count()));
-                                Self::update_time_stat(&self.stats().    flush_update_disk_us, m);
+                        Self::update_time_stat(&self.stats().flush_update_disk_us, m);
                         if disk_resize.is_ok() {
                             flush_entries_updated_on_disk += 1;
                         } else {
@@ -921,7 +925,9 @@ use log::*;
                     if !self.flush_remove_from_cache(removes, current_age, startup, false)
                         || !self.flush_remove_from_cache(removes_random, current_age, startup, true)
                     {
-                        self.stats().restarted_flush_calls.fetch_add(1, Ordering::Relaxed);
+                        self.stats()
+                            .restarted_flush_calls
+                            .fetch_add(1, Ordering::Relaxed);
 
                         iterate_for_age = false; // did not make it all the way through this bucket, so didn't handle age completely
                     }
