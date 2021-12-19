@@ -882,18 +882,20 @@ use log::*;
             .map(|limit| in_mem_count * Self::approx_size_of_one_entry() >= limit * 1024 * 1024)
             .unwrap_or_default();
 
+        let mut flush_entries_updated_on_disk = 0;
         // may have to loop if disk has to grow and we have to restart
         loop {
             let mut removes;
             let mut removes_random = Vec::default();
             let disk = self.bucket.as_ref().unwrap();
 
-            let mut flush_entries_updated_on_disk = 0;
             let mut disk_resize = Ok(());
             // scan and update loop
             // holds read lock
             {
+                let m = Measure::start("flush_scan_and_update"); // we don't care about lock time in this metric - bg threads can wait
                 let map = self.map().read().unwrap();
+                Self::update_time_stat(&self.stats().flush_read_lock_us, m);
                 removes = Vec::with_capacity(map.len());
                 let m = Measure::start("flush_scan_and_update"); // we don't care about lock time in this metric - bg threads can wait
                 for (k, v) in map.iter() {
@@ -915,8 +917,10 @@ use log::*;
                         //  That prevents dropping an item from cache before disk is updated to latest in mem.
                         // happens inside of lock on in-mem cache. This is because of deleting items
                         // it is possible that the item in the cache is marked as dirty while these updates are happening. That is ok.
+                        let m = Measure::start("flush_scan_and_update"); // we don't care about lock time in this metric - bg threads can wait
                         disk_resize =
                             disk.try_write(k, (&v.slot_list.read().unwrap(), v.ref_count()));
+                                Self::update_time_stat(&self.stats().    flush_update_disk_us, m);
                         if disk_resize.is_ok() {
                             flush_entries_updated_on_disk += 1;
                         } else {
@@ -929,10 +933,6 @@ use log::*;
                 drop(map);
                 Self::update_time_stat(&self.stats().flush_scan_update_us, m);
             }
-            Self::update_stat(
-                &self.stats().flush_entries_updated_on_disk,
-                flush_entries_updated_on_disk,
-            );
 
             let m = Measure::start("flush_remove_or_grow");
             match disk_resize {
@@ -959,6 +959,10 @@ use log::*;
                         assert_eq!(current_age, self.storage.current_age());
                         self.set_has_aged(current_age);
                     }
+                    Self::update_stat(
+                        &self.stats().flush_entries_updated_on_disk,
+                        flush_entries_updated_on_disk,
+                    );
                     return;
                 }
                 Err(err) => {
