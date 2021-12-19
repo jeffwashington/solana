@@ -860,7 +860,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
             } else {
                 // only read the slot list if we are planning to throw the item out
                 let slot_list = &entry.slot_list;
-                if slot_list.len() != 1 {
+                if false && slot_list.len() != 1 {
                     if update_stats {
                         Self::update_stat(&self.stats().held_in_mem_slot_list_len, 1);
                     }
@@ -936,7 +936,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                         // it is possible that the item in the cache is marked as dirty while these updates are happening. That is ok.
                         let m = Measure::start("flush_scan_and_update"); // we don't care about lock time in this metric - bg threads can wait
                         disk_resize =
-                            disk.try_write(k, (&v.slot_list.read().unwrap(), v.ref_count()));
+                            disk.try_write(k, (&v.slot_list, v.ref_count()));
                         Self::update_time_stat(&self.stats().flush_update_disk_us, m);
                         if disk_resize.is_ok() {
                             flush_entries_updated_on_disk += 1;
