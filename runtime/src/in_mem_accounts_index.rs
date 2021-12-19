@@ -718,9 +718,6 @@ use log::*;
                 1,
             );
 
-            if !already_held {
-                error!("holding_range: {}..={}, {:?}", start, end, ranges);
-            }
             if already_held || !only_add_if_already_held {
                 ranges.push(inclusive_range);
             }
@@ -774,8 +771,10 @@ use log::*;
 
     fn put_range_in_cache<R>(&self, range: &Option<&R>)
     where
-        R: RangeBounds<Pubkey>,
+        R: RangeBounds<Pubkey> + std::fmt::Debug,
     {
+        use log::*;
+        error!("put range in cache: {:?}", range);
         assert!(self.get_stop_flush()); // caller should be controlling the lifetime of how long this needs to be present
         let m = Measure::start("range");
 
