@@ -328,6 +328,7 @@ impl BucketMapHolderStats {
                     i64
                 ),
                 ("items", self.items.swap(0, Ordering::Relaxed), i64),
+                ("age", storage.current_age(), i64),
                 ("keys", self.keys.swap(0, Ordering::Relaxed), i64),
                 ("ms_per_age", ms_per_age, i64),
                 (
