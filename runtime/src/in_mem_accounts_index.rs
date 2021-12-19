@@ -835,7 +835,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         if startup || (current_age == entry.age()) {
             // only read the slot list if we are planning to throw the item out
             let slot_list = entry.slot_list.read().unwrap();
-            if slot_list.len() != 1 {
+            if false { //slot_list.len() != 1 {
                 if update_stats {
                     Self::update_stat(&self.stats().held_in_mem_slot_list_len, 1);
                 }
