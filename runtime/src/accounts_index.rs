@@ -750,7 +750,6 @@ impl<'a, T: IndexValue> AccountsIndexIterator<'a, T> {
         // forward this hold request ONLY to the bins which contain keys in the specified range
         let (start_bin, bin_range) = self.bin_start_and_range();
         // the ranges here should be small
-        error!("hold range: {}, {}", start_bin, bin_range);
         let max_threads = 4;
         let chunks = std::cmp::min(max_threads, bin_range);
         (0..chunks).into_par_iter().for_each(|chunk| {
