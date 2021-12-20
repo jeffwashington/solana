@@ -829,13 +829,15 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         entry: &AccountMapEntry<T>,
         startup: bool,
         update_stats: bool,
+        in_mem_count: usize,
     ) -> bool {
         // this could be tunable dynamically based on memory pressure
         // we could look at more ages or we could throw out more items we are choosing to keep in the cache
         if startup || (current_age == entry.age()) {
             // only read the slot list if we are planning to throw the item out
             let slot_list = entry.slot_list.read().unwrap();
-            if false { //slot_list.len() != 1 {
+            let limit = 10_000_000;
+            if in_mem_count < limit && slot_list.len() != 1 {
                 if update_stats {
                     Self::update_stat(&self.stats().held_in_mem_slot_list_len, 1);
                 }
@@ -867,6 +869,8 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
             return;
         }
 
+        let in_mem_count = self.stats().count_in_mem.load(Ordering::Relaxed);
+
         let mut flush_entries_updated_on_disk = 0;
         // may have to loop if disk has to grow and we have to restart
         loop {
@@ -884,7 +888,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                 removes = Vec::with_capacity(map.len());
                 let m = Measure::start("flush_scan_and_update"); // we don't care about lock time in this metric - bg threads can wait
                 for (k, v) in map.iter() {
-                    if self.should_remove_from_mem(current_age, v, startup, true) {
+                    if self.should_remove_from_mem(current_age, v, startup, true, in_mem_count) {
                         removes.push(*k);
                     } else if Self::random_chance_of_eviction() {
                         removes_random.push(*k);
@@ -922,8 +926,8 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
             let m = Measure::start("flush_remove_or_grow");
             match disk_resize {
                 Ok(_) => {
-                    if !self.flush_remove_from_cache(removes, current_age, startup, false)
-                        || !self.flush_remove_from_cache(removes_random, current_age, startup, true)
+                    if !self.flush_remove_from_cache(removes, current_age, startup, false, in_mem_count)
+                        || !self.flush_remove_from_cache(removes_random, current_age, startup, true, in_mem_count)
                     {
                         self.stats()
                             .restarted_flush_calls
@@ -962,6 +966,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         current_age: Age,
         startup: bool,
         randomly_evicted: bool,
+        in_mem_count: usize,
     ) -> bool {
         let mut completed_scan = true;
         if removes.is_empty() {
@@ -986,7 +991,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
 
                 if v.dirty()
                     || (!randomly_evicted
-                        && !self.should_remove_from_mem(current_age, v, startup, false))
+                        && !self.should_remove_from_mem(current_age, v, startup, false, in_mem_count))
                 {
                     // marked dirty or bumped in age after we looked above
                     // these will be handled in later passes
