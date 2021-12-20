@@ -4226,13 +4226,21 @@ impl Bank {
         let end = start.saturating_add(n);
 
         let subrange_new = Self::pubkey_range_from_partition((start, end, partitions));
-        if let Some(held) = &self.rc.accounts.accounts_db.last_range_held {
+        let mut range = self
+            .rc
+            .accounts
+            .accounts_db
+            .last_range_held
+            .write()
+            .unwrap();
+        if let Some(held) = &*range {
             if held == &subrange_new {
                 return;
             }
             self.rc.accounts.hold_range_in_memory(held, false);
         }
         self.rc.accounts.hold_range_in_memory(&subrange_new, true);
+        *range = Some(subrange_new);
     }
 
     fn collect_rent_in_partition(&self, partition: Partition) -> usize {
