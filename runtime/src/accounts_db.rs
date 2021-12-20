@@ -1065,7 +1065,7 @@ pub struct AccountsDb {
 
     /// keep track of when last root was made
     pub(crate) root_last_time: AtomicInterval,
-    pub last_range_held: Option<RangeInclusive<Pubkey>>,
+    pub last_range_held: RwLock<Option<RangeInclusive<Pubkey>>>,
 }
 
 #[derive(Debug, Default)]
@@ -1602,7 +1602,7 @@ impl AccountsDb {
             filler_account_suffix: None,
             num_hash_scan_passes,
             root_last_time: AtomicInterval::default(),
-            last_range_held: None::<RangeInclusive<Pubkey>>,
+            last_range_held: RwLock::default(),
         }
     }
 
