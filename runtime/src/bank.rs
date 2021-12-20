@@ -4220,7 +4220,7 @@ impl Bank {
     }
 
     fn hold_next_n_slots_in_partition(&self, partition: Partition) {
-        let (start, end, partitions) = partition;
+        let (start, _end, partitions) = partition;
         let n = 10;
         let start = start.saturating_sub(start % n); // even boundary
         let end = start.saturating_add(n);

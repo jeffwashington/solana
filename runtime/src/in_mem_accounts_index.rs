@@ -7,7 +7,6 @@ use {
         bucket_map_holder::{Age, BucketMapHolder},
         bucket_map_holder_stats::BucketMapHolderStats,
     },
-    rand::{thread_rng, Rng},
     solana_bucket_map::bucket_api::BucketApi,
     solana_measure::measure::Measure,
     solana_sdk::{clock::Slot, pubkey::Pubkey},
@@ -681,7 +680,6 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
             Bound::Included(bound) | Bound::Excluded(bound) => *bound,
             Bound::Unbounded => Pubkey::new(&[0xff; 32]),
         };
-        use log::*;
         // this becomes inclusive - that is ok - we are just roughly holding a range of items.
         // inclusive is bigger than exclusive so we may hold 1 extra item worst case
         let inclusive_range = start..=end;

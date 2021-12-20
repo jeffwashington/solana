@@ -13,6 +13,7 @@ use {
     log::*,
     ouroboros::self_referencing,
     rand::{thread_rng, Rng},
+    rayon::iter::{IntoParallelIterator, ParallelIterator},
     solana_measure::measure::Measure,
     solana_sdk::{
         clock::{BankId, Slot},
@@ -748,17 +749,21 @@ impl<'a, T: IndexValue> AccountsIndexIterator<'a, T> {
     {
         // forward this hold request ONLY to the bins which contain keys in the specified range
         let (start_bin, bin_range) = self.bin_start_and_range();
+        // the ranges here should be small
         error!("hold range: {}, {}", start_bin, bin_range);
-        use rayon::iter::IntoParallelIterator;
-        use rayon::iter::ParallelIterator;
-        (start_bin..(start_bin + bin_range))
-            .into_par_iter()
-            .for_each(|idx: usize| {
-                let map = &self.account_maps[idx];
-                map.read()
-                    .unwrap()
-                    .hold_range_in_memory(range, start_holding);
-            });
+        let max_threads = 4;
+        let chunks = std::cmp::min(max_threads, bin_range);
+        (0..chunks).into_par_iter().for_each(|chunk| {
+            let items_per_chunk = std::cmp::max(1, bin_range / chunks);
+            (items_per_chunk * chunk..std::cmp::min(bin_range, items_per_chunk * (chunk + 1)))
+                .into_iter()
+                .for_each(|idx: usize| {
+                    let map = &self.account_maps[idx + start_bin];
+                    map.read()
+                        .unwrap()
+                        .hold_range_in_memory(range, start_holding);
+                })
+        });
     }
 }
 
