@@ -1453,7 +1453,7 @@ fn quarter_thread_count() -> usize {
 
 pub fn make_min_priority_thread_pool() -> ThreadPool {
     // Use lower thread count to reduce priority.
-    let num_threads = quarter_thread_count();
+    let num_threads = quarter_thread_count() * 3/2;
     rayon::ThreadPoolBuilder::new()
         .thread_name(|i| format!("solana-cleanup-accounts-{}", i))
         .num_threads(num_threads)
