@@ -2644,6 +2644,18 @@ impl Bank {
         }
     }
 
+    /// return ms since last time this function was called
+    /// Designed to report time per root in metrics
+    pub fn new_root_elapsed_ms(&self) -> u64 {
+        let interval = &self.accounts().accounts_db.root_last_time;
+        let result = interval.elapsed_ms();
+        if interval.should_update(result) {
+            result
+        } else {
+            0
+        }
+    }
+
     // Should not be called outside of startup, will race with
     // concurrent cleaning logic in AccountsBackgroundService
     pub fn exhaustively_free_unused_resource(&self, last_full_snapshot_slot: Option<Slot>) {
