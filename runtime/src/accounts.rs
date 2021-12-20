@@ -36,7 +36,6 @@ use {
         pubkey::Pubkey,
         system_program,
         sysvar::{self, instructions::construct_instructions_data},
-        timing::AtomicInterval,
         transaction::{Result, SanitizedTransaction, TransactionError},
         transaction_context::TransactionAccount,
     },

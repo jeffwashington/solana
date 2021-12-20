@@ -4203,8 +4203,8 @@ impl Bank {
             .extend(rent_debits.into_unordered_rewards_iter());
     }
 
-    fn hold_next_n_slots_in_partition(&self, partition: Partition) {
-        let (start, end, partitions) = partition;
+    fn hold_next_n_slots_in_partition(&self, partition: Partition, thread_pool: &ThreadPool) {
+        let (start, _end, partitions) = partition;
         let n = 10;
         let start = start.saturating_sub(start % n); // even boundary
         let end = start.saturating_add(n);
@@ -4225,20 +4225,20 @@ impl Bank {
                 "switching range held from: {:?} to {:?}",
                 held, subrange_new
             );
-            self.rc.accounts.hold_range_in_memory(held, false);
+            self.rc.accounts.hold_range_in_memory(held, false, thread_pool);
         } else {
             error!("no range previously held");
         }
-        self.rc.accounts.hold_range_in_memory(&subrange_new, true);
+        self.rc.accounts.hold_range_in_memory(&subrange_new, true, thread_pool);
         *range = Some(subrange_new);
         error!("range set");
     }
 
     fn collect_rent_in_partition(&self, partition: Partition) -> usize {
         error!("collect_rent_in_partition");
-        self.hold_next_n_slots_in_partition(partition);
-        let subrange_full = Self::pubkey_range_from_partition(partition);
         let thread_pool = &self.rc.accounts.accounts_db.thread_pool;
+        self.hold_next_n_slots_in_partition(partition, thread_pool);
+        let subrange_full = Self::pubkey_range_from_partition(partition);
         self.rc
             .accounts
             .hold_range_in_memory(&subrange_full, true, thread_pool);
