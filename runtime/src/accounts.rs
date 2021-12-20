@@ -873,7 +873,7 @@ impl Accounts {
 
     pub fn hold_range_in_memory<R>(&self, range: &R, start_holding: bool)
     where
-        R: RangeBounds<Pubkey> + std::fmt::Debug,
+        R: RangeBounds<Pubkey> + std::fmt::Debug + Sync,
     {
         self.accounts_db
             .accounts_index
