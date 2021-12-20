@@ -2645,7 +2645,7 @@ impl Bank {
     pub fn new_root_elapsed_ms(&self) -> u64 {
         let interval = &self.accounts().accounts_db.root_last_time;
         let result = interval.elapsed_ms();
-        if interval.should_update(result) {
+        if interval.should_update(result.saturating_sub(1)) {
             result
         } else {
             0
