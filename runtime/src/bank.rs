@@ -4219,7 +4219,24 @@ impl Bank {
             .extend(rent_debits.into_unordered_rewards_iter());
     }
 
+    fn hold_next_n_slots_in_partition(&self, partition: Partition) {
+        let (start, end, partitions) = partition;
+        let n = 10;
+        let start = start.saturating_sub(start % n); // even boundary
+        let end = start.saturating_add(n);
+
+        let subrange_new = Self::pubkey_range_from_partition((start, end, partitions));
+        if let Some(held) = &self.rc.accounts.accounts_db.last_range_held {
+            if held == &subrange_new {
+                return;
+            }
+            self.rc.accounts.hold_range_in_memory(held, false);
+        }
+        self.rc.accounts.hold_range_in_memory(&subrange_new, true);
+    }
+
     fn collect_rent_in_partition(&self, partition: Partition) -> usize {
+        self.hold_next_n_slots_in_partition(partition);
         let subrange_full = Self::pubkey_range_from_partition(partition);
         self.rc.accounts.hold_range_in_memory(&subrange_full, true);
         let num_threads = std::cmp::max(2, num_cpus::get() / 4) as Slot;
