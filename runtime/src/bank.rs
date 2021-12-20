@@ -4233,7 +4233,11 @@ impl Bank {
             if held == &subrange_new {
                 return;
             }
+            error!("switching range held from: {:?} to {:?}", held, subrange_new);
             self.rc.accounts.hold_range_in_memory(held, false);
+        }
+        else {
+            error!("no range previously held");
         }
         self.rc.accounts.hold_range_in_memory(&subrange_new, true);
         *range = Some(subrange_new);
