@@ -834,21 +834,25 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         // this could be tunable dynamically based on memory pressure
         // we could look at more ages or we could throw out more items we are choosing to keep in the cache
         if startup || (current_age == entry.age()) {
-            // only read the slot list if we are planning to throw the item out
-            let slot_list = entry.slot_list.read().unwrap();
             let limit = 10_000_000;
-            if in_mem_count < limit && slot_list.len() != 1 {
-                if update_stats {
-                    Self::update_stat(&self.stats().held_in_mem_slot_list_len, 1);
-                }
-                false // keep 0 and > 1 slot lists in mem. They will be cleaned or shrunk soon.
+            if in_mem_count >= limit {
+                true
             } else {
-                // keep items with slot lists that contained cached items
-                let remove = !slot_list.iter().any(|(_, info)| info.is_cached());
-                if !remove && update_stats {
-                    Self::update_stat(&self.stats().held_in_mem_slot_list_cached, 1);
+                // only read the slot list if we are planning to throw the item out
+                let slot_list = entry.slot_list.read().unwrap();
+                if slot_list.len() != 1 {
+                    if update_stats {
+                        Self::update_stat(&self.stats().held_in_mem_slot_list_len, 1);
+                    }
+                    false // keep 0 and > 1 slot lists in mem. They will be cleaned or shrunk soon.
+                } else {
+                    // keep items with slot lists that contained cached items
+                    let remove = !slot_list.iter().any(|(_, info)| info.is_cached());
+                    if !remove && update_stats {
+                        Self::update_stat(&self.stats().held_in_mem_slot_list_cached, 1);
+                    }
+                    remove
                 }
-                remove
             }
         } else {
             false
@@ -926,9 +930,19 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
             let m = Measure::start("flush_remove_or_grow");
             match disk_resize {
                 Ok(_) => {
-                    if !self.flush_remove_from_cache(removes, current_age, startup, false, in_mem_count)
-                        || !self.flush_remove_from_cache(removes_random, current_age, startup, true, in_mem_count)
-                    {
+                    if !self.flush_remove_from_cache(
+                        removes,
+                        current_age,
+                        startup,
+                        false,
+                        in_mem_count,
+                    ) || !self.flush_remove_from_cache(
+                        removes_random,
+                        current_age,
+                        startup,
+                        true,
+                        in_mem_count,
+                    ) {
                         self.stats()
                             .restarted_flush_calls
                             .fetch_add(1, Ordering::Relaxed);
@@ -991,7 +1005,13 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
 
                 if v.dirty()
                     || (!randomly_evicted
-                        && !self.should_remove_from_mem(current_age, v, startup, false, in_mem_count))
+                        && !self.should_remove_from_mem(
+                            current_age,
+                            v,
+                            startup,
+                            false,
+                            in_mem_count,
+                        ))
                 {
                     // marked dirty or bumped in age after we looked above
                     // these will be handled in later passes
