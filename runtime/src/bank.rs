@@ -4221,23 +4221,28 @@ impl Bank {
             if held == &subrange_new {
                 return;
             }
-            error!("switching range held from: {:?} to {:?}", held, subrange_new);
+            error!(
+                "switching range held from: {:?} to {:?}",
+                held, subrange_new
+            );
             self.rc.accounts.hold_range_in_memory(held, false);
-        }
-        else {
+        } else {
             error!("no range previously held");
         }
         self.rc.accounts.hold_range_in_memory(&subrange_new, true);
         *range = Some(subrange_new);
+        error!("range set");
     }
 
     fn collect_rent_in_partition(&self, partition: Partition) -> usize {
+        error!("collect_rent_in_partition");
         self.hold_next_n_slots_in_partition(partition);
         let subrange_full = Self::pubkey_range_from_partition(partition);
         let thread_pool = &self.rc.accounts.accounts_db.thread_pool;
         self.rc
             .accounts
             .hold_range_in_memory(&subrange_full, true, thread_pool);
+        error!("collect_rent_in_partition2");
         let num_threads = std::cmp::max(2, num_cpus::get() / 4) as Slot;
         // divide the range into num_threads smaller ranges and process in parallel
         // Note that 'pubkey_range_from_partition' cannot easily be re-used here to break the range smaller.
