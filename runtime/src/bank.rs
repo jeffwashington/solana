@@ -4231,7 +4231,6 @@ impl Bank {
         }
         self.rc.accounts.hold_range_in_memory(&subrange_new, true, thread_pool);
         *range = Some(subrange_new);
-        error!("range set");
     }
 
     fn collect_rent_in_partition(&self, partition: Partition) -> usize {
