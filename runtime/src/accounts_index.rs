@@ -744,15 +744,17 @@ impl<'a, T: IndexValue> AccountsIndexIterator<'a, T> {
 
     pub fn hold_range_in_memory<R>(&self, range: &R, start_holding: bool)
     where
-        R: RangeBounds<Pubkey> + Debug,
+        R: RangeBounds<Pubkey> + Debug + Sync,
     {
         // forward this hold request ONLY to the bins which contain keys in the specified range
         let (start_bin, bin_range) = self.bin_start_and_range();
-        self.account_maps
-            .iter()
-            .skip(start_bin)
-            .take(bin_range)
-            .for_each(|map| {
+        error!("hold range: {}, {}", start_bin, bin_range);
+        use rayon::iter::IntoParallelIterator;
+        use rayon::iter::ParallelIterator;
+        (start_bin..(start_bin + bin_range))
+            .into_par_iter()
+            .for_each(|idx: usize| {
+                let map = &self.account_maps[idx];
                 map.read()
                     .unwrap()
                     .hold_range_in_memory(range, start_holding);
@@ -1462,7 +1464,7 @@ impl<T: IndexValue> AccountsIndex<T> {
 
     pub fn hold_range_in_memory<R>(&self, range: &R, start_holding: bool)
     where
-        R: RangeBounds<Pubkey> + Debug,
+        R: RangeBounds<Pubkey> + Debug + Sync,
     {
         let iter = self.iter(Some(range), true);
         iter.hold_range_in_memory(range, start_holding);
