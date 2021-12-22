@@ -4207,7 +4207,7 @@ impl Bank {
         let (start, _end, partitions) = partition;
         let n = 10;
         let start = start.saturating_sub(start % n); // even boundary
-        let end = start.saturating_add(n);
+        let end = std::cmp::min(start.saturating_add(n), partitions.saturating_sub(1)); // 'n' items up to # partitions - 1
 
         let subrange_new = Self::pubkey_range_from_partition((start, end, partitions));
         let mut range = self
