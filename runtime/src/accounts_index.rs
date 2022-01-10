@@ -348,11 +348,9 @@ impl<T: IndexValue> PreAllocatedAccountMapEntry<T> {
     ) -> AccountMapEntry<T> {
         let ref_count = if account_info.is_cached() { 0 } else { 1 };
         let meta = AccountMapEntryMeta::new_dirty(storage);
-        Arc::new(AccountMapEntryInner::new(
-            vec![(slot, account_info)],
-            ref_count,
-            meta,
-        ))
+        let mut slot_list = Vec::with_capacity(10);
+        slot_list.push((slot, account_info));
+        Arc::new(AccountMapEntryInner::new(slot_list, ref_count, meta))
     }
 
     pub fn into_account_map_entry(self, storage: &Arc<BucketMapHolder<T>>) -> AccountMapEntry<T> {
