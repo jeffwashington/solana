@@ -488,6 +488,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         }
 
         // if we make it here, we did not find the slot in the list
+        list.reserve(10);
         list.push((slot, account_info));
         addref
     }
