@@ -5306,7 +5306,7 @@ impl Bank {
         );
 
         if self.slot() == 116979357 {
-            panic!("end");
+            //panic!("end");
         }
 
         info!(
