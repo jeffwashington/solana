@@ -5730,7 +5730,7 @@ impl AccountsDb {
         } else {
             scan_and_hash()
         };
-        error!("hash: {:?}, slot: {}", result, storages.range());
+        error!("hash: {:?}, slot: {}", result, storages.range().end);
         result
     }
 
