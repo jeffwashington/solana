@@ -5725,11 +5725,13 @@ impl AccountsDb {
 
             Ok(final_result)
         };
-        if let Some(thread_pool) = thread_pool {
+        let result = if let Some(thread_pool) = thread_pool {
             thread_pool.install(scan_and_hash)
         } else {
             scan_and_hash()
-        }
+        };
+        error!("hash: {:?}, slot: {}", result, storages.range());
+        result
     }
 
     /// Only called from startup or test code.
