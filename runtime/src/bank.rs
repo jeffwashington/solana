@@ -39,7 +39,7 @@ use {
     crate::{
         accounts::{AccountAddressFilter, Accounts, LoadedTransaction, TransactionLoadResult},
         accounts_db::{
-            AccountShrinkThreshold, AccountsDbConfig, ErrorCounters, SnapshotStorages,
+            AccountShrinkThreshold, AccountsDbConfig, ErrorCounters, Rewrites, SnapshotStorages,
             ACCOUNTS_DB_CONFIG_FOR_BENCHMARKS, ACCOUNTS_DB_CONFIG_FOR_TESTING,
         },
         accounts_index::{AccountSecondaryIndexes, IndexKey, ScanConfig, ScanResult},
@@ -1179,6 +1179,8 @@ pub struct Bank {
 
     sysvar_cache: RwLock<SysvarCache>,
 
+    rewrites: Rewrites,
+
     /// Current size of the accounts data.  Used when processing messages to enforce a limit on its
     /// maximum size.
     accounts_data_len: AtomicU64,
@@ -1268,6 +1270,7 @@ impl Bank {
 
     fn default_with_accounts(accounts: Accounts) -> Self {
         let bank = Self {
+            rewrites: Rewrites::default(),
             rc: BankRc::new(accounts, Slot::default()),
             src: StatusCacheRc::default(),
             blockhash_queue: RwLock::<BlockhashQueue>::default(),
@@ -1578,6 +1581,7 @@ impl Bank {
             Measure::this(|_| parent.feature_set.clone(), (), "feature_set_creation");
 
         let mut new = Bank {
+            rewrites: Rewrites::default(),
             rc,
             src,
             slot,
@@ -1873,6 +1877,7 @@ impl Bank {
             T::default()
         }
         let mut bank = Self {
+            rewrites: Rewrites::default(),
             rc: bank_rc,
             src: new(),
             blockhash_queue: RwLock::new(fields.blockhash_queue),
@@ -2891,7 +2896,7 @@ impl Bank {
         let mut hash = self.hash.write().unwrap();
         if *hash == Hash::default() {
             // finish up any deferred changes to account state
-            self.collect_rent_eagerly();
+            self.collect_rent_eagerly(false);
             self.collect_fees();
             self.distribute_rent();
             self.update_slot_history();
@@ -2966,6 +2971,13 @@ impl Bank {
             .iter()
             .for_each(|slot| self.src.status_cache.write().unwrap().add_root(*slot));
         squash_cache_time.stop();
+
+        if false // useful debug option that way slows things down
+        {
+            // verify hash after every root gets made
+            self.force_flush_accounts_cache();
+            self.update_accounts_hash_with_index_option(false, true, false);
+        }
 
         SquashTiming {
             squash_accounts_ms: squash_accounts_time.as_ms(),
@@ -4492,7 +4504,13 @@ impl Bank {
         }
     }
 
-    fn collect_rent_eagerly(&self) {
+    /// after deserialize, populate rewrites with accounts that would normally have had their data rewritten in this slot due to rent collection (but didn't)
+    pub fn prepare_rewrites_for_hash(&self) {
+        self.collect_rent_eagerly(true);
+        error!("ancient_append_vec: collecting rewrites: {}", self.rewrites.len());
+    }
+
+    fn collect_rent_eagerly(&self, just_rewrites: bool) {
         if self.lazy_rent_collection.load(Relaxed) {
             return;
         }
@@ -4502,13 +4520,14 @@ impl Bank {
         let count = partitions.len();
         let account_count: usize = partitions
             .into_iter()
-            .map(|partition| self.collect_rent_in_partition(partition))
+            .map(|partition| self.collect_rent_in_partition(partition, just_rewrites))
             .sum();
         measure.stop();
         datapoint_info!(
             "collect_rent_eagerly",
             ("accounts", account_count, i64),
-            ("partitions", count, i64)
+            ("partitions", count, i64),
+            ("skipped_rewrite", self.rewrites.len(), i64),
         );
         inc_new_counter_info!("collect_rent_eagerly-ms", measure.as_ms() as usize);
     }
@@ -4538,7 +4557,7 @@ impl Bank {
         }
     }
 
-    fn collect_rent_in_partition(&self, partition: Partition) -> usize {
+    fn collect_rent_in_partition(&self, partition: Partition, just_rewrites: bool) -> usize {
         let subrange = Self::pubkey_range_from_partition(partition);
 
         let thread_pool = &self.rc.accounts.accounts_db.thread_pool;
@@ -4546,28 +4565,40 @@ impl Bank {
             .accounts
             .hold_range_in_memory(&subrange, true, thread_pool);
 
-        let accounts = self
+        let mut accounts = self
             .rc
             .accounts
             .load_to_collect_rent_eagerly(&self.ancestors, subrange.clone());
         let account_count = accounts.len();
+        accounts.sort_by(|(a, _),(b, _)| a.cmp(&b));
 
         // parallelize?
         let mut rent_debits = RentDebits::default();
         let mut total_collected = CollectedInfo::default();
         for (pubkey, mut account) in accounts {
+            let found = Self::partition_from_pubkey(&pubkey, partition.2);        
+            assert!(found <= partition.1, "{}, {}, {:?}", pubkey, found, partition);
+            assert!(found > partition.0 || (found == 0 && partition.0 == 0), "{}, {}, {:?}", pubkey, found, partition);
             let collected = self.rent_collector.collect_from_existing_account(
                 &pubkey,
                 &mut account,
                 self.rc.accounts.accounts_db.filler_account_suffix.as_ref(),
             );
             total_collected += collected;
-            // Store all of them unconditionally to purge old AppendVec,
-            // even if collected rent is 0 (= not updated).
-            // Also, there's another subtle side-effect from this: this
-            // ensures we verify the whole on-chain state (= all accounts)
-            // via the account delta hash slowly once per an epoch.
-            self.store_account(&pubkey, &account);
+            // only store accounts where we collected rent
+            // because of this, we are not doing this:
+            //  verify the whole on-chain state (= all accounts)
+            //  via the account delta hash slowly once per an epoch.
+            if collected.rent_amount != 0 {//} || !interesting {//|| !first {//} || self.slot() >= 116979356 {
+                if !just_rewrites {
+                    self.store_account(&pubkey, &account);
+                }
+            } else {
+                let hash =
+                    crate::accounts_db::AccountsDb::hash_account(self.slot(), &account, &pubkey);
+                //error!("rehashed in rent collection: {}, {} {}, partition: {:?}, rent_epoch: {}", pubkey, self.slot(), hash, (partition.0, partition.1, partition.2), account.rent_epoch());
+                self.rewrites.insert(pubkey, hash); // this would have been rewritten, except we're not going to do so
+            }
             rent_debits.insert(&pubkey, collected.rent_amount, account.lamports());
         }
         self.collected_rent
@@ -4588,7 +4619,6 @@ impl Bank {
 
     /// This is the inverse of pubkey_range_from_partition.
     /// return the lowest end_index which would contain this pubkey
-    #[cfg(test)]
     pub fn partition_from_pubkey(
         pubkey: &Pubkey,
         partition_count: PartitionsPerCycle,
@@ -4834,6 +4864,7 @@ impl Bank {
         let (current_epoch, current_slot_index) = self.get_epoch_and_slot_index(self.slot());
         let (parent_epoch, mut parent_slot_index) =
             self.get_epoch_and_slot_index(self.parent_slot());
+        error!("variable_cycle_partitions: slot: {}, current_slot_index: {}", self.slot(), current_slot_index);
 
         let mut partitions = vec![];
         if parent_epoch < current_epoch {
@@ -5598,7 +5629,11 @@ impl Bank {
     ///  of the delta of the ledger since the last vote and up to now
     fn hash_internal_state(&self) -> Hash {
         // If there are no accounts, return the hash of the previous state and the latest blockhash
-        let accounts_delta_hash = self.rc.accounts.bank_hash_info_at(self.slot());
+        let len = self.rewrites.len();
+        let accounts_delta_hash = self
+            .rc
+            .accounts
+            .bank_hash_info_at(self.slot(), &self.rewrites);
         let mut signature_count_buf = [0u8; 8];
         LittleEndian::write_u64(&mut signature_count_buf[..], self.signature_count() as u64);
 
@@ -5620,13 +5655,14 @@ impl Bank {
         }
 
         info!(
-            "bank frozen: {} hash: {} accounts_delta: {} signature_count: {} last_blockhash: {} capitalization: {}",
+            "bank frozen: {} hash: {} accounts_delta: {} signature_count: {} last_blockhash: {} capitalization: {}, rewrites: {}",
             self.slot(),
             hash,
             accounts_delta_hash.hash,
             self.signature_count(),
             self.last_blockhash(),
             self.capitalization(),
+            len,
         );
 
         info!(
@@ -5647,6 +5683,8 @@ impl Bank {
             &self.ancestors,
             self.capitalization(),
             test_hash_calculation,
+            Some(self.epoch_schedule()),
+            &self.rent_collector,
         )
     }
 
@@ -5709,18 +5747,22 @@ impl Bank {
         Ok(sanitized_tx)
     }
 
-    pub fn calculate_capitalization(&self, debug_verify: bool) -> u64 {
+    pub fn calculate_capitalization(&self, debug_verify: bool,
+        slots_per_epoch: Option<Slot>,
+    ) -> u64 {
         let can_cached_slot_be_unflushed = true; // implied yes
         self.rc.accounts.calculate_capitalization(
             &self.ancestors,
             self.slot(),
             can_cached_slot_be_unflushed,
             debug_verify,
+            Some(self.epoch_schedule()),
+            &self.rent_collector,
         )
     }
 
     pub fn calculate_and_verify_capitalization(&self, debug_verify: bool) -> bool {
-        let calculated = self.calculate_capitalization(debug_verify);
+        let calculated = self.calculate_capitalization(debug_verify, Some(self.epoch_schedule().slots_per_epoch));
         let expected = self.capitalization();
         if calculated == expected {
             true
@@ -5739,7 +5781,7 @@ impl Bank {
         let old = self.capitalization();
         let debug_verify = true;
         self.capitalization
-            .store(self.calculate_capitalization(debug_verify), Relaxed);
+            .store(self.calculate_capitalization(debug_verify, Some(self.epoch_schedule().slots_per_epoch)), Relaxed);
         old
     }
 
@@ -5755,7 +5797,6 @@ impl Bank {
         &self,
         use_index: bool,
         mut debug_verify: bool,
-        slots_per_epoch: Option<Slot>,
         is_startup: bool,
     ) -> Hash {
         let (hash, total_lamports) = self
@@ -5769,7 +5810,8 @@ impl Bank {
                 &self.ancestors,
                 Some(self.capitalization()),
                 false,
-                slots_per_epoch,
+                Some(self.epoch_schedule()),
+                &self.rent_collector,
                 is_startup,
             );
         if total_lamports != self.capitalization() {
@@ -5794,7 +5836,8 @@ impl Bank {
                         &self.ancestors,
                         Some(self.capitalization()),
                         false,
-                        slots_per_epoch,
+                        Some(self.epoch_schedule()),
+                        &self.rent_collector,
                         is_startup,
                     );
             }
@@ -5810,7 +5853,7 @@ impl Bank {
     }
 
     pub fn update_accounts_hash(&self) -> Hash {
-        self.update_accounts_hash_with_index_option(true, false, None, false)
+        self.update_accounts_hash_with_index_option(true, false, false)
     }
 
     /// A snapshot bank should be purged of 0 lamport accounts which are not part of the hash
@@ -5841,6 +5884,9 @@ impl Bank {
         shrink_all_slots_time.stop();
 
         info!("verify_bank_hash..");
+        let mut verify_time = Measure::start("verify_bank_hash");
+        let mut verify = self.verify_bank_hash(test_hash_calculation);
+        verify_time.stop();
         let mut verify_time = Measure::start("verify_bank_hash");
         let mut verify = self.verify_bank_hash(test_hash_calculation);
         verify_time.stop();

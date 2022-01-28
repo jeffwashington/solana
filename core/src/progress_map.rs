@@ -509,7 +509,7 @@ impl std::ops::DerefMut for ProgressMap {
 }
 
 impl ProgressMap {
-    pub fn insert(&mut self, slot: Slot, fork_progress: ForkProgress) {
+    pub fn insert2(&mut self, slot: Slot, fork_progress: ForkProgress) {
         self.progress_map.insert(slot, fork_progress);
     }
 

@@ -340,18 +340,25 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         &self,
         pubkey: &Pubkey,
         new_value: PreAllocatedAccountMapEntry<T>,
+        other_slot: Option<Slot>,
         reclaims: &mut SlotList<T>,
         previous_slot_entry_was_cached: bool,
     ) {
+        use log::*;
         // try to get it just from memory first using only a read lock
         self.get_only_in_mem(pubkey, |entry| {
             if let Some(entry) = entry {
                 Self::lock_and_update_slot_list(
                     entry,
                     new_value.into(),
+                    other_slot,
                     reclaims,
                     previous_slot_entry_was_cached,
+                    pubkey,
                 );
+                if reclaims.len() > 1 {
+                    //error!("2.2 reclaims: {:?}, {}, {:?}", reclaims, pubkey, other_slot);
+                }
                 Self::update_stat(&self.stats().updates_in_mem, 1);
             } else {
                 let mut m = Measure::start("entry");
@@ -359,14 +366,18 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                 let entry = map.entry(*pubkey);
                 m.stop();
                 let found = matches!(entry, Entry::Occupied(_));
+                let reclaims_orig_len = reclaims.len();
                 match entry {
                     Entry::Occupied(mut occupied) => {
+                        let key = *occupied.key();
                         let current = occupied.get_mut();
                         Self::lock_and_update_slot_list(
                             current,
                             new_value.into(),
+                            other_slot,
                             reclaims,
                             previous_slot_entry_was_cached,
+                            &key,
                         );
                         current.set_age(self.storage.future_age_to_flush());
                         Self::update_stat(&self.stats().updates_in_mem, 1);
@@ -398,8 +409,10 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                                 Self::lock_and_update_slot_list(
                                     &disk_entry,
                                     new_value.into(),
+                                    None, // todo
                                     reclaims,
                                     previous_slot_entry_was_cached,
+                                    vacant.key(),
                                 );
                                 disk_entry
                             } else {
@@ -412,6 +425,11 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                             self.stats().insert_or_delete_mem(true, self.bin);
                         }
                     }
+                }
+
+                let reclaims_now_len = reclaims.len();
+                if reclaims_now_len - reclaims_orig_len > 1 {
+                    error!("at least 2 reclaims: {:?}, {}, {:?}", reclaims.iter().skip(reclaims_orig_len).collect::<Vec<_>>(), pubkey, other_slot);
                 }
 
                 drop(map);
@@ -434,21 +452,27 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
     // Try to update an item in the slot list the given `slot` If an item for the slot
     // already exists in the list, remove the older item, add it to `reclaims`, and insert
     // the new item.
+    /// bprumo TODO: doc
     pub fn lock_and_update_slot_list(
         current: &AccountMapEntryInner<T>,
         new_value: (Slot, T),
+        other_slot: Option<Slot>,
         reclaims: &mut SlotList<T>,
         previous_slot_entry_was_cached: bool,
+        pubkey: &Pubkey,
     ) {
         let mut slot_list = current.slot_list.write().unwrap();
-        let (slot, new_entry) = new_value;
         let addref = Self::update_slot_list(
             &mut slot_list,
-            slot,
-            new_entry,
+            new_value,
+            other_slot,
             reclaims,
             previous_slot_entry_was_cached,
         );
+        if slot_list.len() == 2 {
+            //use log::*;
+            //error!("slot list: {:?}, {}", slot_list, pubkey);
+        }
         if addref {
             current.add_un_ref(true);
         }
@@ -457,39 +481,94 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
 
     // modifies slot_list
     // returns true if caller should addref
+    /// bprumo TODO: doc
     fn update_slot_list(
-        list: &mut SlotList<T>,
-        slot: Slot,
-        account_info: T,
+        slot_list: &mut SlotList<T>,
+        new_value: (Slot, T),
+        other_slot: Option<Slot>,
         reclaims: &mut SlotList<T>,
         previous_slot_entry_was_cached: bool,
     ) -> bool {
-        let mut addref = !account_info.is_cached();
+        let (new_slot, new_account_info) = new_value;
+        let is_new_account_cached = new_account_info.is_cached();
 
-        // find other dirty entries from the same slot
-        for list_index in 0..list.len() {
-            let (s, previous_update_value) = &list[list_index];
-            if *s == slot {
-                let previous_was_cached = previous_update_value.is_cached();
-                addref = addref && previous_was_cached;
+        // There may be two dirty accounts found (one at new_value's slot and one at other_slot)
+        // that are already in the slot list.  Since the first one found will be swapped with the
+        // new account, if a second one is found, we cannot swap again (instead, just remove it).
+        // Use this flag to indicate if we've already found an old account, so the next one should
+        // just remove.
+        // let mut found = false;
 
-                let mut new_item = (slot, account_info);
-                std::mem::swap(&mut new_item, &mut list[list_index]);
-                if previous_slot_entry_was_cached {
-                    assert!(previous_was_cached);
-                } else {
-                    reclaims.push(new_item);
-                }
-                list[(list_index + 1)..]
-                    .iter()
-                    .for_each(|item| assert!(item.0 != slot));
-                return addref;
+        // find other dirty entries
+        for slot_list_index in 0..slot_list.len() {
+            let (cur_slot, cur_account_info) = &slot_list[slot_list_index];
+            if *cur_slot == new_slot || Some(*cur_slot) == other_slot {
+                let is_cur_account_cached = cur_account_info.is_cached();
+                /* if !found */
+                {
+                    // found = true;
+                    let mut new_item = (new_slot, new_account_info);
+                    std::mem::swap(&mut new_item, &mut slot_list[slot_list_index]);
+
+                    if previous_slot_entry_was_cached {
+                        assert!(is_cur_account_cached);
+                    } else {
+                        reclaims.push(new_item);
+                    }
+                    if let Some(other_slot) = other_slot {
+                        (slot_list_index + 1..slot_list.len())
+                            .into_iter()
+                            .rev()
+                            .for_each(|i| {
+                                let found_slot = slot_list[i].0;
+                                if found_slot == new_slot || found_slot == other_slot {
+                                    let removed = slot_list.remove(i);
+                                    if previous_slot_entry_was_cached {
+                                        assert!(is_cur_account_cached);
+                                    } else {
+                                        reclaims.push(removed);
+                                    }
+                                }
+                            });
+                    } else {
+                        assert!(slot_list
+                            .iter()
+                            .skip(slot_list_index + 1)
+                            .all(|(slot, _)| *slot != new_slot));
+                        // If there's no `old_slot`, then we've found and updated the only account.
+                        // Return early!
+                    }
+                    return is_cur_account_cached && !is_new_account_cached;
+                } /* else {
+                      // If the new account has already been swapped into the slot list in a previous
+                      // iteration, then just remove this second dirty account.
+                      let removed = slot_list.swap_remove(slot_list_index);
+                      if previous_slot_entry_was_cached {
+                          assert!(is_cur_account_cached);
+                      } else {
+                          reclaims.push(removed);
+                      }
+                      assert!(slot_list
+                          .iter()
+                          .skip(slot_list_index + 1)
+                          .all(|(slot, _)| *slot != new_slot && Some(*slot) != other_slot));
+                      // bprumo TODO: handle addref
+                      return removed.1.is_cached() && !is_new_account_cached;
+                  }*/
             }
         }
 
+        // bprumo TODO: alternative impl
+        // - change params to be the new entry (slot + account info) and a list (slice) of slots to
+        //   look for/flush
+        // - loop through the slot list and get all the indexes that match the list of slots param
+        // - if indexes list is empty, push(), and we're done
+        // - if indexes list is one element, swap(), and we're done
+        // - otherwise, first slot calls swap(), and all the rest do the swap_remove()
+
         // if we make it here, we did not find the slot in the list
-        list.push((slot, account_info));
-        addref
+        slot_list.push((new_slot, new_account_info));
+        !is_new_account_cached
     }
 
     // convert from raw data on disk to AccountMapEntry, set to age in future
@@ -526,8 +605,10 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                 InMemAccountsIndex::lock_and_update_slot_list(
                     occupied.get(),
                     (slot, account_info),
+                    None, // todo
                     &mut Vec::default(),
                     false,
+                    occupied.key(),
                 );
                 (
                     true, /* found in mem */
@@ -552,8 +633,10 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                         InMemAccountsIndex::lock_and_update_slot_list(
                             &disk_entry,
                             (slot, account_info),
+                            None, // todo
                             &mut Vec::default(),
                             false,
+                            vacant.key(),
                         );
                         vacant.insert(disk_entry);
                         (
@@ -606,8 +689,8 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                     let mut slot_list = slot_list.to_vec();
                     let addref = Self::update_slot_list(
                         &mut slot_list,
-                        slot,
-                        account_info,
+                        (slot, account_info),
+                        None, // todo
                         reclaims,
                         previous_slot_entry_was_cached,
                     );

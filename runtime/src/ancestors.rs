@@ -7,9 +7,14 @@ use {
 
 pub type AncestorsForSerialization = HashMap<Slot, usize>;
 
-#[derive(Clone, PartialEq, AbiExample)]
+#[derive(PartialEq, AbiExample)]
 pub struct Ancestors {
     ancestors: RollingBitField,
+}
+impl Clone for Ancestors {
+    fn clone(&self) -> Self {
+        Ancestors::from(self.ancestors.get_all())
+    }
 }
 
 impl Debug for Ancestors {
