@@ -6479,11 +6479,13 @@ if false {
         let sort_time = AtomicU64::new(0);
 
         let find_next_slot = |slot: Slot| {
-            let storage_root = storage.find_valid_slot(slot);
             let roots = maybe_db.unwrap().accounts_index.get_next_root(slot);
+            /*
+            // let storage_root = storage.find_valid_slot(slot);
             if storage_root != roots {
                 error!("ancient_append_vec, next slot different: {:?} vs {:?}, range: {:?}, slot: {}", storage_root, roots, storage.range(), slot);
             }
+            */
             roots
         };
 
