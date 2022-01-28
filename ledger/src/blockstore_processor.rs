@@ -586,7 +586,7 @@ fn do_process_blockstore_from_root(
 ) -> BlockstoreProcessorResult {
     info!("processing ledger from slot {}...", bank.slot());
 
-    let stats = bank.set_active(solana_runtime::active_stats::ActiveStatItem::ProcessBlockstoreFromRoot);
+    //let stats = bank.set_active(solana_runtime::active_stats::ActiveStatItem::ProcessBlockstoreFromRoot);
 
     // Starting slot must be a root, and thus has no parents
     assert!(bank.parent().is_none());
