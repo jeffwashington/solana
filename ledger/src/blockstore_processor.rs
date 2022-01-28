@@ -659,7 +659,6 @@ fn do_process_blockstore_from_root(
             // and there's no point in processing the rest of blockstore and implies blockstore
             // should be empty past this point.
             let leader_schedule_cache = LeaderScheduleCache::new_from_bank(&bank);
-            drop(stats);
             (vec![bank], leader_schedule_cache)
         }
     };
