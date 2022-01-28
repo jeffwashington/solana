@@ -6482,7 +6482,7 @@ if false {
             let storage_root = storage.find_valid_slot(slot);
             let roots = maybe_db.unwrap().accounts_index.get_next_root(slot);
             if storage_root != roots {
-                error!("ancient_append_vec, next slot different: {:?} vs {:?}, range: {:?}", storage_root, roots, storage.range());
+                error!("ancient_append_vec, next slot different: {:?} vs {:?}, range: {:?}, slot: {}", storage_root, roots, storage.range(), slot);
             }
             roots
         };
