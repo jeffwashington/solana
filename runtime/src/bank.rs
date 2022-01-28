@@ -2976,7 +2976,7 @@ impl Bank {
         {
             // verify hash after every root gets made
             self.force_flush_accounts_cache();
-            self.update_accounts_hash_with_index_option(false, true, false);
+            self.update_accounts_hash_with_index_option(false, false, true);
         }
 
         SquashTiming {
