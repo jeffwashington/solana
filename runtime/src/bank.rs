@@ -4572,6 +4572,7 @@ impl Bank {
         let account_count = accounts.len();
         accounts.sort_by(|(a, _),(b, _)| a.cmp(&b));
 
+        let mut first = true;
         // parallelize?
         let mut rent_debits = RentDebits::default();
         let mut total_collected = CollectedInfo::default();
@@ -4589,11 +4590,12 @@ impl Bank {
             // because of this, we are not doing this:
             //  verify the whole on-chain state (= all accounts)
             //  via the account delta hash slowly once per an epoch.
-            if collected.rent_amount != 0 {//} || !interesting {//|| !first {//} || self.slot() >= 116979356 {
+            if collected.rent_amount != 0 || !first {//} || !interesting {//|| !first {//} || self.slot() >= 116979356 {
                 if !just_rewrites {
                     self.store_account(&pubkey, &account);
                 }
             } else {
+                first = true;
                 let hash =
                     crate::accounts_db::AccountsDb::hash_account(self.slot(), &account, &pubkey);
                 //error!("rehashed in rent collection: {}, {} {}, partition: {:?}, rent_epoch: {}", pubkey, self.slot(), hash, (partition.0, partition.1, partition.2), account.rent_epoch());
