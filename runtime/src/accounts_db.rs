@@ -3105,6 +3105,7 @@ impl AccountsDb {
     }
 
     fn shrink_ancient_slots(&self) {
+        return;
         let max_root = self.accounts_index.max_root();
         use solana_sdk::clock::DEFAULT_SLOTS_PER_EPOCH;
         // This can't practically be within the current epoch. Otherwise, we would lose track of the roots that used to exist and we couldn't load from a snapshot.
