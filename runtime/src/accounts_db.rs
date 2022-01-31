@@ -6396,10 +6396,10 @@ impl AccountsDb {
             expected_rent_collection_slot_max_epoch =
                 expected_rent_collection_slot_max_epoch.saturating_sub(slots_per_epoch);
         }
-        let interesting = pubkey
+        let interesting = false && (pubkey
             == &Pubkey::from_str("2cy1guFAaqDZztT7vrsc8Q5u9aAHN8oBxDbSyUdBKpW3").unwrap()
             || ((storage_slot == 114612876 || storage_slot == 115044876)
-                && partition_index_from_max_slot == partition_from_pubkey);
+                && partition_index_from_max_slot == partition_from_pubkey));
 
         let mut use_stored = true;
 
