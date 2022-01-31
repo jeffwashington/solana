@@ -4578,6 +4578,7 @@ impl Bank {
         let mut first = self.slot() >= 115929262 && self.slot() <= 115929262; //115929302; //false;
         // parallelize?
         let mut rent_debits = RentDebits::default();
+        let mut skipped = vec![];
         let mut total_collected = CollectedInfo::default();
         for (pubkey, mut account) in accounts {
             /*
@@ -4604,10 +4605,14 @@ impl Bank {
                 //first = false;
                 let hash =
                     crate::accounts_db::AccountsDb::hash_account(self.slot(), &account, &pubkey);
+                    skipped.push((pubkey, hash, account.rent_epoch, account.lamports()));
                 //error!("rehashed in rent collection: {}, {} {}, partition: {:?}, rent_epoch: {}", pubkey, self.slot(), hash, (partition.0, partition.1, partition.2), account.rent_epoch());
                 self.rewrites.insert(pubkey, hash); // this would have been rewritten, except we're not going to do so
             }
             rent_debits.insert(&pubkey, collected.rent_amount, account.lamports());
+        }
+        if skipped.any() {
+            error!("skipped: {:?}, slot: {}", skipped, self.slot());
         }
         self.collected_rent
             .fetch_add(total_collected.rent_amount, Relaxed);
