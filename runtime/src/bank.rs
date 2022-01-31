@@ -4611,7 +4611,7 @@ impl Bank {
             }
             rent_debits.insert(&pubkey, collected.rent_amount, account.lamports());
         }
-        if skipped.any() {
+        if !skipped.is_empty() {
             error!("skipped: {:?}, slot: {}", skipped, self.slot());
         }
         self.collected_rent
