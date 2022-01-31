@@ -6341,6 +6341,7 @@ impl AccountsDb {
         find_next_slot: impl Fn(Slot) -> Option<Slot>,
         filler_account_suffix: Option<&Pubkey>,
     ) -> Hash {
+        return loaded_account.loaded_hash();
         assert!(epoch_schedule.is_some());
         let epoch_schedule = epoch_schedule.unwrap();
         let slots_per_epoch = epoch_schedule.slots_per_epoch;
