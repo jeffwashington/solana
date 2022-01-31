@@ -6518,7 +6518,7 @@ impl AccountsDb {
             // we can use the previously calculated hash
             return loaded_account.loaded_hash();
         }
-        log = true;
+        //log = true;
         let recalc_hash = crate::accounts_db::AccountsDb::hash_account_with_rent_epoch(
             expected_rent_collection_slot_max_epoch,
             loaded_account,
@@ -6631,7 +6631,7 @@ impl AccountsDb {
                     filler_account_suffix,
                 );
 
-                let interesting = pubkey
+                let interesting = false || pubkey
                     == &Pubkey::from_str("2cy1guFAaqDZztT7vrsc8Q5u9aAHN8oBxDbSyUdBKpW3").unwrap();
 
                 let source_item = CalculateHashIntermediate::new(hash, balance, *pubkey);
