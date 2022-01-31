@@ -4601,7 +4601,7 @@ impl Bank {
                     self.store_account(&pubkey, &account);
                 }
             } else {
-                first = true;
+                first = false;
                 let hash =
                     crate::accounts_db::AccountsDb::hash_account(self.slot(), &account, &pubkey);
                 //error!("rehashed in rent collection: {}, {} {}, partition: {:?}, rent_epoch: {}", pubkey, self.slot(), hash, (partition.0, partition.1, partition.2), account.rent_epoch());
