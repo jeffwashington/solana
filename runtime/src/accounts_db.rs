@@ -6170,7 +6170,7 @@ impl AccountsDb {
         }
     }
 
-    fn calculate_accounts_hash_helper(
+    fn calculate_accounts_hash_helper2(
         &self,
         mut use_index: bool,
         slot: Slot,
@@ -6217,7 +6217,7 @@ impl AccountsDb {
             } else {
                 Some(&self.thread_pool_clean)
             };
-            Self::calculate_accounts_hash_without_index(
+            Self::calculate_accounts_hash_without_index2(
                 &self.accounts_hash_cache_path,
                 &storages,
                 thread_pool,
@@ -6261,7 +6261,7 @@ impl AccountsDb {
     ) -> Result<(Hash, u64), BankHashVerificationError> {
         assert!(epoch_schedule.is_some());
         let _guard = self.active_stats.activate(ActiveStatItem::Hash);
-        let (hash, total_lamports) = self.calculate_accounts_hash_helper(
+        let (hash, total_lamports) = self.calculate_accounts_hash_helper2(
             use_index,
             slot,
             ancestors,
@@ -6274,7 +6274,7 @@ impl AccountsDb {
         )?;
         if debug_verify {
             // calculate the other way (store or non-store) and verify results match.
-            let (hash_other, total_lamports_other) = self.calculate_accounts_hash_helper(
+            let (hash_other, total_lamports_other) = self.calculate_accounts_hash_helper2(
                 !use_index,
                 slot,
                 ancestors,
@@ -6291,6 +6291,29 @@ impl AccountsDb {
                 && total_lamports == expected_capitalization.unwrap_or(total_lamports);
             assert!(success, "update_accounts_hash_with_index_option mismatch. hashes: {}, {}; lamports: {}, {}; expected lamports: {:?}, using index: {}, slot: {}", hash, hash_other, total_lamports, total_lamports_other, expected_capitalization, use_index, slot);
         }
+
+        {
+            let max_root = slot;
+            let width = epoch_schedule.unwrap().slots_per_epoch + 10; // a buffer
+            if max_root > width {
+                let min_root = max_root - width;
+                let mut valid_slots = HashSet::default();
+                let all_roots = self.accounts_index.roots_tracker.read().unwrap();
+
+                if all_roots.roots_original.min().is_some() {
+                    for slot in all_roots.roots_original.min().unwrap()..=min_root {
+                        if all_roots.roots.contains(&slot) {
+                            valid_slots.insert(slot); // there was a storage for this root, so it counts as a root
+                        }
+                    }
+                }
+                drop(all_roots);
+
+                self.accounts_index.remove_old_roots(min_root, valid_slots);
+            }
+        }
+
+
         Ok((hash, total_lamports))
     }
 
@@ -6716,7 +6739,7 @@ impl AccountsDb {
 
     // modeled after get_accounts_delta_hash
     // intended to be faster than calculate_accounts_hash
-    pub fn calculate_accounts_hash_without_index(
+    pub fn calculate_accounts_hash_without_index2(
         accounts_hash_cache_path: &Path,
         storages: &SortedStorages,
         thread_pool: Option<&ThreadPool>,
@@ -6790,25 +6813,6 @@ impl AccountsDb {
         };
 
         error!("hash: {:?}, slot: {}", result, storages.range().end);
-
-        if let Some(db) = maybe_db {
-            let range = storages.range();
-            let max_root = range.end;
-            let width = epoch_schedule.unwrap().slots_per_epoch + 10; // a buffer
-            if max_root > width {
-                let min_root = max_root - width;
-                let mut valid_slots = HashSet::default();
-
-                for slot in range.start..=min_root {
-                    if storages.contains(slot) {
-                        valid_slots.insert(slot); // there was a storage for this root, so it counts as a root
-                    }
-                }
-
-                db.accounts_index.remove_old_roots(min_root, valid_slots);
-            }
-        }
-
         result
     }
 
