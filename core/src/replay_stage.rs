@@ -1783,7 +1783,7 @@ impl ReplayStage {
             if let Some(sender) = bank_notification_sender {
                 sender
                     .send(BankNotification::Root(root_bank))
-                    .unwrap_or_else(|err| warn!("bank_notification_sender failed: {:?}", err));
+                    .unwrap_or_else(|err| warn!("bank_notification_sender failed: {:?}, handle_votable_bank", err));
             }
             latest_root_senders.iter().for_each(|s| {
                 if let Err(e) = s.send(new_root) {
@@ -2243,7 +2243,7 @@ impl ReplayStage {
                 if let Some(sender) = bank_notification_sender {
                     sender
                         .send(BankNotification::Frozen(bank.clone()))
-                        .unwrap_or_else(|err| warn!("bank_notification_sender failed: {:?}", err));
+                        .unwrap_or_else(|err| warn!("bank_notification_sender failed: {:?}, replay_active_banks", err));
                 }
                 blockstore_processor::cache_block_meta(&bank, cache_block_meta_sender);
 

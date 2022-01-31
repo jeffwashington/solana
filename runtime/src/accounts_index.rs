@@ -632,7 +632,7 @@ impl RollingBitField {
 
 #[derive(Debug)]
 pub struct RootsTracker {
-    roots2: RollingBitField,
+    roots: RollingBitField,
     roots_original: RollingBitField,
     max_root: Slot,
     uncleaned_roots: HashSet<Slot>,
@@ -651,7 +651,7 @@ impl Default for RootsTracker {
 impl RootsTracker {
     pub fn new(max_width: u64) -> Self {
         Self {
-            roots2: RollingBitField::new(max_width),
+            roots: RollingBitField::new(max_width),
             roots_original: RollingBitField::new(max_width),
             max_root: 0,
             uncleaned_roots: HashSet::new(),
@@ -660,11 +660,11 @@ impl RootsTracker {
     }
 
     pub fn max_root(&self) -> Slot {
-        self.roots2.max()
+        self.roots.max()
     }
 
     pub fn min_root(&self) -> Option<Slot> {
-        self.roots2.min()
+        self.roots.min()
     }
 }
 
@@ -1397,7 +1397,7 @@ impl<T: IndexValue> AccountsIndex<T> {
 
     pub fn get_rooted_entries(&self, slice: SlotSlice<T>, max: Option<Slot>) -> SlotList<T> {
         let max = max.unwrap_or(Slot::MAX);
-        let lock = &self.roots_tracker.read().unwrap().roots2;
+        let lock = &self.roots_tracker.read().unwrap().roots;
         slice
             .iter()
             .filter(|(slot, _)| *slot <= max && lock.contains(slot))
@@ -1480,7 +1480,7 @@ impl<T: IndexValue> AccountsIndex<T> {
                     Some(inner) => inner,
                     None => self.roots_tracker.read().unwrap(),
                 };
-                if lock.roots2.contains(slot) {
+                if lock.roots.contains(slot) {
                     rv = Some(i);
                     current_max = *slot;
                 }
@@ -1828,7 +1828,7 @@ impl<T: IndexValue> AccountsIndex<T> {
     ) {
         let roots_tracker = &self.roots_tracker.read().unwrap();
         let newest_root_in_slot_list =
-            Self::get_newest_root_in_slot_list(&roots_tracker.roots2, slot_list, max_clean_root);
+            Self::get_newest_root_in_slot_list(&roots_tracker.roots, slot_list, max_clean_root);
         let max_clean_root = max_clean_root.unwrap_or(roots_tracker.max_root);
 
         slot_list.retain(|(slot, value)| {
@@ -1889,7 +1889,7 @@ impl<T: IndexValue> AccountsIndex<T> {
         let roots_tracker = self.roots_tracker.read().unwrap();
         slots
             .filter_map(|s| {
-                if roots_tracker.roots2.contains(s) {
+                if roots_tracker.roots.contains(s) {
                     Some(*s)
                 } else {
                     None
@@ -1900,7 +1900,7 @@ impl<T: IndexValue> AccountsIndex<T> {
 
     pub fn is_root(&self, slot: Slot) -> bool {
         let read = self.roots_tracker.read().unwrap();
-        let r = read.roots2.contains(&slot);
+        let r = read.roots.contains(&slot);
         if !r && read.roots_original.contains(&slot) {
             panic!("different call maybe");
         }
@@ -1909,7 +1909,7 @@ impl<T: IndexValue> AccountsIndex<T> {
 
     pub fn add_root(&self, slot: Slot, caching_enabled: bool) {
         let mut w_roots_tracker = self.roots_tracker.write().unwrap();
-        w_roots_tracker.roots2.insert(slot);
+        w_roots_tracker.roots.insert(slot);
         w_roots_tracker.roots_original.insert(slot);
         // we delay cleaning until flushing!
         if !caching_enabled {
@@ -1982,7 +1982,7 @@ impl<T: IndexValue> AccountsIndex<T> {
             }
         }
         */
-        if !w_roots_tracker.roots2.remove(&slot) {
+        if !w_roots_tracker.roots.remove(&slot) {
             // w_roots_tracker.roots.contains(&slot) {
             if removed_from_unclean_roots {
                 error!("clean_dead_slot-removed_from_unclean_roots: {}", slot);
@@ -2001,10 +2001,10 @@ impl<T: IndexValue> AccountsIndex<T> {
             }
             false
         } else {
-            stats.roots_len = w_roots_tracker.roots2.len();
+            stats.roots_len = w_roots_tracker.roots.len();
             stats.uncleaned_roots_len = w_roots_tracker.uncleaned_roots.len();
             stats.previous_uncleaned_roots_len = w_roots_tracker.previous_uncleaned_roots.len();
-            stats.roots_range = w_roots_tracker.roots2.range_width();
+            stats.roots_range = w_roots_tracker.roots.range_width();
             true
         }
     }
@@ -2055,12 +2055,12 @@ impl<T: IndexValue> AccountsIndex<T> {
     }
 
     pub fn num_roots(&self) -> usize {
-        self.roots_tracker.read().unwrap().roots2.len()
+        self.roots_tracker.read().unwrap().roots.len()
     }
 
     pub fn all_roots(&self) -> Vec<Slot> {
         let tracker = self.roots_tracker.read().unwrap();
-        tracker.roots2.get_all()
+        tracker.roots.get_all()
     }
 
     #[cfg(test)]
