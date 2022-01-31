@@ -6000,6 +6000,7 @@ match self.rent_collector.calculate_rent_result(pubkey, &account, None) {
         mut debug_verify: bool,
         is_startup: bool,
     ) -> Hash {
+        let slots_per_epoch = Some(self.epoch_schedule().slots_per_epoch);
         let (hash, total_lamports) = self
             .rc
             .accounts
