@@ -4605,7 +4605,7 @@ impl Bank {
                 //first = false;
                 let hash =
                     crate::accounts_db::AccountsDb::hash_account(self.slot(), &account, &pubkey);
-                    skipped.push((pubkey, hash, account.rent_epoch, account.lamports()));
+                    skipped.push((pubkey, hash, account.rent_epoch(), account.lamports()));
                 //error!("rehashed in rent collection: {}, {} {}, partition: {:?}, rent_epoch: {}", pubkey, self.slot(), hash, (partition.0, partition.1, partition.2), account.rent_epoch());
                 self.rewrites.insert(pubkey, hash); // this would have been rewritten, except we're not going to do so
             }
