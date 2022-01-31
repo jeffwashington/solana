@@ -4575,7 +4575,7 @@ impl Bank {
             .load_to_collect_rent_eagerly(&self.ancestors, subrange.clone());
         let account_count = accounts.len();
 
-        let mut first = true;
+        let mut first = false;
         // parallelize?
         let mut rent_debits = RentDebits::default();
         let mut total_collected = CollectedInfo::default();
