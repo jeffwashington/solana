@@ -6618,7 +6618,7 @@ impl AccountsDb {
                 };
 
                 let hash = loaded_account.loaded_hash();
-                check_hash = false;
+                //check_hash = false;
                 /*Self::maybe_rehash_rewrites(
                     &loaded_account,
                     pubkey,
