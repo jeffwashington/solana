@@ -4579,7 +4579,7 @@ impl Bank {
         // parallelize?
         let mut rent_debits = RentDebits::default();
         let mut skipped = vec![];
-        let mut collected = vec![];
+        let mut collected2 = vec![];
         let mut total_collected = CollectedInfo::default();
         for (pubkey, mut account) in accounts {
             /*
@@ -4601,7 +4601,7 @@ impl Bank {
                 //} || !interesting {//|| !first {//} || self.slot() >= 116979356 {
                 if !just_rewrites {
                     self.store_account(&pubkey, &account);
-                    collected.push((pubkey, account.rent_epoch(), account.lamports()));
+                    collected2.push((pubkey, account.rent_epoch(), account.lamports()));
                 }
             } else {
                 //first = false;
@@ -4614,7 +4614,7 @@ impl Bank {
             rent_debits.insert(&pubkey, collected.rent_amount, account.lamports());
         }
         if !skipped.is_empty() {
-            error!("skipped: {:?}, slot: {}, collected: {:?}", skipped, self.slot());
+            error!("skipped: {:?}, slot: {}, collected: {:?}", skipped, self.slot(), collected2);
         }
         self.collected_rent
             .fetch_add(total_collected.rent_amount, Relaxed);
