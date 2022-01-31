@@ -6617,7 +6617,9 @@ impl AccountsDb {
                     raw_lamports
                 };
 
-                let hash = Self::maybe_rehash_rewrites(
+                let hash = loaded_account.loaded_hash();
+                check_hash = false;
+                /*Self::maybe_rehash_rewrites(
                     &loaded_account,
                     pubkey,
                     slot,
@@ -6629,7 +6631,7 @@ impl AccountsDb {
                     storage.range().end,
                     find_next_slot,
                     filler_account_suffix,
-                );
+                );*/
 
                 let interesting = false || pubkey
                     == &Pubkey::from_str("2cy1guFAaqDZztT7vrsc8Q5u9aAHN8oBxDbSyUdBKpW3").unwrap();
@@ -6731,7 +6733,6 @@ impl AccountsDb {
         rent_collector: &RentCollector,
         maybe_db: &Option<&AccountsDb>,
     ) -> Result<(Hash, u64), BankHashVerificationError> {
-        return Ok((Hash::default(), 0));
         assert!(epoch_schedule.is_some());
 
         let rehash = AtomicUsize::default();
