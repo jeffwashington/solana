@@ -111,7 +111,7 @@ impl SnapshotRequestHandler {
                 let previous_hash = if test_hash_calculation {
                     // We have to use the index version here.
                     // We cannot calculate the non-index way because cache has not been flushed and stores don't match reality.
-                    snapshot_root_bank.update_accounts_hash_with_index_option(true, false, None, false)
+                    snapshot_root_bank.update_accounts_hash_with_index_option(true, false, false)
                 } else {
                     Hash::default()
                 };
@@ -149,7 +149,6 @@ impl SnapshotRequestHandler {
                 let this_hash = snapshot_root_bank.update_accounts_hash_with_index_option(
                     use_index_hash_calculation,
                     test_hash_calculation,
-                    Some(snapshot_root_bank.epoch_schedule().slots_per_epoch),
                     false,
                 );
                 let hash_for_testing = if test_hash_calculation {
@@ -170,6 +169,7 @@ impl SnapshotRequestHandler {
 
                 if accounts_db_caching_enabled {
                     shrink_time = Measure::start("shrink_time");
+                    error!("{}{}", file!(), line!());
                     snapshot_root_bank.shrink_candidate_slots();
                     shrink_time.stop();
                 }

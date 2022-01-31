@@ -586,6 +586,8 @@ fn do_process_blockstore_from_root(
 ) -> BlockstoreProcessorResult {
     info!("processing ledger from slot {}...", bank.slot());
 
+    //let stats = bank.set_active(solana_runtime::active_stats::ActiveStatItem::ProcessBlockstoreFromRoot);
+
     // Starting slot must be a root, and thus has no parents
     assert!(bank.parent().is_none());
     let start_slot = bank.slot();
@@ -1248,7 +1250,6 @@ fn load_frozen_forks(
                         new_root_bank.update_accounts_hash_with_index_option(
                             snapshot_config.accounts_hash_use_index,
                             snapshot_config.accounts_hash_debug_verify,
-                            Some(new_root_bank.epoch_schedule().slots_per_epoch),
                             false,
                         );
                         snapshot_utils::snapshot_bank(
