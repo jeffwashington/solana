@@ -6467,6 +6467,38 @@ impl AccountsDb {
             return loaded_account.loaded_hash();
         }
         */
+        // the slot we're dealing with is where we expected the rent to be collected for this pubkey, so use what is in this slot
+        if storage_slot == expected_rent_collection_slot_max_epoch {
+            if interesting {
+                //storage_slot == 115044876 || storage_slot ==  {//partition_from_pubkey == storage_slot % slots_per_epoch {
+                let recalc_hash =
+                    loaded_account.compute_hash(expected_rent_collection_slot_max_epoch, pubkey);
+                /*
+                let hash =
+                crate::accounts_db::AccountsDb::hash_account(self.slot(), &account, &pubkey);
+                */
+
+                error!("early maybe_rehash: {}, loaded_hash: {}, storage_slot: {}, max_slot_in_storages: {}, expected_rent_collection_slot_max_epoch: {}, storage_slot_distance_from_max: {}, partition_index_from_max_slot: {}, partition_from_pubkey: {}, calculated hash: {}, use_stored: {}, storage_slot_partition: {}, rent_epoch: {}, cached: {}",
+                pubkey,
+                loaded_account.loaded_hash(),
+                storage_slot,
+                max_slot_in_storages,
+                expected_rent_collection_slot_max_epoch,
+                max_slot_in_storages - storage_slot,
+                partition_index_from_max_slot,
+                partition_from_pubkey,
+                recalc_hash,
+                use_stored,
+                epoch_schedule.get_epoch_and_slot_index(storage_slot).1,
+                loaded_account.rent_epoch(),
+                loaded_account.is_cached(),
+            );
+            }
+            // the storage slot is at least as recent as the expected rent collection slot, so whatever is in the append vec is good
+            // we have not collected rent yet in this epoch for this pubkey
+            // we can use the previously calculated hash
+            return loaded_account.loaded_hash();
+        }
 
         let expected_slot_start = expected_rent_collection_slot_max_epoch;
         let find = find_next_slot(expected_slot_start);
@@ -6475,8 +6507,11 @@ impl AccountsDb {
             if interesting {
                 error!("{}, find: {}, expected_rent_collection_slot_max_epoch: {}", pubkey, find, expected_rent_collection_slot_max_epoch);
             }
-            expected_rent_collection_slot_max_epoch = find;
-            use_stored = false;
+            if find >= expected_rent_collection_slot_max_epoch {
+                // only skip stored if the 
+                expected_rent_collection_slot_max_epoch = find;
+                use_stored = false;
+            }
         }
 
         if !use_stored && maybe_db.is_some() {
@@ -6530,7 +6565,7 @@ impl AccountsDb {
             // we have an account we wrote in this epoch already, so we collected rent then, so we would not have rewritten it again later in this same slot
             use_stored = true;
         }
-        let mut log = true;
+        let mut log = false;
         if interesting {
             //storage_slot == 114612876 { //partition_from_pubkey == storage_slot % slots_per_epoch {
             let recalc_hash = crate::accounts_db::AccountsDb::hash_account_with_rent_epoch(
@@ -6560,7 +6595,6 @@ impl AccountsDb {
             // we can use the previously calculated hash
             return loaded_account.loaded_hash();
         }
-        log = false;
         let recalc_hash = crate::accounts_db::AccountsDb::hash_account_with_rent_epoch(
             expected_rent_collection_slot_max_epoch,
             loaded_account,
