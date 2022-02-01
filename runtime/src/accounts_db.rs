@@ -6472,6 +6472,9 @@ impl AccountsDb {
         let find = find_next_slot(expected_slot_start);
         if let Some(find) = find {
             // found a root (because we have a storage) that is >= expected_rent_collection_slot.
+            if interesting {
+                error!("{}, find: {}, expected_rent_collection_slot_max_epoch: {}", pubkey, find, expected_rent_collection_slot_max_epoch);
+            }
             expected_rent_collection_slot_max_epoch = find;
             use_stored = false;
         }
@@ -6484,6 +6487,9 @@ impl AccountsDb {
                 .get_account_read_entry(pubkey)
                 .unwrap();
             let mut found = false;
+            if interesting {
+                error!("{}, slotlist: {:?}, storage_slot: {}", pubkey, list.slot_list(), storage_slot);
+            }
             for (slot, info) in list.slot_list() {
                 if slot > &storage_slot {
                     found = true;
@@ -6516,6 +6522,9 @@ impl AccountsDb {
 
         let partition_storage_slot = epoch_schedule.get_epoch_and_slot_index(storage_slot).1;
         if !use_stored && partition_storage_slot < partition_from_pubkey {
+            if interesting {
+                error!("{}, partition_storage_slot: {:?}, partition_from_pubkey: {}", pubkey, partition_storage_slot, partition_from_pubkey);
+            }
             // we have an account we wrote in this epoch already, so we collected rent then, so we would not have rewritten it again later in this same slot
             use_stored = true;
         }
