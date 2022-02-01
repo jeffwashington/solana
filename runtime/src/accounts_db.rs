@@ -6530,7 +6530,7 @@ impl AccountsDb {
             // we have an account we wrote in this epoch already, so we collected rent then, so we would not have rewritten it again later in this same slot
             use_stored = true;
         }
-        let mut log = false;
+        let mut log = true;
         if interesting {
             //storage_slot == 114612876 { //partition_from_pubkey == storage_slot % slots_per_epoch {
             let recalc_hash = crate::accounts_db::AccountsDb::hash_account_with_rent_epoch(
