@@ -1305,6 +1305,7 @@ fn load_frozen_forks(
             )?;
 
             if slot >= dev_halt_at_slot {
+                bank.force_flush_accounts_cache();
                 bank.verify_bank_hash(true);
                 break;
             }

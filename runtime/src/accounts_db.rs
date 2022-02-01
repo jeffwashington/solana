@@ -6869,7 +6869,7 @@ impl AccountsDb {
             scan_and_hash()
         };
 
-        error!("hash: {:?}, slot: {}", result, storages.range().end);
+        error!("hash: {:?}, slot (exclusive): {}", result, storages.range().end);
         result
     }
 
