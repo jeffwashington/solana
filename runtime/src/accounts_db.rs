@@ -6709,7 +6709,7 @@ impl AccountsDb {
                     storage.range().end,
                     find_next_slot,
                     filler_account_suffix,
-                );*/
+                );
 
                 let interesting = true && pubkey
                     == &Pubkey::from_str("3S88CYJ7vV7uXNw5tKrXiKfUtfGsKYpUzzPjnDZz6WyT").unwrap();
