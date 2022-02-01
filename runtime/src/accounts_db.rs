@@ -6468,7 +6468,7 @@ impl AccountsDb {
         }
         */
         // the slot we're dealing with is where we expected the rent to be collected for this pubkey, so use what is in this slot
-        if storage_slot == expected_rent_collection_slot_max_epoch {
+        if storage_slot >= expected_rent_collection_slot_max_epoch {
             if interesting {
                 //storage_slot == 115044876 || storage_slot ==  {//partition_from_pubkey == storage_slot % slots_per_epoch {
                 let recalc_hash =
@@ -6565,7 +6565,7 @@ impl AccountsDb {
             // we have an account we wrote in this epoch already, so we collected rent then, so we would not have rewritten it again later in this same slot
             use_stored = true;
         }
-        let mut log = false;//true;
+        let mut log = true;//true;
         if interesting {
             //storage_slot == 114612876 { //partition_from_pubkey == storage_slot % slots_per_epoch {
             let recalc_hash = crate::accounts_db::AccountsDb::hash_account_with_rent_epoch(
