@@ -6426,7 +6426,14 @@ impl AccountsDb {
 
         let mut use_stored = true;
 
+        // if we write account a at slot 1 a valid transaction,
+        // but then at slot 2, it is time for a rewrite on account a, then when we find slot 1, we will
+        // not be ancient, BUT, we should do a rewrite on it later, so we can't just bail out when it is
+        // not ancient - we still may have to do a rewrite at a higher slot #
+        // this needs a test case
+
         // todo think about: can't rely on 'is_ancient'
+        /*
         if !is_ancient {
             //} /* !is_ancient && */ storage_slot >= expected_rent_collection_slot_max_epoch {
             if interesting {
@@ -6459,6 +6466,7 @@ impl AccountsDb {
             // we can use the previously calculated hash
             return loaded_account.loaded_hash();
         }
+        */
 
         let expected_slot_start = expected_rent_collection_slot_max_epoch;
         let find = find_next_slot(expected_slot_start);
