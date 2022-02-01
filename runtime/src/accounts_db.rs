@@ -6569,7 +6569,7 @@ impl AccountsDb {
             // not true because we always rewrite on the pubkey-based slot
             // use_stored = true;
         }
-        let mut log = true;//true;
+        let mut log = false;
         if interesting {
             //storage_slot == 114612876 { //partition_from_pubkey == storage_slot % slots_per_epoch {
             let recalc_hash = crate::accounts_db::AccountsDb::hash_account_with_rent_epoch(
