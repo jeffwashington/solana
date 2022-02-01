@@ -6491,7 +6491,8 @@ impl AccountsDb {
                 error!("{}, slotlist: {:?}, storage_slot: {}", pubkey, list.slot_list(), storage_slot);
             }
             for (slot, info) in list.slot_list() {
-                if slot >= &storage_slot {
+                // >= means THIS slot or one in the future is expected to be seen and IT will have a more up to date hash already
+                if slot >= &storage_slot && slot < max_slot_in_storages_exclusive {
                     found = true;
                     use_stored = true;
                 }
