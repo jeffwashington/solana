@@ -6549,7 +6549,7 @@ impl AccountsDb {
             // we can use the previously calculated hash
             return loaded_account.loaded_hash();
         }
-        log = false;
+        log = true;
         let recalc_hash = crate::accounts_db::AccountsDb::hash_account_with_rent_epoch(
             expected_rent_collection_slot_max_epoch,
             loaded_account,
