@@ -6507,10 +6507,10 @@ impl AccountsDb {
             if interesting {
                 error!("{}, find: {}, expected_rent_collection_slot_max_epoch: {}", pubkey, find, expected_rent_collection_slot_max_epoch);
             }
-            if find >= expected_rent_collection_slot_max_epoch {
-                // only skip stored if the 
-                expected_rent_collection_slot_max_epoch = find;
-                use_stored = false;
+            expected_rent_collection_slot_max_epoch = find;
+            {//if find >= expected_rent_collection_slot_max_epoch {
+                // only skip stored if the ??? todo finish my thought hahaha
+                use_stored = false; // this means try to figure out if we need to use stored or not based on future slots
             }
         }
 
