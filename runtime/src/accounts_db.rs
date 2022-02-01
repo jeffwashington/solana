@@ -6491,7 +6491,7 @@ impl AccountsDb {
                 error!("{}, slotlist: {:?}, storage_slot: {}", pubkey, list.slot_list(), storage_slot);
             }
             for (slot, info) in list.slot_list() {
-                if slot > &storage_slot {
+                if slot >= &storage_slot {
                     found = true;
                     use_stored = true;
                 }
