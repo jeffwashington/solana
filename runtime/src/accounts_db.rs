@@ -6566,7 +6566,7 @@ impl AccountsDb {
                 error!("{}, partition_storage_slot: {:?}, partition_from_pubkey: {}", pubkey, partition_storage_slot, partition_from_pubkey);
             }
             // we have an account we wrote in this epoch already, so we collected rent then, so we would not have rewritten it again later in this same slot
-            // not true because we always rewrite on our slot
+            // not true because we always rewrite on the pubkey-based slot
             // use_stored = true;
         }
         let mut log = true;//true;
