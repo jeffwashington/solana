@@ -1902,7 +1902,7 @@ impl<T: IndexValue> AccountsIndex<T> {
         let read = self.roots_tracker.read().unwrap();
         let r = read.roots.contains(&slot);
         if !r && read.roots_original.contains(&slot) {
-            panic!("different call maybe");
+            error!("is_root disagrees: {}", slot);
         }
         r
     }
