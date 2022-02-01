@@ -6697,9 +6697,7 @@ impl AccountsDb {
                     raw_lamports
                 };
 
-                let hash = loaded_account.loaded_hash();
-                //check_hash = false;
-                /*Self::maybe_rehash_rewrites(
+                let hash = Self::maybe_rehash_rewrites(
                     &loaded_account,
                     pubkey,
                     slot,
