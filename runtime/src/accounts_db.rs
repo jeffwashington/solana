@@ -6548,6 +6548,9 @@ impl AccountsDb {
             RentResult::CollectRent((next_epoch, rent_due)) => {
                 if next_epoch > rent_epoch {
                     if rent_due != 0 {
+                        if interesting {
+                            error!("{}, rent due: {}, next_epoch: {}, rent_epoch: {}", pubkey, rent_due, next_epoch, rent_epoch);
+                        }
                         use_stored = true; // this is an account in an ancient append vec that would have had rent collected, so just use the hash we have since there must be a newer version of this account already in a newer slot
                     }
                 }
@@ -6563,7 +6566,8 @@ impl AccountsDb {
                 error!("{}, partition_storage_slot: {:?}, partition_from_pubkey: {}", pubkey, partition_storage_slot, partition_from_pubkey);
             }
             // we have an account we wrote in this epoch already, so we collected rent then, so we would not have rewritten it again later in this same slot
-            use_stored = true;
+            // not true because we always rewrite on our slot
+            // use_stored = true;
         }
         let mut log = true;//true;
         if interesting {
