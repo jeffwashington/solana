@@ -5764,7 +5764,7 @@ impl AccountsDb {
                             if self.is_filler_account(pubkey) {
                                 return None;
                             }
-                            let mut interesting =         pubkey == &Pubkey::from_str("3S88CYJ7vV7uXNw5tKrXiKfUtfGsKYpUzzPjnDZz6WyT").unwrap();
+                            let mut interesting =         pubkey == &Pubkey::from_str("EGfZ9jRFPCr6dw7THm15CoibHayr5C3Dqg5CHz83vFGe").unwrap();
                             let search = self.accounts_index.get(pubkey, Some(ancestors), Some(max_root));
                             if let AccountIndexGetResult::Found(lock, index) =
                                 search
@@ -6420,7 +6420,7 @@ impl AccountsDb {
                 expected_rent_collection_slot_max_epoch.saturating_sub(slots_per_epoch);
         }
         let interesting = true && (pubkey
-            == &Pubkey::from_str("3S88CYJ7vV7uXNw5tKrXiKfUtfGsKYpUzzPjnDZz6WyT").unwrap()
+            == &Pubkey::from_str("EGfZ9jRFPCr6dw7THm15CoibHayr5C3Dqg5CHz83vFGe").unwrap()
             || ((storage_slot == 114612876 || storage_slot == 115044876)
                 && partition_index_from_max_slot == partition_from_pubkey));
 
@@ -6493,7 +6493,7 @@ impl AccountsDb {
         }
 
         /*
-        if pubkey == &Pubkey::from_str("3S88CYJ7vV7uXNw5tKrXiKfUtfGsKYpUzzPjnDZz6WyT").unwrap() {
+        if pubkey == &Pubkey::from_str("EGfZ9jRFPCr6dw7THm15CoibHayr5C3Dqg5CHz83vFGe").unwrap() {
         }
         */
         assert!(!force_rehash);
@@ -6519,7 +6519,7 @@ impl AccountsDb {
             // we have an account we wrote in this epoch already, so we collected rent then, so we would not have rewritten it again later in this same slot
             use_stored = true;
         }
-        let mut log = true;
+        let mut log = false;
         if interesting {
             //storage_slot == 114612876 { //partition_from_pubkey == storage_slot % slots_per_epoch {
             let recalc_hash = crate::accounts_db::AccountsDb::hash_account_with_rent_epoch(
@@ -6665,7 +6665,7 @@ impl AccountsDb {
                 );*/
 
                 let interesting = true && pubkey
-                    == &Pubkey::from_str("3S88CYJ7vV7uXNw5tKrXiKfUtfGsKYpUzzPjnDZz6WyT").unwrap();
+                    == &Pubkey::from_str("EGfZ9jRFPCr6dw7THm15CoibHayr5C3Dqg5CHz83vFGe").unwrap();
 
                 let source_item = CalculateHashIntermediate::new(hash, balance, *pubkey);
                 if interesting {
@@ -7019,7 +7019,7 @@ impl AccountsDb {
                     let old_slot = pubkey_account.2;
                     use std::str::FromStr;
                     let mut interesting = pubkey
-                        == &Pubkey::from_str("3S88CYJ7vV7uXNw5tKrXiKfUtfGsKYpUzzPjnDZz6WyT")
+                        == &Pubkey::from_str("EGfZ9jRFPCr6dw7THm15CoibHayr5C3Dqg5CHz83vFGe")
                             .unwrap();
                     if interesting {
                         error!(
