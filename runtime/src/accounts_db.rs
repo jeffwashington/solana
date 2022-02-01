@@ -6493,7 +6493,7 @@ impl AccountsDb {
             for (slot, info) in list.slot_list() {
                 // >= means THIS slot or one in the future is expected to be seen and IT will have a more up to date hash already
                 // note this requires that EVERYTHING < max_slot_in_storages_exclusive in the accounts index is a root
-                if slot >= &storage_slot && slot < max_slot_in_storages_exclusive {
+                if slot >= &storage_slot && slot < &max_slot_in_storages_exclusive {
                     found = true;
                     use_stored = true;
                 }
