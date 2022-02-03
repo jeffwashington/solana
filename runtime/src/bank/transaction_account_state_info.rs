@@ -23,11 +23,12 @@ impl Bank {
         (0..message.account_keys_len())
             .map(|i| {
                 let rent_state = if message.is_writable(i) {
-                    let account = transaction_context.get_account_at_index(i).borrow();
+                    let state = if let Ok(account) = transaction_context.get_account_at_index(i) {
+                        let account = account.borrow();
 
-                    // Native programs appear to be RentPaying because they carry low lamport
-                    // balances; however they will never be loaded as writable
-                    debug_assert!(!native_loader::check_id(account.owner()));
+                        // Native programs appear to be RentPaying because they carry low lamport
+                        // balances; however they will never be loaded as writable
+                        debug_assert!(!native_loader::check_id(account.owner()));
 
                     let fa = RentState::from_account(
                         &account,
