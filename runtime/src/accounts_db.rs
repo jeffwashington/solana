@@ -3810,6 +3810,7 @@ impl AccountsDb {
             stats: BankHashStats::default(),
         };
         error!("set_hash: {}, {}", slot, new_hash_info.hash);
+        panic!("dup");
         bank_hashes.insert(slot, new_hash_info);
     }
 
