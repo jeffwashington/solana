@@ -883,6 +883,8 @@ pub fn confirm_slot(
             .map_err(BlockstoreProcessorError::FailedToLoadEntries);
         load_elapsed.stop();
         if load_result.is_err() {
+            panic!("confirm_slot failed: {}, allow_dead_slots: {}", slot, allow_dead_slots);
+
             timing.fetch_fail_elapsed += load_elapsed.as_us();
         } else {
             timing.fetch_elapsed += load_elapsed.as_us();
