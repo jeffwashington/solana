@@ -1942,6 +1942,9 @@ impl<T: IndexValue> AccountsIndex<T> {
             }
             false
         } else {
+            if slot == 116147591 {
+                panic!("removing important root: {}", slot);
+            }
             stats.roots_len = w_roots_tracker.roots.len();
             stats.uncleaned_roots_len = w_roots_tracker.uncleaned_roots.len();
             stats.previous_uncleaned_roots_len = w_roots_tracker.previous_uncleaned_roots.len();
