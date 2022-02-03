@@ -3800,6 +3800,7 @@ impl AccountsDb {
                 "set_hash: already exists; multiple forks with shared slot {} as child (parent: {})!?, hash: {}",
                 slot, parent_slot, hash.hash,
             );
+            panic!("dup");
             return;
         }
 
