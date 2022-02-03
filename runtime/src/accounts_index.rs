@@ -1925,6 +1925,9 @@ impl<T: IndexValue> AccountsIndex<T> {
         let removed_from_previous_uncleaned_roots =
             w_roots_tracker.previous_uncleaned_roots.remove(&slot);
         if !w_roots_tracker.roots.remove(&slot) {
+            if slot == 116147591 {
+                error!("removing2 important root: {}", slot);
+            }
             if removed_from_unclean_roots {
                 error!("clean_dead_slot-removed_from_unclean_roots: {}", slot);
                 inc_new_counter_error!("clean_dead_slot-removed_from_unclean_roots", 1, 1);
@@ -1943,7 +1946,7 @@ impl<T: IndexValue> AccountsIndex<T> {
             false
         } else {
             if slot == 116147591 {
-                panic!("removing important root: {}", slot);
+                error!("removing important root: {}", slot);
             }
             stats.roots_len = w_roots_tracker.roots.len();
             stats.uncleaned_roots_len = w_roots_tracker.uncleaned_roots.len();
