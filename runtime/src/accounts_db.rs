@@ -3800,7 +3800,7 @@ impl AccountsDb {
                 "set_hash: already exists; multiple forks with shared slot {} as child (parent: {})!?, hash: {}",
                 slot, parent_slot, hash.hash,
             );
-            panic!("dup");
+            //panic!("dup");
             return;
         }
 
@@ -3810,7 +3810,7 @@ impl AccountsDb {
             stats: BankHashStats::default(),
         };
         error!("set_hash: {}, {}", slot, new_hash_info.hash);
-        panic!("dup");
+        //panic!("dup");
         bank_hashes.insert(slot, new_hash_info);
     }
 

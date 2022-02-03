@@ -1062,6 +1062,8 @@ fn process_next_slots(
         return Ok(());
     }
 
+    error!("next slots: {:?}", meta.next_slots);
+
     // This is a fork point if there are multiple children, create a new child bank for each fork
     for next_slot in &meta.next_slots {
         let next_meta = blockstore
