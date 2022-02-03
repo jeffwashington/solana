@@ -3798,7 +3798,7 @@ impl AccountsDb {
         if let Some(hash) = bank_hashes.get(&slot) {
             error!(
                 "set_hash: already exists; multiple forks with shared slot {} as child (parent: {})!?, hash: {}",
-                slot, parent_slot, hash,
+                slot, parent_slot, hash.hash,
             );
             return;
         }
