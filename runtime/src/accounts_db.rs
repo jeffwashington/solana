@@ -6669,6 +6669,10 @@ impl AccountsDb {
                 .unwrap()
                 .accounts_index
                 .get_next_original_root(slot);
+                if roots.is_none() {
+                    error!("not next slot: {}, max: {}", slot, maybe_db
+                    .unwrap().accounts_index.max_root());
+                }
             /*
             // let storage_root = storage.find_valid_slot(slot);
             if storage_root != roots {
