@@ -6542,6 +6542,7 @@ impl AccountsDb {
         */
         assert!(!force_rehash);
 
+        // this should be conditional
         let rent_result =
             rent_collector.calculate_rent_result(pubkey, loaded_account, filler_account_suffix);
         let mut rent_epoch = loaded_account.rent_epoch();
@@ -6570,7 +6571,7 @@ impl AccountsDb {
             // not true because we always rewrite on the pubkey-based slot
             // use_stored = true;
         }
-        let mut log = false;
+        let mut log = storage_slot == 116147591;
         if interesting {
             //storage_slot == 114612876 { //partition_from_pubkey == storage_slot % slots_per_epoch {
             let recalc_hash = crate::accounts_db::AccountsDb::hash_account_with_rent_epoch(
