@@ -5795,8 +5795,7 @@ impl AccountsDb {
                                             let find_next_slot = |slot: Slot| {
                                                 let roots = self.accounts_index.get_next_original_root(slot);
                                                 if roots.is_none() {
-                                                    error!("not next slot2: {}, max: {}", slot, maybe_db
-                                                    .unwrap().accounts_index.max_root());
+                                                    error!("not next slot2: {}, max: {}", slot, self.accounts_index.max_root());
                                                 }
                                                 roots
                                                                             };
