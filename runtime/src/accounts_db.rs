@@ -5793,8 +5793,13 @@ impl AccountsDb {
                                     .and_then(
                                         |loaded_account| {
                                             let find_next_slot = |slot: Slot| {
-                                                self.accounts_index.get_next_original_root(slot)
-                                            };
+                                                let roots = self.accounts_index.get_next_original_root(slot);
+                                                if roots.is_none() {
+                                                    error!("not next slot2: {}, max: {}", slot, maybe_db
+                                                    .unwrap().accounts_index.max_root());
+                                                }
+                                                roots
+                                                                            };
                                             let slots_per_epoch = Some(432_000);
                                             let loaded_hash = Self::maybe_rehash_rewrites(
                                                 &loaded_account,
