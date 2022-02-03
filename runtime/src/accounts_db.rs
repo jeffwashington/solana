@@ -3795,10 +3795,10 @@ impl AccountsDb {
 
     pub fn set_hash(&self, slot: Slot, parent_slot: Slot) {
         let mut bank_hashes = self.bank_hashes.write().unwrap();
-        if bank_hashes.get(&slot).is_some() {
+        if let Some(hash) = bank_hashes.get(&slot) {
             error!(
-                "set_hash: already exists; multiple forks with shared slot {} as child (parent: {})!?",
-                slot, parent_slot,
+                "set_hash: already exists; multiple forks with shared slot {} as child (parent: {})!?, hash: {}",
+                slot, parent_slot, hash,
             );
             return;
         }
@@ -3808,6 +3808,7 @@ impl AccountsDb {
             snapshot_hash: Hash::default(),
             stats: BankHashStats::default(),
         };
+        error!("set_hash: {}, {}", slot, new_hash_info.hash);
         bank_hashes.insert(slot, new_hash_info);
     }
 
