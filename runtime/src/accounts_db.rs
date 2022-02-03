@@ -6514,6 +6514,9 @@ impl AccountsDb {
                 use_stored = false; // this means try to figure out if we need to use stored or not based on future slots
             }
         }
+        else if interesting {
+            error!("{}, did not find: {}, expected_rent_collection_slot_max_epoch: {}", pubkey, expected_slot_start, expected_rent_collection_slot_max_epoch);
+        }
 
         if !use_stored && maybe_db.is_some() {
             let maybe_db = maybe_db.as_ref().unwrap();
