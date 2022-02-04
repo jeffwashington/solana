@@ -1912,9 +1912,6 @@ impl<T: IndexValue> AccountsIndex<T> {
     }
 
     pub fn add_root(&self, slot: Slot, caching_enabled: bool) {
-        if slot >= 116501869 - 10 {
-            error!("add_root: {}", slot);
-        }
         let mut w_roots_tracker = self.roots_tracker.write().unwrap();
         w_roots_tracker.roots.insert(slot);
         w_roots_tracker.roots_original.insert(slot);
