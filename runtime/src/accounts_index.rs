@@ -1912,6 +1912,9 @@ impl<T: IndexValue> AccountsIndex<T> {
     }
 
     pub fn add_root(&self, slot: Slot, caching_enabled: bool) {
+        if slot >= 116501869 - 10 {
+            error!("add_root: {}", slot);
+        }
         let mut w_roots_tracker = self.roots_tracker.write().unwrap();
         w_roots_tracker.roots.insert(slot);
         w_roots_tracker.roots_original.insert(slot);
@@ -2007,8 +2010,8 @@ impl<T: IndexValue> AccountsIndex<T> {
             }
             false
         } else {
-            if slot == 116147591 {
-                panic!("removing important root: {}", slot);
+            if slot >= 116501869 - 10 {
+                error!("removing important root: {}", slot);
             }
             stats.roots_len = w_roots_tracker.roots.len();
             stats.uncleaned_roots_len = w_roots_tracker.uncleaned_roots.len();
