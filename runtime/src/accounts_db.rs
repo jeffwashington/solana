@@ -7043,6 +7043,12 @@ impl AccountsDb {
         }
         hashes.extend(rewrites.into_iter());
 
+        if slot == 119332732 {
+            let mut cloned = hashes.clone();
+            AccountsHash::sort_hashes_by_pubkey(&mut cloned);            
+            error!("hashes: {} {:?}", slot, cloned);
+        }
+
         let ret = AccountsHash::accumulate_account_hashes(hashes);
         accumulate.stop();
         let mut uncleaned_time = Measure::start("uncleaned_index");
