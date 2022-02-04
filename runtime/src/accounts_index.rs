@@ -1944,6 +1944,7 @@ impl<T: IndexValue> AccountsIndex<T> {
             }
         }
         assert!(!w_roots_tracker.roots_original.contains(&slot));
+        assert!(!w_roots_tracker.roots.contains(&slot));
         None
     }
 
