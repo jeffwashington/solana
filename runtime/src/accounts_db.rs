@@ -5795,7 +5795,7 @@ impl AccountsDb {
                                     .get_loaded_account()
                                     .and_then(
                                         |loaded_account| {
-                                            assert!(self.accounts_index.is_root(slot), "not root: {}, max: {}", slot, self.accounts_index.max_root_inclusive());
+                                            assert!(self.accounts_index.is_root(*slot), "not root: {}, max: {}", slot, self.accounts_index.max_root_inclusive());
 
                                             let find_next_slot = |slot: Slot| {
                                                 let roots = self.accounts_index.get_next_original_root(slot);
