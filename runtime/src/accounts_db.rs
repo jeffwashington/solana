@@ -5797,7 +5797,7 @@ impl AccountsDb {
         let use_index = false;
         let check_hash = true;
         let is_startup = true;
-        let can_cached_slot_be_unflushed = false;
+        let can_cached_slot_be_unflushed = true;
         let (calculated_hash, calculated_lamports) = self
             .calculate_accounts_hash_helper_with_verify(
                 use_index,
