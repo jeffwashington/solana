@@ -5795,10 +5795,8 @@ impl AccountsDb {
                                     .get_loaded_account()
                                     .and_then(
                                         |loaded_account| {
-                                            assert!(self.accounts_index.is_root(*slot), "not root: {}, max: {}", slot, self.accounts_index.max_root_inclusive());
-
                                             let find_next_slot = |slot: Slot| {
-                                                let roots = self.accounts_index.get_next_original_root(slot);
+                                                let roots = self.accounts_index.get_next_original_root(slot, &Some(&ancestors));
                                                 if roots.is_none() {
                                                     error!("not next slot2: {}, max_inclusive: {}, is_root(slot): {}", slot, self.accounts_index.max_root_inclusive(), self.accounts_index.is_root(slot));
                                                 }
@@ -6679,7 +6677,7 @@ impl AccountsDb {
             let roots = maybe_db
                 .unwrap()
                 .accounts_index
-                .get_next_original_root(slot);
+                .get_next_original_root(slot, &accounts_cache_and_ancestors.map(|(_, ancestors, _)| ancestors));
                 if roots.is_none() {
                     error!("not next slot: {}, max: {}", slot, maybe_db
                     .unwrap().accounts_index.max_root_inclusive());

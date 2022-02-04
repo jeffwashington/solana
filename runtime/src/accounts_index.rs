@@ -1939,7 +1939,15 @@ impl<T: IndexValue> AccountsIndex<T> {
         self.roots_tracker.read().unwrap().max_root_inclusive
     }
 
-    pub fn get_next_original_root(&self, slot: Slot) -> Option<Slot> {
+    pub fn get_next_original_root(&self, slot: Slot, ancestors: &Option<&Ancestors>) -> Option<Slot> {
+        if let Some(ancestors) = ancestors {
+            let min = std::cmp::max(slot, ancestors.min_slot());
+            for root in min..=ancestors.max_slot() {
+                if ancestors.contains_key(&root) {
+                    return Some(root);
+                }
+            }
+        }
         let w_roots_tracker = self.roots_tracker.read().unwrap();
         for root in slot..w_roots_tracker.roots_original.max() {
             if w_roots_tracker.roots_original.contains(&root) {
