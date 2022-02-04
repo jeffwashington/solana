@@ -2002,7 +2002,7 @@ impl AccountsDb {
         timings: &mut CleanKeyTimings,
     ) -> Vec<Pubkey> {
         let mut dirty_store_processing_time = Measure::start("dirty_store_processing");
-        let max_slot = max_clean_root.unwrap_or_else(|| self.accounts_index.max_root());
+        let max_slot = max_clean_root.unwrap_or_else(|| self.accounts_index.max_root_inclusive());
         let mut dirty_stores = Vec::with_capacity(self.dirty_stores.len());
         self.dirty_stores.retain(|(slot, _store_id), store| {
             if *slot > max_slot {
@@ -3099,7 +3099,7 @@ impl AccountsDb {
 
     fn shrink_ancient_slots(&self) {
         return;
-        let max_root = self.accounts_index.max_root();
+        let max_root = self.accounts_index.max_root_inclusive();
         use solana_sdk::clock::DEFAULT_SLOTS_PER_EPOCH;
         // This can't practically be within the current epoch. Otherwise, we would lose track of the roots that used to exist and we couldn't load from a snapshot.
         let epoch_width = DEFAULT_SLOTS_PER_EPOCH; // * 60 / 100; // todo - put some 'in-this-epoch' slots into an ancient append vec
@@ -5798,7 +5798,7 @@ impl AccountsDb {
                                             let find_next_slot = |slot: Slot| {
                                                 let roots = self.accounts_index.get_next_original_root(slot);
                                                 if roots.is_none() {
-                                                    error!("not next slot2: {}, max: {}", slot, self.accounts_index.max_root());
+                                                    error!("not next slot2: {}, max: {}", slot, self.accounts_index.max_root_inclusive());
                                                 }
                                                 roots
                                                                             };
@@ -6680,7 +6680,7 @@ impl AccountsDb {
                 .get_next_original_root(slot);
                 if roots.is_none() {
                     error!("not next slot: {}, max: {}", slot, maybe_db
-                    .unwrap().accounts_index.max_root());
+                    .unwrap().accounts_index.max_root_inclusive());
                 }
             /*
             // let storage_root = storage.find_valid_slot(slot);

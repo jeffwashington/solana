@@ -634,7 +634,7 @@ impl RollingBitField {
 pub struct RootsTracker {
     pub roots: RollingBitField,
     pub roots_original: RollingBitField,
-    max_root: Slot, // inclusive
+    max_root_inclusive: Slot,
     uncleaned_roots: HashSet<Slot>,
     previous_uncleaned_roots: HashSet<Slot>,
 }
@@ -653,15 +653,18 @@ impl RootsTracker {
         Self {
             roots: RollingBitField::new(max_width),
             roots_original: RollingBitField::new(max_width),
-            max_root: 0,
+            max_root_inclusive: 0,
             uncleaned_roots: HashSet::new(),
             previous_uncleaned_roots: HashSet::new(),
         }
     }
 
-    /// returns inclusive max root
-    pub fn max_root(&self) -> Slot {
+    pub fn max_root_exclusive(&self) -> Slot {
         self.roots.max()
+    }
+
+    pub fn max_root_inclusive(&self) -> Slot {
+        self.max_root_inclusive
     }
 
     pub fn min_root(&self) -> Option<Slot> {
@@ -983,10 +986,10 @@ impl<T: IndexValue> AccountsIndex<T> {
             // the `ongoing_scan_roots` lock is held,
             // make sure inverse doesn't happen to avoid
             // deadlock
-            let max_root = self.max_root();
-            *w_ongoing_scan_roots.entry(max_root).or_default() += 1;
+            let max_root_inclusive = self.max_root_inclusive();
+            *w_ongoing_scan_roots.entry(max_root_inclusive).or_default() += 1;
 
-            max_root
+            max_root_inclusive
         };
 
         // First we show that for any bank `B` that is a descendant of
@@ -1830,7 +1833,7 @@ impl<T: IndexValue> AccountsIndex<T> {
         let roots_tracker = &self.roots_tracker.read().unwrap();
         let newest_root_in_slot_list =
             Self::get_newest_root_in_slot_list(&roots_tracker.roots, slot_list, max_clean_root);
-        let max_clean_root = max_clean_root.unwrap_or(roots_tracker.max_root);
+        let max_clean_root = max_clean_root.unwrap_or(roots_tracker.max_root_inclusive);
 
         slot_list.retain(|(slot, value)| {
             let should_purge =
@@ -1917,8 +1920,8 @@ impl<T: IndexValue> AccountsIndex<T> {
             w_roots_tracker.uncleaned_roots.insert(slot);
         }
         // `AccountsDb::flush_accounts_cache()` relies on roots being added in order
-        assert!(slot >= w_roots_tracker.max_root);
-        w_roots_tracker.max_root = slot;
+        assert!(slot >= w_roots_tracker.max_root_inclusive);
+        w_roots_tracker.max_root_inclusive = slot;
     }
 
     pub fn add_uncleaned_roots<I>(&self, roots: I)
@@ -1929,17 +1932,18 @@ impl<T: IndexValue> AccountsIndex<T> {
         w_roots_tracker.uncleaned_roots.extend(roots);
     }
 
-    pub fn max_root(&self) -> Slot {
-        self.roots_tracker.read().unwrap().max_root
+    pub fn max_root_inclusive(&self) -> Slot {
+        self.roots_tracker.read().unwrap().max_root_inclusive
     }
 
     pub fn get_next_original_root(&self, slot: Slot) -> Option<Slot> {
         let w_roots_tracker = self.roots_tracker.read().unwrap();
-        for root in slot..=w_roots_tracker.max_root() {
+        for root in slot..w_roots_tracker.roots_original.max() {
             if w_roots_tracker.roots_original.contains(&root) {
                 return Some(root);
             }
         }
+        assert!(!w_roots_tracker.roots_original.contains(&slot));
         None
     }
 
