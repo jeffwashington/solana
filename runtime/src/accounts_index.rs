@@ -634,7 +634,7 @@ impl RollingBitField {
 pub struct RootsTracker {
     pub roots: RollingBitField,
     pub roots_original: RollingBitField,
-    max_root: Slot,
+    max_root: Slot, // inclusive
     uncleaned_roots: HashSet<Slot>,
     previous_uncleaned_roots: HashSet<Slot>,
 }
@@ -659,6 +659,7 @@ impl RootsTracker {
         }
     }
 
+    /// returns inclusive max root
     pub fn max_root(&self) -> Slot {
         self.roots.max()
     }
@@ -1934,7 +1935,7 @@ impl<T: IndexValue> AccountsIndex<T> {
 
     pub fn get_next_original_root(&self, slot: Slot) -> Option<Slot> {
         let w_roots_tracker = self.roots_tracker.read().unwrap();
-        for root in slot..w_roots_tracker.max_root() {
+        for root in slot..=w_roots_tracker.max_root() {
             if w_roots_tracker.roots_original.contains(&root) {
                 return Some(root);
             }
