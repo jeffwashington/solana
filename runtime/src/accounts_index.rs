@@ -1940,6 +1940,13 @@ impl<T: IndexValue> AccountsIndex<T> {
     }
 
     pub fn get_next_original_root(&self, slot: Slot, ancestors: &Option<&Ancestors>) -> Option<Slot> {
+        let w_roots_tracker = self.roots_tracker.read().unwrap();
+        for root in slot..w_roots_tracker.roots_original.max() {
+            if w_roots_tracker.roots_original.contains(&root) {
+                return Some(root);
+            }
+        }
+        // ancestors are higher than roots, so look for roots first
         if let Some(ancestors) = ancestors {
             let min = std::cmp::max(slot, ancestors.min_slot());
             for root in min..=ancestors.max_slot() {
@@ -1948,12 +1955,7 @@ impl<T: IndexValue> AccountsIndex<T> {
                 }
             }
         }
-        let w_roots_tracker = self.roots_tracker.read().unwrap();
-        for root in slot..w_roots_tracker.roots_original.max() {
-            if w_roots_tracker.roots_original.contains(&root) {
-                return Some(root);
-            }
-        }
+
         assert!(!w_roots_tracker.roots_original.contains(&slot));
         assert!(!w_roots_tracker.roots.contains(&slot));
         None
