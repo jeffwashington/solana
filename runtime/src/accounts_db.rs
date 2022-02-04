@@ -3809,7 +3809,7 @@ impl AccountsDb {
             snapshot_hash: Hash::default(),
             stats: BankHashStats::default(),
         };
-        error!("set_hash: {}, {}", slot, new_hash_info.hash);
+        //error!("set_hash: {}, {}", slot, new_hash_info.hash);
         //panic!("dup");
         bank_hashes.insert(slot, new_hash_info);
     }
