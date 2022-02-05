@@ -111,15 +111,6 @@ impl RentCollector {
         match self.calculate_rent_result(address, account, filler_account_suffix) {
             RentResult::LeaveAloneNoRent => CollectedInfo::default(),
             RentResult::CollectRent((next_epoch, rent_due)) => {
-                use log::*;
-                use std::str::FromStr;
-                let mut interesting = address
-                == &Pubkey::from_str("51ziC7nFBiY6vbBg4LWf6NeFywfntSHnXFuJtZMBoT6x")
-                    .unwrap();
-                                                    if interesting {
-                    error!("collect_from_existing_account: {}, {:?}, next_epoch: {}, rent_due: {}", address, account, next_epoch, rent_due);
-                }
-
                 account.set_rent_epoch(next_epoch);
 
                 let begin_lamports = account.lamports();
@@ -146,6 +137,7 @@ impl RentCollector {
         account: &impl ReadableAccount,
         filler_account_suffix: Option<&Pubkey>,
     ) -> RentResult {
+        let result = || {
         if self.can_skip_rent_collection(address, account, filler_account_suffix) {
             return RentResult::LeaveAloneNoRent;
         }
@@ -164,6 +156,17 @@ impl RentCollector {
             RentDue::Paying(_) => 1,
         };
         RentResult::CollectRent((self.epoch + epoch_increment, rent_due.lamports()))
+    };
+    let result = result();
+    use log::*;
+    use std::str::FromStr;
+    let mut interesting = address
+    == &Pubkey::from_str("51ziC7nFBiY6vbBg4LWf6NeFywfntSHnXFuJtZMBoT6x")
+        .unwrap();
+                                        if interesting {
+        error!("collect_from_existing_account: {}, {:?}, result: {:?}", address, (account.lamports(), account.rent_epoch()), result);
+    }
+    result
     }
 
     #[must_use = "add to Bank::collected_rent"]
