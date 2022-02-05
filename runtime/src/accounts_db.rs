@@ -5136,6 +5136,7 @@ impl AccountsDb {
         // We'll also accumulate the lamports within each chunk and fewer chunks results in less contention to accumulate the sum.
         let chunks = crate::accounts_hash::MERKLE_FANOUT.pow(4);
         let total_lamports = Mutex::<u64>::new(0);
+
         let get_hashes = || {
             keys.par_chunks(chunks)
                 .map(|pubkeys| {
@@ -5169,6 +5170,12 @@ impl AccountsDb {
                                     .and_then(
                                         |loaded_account| {
                                             let loaded_hash = loaded_account.loaded_hash();
+                                            let mut interesting = pubkey
+                                            == &Pubkey::from_str("51ziC7nFBiY6vbBg4LWf6NeFywfntSHnXFuJtZMBoT6x")
+                                                .unwrap();
+                                                                                if interesting {
+                                                error!("{}, {}, slot: {}, list: {:?}", pubkey, loaded_hash, slot, lock.slot_list());
+                                            }
                                             let balance = loaded_account.lamports();
                                             if check_hash && !self.is_filler_account(pubkey) {
                                                 let computed_hash =
