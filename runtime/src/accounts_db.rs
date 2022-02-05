@@ -5174,7 +5174,7 @@ impl AccountsDb {
                                             == &Pubkey::from_str("51ziC7nFBiY6vbBg4LWf6NeFywfntSHnXFuJtZMBoT6x")
                                                 .unwrap();
                                                                                 if interesting {
-                                                error!("{}, {}, slot: {}, list: {:?}", pubkey, loaded_hash, slot, lock.slot_list());
+                                                error!("{}, {}, slot: {}, list: {:?}, lamports: {}, rent_epoch: {}", pubkey, loaded_hash, slot, lock.slot_list(), loaded_account.lamports(), loaded_account.rent_epoch());
                                             }
                                             let balance = loaded_account.lamports();
                                             if check_hash && !self.is_filler_account(pubkey) {
