@@ -327,6 +327,15 @@ impl Accounts {
                         account
                     }
                 };
+                use log::*;
+                use std::str::FromStr;
+                let mut interesting = key
+                == &Pubkey::from_str("51ziC7nFBiY6vbBg4LWf6NeFywfntSHnXFuJtZMBoT6x")
+                    .unwrap();
+                                                    if interesting {
+                    error!("accounts.push: {}, {:?}", key, account);
+                }
+            
                 accounts.push((*key, account));
             }
             debug_assert_eq!(accounts.len(), message.account_keys_len());
