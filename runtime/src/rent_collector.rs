@@ -98,6 +98,7 @@ impl RentCollector {
             RentResult::LeaveAloneNoRent => CollectedInfo::default(),
             RentResult::CollectRent((next_epoch, rent_due)) => {
                 use log::*;
+                use std::str::FromStr;
                 let mut interesting = address
                 == &Pubkey::from_str("51ziC7nFBiY6vbBg4LWf6NeFywfntSHnXFuJtZMBoT6x")
                     .unwrap();
