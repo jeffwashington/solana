@@ -97,6 +97,14 @@ impl RentCollector {
         match self.calculate_rent_result(address, account, filler_account_suffix) {
             RentResult::LeaveAloneNoRent => CollectedInfo::default(),
             RentResult::CollectRent((next_epoch, rent_due)) => {
+                use log::*;
+                let mut interesting = address
+                == &Pubkey::from_str("51ziC7nFBiY6vbBg4LWf6NeFywfntSHnXFuJtZMBoT6x")
+                    .unwrap();
+                                                    if interesting {
+                    error!("collect_from_existing_account: {}, {:?}, next_epoch: {}, rent_due: {}", address, account, next_epoch, rent_due);
+                }
+
                 account.set_rent_epoch(next_epoch);
 
                 let begin_lamports = account.lamports();
