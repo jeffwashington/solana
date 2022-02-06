@@ -255,6 +255,7 @@ impl Accounts {
             let mut account_deps = Vec::with_capacity(message.account_keys_len());
             let mut rent_debits = RentDebits::default();
             for (i, key) in message.account_keys_iter().enumerate() {
+                let mut rent = 0;
                 let account = if !message.is_non_loader_key(i) {
                     // Fill in an empty account for the program slots.
                     AccountSharedData::default()
@@ -274,18 +275,14 @@ impl Accounts {
                             .accounts_db
                             .load_with_fixed_root(ancestors, key)
                             .map(|(mut account, _)| {
-                                if message.is_writable(i) {
-                                    let rent_due = rent_collector
-                                        .collect_from_existing_account(
-                                            key,
-                                            &mut account,
-                                            self.accounts_db.filler_account_suffix.as_ref(),
-                                        )
-                                        .rent_amount;
-                                    (account, rent_due)
-                                } else {
-                                    (account, 0)
-                                }
+                                rent = rent_collector
+                                    .collect_from_existing_account(
+                                        key,
+                                        &mut account,
+                                        self.accounts_db.filler_account_suffix.as_ref(),
+                                    )
+                                    .rent_amount;
+                                (account, rent)
                             })
                             .unwrap_or_default();
 
@@ -333,7 +330,7 @@ impl Accounts {
                 == &Pubkey::from_str("51ziC7nFBiY6vbBg4LWf6NeFywfntSHnXFuJtZMBoT6x")
                     .unwrap();
                                                     if interesting {
-                    error!("accounts.push: {}, {:?}", key, account);
+                    error!("accounts.push: {}, {:?}, rent_due: {}, writable: {}", key, account, rent, message.is_writable(i));
                 }
             
                 accounts.push((*key, account));
