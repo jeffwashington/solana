@@ -4,6 +4,7 @@ use {
         bank::Bank,
     },
     solana_sdk::{
+        pubkey::Pubkey,
         account::ReadableAccount, feature_set, message::SanitizedMessage, native_loader,
         transaction::Result, transaction_context::TransactionContext,
     },
@@ -28,10 +29,21 @@ impl Bank {
                     // balances; however they will never be loaded as writable
                     debug_assert!(!native_loader::check_id(account.owner()));
 
-                    Some(RentState::from_account(
+                    let fa = RentState::from_account(
                         &account,
                         &self.rent_collector().rent,
-                    ))
+                    );
+                    use log::*;
+                    use std::str::FromStr;
+                    let key =  transaction_context.get_key_of_account_at_index(i);
+                    let mut interesting = key
+                    == &Pubkey::from_str("51ziC7nFBiY6vbBg4LWf6NeFywfntSHnXFuJtZMBoT6x")
+                        .unwrap();
+                                                        if interesting {
+                        error!("accounts.push: {}, {:?}, {:?}", key, account, fa);
+                    }
+    
+                    Some(fa)
                 } else {
                     None
                 };
