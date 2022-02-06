@@ -5595,7 +5595,7 @@ impl AccountsDb {
             == Pubkey::from_str("51ziC7nFBiY6vbBg4LWf6NeFywfntSHnXFuJtZMBoT6x")
                 .unwrap();
                                                 if interesting {
-                error!("store_accounts_to: {}, {:?}, slot: {}", meta.pubkey, (account.lamports(), account.rent_epoch()), slot);
+                error!("store_accounts_to: {}, {:?}, slot: {}", meta.pubkey, (account.map(|x| x.lamports()).unwrap_or_default(), account.map(|x| x.rent_epoch()).unwrap_or_default()), slot);
             }
         }
 
