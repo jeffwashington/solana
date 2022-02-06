@@ -4980,7 +4980,7 @@ impl AccountsDb {
             .calc_stored_meta
             .fetch_add(calc_stored_meta_time.as_us(), Ordering::Relaxed);
 
-        for (meta, account) in accounts_and_meta_to_store {
+        for (meta, account) in &accounts_and_meta_to_store {
             use log::*;
             use std::str::FromStr;
             let mut interesting = meta.pubkey
