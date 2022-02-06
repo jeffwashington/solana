@@ -4989,7 +4989,7 @@ impl AccountsDb {
             == Pubkey::from_str("51ziC7nFBiY6vbBg4LWf6NeFywfntSHnXFuJtZMBoT6x")
                 .unwrap();
                                                 if interesting {
-                error!("store_accounts_to: {}, {:?}, slot: {}", meta.pubkey, (account.lamports(), account.rent_epoch(), slot);
+                error!("store_accounts_to: {}, {:?}, slot: {}", meta.pubkey, (account.lamports(), account.rent_epoch()), slot);
             }
         }
 
