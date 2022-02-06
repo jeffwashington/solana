@@ -4982,6 +4982,17 @@ impl AccountsDb {
             .calc_stored_meta
             .fetch_add(calc_stored_meta_time.as_us(), Ordering::Relaxed);
 
+        for (meta, account) in accounts_and_meta_to_store {
+            use log::*;
+            use std::str::FromStr;
+            let mut interesting = meta.pubkey
+            == Pubkey::from_str("51ziC7nFBiY6vbBg4LWf6NeFywfntSHnXFuJtZMBoT6x")
+                .unwrap();
+                                                if interesting {
+                error!("store_accounts_to: {}, {:?}, slot: {}", meta.pubkey, (account.lamports(), account.rent_epoch(), slot);
+            }
+        }
+
         if self.caching_enabled && is_cached_store {
             self.write_accounts_to_cache(slot, hashes, &accounts_and_meta_to_store)
         } else {
