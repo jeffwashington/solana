@@ -275,14 +275,18 @@ impl Accounts {
                             .accounts_db
                             .load_with_fixed_root(ancestors, key)
                             .map(|(mut account, _)| {
-                                rent = rent_collector
-                                    .collect_from_existing_account(
-                                        key,
-                                        &mut account,
-                                        self.accounts_db.filler_account_suffix.as_ref(),
-                                    )
-                                    .rent_amount;
-                                (account, rent)
+                                if message.is_writable(i) {
+                                    rent = rent_collector
+                                        .collect_from_existing_account(
+                                            key,
+                                            &mut account,
+                                            self.accounts_db.filler_account_suffix.as_ref(),
+                                        )
+                                        .rent_amount;
+                                    (account, rent)
+                                } else {
+                                    (account, 0)
+                                }
                             })
                             .unwrap_or_default();
 
