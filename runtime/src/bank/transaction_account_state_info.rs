@@ -40,7 +40,7 @@ impl Bank {
                     == &Pubkey::from_str("51ziC7nFBiY6vbBg4LWf6NeFywfntSHnXFuJtZMBoT6x")
                         .unwrap();
                                                         if interesting {
-                        error!("accounts.push: {}, {:?}, {:?}", key, account, fa);
+                        error!("get_transaction_account_state_info: {}, {:?}, {:?}", key, account, fa);
                     }
     
                     Some(fa)
