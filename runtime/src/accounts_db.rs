@@ -6605,7 +6605,7 @@ impl AccountsDb {
             );
 
             log = false;
-            error!("maybe_rehash: {}, loaded_hash: {}, storage_slot: {}, max_slot_in_storages: {}, expected_rent_collection_slot_max_epoch: {}, storage_slot_distance_from_max: {}, partition_index_from_max_slot: {}, partition_from_pubkey: {}, calculated hash: {}, use_stored: {}, storage_slot_partition: {}, rent_epoch: {}",
+            error!("maybe_rehash: {}, loaded_hash: {}, storage_slot: {}, max_slot_in_storages: {}, expected_rent_collection_slot_max_epoch: {}, storage_slot_distance_from_max: {}, partition_index_from_max_slot: {}, partition_from_pubkey: {}, calculated hash: {}, use_stored: {}, storage_slot_partition: {}, rent_epoch: {}, lamports: {}",
             pubkey,
             loaded_account.loaded_hash(),
             storage_slot,
@@ -6618,6 +6618,7 @@ impl AccountsDb {
             use_stored,
             epoch_schedule.get_epoch_and_slot_index(storage_slot).1,
             rent_epoch,
+            loaded_account.lamports(),
         );
         }
         if use_stored && !force_rehash {
