@@ -4576,7 +4576,7 @@ impl Bank {
         let account_count = accounts.len();
 
         let mut first = true || (self.slot() >= 115929262 && self.slot() <= 115929262); //115929302; //false;
-        // parallelize?
+                                                                                        // parallelize?
         let mut rent_debits = RentDebits::default();
         let mut skipped = vec![];
         let mut collected2 = vec![];
@@ -4607,14 +4607,20 @@ impl Bank {
                 //first = false;
                 let hash =
                     crate::accounts_db::AccountsDb::hash_account(self.slot(), &account, &pubkey);
-                    skipped.push((pubkey, hash, account.rent_epoch(), account.lamports()));
+                skipped.push((pubkey, hash, account.rent_epoch(), account.lamports()));
                 //error!("rehashed in rent collection: {}, {} {}, partition: {:?}, rent_epoch: {}", pubkey, self.slot(), hash, (partition.0, partition.1, partition.2), account.rent_epoch());
                 self.rewrites.insert(pubkey, hash); // this would have been rewritten, except we're not going to do so
             }
             rent_debits.insert(&pubkey, collected.rent_amount, account.lamports());
         }
         if !skipped.is_empty() {
-            error!("rent skipped rewrites ({}): {:?}, slot: {}, collected: {:?}", skipped.len(), skipped, self.slot(), collected2);
+            error!(
+                "rent skipped rewrites ({}): {:?}, slot: {}, collected: {:?}",
+                skipped.len(),
+                skipped,
+                self.slot(),
+                collected2
+            );
         }
         self.collected_rent
             .fetch_add(total_collected.rent_amount, Relaxed);
@@ -5449,8 +5455,16 @@ impl Bank {
     // pro: safer assertion can be enabled inside AccountsDb
     // con: panics!() if called from off-chain processing
     pub fn get_account_with_fixed_root(&self, pubkey: &Pubkey) -> Option<AccountSharedData> {
-        self.load_slow_with_fixed_root(&self.ancestors, pubkey)
-            .map(|(acc, _slot)| acc)
+        match self.load_slow_with_fixed_root(&self.ancestors, pubkey)
+            .map(|(acc, _slot)| acc) {
+                Some(mut account) => {
+                    // we may need to adjust rent epoch here if this is an account which should have had a rewrite
+                    self.rent_collector
+                        .collect_from_existing_account(pubkey, &mut account, None);
+                    Some(account)
+                }
+                None => None
+            }
     }
 
     pub fn get_account_modified_slot(&self, pubkey: &Pubkey) -> Option<(AccountSharedData, Slot)> {
