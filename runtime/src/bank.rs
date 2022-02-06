@@ -51,7 +51,7 @@ use {
         epoch_stakes::{EpochStakes, NodeVoteAccounts},
         inline_spl_associated_token_account, inline_spl_token,
         message_processor::MessageProcessor,
-        rent_collector::{CollectedInfo, RentCollector},
+        rent_collector::{CollectedInfo, RentCollector, RentResult},
         stake_weighted_timestamp::{
             calculate_stake_weighted_timestamp, MaxAllowableDrift, MAX_ALLOWABLE_DRIFT_PERCENTAGE,
             MAX_ALLOWABLE_DRIFT_PERCENTAGE_FAST, MAX_ALLOWABLE_DRIFT_PERCENTAGE_SLOW,
@@ -5455,16 +5455,8 @@ impl Bank {
     // pro: safer assertion can be enabled inside AccountsDb
     // con: panics!() if called from off-chain processing
     pub fn get_account_with_fixed_root(&self, pubkey: &Pubkey) -> Option<AccountSharedData> {
-        match self.load_slow_with_fixed_root(&self.ancestors, pubkey)
-            .map(|(acc, _slot)| acc) {
-                Some(mut account) => {
-                    // we may need to adjust rent epoch here if this is an account which should have had a rewrite
-                    self.rent_collector
-                        .collect_from_existing_account(pubkey, &mut account, None);
-                    Some(account)
-                }
-                None => None
-            }
+        self.load_slow_with_fixed_root(&self.ancestors, pubkey)
+            .map(|(acc, _slot)| acc)
     }
 
     pub fn get_account_modified_slot(&self, pubkey: &Pubkey) -> Option<(AccountSharedData, Slot)> {
@@ -5487,7 +5479,36 @@ impl Bank {
         ancestors: &Ancestors,
         pubkey: &Pubkey,
     ) -> Option<(AccountSharedData, Slot)> {
-        self.rc.accounts.load_with_fixed_root(ancestors, pubkey)
+        match self.rc.accounts.load_with_fixed_root(ancestors, pubkey) {
+            Some((mut account, slot)) => {
+                // we may need to adjust rent epoch here if this is an account which should have had a rewrite
+                match self.rent_collector.calculate_rent_result(pubkey, &account, None) {
+                    RentResult::LeaveAloneNoRent => {},
+                    RentResult::CollectRent((next_epoch, rent_due)) => {
+                        if rent_due == 0 {
+                            // we could have an account where we skipped rewrite last epoch. But, this epoch we haven't skipped it yet. So, we would then expect to see 
+                            let (current_epoch, current_slot_index) = self.get_epoch_and_slot_index(self.slot());
+                            let slot_index_of_pubkey = Self::partition_from_pubkey(pubkey, self.epoch_schedule().slots_per_epoch);
+                            let rent_epoch = account.rent_epoch();
+                            if rent_epoch < self.epoch() {
+                                let new_rent_epoch = if slot_index_of_pubkey < current_slot_index {
+                                    // we already would have done a rewrite on this account IN this epoch
+                                    next_epoch
+                                }
+                                else {
+                                // should have done rewrite up to last epoch
+                                next_epoch.saturating_sub(1) // we have not passed THIS epoch's rewrite slot yet
+                                };
+                                error!("updating rent_epoch: {}, old: {}, new: {}", pubkey, rent_epoch, new_rent_epoch);
+                                account.set_rent_epoch(new_rent_epoch);
+                            }
+                        }
+                    }
+                }
+                Some((account, slot))
+            }
+            None => None
+        }
     }
 
     pub fn get_program_accounts(
