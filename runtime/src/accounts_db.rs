@@ -5180,6 +5180,10 @@ impl AccountsDb {
                                     .get_loaded_account()
                                     .and_then(
                                         |loaded_account| {
+                                            let mut interesting =         pubkey == &Pubkey::from_str("51ziC7nFBiY6vbBg4LWf6NeFywfntSHnXFuJtZMBoT6x").unwrap();
+                                            if slot == &119675231 {
+                                                error!("calc hash: {}, {}, slot: {}, list: {:?}, lamports: {}, rent_epoch: {}", pubkey, loaded_account.loaded_hash(), slot, lock.slot_list(), loaded_account.lamports(), loaded_account.rent_epoch());
+                                            }
                                             let loaded_hash = loaded_account.loaded_hash();
                                             let mut interesting = pubkey
                                             == &Pubkey::from_str("51ziC7nFBiY6vbBg4LWf6NeFywfntSHnXFuJtZMBoT6x")
