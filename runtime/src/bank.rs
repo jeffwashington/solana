@@ -4574,6 +4574,7 @@ impl Bank {
             .accounts
             .load_to_collect_rent_eagerly(&self.ancestors, subrange.clone());
         let account_count = accounts.len();
+        accounts.sort_by(|a, b| a.0.cmp(&b.0));
 
         let mut first = true || (self.slot() >= 115929262 && self.slot() <= 115929262); //115929302; //false;
                                                                                         // parallelize?
@@ -4609,9 +4610,10 @@ impl Bank {
                 // 43 fails
                 // 40 fails
                 // 38 was good
+                // 39 was good
                 // 50 failed
 
-                if self.rewrites.len() > 39 {
+                if self.rewrites.len() > 40 {
                     first = false;
                 }
                 //first = false;
