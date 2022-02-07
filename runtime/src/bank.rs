@@ -4604,7 +4604,7 @@ impl Bank {
                     collected2.push((pubkey, account.rent_epoch(), account.lamports()));
                 }
             } else {
-                if self.rewrites.len() > 50 {
+                if self.rewrites.len() > 25 {
                     first = false;
                 }
                 //first = false;
