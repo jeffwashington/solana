@@ -4608,9 +4608,10 @@ impl Bank {
                 // 37 was good
                 // 43 fails
                 // 40 fails
+                // 38 was good
                 // 50 failed
 
-                if self.rewrites.len() > 38 {
+                if self.rewrites.len() > 39 {
                     first = false;
                 }
                 //first = false;
