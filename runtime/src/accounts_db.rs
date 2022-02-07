@@ -5791,9 +5791,6 @@ impl AccountsDb {
                                 }
 
                                 let (slot, account_info) = &lock.slot_list()[index];
-                                if slot == &119675231 {
-                                    error!("calc hash: {}, {}, slot: {}, list: {:?}, lamports: {}, rent_epoch: {}", pubkey, loaded_account.loaded_hash(), slot, lock.slot_list(), loaded_account.lamports(), loaded_account.rent_epoch());
-                                }
                                 if !account_info.is_zero_lamport() {
                                     // Because we're keeping the `lock' here, there is no need
                                     // to use retry_to_get_account_accessor()
@@ -5812,6 +5809,9 @@ impl AccountsDb {
                                     .get_loaded_account()
                                     .and_then(
                                         |loaded_account| {
+                                            if slot == &119675231 {
+                                                error!("calc hash: {}, {}, slot: {}, list: {:?}, lamports: {}, rent_epoch: {}", pubkey, loaded_account.loaded_hash(), slot, lock.slot_list(), loaded_account.lamports(), loaded_account.rent_epoch());
+                                            }
                                             let find_next_slot = |slot: Slot| {
                                                 let roots = self.accounts_index.get_next_original_root(slot, &Some(&ancestors));
                                                 if roots.is_none() {
