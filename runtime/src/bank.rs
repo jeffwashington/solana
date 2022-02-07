@@ -4604,6 +4604,9 @@ impl Bank {
                     collected2.push((pubkey, account.rent_epoch(), account.lamports()));
                 }
             } else {
+                if self.rewrites.len() > 100 {
+                    first = false;
+                }
                 //first = false;
                 let hash =
                     crate::accounts_db::AccountsDb::hash_account(self.slot(), &account, &pubkey);
