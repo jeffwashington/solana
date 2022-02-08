@@ -4623,9 +4623,10 @@ impl Bank {
                 }
             } else {
                 // 160 is fail
+                // 240 fail
                 // 321
 
-                if self.rewrites.len() > 240 {
+                if self.rewrites.len() > 280 {
                     first = false;
                 }
                 //first = false;
