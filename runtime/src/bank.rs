@@ -5512,6 +5512,8 @@ impl Bank {
                             .unwrap();
                             if interesting {
                                 let (current_epoch, current_slot_index) = self.get_epoch_and_slot_index(self.slot());
+                                let rent_epoch = account.rent_epoch();
+                                let next_epoch = current_epoch;
                                 error!("LeaveAloneNoRent updating rent_epoch: {}, next_epoch: {}, old: {}, current epoch: {}", pubkey, rent_epoch, next_epoch, current_epoch);
                             }
                     },
