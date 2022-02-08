@@ -6629,7 +6629,6 @@ impl AccountsDb {
             epoch_schedule.get_epoch_and_slot_index(storage_slot).1,
             rent_epoch,
             loaded_account.lamports(),
-            current_epoch,
             loaded_account.rent_epoch(),
         );
         }
