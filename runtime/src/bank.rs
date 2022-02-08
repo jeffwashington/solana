@@ -4598,6 +4598,10 @@ impl Bank {
             // because of this, we are not doing this:
             //  verify the whole on-chain state (= all accounts)
             //  via the account delta hash slowly once per an epoch.
+            let interesting = true && &pubkey
+            == &Pubkey::from_str("SysvarC1ock11111111111111111111111111111111").unwrap();
+            first = !interesting;
+
             if collected.rent_amount != 0 || !first {
                 //} || !interesting {//|| !first {//} || self.slot() >= 116979356 {
                 if !just_rewrites {
