@@ -4639,8 +4639,8 @@ impl Bank {
                 // 110 fail
                 // 120 fail
 
-                if self.rewrites.len() > 103 {
-                    //first = false;
+                if self.rewrites.len() > 160 {
+                    first = false;
                 }
                 //first = false;
                 let hash =
