@@ -100,7 +100,7 @@ impl RentCollector {
             use log::*;
             use std::str::FromStr;
             let mut interesting = address
-            == &Pubkey::from_str("SysvarS1otHashes111111111111111111111111111")
+            == &Pubkey::from_str("SsRCiXgj4XhH39b2DgMmL1SFEYKBgAxHg6zpREntFXg")
                 .unwrap();
                                                 if interesting {
                 error!("collect_from_existing_account {}, {:?}, {:?}", address, account, r);
@@ -160,7 +160,7 @@ impl RentCollector {
     use log::*;
     use std::str::FromStr;
     let mut interesting = address
-    == &Pubkey::from_str("51ziC7nFBiY6vbBg4LWf6NeFywfntSHnXFuJtZMBoT6x")
+    == &Pubkey::from_str("SsRCiXgj4XhH39b2DgMmL1SFEYKBgAxHg6zpREntFXg")
         .unwrap();
                                         if interesting {
         error!("collect_from_existing_account: {}, {:?}, result: {:?}", address, (account.lamports(), account.rent_epoch()), result);

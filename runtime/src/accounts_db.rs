@@ -4984,7 +4984,7 @@ impl AccountsDb {
             use log::*;
             use std::str::FromStr;
             let mut interesting = meta.pubkey
-            == Pubkey::from_str("SysvarS1otHashes111111111111111111111111111")
+            == Pubkey::from_str("SsRCiXgj4XhH39b2DgMmL1SFEYKBgAxHg6zpREntFXg")
                 .unwrap();
                                                 if interesting {
                 error!("store_accounts_to: {}, {:?}, slot: {}", meta.pubkey, (account.map(|x| x.lamports()).unwrap_or_default(), account.map(|x| x.rent_epoch()).unwrap_or_default()), slot);
@@ -5177,13 +5177,13 @@ impl AccountsDb {
                                     .get_loaded_account()
                                     .and_then(
                                         |loaded_account| {
-                                            let mut interesting =         pubkey == &Pubkey::from_str("51ziC7nFBiY6vbBg4LWf6NeFywfntSHnXFuJtZMBoT6x").unwrap();
-                                            if slot == &119675231 {
+                                            let mut interesting =         pubkey == &Pubkey::from_str("SsRCiXgj4XhH39b2DgMmL1SFEYKBgAxHg6zpREntFXg").unwrap();
+                                            if slot == &119675231 && interesting {
                                                 error!("calc hash: {}, {}, slot: {}, list: {:?}, lamports: {}, rent_epoch: {}", pubkey, loaded_account.loaded_hash(), slot, lock.slot_list(), loaded_account.lamports(), loaded_account.rent_epoch());
                                             }
                                             let loaded_hash = loaded_account.loaded_hash();
                                             let mut interesting = pubkey
-                                            == &Pubkey::from_str("51ziC7nFBiY6vbBg4LWf6NeFywfntSHnXFuJtZMBoT6x")
+                                            == &Pubkey::from_str("SsRCiXgj4XhH39b2DgMmL1SFEYKBgAxHg6zpREntFXg")
                                                 .unwrap();
                                                                                 if interesting {
                                                 error!("{}, {}, slot: {}, list: {:?}, lamports: {}, rent_epoch: {}", pubkey, loaded_hash, slot, lock.slot_list(), loaded_account.lamports(), loaded_account.rent_epoch());
@@ -5911,7 +5911,7 @@ impl AccountsDb {
                 slot,
                 |loaded_account: LoadedAccount| {
                     let mut interesting = loaded_account.pubkey()
-                        == &Pubkey::from_str("51ziC7nFBiY6vbBg4LWf6NeFywfntSHnXFuJtZMBoT6x")
+                        == &Pubkey::from_str("SsRCiXgj4XhH39b2DgMmL1SFEYKBgAxHg6zpREntFXg")
                             .unwrap();
                     if interesting {
                         error!("delta1: {} {} {:?}", slot, loaded_account.pubkey(), (loaded_account.loaded_hash(), loaded_account.rent_epoch(), loaded_account.lamports()));
@@ -5922,7 +5922,7 @@ impl AccountsDb {
                 },
                 |accum: &DashMap<Pubkey, (u64, Hash)>, loaded_account: LoadedAccount| {
                     let mut interesting = loaded_account.pubkey()
-                        == &Pubkey::from_str("51ziC7nFBiY6vbBg4LWf6NeFywfntSHnXFuJtZMBoT6x")
+                        == &Pubkey::from_str("SsRCiXgj4XhH39b2DgMmL1SFEYKBgAxHg6zpREntFXg")
                             .unwrap();
                     if interesting {
                         error!("delta2: {} {} {:?}", slot, loaded_account.pubkey(), (loaded_account.loaded_hash(), loaded_account.rent_epoch(), loaded_account.lamports()));
