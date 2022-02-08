@@ -6589,6 +6589,9 @@ impl AccountsDb {
                         use_stored = true; // this is an account in an ancient append vec that would have had rent collected, so just use the hash we have since there must be a newer version of this account already in a newer slot
                     }
                 }
+                if partition_index_from_max_slot < partition_from_pubkey {
+                    next_epoch = next_epoch.saturating_sub(1); // this account won't have had rent collected for the current epoch yet (rent_collector has a current epoch), so our expected next_epoch is for the previous epoch
+                }
                 rent_epoch = next_epoch;
             }
             // nothing to do
