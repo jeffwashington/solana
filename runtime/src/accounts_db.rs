@@ -4984,7 +4984,7 @@ impl AccountsDb {
             use log::*;
             use std::str::FromStr;
             let mut interesting = meta.pubkey
-            == Pubkey::from_str("51ziC7nFBiY6vbBg4LWf6NeFywfntSHnXFuJtZMBoT6x")
+            == Pubkey::from_str("SysvarS1otHashes111111111111111111111111111")
                 .unwrap();
                                                 if interesting {
                 error!("store_accounts_to: {}, {:?}, slot: {}", meta.pubkey, (account.map(|x| x.lamports()).unwrap_or_default(), account.map(|x| x.rent_epoch()).unwrap_or_default()), slot);
