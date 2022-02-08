@@ -4617,6 +4617,7 @@ impl Bank {
                 // 80 was good
                 // 100 was good
                 // 102 was good
+                // 103 was bad
                 // 105 fail
                 // 110 fail
                 // 120 fail
@@ -5521,6 +5522,15 @@ impl Bank {
                                 };
                                 error!("updating rent_epoch: {}, old: {}, new: {}", pubkey, rent_epoch, new_rent_epoch);
                                 account.set_rent_epoch(new_rent_epoch);
+                            }
+                            else {
+                                let mut interesting = pubkey
+                                == &Pubkey::from_str("SysvarC1ock11111111111111111111111111111111")
+                                    .unwrap();
+                                    if interesting {
+                                        error!("NOT updating rent_epoch: {}, next_epoch: {}, old: {}, current epoch: {}", pubkey, rent_epoch, next_epoch, current_epoch);
+                                    }
+                    
                             }
                         }
                     }
