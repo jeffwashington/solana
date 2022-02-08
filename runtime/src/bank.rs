@@ -4623,7 +4623,7 @@ impl Bank {
                 }
             } else {
                 // 40 succeed
-                // 50
+                // 50 fail
                 // 60 fail
                 // 80 is fail
                 // 160 is fail
@@ -4632,7 +4632,7 @@ impl Bank {
                 // 300 fail
                 // 321
 
-                if self.rewrites.len() > 50 {
+                if self.rewrites.len() > 45 {
                     first = false;
                 }
                 //first = false;
