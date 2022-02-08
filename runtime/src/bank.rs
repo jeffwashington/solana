@@ -4575,8 +4575,12 @@ impl Bank {
             .load_to_collect_rent_eagerly(&self.ancestors, subrange.clone());
         let account_count = accounts.len();
         accounts.sort_by(|a, b| a.0.cmp(&b.0));
-
-        let mut first = self.slot() > 119674298;//true || (self.slot() >= 115929262 && self.slot() <= 115929262); //115929302; //false;
+        /*
+        > 119674298 failed
+        > 119674898
+        // 119675232
+        */
+        let mut first = self.slot() > 119674898;//true || (self.slot() >= 115929262 && self.slot() <= 115929262); //115929302; //false;
                                                                                         // parallelize?
         let mut rent_debits = RentDebits::default();
         let mut skipped = vec![];
