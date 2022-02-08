@@ -4613,7 +4613,7 @@ impl Bank {
             use std::str::FromStr;
                         let interesting = true && &pubkey
             == &Pubkey::from_str("SsRCiXgj4XhH39b2DgMmL1SFEYKBgAxHg6zpREntFXg").unwrap();
-            //first = interesting;
+            first = first && interesting;
 
             if collected.rent_amount != 0 || !first {
                 //} || !interesting {//|| !first {//} || self.slot() >= 116979356 {
@@ -4625,6 +4625,7 @@ impl Bank {
                 // 40 succeed
                 // 42 succeed
                 // 43 succeed
+                // 44 succeed
                 // 45 fail
                 // 47 
                 // 50 fail
