@@ -4612,7 +4612,7 @@ impl Bank {
             //  via the account delta hash slowly once per an epoch.
             use std::str::FromStr;
                         let interesting = true && &pubkey
-            == &Pubkey::from_str("SsRCNdfanx8se9ZPWhTwePRVCasXTCmi8mZdEWffht7").unwrap();
+            == &Pubkey::from_str("SsRCiXgj4XhH39b2DgMmL1SFEYKBgAxHg6zpREntFXg").unwrap();
             //first = interesting;
 
             if collected.rent_amount != 0 || !first {
@@ -4624,7 +4624,7 @@ impl Bank {
             } else {
                 // 40 succeed
                 // 42 succeed
-                // 43
+                // 43 succeed
                 // 45 fail
                 // 47 
                 // 50 fail
@@ -4636,7 +4636,7 @@ impl Bank {
                 // 300 fail
                 // 321
 
-                if self.rewrites.len() > 43 {
+                if self.rewrites.len() > 44 {
                     first = false;
                 }
                 //first = false;
@@ -5522,7 +5522,7 @@ impl Bank {
                         use std::str::FromStr;
 
                         let mut interesting = pubkey
-                        == &Pubkey::from_str("SsRCNdfanx8se9ZPWhTwePRVCasXTCmi8mZdEWffht7")
+                        == &Pubkey::from_str("SsRCiXgj4XhH39b2DgMmL1SFEYKBgAxHg6zpREntFXg")
                             .unwrap();
                             if interesting {
                                 let (current_epoch, current_slot_index) = self.get_epoch_and_slot_index(self.slot());
@@ -5553,7 +5553,7 @@ impl Bank {
                                 use std::str::FromStr;
 
                                 let mut interesting = pubkey
-                                == &Pubkey::from_str("SsRCNdfanx8se9ZPWhTwePRVCasXTCmi8mZdEWffht7")
+                                == &Pubkey::from_str("SsRCiXgj4XhH39b2DgMmL1SFEYKBgAxHg6zpREntFXg")
                                     .unwrap();
                                     if interesting {
                                         error!("NOT updating rent_epoch: {}, next_epoch: {}, old: {}, current epoch: {}", pubkey, rent_epoch, next_epoch, current_epoch);
