@@ -5524,6 +5524,8 @@ impl Bank {
                                 account.set_rent_epoch(new_rent_epoch);
                             }
                             else {
+                                use std::str::FromStr;
+
                                 let mut interesting = pubkey
                                 == &Pubkey::from_str("SysvarC1ock11111111111111111111111111111111")
                                     .unwrap();
