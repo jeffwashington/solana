@@ -6580,7 +6580,7 @@ impl AccountsDb {
             rent_collector.calculate_rent_result(pubkey, loaded_account, filler_account_suffix);
         let mut rent_epoch = loaded_account.rent_epoch();
         match rent_result {
-            RentResult::CollectRent((next_epoch, rent_due)) => {
+            RentResult::CollectRent((pub next_epoch, rent_due)) => {
                 if next_epoch > rent_epoch {
                     if rent_due != 0 {
                         if interesting {
