@@ -4588,7 +4588,7 @@ impl Bank {
         > 119675190 succeeded
         // 119675232
         */
-        let mut first = self.slot() == 119675183;//true || (self.slot() >= 115929262 && self.slot() <= 115929262); //115929302; //false;
+        let mut first = true;//self.slot() == 119675183;//true || (self.slot() >= 115929262 && self.slot() <= 115929262); //115929302; //false;
                                                                                         // parallelize?
         let mut rent_debits = RentDebits::default();
         let mut skipped = vec![];
@@ -4627,7 +4627,7 @@ impl Bank {
                 // 321
 
                 if self.rewrites.len() > 280 {
-                    first = false;
+                    //first = false;
                 }
                 //first = false;
                 let hash =
