@@ -4622,13 +4622,14 @@ impl Bank {
                     collected2.push((pubkey, account.rent_epoch(), account.lamports()));
                 }
             } else {
+                // 80 
                 // 160 is fail
                 // 240 fail
                 // 280 fail
                 // 300 fail
                 // 321
 
-                if self.rewrites.len() > 310 {
+                if self.rewrites.len() > 80 {
                     first = false;
                 }
                 //first = false;
