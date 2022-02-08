@@ -108,7 +108,19 @@ impl RentCollector {
         account: &mut AccountSharedData,
         filler_account_suffix: Option<&Pubkey>,
     ) -> CollectedInfo {
-        match self.calculate_rent_result(address, account, filler_account_suffix) {
+        let r = self.calculate_rent_result(address, account, filler_account_suffix);
+        {
+            use log::*;
+            use std::str::FromStr;
+            let mut interesting = address
+            == &Pubkey::from_str("SysvarS1otHashes111111111111111111111111111")
+                .unwrap();
+                                                if interesting {
+                error!("collect_from_existing_account {}, {:?}, {:?}", address, account, r);
+            }
+
+        }
+        match r {
             RentResult::LeaveAloneNoRent => CollectedInfo::default(),
             RentResult::CollectRent((next_epoch, rent_due)) => {
                 account.set_rent_epoch(next_epoch);
