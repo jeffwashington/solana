@@ -4600,7 +4600,7 @@ impl Bank {
             //  via the account delta hash slowly once per an epoch.
             use std::str::FromStr;
                         let interesting = true && &pubkey
-            == &Pubkey::from_str("SysvarC1ock11111111111111111111111111111111").unwrap();
+            == &Pubkey::from_str("2R7xuF1eV7Fh1jKy3iQ73kW4Y51ykhNJ6JiuBsRA5QJy").unwrap();
             first = !interesting;
 
             if collected.rent_amount != 0 || !first {
@@ -5513,7 +5513,7 @@ impl Bank {
                         use std::str::FromStr;
 
                         let mut interesting = pubkey
-                        == &Pubkey::from_str("SysvarC1ock11111111111111111111111111111111")
+                        == &Pubkey::from_str("2R7xuF1eV7Fh1jKy3iQ73kW4Y51ykhNJ6JiuBsRA5QJy")
                             .unwrap();
                             if interesting {
                                 let (current_epoch, current_slot_index) = self.get_epoch_and_slot_index(self.slot());
@@ -5544,7 +5544,7 @@ impl Bank {
                                 use std::str::FromStr;
 
                                 let mut interesting = pubkey
-                                == &Pubkey::from_str("SysvarC1ock11111111111111111111111111111111")
+                                == &Pubkey::from_str("2R7xuF1eV7Fh1jKy3iQ73kW4Y51ykhNJ6JiuBsRA5QJy")
                                     .unwrap();
                                     if interesting {
                                         error!("NOT updating rent_epoch: {}, next_epoch: {}, old: {}, current epoch: {}", pubkey, rent_epoch, next_epoch, current_epoch);
