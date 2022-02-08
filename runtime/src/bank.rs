@@ -5504,7 +5504,16 @@ impl Bank {
             Some((mut account, slot)) => {
                 // we may need to adjust rent epoch here if this is an account which should have had a rewrite
                 match self.rent_collector.calculate_rent_result(pubkey, &account, None) {
-                    RentResult::LeaveAloneNoRent => {},
+                    RentResult::LeaveAloneNoRent => {
+                        use std::str::FromStr;
+
+                        let mut interesting = pubkey
+                        == &Pubkey::from_str("SysvarC1ock11111111111111111111111111111111")
+                            .unwrap();
+                            if interesting {
+                                error!("LeaveAloneNoRent updating rent_epoch: {}, next_epoch: {}, old: {}, current epoch: {}", pubkey, rent_epoch, next_epoch, current_epoch);
+                            }
+                    },
                     RentResult::CollectRent((next_epoch, rent_due)) => {
                         if rent_due == 0 {
                             // we could have an account where we skipped rewrite last epoch. But, this epoch we haven't skipped it yet. So, we would then expect to see 
