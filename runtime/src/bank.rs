@@ -4623,6 +4623,9 @@ impl Bank {
                 }
             } else {
                 // 40 succeed
+                // 42
+                // 45 fail
+                // 47 
                 // 50 fail
                 // 60 fail
                 // 80 is fail
@@ -4632,7 +4635,7 @@ impl Bank {
                 // 300 fail
                 // 321
 
-                if self.rewrites.len() > 45 {
+                if self.rewrites.len() > 42 {
                     first = false;
                 }
                 //first = false;
@@ -4644,7 +4647,7 @@ impl Bank {
             }
             rent_debits.insert(&pubkey, collected.rent_amount, account.lamports());
         }
-        if !skipped.is_empty() && false {
+        if !skipped.is_empty() {
             error!(
                 "rent skipped rewrites ({}): {:?}, slot: {}, collected: {:?}",
                 skipped.len(),
