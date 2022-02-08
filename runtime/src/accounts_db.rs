@@ -5596,10 +5596,10 @@ impl AccountsDb {
                 .unwrap();
                                                 if interesting {
                 error!("store_accounts_to: {}, {:?}, slot: {}", meta.pubkey, (account.map(|x| x.lamports()).unwrap_or_default(), account.map(|x| x.rent_epoch()).unwrap_or_default()), slot);
-                if (account.map(|x| x.lamports()).unwrap_or_default(), account.map(|x| x.rent_epoch()).unwrap_or_default()) == (1169280, 276) {
+                if (account.map(|x| x.lamports()).unwrap_or_default(), account.map(|x| x.rent_epoch()).unwrap_or_default()) == (1169280, 276) && slot == 119675231 {
                     panic!("writing to");
                 }
-            }
+            }(1169280, 276), slot: 119675231
         }
 
         if self.caching_enabled && is_cached_store {
