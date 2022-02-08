@@ -4576,7 +4576,7 @@ impl Bank {
         let account_count = accounts.len();
         accounts.sort_by(|a, b| a.0.cmp(&b.0));
 
-        let mut first = 119675231 == self.slot();//true || (self.slot() >= 115929262 && self.slot() <= 115929262); //115929302; //false;
+        let mut first = self.slot() > 119674298;//true || (self.slot() >= 115929262 && self.slot() <= 115929262); //115929302; //false;
                                                                                         // parallelize?
         let mut rent_debits = RentDebits::default();
         let mut skipped = vec![];
