@@ -4636,10 +4636,11 @@ impl Bank {
                 // 150 2hXBg6H2pb4EGAQPB43AHzgh5VP7PRGFLuknesLk4DXQ
                 // 225 2hXBg6H2pb4EGAQPB43AHzgh5VP7PRGFLuknesLk4DXQ
                 // 245 2hXBg6H2pb4EGAQPB43AHzgh5VP7PRGFLuknesLk4DXQ
+                // 255 2hXBg6H2pb4EGAQPB43AHzgh5VP7PRGFLuknesLk4DXQ
                 // 265 2jBWZ8jzRPirMwpihvNXsqn6W2PxCKwetgeGQK6rGPq3
                 // 305
 
-                if self.rewrites.len() > 255 {
+                if self.rewrites.len() > 260 {
                     first = false;
                 }
                 //first = false;
