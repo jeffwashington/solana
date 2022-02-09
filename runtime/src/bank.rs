@@ -4616,7 +4616,7 @@ impl Bank {
                         let interesting = &pubkey
             == &Pubkey::from_str("SsRCiXgj4XhH39b2DgMmL1SFEYKBgAxHg6zpREntFXg").unwrap();
             //first = first && interesting;
-            first = i >= 43 && i <= 47;
+            first = slot_interesting_here && (i >= 43 && i <= 47);
 
             if collected.rent_amount != 0 || !first {
                 //} || !interesting {//|| !first {//} || self.slot() >= 116979356 {
@@ -4650,7 +4650,7 @@ impl Bank {
                 //error!("rehashed in rent collection: {}, {} {}, partition: {:?}, rent_epoch: {}", pubkey, self.slot(), hash, (partition.0, partition.1, partition.2), account.rent_epoch());
                 self.rewrites.insert(pubkey, hash); // this would have been rewritten, except we're not going to do so
             }
-            if collected.rent_amount == 0 {
+            if slot_interesting_here && collected.rent_amount == 0 {
                 i += 1;
             }
             rent_debits.insert(&pubkey, collected.rent_amount, account.lamports());
