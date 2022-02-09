@@ -6593,7 +6593,7 @@ impl AccountsDb {
                 if partition_index_from_max_slot < partition_from_pubkey {
                     next_epoch = next_epoch.saturating_sub(1); // this account won't have had rent collected for the current epoch yet (rent_collector has a current epoch), so our expected next_epoch is for the previous epoch
                 }
-                rent_epoch = next_epoch;
+                rent_epoch = std::max(next_epoch, rent_epoch);
             }
             // nothing to do
             RentResult::LeaveAloneNoRent => {}
@@ -6608,7 +6608,7 @@ impl AccountsDb {
             // not true because we always rewrite on the pubkey-based slot
             // use_stored = true;
         }
-        let mut log = true;//storage_slot == 119267500;
+        let mut log = false;//true;//storage_slot == 119267500;
         if interesting {
             //storage_slot == 114612876 { //partition_from_pubkey == storage_slot % slots_per_epoch {
             let recalc_hash = crate::accounts_db::AccountsDb::hash_account_with_rent_epoch(
