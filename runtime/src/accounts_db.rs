@@ -5592,7 +5592,7 @@ impl AccountsDb {
             use log::*;
             use std::str::FromStr;
             let mut interesting = meta.pubkey
-            == Pubkey::from_str("SsRCiXgj4XhH39b2DgMmL1SFEYKBgAxHg6zpREntFXg")
+            == Pubkey::from_str("HEkZLiZWT9WPvaremdWerd2D2rGBNytATpjhvd7GBDkv")
                 .unwrap();
                                                 if interesting {
                 error!("store_accounts_to: {}, {:?}, slot: {}", meta.pubkey, (account.map(|x| x.lamports()).unwrap_or_default(), account.map(|x| x.rent_epoch()).unwrap_or_default()), slot);
@@ -5781,7 +5781,7 @@ impl AccountsDb {
                             if self.is_filler_account(pubkey) {
                                 return None;
                             }
-                            let mut interesting =         pubkey == &Pubkey::from_str("SsRCiXgj4XhH39b2DgMmL1SFEYKBgAxHg6zpREntFXg").unwrap();
+                            let mut interesting =         pubkey == &Pubkey::from_str("HEkZLiZWT9WPvaremdWerd2D2rGBNytATpjhvd7GBDkv").unwrap();
                             let search = self.accounts_index.get(pubkey, Some(ancestors), Some(max_root));
                             if let AccountIndexGetResult::Found(lock, index) =
                                 search
@@ -6449,7 +6449,7 @@ impl AccountsDb {
         let interesting_slot = 217092740;
         let interesting_parittion = 11231_000;
         let interesting = true && (pubkey
-            == &Pubkey::from_str("SsRCiXgj4XhH39b2DgMmL1SFEYKBgAxHg6zpREntFXg").unwrap()
+            == &Pubkey::from_str("HEkZLiZWT9WPvaremdWerd2D2rGBNytATpjhvd7GBDkv").unwrap()
             || ((storage_slot == interesting_slot || storage_slot == 115044876)
                 && partition_index_from_max_slot == partition_from_pubkey)) || partition_from_pubkey == interesting_parittion;
 
@@ -6571,7 +6571,7 @@ impl AccountsDb {
         }
 
         /*
-        if pubkey == &Pubkey::from_str("SsRCiXgj4XhH39b2DgMmL1SFEYKBgAxHg6zpREntFXg").unwrap() {
+        if pubkey == &Pubkey::from_str("HEkZLiZWT9WPvaremdWerd2D2rGBNytATpjhvd7GBDkv").unwrap() {
         }
         */
         assert!(!force_rehash);
@@ -6651,7 +6651,7 @@ impl AccountsDb {
             return recalc_hash;
         }
         if recalc_hash != loaded_account.loaded_hash() && log {
-            error!("maybe_rehash2: {}, loaded_hash: {}, storage_slot: {}, max_slot_in_storages: {}, expected_rent_collection_slot_max_epoch: {}, storage_slot_distance_from_max: {}, partition_index_from_max_slot: {}, partition_from_pubkey: {}, calculated hash: {}, use_stored: {}, storage_slot_partition: {}, rent_epoch: {}, lamports: {}, account rent epoch: {}",
+            error!("maybe_rehash2: {}, loaded_hash: {}, storage_slot: {}, max_slot_in_storages: {}, expected_rent_collection_slot_max_epoch: {}, storage_slot_distance_from_max: {}, partition_index_from_max_slot: {}, partition_from_pubkey: {}, calculated hash: {}, use_stored: {}, storage_slot_partition: {}, rent_epoch: {}, lamports: {}, account rent epoch: {}, epoch_of_max_storage_slot: {}",
         pubkey,
         loaded_account.loaded_hash(),
         storage_slot,
@@ -6666,6 +6666,8 @@ impl AccountsDb {
         rent_epoch,
         loaded_account.lamports(),
         loaded_account.rent_epoch(),
+        epoch_of_max_storage_slot,
+
 );
         }
         let num = rehash.fetch_add(1, Ordering::Relaxed);
@@ -6764,7 +6766,7 @@ impl AccountsDb {
                 );
 
                 let interesting = true && pubkey
-                    == &Pubkey::from_str("SsRCiXgj4XhH39b2DgMmL1SFEYKBgAxHg6zpREntFXg").unwrap();
+                    == &Pubkey::from_str("HEkZLiZWT9WPvaremdWerd2D2rGBNytATpjhvd7GBDkv").unwrap();
 
                 let source_item = CalculateHashIntermediate::new(hash, balance, *pubkey);
                 if interesting {
@@ -7031,7 +7033,7 @@ impl AccountsDb {
                 slot,
                 |loaded_account: LoadedAccount| {
                     let mut interesting = loaded_account.pubkey()
-                        == &Pubkey::from_str("SsRCiXgj4XhH39b2DgMmL1SFEYKBgAxHg6zpREntFXg")
+                        == &Pubkey::from_str("HEkZLiZWT9WPvaremdWerd2D2rGBNytATpjhvd7GBDkv")
                             .unwrap();
                     if interesting {
                         error!("delta1: {} {} {:?}", slot, loaded_account.pubkey(), (loaded_account.loaded_hash(), loaded_account.rent_epoch(), loaded_account.lamports()));
@@ -7042,7 +7044,7 @@ impl AccountsDb {
                 },
                 |accum: &DashMap<Pubkey, (u64, Hash)>, loaded_account: LoadedAccount| {
                     let mut interesting = loaded_account.pubkey()
-                        == &Pubkey::from_str("SsRCiXgj4XhH39b2DgMmL1SFEYKBgAxHg6zpREntFXg")
+                        == &Pubkey::from_str("HEkZLiZWT9WPvaremdWerd2D2rGBNytATpjhvd7GBDkv")
                             .unwrap();
                     if interesting {
                         error!("delta2: {} {} {:?}", slot, loaded_account.pubkey(), (loaded_account.loaded_hash(), loaded_account.rent_epoch(), loaded_account.lamports()));
@@ -7137,7 +7139,7 @@ impl AccountsDb {
                     let old_slot = pubkey_account.2;
                     use std::str::FromStr;
                     let mut interesting = pubkey
-                        == &Pubkey::from_str("SsRCiXgj4XhH39b2DgMmL1SFEYKBgAxHg6zpREntFXg")
+                        == &Pubkey::from_str("HEkZLiZWT9WPvaremdWerd2D2rGBNytATpjhvd7GBDkv")
                             .unwrap();
                     if interesting {
                         error!(
