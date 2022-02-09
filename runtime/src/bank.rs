@@ -4617,7 +4617,8 @@ impl Bank {
             == &Pubkey::from_str("SsRCiXgj4XhH39b2DgMmL1SFEYKBgAxHg6zpREntFXg").unwrap();
             //first = first && interesting;
             // >= 43, <=47 wrong result
-            first = slot_interesting_here && (i >= 43 && i <= 46);
+            // >= 43, <=46 wrong result Epugq2tPW3w9bzaHoxhE3SmBBrX2gUs7zGczNpy4V12V
+            first = slot_interesting_here && (i >= 45 && i <= 46);
 
             if collected.rent_amount != 0 || !first {
                 //} || !interesting {//|| !first {//} || self.slot() >= 116979356 {
