@@ -6593,7 +6593,7 @@ impl AccountsDb {
                 if partition_index_from_max_slot < partition_from_pubkey {
                     next_epoch = next_epoch.saturating_sub(1); // this account won't have had rent collected for the current epoch yet (rent_collector has a current epoch), so our expected next_epoch is for the previous epoch
                 }
-                rent_epoch = std::max(next_epoch, rent_epoch);
+                rent_epoch = std::cmp::max(next_epoch, rent_epoch);
             }
             // nothing to do
             RentResult::LeaveAloneNoRent => {}
