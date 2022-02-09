@@ -5547,8 +5547,10 @@ impl Bank {
                                 // should have done rewrite up to last epoch
                                 next_epoch.saturating_sub(1) // we have not passed THIS epoch's rewrite slot yet
                                 };
-                                error!("updating rent_epoch: {}, old: {}, new: {}", pubkey, rent_epoch, new_rent_epoch);
-                                account.set_rent_epoch(new_rent_epoch);
+                                if rent_epoch != new_rent_epoch {
+                                    error!("updating rent_epoch: {}, old: {}, new: {}", pubkey, rent_epoch, new_rent_epoch);
+                                    account.set_rent_epoch(new_rent_epoch);
+                                }
                             }
                             else {
                                 use std::str::FromStr;
