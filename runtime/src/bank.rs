@@ -4618,7 +4618,8 @@ impl Bank {
             //first = first && interesting;
             // >= 43, <=47 wrong result
             // >= 43, <=46 wrong result Epugq2tPW3w9bzaHoxhE3SmBBrX2gUs7zGczNpy4V12V
-            first = slot_interesting_here && (i >= 45 && i <= 46);
+            // >= 45, <=46 wrong result Epugq2tPW3w9bzaHoxhE3SmBBrX2gUs7zGczNpy4V12V
+            first = slot_interesting_here && (i >= 46 && i <= 46);
 
             if collected.rent_amount != 0 || !first {
                 //} || !interesting {//|| !first {//} || self.slot() >= 116979356 {
