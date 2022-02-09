@@ -4613,7 +4613,7 @@ impl Bank {
             use std::str::FromStr;
                         let interesting = true && &pubkey
             == &Pubkey::from_str("SsRCNdfanx8se9ZPWhTwePRVCasXTCmi8mZdEWffht7").unwrap();
-            first = first && interesting;
+            //first = first && interesting;
 
             if collected.rent_amount != 0 || !first {
                 //} || !interesting {//|| !first {//} || self.slot() >= 116979356 {
@@ -5518,13 +5518,14 @@ impl Bank {
         match self.rc.accounts.load_with_fixed_root(ancestors, pubkey) {
             Some((mut account, slot)) => {
                 // we may need to adjust rent epoch here if this is an account which should have had a rewrite
-                match self.rent_collector.calculate_rent_result(pubkey, &account, None) {
+                use std::str::FromStr;
+                let mut interesting = pubkey
+                == &Pubkey::from_str("SsRCNdfanx8se9ZPWhTwePRVCasXTCmi8mZdEWffht7")
+                    .unwrap();
+match self.rent_collector.calculate_rent_result(pubkey, &account, None) {
                     RentResult::LeaveAloneNoRent => {
                         use std::str::FromStr;
 
-                        let mut interesting = pubkey
-                        == &Pubkey::from_str("SsRCNdfanx8se9ZPWhTwePRVCasXTCmi8mZdEWffht7")
-                            .unwrap();
                             if interesting {
                                 let (current_epoch, current_slot_index) = self.get_epoch_and_slot_index(self.slot());
                                 let rent_epoch = account.rent_epoch();
@@ -5547,17 +5548,12 @@ impl Bank {
                                 // should have done rewrite up to last epoch
                                 next_epoch.saturating_sub(1) // we have not passed THIS epoch's rewrite slot yet
                                 };
-                                if rent_epoch != new_rent_epoch {
+                                if rent_epoch != new_rent_epoch || interesting {
                                     error!("updating rent_epoch: {}, old: {}, new: {}", pubkey, rent_epoch, new_rent_epoch);
                                     account.set_rent_epoch(new_rent_epoch);
                                 }
                             }
                             else {
-                                use std::str::FromStr;
-
-                                let mut interesting = pubkey
-                                == &Pubkey::from_str("SsRCNdfanx8se9ZPWhTwePRVCasXTCmi8mZdEWffht7")
-                                    .unwrap();
                                     if interesting {
                                         error!("NOT updating rent_epoch: {}, next_epoch: {}, old: {}, current epoch: {}", pubkey, rent_epoch, next_epoch, current_epoch);
                                     }
