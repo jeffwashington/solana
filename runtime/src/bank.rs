@@ -4576,19 +4576,10 @@ impl Bank {
         let account_count = accounts.len();
         accounts.sort_by(|a, b| a.0.cmp(&b.0));
         /*
-        > 119674298 failed
-        > 119674898 failed
-        > 119675000 failed
-        > 119675150 failed
-        > 119675170 failed
-        > 119675180 failed
-        > 119675182 failed
-        > 119675183 succeeded
-        > 119675185 succeeded
-        > 119675190 succeeded
-        // 119675232
+        > 119675170
+        119675231
         */
-        let slot_interesting_here = self.slot() > 119675170;// self.slot() == 119675183;
+        let slot_interesting_here = self.slot() > 119675200;// self.slot() == 119675183;
         let mut first = slot_interesting_here;//true || (self.slot() >= 115929262 && self.slot() <= 115929262); //115929302; //false;
                                                                                         // parallelize?
         let mut rent_debits = RentDebits::default();
