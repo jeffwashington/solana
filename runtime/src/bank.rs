@@ -4583,7 +4583,7 @@ impl Bank {
           119675032 2jBWZ8jzRPirMwpihvNXsqn6W2PxCKwetgeGQK6rGPq3
           119675036 2jBWZ8jzRPirMwpihvNXsqn6W2PxCKwetgeGQK6rGPq3
           119675037 2jBWZ8jzRPirMwpihvNXsqn6W2PxCKwetgeGQK6rGPq3
-          == 119675039
+          == 119675038 2jBWZ8jzRPirMwpihvNXsqn6W2PxCKwetgeGQK6rGPq3
           119675038 2hXBg6H2pb4EGAQPB43AHzgh5VP7PRGFLuknesLk4DXQ
           119675039 2hXBg6H2pb4EGAQPB43AHzgh5VP7PRGFLuknesLk4DXQ
           119675046 2hXBg6H2pb4EGAQPB43AHzgh5VP7PRGFLuknesLk4DXQ
@@ -4647,7 +4647,7 @@ impl Bank {
                 // 300 fail
                 // 321
 
-                if self.rewrites.len() > 45 {
+                if self.rewrites.len() > 150 {
                     //first = false;
                 }
                 //first = false;
