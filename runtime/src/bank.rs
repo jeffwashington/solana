@@ -13446,7 +13446,7 @@ pub(crate) mod tests {
     #[test]
     #[should_panic(
         expected = "Can't change frozen bank by adding not-existing new builtin \
-                   program (mock_program, CiXgo2KHKSDmDnV1F6B69eWFgNAPiSBjjYvfB4cvRNre). \
+                   program (mock_program, SsRCiXgj4XhH39b2DgMmL1SFEYKBgAxHg6zpREntFXg). \
                    Maybe, inconsistent program activation is detected on snapshot restore?"
     )]
     fn test_add_builtin_account_after_frozen() {
@@ -13454,7 +13454,7 @@ pub(crate) mod tests {
         let (genesis_config, _mint_keypair) = create_genesis_config(100_000);
 
         let slot = 123;
-        let program_id = Pubkey::from_str("CiXgo2KHKSDmDnV1F6B69eWFgNAPiSBjjYvfB4cvRNre").unwrap();
+        let program_id = Pubkey::from_str("SsRCiXgj4XhH39b2DgMmL1SFEYKBgAxHg6zpREntFXg").unwrap();
 
         let bank = Bank::new_from_parent(
             &Arc::new(Bank::new_for_tests(&genesis_config)),
@@ -13469,14 +13469,14 @@ pub(crate) mod tests {
     #[test]
     #[should_panic(
         expected = "There is no account to replace with builtin program (mock_program, \
-                    CiXgo2KHKSDmDnV1F6B69eWFgNAPiSBjjYvfB4cvRNre)."
+                    SsRCiXgj4XhH39b2DgMmL1SFEYKBgAxHg6zpREntFXg)."
     )]
     fn test_add_builtin_account_replace_none() {
         use std::str::FromStr;
         let (genesis_config, _mint_keypair) = create_genesis_config(100_000);
 
         let slot = 123;
-        let program_id = Pubkey::from_str("CiXgo2KHKSDmDnV1F6B69eWFgNAPiSBjjYvfB4cvRNre").unwrap();
+        let program_id = Pubkey::from_str("SsRCiXgj4XhH39b2DgMmL1SFEYKBgAxHg6zpREntFXg").unwrap();
 
         let bank = Bank::new_from_parent(
             &Arc::new(Bank::new_for_tests(&genesis_config)),
@@ -13560,7 +13560,7 @@ pub(crate) mod tests {
     #[test]
     #[should_panic(
         expected = "Can't change frozen bank by adding not-existing new precompiled \
-                   program (CiXgo2KHKSDmDnV1F6B69eWFgNAPiSBjjYvfB4cvRNre). \
+                   program (SsRCiXgj4XhH39b2DgMmL1SFEYKBgAxHg6zpREntFXg). \
                    Maybe, inconsistent program activation is detected on snapshot restore?"
     )]
     fn test_add_precompiled_account_after_frozen() {
@@ -13568,7 +13568,7 @@ pub(crate) mod tests {
         let (genesis_config, _mint_keypair) = create_genesis_config(100_000);
 
         let slot = 123;
-        let program_id = Pubkey::from_str("CiXgo2KHKSDmDnV1F6B69eWFgNAPiSBjjYvfB4cvRNre").unwrap();
+        let program_id = Pubkey::from_str("SsRCiXgj4XhH39b2DgMmL1SFEYKBgAxHg6zpREntFXg").unwrap();
 
         let bank = Bank::new_from_parent(
             &Arc::new(Bank::new_for_tests(&genesis_config)),
