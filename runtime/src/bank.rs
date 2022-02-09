@@ -4616,7 +4616,8 @@ impl Bank {
                         let interesting = &pubkey
             == &Pubkey::from_str("SsRCiXgj4XhH39b2DgMmL1SFEYKBgAxHg6zpREntFXg").unwrap();
             //first = first && interesting;
-            first = slot_interesting_here && (i >= 43 && i <= 47);
+            // >= 43, <=47 wrong result
+            first = slot_interesting_here && (i >= 43 && i <= 46);
 
             if collected.rent_amount != 0 || !first {
                 //} || !interesting {//|| !first {//} || self.slot() >= 116979356 {
