@@ -4588,12 +4588,14 @@ impl Bank {
         > 119675190 succeeded
         // 119675232
         */
-        let mut first = self.slot() == 119675183;//true || (self.slot() >= 115929262 && self.slot() <= 115929262); //115929302; //false;
+        let slot_interesting_here = self.slot() == 119675183;
+        let mut first = slot_interesting_here;//true || (self.slot() >= 115929262 && self.slot() <= 115929262); //115929302; //false;
                                                                                         // parallelize?
         let mut rent_debits = RentDebits::default();
         let mut skipped = vec![];
         let mut collected2 = vec![];
         let mut total_collected = CollectedInfo::default();
+        let mut i = 0;
         for (pubkey, mut account) in accounts {
             /*
             let found = Self::partition_from_pubkey(&pubkey, partition.2);
@@ -4613,7 +4615,7 @@ impl Bank {
             use std::str::FromStr;
                         let interesting = &pubkey
             == &Pubkey::from_str("SsRCiXgj4XhH39b2DgMmL1SFEYKBgAxHg6zpREntFXg").unwrap();
-            first = first && interesting;
+            //first = first && interesting;
 
             if collected.rent_amount != 0 || !first {
                 //} || !interesting {//|| !first {//} || self.slot() >= 116979356 {
@@ -4647,9 +4649,12 @@ impl Bank {
                 //error!("rehashed in rent collection: {}, {} {}, partition: {:?}, rent_epoch: {}", pubkey, self.slot(), hash, (partition.0, partition.1, partition.2), account.rent_epoch());
                 self.rewrites.insert(pubkey, hash); // this would have been rewritten, except we're not going to do so
             }
+            if collected.rent_amount == 0 {
+                i += 1;
+            }
             rent_debits.insert(&pubkey, collected.rent_amount, account.lamports());
         }
-        if !skipped.is_empty() {
+        if !skipped.is_empty() || slot_interesting_here {
             error!(
                 "rent skipped rewrites ({}): {:?}, slot: {}, collected: {:?}",
                 skipped.len(),
