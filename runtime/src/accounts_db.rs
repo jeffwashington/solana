@@ -6428,8 +6428,8 @@ impl AccountsDb {
         // if we are not ancient, we can calculate based on distance of this slot from max
         let partition_from_pubkey =
             crate::bank::Bank::partition_from_pubkey(pubkey, slots_per_epoch);
-            let (epoch_of_storage_slot, _partition_index_from_max_slot) =
-            epoch_schedule.get_epoch_and_slot_index(storage_slot);
+            let (epoch_of_max_storage_slot, _partition_index_from_max_slot) =
+            epoch_schedule.get_epoch_and_slot_index(max_slot_in_storages);
             let (_, partition_index_from_max_slot) =
             epoch_schedule.get_epoch_and_slot_index(max_slot_in_storages);
         if max_slot_in_storages >= slots_per_epoch
@@ -6499,7 +6499,7 @@ impl AccountsDb {
         // the slot we're dealing with is where we expected the rent to be collected for this pubkey, so use what is in this slot
         // however, there are cases, such as adjusting the clock, where we store the account IN the same slot, but we do so BEFORE we collect rent. We later store the account AGAIN for rewrite/rent collection.
         // So, if storage_slot == expected_rent_collection_slot..., then we MAY have collected rent or may not have. So, it has to be >
-        if storage_slot > expected_rent_collection_slot_max_epoch || loaded_account.rent_epoch() > epoch_of_storage_slot {
+        if storage_slot > expected_rent_collection_slot_max_epoch || loaded_account.rent_epoch() > epoch_of_max_storage_slot {
             if interesting || (storage_slot == interesting_slot && partition_index_from_max_slot == partition_from_pubkey) {
                 //storage_slot == 115044876 || storage_slot ==  {//partition_from_pubkey == storage_slot % slots_per_epoch {
                 let recalc_hash =
@@ -6509,7 +6509,7 @@ impl AccountsDb {
                 crate::accounts_db::AccountsDb::hash_account(self.slot(), &account, &pubkey);
                 */
 
-                error!("early maybe_rehash: {}, loaded_hash: {}, storage_slot: {}, max_slot_in_storages: {}, expected_rent_collection_slot_max_epoch: {}, storage_slot_distance_from_max: {}, partition_index_from_max_slot: {}, partition_from_pubkey: {}, calculated hash: {}, use_stored: {}, storage_slot_partition: {}, rent_epoch: {}, cached: {}",
+                error!("early maybe_rehash: {}, loaded_hash: {}, storage_slot: {}, max_slot_in_storages: {}, expected_rent_collection_slot_max_epoch: {}, storage_slot_distance_from_max: {}, partition_index_from_max_slot: {}, partition_from_pubkey: {}, calculated hash: {}, use_stored: {}, storage_slot_partition: {}, rent_epoch: {}, cached: {}, epoch_of_max_storage_slot: {}",
                 pubkey,
                 loaded_account.loaded_hash(),
                 storage_slot,
@@ -6523,6 +6523,7 @@ impl AccountsDb {
                 epoch_schedule.get_epoch_and_slot_index(storage_slot).1,
                 loaded_account.rent_epoch(),
                 loaded_account.is_cached(),
+                epoch_of_max_storage_slot,
             );
             }
             // the storage slot is at least as recent as the expected rent collection slot, so whatever is in the append vec is good
