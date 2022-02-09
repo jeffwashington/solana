@@ -4589,7 +4589,7 @@ impl Bank {
         // 119675232
         */
         let slot_interesting_here = self.slot() == 119675183;
-        let mut first = slot_interesting_here;//true || (self.slot() >= 115929262 && self.slot() <= 115929262); //115929302; //false;
+        let mut first = true;//slot_interesting_here;//true || (self.slot() >= 115929262 && self.slot() <= 115929262); //115929302; //false;
                                                                                         // parallelize?
         let mut rent_debits = RentDebits::default();
         let mut skipped = vec![];
@@ -4619,7 +4619,7 @@ impl Bank {
             // >= 43, <=47 wrong result
             // >= 43, <=46 wrong result Epugq2tPW3w9bzaHoxhE3SmBBrX2gUs7zGczNpy4V12V
             // >= 45, <=46 wrong result Epugq2tPW3w9bzaHoxhE3SmBBrX2gUs7zGczNpy4V12V
-            first = slot_interesting_here && (i >= 46 && i <= 46);
+            //first = slot_interesting_here && (i >= 46 && i <= 46);
 
             if collected.rent_amount != 0 || !first {
                 //} || !interesting {//|| !first {//} || self.slot() >= 116979356 {
@@ -4644,7 +4644,7 @@ impl Bank {
                 // 321
 
                 if self.rewrites.len() > 45 {
-                    first = false;
+                    //first = false;
                 }
                 //first = false;
                 let hash =
