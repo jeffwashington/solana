@@ -5400,8 +5400,8 @@ impl Bank {
         }
         use log::*;
         use std::str::FromStr;
-        let mut interesting = meta.pubkey
-        == Pubkey::from_str("SysvarC1ock11111111111111111111111111111111")
+        let mut interesting = pubkey
+        == &Pubkey::from_str("SysvarC1ock11111111111111111111111111111111")
             .unwrap();
                                             if interesting {
                                                 error!("store_account: {}, {:?}", pubkey, new_account);
