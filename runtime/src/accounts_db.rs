@@ -5592,7 +5592,7 @@ impl AccountsDb {
             use log::*;
             use std::str::FromStr;
             let mut interesting = meta.pubkey
-            == Pubkey::from_str("Sysv1HhTNVz8gn94Bs4CLQN86LB2gQmPWCtKSq7uvo9")
+            == Pubkey::from_str("SysvarC1ock11111111111111111111111111111111")
                 .unwrap();
                                                 if interesting {
                 error!("store_accounts_to: {}, {:?}, slot: {}", meta.pubkey, (account.map(|x| x.lamports()).unwrap_or_default(), account.map(|x| x.rent_epoch()).unwrap_or_default()), slot);
@@ -5781,7 +5781,7 @@ impl AccountsDb {
                             if self.is_filler_account(pubkey) {
                                 return None;
                             }
-                            let mut interesting =         pubkey == &Pubkey::from_str("Sysv1HhTNVz8gn94Bs4CLQN86LB2gQmPWCtKSq7uvo9").unwrap();
+                            let mut interesting =         pubkey == &Pubkey::from_str("SysvarC1ock11111111111111111111111111111111").unwrap();
                             let search = self.accounts_index.get(pubkey, Some(ancestors), Some(max_root));
                             if let AccountIndexGetResult::Found(lock, index) =
                                 search
@@ -6449,7 +6449,7 @@ impl AccountsDb {
         let interesting_slot = 217092740;
         let interesting_parittion = 11231_000;
         let interesting = true && (pubkey
-            == &Pubkey::from_str("Sysv1HhTNVz8gn94Bs4CLQN86LB2gQmPWCtKSq7uvo9").unwrap()
+            == &Pubkey::from_str("SysvarC1ock11111111111111111111111111111111").unwrap()
             || ((storage_slot == interesting_slot || storage_slot == 115044876)
                 && partition_index_from_max_slot == partition_from_pubkey)) || partition_from_pubkey == interesting_parittion;
 
@@ -6571,7 +6571,7 @@ impl AccountsDb {
         }
 
         /*
-        if pubkey == &Pubkey::from_str("Sysv1HhTNVz8gn94Bs4CLQN86LB2gQmPWCtKSq7uvo9").unwrap() {
+        if pubkey == &Pubkey::from_str("SysvarC1ock11111111111111111111111111111111").unwrap() {
         }
         */
         assert!(!force_rehash);
@@ -6766,7 +6766,7 @@ impl AccountsDb {
                 );
 
                 let interesting = true && pubkey
-                    == &Pubkey::from_str("Sysv1HhTNVz8gn94Bs4CLQN86LB2gQmPWCtKSq7uvo9").unwrap();
+                    == &Pubkey::from_str("SysvarC1ock11111111111111111111111111111111").unwrap();
 
                 let source_item = CalculateHashIntermediate::new(hash, balance, *pubkey);
                 if interesting {
@@ -7034,7 +7034,7 @@ impl AccountsDb {
                 slot,
                 |loaded_account: LoadedAccount| {
                     let mut interesting = loaded_account.pubkey()
-                        == &Pubkey::from_str("Sysv1HhTNVz8gn94Bs4CLQN86LB2gQmPWCtKSq7uvo9")
+                        == &Pubkey::from_str("SysvarC1ock11111111111111111111111111111111")
                             .unwrap();
                     if interesting {
                         error!("delta1: {} {} {:?}", slot, loaded_account.pubkey(), (loaded_account.loaded_hash(), loaded_account.rent_epoch(), loaded_account.lamports()));
@@ -7045,7 +7045,7 @@ impl AccountsDb {
                 },
                 |accum: &DashMap<Pubkey, (u64, Hash)>, loaded_account: LoadedAccount| {
                     let mut interesting = loaded_account.pubkey()
-                        == &Pubkey::from_str("Sysv1HhTNVz8gn94Bs4CLQN86LB2gQmPWCtKSq7uvo9")
+                        == &Pubkey::from_str("SysvarC1ock11111111111111111111111111111111")
                             .unwrap();
                     if interesting {
                         error!("delta2: {} {} {:?}", slot, loaded_account.pubkey(), (loaded_account.loaded_hash(), loaded_account.rent_epoch(), loaded_account.lamports()));
@@ -7140,7 +7140,7 @@ impl AccountsDb {
                     let old_slot = pubkey_account.2;
                     use std::str::FromStr;
                     let mut interesting = pubkey
-                        == &Pubkey::from_str("Sysv1HhTNVz8gn94Bs4CLQN86LB2gQmPWCtKSq7uvo9")
+                        == &Pubkey::from_str("SysvarC1ock11111111111111111111111111111111")
                             .unwrap();
                     if interesting {
                         error!(

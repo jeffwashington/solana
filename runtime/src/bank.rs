@@ -4617,9 +4617,10 @@ impl Bank {
             //  verify the whole on-chain state (= all accounts)
             //  via the account delta hash slowly once per an epoch.
             use std::str::FromStr;
+            
                         let interesting = &pubkey
 /*
- [(Sysv1HhTNVz8gn94Bs4CLQN86LB2gQmPWCtKSq7uvo9, BVitCMWNY8BaqRr1GcKoSgw8Dtm493e2WeFv8xgSmw7T, 277, 1000000),
+ [(SysvarC1ock11111111111111111111111111111111, BVitCMWNY8BaqRr1GcKoSgw8Dtm493e2WeFv8xgSmw7T, 277, 1000000),
  (SysvZZkWAjU4vSDKbChruubcriS8arDaeyM1YP6b5Bw, CGYje5QNVAsAaZMJvQzFqzRLCfuFmjq8g3Sh67YWRGB, 277, 2039280),
  (SysvarC1ock11111111111111111111111111111111, DtR67m31uqLFLWE2r7r4DJV5QZEd15uDBneDZAinHEMZ, 277, 1169280)]
  */                        
@@ -5536,7 +5537,7 @@ impl Bank {
                 // we may need to adjust rent epoch here if this is an account which should have had a rewrite
                 use std::str::FromStr;
                 let mut interesting = pubkey
-                == &Pubkey::from_str("Sysv1HhTNVz8gn94Bs4CLQN86LB2gQmPWCtKSq7uvo9")
+                == &Pubkey::from_str("SysvarC1ock11111111111111111111111111111111")
                     .unwrap();
 match self.rent_collector.calculate_rent_result(pubkey, &account, None) {
                     RentResult::LeaveAloneNoRent => {
