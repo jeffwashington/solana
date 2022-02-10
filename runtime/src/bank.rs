@@ -4623,11 +4623,11 @@ impl Bank {
             
                         let interesting = &pubkey
 /*
- [(SysvarC1ock11111111111111111111111111111111, BVitCMWNY8BaqRr1GcKoSgw8Dtm493e2WeFv8xgSmw7T, 277, 1000000),
+ [(SY4CyV3gWWQ7HRAaNyiLeVGe7qQbJgc5kC2YUJtykck, BVitCMWNY8BaqRr1GcKoSgw8Dtm493e2WeFv8xgSmw7T, 277, 1000000),
  (SysvZZkWAjU4vSDKbChruubcriS8arDaeyM1YP6b5Bw, CGYje5QNVAsAaZMJvQzFqzRLCfuFmjq8g3Sh67YWRGB, 277, 2039280),
- (SysvarC1ock11111111111111111111111111111111, DtR67m31uqLFLWE2r7r4DJV5QZEd15uDBneDZAinHEMZ, 277, 1169280)]
+ (SY4CyV3gWWQ7HRAaNyiLeVGe7qQbJgc5kC2YUJtykck, DtR67m31uqLFLWE2r7r4DJV5QZEd15uDBneDZAinHEMZ, 277, 1169280)]
  */                        
-            == &Pubkey::from_str("SysvarC1ock11111111111111111111111111111111").unwrap();
+            == &Pubkey::from_str("SY4CyV3gWWQ7HRAaNyiLeVGe7qQbJgc5kC2YUJtykck").unwrap();
             //first = first && interesting;
             // >= 43, <=47 wrong result
             // >= 43, <=46 wrong result Epugq2tPW3w9bzaHoxhE3SmBBrX2gUs7zGczNpy4V12V
@@ -5559,7 +5559,7 @@ impl Bank {
                 // we may need to adjust rent epoch here if this is an account which should have had a rewrite
                 use std::str::FromStr;
                 let mut interesting = pubkey
-                == &Pubkey::from_str("SysvarC1ock11111111111111111111111111111111")
+                == &Pubkey::from_str("SY4CyV3gWWQ7HRAaNyiLeVGe7qQbJgc5kC2YUJtykck")
                     .unwrap();
 match self.rent_collector.calculate_rent_result(pubkey, &account, None) {
                     RentResult::LeaveAloneNoRent => {
