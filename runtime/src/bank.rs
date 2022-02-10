@@ -4594,7 +4594,7 @@ impl Bank {
           119675231
         */
         let slot_interesting_here = self.slot() == 119675231;// self.slot() == 119675183;
-        let mut first = slot_interesting_here;//true || (self.slot() >= 115929262 && self.slot() <= 115929262); //115929302; //false;
+        let mut first = true;//slot_interesting_here;//true || (self.slot() >= 115929262 && self.slot() <= 115929262); //115929302; //false;
                                                                                         // parallelize?
         let mut rent_debits = RentDebits::default();
         let mut skipped = vec![];
@@ -4632,7 +4632,7 @@ impl Bank {
             // >= 43, <=47 wrong result
             // >= 43, <=46 wrong result Epugq2tPW3w9bzaHoxhE3SmBBrX2gUs7zGczNpy4V12V
             // >= 45, <=46 wrong result Epugq2tPW3w9bzaHoxhE3SmBBrX2gUs7zGczNpy4V12V
-            first = slot_interesting_here && interesting;//&& i >= 102 && i <= 104;// && interesting;//(i >= 46 && i <= 46);
+            //first = slot_interesting_here && interesting;//&& i >= 102 && i <= 104;// && interesting;//(i >= 46 && i <= 46);
             //first = true;//slot_interesting_here && interesting;
             //2hXBg6H2pb4EGAQPB43AHzgh5VP7PRGFLuknesLk4DXQ
             let mut force = false;
