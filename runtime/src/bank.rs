@@ -2083,6 +2083,7 @@ impl Bank {
     where
         F: Fn(&Option<AccountSharedData>) -> AccountSharedData,
     {
+        error!("update_sysvar_account: {}", pubkey);
         let old_account = self.get_account_with_fixed_root(pubkey);
         let mut new_account = updater(&old_account);
 
