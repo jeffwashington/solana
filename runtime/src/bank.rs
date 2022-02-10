@@ -4623,7 +4623,7 @@ impl Bank {
             // >= 43, <=47 wrong result
             // >= 43, <=46 wrong result Epugq2tPW3w9bzaHoxhE3SmBBrX2gUs7zGczNpy4V12V
             // >= 45, <=46 wrong result Epugq2tPW3w9bzaHoxhE3SmBBrX2gUs7zGczNpy4V12V
-            first = slot_interesting_here && interesting;//(i >= 46 && i <= 46);
+            first = slot_interesting_here && i >= 102 && i <= 104;// && interesting;//(i >= 46 && i <= 46);
             //first = true;//slot_interesting_here && interesting;
             //2hXBg6H2pb4EGAQPB43AHzgh5VP7PRGFLuknesLk4DXQ
             if collected.rent_amount != 0 || !first {
