@@ -5566,7 +5566,7 @@ match self.rent_collector.calculate_rent_result(pubkey, &account, None) {
                                 next_epoch.saturating_sub(1) // we have not passed THIS epoch's rewrite slot yet
                                 };
                                 if rent_epoch != new_rent_epoch || interesting {
-                                    error!("updating rent_epoch: {}, old: {}, new: {}", pubkey, rent_epoch, new_rent_epoch);
+                                    error!("updating rent_epoch: {}, old: {}, new: {}, current_slot_index: {}, slot_index_of_pubkey: {}", pubkey, rent_epoch, new_rent_epoch, current_slot_index, slot_index_of_pubkey);
                                     account.set_rent_epoch(new_rent_epoch);
                                 }
                             }
