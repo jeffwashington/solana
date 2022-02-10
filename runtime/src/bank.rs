@@ -4618,12 +4618,13 @@ impl Bank {
             //  via the account delta hash slowly once per an epoch.
             use std::str::FromStr;
                         let interesting = &pubkey
-            == &Pubkey::from_str("HEkZLiZWT9WPvaremdWerd2D2rGBNytATpjhvd7GBDkv").unwrap();
+            == &Pubkey::from_str("SY4CyV3gWWQ7HRAaNyiLeVGe7qQbJgc5kC2YUJtykck").unwrap();
             //first = first && interesting;
             // >= 43, <=47 wrong result
             // >= 43, <=46 wrong result Epugq2tPW3w9bzaHoxhE3SmBBrX2gUs7zGczNpy4V12V
             // >= 45, <=46 wrong result Epugq2tPW3w9bzaHoxhE3SmBBrX2gUs7zGczNpy4V12V
             //first = slot_interesting_here && (i >= 46 && i <= 46);
+            first = slot_interesting_here && interesting;
             //2hXBg6H2pb4EGAQPB43AHzgh5VP7PRGFLuknesLk4DXQ
             if collected.rent_amount != 0 || !first {
                 //} || !interesting {//|| !first {//} || self.slot() >= 116979356 {
@@ -4638,10 +4639,13 @@ impl Bank {
                 // 245 2hXBg6H2pb4EGAQPB43AHzgh5VP7PRGFLuknesLk4DXQ
                 // 255 2hXBg6H2pb4EGAQPB43AHzgh5VP7PRGFLuknesLk4DXQ
                 // 258 2hXBg6H2pb4EGAQPB43AHzgh5VP7PRGFLuknesLk4DXQ
+                // 259 2jBWZ8jzRPirMwpihvNXsqn6W2PxCKwetgeGQK6rGPq3
                 // 260 2jBWZ8jzRPirMwpihvNXsqn6W2PxCKwetgeGQK6rGPq3
                 // 265 2jBWZ8jzRPirMwpihvNXsqn6W2PxCKwetgeGQK6rGPq3
                 // 305
-
+/*
+(SY45uHnE6s9Bry2Jd6HbxW3SXCTw3Geb4GDVeRSxPK4, 8bjZKPs4uU9SSWqtC6GMQCU4Ngkav1DkqyY1pEEZrpU, 277, 2039280), (SY48DYmmqnbGS9WVGtipGu7asV7BNphumTtqHpEx3iD, Xo6zwh6okExFVFpPtx1DD6tEUD7W1mGYoCP7BmqXhsX, 277, 2039280), (SY4BttPGJmTFkuus7sUDbwcZSRMDM5FSnaaZp8C416N, B9pXjockwvw4UiET7ojzBRW4hWHbxX5WGZ4T5kfDTqcF, 277, 2039280), (SY4CyV3gWWQ7HRAaNyiLeVGe7qQbJgc5kC2YUJtykck,
+    */
                 if self.rewrites.len() > 259 {
                     first = false;
                 }
@@ -5528,7 +5532,7 @@ impl Bank {
                 // we may need to adjust rent epoch here if this is an account which should have had a rewrite
                 use std::str::FromStr;
                 let mut interesting = pubkey
-                == &Pubkey::from_str("HEkZLiZWT9WPvaremdWerd2D2rGBNytATpjhvd7GBDkv")
+                == &Pubkey::from_str("SY4CyV3gWWQ7HRAaNyiLeVGe7qQbJgc5kC2YUJtykck")
                     .unwrap();
 match self.rent_collector.calculate_rent_result(pubkey, &account, None) {
                     RentResult::LeaveAloneNoRent => {
