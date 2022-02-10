@@ -4592,7 +4592,7 @@ impl Bank {
         > 119675200 2hX
           119675231
         */
-        let slot_interesting_here = self.slot() == 119675038;// self.slot() == 119675183;
+        let slot_interesting_here = self.slot() == 119675232;// self.slot() == 119675183;
         let mut first = slot_interesting_here;//true || (self.slot() >= 115929262 && self.slot() <= 115929262); //115929302; //false;
                                                                                         // parallelize?
         let mut rent_debits = RentDebits::default();
@@ -4624,7 +4624,7 @@ impl Bank {
             // >= 43, <=46 wrong result Epugq2tPW3w9bzaHoxhE3SmBBrX2gUs7zGczNpy4V12V
             // >= 45, <=46 wrong result Epugq2tPW3w9bzaHoxhE3SmBBrX2gUs7zGczNpy4V12V
             //first = slot_interesting_here && (i >= 46 && i <= 46);
-            first = true;//slot_interesting_here && interesting;
+            //first = true;//slot_interesting_here && interesting;
             //2hXBg6H2pb4EGAQPB43AHzgh5VP7PRGFLuknesLk4DXQ
             if collected.rent_amount != 0 || !first {
                 //} || !interesting {//|| !first {//} || self.slot() >= 116979356 {
@@ -4633,10 +4633,11 @@ impl Bank {
                     collected2.push((pubkey, account.rent_epoch(), account.lamports()));
                 }
             } else {
-                // 0
+                // 0 GzPr6qkupyuXnmHdV1AyQYHH1Qt1VH7NbNrj68C3VyHy good
+                // > 79 EA6vgwyDbq5qYVaptRJybAh3MhZ1gbf2C2YNxFjoJFGo
                 // > 158 EA6vgwyDbq5qYVaptRJybAh3MhZ1gbf2C2YNxFjoJFGo bad
                 // 317
-                if self.rewrites.len() > 79 {
+                if self.rewrites.len() > 158 {
                     first = false;
                 }
                 //first = false;
