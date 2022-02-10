@@ -4601,12 +4601,14 @@ impl Bank {
         let mut collected2 = vec![];
         let mut total_collected = CollectedInfo::default();
         let mut i = 0;
+        let target_slot = self.slot();
         for (pubkey, mut account) in accounts {
             /*
             let found = Self::partition_from_pubkey(&pubkey, partition.2);
             assert!(found <= partition.1, "{}, {}, {:?}", pubkey, found, partition);
             assert!(found > partition.0 || (found == 0 && partition.0 == 0), "{}, {}, {:?}", pubkey, found, partition);
             */
+            let old_rent_epoch = account.rent_epoch();
             let collected = self.rent_collector.collect_from_existing_account(
                 &pubkey,
                 &mut account,
@@ -4633,7 +4635,19 @@ impl Bank {
             first = slot_interesting_here && interesting;//&& i >= 102 && i <= 104;// && interesting;//(i >= 46 && i <= 46);
             //first = true;//slot_interesting_here && interesting;
             //2hXBg6H2pb4EGAQPB43AHzgh5VP7PRGFLuknesLk4DXQ
-            if collected.rent_amount != 0 || !first {
+            let mut force = false;
+            if collected.rent_amount == 0 && old_rent_epoch != account.rent_epoch() {
+                // rent epoch should increment. If we already wrote IN this slot, then we need to update again.
+                if let Some(entry) = self.rc.accounts.accounts_db.accounts_index.get_account_read_entry(&pubkey) {
+                    if entry.slot_list().iter().any(|(slot, _)| slot == &target_slot) {
+                        // we already wrote this account in this slot, but we may not have collected rent (sys vars for example)
+                        // so, force ourselves to rewrite it
+                        error!("forcing update since this account was written in this slot: {}, {}", pubkey, target_slot);
+                        force = true;
+                    }
+                }
+            }
+            if collected.rent_amount != 0 || !first || force {
                 //} || !interesting {//|| !first {//} || self.slot() >= 116979356 {
                 if !just_rewrites {
                     self.store_account(&pubkey, &account);
@@ -5401,7 +5415,7 @@ impl Bank {
         use log::*;
         use std::str::FromStr;
         let mut interesting = pubkey
-        == &Pubkey::from_str("SysvarC1ock11111111111111111111111111111111")
+        == &Pubkey::from_str("SysvarS1otHistory11111111111111111111111111")
             .unwrap();
                                             if interesting {
                                                 error!("store_account: {}, {:?}", pubkey, new_account);
