@@ -6955,6 +6955,7 @@ impl AccountsDb {
                 is_startup,
             )?;
 
+            // what if there is nothing written for a given slot - no rewrites occur
         if calculated_lamports != total_lamports {
             warn!(
                 "Mismatched total lamports: {} calculated: {}",
