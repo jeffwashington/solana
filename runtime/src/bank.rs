@@ -2083,7 +2083,7 @@ impl Bank {
     where
         F: Fn(&Option<AccountSharedData>) -> AccountSharedData,
     {
-        error!("update_sysvar_account: {}", pubkey);
+        error!("update_sysvar_account: {}, slot: {}", pubkey, self.slot());
         let old_account = self.get_account_with_fixed_root(pubkey);
         let mut new_account = updater(&old_account);
 
@@ -5398,8 +5398,15 @@ impl Bank {
             self.capitalization
                 .fetch_add(new_account.lamports(), Relaxed);
         }
-
-        self.store_account(pubkey, new_account);
+        use log::*;
+        use std::str::FromStr;
+        let mut interesting = meta.pubkey
+        == Pubkey::from_str("SysvarC1ock11111111111111111111111111111111")
+            .unwrap();
+                                            if interesting {
+                                                error!("store_account: {}, {:?}", pubkey, new_account);
+                                            }
+    self.store_account(pubkey, new_account);
     }
 
     fn withdraw(&self, pubkey: &Pubkey, lamports: u64) -> Result<()> {
