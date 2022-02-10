@@ -37,7 +37,7 @@ impl Bank {
                     use std::str::FromStr;
                     let key =  transaction_context.get_key_of_account_at_index(i);
                     let mut interesting = key
-                    == &Pubkey::from_str("SY4CyV3gWWQ7HRAaNyiLeVGe7qQbJgc5kC2YUJtykck")
+                    == &Pubkey::from_str("Sysv1HhTNVz8gn94Bs4CLQN86LB2gQmPWCtKSq7uvo9")
                         .unwrap();
                                                         if interesting {
                         error!("get_transaction_account_state_info: {}, {:?}, {:?}", key, account, fa);
