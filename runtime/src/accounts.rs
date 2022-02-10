@@ -329,7 +329,7 @@ impl Accounts {
                 use log::*;
                 use std::str::FromStr;
                 let mut interesting = key
-                == &Pubkey::from_str("SY4CyV3gWWQ7HRAaNyiLeVGe7qQbJgc5kC2YUJtykck")
+                == &Pubkey::from_str("SysvarC1ock11111111111111111111111111111111")
                     .unwrap();
                                                     if interesting {
                     error!("accounts.push: {}, {:?}", key, account);
