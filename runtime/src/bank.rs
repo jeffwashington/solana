@@ -4656,8 +4656,9 @@ impl Bank {
             } else {
                 // 0 
                 // 52  
+                // 77  
                 // 104 7DD34QzpC8KmfXLV3NgXdUSWMkpsW4uV1bGPYtFQtX6e, DGPJpChhspHsnkEbbXdjgvPRCL2f6UAtJibXDHvLoChz
-                if self.rewrites.len() > 52 {
+                if self.rewrites.len() > 77 {
                     first = false;
                 }
                 //first = false;
