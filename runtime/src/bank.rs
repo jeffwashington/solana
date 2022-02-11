@@ -4593,7 +4593,7 @@ impl Bank {
         > 119675200 2hX
           119675231
         */
-        let slot_interesting_here = self.slot() == 120253357;// self.slot() == 119675183;
+        let slot_interesting_here = true;//self.slot() == 120253357;// self.slot() == 119675183;
         let mut first = slot_interesting_here;//true || (self.slot() >= 115929262 && self.slot() <= 115929262); //115929302; //false;
                                                                                         // parallelize?
         let mut rent_debits = RentDebits::default();
@@ -4628,7 +4628,7 @@ impl Bank {
  (3CKKAoVi94EnfX8QcVxEmk8CAvZTc6nAYzXp1WkSUofX, DtR67m31uqLFLWE2r7r4DJV5QZEd15uDBneDZAinHEMZ, 277, 1169280)]
  */                        
             == &Pubkey::from_str("3CKKAoVi94EnfX8QcVxEmk8CAvZTc6nAYzXp1WkSUofX").unwrap();
-            first = first && slot_interesting_here;
+            //first = first && slot_interesting_here;
             // >= 43, <=47 wrong result
             // >= 43, <=46 wrong result Epugq2tPW3w9bzaHoxhE3SmBBrX2gUs7zGczNpy4V12V
             // >= 45, <=46 wrong result Epugq2tPW3w9bzaHoxhE3SmBBrX2gUs7zGczNpy4V12V
@@ -4664,7 +4664,7 @@ impl Bank {
                 // 77  
                 // 104 7DD34QzpC8KmfXLV3NgXdUSWMkpsW4uV1bGPYtFQtX6e, DGPJpChhspHsnkEbbXdjgvPRCL2f6UAtJibXDHvLoChz
                 if self.rewrites.len() > 0 {
-                    first = false;
+                    //first = false;
                 }
                 //first = false;
                 let hash =
