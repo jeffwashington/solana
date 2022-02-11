@@ -4655,13 +4655,14 @@ impl Bank {
                 }
             } else {
                 // 0 
-
-                // 13 
+                // 3
+                // 6 
+                // 13  7DD failed still
                 // 26
                 // 52  
                 // 77  
                 // 104 7DD34QzpC8KmfXLV3NgXdUSWMkpsW4uV1bGPYtFQtX6e, DGPJpChhspHsnkEbbXdjgvPRCL2f6UAtJibXDHvLoChz
-                if self.rewrites.len() > 6 {
+                if self.rewrites.len() > 3 {
                     first = false;
                 }
                 //first = false;
