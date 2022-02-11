@@ -2897,11 +2897,17 @@ impl Bank {
         let mut hash = self.hash.write().unwrap();
         if *hash == Hash::default() {
             // finish up any deferred changes to account state
+            error!("{} {}", file!(), line!());
             self.collect_rent_eagerly(false);
+            error!("{} {}", file!(), line!());
             self.collect_fees();
+            error!("{} {}", file!(), line!());
             self.distribute_rent();
+            error!("{} {}", file!(), line!());
             self.update_slot_history();
+            error!("{} {}", file!(), line!());
             self.run_incinerator();
+            error!("{} {}", file!(), line!());
 
             // freeze is a one-way trip, idempotent
             self.freeze_started.store(true, Relaxed);
@@ -4593,8 +4599,8 @@ impl Bank {
         > 119675200 2hX
           119675231
         */
-        let slot_interesting_here = self.slot() == 119675231;// self.slot() == 119675183;
-        let mut first = true;//slot_interesting_here;//true || (self.slot() >= 115929262 && self.slot() <= 115929262); //115929302; //false;
+        let slot_interesting_here = true;//self.slot() == 120253357;// self.slot() == 119675183;
+        let mut first = slot_interesting_here;//true || (self.slot() >= 115929262 && self.slot() <= 115929262); //115929302; //false;
                                                                                         // parallelize?
         let mut rent_debits = RentDebits::default();
         let mut skipped = vec![];
@@ -4654,20 +4660,17 @@ impl Bank {
                     collected2.push((pubkey, account.rent_epoch(), account.lamports()));
                 }
             } else {
-                // 0 GzPr6qkupyuXnmHdV1AyQYHH1Qt1VH7NbNrj68C3VyHy good
-                // > 83  GzPr6qkupyuXnmHdV1AyQYHH1Qt1VH7NbNrj68C3VyHy
-                // > 93  GzPr6qkupyuXnmHdV1AyQYHH1Qt1VH7NbNrj68C3VyHy
-                // > 98  GzPr6qkupyuXnmHdV1AyQYHH1Qt1VH7NbNrj68C3VyHy
-                // > 100 GzPr6qkupyuXnmHdV1AyQYHH1Qt1VH7NbNrj68C3VyHy
-                // > 102 GzPr6qkupyuXnmHdV1AyQYHH1Qt1VH7NbNrj68C3VyHy
-                // > 103 F1kHxjAuop1KWRgQSop5h83T3XMU4hA1TVqcP4hDt1FA
-                // > 124 EA6vgwyDbq5qYVaptRJybAh3MhZ1gbf2C2YNxFjoJFGo
-                // > 167 EA6vgwyDbq5qYVaptRJybAh3MhZ1gbf2C2YNxFjoJFGo  
-                // > 237  
-                // 334 EA6vgwyDbq5qYVaptRJybAh3MhZ1gbf2C2YNxFjoJFGo
-                // 1317 
-                if self.rewrites.len() > 102 {
-                    first = false;
+                // 0  
+                // 1  
+                // 3  failed
+                // 6 
+                // 13 7DD failed still
+                // 26
+                // 52  
+                // 77  
+                // 104 7DD34QzpC8KmfXLV3NgXdUSWMkpsW4uV1bGPYtFQtX6e, DGPJpChhspHsnkEbbXdjgvPRCL2f6UAtJibXDHvLoChz
+                if self.rewrites.len() > 0 {
+                    //first = false;
                 }
                 //first = false;
                 let hash =
@@ -5615,7 +5618,7 @@ match self.rent_collector.calculate_rent_result(pubkey, &account, None) {
                                 next_epoch.saturating_sub(1) // we have not passed THIS epoch's rewrite slot yet
                                 };
                                 if rent_epoch != new_rent_epoch || interesting {
-                                    error!("updating rent_epoch: {}, old: {}, new: {}, current_slot_index: {}, slot_index_of_pubkey: {}", pubkey, rent_epoch, new_rent_epoch, current_slot_index, slot_index_of_pubkey);
+                                    error!("updating rent_epoch: {}, old: {}, new: {}, current_slot_index: {}, slot_index_of_pubkey: {}, current_epoch: {}, self.epoch(): {}", pubkey, rent_epoch, new_rent_epoch, current_slot_index, slot_index_of_pubkey, current_epoch, self.epoch());
                                     account.set_rent_epoch(new_rent_epoch);
                                 }
                             }

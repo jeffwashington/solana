@@ -5595,8 +5595,8 @@ impl AccountsDb {
             == Pubkey::from_str("3CKKAoVi94EnfX8QcVxEmk8CAvZTc6nAYzXp1WkSUofX")
                 .unwrap();
                                                 if interesting {
-                error!("store_accounts_to: {}, {:?}, slot: {}", meta.pubkey, (account.map(|x| x.lamports()).unwrap_or_default(), account.map(|x| x.rent_epoch()).unwrap_or_default()), slot);
-                if (account.map(|x| x.lamports()).unwrap_or_default(), account.map(|x| x.rent_epoch()).unwrap_or_default()) == (1169280, 276) && slot == 119675231 {
+                error!("store_accounts_to: {}, {:?}, slot: {}", meta.pubkey, (account.map(|x| x.lamports()).unwrap_or_default(), account.map(|x| x.rent_epoch()).unwrap_or_default(), account.map(|x| *x.owner()).unwrap_or_default()), slot);
+                if (account.map(|x| x.lamports()).unwrap_or_default(), account.map(|x| x.rent_epoch()).unwrap_or_default()) == (11021, 0) && slot == 120253289 {
                     // panic!("writing to");
                 }
             }
@@ -7093,7 +7093,7 @@ impl AccountsDb {
         }
         hashes.extend(rewrites.into_iter());
 
-        if slot == 119332732 {
+        if slot == 999120253357 {
             let mut cloned = hashes.clone();
             AccountsHash::sort_hashes_by_pubkey(&mut cloned);            
             error!("hashes: {} {:?}", slot, cloned);
