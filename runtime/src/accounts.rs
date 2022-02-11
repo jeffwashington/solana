@@ -331,7 +331,7 @@ impl Accounts {
                 use log::*;
                 use std::str::FromStr;
                 let mut interesting = key
-                == &Pubkey::from_str("3CKKAoVi94EnfX8QcVxEmk8CAvZTc6nAYzXp1WkSUofX 3akhnYGNjugsVGyPaXGBSzKo2KHJmtBTYUNavv9nZ1gT")
+                == &Pubkey::from_str("3CKKAoVi94EnfX8QcVxEmk8CAvZTc6nAYzXp1WkSUofX")
                     .unwrap();
                                                     if interesting {
                     error!("accounts.push: {}, {:?}, rent_due: {}, writable: {}", key, account, rent, message.is_writable(i));
