@@ -5597,7 +5597,7 @@ impl AccountsDb {
                                                 if interesting {
                 error!("store_accounts_to: {}, {:?}, slot: {}", meta.pubkey, (account.map(|x| x.lamports()).unwrap_or_default(), account.map(|x| x.rent_epoch()).unwrap_or_default(), account.map(|x| *x.owner()).unwrap_or_default()), slot);
                 if (account.map(|x| x.lamports()).unwrap_or_default(), account.map(|x| x.rent_epoch()).unwrap_or_default()) == (11021, 0) && slot == 120253289 {
-                    // panic!("writing to");
+                    panic!("writing to");
                 }
             }
         }
