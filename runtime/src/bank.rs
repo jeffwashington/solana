@@ -4623,12 +4623,12 @@ impl Bank {
             
                         let interesting = &pubkey
 /*
- [(SY4CyV3gWWQ7HRAaNyiLeVGe7qQbJgc5kC2YUJtykck, BVitCMWNY8BaqRr1GcKoSgw8Dtm493e2WeFv8xgSmw7T, 277, 1000000),
+ [(7H1CZ4Rbjo9YahkuBTJo4pheQQumuiAYc1SLmxJ82oAE, BVitCMWNY8BaqRr1GcKoSgw8Dtm493e2WeFv8xgSmw7T, 277, 1000000),
  (SysvZZkWAjU4vSDKbChruubcriS8arDaeyM1YP6b5Bw, CGYje5QNVAsAaZMJvQzFqzRLCfuFmjq8g3Sh67YWRGB, 277, 2039280),
- (SY4CyV3gWWQ7HRAaNyiLeVGe7qQbJgc5kC2YUJtykck, DtR67m31uqLFLWE2r7r4DJV5QZEd15uDBneDZAinHEMZ, 277, 1169280)]
+ (7H1CZ4Rbjo9YahkuBTJo4pheQQumuiAYc1SLmxJ82oAE, DtR67m31uqLFLWE2r7r4DJV5QZEd15uDBneDZAinHEMZ, 277, 1169280)]
  */                        
-            == &Pubkey::from_str("SY4CyV3gWWQ7HRAaNyiLeVGe7qQbJgc5kC2YUJtykck").unwrap();
-            //first = first && interesting;
+            == &Pubkey::from_str("7H1CZ4Rbjo9YahkuBTJo4pheQQumuiAYc1SLmxJ82oAE").unwrap();
+            first = first && slot_interesting_here;
             // >= 43, <=47 wrong result
             // >= 43, <=46 wrong result Epugq2tPW3w9bzaHoxhE3SmBBrX2gUs7zGczNpy4V12V
             // >= 45, <=46 wrong result Epugq2tPW3w9bzaHoxhE3SmBBrX2gUs7zGczNpy4V12V
@@ -5556,7 +5556,7 @@ impl Bank {
                 // we may need to adjust rent epoch here if this is an account which should have had a rewrite
                 use std::str::FromStr;
                 let mut interesting = pubkey
-                == &Pubkey::from_str("SY4CyV3gWWQ7HRAaNyiLeVGe7qQbJgc5kC2YUJtykck")
+                == &Pubkey::from_str("7H1CZ4Rbjo9YahkuBTJo4pheQQumuiAYc1SLmxJ82oAE")
                     .unwrap();
 match self.rent_collector.calculate_rent_result(pubkey, &account, None) {
                     RentResult::LeaveAloneNoRent => {
