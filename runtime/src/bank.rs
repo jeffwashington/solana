@@ -5575,7 +5575,8 @@ match self.rent_collector.calculate_rent_result(pubkey, &account, None) {
                             let (current_epoch, current_slot_index) = self.get_epoch_and_slot_index(self.slot());
                             let slot_index_of_pubkey = Self::partition_from_pubkey(pubkey, self.epoch_schedule().slots_per_epoch);
                             let rent_epoch = account.rent_epoch();
-                            if rent_epoch < self.epoch() {
+                            // there is an account created in maybe in 3CKKAoVi94EnfX8QcVxEmk8CAvZTc6nAYzXp1WkSUofX, 120253355 with rent_epoch = 0
+                            if rent_epoch < self.epoch() && current_epoch < self.epoch() {
                                 let new_rent_epoch = if slot_index_of_pubkey < current_slot_index {
                                     // we already would have done a rewrite on this account IN this epoch
                                     next_epoch
