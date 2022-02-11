@@ -5608,7 +5608,7 @@ match self.rent_collector.calculate_rent_result(pubkey, &account, None) {
                             let rent_epoch = account.rent_epoch();
                             // there is an account created maybe 3CKKAoVi94EnfX8QcVxEmk8CAvZTc6nAYzXp1WkSUofX, 120253355 with rent_epoch = 0
                             // if an account was written >= its rent collection slot within the last epoch worth of slots, then we don't want to update it here
-                            if can_update && rent_epoch < self.epoch() && current_epoch < self.epoch() {
+                            if can_update && rent_epoch < self.epoch() { // && current_epoch < self.epoch() {
                                 let new_rent_epoch = if slot_index_of_pubkey < current_slot_index {
                                     // we already would have done a rewrite on this account IN this epoch
                                     next_epoch
