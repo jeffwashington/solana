@@ -4594,7 +4594,7 @@ impl Bank {
           119675231
         */
         let slot_interesting_here = self.slot() == 120253357;// self.slot() == 119675183;
-        let mut first = slot_interesting_here;//true || (self.slot() >= 115929262 && self.slot() <= 115929262); //115929302; //false;
+        let mut first = false;//slot_interesting_here;//true || (self.slot() >= 115929262 && self.slot() <= 115929262); //115929302; //false;
                                                                                         // parallelize?
         let mut rent_debits = RentDebits::default();
         let mut skipped = vec![];
@@ -4654,7 +4654,8 @@ impl Bank {
                     collected2.push((pubkey, account.rent_epoch(), account.lamports()));
                 }
             } else {
-                // 0 
+                // 0
+                //  
                 // 3
                 // 6 
                 // 13  7DD failed still
