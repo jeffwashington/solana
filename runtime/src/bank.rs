@@ -4654,19 +4654,10 @@ impl Bank {
                     collected2.push((pubkey, account.rent_epoch(), account.lamports()));
                 }
             } else {
-                // 0 GzPr6qkupyuXnmHdV1AyQYHH1Qt1VH7NbNrj68C3VyHy good
-                // > 83  GzPr6qkupyuXnmHdV1AyQYHH1Qt1VH7NbNrj68C3VyHy
-                // > 93  GzPr6qkupyuXnmHdV1AyQYHH1Qt1VH7NbNrj68C3VyHy
-                // > 98  GzPr6qkupyuXnmHdV1AyQYHH1Qt1VH7NbNrj68C3VyHy
-                // > 100 GzPr6qkupyuXnmHdV1AyQYHH1Qt1VH7NbNrj68C3VyHy
-                // > 102 GzPr6qkupyuXnmHdV1AyQYHH1Qt1VH7NbNrj68C3VyHy
-                // > 103 F1kHxjAuop1KWRgQSop5h83T3XMU4hA1TVqcP4hDt1FA
-                // > 124 EA6vgwyDbq5qYVaptRJybAh3MhZ1gbf2C2YNxFjoJFGo
-                // > 167 EA6vgwyDbq5qYVaptRJybAh3MhZ1gbf2C2YNxFjoJFGo  
-                // > 237  
-                // 334 EA6vgwyDbq5qYVaptRJybAh3MhZ1gbf2C2YNxFjoJFGo
-                // 1317 
-                if self.rewrites.len() > 102 {
+                // 0 
+                // 52  
+                // 104 7DD34QzpC8KmfXLV3NgXdUSWMkpsW4uV1bGPYtFQtX6e, DGPJpChhspHsnkEbbXdjgvPRCL2f6UAtJibXDHvLoChz
+                if self.rewrites.len() > 52 {
                     first = false;
                 }
                 //first = false;
