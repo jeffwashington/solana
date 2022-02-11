@@ -5555,7 +5555,7 @@ impl Bank {
         pubkey: &Pubkey,
     ) -> Option<(AccountSharedData, Slot)> {
         match self.rc.accounts.load_with_fixed_root(ancestors, pubkey) {
-            Some((mut account, slot)) => {
+            Some((mut account, storage_slot)) => {
                 // we may need to adjust rent epoch here if this is an account which should have had a rewrite
                 use std::str::FromStr;
                 let mut interesting = pubkey
@@ -5576,9 +5576,36 @@ match self.rent_collector.calculate_rent_result(pubkey, &account, None) {
                         if rent_due == 0 {
                             // we could have an account where we skipped rewrite last epoch. But, this epoch we haven't skipped it yet. So, we would then expect to see 
                             let (current_epoch, current_slot_index) = self.get_epoch_and_slot_index(self.slot());
+                            let (storage_epoch, storage_slot_index) = self.get_epoch_and_slot_index(storage_slot);
                             let slot_index_of_pubkey = Self::partition_from_pubkey(pubkey, self.epoch_schedule().slots_per_epoch);
+                            let mut can_update = true;
+                            if current_epoch == storage_epoch {
+                                // storage is in same epoch as bank
+                                if slot_index_of_pubkey > current_slot_index { // >?
+                                    // we haven't hit the slot's rent collection slot yet, and the storage was within this slot, so do not update
+                                    can_update = false;
+                                }
+                                else if slot_index_of_pubkey < current_slot_index {
+                                    // storage is IN same epoch as bank and we HAVE since hit the slot's rent collection slot in this epoch, so we should update since we must have avoided a rewrite
+                                    // todo - do we need to look at skipped slots to calculate these things? skipped slots could mean WE are the rent collection slot even though we're greater. true for all comparisons
+                                    can_update = true;
+                                }
+                            }
+                            else if current_epoch == storage_epoch + 1  {
+                                // storage is in the previous epoch
+                                if storage_slot_index < slot_index_of_pubkey {
+                                    can_update = true; // the most recent write was in the previous epoch, prior to the pubkey's rent collection slot, so we skipped the rewrite last epoch
+                                }
+                                else if slot_index_of_pubkey >= current_slot_index {
+                                    // todo - think about skipped slots. ugggh
+                                    // we did do rewrite in last epoch, and we have not yet hit the rent collection slot in THIS epoch
+                                    can_update = false;
+                                }
+                            } // if more than 1 epoch old, then we need to collect rent because we clearly skipped it. todo: once again, skipped slots... ugh
                             let rent_epoch = account.rent_epoch();
-                            if rent_epoch < self.epoch() {
+                            // there is an account created maybe 3CKKAoVi94EnfX8QcVxEmk8CAvZTc6nAYzXp1WkSUofX, 120253355 with rent_epoch = 0
+                            // if an account was written >= its rent collection slot within the last epoch worth of slots, then we don't want to update it here
+                            if can_update && rent_epoch < self.epoch() /* && current_epoch < self.epoch() added at some point - this seems not possible */ {
                                 let new_rent_epoch = if slot_index_of_pubkey < current_slot_index {
                                     // we already would have done a rewrite on this account IN this epoch
                                     next_epoch
@@ -5601,7 +5628,7 @@ match self.rent_collector.calculate_rent_result(pubkey, &account, None) {
                         }
                     }
                 }
-                Some((account, slot))
+                Some((account, storage_slot))
             }
             None => None
         }
