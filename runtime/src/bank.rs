@@ -2897,11 +2897,17 @@ impl Bank {
         let mut hash = self.hash.write().unwrap();
         if *hash == Hash::default() {
             // finish up any deferred changes to account state
+            error!("{} {}", file!(), line!());
             self.collect_rent_eagerly(false);
+            error!("{} {}", file!(), line!());
             self.collect_fees();
+            error!("{} {}", file!(), line!());
             self.distribute_rent();
+            error!("{} {}", file!(), line!());
             self.update_slot_history();
+            error!("{} {}", file!(), line!());
             self.run_incinerator();
+            error!("{} {}", file!(), line!());
 
             // freeze is a one-way trip, idempotent
             self.freeze_started.store(true, Relaxed);
