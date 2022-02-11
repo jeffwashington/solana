@@ -218,6 +218,220 @@ pub struct ErrorCounters {
     pub invalid_writable_account: usize,
     pub invalid_rent_paying_account: usize,
 }
+use crate::bank::PartitionIndex;
+pub struct ExpectedRentCollection {
+    pub partition_from_pubkey: PartitionIndex,
+    pub epoch_of_max_storage_slot: Epoch,
+    pub partition_index_from_max_slot: PartitionIndex,
+    pub storage_slot: Slot,
+    pub first_slot_in_max_epoch: Slot,
+    pub expected_rent_collection_slot_max_epoch: Slot,
+    pub rent_epoch: Epoch,
+    pub max_slot_in_storages: Epoch,
+}
+
+impl ExpectedRentCollection {
+    pub fn new(        pubkey: &Pubkey,
+        loaded_account: &impl ReadableAccount        ,
+        storage_slot: Slot,
+        epoch_schedule: Option<&EpochSchedule>,
+        rent_collector: &RentCollector,
+        maybe_db: &Option<&AccountsDb>,
+        max_slot_in_storages_exclusive: Slot,
+        find_next_slot: impl Fn(Slot) -> Option<Slot>,
+        filler_account_suffix: Option<&Pubkey>,
+) -> Option<Self> {
+        assert!(epoch_schedule.is_some());
+        let epoch_schedule = epoch_schedule.unwrap();
+        let slots_per_epoch = epoch_schedule.slots_per_epoch;
+
+        assert!(max_slot_in_storages_exclusive > 0);
+        let max_slot_in_storages = max_slot_in_storages_exclusive.saturating_sub(1);
+        /*
+        assert_eq!(
+            find_next_slot(max_slot_in_storages),
+            Some(max_slot_in_storages)
+        );*/ // sometimes not true?
+
+        let mut is_ancient = false;
+        if storage_slot + slots_per_epoch <= max_slot_in_storages {
+            is_ancient = true; // has to be treated like ancient since we are older than an epoch
+        }
+        /*
+        if let Some(storages) = storage.get(storage_slot) {
+            if storages.len() == 1 {
+                if storages[0].accounts.is_ancient() {
+                    is_ancient = true;
+                }
+                else if storage_slot + slots_per_epoch < max_slot_in_storages {
+                    is_ancient = true; // has to be treated like ancient since we are older than an epoch
+                }
+                else {
+                    let capacity =  storages[0].accounts.capacity();
+                    use crate::append_vec::MAXIMUM_APPEND_VEC_FILE_SIZE;
+                    let size = (MAXIMUM_APPEND_VEC_FILE_SIZE - 2048) / 1; // below max? todo - too small to make us do this more often
+                    if capacity == size {
+                        is_ancient = true;
+                    }
+                }
+            }
+        }
+        */
+        // todo: if we are ancient, then we should assume we need to recompute
+        // if we are not ancient, we can calculate based on distance of this slot from max
+        let partition_from_pubkey =
+            crate::bank::Bank::partition_from_pubkey(pubkey, slots_per_epoch);
+            let (epoch_of_max_storage_slot, _partition_index_from_max_slot) =
+            epoch_schedule.get_epoch_and_slot_index(max_slot_in_storages);
+            let (_, partition_index_from_max_slot) =
+            epoch_schedule.get_epoch_and_slot_index(max_slot_in_storages);
+        if max_slot_in_storages >= slots_per_epoch
+            && storage_slot <= max_slot_in_storages - slots_per_epoch
+        {
+            // this storage_slot is ancient and we know we have to recompute
+        }
+        // now, we have to find the root that is >= that storage_slot
+        let first_slot_in_max_epoch = max_slot_in_storages - partition_index_from_max_slot;
+        let mut expected_rent_collection_slot_max_epoch =
+            first_slot_in_max_epoch + partition_from_pubkey;
+        if expected_rent_collection_slot_max_epoch > max_slot_in_storages {
+            // max slot has not hit the slot in the max epoch where we would have collected rent yet, so the most recent rent-collected rewrite slot for this pubkey would be in the previous epoch
+            expected_rent_collection_slot_max_epoch =
+                expected_rent_collection_slot_max_epoch.saturating_sub(slots_per_epoch);
+        }
+        let interesting_slot = 217092740;
+        let interesting_parittion = 11231_000;
+        let interesting = true && (pubkey
+            == &Pubkey::from_str("3CKKAoVi94EnfX8QcVxEmk8CAvZTc6nAYzXp1WkSUofX").unwrap()
+            || ((storage_slot == interesting_slot || storage_slot == 115044876)
+                && partition_index_from_max_slot == partition_from_pubkey)) || partition_from_pubkey == interesting_parittion;
+
+        let mut use_stored = true;
+
+        // if we write account a at slot 1 a valid transaction,
+        // but then at slot 2, it is time for a rewrite on account a, then when we find slot 1, we will
+        // not be ancient, BUT, we should do a rewrite on it later, so we can't just bail out when it is
+        // not ancient - we still may have to do a rewrite at a higher slot #
+        // this needs a test case
+
+        // todo think about: can't rely on 'is_ancient'
+        /*
+        if !is_ancient {
+            //} /* !is_ancient && */ storage_slot >= expected_rent_collection_slot_max_epoch {
+            if interesting {
+                //storage_slot == 115044876 || storage_slot ==  {//partition_from_pubkey == storage_slot % slots_per_epoch {
+                let recalc_hash =
+                    loaded_account.compute_hash(expected_rent_collection_slot_max_epoch, pubkey);
+                /*
+                let hash =
+                crate::accounts_db::AccountsDb::hash_account(self.slot(), &account, &pubkey);
+                */
+
+                error!("early maybe_rehash: {}, loaded_hash: {}, storage_slot: {}, max_slot_in_storages: {}, expected_rent_collection_slot_max_epoch: {}, storage_slot_distance_from_max: {}, partition_index_from_max_slot: {}, partition_from_pubkey: {}, calculated hash: {}, use_stored: {}, storage_slot_partition: {}, rent_epoch: {}, cached: {}",
+                pubkey,
+                loaded_account.loaded_hash(),
+                storage_slot,
+                max_slot_in_storages,
+                expected_rent_collection_slot_max_epoch,
+                max_slot_in_storages - storage_slot,
+                partition_index_from_max_slot,
+                partition_from_pubkey,
+                recalc_hash,
+                use_stored,
+                epoch_schedule.get_epoch_and_slot_index(storage_slot).1,
+                loaded_account.rent_epoch(),
+                loaded_account.is_cached(),
+            );
+            }
+            // the storage slot is at least as recent as the expected rent collection slot, so whatever is in the append vec is good
+            // we have not collected rent yet in this epoch for this pubkey
+            // we can use the previously calculated hash
+            return loaded_account.loaded_hash();
+        }
+        */
+        // the slot we're dealing with is where we expected the rent to be collected for this pubkey, so use what is in this slot
+        // however, there are cases, such as adjusting the clock, where we store the account IN the same slot, but we do so BEFORE we collect rent. We later store the account AGAIN for rewrite/rent collection.
+        // So, if storage_slot == expected_rent_collection_slot..., then we MAY have collected rent or may not have. So, it has to be >
+        if storage_slot > expected_rent_collection_slot_max_epoch /* || loaded_account.rent_epoch() > epoch_of_max_storage_slot this doesn't work because we could write IN this slot and update rent epoch, but then we skip the rewrite in THAT slot and we need to rehash because the slot changed */ {
+            // no need to update hash
+            return None;
+        }
+
+        let expected_slot_start = expected_rent_collection_slot_max_epoch;
+        let find = find_next_slot(expected_slot_start);
+        if let Some(find) = find {
+            // found a root (because we have a storage) that is >= expected_rent_collection_slot.
+            if interesting {
+                error!("{}, find: {}, expected_rent_collection_slot_max_epoch: {}", pubkey, find, expected_rent_collection_slot_max_epoch);
+            }
+            expected_rent_collection_slot_max_epoch = find;
+            {//if find >= expected_rent_collection_slot_max_epoch {
+                // only skip stored if the ??? todo finish my thought hahaha
+                use_stored = false; // this means try to figure out if we need to use stored or not based on future slots
+            }
+        }
+        else if interesting {
+            error!("{}, did not find: {}, expected_rent_collection_slot_max_epoch: {}", pubkey, expected_slot_start, expected_rent_collection_slot_max_epoch);
+        }
+
+        if !use_stored && maybe_db.is_some() {
+            let maybe_db = maybe_db.as_ref().unwrap();
+            // see if this account is written later. if so, then we don't need to rehash it
+            let list = maybe_db
+                .accounts_index
+                .get_account_read_entry(pubkey)
+                .unwrap();
+            let mut found = false;
+            if interesting {
+                error!("{}, slotlist: {:?}, storage_slot: {}", pubkey, list.slot_list(), storage_slot);
+            }
+            for (slot, info) in list.slot_list() {
+                // > means a slot in the future is expected to be seen and IT will have a more up to date hash already
+                // note this requires that EVERYTHING < max_slot_in_storages_exclusive in the accounts index is a root
+                if slot > &storage_slot && slot < &max_slot_in_storages_exclusive { // todo - perhaps this should be max slot in ancestors, max root, roots, etc. Or, this might need to be a real root, not a potential ancestor fork that will be pruned???
+                    found = true;
+                    use_stored = true;
+                }
+            }
+        }
+
+        // this should be conditional
+        let rent_result =
+            rent_collector.calculate_rent_result(pubkey, loaded_account, filler_account_suffix);
+        let mut rent_epoch = loaded_account.rent_epoch();
+        match rent_result {
+            RentResult::CollectRent((mut next_epoch, rent_due)) => {
+                if next_epoch > rent_epoch {
+                    if rent_due != 0 {
+                        if interesting {
+                            error!("{}, rent due: {}, next_epoch: {}, rent_epoch: {}", pubkey, rent_due, next_epoch, rent_epoch);
+                        }
+                        use_stored = true; // this is an account in an ancient append vec that would have had rent collected, so just use the hash we have since there must be a newer version of this account already in a newer slot
+                    }
+                }
+                if partition_index_from_max_slot < partition_from_pubkey {
+                    next_epoch = next_epoch.saturating_sub(1); // this account won't have had rent collected for the current epoch yet (rent_collector has a current epoch), so our expected next_epoch is for the previous epoch
+                }
+                rent_epoch = std::cmp::max(next_epoch, rent_epoch);
+            }
+            // nothing to do
+            RentResult::LeaveAloneNoRent => {}
+        };
+
+        Some(
+        Self {
+            partition_from_pubkey,
+            epoch_of_max_storage_slot,
+            partition_index_from_max_slot,
+            storage_slot,
+            first_slot_in_max_epoch,
+            expected_rent_collection_slot_max_epoch,
+            rent_epoch,
+            max_slot_in_storages,
+        }
+        )
+    }
+}
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct IndexGenerationInfo {
@@ -6388,234 +6602,26 @@ impl AccountsDb {
         find_next_slot: impl Fn(Slot) -> Option<Slot>,
         filler_account_suffix: Option<&Pubkey>,
     ) -> Hash {
-        assert!(epoch_schedule.is_some());
-        let epoch_schedule = epoch_schedule.unwrap();
-        let slots_per_epoch = epoch_schedule.slots_per_epoch;
-
-        assert!(max_slot_in_storages_exclusive > 0);
-        let max_slot_in_storages = max_slot_in_storages_exclusive.saturating_sub(1);
-        /*
-        assert_eq!(
-            find_next_slot(max_slot_in_storages),
-            Some(max_slot_in_storages)
-        );*/ // sometimes not true?
-
-        let mut is_ancient = false;
-        if storage_slot + slots_per_epoch <= max_slot_in_storages {
-            is_ancient = true; // has to be treated like ancient since we are older than an epoch
-        }
-        /*
-        if let Some(storages) = storage.get(storage_slot) {
-            if storages.len() == 1 {
-                if storages[0].accounts.is_ancient() {
-                    is_ancient = true;
-                }
-                else if storage_slot + slots_per_epoch < max_slot_in_storages {
-                    is_ancient = true; // has to be treated like ancient since we are older than an epoch
-                }
-                else {
-                    let capacity =  storages[0].accounts.capacity();
-                    use crate::append_vec::MAXIMUM_APPEND_VEC_FILE_SIZE;
-                    let size = (MAXIMUM_APPEND_VEC_FILE_SIZE - 2048) / 1; // below max? todo - too small to make us do this more often
-                    if capacity == size {
-                        is_ancient = true;
-                    }
-                }
-            }
-        }
-        */
-        // todo: if we are ancient, then we should assume we need to recompute
-        // if we are not ancient, we can calculate based on distance of this slot from max
-        let partition_from_pubkey =
-            crate::bank::Bank::partition_from_pubkey(pubkey, slots_per_epoch);
-            let (epoch_of_max_storage_slot, _partition_index_from_max_slot) =
-            epoch_schedule.get_epoch_and_slot_index(max_slot_in_storages);
-            let (_, partition_index_from_max_slot) =
-            epoch_schedule.get_epoch_and_slot_index(max_slot_in_storages);
-        if max_slot_in_storages >= slots_per_epoch
-            && storage_slot <= max_slot_in_storages - slots_per_epoch
-        {
-            // this storage_slot is ancient and we know we have to recompute
-        }
-        // now, we have to find the root that is >= that storage_slot
-        let first_slot_in_max_epoch = max_slot_in_storages - partition_index_from_max_slot;
-        let mut expected_rent_collection_slot_max_epoch =
-            first_slot_in_max_epoch + partition_from_pubkey;
-        if expected_rent_collection_slot_max_epoch > max_slot_in_storages {
-            // max slot has not hit the slot in the max epoch where we would have collected rent yet, so the most recent rent-collected rewrite slot for this pubkey would be in the previous epoch
-            expected_rent_collection_slot_max_epoch =
-                expected_rent_collection_slot_max_epoch.saturating_sub(slots_per_epoch);
-        }
-        let interesting_slot = 217092740;
-        let interesting_parittion = 11231_000;
-        let interesting = true && (pubkey
-            == &Pubkey::from_str("3CKKAoVi94EnfX8QcVxEmk8CAvZTc6nAYzXp1WkSUofX").unwrap()
-            || ((storage_slot == interesting_slot || storage_slot == 115044876)
-                && partition_index_from_max_slot == partition_from_pubkey)) || partition_from_pubkey == interesting_parittion;
+        let interesting = pubkey
+            == &Pubkey::from_str("3CKKAoVi94EnfX8QcVxEmk8CAvZTc6nAYzXp1WkSUofX").unwrap();
 
         let mut use_stored = true;
-
-        // if we write account a at slot 1 a valid transaction,
-        // but then at slot 2, it is time for a rewrite on account a, then when we find slot 1, we will
-        // not be ancient, BUT, we should do a rewrite on it later, so we can't just bail out when it is
-        // not ancient - we still may have to do a rewrite at a higher slot #
-        // this needs a test case
-
-        // todo think about: can't rely on 'is_ancient'
-        /*
-        if !is_ancient {
-            //} /* !is_ancient && */ storage_slot >= expected_rent_collection_slot_max_epoch {
-            if interesting {
-                //storage_slot == 115044876 || storage_slot ==  {//partition_from_pubkey == storage_slot % slots_per_epoch {
-                let recalc_hash =
-                    loaded_account.compute_hash(expected_rent_collection_slot_max_epoch, pubkey);
-                /*
-                let hash =
-                crate::accounts_db::AccountsDb::hash_account(self.slot(), &account, &pubkey);
-                */
-
-                error!("early maybe_rehash: {}, loaded_hash: {}, storage_slot: {}, max_slot_in_storages: {}, expected_rent_collection_slot_max_epoch: {}, storage_slot_distance_from_max: {}, partition_index_from_max_slot: {}, partition_from_pubkey: {}, calculated hash: {}, use_stored: {}, storage_slot_partition: {}, rent_epoch: {}, cached: {}",
-                pubkey,
-                loaded_account.loaded_hash(),
-                storage_slot,
-                max_slot_in_storages,
-                expected_rent_collection_slot_max_epoch,
-                max_slot_in_storages - storage_slot,
-                partition_index_from_max_slot,
-                partition_from_pubkey,
-                recalc_hash,
-                use_stored,
-                epoch_schedule.get_epoch_and_slot_index(storage_slot).1,
-                loaded_account.rent_epoch(),
-                loaded_account.is_cached(),
-            );
-            }
-            // the storage slot is at least as recent as the expected rent collection slot, so whatever is in the append vec is good
-            // we have not collected rent yet in this epoch for this pubkey
-            // we can use the previously calculated hash
+        let expected = ExpectedRentCollection::new(pubkey, loaded_account, storage_slot, epoch_schedule, rent_collector, maybe_db, max_slot_in_storages_exclusive, find_next_slot, filler_account_suffix);
+        if expected.is_none() {
             return loaded_account.loaded_hash();
         }
-        */
-        // the slot we're dealing with is where we expected the rent to be collected for this pubkey, so use what is in this slot
-        // however, there are cases, such as adjusting the clock, where we store the account IN the same slot, but we do so BEFORE we collect rent. We later store the account AGAIN for rewrite/rent collection.
-        // So, if storage_slot == expected_rent_collection_slot..., then we MAY have collected rent or may not have. So, it has to be >
-        if storage_slot > expected_rent_collection_slot_max_epoch /* || loaded_account.rent_epoch() > epoch_of_max_storage_slot this doesn't work because we could write IN this slot and update rent epoch, but then we skip the rewrite in THAT slot and we need to rehash because the slot changed */ {
-            if interesting || (storage_slot == interesting_slot && partition_index_from_max_slot == partition_from_pubkey) {
-                //storage_slot == 115044876 || storage_slot ==  {//partition_from_pubkey == storage_slot % slots_per_epoch {
-                let recalc_hash =
-                    loaded_account.compute_hash(expected_rent_collection_slot_max_epoch, pubkey);
-                /*
-                let hash =
-                crate::accounts_db::AccountsDb::hash_account(self.slot(), &account, &pubkey);
-                */
+        use_stored = false;
+        let epoch_schedule = epoch_schedule.unwrap();
+        let expected = expected.unwrap();
 
-                error!("early maybe_rehash: {}, loaded_hash: {}, storage_slot: {}, max_slot_in_storages: {}, expected_rent_collection_slot_max_epoch: {}, storage_slot_distance_from_max: {}, partition_index_from_max_slot: {}, partition_from_pubkey: {}, calculated hash: {}, use_stored: {}, storage_slot_partition: {}, rent_epoch: {}, cached: {}, epoch_of_max_storage_slot: {}",
-                pubkey,
-                loaded_account.loaded_hash(),
-                storage_slot,
-                max_slot_in_storages,
-                expected_rent_collection_slot_max_epoch,
-                max_slot_in_storages - storage_slot,
-                partition_index_from_max_slot,
-                partition_from_pubkey,
-                recalc_hash,
-                use_stored,
-                epoch_schedule.get_epoch_and_slot_index(storage_slot).1,
-                loaded_account.rent_epoch(),
-                loaded_account.is_cached(),
-                epoch_of_max_storage_slot,
-            );
-            }
-            // the storage slot is at least as recent as the expected rent collection slot, so whatever is in the append vec is good
-            // we have not collected rent yet in this epoch for this pubkey
-            // we can use the previously calculated hash
-            return loaded_account.loaded_hash();
-        }
-
-        let expected_slot_start = expected_rent_collection_slot_max_epoch;
-        let find = find_next_slot(expected_slot_start);
-        if let Some(find) = find {
-            // found a root (because we have a storage) that is >= expected_rent_collection_slot.
-            if interesting {
-                error!("{}, find: {}, expected_rent_collection_slot_max_epoch: {}", pubkey, find, expected_rent_collection_slot_max_epoch);
-            }
-            expected_rent_collection_slot_max_epoch = find;
-            {//if find >= expected_rent_collection_slot_max_epoch {
-                // only skip stored if the ??? todo finish my thought hahaha
-                use_stored = false; // this means try to figure out if we need to use stored or not based on future slots
-            }
-        }
-        else if interesting {
-            error!("{}, did not find: {}, expected_rent_collection_slot_max_epoch: {}", pubkey, expected_slot_start, expected_rent_collection_slot_max_epoch);
-        }
-
-        if !use_stored && maybe_db.is_some() {
-            let maybe_db = maybe_db.as_ref().unwrap();
-            // see if this account is written later. if so, then we don't need to rehash it
-            let list = maybe_db
-                .accounts_index
-                .get_account_read_entry(pubkey)
-                .unwrap();
-            let mut found = false;
-            if interesting {
-                error!("{}, slotlist: {:?}, storage_slot: {}", pubkey, list.slot_list(), storage_slot);
-            }
-            for (slot, info) in list.slot_list() {
-                // > means a slot in the future is expected to be seen and IT will have a more up to date hash already
-                // note this requires that EVERYTHING < max_slot_in_storages_exclusive in the accounts index is a root
-                if slot > &storage_slot && slot < &max_slot_in_storages_exclusive { // todo - perhaps this should be max slot in ancestors, max root, roots, etc. Or, this might need to be a real root, not a potential ancestor fork that will be pruned???
-                    found = true;
-                    use_stored = true;
-                }
-            }
-        }
-
-        /*
-        if pubkey == &Pubkey::from_str("3CKKAoVi94EnfX8QcVxEmk8CAvZTc6nAYzXp1WkSUofX").unwrap() {
-        }
-        */
-        assert!(!force_rehash);
-
-        // this should be conditional
-        let rent_result =
-            rent_collector.calculate_rent_result(pubkey, loaded_account, filler_account_suffix);
-        let mut rent_epoch = loaded_account.rent_epoch();
-        match rent_result {
-            RentResult::CollectRent((mut next_epoch, rent_due)) => {
-                if next_epoch > rent_epoch {
-                    if rent_due != 0 {
-                        if interesting {
-                            error!("{}, rent due: {}, next_epoch: {}, rent_epoch: {}", pubkey, rent_due, next_epoch, rent_epoch);
-                        }
-                        use_stored = true; // this is an account in an ancient append vec that would have had rent collected, so just use the hash we have since there must be a newer version of this account already in a newer slot
-                    }
-                }
-                if partition_index_from_max_slot < partition_from_pubkey {
-                    next_epoch = next_epoch.saturating_sub(1); // this account won't have had rent collected for the current epoch yet (rent_collector has a current epoch), so our expected next_epoch is for the previous epoch
-                }
-                rent_epoch = std::cmp::max(next_epoch, rent_epoch);
-            }
-            // nothing to do
-            RentResult::LeaveAloneNoRent => {}
-        }
-
-        let partition_storage_slot = epoch_schedule.get_epoch_and_slot_index(storage_slot).1;
-        if !use_stored && partition_storage_slot < partition_from_pubkey {
-            if interesting {
-                error!("{}, partition_storage_slot: {:?}, partition_from_pubkey: {}", pubkey, partition_storage_slot, partition_from_pubkey);
-            }
-            // we have an account we wrote in this epoch already, so we collected rent then, so we would not have rewritten it again later in this same epoch
-            // not true because we always rewrite on the pubkey-based slot
-            // use_stored = true;
-        }
         let mut log = false;//true;//storage_slot == 119267500;
         if interesting {
             //storage_slot == 114612876 { //partition_from_pubkey == storage_slot % slots_per_epoch {
             let recalc_hash = crate::accounts_db::AccountsDb::hash_account_with_rent_epoch(
-                expected_rent_collection_slot_max_epoch,
+                expected.expected_rent_collection_slot_max_epoch,
                 loaded_account,
                 &pubkey,
-                rent_epoch,
+                expected.rent_epoch,
             );
 
             log = false;
@@ -6623,15 +6629,15 @@ impl AccountsDb {
             pubkey,
             loaded_account.loaded_hash(),
             storage_slot,
-            max_slot_in_storages,
-            expected_rent_collection_slot_max_epoch,
-            max_slot_in_storages - storage_slot,
-            partition_index_from_max_slot,
-            partition_from_pubkey,
+            expected.max_slot_in_storages,
+            expected.expected_rent_collection_slot_max_epoch,
+            expected.max_slot_in_storages - storage_slot,
+            expected.partition_index_from_max_slot,
+            expected.partition_from_pubkey,
             recalc_hash,
             use_stored,
             epoch_schedule.get_epoch_and_slot_index(storage_slot).1,
-            rent_epoch,
+            expected.rent_epoch,
             loaded_account.lamports(),
             loaded_account.rent_epoch(),
         );
@@ -6641,10 +6647,10 @@ impl AccountsDb {
             return loaded_account.loaded_hash();
         }
         let recalc_hash = crate::accounts_db::AccountsDb::hash_account_with_rent_epoch(
-            expected_rent_collection_slot_max_epoch,
+            expected.expected_rent_collection_slot_max_epoch,
             loaded_account,
             &pubkey,
-            rent_epoch,
+            expected.rent_epoch,
         );
         if recalc_hash == loaded_account.loaded_hash() {
             // unnecessary calculation occurred
@@ -6655,18 +6661,18 @@ impl AccountsDb {
         pubkey,
         loaded_account.loaded_hash(),
         storage_slot,
-        max_slot_in_storages,
-        expected_rent_collection_slot_max_epoch,
-        max_slot_in_storages - storage_slot,
-        partition_index_from_max_slot,
-        partition_from_pubkey,
+        expected.max_slot_in_storages,
+        expected.expected_rent_collection_slot_max_epoch,
+        expected.max_slot_in_storages - storage_slot,
+        expected.partition_index_from_max_slot,
+        expected.partition_from_pubkey,
         recalc_hash,
         use_stored,
         epoch_schedule.get_epoch_and_slot_index(storage_slot).1,
-        rent_epoch,
+        expected.rent_epoch,
         loaded_account.lamports(),
         loaded_account.rent_epoch(),
-        epoch_of_max_storage_slot,
+        expected.epoch_of_max_storage_slot,
 
 );
         }

@@ -220,7 +220,7 @@ pub type BankSlotDelta = SlotDelta<Result<()>>;
 // Eager rent collection repeats in cyclic manner.
 // Each cycle is composed of <partition_count> number of tiny pubkey subranges
 // to scan, which is always multiple of the number of slots in epoch.
-type PartitionIndex = u64;
+pub type PartitionIndex = u64;
 type PartitionsPerCycle = u64;
 type Partition = (PartitionIndex, PartitionIndex, PartitionsPerCycle);
 type RentCollectionCycleParams = (
