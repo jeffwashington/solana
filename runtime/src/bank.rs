@@ -1039,6 +1039,8 @@ pub struct Bank {
     /// Hash of this Bank's state. Only meaningful after freezing.
     hash: RwLock<Hash>,
 
+    rent_collected: AtomicBool,
+
     /// Hash of this Bank's parent's state
     parent_hash: Hash,
 
@@ -1274,6 +1276,7 @@ impl Bank {
             rc: BankRc::new(accounts, Slot::default()),
             src: StatusCacheRc::default(),
             blockhash_queue: RwLock::<BlockhashQueue>::default(),
+            rent_collected: AtomicBool::default(),
             ancestors: Ancestors::default(),
             hash: RwLock::<Hash>::default(),
             parent_hash: Hash::default(),
@@ -1588,6 +1591,7 @@ impl Bank {
             bank_id,
             epoch,
             blockhash_queue,
+            rent_collected: AtomicBool::default(),
 
             // TODO: clean this up, so much special-case copying...
             hashes_per_tick: parent.hashes_per_tick,
@@ -1881,6 +1885,7 @@ impl Bank {
             rc: bank_rc,
             src: new(),
             blockhash_queue: RwLock::new(fields.blockhash_queue),
+            rent_collected: AtomicBool::new(true),
             ancestors: Ancestors::from(&fields.ancestors),
             hash: RwLock::new(fields.hash),
             parent_hash: fields.parent_hash,
@@ -2899,6 +2904,7 @@ impl Bank {
             // finish up any deferred changes to account state
             error!("{} {}", file!(), line!());
             self.collect_rent_eagerly(false);
+            self.rent_collected.store(true, Release);
             error!("{} {}", file!(), line!());
             self.collect_fees();
             error!("{} {}", file!(), line!());
@@ -4599,7 +4605,7 @@ impl Bank {
         > 119675200 2hX
           119675231
         */
-        let slot_interesting_here = true;//self.slot() == 120253357;// self.slot() == 119675183;
+        let slot_interesting_here = true; //self.slot() == 119675231;// self.slot() == 119675183;
         let mut first = slot_interesting_here;//true || (self.slot() >= 115929262 && self.slot() <= 115929262); //115929302; //false;
                                                                                         // parallelize?
         let mut rent_debits = RentDebits::default();
@@ -4634,8 +4640,8 @@ impl Bank {
  (3CKKAoVi94EnfX8QcVxEmk8CAvZTc6nAYzXp1WkSUofX, DtR67m31uqLFLWE2r7r4DJV5QZEd15uDBneDZAinHEMZ, 277, 1169280)]
  */                        
             == &Pubkey::from_str("3CKKAoVi94EnfX8QcVxEmk8CAvZTc6nAYzXp1WkSUofX").unwrap();
-            //first = first && interesting;
-            // >= 43, <=47 wrong result
+            //first = slot_interesting_here && interesting;
+            // >= 43, <=47 wrong result 
             // >= 43, <=46 wrong result Epugq2tPW3w9bzaHoxhE3SmBBrX2gUs7zGczNpy4V12V
             // >= 45, <=46 wrong result Epugq2tPW3w9bzaHoxhE3SmBBrX2gUs7zGczNpy4V12V
             //first = slot_interesting_here && interesting;//&& i >= 102 && i <= 104;// && interesting;//(i >= 46 && i <= 46);
@@ -4660,16 +4666,20 @@ impl Bank {
                     collected2.push((pubkey, account.rent_epoch(), account.lamports()));
                 }
             } else {
-                // 0  
-                // 1  
-                // 3  failed
-                // 6 
-                // 13 7DD failed still
-                // 26
-                // 52  
-                // 77  
-                // 104 7DD34QzpC8KmfXLV3NgXdUSWMkpsW4uV1bGPYtFQtX6e, DGPJpChhspHsnkEbbXdjgvPRCL2f6UAtJibXDHvLoChz
-                if self.rewrites.len() > 0 {
+                // 0    GzPr6qkupyuXnmHdV1AyQYHH1Qt1VH7NbNrj68C3VyHy
+                // 77   good
+                // 96
+                // 115  good
+                // 116 bad // last one is: 3CKKAoVi94EnfX8QcVxEmk8CAvZTc6nAYzXp1WkSUofX
+                // 118 bad
+                // 120
+                // 125  
+                // 130
+                // 135  bad
+                // 145  
+                // 155  bad
+                // 330  FUfRsfNsK4TWQUoj8rM5u57Qt125Dn4oKg7PkbY9maU5
+                if self.rewrites.len() > 116 {
                     //first = false;
                 }
                 //first = false;
@@ -5418,7 +5428,7 @@ impl Bank {
         use log::*;
         use std::str::FromStr;
         let mut interesting = pubkey
-        == &Pubkey::from_str("SysvarS1otHistory11111111111111111111111111")
+        == &Pubkey::from_str("3CKKAoVi94EnfX8QcVxEmk8CAvZTc6nAYzXp1WkSUofX")
             .unwrap();
                                             if interesting {
                                                 error!("store_account: {}, {:?}", pubkey, new_account);
@@ -5577,6 +5587,8 @@ match self.rent_collector.calculate_rent_result(pubkey, &account, None) {
                     },
                     RentResult::CollectRent((next_epoch, rent_due)) => {
                         if rent_due == 0 {
+                            let rent_collected_this_slot = self.rent_collected.load(Acquire);
+
                             // we could have an account where we skipped rewrite last epoch. But, this epoch we haven't skipped it yet. So, we would then expect to see 
                             let (current_epoch, current_slot_index) = self.get_epoch_and_slot_index(self.slot());
                             let (storage_epoch, storage_slot_index) = self.get_epoch_and_slot_index(storage_slot);
@@ -5609,8 +5621,13 @@ match self.rent_collector.calculate_rent_result(pubkey, &account, None) {
                             // there is an account created maybe 3CKKAoVi94EnfX8QcVxEmk8CAvZTc6nAYzXp1WkSUofX, 120253355 with rent_epoch = 0
                             // if an account was written >= its rent collection slot within the last epoch worth of slots, then we don't want to update it here
                             if can_update && rent_epoch < self.epoch() /* && current_epoch < self.epoch() added at some point - this seems not possible */ {
+                                // todo here - this needs to see if WE are the slot which should have done the rewrite for a prior slot when rent collection was due. so, we need to look at roots_original and ancestors...
                                 let new_rent_epoch = if slot_index_of_pubkey < current_slot_index {
                                     // we already would have done a rewrite on this account IN this epoch
+                                    next_epoch
+                                }
+                                else if self.rewrites.contains_key(pubkey) {
+                                    // we already collected rent IN this slot AND skipped the rewrite, so we almost certainly need to adjust
                                     next_epoch
                                 }
                                 else {
@@ -5618,15 +5635,15 @@ match self.rent_collector.calculate_rent_result(pubkey, &account, None) {
                                 next_epoch.saturating_sub(1) // we have not passed THIS epoch's rewrite slot yet
                                 };
                                 if rent_epoch != new_rent_epoch || interesting {
-                                    error!("updating rent_epoch: {}, old: {}, new: {}, current_slot_index: {}, slot_index_of_pubkey: {}, current_epoch: {}, self.epoch(): {}", pubkey, rent_epoch, new_rent_epoch, current_slot_index, slot_index_of_pubkey, current_epoch, self.epoch());
+                                    error!("updating rent_epoch: {}, old: {}, new: {}, current_slot_index: {}, slot_index_of_pubkey: {}, current_epoch: {}, self.epoch(): {}, rent_collected_this_slot: {}", pubkey, rent_epoch, new_rent_epoch, current_slot_index, slot_index_of_pubkey, current_epoch, self.epoch(), rent_collected_this_slot);
                                     account.set_rent_epoch(new_rent_epoch);
                                 }
                             }
                             else {
-                                    if interesting {
-                                        error!("NOT updating rent_epoch: {}, next_epoch: {}, old: {}, current epoch: {}", pubkey, rent_epoch, next_epoch, current_epoch);
-                                    }
-                    
+                                assert!(!self.rewrites.contains_key(pubkey));
+                                if interesting {
+                                    error!("NOT updating rent_epoch: {}, next_epoch: {}, old: {}, current epoch: {}, rent_collected_this_slot: {}", pubkey, rent_epoch, next_epoch, current_epoch, rent_collected_this_slot);
+                                }
                             }
                         }
                     }

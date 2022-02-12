@@ -5934,6 +5934,10 @@ impl AccountsDb {
         );
     }
 
+    pub fn find_next_slot(&self, slot: Slot, ancestors: &Option<&Ancestors>) -> Option<Slot> {
+        self.accounts_index.get_next_original_root(slot, ancestors)
+    }
+
     pub fn checked_iterative_sum_for_capitalization(total_cap: u64, new_cap: u64) -> u64 {
         let new_total = total_cap as u128 + new_cap as u128;
         AccountsHash::checked_cast_for_capitalization(new_total)
@@ -6027,7 +6031,7 @@ impl AccountsDb {
                                                 error!("calc hash: {}, {}, slot: {}, list: {:?}, lamports: {}, rent_epoch: {}", pubkey, loaded_account.loaded_hash(), slot, lock.slot_list(), loaded_account.lamports(), loaded_account.rent_epoch());
                                             }
                                             let find_next_slot = |slot: Slot| {
-                                                let roots = self.accounts_index.get_next_original_root(slot, &Some(&ancestors));
+                                                let roots = self.find_next_slot(slot, &Some(&ancestors));
                                                 if roots.is_none() {
                                                     error!("{}, {}, slot: {}, list: {:?}, lamports: {}, rent_epoch: {}", pubkey, loaded_account.loaded_hash(), slot, lock.slot_list(), loaded_account.lamports(), loaded_account.rent_epoch());
                                                 }
@@ -6718,8 +6722,7 @@ impl AccountsDb {
         let find_next_slot = |slot: Slot| {
             let roots = maybe_db
                 .unwrap()
-                .accounts_index
-                .get_next_original_root(slot, &accounts_cache_and_ancestors.map(|(_, ancestors, _)| ancestors));
+                .find_next_slot(slot, &accounts_cache_and_ancestors.map(|(_, ancestors, _)| ancestors));
                 if roots.is_none() {
                     error!("not next slot: {}, max: {}", slot, maybe_db
                     .unwrap().accounts_index.max_root_inclusive());
@@ -7099,7 +7102,7 @@ impl AccountsDb {
         }
         hashes.extend(rewrites.into_iter());
 
-        if slot == 999120253357 {
+        if slot == 119675231 {
             let mut cloned = hashes.clone();
             AccountsHash::sort_hashes_by_pubkey(&mut cloned);            
             error!("hashes: {} {:?}", slot, cloned);
