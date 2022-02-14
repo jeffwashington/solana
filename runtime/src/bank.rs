@@ -4640,6 +4640,7 @@ impl Bank {
  (9iksGx9TJdL3kBqVndFAnenpXxbgCF2swXxpktn9JAvQ, DtR67m31uqLFLWE2r7r4DJV5QZEd15uDBneDZAinHEMZ, 277, 1169280)]
  */                        
             == &Pubkey::from_str("9iksGx9TJdL3kBqVndFAnenpXxbgCF2swXxpktn9JAvQ").unwrap();
+            first = false;
             //first = slot_interesting_here && interesting;
             // >= 43, <=47 wrong result 
             // >= 43, <=46 wrong result Epugq2tPW3w9bzaHoxhE3SmBBrX2gUs7zGczNpy4V12V
