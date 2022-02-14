@@ -4648,8 +4648,8 @@ impl Bank {
             //first = slot_interesting_here && interesting;//&& i >= 102 && i <= 104;// && interesting;//(i >= 46 && i <= 46);
             //first = true;//slot_interesting_here && interesting;
             //2hXBg6H2pb4EGAQPB43AHzgh5VP7PRGFLuknesLk4DXQ
-            let mut force = false;
-            if collected.rent_amount == 0 && old_rent_epoch != account.rent_epoch() {
+            let mut force = account.rent_epoch() == 0; // special case for default rent value
+            if !force && collected.rent_amount == 0 && old_rent_epoch != account.rent_epoch() {
                 // rent epoch should increment. If we already wrote IN this slot, then we need to update again.
                 if let Some(entry) = self.rc.accounts.accounts_db.accounts_index.get_account_read_entry(&pubkey) {
                     if entry.slot_list().iter().any(|(slot, _)| slot == &target_slot) {
@@ -5613,6 +5613,10 @@ match self.rent_collector.calculate_rent_result(pubkey, &account, None) {
                                 }
                             } // if more than 1 epoch old, then we need to collect rent because we clearly skipped it. todo: once again, skipped slots... ugh
                             let rent_epoch = account.rent_epoch();
+                            if rent_epoch == 0 && self.epoch() > 1 {
+                                can_update = false;
+                            }
+
                             // there is an account created maybe 3CKKAoVi94EnfX8QcVxEmk8CAvZTc6nAYzXp1WkSUofX, 120253355 with rent_epoch = 0
                             // if an account was written >= its rent collection slot within the last epoch worth of slots, then we don't want to update it here
                             if can_update && rent_epoch < self.epoch() /* && current_epoch < self.epoch() added at some point - this seems not possible */ {
