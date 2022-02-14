@@ -912,7 +912,10 @@ pub struct AccountsIndex<T: IndexValue> {
 
 impl<T: IndexValue> AccountsIndex<T> {
     pub fn default_for_tests() -> Self {
-        Self::new(Some(ACCOUNTS_INDEX_CONFIG_FOR_TESTING))
+        let mut config = ACCOUNTS_INDEX_CONFIG_FOR_TESTING;
+        config.index_limit_mb = Some(10_000);
+
+        Self::new(Some(config))
     }
 
     pub fn new(config: Option<AccountsIndexConfig>) -> Self {
