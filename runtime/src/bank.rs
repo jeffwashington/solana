@@ -5430,7 +5430,7 @@ impl Bank {
         == &Pubkey::from_str("3CKKAoVi94EnfX8QcVxEmk8CAvZTc6nAYzXp1WkSUofX")
             .unwrap();
         if interesting {
-            error!("load_slow_with_fixed_root: {}, {:?}", pubkey, (account.map(|x| x.0.lamports()).unwrap_or_default(), account.map(|x| x.0.rent_epoch()).unwrap_or_default()));
+            error!("load_slow_with_fixed_root: {}, {:?}", pubkey, (account.as_ref().map(|x| x.0.lamports()).unwrap_or_default(), account.as_ref().map(|x| x.0.rent_epoch()).unwrap_or_default()));
         }
     
         account
