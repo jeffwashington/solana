@@ -5423,7 +5423,17 @@ impl Bank {
         ancestors: &Ancestors,
         pubkey: &Pubkey,
     ) -> Option<(AccountSharedData, Slot)> {
-        self.rc.accounts.load_with_fixed_root(ancestors, pubkey)
+        let account = self.rc.accounts.load_with_fixed_root(ancestors, pubkey);
+        use log::*;
+        use std::str::FromStr;
+        let mut interesting = pubkey
+        == &Pubkey::from_str("3CKKAoVi94EnfX8QcVxEmk8CAvZTc6nAYzXp1WkSUofX")
+            .unwrap();
+        if interesting {
+            error!("load_slow_with_fixed_root: {}, {:?}", pubkey, (account.map(|x| x.0.lamports()).unwrap_or_default(), account.map(|x| x.0.rent_epoch()).unwrap_or_default()));
+        }
+    
+        account
     }
 
     pub fn get_program_accounts(
