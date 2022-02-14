@@ -5640,7 +5640,9 @@ match self.rent_collector.calculate_rent_result(pubkey, &account, None) {
                                 }
                             }
                             else {
-                                assert!(!self.rewrites.contains_key(pubkey));
+                                if !can_update {
+                                    assert!(!self.rewrites.contains_key(pubkey), "NOT updating rent_epoch: {}, next_epoch: {}, old: {}, current epoch: {}, rent_collected_this_slot: {}, can_update: {}", pubkey, rent_epoch, next_epoch, current_epoch, rent_collected_this_slot, can_update);
+                                }
                                 if interesting {
                                     error!("NOT updating rent_epoch: {}, next_epoch: {}, old: {}, current epoch: {}, rent_collected_this_slot: {}", pubkey, rent_epoch, next_epoch, current_epoch, rent_collected_this_slot);
                                 }
