@@ -371,7 +371,7 @@ impl ExpectedRentCollection {
             }
         }
         else if interesting {
-            error!("{}, did not find: {}, expected_rent_collection_slot_max_epoch: {}", pubkey, expected_slot_start, expected_rent_collection_slot_max_epoch);
+            panic!("{}, did not find: {}, expected_rent_collection_slot_max_epoch: {}", pubkey, expected_slot_start, expected_rent_collection_slot_max_epoch);
         }
 
         if !use_stored && maybe_db.is_some() {
@@ -389,8 +389,13 @@ impl ExpectedRentCollection {
                 // > means a slot in the future is expected to be seen and IT will have a more up to date hash already
                 // note this requires that EVERYTHING < max_slot_in_storages_exclusive in the accounts index is a root
                 if slot > &storage_slot && slot < &max_slot_in_storages_exclusive { // todo - perhaps this should be max slot in ancestors, max root, roots, etc. Or, this might need to be a real root, not a potential ancestor fork that will be pruned???
-                    found = true;
-                    use_stored = true;
+                    if find_next_slot(*slot) == Some(*slot) {
+                        found = true;
+                        use_stored = true;
+                    }
+                    else {
+                        panic!("found slot in future is NOT root: {:?}, {}, {}, {:?}", find_next_slot(*slot), slot, pubkey, list.slot_list());
+                    }
                 }
             }
         }
@@ -409,7 +414,11 @@ impl ExpectedRentCollection {
                         use_stored = true; // this is an account in an ancient append vec that would have had rent collected, so just use the hash we have since there must be a newer version of this account already in a newer slot
                     }
                 }
-                if partition_index_from_max_slot < partition_from_pubkey {
+                if first_slot_in_max_epoch > expected_rent_collection_slot_max_epoch {
+                    // if rent was due to be collected in slot before current epoch, but that slot was skipped, so we would have collected rent IN this epoch, then we want to use the current epoch.
+                    // otherwise, rent collection would have been in the previous epoch and we need to use THAT epoch as the latest instead of the rent collector's epoch (which is from the bank at the max root)
+                    assert!(partition_index_from_max_slot < partition_from_pubkey, "{}, {}, storage_slot: {}", partition_index_from_max_slot, partition_from_pubkey, storage_slot);
+                    // if partition_index_from_max_slot < partition_from_pubkey {
                     next_epoch = next_epoch.saturating_sub(1); // this account won't have had rent collected for the current epoch yet (rent_collector has a current epoch), so our expected next_epoch is for the previous epoch
                 }
                 rent_epoch = std::cmp::max(next_epoch, rent_epoch);
