@@ -4667,12 +4667,13 @@ impl Bank {
                 }
             } else {
                 // 0    GzPr6qkupyuXnmHdV1AyQYHH1Qt1VH7NbNrj68C3VyHy
+                // 10 
                 // 21 
                 // 42
                 // 85 fail 
                 // 171
                 // 342
-                if self.rewrites.len() > 10 {
+                if self.rewrites.len() > 0 {
                     first = false;
                 }
                 //first = false;
