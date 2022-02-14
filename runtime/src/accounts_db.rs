@@ -352,7 +352,8 @@ impl ExpectedRentCollection {
         // the slot we're dealing with is where we expected the rent to be collected for this pubkey, so use what is in this slot
         // however, there are cases, such as adjusting the clock, where we store the account IN the same slot, but we do so BEFORE we collect rent. We later store the account AGAIN for rewrite/rent collection.
         // So, if storage_slot == expected_rent_collection_slot..., then we MAY have collected rent or may not have. So, it has to be >
-        if storage_slot > expected_rent_collection_slot_max_epoch /* || loaded_account.rent_epoch() > epoch_of_max_storage_slot this doesn't work because we could write IN this slot and update rent epoch, but then we skip the rewrite in THAT slot and we need to rehash because the slot changed */ {
+        // rent epoch=0 is a special case
+        if storage_slot > expected_rent_collection_slot_max_epoch || loaded_account.rent_epoch() == 0 /* || loaded_account.rent_epoch() > epoch_of_max_storage_slot this doesn't work because we could write IN this slot and update rent epoch, but then we skip the rewrite in THAT slot and we need to rehash because the slot changed */ {
             // no need to update hash
             return None;
         }
