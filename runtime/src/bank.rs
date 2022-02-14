@@ -4667,20 +4667,10 @@ impl Bank {
                 }
             } else {
                 // 0    GzPr6qkupyuXnmHdV1AyQYHH1Qt1VH7NbNrj68C3VyHy
-                // 77   good
-                // 96
-                // 115  good
-                // 116 bad // last one is: 9iksGx9TJdL3kBqVndFAnenpXxbgCF2swXxpktn9JAvQ
-                // 118 bad
-                // 120
-                // 125  
-                // 130
-                // 135  bad
-                // 145  
-                // 155  bad
-                // 330  FUfRsfNsK4TWQUoj8rM5u57Qt125Dn4oKg7PkbY9maU5
-                if self.rewrites.len() > 116 {
-                    //first = false;
+                // 171
+                // 342
+                if self.rewrites.len() > 171 {
+                    first = false;
                 }
                 //first = false;
                 let hash =
