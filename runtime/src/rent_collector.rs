@@ -148,7 +148,7 @@ impl RentCollector {
     use log::*;
     use std::str::FromStr;
     let mut interesting = address
-    == &Pubkey::from_str("9iksGx9TJdL3kBqVndFAnenpXxbgCF2swXxpktn9JAvQ")
+    == &Pubkey::from_str("3CKKAoVi94EnfX8QcVxEmk8CAvZTc6nAYzXp1WkSUofX")
         .unwrap();
                                         if interesting {
         error!("collect_from_existing_account: {}, {:?}, result: {:?}", address, (account.lamports(), account.rent_epoch()), result);
