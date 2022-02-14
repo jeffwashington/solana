@@ -4986,9 +4986,9 @@ impl AccountsDb {
             let mut interesting = meta.pubkey
             == Pubkey::from_str("3CKKAoVi94EnfX8QcVxEmk8CAvZTc6nAYzXp1WkSUofX")
                 .unwrap();
-                                                if interesting {
+            if interesting {
                 error!("store_accounts_to: {}, {:?}, slot: {}", meta.pubkey, (account.map(|x| x.lamports()).unwrap_or_default(), account.map(|x| x.rent_epoch()).unwrap_or_default()), slot);
-                if (slot, account.map(|x| x.lamports()).unwrap_or_default(), account.map(|x| x.rent_epoch()).unwrap_or_default())) == (120253357, 6558757, 0) {
+                if (slot, account.map(|x| x.lamports()).unwrap_or_default(), account.map(|x| x.rent_epoch()).unwrap_or_default()) == (120253357, 6558757, 0) {
                     panic!("interesting one");
                 }
             }
