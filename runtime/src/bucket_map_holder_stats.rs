@@ -18,6 +18,8 @@ pub struct BucketMapHolderStats {
     pub gets_from_mem: AtomicU64,
     pub get_missing_us: AtomicU64,
     pub gets_missing: AtomicU64,
+    pub flush_read_lock_us: AtomicU64,
+    pub flush_update_disk_us: AtomicU64,
     pub entry_mem_us: AtomicU64,
     pub entries_from_mem: AtomicU64,
     pub entry_missing_us: AtomicU64,
@@ -28,6 +30,8 @@ pub struct BucketMapHolderStats {
     pub load_disk_missing_us: AtomicU64,
     pub updates_in_mem: AtomicU64,
     pub items: AtomicU64,
+    pub empty_flush_calls: AtomicU64,
+    pub restarted_flush_calls: AtomicU64,
     pub items_us: AtomicU64,
     pub keys: AtomicU64,
     pub deletes: AtomicU64,
@@ -41,6 +45,8 @@ pub struct BucketMapHolderStats {
     pub flush_entries_removed_from_mem: AtomicU64,
     pub active_threads: AtomicU64,
     pub get_range_us: AtomicU64,
+    pub range_held_already: AtomicU64,
+    pub new_range_held: AtomicU64,
     last_age: AtomicU8,
     last_ages_flushed: AtomicU64,
     pub flush_scan_update_us: AtomicU64,
@@ -246,6 +252,17 @@ impl BucketMapHolderStats {
                     self.get_mem_us.swap(0, Ordering::Relaxed),
                     i64
                 ),
+                
+                (
+                    "flush_update_disk_us",
+                    self.flush_update_disk_us.swap(0, Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "flush_read_lock_us",
+                    self.flush_read_lock_us.swap(0, Ordering::Relaxed),
+                    i64
+                ),
                 (
                     "gets_missing",
                     self.gets_missing.swap(0, Ordering::Relaxed),
@@ -306,6 +323,16 @@ impl BucketMapHolderStats {
                     self.get_range_us.swap(0, Ordering::Relaxed),
                     i64
                 ),
+                (
+                    "range_held_already",
+                    self.range_held_already.swap(0, Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "new_range_held",
+                    self.new_range_held.swap(0, Ordering::Relaxed),
+                    i64
+                ),
                 ("inserts", self.inserts.swap(0, Ordering::Relaxed), i64),
                 ("deletes", self.deletes.swap(0, Ordering::Relaxed), i64),
                 (
@@ -314,8 +341,19 @@ impl BucketMapHolderStats {
                     i64
                 ),
                 ("items", self.items.swap(0, Ordering::Relaxed), i64),
+                ("age", storage.current_age(), i64),
                 ("keys", self.keys.swap(0, Ordering::Relaxed), i64),
                 ("ms_per_age", ms_per_age, i64),
+                (
+                    "empty_flush_calls",
+                    self.empty_flush_calls.swap(0, Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "restarted_flush_calls",
+                    self.restarted_flush_calls.swap(0, Ordering::Relaxed),
+                    i64
+                ),
                 (
                     "flush_scan_update_us",
                     self.flush_scan_update_us.swap(0, Ordering::Relaxed),
@@ -369,6 +407,12 @@ impl BucketMapHolderStats {
                 (
                     "disk_index_flush_mmap_us",
                     disk.map(|disk| disk.stats.index.mmap_us.swap(0, Ordering::Relaxed))
+                        .unwrap_or_default(),
+                    i64
+                ),
+                (
+                    "disk_index_write_lock_us",
+                    disk.map(|disk| disk.stats.write_lock_us.swap(0, Ordering::Relaxed))
                         .unwrap_or_default(),
                     i64
                 ),
