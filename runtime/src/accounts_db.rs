@@ -103,7 +103,7 @@ pub const DEFAULT_NUM_DIRS: u32 = 4;
 // When calculating hashes, it is helpful to break the pubkeys found into bins based on the pubkey value.
 // More bins means smaller vectors to sort, copy, etc.
 pub const PUBKEY_BINS_FOR_CALCULATING_HASHES: usize = 65536;
-pub const NUM_SCAN_PASSES_DEFAULT: usize = 2;
+pub const NUM_SCAN_PASSES_DEFAULT: usize = 32;
 
 // Without chunks, we end up with 1 output vec for each outer snapshot storage.
 // This results in too many vectors to be efficient.
@@ -1310,6 +1310,9 @@ pub struct AccountsDb {
     // lower passes = faster total time, higher dynamic memory usage
     // passes=2 cuts dynamic memory usage in approximately half.
     pub num_hash_scan_passes: Option<usize>,
+
+    /// keep track of when last root was made
+    pub(crate) root_last_time: AtomicInterval,
 }
 
 #[derive(Debug, Default)]
@@ -1697,7 +1700,7 @@ fn quarter_thread_count() -> usize {
 
 pub fn make_min_priority_thread_pool() -> ThreadPool {
     // Use lower thread count to reduce priority.
-    let num_threads = quarter_thread_count();
+    let num_threads = quarter_thread_count() * 3/2;
     rayon::ThreadPoolBuilder::new()
         .thread_name(|i| format!("solana-cleanup-accounts-{}", i))
         .num_threads(num_threads)
@@ -1846,6 +1849,7 @@ impl AccountsDb {
             filler_account_count: 0,
             filler_account_suffix: None,
             num_hash_scan_passes,
+            root_last_time: AtomicInterval::default(),
         }
     }
 
@@ -1933,6 +1937,10 @@ impl AccountsDb {
             }
         }
         new
+    }
+
+    pub fn full_pubkey_range() -> std::ops::RangeInclusive<Pubkey> {
+        Pubkey::new(&[0; 32])..=Pubkey::new(&[0xff; 32])
     }
 
     pub fn set_shrink_paths(&self, paths: Vec<PathBuf>) {

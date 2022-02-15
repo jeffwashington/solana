@@ -7,7 +7,6 @@ use {
         bucket_map_holder::{Age, BucketMapHolder},
         bucket_map_holder_stats::BucketMapHolderStats,
     },
-    rand::{thread_rng, Rng},
     solana_bucket_map::bucket_api::BucketApi,
     solana_measure::measure::Measure,
     solana_sdk::{clock::Slot, pubkey::Pubkey},
@@ -760,12 +759,24 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                     }
                 }
             }
+            if !(!already_held && only_add_if_already_held) {
+                Self::update_stat(
+                    if already_held {
+                        &self.stats().range_held_already
+                    } else {
+                        &self.stats().new_range_held
+                    },
+                    1,
+                );
+            }
+
             if already_held || !only_add_if_already_held {
                 ranges.push(inclusive_range);
             }
         } else {
             // find the matching range and delete it since we don't want to hold it anymore
             // search backwards, assuming LIFO ordering
+            let mut found = false;
             for (i, r) in ranges.iter().enumerate().rev() {
                 if let (Bound::Included(start_found), Bound::Included(end_found)) =
                     (r.start_bound(), r.end_bound())
@@ -773,10 +784,12 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                     if start_found == &start && end_found == &end {
                         // found a match. There may be dups, that's ok, we expect another call to remove the dup.
                         ranges.remove(i);
+                        found = true;
                         break;
                     }
                 }
             }
+            assert!(found, "not found: {}..={} in {:?}", start, end, ranges);
         }
         already_held
     }
@@ -810,8 +823,10 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
 
     fn put_range_in_cache<R>(&self, range: &Option<&R>)
     where
-        R: RangeBounds<Pubkey>,
+        R: RangeBounds<Pubkey> + std::fmt::Debug,
     {
+        use log::*;
+        error!("put range in cache: bucket: {} {:?}", self.bin, range);
         assert!(self.get_stop_flush()); // caller should be controlling the lifetime of how long this needs to be present
         let m = Measure::start("range");
 
@@ -865,9 +880,9 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
 
     fn random_chance_of_eviction() -> bool {
         // random eviction
-        const N: usize = 1000;
+        //const N: usize = 1000;
         // 1/N chance of eviction
-        thread_rng().gen_range(0, N) == 0
+        false //thread_rng().gen_range(0, N) == 0
     }
 
     /// assumes 1 entry in the slot list. Ignores overhead of the HashMap and such
@@ -922,6 +937,9 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         if !was_dirty && !iterate_for_age && !startup {
             // wasn't dirty and no need to age, so no need to flush this bucket
             // but, at startup we want to remove from buckets as fast as possible if any items exist
+            self.stats()
+                .empty_flush_calls
+                .fetch_add(1, Ordering::Relaxed);
             return;
         }
 
@@ -931,18 +949,20 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
             .map(|limit| in_mem_count * Self::approx_size_of_one_entry() >= limit * 1024 * 1024)
             .unwrap_or_default();
 
+        let mut flush_entries_updated_on_disk = 0;
         // may have to loop if disk has to grow and we have to restart
         loop {
             let mut removes;
             let mut removes_random = Vec::default();
             let disk = self.bucket.as_ref().unwrap();
 
-            let mut flush_entries_updated_on_disk = 0;
             let mut disk_resize = Ok(());
             // scan and update loop
             // holds read lock
             {
+                let m = Measure::start("flush_scan_and_update"); // we don't care about lock time in this metric - bg threads can wait
                 let map = self.map().read().unwrap();
+                Self::update_time_stat(&self.stats().flush_read_lock_us, m);
                 removes = Vec::with_capacity(map.len());
                 let m = Measure::start("flush_scan_and_update"); // we don't care about lock time in this metric - bg threads can wait
                 for (k, v) in map.iter() {
@@ -964,8 +984,10 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                         //  That prevents dropping an item from cache before disk is updated to latest in mem.
                         // happens inside of lock on in-mem cache. This is because of deleting items
                         // it is possible that the item in the cache is marked as dirty while these updates are happening. That is ok.
+                        let m = Measure::start("flush_scan_and_update"); // we don't care about lock time in this metric - bg threads can wait
                         disk_resize =
                             disk.try_write(k, (&v.slot_list.read().unwrap(), v.ref_count()));
+                        Self::update_time_stat(&self.stats().flush_update_disk_us, m);
                         if disk_resize.is_ok() {
                             flush_entries_updated_on_disk += 1;
                         } else {
@@ -975,12 +997,9 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                         }
                     }
                 }
+                drop(map);
                 Self::update_time_stat(&self.stats().flush_scan_update_us, m);
             }
-            Self::update_stat(
-                &self.stats().flush_entries_updated_on_disk,
-                flush_entries_updated_on_disk,
-            );
 
             let m = Measure::start("flush_remove_or_grow");
             match disk_resize {
@@ -998,6 +1017,10 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                         true,
                         exceeds_budget,
                     ) {
+                        self.stats()
+                            .restarted_flush_calls
+                            .fetch_add(1, Ordering::Relaxed);
+
                         iterate_for_age = false; // did not make it all the way through this bucket, so didn't handle age completely
                     }
                     Self::update_time_stat(&self.stats().flush_remove_us, m);
@@ -1007,6 +1030,10 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                         assert_eq!(current_age, self.storage.current_age());
                         self.set_has_aged(current_age);
                     }
+                    Self::update_stat(
+                        &self.stats().flush_entries_updated_on_disk,
+                        flush_entries_updated_on_disk,
+                    );
                     return;
                 }
                 Err(err) => {
@@ -1301,6 +1328,107 @@ mod tests {
             bucket.hold_range_in_memory(&range, false);
             bucket.hold_range_in_memory(&all, false);
         }
+    }
+
+    #[derive(Debug, Default, Clone)]
+    struct testit {
+        data: u64,
+    }
+    impl Drop for testit {
+        fn drop(&mut self) {
+            use log::*;
+            //error!("dropping");
+        }
+    }
+
+    #[test]
+    fn test_hash() {
+        use log::*;
+        solana_logger::setup();
+        use std::collections::hash_map::RandomState;
+        let s = RandomState::new();
+        let mut m = HashMap::with_hasher(s);
+        // x=500k, size = 10k does not get freed
+        let x = 500000u64;
+        m.insert(1u32, 1u32);
+        let mut m = Vec::with_capacity(x as usize);
+        for i in 0..x {
+            let s = 10_000;
+            let mut v_inner = Vec::with_capacity(s);
+            for j in 0..s {
+            v_inner.push(1u32);
+            }
+            let v = Arc::new(vec![(i, (v_inner, 32u64, 45u64, testit::default()))]);
+            if m.len() > 0 && false {
+                m[0] = v;
+            } else {
+                m.push(v);
+            }
+            /*
+            match m.entry(i) {
+                Entry::Occupied(_occupied) => {
+                    assert!(false);
+                }
+                Entry::Vacant(vacant) => {
+                    vacant.insert(v);
+                }
+            }
+            */
+        }
+        error!("waiting after add");
+        std::thread::sleep(std::time::Duration::from_millis(5_000));
+        error!("removing");
+        for i in 0..x {
+            /*
+            match m.entry(i) {
+                Entry::Occupied(occupied) => {
+                    occupied.remove();
+                }
+                Entry::Vacant(_vacant) => {
+                }
+            }
+            */
+            //let r = m.remove(&i).unwrap();
+            let i = (x - i - 1) as usize;
+            if i < m.len() {
+                let r = m.remove(i);
+                /*
+                assert_eq!(1, Arc::strong_count(&r));
+                let mut r = Arc::try_unwrap(r).unwrap();
+                r = vec![];
+                */
+                drop(r);
+            }
+        }
+        error!("done removing");
+        //std::thread::sleep(std::time::Duration::from_millis(5_000));
+        error!("done removing2");
+        std::thread::sleep(std::time::Duration::from_millis(5_000));
+        error!("drop map");
+        drop(m);
+        std::thread::sleep(std::time::Duration::from_millis(5_000));
+        error!("allocate and drop large vector");
+        let m: Vec<u8> = Vec::with_capacity(100_000_000_000);
+        drop(m);
+        std::thread::sleep(std::time::Duration::from_millis(5_000));
+        error!("create new map");
+        let s = RandomState::new();
+        let mut m = HashMap::with_hasher(s);
+        std::thread::sleep(std::time::Duration::from_millis(5_000));
+        error!("populating new map");
+        for i in 0..x {
+            let v = vec![(i, ([1u64; 251], 32u64, 45u64))];
+            match m.entry(i) {
+                Entry::Occupied(_occupied) => {
+                    assert!(false);
+                }
+                Entry::Vacant(vacant) => {
+                    vacant.insert(v);
+                }
+            }
+        }
+        error!("waiting after populating");
+        std::thread::sleep(std::time::Duration::from_millis(5_000));
     }
 
     #[test]
