@@ -3,6 +3,7 @@ use {
         bucket::Bucket, bucket_item::BucketItem, bucket_map::BucketMapError,
         bucket_stats::BucketMapStats, MaxSearch, RefCount,
     },
+    solana_measure::measure::Measure,
     solana_sdk::pubkey::Pubkey,
     std::{
         ops::RangeBounds,

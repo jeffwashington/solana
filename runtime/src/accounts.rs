@@ -42,7 +42,6 @@ use {
         slot_hashes::SlotHashes,
         system_program,
         sysvar::{self, instructions::construct_instructions_data},
-        timing::AtomicInterval,
         transaction::{
             AddressLookupError, Result, SanitizedTransaction, TransactionAccountLocks,
             TransactionError,
