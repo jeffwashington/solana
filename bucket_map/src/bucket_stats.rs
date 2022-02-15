@@ -14,4 +14,5 @@ pub struct BucketStats {
 pub struct BucketMapStats {
     pub index: Arc<BucketStats>,
     pub data: Arc<BucketStats>,
+    pub write_lock_us: AtomicU64,
 }

@@ -74,7 +74,11 @@ impl<T: IndexValue> BucketMapHolder<T> {
     }
 
     pub fn future_age_to_flush(&self) -> Age {
-        self.current_age().wrapping_add(self.ages_to_stay_in_cache)
+        self.future_age(self.ages_to_stay_in_cache)
+    }
+
+    pub fn future_age(&self, delta: Age) -> Age {
+        self.current_age().wrapping_add(delta)
     }
 
     fn has_age_interval_elapsed(&self) -> bool {
@@ -155,7 +159,9 @@ impl<T: IndexValue> BucketMapHolder<T> {
         bucket_config.drives = config.as_ref().and_then(|config| config.drives.clone());
         let mem_budget_mb = config.as_ref().and_then(|config| config.index_limit_mb);
         // only allocate if mem_budget_mb is Some
-        let disk = mem_budget_mb.map(|_| BucketMap::new(bucket_config));
+        // actually, allocate by default
+        let disk = Some(BucketMap::new(bucket_config));
+
         Self {
             disk,
             ages_to_stay_in_cache,
