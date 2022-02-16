@@ -150,7 +150,9 @@ pub mod zk_token_sdk_enabled {
 }
 
 pub mod versioned_tx_message_enabled {
-    solana_sdk::declare_id!("3KZZ6Ks1885aGBQ45fwRcPXVBCtzUvxhUTkwKMR41Tca");
+    // Adjusted to dummy key to disable builtin. kin genesis was made with this feature defined,
+    // but before the builtin was added.
+    solana_sdk::declare_id!("TyeracRaPvo91rMDg2CwcFxfN4pTEzR9AtbjyknuCL2");
 }
 
 pub mod libsecp256k1_fail_on_bad_count {
