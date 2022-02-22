@@ -403,7 +403,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                                 Self::lock_and_update_slot_list(
                                     &disk_entry,
                                     new_value.into(),
-                                    None, // todo
+                                    other_slot,
                                     reclaims,
                                     previous_slot_entry_was_cached,
                                 );
