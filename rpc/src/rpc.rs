@@ -2403,6 +2403,9 @@ pub mod rpc_minimal {
             commitment: Option<CommitmentConfig>,
         ) -> Result<EpochInfo>;
 
+        #[rpc(meta, name = "getGenesisHash")]
+        fn get_genesis_hash(&self, meta: Self::Metadata) -> Result<String>;
+
         #[rpc(meta, name = "getHealth")]
         fn get_health(&self, meta: Self::Metadata) -> Result<String>;
 
@@ -2479,6 +2482,11 @@ pub mod rpc_minimal {
             debug!("get_epoch_info rpc request received");
             let bank = meta.bank(commitment);
             Ok(bank.get_epoch_info())
+        }
+
+        fn get_genesis_hash(&self, meta: Self::Metadata) -> Result<String> {
+            debug!("get_genesis_hash rpc request received");
+            Ok(meta.genesis_hash.to_string())
         }
 
         fn get_health(&self, meta: Self::Metadata) -> Result<String> {
@@ -3155,9 +3163,6 @@ pub mod rpc_full {
             limit: Option<usize>,
         ) -> Result<Vec<RpcPerfSample>>;
 
-        #[rpc(meta, name = "getGenesisHash")]
-        fn get_genesis_hash(&self, meta: Self::Metadata) -> Result<String>;
-
         #[rpc(meta, name = "getSignatureStatuses")]
         fn get_signature_statuses(
             &self,
@@ -3355,11 +3360,6 @@ pub mod rpc_full {
                 .collect())
         }
 
-        fn get_genesis_hash(&self, meta: Self::Metadata) -> Result<String> {
-            debug!("get_genesis_hash rpc request received");
-            Ok(meta.genesis_hash.to_string())
-        }
-
         fn get_signature_statuses(
             &self,
             meta: Self::Metadata,
@@ -3472,7 +3472,7 @@ pub mod rpc_full {
             let preflight_commitment = config
                 .preflight_commitment
                 .map(|commitment| CommitmentConfig { commitment });
-            let preflight_bank = meta.bank(preflight_commitment);
+            let preflight_bank = &*meta.bank(preflight_commitment);
             let transaction = sanitize_transaction(unsanitized_tx)?;
             let signature = *transaction.signature();
 
@@ -3569,7 +3569,7 @@ pub mod rpc_full {
             let (_, mut unsanitized_tx) =
                 decode_and_deserialize::<VersionedTransaction>(data, encoding)?;
 
-            let bank = meta.bank(config.commitment);
+            let bank = &*meta.bank(config.commitment);
             if config.replace_recent_blockhash {
                 if config.sig_verify {
                     return Err(Error::invalid_params(
@@ -3637,7 +3637,7 @@ pub mod rpc_full {
             };
 
             Ok(new_response(
-                &bank,
+                bank,
                 RpcSimulateTransactionResult {
                     err: result.err(),
                     logs: Some(logs),
