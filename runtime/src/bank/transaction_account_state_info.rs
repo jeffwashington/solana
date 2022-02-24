@@ -4,7 +4,6 @@ use {
         bank::Bank,
     },
     solana_sdk::{
-        pubkey::Pubkey,
         account::ReadableAccount, feature_set, message::SanitizedMessage, native_loader,
         transaction::Result, transaction_context::TransactionContext,
     },
@@ -30,21 +29,18 @@ impl Bank {
                         // balances; however they will never be loaded as writable
                         debug_assert!(!native_loader::check_id(account.owner()));
 
-                    let fa = RentState::from_account(
-                        &account,
-                        &self.rent_collector().rent,
+                        Some(RentState::from_account(
+                            &account,
+                            &self.rent_collector().rent,
+                        ))
+                    } else {
+                        None
+                    };
+                    debug_assert!(
+                        state.is_some(),
+                        "message and transaction context out of sync, fatal"
                     );
-                    use log::*;
-                    use std::str::FromStr;
-                    let key =  transaction_context.get_key_of_account_at_index(i);
-                    let mut interesting = key
-                    == &Pubkey::from_str("3CKKAoVi94EnfX8QcVxEmk8CAvZTc6nAYzXp1WkSUofX")
-                        .unwrap();
-                                                        if interesting {
-                        error!("get_transaction_account_state_info: {}, {:?}, {:?}", key, account, fa);
-                    }
-    
-                    Some(fa)
+                    state
                 } else {
                     None
                 };

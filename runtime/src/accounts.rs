@@ -256,7 +256,7 @@ impl Accounts {
             let mut accounts = Vec::with_capacity(account_keys.len());
             let mut account_deps = Vec::with_capacity(account_keys.len());
             let mut rent_debits = RentDebits::default();
-            for (i, key) in message.account_keys_iter().enumerate() {
+            for (i, key) in account_keys.iter().enumerate() {
                 let mut rent = 0;
                 let account = if !message.is_non_loader_key(i) {
                     // Fill in an empty account for the program slots.

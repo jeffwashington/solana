@@ -613,7 +613,7 @@ impl RollingBitField {
                 all.push(*slot)
             }
         });
-        for key in self.min..self.max {
+        for key in self.min..self.max_exclusive {
             if key >= max_slot {
                 break;
             }
@@ -667,7 +667,7 @@ impl RootsTracker {
     }
 
     pub fn max_root_exclusive(&self) -> Slot {
-        self.roots.max()
+        self.roots.max_exclusive()
     }
 
     pub fn max_root_inclusive(&self) -> Slot {
@@ -1947,7 +1947,7 @@ impl<T: IndexValue> AccountsIndex<T> {
 
     pub fn get_next_original_root(&self, slot: Slot, ancestors: &Option<&Ancestors>) -> Option<Slot> {
         let w_roots_tracker = self.roots_tracker.read().unwrap();
-        for root in slot..w_roots_tracker.roots_original.max() {
+        for root in slot..w_roots_tracker.roots_original.max_exclusive() {
             if w_roots_tracker.roots_original.contains(&root) {
                 return Some(root);
             }
