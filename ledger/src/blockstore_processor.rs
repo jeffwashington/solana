@@ -726,6 +726,7 @@ fn do_process_blockstore_from_root(
 
             (initial_forks, leader_schedule_cache)
         } else {
+            error!("{} {} started from a snapshot, and no further info for: {}", file!(), line!(), start_slot);
             // If there's no meta for the input `start_slot`, then we started from a snapshot
             // and there's no point in processing the rest of blockstore and implies blockstore
             // should be empty past this point.
