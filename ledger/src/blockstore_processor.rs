@@ -634,6 +634,7 @@ fn do_process_blockstore_from_root(
             if opts.full_leader_cache {
                 leader_schedule_cache.set_max_schedules(std::usize::MAX);
             }
+            error!("{} {}", file!(), line!());
             let mut initial_forks = load_frozen_forks(
                 &bank,
                 &meta,
@@ -650,6 +651,7 @@ fn do_process_blockstore_from_root(
                 &mut last_full_snapshot_slot,
             )?;
             initial_forks.sort_by_key(|bank| bank.slot());
+            error!("{} {}", file!(), line!());
 
             (initial_forks, leader_schedule_cache)
         } else {
@@ -663,8 +665,10 @@ fn do_process_blockstore_from_root(
     if initial_forks.is_empty() {
         return Err(BlockstoreProcessorError::NoValidForksFound);
     }
+    error!("{} {}", file!(), line!());
 
     let bank_forks = BankForks::new_from_banks(&initial_forks, root);
+    error!("{} {}", file!(), line!());
 
     let processing_time = now.elapsed();
 
@@ -680,6 +684,7 @@ fn do_process_blockstore_from_root(
         return Err(BlockstoreProcessorError::RootBankWithMismatchedCapitalization(root));
     }
     time_cap.stop();
+    error!("{} {}", file!(), line!());
 
     datapoint_info!(
         "process_blockstore_from_root",
@@ -1057,8 +1062,10 @@ fn process_next_slots(
         initial_forks.remove(&parent.slot());
     }
     initial_forks.insert(bank.slot(), bank.clone());
+    error!("{} {}", file!(), line!());
 
     if meta.next_slots.is_empty() {
+        error!("{} {}", file!(), line!());
         return Ok(());
     }
 
@@ -1092,6 +1099,7 @@ fn process_next_slots(
             pending_slots.push((next_meta, next_bank, bank.last_blockhash()));
         }
     }
+    error!("{} {}", file!(), line!());
 
     // Reverse sort by slot, so the next slot to be processed can be popped
     pending_slots.sort_by(|a, b| b.1.slot().cmp(&a.1.slot()));
@@ -1130,6 +1138,7 @@ fn load_frozen_forks(
         "load_frozen_forks() latest root from blockstore: {}, max_root: {}",
         blockstore_max_root, max_root,
     );
+    error!("{} {}", file!(), line!());
 
     process_next_slots(
         root_bank,
@@ -1139,6 +1148,7 @@ fn load_frozen_forks(
         &mut pending_slots,
         &mut initial_forks,
     )?;
+    error!("{} {}", file!(), line!());
 
     let dev_halt_at_slot = opts.dev_halt_at_slot.unwrap_or(std::u64::MAX);
     if root_bank.slot() != dev_halt_at_slot {
@@ -1308,6 +1318,7 @@ fn load_frozen_forks(
             )?;
 
             if slot >= dev_halt_at_slot {
+                error!("{} {}", file!(), line!());
                 bank.force_flush_accounts_cache();
                 let _ = bank.verify_bank_hash(true);
                 break;
