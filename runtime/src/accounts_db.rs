@@ -5977,6 +5977,7 @@ impl AccountsDb {
                     let pubkey = pubkey_account.0;
                     self.accounts_index.upsert(
                         slot,
+                        slot,
                         pubkey,
                         pubkey_account.1,
                         &self.account_indexes,
@@ -11068,6 +11069,7 @@ pub mod tests {
         let mut reclaims = vec![];
         accounts_index.upsert(
             0,
+            0,
             &key0,
             &AccountSharedData::default(),
             &AccountSecondaryIndexes::default(),
@@ -11077,6 +11079,7 @@ pub mod tests {
         );
         accounts_index.upsert(
             1,
+            1,
             &key0,
             &AccountSharedData::default(),
             &AccountSecondaryIndexes::default(),
@@ -11085,6 +11088,7 @@ pub mod tests {
             UPSERT_PREVIOUS_SLOT_ENTRY_WAS_CACHED_FALSE,
         );
         accounts_index.upsert(
+            1,
             1,
             &key1,
             &AccountSharedData::default(),
@@ -11095,6 +11099,7 @@ pub mod tests {
         );
         accounts_index.upsert(
             2,
+            2,
             &key1,
             &AccountSharedData::default(),
             &AccountSecondaryIndexes::default(),
@@ -11104,6 +11109,7 @@ pub mod tests {
         );
         accounts_index.upsert(
             2,
+            2,
             &key2,
             &AccountSharedData::default(),
             &AccountSecondaryIndexes::default(),
@@ -11112,6 +11118,7 @@ pub mod tests {
             UPSERT_PREVIOUS_SLOT_ENTRY_WAS_CACHED_FALSE,
         );
         accounts_index.upsert(
+            3,
             3,
             &key2,
             &AccountSharedData::default(),
