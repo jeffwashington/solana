@@ -375,6 +375,8 @@ impl ExpectedRentCollection {
             panic!("{}, did not find: {}, expected_rent_collection_slot_max_epoch: {}", pubkey, expected_slot_start, expected_rent_collection_slot_max_epoch);
         }
 
+        // this is very expensive with disk-index. cheaper to just re-hash
+        /*
         if !use_stored && maybe_db.is_some() {
             let maybe_db = maybe_db.as_ref().unwrap();
             // see if this account is written later. if so, then we don't need to rehash it
@@ -400,6 +402,7 @@ impl ExpectedRentCollection {
                 }
             }
         }
+        */
 
         // this should be conditional
         let rent_result =
