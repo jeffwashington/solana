@@ -51,6 +51,7 @@ pub struct HashStats {
     pub min_bin_size: usize,
     pub max_bin_size: usize,
     pub storage_size_quartiles: StorageSizeQuartileStats,
+    pub rehash: usize,
 }
 impl HashStats {
     pub fn calc_storage_size_quartiles(&mut self, storages: &SnapshotStorages) {
@@ -145,6 +146,7 @@ impl HashStats {
                 i64
             ),
             ("total", total_time_us as i64, i64),
+            ("rehashed", self.rehash as i64, i64),
         );
     }
 }
@@ -452,7 +454,15 @@ impl AccountsHash {
                             data_len = data.len();
                             data_index = 0;
                         }
-                        hasher.hash(data[data_index].borrow().as_ref());
+                        use std::str::FromStr;
+                        let h = data[data_index].borrow();
+
+                        if h == &Hash::from_str("8yYZ9Pvrq5DCNU9FM1W13WggTiuMpMYsapu6wUZJbVaw")
+                            .unwrap()
+                        {
+                            error!("found hash: {}", h);
+                        }
+                        hasher.hash(h.as_ref());
                         data_index += 1;
                     }
                 } else {
@@ -758,6 +768,16 @@ impl AccountsHash {
                 overall_sum = Self::checked_cast_for_capitalization(
                     item.lamports as u128 + overall_sum as u128,
                 );
+                use std::str::FromStr;
+                let interesting = item.pubkey
+                    == Pubkey::from_str("2cy1guFAaqDZztT7vrsc8Q5u9aAHN8oBxDbSyUdBKpW3").unwrap();
+                if interesting {
+                    error!(
+                        "de_dup found this: {}, {}, {}",
+                        item.hash, item.lamports, item.pubkey
+                    );
+                }
+
                 hashes.push(&item.hash);
             }
             if !duplicate_pubkey_indexes.is_empty() {
@@ -765,7 +785,7 @@ impl AccountsHash {
                 // reverse this list because get_item can remove first_items[*i] when *i is exhausted
                 //  and that would mess up subsequent *i values
                 duplicate_pubkey_indexes.iter().rev().for_each(|i| {
-                    Self::get_item(
+                    let dup = Self::get_item(
                         *i,
                         pubkey_bin,
                         &mut first_items,
@@ -773,6 +793,16 @@ impl AccountsHash {
                         &mut indexes,
                         &mut first_item_to_pubkey_division,
                     );
+                    use std::str::FromStr;
+                    let interesting = dup.pubkey
+                        == Pubkey::from_str("2cy1guFAaqDZztT7vrsc8Q5u9aAHN8oBxDbSyUdBKpW3")
+                            .unwrap();
+                    if interesting {
+                        error!(
+                            "ignoring duplicates: {}, {}, {}",
+                            dup.hash, dup.lamports, dup.pubkey
+                        );
+                    }
                 });
                 duplicate_pubkey_indexes.clear();
             }
@@ -845,6 +875,11 @@ impl AccountsHash {
 
             hash_total -= left_over_hashes; // this is enough to cause the hashes at the end of the data set to be ignored
         }
+        /*
+        hashes.iter().flatten().take(hash_total).for_each(|hash| {
+            error!("h1:{}",hash);
+        });
+        */
 
         // if we have raw hashes to process and
         //   we are not the last pass (we already modded against target_fanout) OR
