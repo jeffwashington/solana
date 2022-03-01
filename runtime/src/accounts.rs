@@ -3,7 +3,7 @@ use {
         account_rent_state::{check_rent_state_with_account, RentState},
         accounts_db::{
             AccountShrinkThreshold, AccountsAddRootTiming, AccountsDb, AccountsDbConfig,
-            BankHashInfo, ErrorCounters, LoadHint, LoadedAccount, ScanStorageResult,
+            BankHashInfo, ErrorCounters, LoadHint, LoadedAccount, Rewrites, ScanStorageResult,
             ACCOUNTS_DB_CONFIG_FOR_BENCHMARKS, ACCOUNTS_DB_CONFIG_FOR_TESTING,
         },
         accounts_index::{AccountSecondaryIndexes, IndexKey, ScanConfig, ScanError, ScanResult},
@@ -254,6 +254,7 @@ impl Accounts {
             let mut account_deps = Vec::with_capacity(account_keys.len());
             let mut rent_debits = RentDebits::default();
             for (i, key) in account_keys.iter().enumerate() {
+                let mut rent = 0;
                 let account = if !message.is_non_loader_key(i) {
                     // Fill in an empty account for the program slots.
                     AccountSharedData::default()
@@ -274,14 +275,14 @@ impl Accounts {
                             .load_with_fixed_root(ancestors, key)
                             .map(|(mut account, _)| {
                                 if message.is_writable(i) {
-                                    let rent_due = rent_collector
+                                    rent = rent_collector
                                         .collect_from_existing_account(
                                             key,
                                             &mut account,
                                             self.accounts_db.filler_account_suffix.as_ref(),
                                         )
                                         .rent_amount;
-                                    (account, rent_due)
+                                    (account, rent)
                                 } else {
                                     (account, 0)
                                 }
@@ -326,6 +327,15 @@ impl Accounts {
                         account
                     }
                 };
+                use log::*;
+                use std::str::FromStr;
+                let mut interesting = key
+                == &Pubkey::from_str("3CKKAoVi94EnfX8QcVxEmk8CAvZTc6nAYzXp1WkSUofX")
+                    .unwrap();
+                                                    if interesting {
+                    error!("accounts.push: {}, {:?}, rent_due: {}, writable: {}", key, account, rent, message.is_writable(i));
+                }
+            
                 accounts.push((*key, account));
             }
             debug_assert_eq!(accounts.len(), account_keys.len());
@@ -982,11 +992,13 @@ impl Accounts {
     /// WARNING: This noncached version is only to be used for tests/benchmarking
     /// as bypassing the cache in general is not supported
     pub fn store_slow_uncached(&self, slot: Slot, pubkey: &Pubkey, account: &AccountSharedData) {
-        self.accounts_db.store_uncached(slot, &[(pubkey, account)]);
+        self.accounts_db
+            .store_uncached(slot, &[(pubkey, account)]);
     }
 
     pub fn store_slow_cached(&self, slot: Slot, pubkey: &Pubkey, account: &AccountSharedData) {
-        self.accounts_db.store_cached(slot, &[(pubkey, account)]);
+        self.accounts_db
+            .store_cached((slot, &[(pubkey, account)][..]));
     }
 
     fn lock_account(
@@ -1035,12 +1047,12 @@ impl Accounts {
         }
     }
 
-    pub fn bank_hash_at(&self, slot: Slot) -> Hash {
-        self.bank_hash_info_at(slot).hash
+    pub fn bank_hash_at(&self, slot: Slot, rewrites: &Rewrites) -> Hash {
+        self.bank_hash_info_at(slot, rewrites).hash
     }
 
-    pub fn bank_hash_info_at(&self, slot: Slot) -> BankHashInfo {
-        let delta_hash = self.accounts_db.get_accounts_delta_hash(slot);
+    pub fn bank_hash_info_at(&self, slot: Slot, rewrites: &Rewrites) -> BankHashInfo {
+        let delta_hash = self.accounts_db.get_accounts_delta_hash_new(slot, rewrites);
         let bank_hashes = self.accounts_db.bank_hashes.read().unwrap();
         let mut hash_info = bank_hashes
             .get(&slot)
@@ -1152,8 +1164,9 @@ impl Accounts {
             blockhash,
             lamports_per_signature,
             leave_nonce_on_success,
+            slot,
         );
-        self.accounts_db.store_cached(slot, &accounts_to_store);
+        self.accounts_db.store_cached((slot, &accounts_to_store[..]));
     }
 
     /// Purge a slot if it is not a root
@@ -1178,7 +1191,8 @@ impl Accounts {
         blockhash: &Hash,
         lamports_per_signature: u64,
         leave_nonce_on_success: bool,
-    ) -> Vec<(&'a Pubkey, &'a AccountSharedData)> {
+        slot: Slot,
+    ) -> Vec<(&'a Pubkey, &'a AccountSharedData, Slot)> {
         let mut accounts = Vec::with_capacity(load_results.len());
         for (i, ((tx_load_result, nonce), tx)) in load_results.iter_mut().zip(txs).enumerate() {
             if tx_load_result.is_err() {
@@ -1247,7 +1261,7 @@ impl Accounts {
                         }
 
                         // Add to the accounts to store
-                        accounts.push((&*address, &*account));
+                        accounts.push((&*address, &*account, slot));
                     }
                 }
             }
@@ -2402,7 +2416,7 @@ mod tests {
             false,
             AccountShrinkThreshold::default(),
         );
-        accounts.bank_hash_at(1);
+        accounts.bank_hash_at(1, &Rewrites::default());
     }
 
     #[test]
@@ -2963,14 +2977,15 @@ mod tests {
             &Hash::default(),
             0,
             true, // leave_nonce_on_success
+            0,
         );
         assert_eq!(collected_accounts.len(), 2);
         assert!(collected_accounts
             .iter()
-            .any(|(pubkey, _account)| *pubkey == &keypair0.pubkey()));
+            .any(|(pubkey, _account, _slot)| *pubkey == &keypair0.pubkey()));
         assert!(collected_accounts
             .iter()
-            .any(|(pubkey, _account)| *pubkey == &keypair1.pubkey()));
+            .any(|(pubkey, _account, _slot)| *pubkey == &keypair1.pubkey()));
 
         // Ensure readonly_lock reflects lock
         assert_eq!(
@@ -3392,21 +3407,22 @@ mod tests {
             &next_blockhash,
             0,
             true, // leave_nonce_on_success
+            0,
         );
         assert_eq!(collected_accounts.len(), 2);
         assert_eq!(
             collected_accounts
                 .iter()
-                .find(|(pubkey, _account)| *pubkey == &from_address)
-                .map(|(_pubkey, account)| *account)
+                .find(|(pubkey, _account, _slot)| *pubkey == &from_address)
+                .map(|(_pubkey, account, _slot)| *account)
                 .cloned()
                 .unwrap(),
             from_account_pre,
         );
         let collected_nonce_account = collected_accounts
             .iter()
-            .find(|(pubkey, _account)| *pubkey == &nonce_address)
-            .map(|(_pubkey, account)| *account)
+            .find(|(pubkey, _account, _slot)| *pubkey == &nonce_address)
+            .map(|(_pubkey, account, _slot)| *account)
             .cloned()
             .unwrap();
         assert_eq!(
@@ -3501,12 +3517,13 @@ mod tests {
             &next_blockhash,
             0,
             true, // leave_nonce_on_success
+            0,
         );
         assert_eq!(collected_accounts.len(), 1);
         let collected_nonce_account = collected_accounts
             .iter()
-            .find(|(pubkey, _account)| *pubkey == &nonce_address)
-            .map(|(_pubkey, account)| *account)
+            .find(|(pubkey, _account, _slot)| *pubkey == &nonce_address)
+            .map(|(_pubkey, account, _slot)| *account)
             .cloned()
             .unwrap();
         assert_eq!(

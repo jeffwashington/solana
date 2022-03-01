@@ -162,6 +162,7 @@ impl RentCollector {
         account: &impl ReadableAccount,
         filler_account_suffix: Option<&Pubkey>,
     ) -> RentResult {
+        let result = || {
         if self.can_skip_rent_collection(address, account, filler_account_suffix) {
             return RentResult::LeaveAloneNoRent;
         }
@@ -180,6 +181,17 @@ impl RentCollector {
             RentDue::Paying(_) => 1,
         };
         RentResult::CollectRent((self.epoch + epoch_increment, rent_due.lamports()))
+    };
+    let result = result();
+    use log::*;
+    use std::str::FromStr;
+    let mut interesting = address
+    == &Pubkey::from_str("3CKKAoVi94EnfX8QcVxEmk8CAvZTc6nAYzXp1WkSUofX")
+        .unwrap();
+                                        if interesting {
+        error!("collect_from_existing_account: {}, {:?}, result: {:?}", address, (account.lamports(), account.rent_epoch()), result);
+    }
+    result
     }
 
     #[must_use = "add to Bank::collected_rent"]

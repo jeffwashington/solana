@@ -4,6 +4,7 @@ use {
         bank::Bank,
     },
     solana_sdk::{
+        pubkey::Pubkey,
         account::ReadableAccount, feature_set, message::SanitizedMessage, native_loader,
         transaction::Result, transaction_context::TransactionContext,
     },
@@ -25,14 +26,26 @@ impl Bank {
                     let state = if let Ok(account) = transaction_context.get_account_at_index(i) {
                         let account = account.borrow();
 
-                        // Native programs appear to be RentPaying because they carry low lamport
-                        // balances; however they will never be loaded as writable
-                        debug_assert!(!native_loader::check_id(account.owner()));
+                    // Native programs appear to be RentPaying because they carry low lamport
+                    // balances; however they will never be loaded as writable
+                    debug_assert!(!native_loader::check_id(account.owner()));
 
-                        Some(RentState::from_account(
-                            &account,
-                            &self.rent_collector().rent,
-                        ))
+                    let fa = RentState::from_account(
+                        &account,
+                        &self.rent_collector().rent,
+                    );
+                    use log::*;
+                    use std::str::FromStr;
+                    let key =  transaction_context.get_key_of_account_at_index(i);
+                        if let Ok(key) = key {
+                            let interesting = key
+                                == &Pubkey::from_str("3CKKAoVi94EnfX8QcVxEmk8CAvZTc6nAYzXp1WkSUofX")
+                                .unwrap();
+                                                                if interesting {
+                                error!("get_transaction_account_state_info: {}, {:?}, {:?}", key, account, fa);
+                            }
+                        }
+                        Some(fa)
                     } else {
                         None
                     };
