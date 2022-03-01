@@ -628,6 +628,25 @@ impl RollingBitField {
         self.max_exclusive.saturating_sub(1)
     }
 
+    pub fn get_all_less_than(&self, max_slot: Slot) -> Vec<u64> {
+        let mut all = Vec::with_capacity(self.count);
+        self.excess.iter().for_each(|slot| {
+            if slot < &max_slot {
+                all.push(*slot)
+            }
+        });
+        for key in self.min..self.max_exclusive() {
+            if key >= max_slot {
+                break;
+            }
+
+            if self.contains_assume_in_range(&key) {
+                all.push(key);
+            }
+        }
+        all
+    }
+
     pub fn get_all(&self) -> Vec<u64> {
         let mut all = Vec::with_capacity(self.count);
         self.excess.iter().for_each(|slot| all.push(*slot));
@@ -642,7 +661,9 @@ impl RollingBitField {
 
 #[derive(Debug)]
 pub struct RootsTracker {
-    roots: RollingBitField,
+    pub roots: RollingBitField,
+    pub roots_original: RollingBitField,
+    max_root_inclusive: Slot,
     uncleaned_roots: HashSet<Slot>,
     previous_uncleaned_roots: HashSet<Slot>,
 }
@@ -660,9 +681,19 @@ impl RootsTracker {
     pub fn new(max_width: u64) -> Self {
         Self {
             roots: RollingBitField::new(max_width),
+            roots_original: RollingBitField::new(max_width),
+            max_root_inclusive: 0,
             uncleaned_roots: HashSet::new(),
             previous_uncleaned_roots: HashSet::new(),
         }
+    }
+
+    pub fn max_root_exclusive(&self) -> Slot {
+        self.roots.max_exclusive() // check this
+    }
+
+    pub fn max_root_inclusive(&self) -> Slot {
+        self.max_root_inclusive
     }
 
     pub fn min_root(&self) -> Option<Slot> {
@@ -859,7 +890,7 @@ pub struct AccountsIndex<T: IndexValue> {
     program_id_index: SecondaryIndex<DashMapSecondaryIndexEntry>,
     spl_token_mint_index: SecondaryIndex<DashMapSecondaryIndexEntry>,
     spl_token_owner_index: SecondaryIndex<RwLockSecondaryIndexEntry>,
-    roots_tracker: RwLock<RootsTracker>,
+    pub roots_tracker: RwLock<RootsTracker>,
     ongoing_scan_roots: RwLock<BTreeMap<Slot, u64>>,
     // Each scan has some latest slot `S` that is the tip of the fork the scan
     // is iterating over. The unique id of that slot `S` is recorded here (note we don't use
@@ -1913,7 +1944,12 @@ impl<T: IndexValue> AccountsIndex<T> {
     }
 
     pub fn is_root(&self, slot: Slot) -> bool {
-        self.roots_tracker.read().unwrap().roots.contains(&slot)
+        let read = self.roots_tracker.read().unwrap();
+        let r = read.roots.contains(&slot);
+        if !r && read.roots_original.contains(&slot) {
+            error!("is_root disagrees: {}", slot);
+        }
+        r
     }
 
     pub fn add_root(&self, slot: Slot, caching_enabled: bool) {
@@ -1921,6 +1957,7 @@ impl<T: IndexValue> AccountsIndex<T> {
         // `AccountsDb::flush_accounts_cache()` relies on roots being added in order
         assert!(slot >= w_roots_tracker.roots.max_inclusive());
         w_roots_tracker.roots.insert(slot);
+        w_roots_tracker.roots_original.insert(slot);
         // we delay cleaning until flushing!
         if !caching_enabled {
             w_roots_tracker.uncleaned_roots.insert(slot);
@@ -1939,6 +1976,44 @@ impl<T: IndexValue> AccountsIndex<T> {
         self.roots_tracker.read().unwrap().roots.max_inclusive()
     }
 
+    pub fn get_next_original_root(&self, slot: Slot, ancestors: &Option<&Ancestors>) -> Option<Slot> {
+        let w_roots_tracker = self.roots_tracker.read().unwrap();
+        for root in slot..w_roots_tracker.roots_original.max_exclusive() {
+            if w_roots_tracker.roots_original.contains(&root) {
+                return Some(root);
+            }
+        }
+        // ancestors are higher than roots, so look for roots first
+        if let Some(ancestors) = ancestors {
+            let min = std::cmp::max(slot, ancestors.min_slot());
+            for root in min..=ancestors.max_slot() {
+                if ancestors.contains_key(&root) {
+                    return Some(root);
+                }
+            }
+        }
+
+        assert!(!w_roots_tracker.roots_original.contains(&slot));
+        assert!(!w_roots_tracker.roots.contains(&slot));
+        None
+    }
+
+    pub fn remove_old_roots(&self, newest_slot: Slot, keep: HashSet<Slot>) {
+        let w_roots_tracker = self.roots_tracker.read().unwrap();
+        let mut roots = w_roots_tracker
+            .roots_original
+            .get_all_less_than(newest_slot);
+        roots.retain(|root| !keep.contains(root));
+        drop(w_roots_tracker);
+        if !roots.is_empty() {
+            error!("ancient_append_vec: removing really old roots. newest_slot: {}, # roots to delete: {}, ancient to keep: {}, {:?}, keep: {:?}", newest_slot, roots.len(), keep.len(), roots, keep);
+            let mut w_roots_tracker = self.roots_tracker.write().unwrap();
+            roots.into_iter().for_each(|root| {
+                w_roots_tracker.roots_original.remove(&root);
+            });
+        }
+    }
+
     /// Remove the slot when the storage for the slot is freed
     /// Accounts no longer reference this slot.
     /// return true if slot was a root
@@ -1947,7 +2022,24 @@ impl<T: IndexValue> AccountsIndex<T> {
         let removed_from_unclean_roots = w_roots_tracker.uncleaned_roots.remove(&slot);
         let removed_from_previous_uncleaned_roots =
             w_roots_tracker.previous_uncleaned_roots.remove(&slot);
+        /*
+        let length = 432_000;
+        let max = w_roots_tracker.max_root();
+        if max >= length {
+            if slot >= max - length {
+                let contains = w_roots_tracker.roots.contains(&slot);
+                if contains {
+                    error!("ancient_append_vecs: removing root that isn't old: {}, max: {}, min: {}, distance from max: {}", slot, max, max - length, max - slot);
+                    if max - slot < 100 {
+                        //panic!("figure out where this is coming from");
+                    }
+                    return true; // short circuit to not actually remove
+                }
+            }
+        }
+        */
         if !w_roots_tracker.roots.remove(&slot) {
+            // w_roots_tracker.roots.contains(&slot) {
             if removed_from_unclean_roots {
                 error!("clean_dead_slot-removed_from_unclean_roots: {}", slot);
                 inc_new_counter_error!("clean_dead_slot-removed_from_unclean_roots", 1, 1);
@@ -1965,6 +2057,9 @@ impl<T: IndexValue> AccountsIndex<T> {
             }
             false
         } else {
+            if slot >= 116501869 - 10 {
+                error!("removing important root: {}", slot);
+            }
             stats.roots_len = w_roots_tracker.roots.len();
             stats.uncleaned_roots_len = w_roots_tracker.uncleaned_roots.len();
             stats.previous_uncleaned_roots_len = w_roots_tracker.previous_uncleaned_roots.len();
@@ -3210,7 +3305,7 @@ pub mod tests {
         w_account_maps.upsert(
             &key.pubkey(),
             new_entry,
-            None,
+            None, // bprumo TODO: needs real value
             &mut SlotList::default(),
             UPSERT_PREVIOUS_SLOT_ENTRY_WAS_CACHED_FALSE,
         );
