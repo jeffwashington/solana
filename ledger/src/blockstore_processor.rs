@@ -657,6 +657,8 @@ fn do_process_blockstore_from_root(
 ) -> BlockstoreProcessorResult {
     info!("processing ledger from slot {}...", bank.slot());
 
+    //let stats = bank.set_active(solana_runtime::active_stats::ActiveStatItem::ProcessBlockstoreFromRoot);
+
     // Starting slot must be a root, and thus has no parents
     assert!(bank.parent().is_none());
     let start_slot = bank.slot();
@@ -952,6 +954,8 @@ pub fn confirm_slot(
             .map_err(BlockstoreProcessorError::FailedToLoadEntries);
         load_elapsed.stop();
         if load_result.is_err() {
+            error!("confirm_slot failed: {}, allow_dead_slots: {}", slot, allow_dead_slots);
+
             timing.fetch_fail_elapsed += load_elapsed.as_us();
         } else {
             timing.fetch_elapsed += load_elapsed.as_us();
@@ -1130,6 +1134,8 @@ fn process_next_slots(
     if meta.next_slots.is_empty() {
         return Ok(());
     }
+
+    error!("next slots: {:?}", meta.next_slots);
 
     // This is a fork point if there are multiple children, create a new child bank for each fork
     for next_slot in &meta.next_slots {
@@ -1374,6 +1380,8 @@ fn load_frozen_forks(
             )?;
 
             if slot >= dev_halt_at_slot {
+                bank.force_flush_accounts_cache();
+                bank.verify_bank_hash(false);//true);
                 break;
             }
         }

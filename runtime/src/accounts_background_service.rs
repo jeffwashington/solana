@@ -169,6 +169,7 @@ impl SnapshotRequestHandler {
 
                 if accounts_db_caching_enabled {
                     shrink_time = Measure::start("shrink_time");
+                    error!("{}{}", file!(), line!());
                     snapshot_root_bank.shrink_candidate_slots();
                     shrink_time.stop();
                 }
