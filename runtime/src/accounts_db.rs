@@ -3047,7 +3047,7 @@ impl AccountsDb {
             }
         };
 
-        if shrink_slots.is_empty() && shrink_slots_next_batch.unwrap_or_default().is_empty() {
+        if shrink_slots.is_empty() && shrink_slots_next_batch.as_ref().unwrap_or_default().is_empty() {
             return 0;
         }
 
