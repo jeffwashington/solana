@@ -204,10 +204,10 @@ where
 {
     macro_rules! INTO {
         ($style:ident) => {{
-            use log::*;error!("{} {}", file!(), line!());
+            use log::*;error!("{} {} before deserialize", file!(), line!());
             let (full_snapshot_bank_fields, full_snapshot_accounts_db_fields) =
                 $style::Context::deserialize_bank_fields(snapshot_streams.full_snapshot_stream)?;
-                use log::*;error!("{} {}", file!(), line!());
+                use log::*;error!("{} {} after deserialize", file!(), line!());
                 let (incremental_snapshot_bank_fields, incremental_snapshot_accounts_db_fields) =
                 if let Some(ref mut incremental_snapshot_stream) =
                     snapshot_streams.incremental_snapshot_stream

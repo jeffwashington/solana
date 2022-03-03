@@ -262,8 +262,11 @@ impl<'a> TypeContext<'a> for Context {
     where
         R: Read,
     {
+        use log::*;error!("{} {}", file!(), line!());
         let bank_fields = deserialize_from::<_, DeserializableVersionedBank>(&mut stream)?.into();
+        use log::*;error!("{} {}", file!(), line!());
         let accounts_db_fields = Self::deserialize_accounts_db_fields(stream)?;
+        use log::*;error!("{} {}", file!(), line!());
         Ok((bank_fields, accounts_db_fields))
     }
 
@@ -273,6 +276,7 @@ impl<'a> TypeContext<'a> for Context {
     where
         R: Read,
     {
+        use log::*;error!("{} {}", file!(), line!());
         deserialize_from(stream)
     }
 }
