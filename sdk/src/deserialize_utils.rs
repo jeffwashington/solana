@@ -10,7 +10,7 @@ where
     T: Deserialize<'de> + Default,
 {
     let result = T::deserialize(d);
-    if let Err(err) = result {
+    if let Err(err) = &result {
         use log::*;
         error!("to_string: {}", err.to_string())
     }
