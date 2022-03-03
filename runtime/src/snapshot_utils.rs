@@ -779,6 +779,7 @@ pub fn bank_from_snapshot_archives(
         unpacked_append_vec_map.extend(incremental_snapshot_unpacked_append_vec_map.into_iter());
     }
 
+    use log::*;error!("{} {}", file!(), line!());
     let mut measure_rebuild = Measure::start("rebuild bank from snapshots");
     let bank = rebuild_bank_from_snapshots(
         &unarchived_full_snapshot.unpacked_snapshots_dir_and_version,
