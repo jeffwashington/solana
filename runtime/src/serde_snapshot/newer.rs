@@ -6,6 +6,7 @@ use {
     },
     crate::{ancestors::AncestorsForSerialization, stakes::StakesCache},
     solana_measure::measure::Measure,
+    solana_sdk::deserialize_utils::default_on_eof,
     std::{cell::RefCell, collections::HashSet, sync::RwLock},
 };
 
@@ -57,6 +58,7 @@ struct DeserializableVersionedBank {
     unused_accounts: UnusedAccounts,
     epoch_stakes: HashMap<Epoch, EpochStakes>,
     is_delta: bool,
+    #[serde(deserialize_with = "default_on_eof")]
     prior_roots: Vec<Slot>,
 }
 
