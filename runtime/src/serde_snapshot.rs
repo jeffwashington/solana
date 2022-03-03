@@ -30,6 +30,7 @@ use {
         hash::Hash,
         inflation::Inflation,
         pubkey::Pubkey,
+        deserialize_utils::default_on_eof,
     },
     std::{
         collections::{HashMap, HashSet},
@@ -67,6 +68,8 @@ struct AccountsDbFields<T>(
     StoredMetaWriteVersion,
     Slot,
     BankHashInfo,
+    #[serde(deserialize_with = "default_on_eof")]
+    Vec<Slot>,
 );
 
 /// Helper type to wrap BufReader streams when deserializing and reconstructing from either just a
@@ -97,6 +100,7 @@ impl<T> SnapshotAccountsDbFields<T> {
                 incremental_snapshot_version,
                 incremental_snapshot_slot,
                 incremental_snapshot_bank_hash_info,
+                incremental_snapshot_prior_roots,
             )) => {
                 let full_snapshot_storages = self.full_snapshot_accounts_db_fields.0;
                 let full_snapshot_slot = self.full_snapshot_accounts_db_fields.2;
@@ -119,6 +123,7 @@ impl<T> SnapshotAccountsDbFields<T> {
                     incremental_snapshot_version,
                     incremental_snapshot_slot,
                     incremental_snapshot_bank_hash_info,
+                    incremental_snapshot_prior_roots
                 ))
             }
         }
@@ -297,6 +302,9 @@ struct SerializableAccountsDb<'a, C> {
     slot: Slot,
     account_storage_entries: &'a [SnapshotStorage],
     phantom: std::marker::PhantomData<C>,
+    //#[serde(deserialize_with = "default_on_eof")]
+    //prior_roots: Vec<Slot>,
+
 }
 
 impl<'a, C: TypeContext<'a>> Serialize for SerializableAccountsDb<'a, C> {
@@ -421,6 +429,7 @@ where
         snapshot_version,
         snapshot_slot,
         snapshot_bank_hash_info,
+        snapshot_prior_roots,
     ) = snapshot_accounts_db_fields.collapse_into()?;
 
     let snapshot_storages = snapshot_storages.into_iter().collect::<Vec<_>>();

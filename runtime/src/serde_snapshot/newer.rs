@@ -58,8 +58,8 @@ struct DeserializableVersionedBank {
     unused_accounts: UnusedAccounts,
     epoch_stakes: HashMap<Epoch, EpochStakes>,
     is_delta: bool,
-    #[serde(deserialize_with = "default_on_eof")]
-    prior_roots: Vec<Slot>,
+    //#[serde(deserialize_with = "default_on_eof")]
+    //prior_roots: Vec<Slot>,
 }
 
 impl From<DeserializableVersionedBank> for BankFieldsToDeserialize {
@@ -95,7 +95,7 @@ impl From<DeserializableVersionedBank> for BankFieldsToDeserialize {
             stakes: dvb.stakes,
             epoch_stakes: dvb.epoch_stakes,
             is_delta: dvb.is_delta,
-            prior_roots: dvb.prior_roots,
+            prior_roots: Vec::default(),
         }
     }
 }
@@ -136,7 +136,7 @@ struct SerializableVersionedBank<'a> {
     unused_accounts: UnusedAccounts,
     epoch_stakes: &'a HashMap<Epoch, EpochStakes>,
     is_delta: bool,
-    prior_roots: Vec<Slot>,
+    //prior_roots: Vec<Slot>,
 }
 
 impl<'a> From<crate::bank::BankFieldsToSerialize<'a>> for SerializableVersionedBank<'a> {
@@ -174,7 +174,7 @@ impl<'a> From<crate::bank::BankFieldsToSerialize<'a>> for SerializableVersionedB
             unused_accounts: UnusedAccounts::default(),
             epoch_stakes: rhs.epoch_stakes,
             is_delta: rhs.is_delta,
-            prior_roots: rhs.prior_roots,
+            //prior_roots: rhs.prior_roots,
         }
     }
 }
@@ -203,6 +203,7 @@ impl<'a> TypeContext<'a> for Context {
                 slot: serializable_bank.bank.rc.slot,
                 account_storage_entries: serializable_bank.snapshot_storages,
                 phantom: std::marker::PhantomData::default(),
+                //prior_roots: Vec::default(),
             },
         )
             .serialize(serializer)
