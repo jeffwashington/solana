@@ -245,8 +245,10 @@ impl<'a> TypeContext<'a> for Context {
             .unwrap_or_else(|| panic!("No bank_hashes entry for slot {}", serializable_db.slot))
             .clone();
 
+        let prior_roots = serializable_db.accounts_db.accounts_index.roots_tracker.read().unwrap().roots_original.get_all();
+
         let mut serialize_account_storage_timer = Measure::start("serialize_account_storage_ms");
-        let result = (entries, version, slot, hash).serialize(serializer);
+        let result = (entries, version, slot, hash, prior_roots).serialize(serializer);
         serialize_account_storage_timer.stop();
         datapoint_info!(
             "serialize_account_storage_ms",

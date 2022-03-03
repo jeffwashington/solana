@@ -423,7 +423,6 @@ where
         accounts_db_config,
         accounts_update_notifier,
     );
-
     let AccountsDbFields(
         snapshot_storages,
         snapshot_version,
@@ -431,6 +430,13 @@ where
         snapshot_bank_hash_info,
         snapshot_prior_roots,
     ) = snapshot_accounts_db_fields.collapse_into()?;
+
+    {
+        let mut writer = accounts_db.accounts_index.roots_tracker.write().unwrap();
+        for x in snapshot_prior_roots {
+            writer.roots_original.insert(x);
+        }
+    }
 
     let snapshot_storages = snapshot_storages.into_iter().collect::<Vec<_>>();
 

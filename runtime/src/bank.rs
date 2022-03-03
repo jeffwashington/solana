@@ -2012,6 +2012,7 @@ impl Bank {
             accounts_data_len: AtomicU64::new(accounts_data_len),
             fee_structure: FeeStructure::default(),
         };
+        if false
         {
             let mut writer = bank.rc.accounts.accounts_db.accounts_index.roots_tracker.write().unwrap();
             for x in fields.prior_roots {
