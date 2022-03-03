@@ -237,6 +237,7 @@ where
             Ok(bank)
         }};
     }
+    use log::*;error!("{} {}", file!(), line!());
     match serde_style {
         SerdeStyle::Newer => INTO!(newer),
     }
