@@ -959,7 +959,7 @@ where
         unpack_dir.path(),
         account_paths,
         archive_format,
-        parallel_divisions,
+        1,
     )?;
     measure_untar.stop();
     info!("{}", measure_untar);
