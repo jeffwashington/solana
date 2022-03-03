@@ -1474,7 +1474,7 @@ fn rebuild_bank_from_snapshots(
     use log::*;error!("{} {}", file!(), line!());
 
     let bank = deserialize_snapshot_data_files(&snapshot_root_paths, |snapshot_streams| {
-        Ok(
+        Ok({
             use log::*;error!("{} {}", file!(), line!());
             let r = match incremental_snapshot_version.unwrap_or(full_snapshot_version) {
                 SnapshotVersion::V1_2_0 => bank_from_streams(
@@ -1497,6 +1497,7 @@ fn rebuild_bank_from_snapshots(
             use log::*;error!("{} {}", file!(), line!());
 
             r
+        }
         )
     })?;
 
