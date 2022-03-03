@@ -839,7 +839,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         R: RangeBounds<Pubkey> + std::fmt::Debug,
     {
         use log::*;
-        error!("put range in cache: bucket: {} {:?}", self.bin, range);
+        //error!("put range in cache: bucket: {} {:?}", self.bin, range);
         assert!(self.get_stop_evictions()); // caller should be controlling the lifetime of how long this needs to be present
         let m = Measure::start("range");
 
