@@ -687,7 +687,7 @@ impl RootsTracker {
     }
 
     pub fn max_root_inclusive(&self) -> Slot {
-        self.max_root_inclusive
+        self.max_root_exclusive().saturating_sub(1)
     }
 
     pub fn min_root(&self) -> Option<Slot> {
