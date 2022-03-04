@@ -6,6 +6,7 @@ use {
     },
     crate::{ancestors::AncestorsForSerialization, stakes::StakesCache},
     solana_measure::measure::Measure,
+    solana_sdk::deserialize_utils::default_on_eof,
     std::{cell::RefCell, collections::HashSet, sync::RwLock},
 };
 
@@ -57,6 +58,8 @@ struct DeserializableVersionedBank {
     unused_accounts: UnusedAccounts,
     epoch_stakes: HashMap<Epoch, EpochStakes>,
     is_delta: bool,
+    //#[serde(deserialize_with = "default_on_eof")]
+    //prior_roots: Vec<Slot>,
 }
 
 impl From<DeserializableVersionedBank> for BankFieldsToDeserialize {
@@ -92,6 +95,7 @@ impl From<DeserializableVersionedBank> for BankFieldsToDeserialize {
             stakes: dvb.stakes,
             epoch_stakes: dvb.epoch_stakes,
             is_delta: dvb.is_delta,
+            prior_roots: Vec::default(),
         }
     }
 }
@@ -132,6 +136,7 @@ struct SerializableVersionedBank<'a> {
     unused_accounts: UnusedAccounts,
     epoch_stakes: &'a HashMap<Epoch, EpochStakes>,
     is_delta: bool,
+    //prior_roots: Vec<Slot>,
 }
 
 impl<'a> From<crate::bank::BankFieldsToSerialize<'a>> for SerializableVersionedBank<'a> {
@@ -169,6 +174,7 @@ impl<'a> From<crate::bank::BankFieldsToSerialize<'a>> for SerializableVersionedB
             unused_accounts: UnusedAccounts::default(),
             epoch_stakes: rhs.epoch_stakes,
             is_delta: rhs.is_delta,
+            //prior_roots: rhs.prior_roots,
         }
     }
 }
@@ -197,6 +203,7 @@ impl<'a> TypeContext<'a> for Context {
                 slot: serializable_bank.bank.rc.slot,
                 account_storage_entries: serializable_bank.snapshot_storages,
                 phantom: std::marker::PhantomData::default(),
+                //prior_roots: Vec::default(),
             },
         )
             .serialize(serializer)
@@ -238,8 +245,10 @@ impl<'a> TypeContext<'a> for Context {
             .unwrap_or_else(|| panic!("No bank_hashes entry for slot {}", serializable_db.slot))
             .clone();
 
+        let prior_roots = serializable_db.accounts_db.accounts_index.roots_tracker.read().unwrap().roots_original.get_all();
+
         let mut serialize_account_storage_timer = Measure::start("serialize_account_storage_ms");
-        let result = (entries, version, slot, hash).serialize(serializer);
+        let result = (entries, version, slot, hash, prior_roots).serialize(serializer);
         serialize_account_storage_timer.stop();
         datapoint_info!(
             "serialize_account_storage_ms",
@@ -255,8 +264,11 @@ impl<'a> TypeContext<'a> for Context {
     where
         R: Read,
     {
+        use log::*;error!("{} {}", file!(), line!());
         let bank_fields = deserialize_from::<_, DeserializableVersionedBank>(&mut stream)?.into();
+        use log::*;error!("{} {}", file!(), line!());
         let accounts_db_fields = Self::deserialize_accounts_db_fields(stream)?;
+        use log::*;error!("{} {}", file!(), line!());
         Ok((bank_fields, accounts_db_fields))
     }
 
@@ -266,6 +278,7 @@ impl<'a> TypeContext<'a> for Context {
     where
         R: Read,
     {
+        use log::*;error!("{} {}", file!(), line!());
         deserialize_from(stream)
     }
 }

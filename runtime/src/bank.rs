@@ -919,12 +919,13 @@ pub(crate) struct BankFieldsToDeserialize {
     pub(crate) stakes: Stakes,
     pub(crate) epoch_stakes: HashMap<Epoch, EpochStakes>,
     pub(crate) is_delta: bool,
+    pub(crate) prior_roots: Vec<Slot>,
 }
 
-// Bank's common fields shared by all supported snapshot versions for serialization.
-// This is separated from BankFieldsToDeserialize to avoid cloning by using refs.
-// So, sync fields with BankFieldsToDeserialize!
-// all members are made public to keep Bank private and to make versioned serializer workable on this
+/// Bank's common fields shared by all supported snapshot versions for serialization.
+/// This is separated from BankFieldsToDeserialize to avoid cloning by using refs.
+/// So, sync fields with BankFieldsToDeserialize!
+/// all members are made public to keep Bank private and to make versioned serializer workable on this
 #[derive(Debug)]
 pub(crate) struct BankFieldsToSerialize<'a> {
     pub(crate) blockhash_queue: &'a RwLock<BlockhashQueue>,
@@ -957,6 +958,13 @@ pub(crate) struct BankFieldsToSerialize<'a> {
     pub(crate) stakes: &'a StakesCache,
     pub(crate) epoch_stakes: &'a HashMap<Epoch, EpochStakes>,
     pub(crate) is_delta: bool,
+    /// The list of roots which are no longer roots in the current bank instance.
+    /// As we eliminate rewrites/ancient append vec, we need to the ability to
+    /// remember slots within that last epoch that WERE roots even if they no
+    /// longer contain any accounts.  Without remembering those prior roots,
+    /// accounts that we skip rewrites might have their rent collection time
+    /// point to the incorrect roots as their correct roots were removed.
+    pub(crate) prior_roots: Vec<Slot>,
 }
 
 // Can't derive PartialEq because RwLock doesn't implement PartialEq
@@ -995,6 +1003,7 @@ impl PartialEq for Bank {
             && *self.stakes_cache.stakes() == *other.stakes_cache.stakes()
             && self.epoch_stakes == other.epoch_stakes
             && self.is_delta.load(Relaxed) == other.is_delta.load(Relaxed)
+            && self.prior_roots == other.prior_roots
     }
 }
 
@@ -1179,6 +1188,9 @@ pub struct Bank {
     /// stream for the slot == self.slot
     is_delta: AtomicBool,
 
+    /// The list of roots which are no longer roots in the current bank instance.
+    pub prior_roots: Vec<Slot>,
+
     /// The builtin programs
     builtin_programs: BuiltinPrograms,
 
@@ -1352,6 +1364,7 @@ impl Bank {
             stakes_cache: StakesCache::default(),
             epoch_stakes: HashMap::<Epoch, EpochStakes>::default(),
             is_delta: AtomicBool::default(),
+            prior_roots: Vec::<Slot>::default(),
             builtin_programs: BuiltinPrograms::default(),
             compute_budget: Option::<ComputeBudget>::default(),
             builtin_feature_transitions: Arc::<Vec<BuiltinFeatureTransition>>::default(),
@@ -1668,6 +1681,7 @@ impl Bank {
             ancestors: Ancestors::default(),
             hash: RwLock::new(Hash::default()),
             is_delta: AtomicBool::new(false),
+            prior_roots: parent.prior_roots.clone(),
             tick_height: AtomicU64::new(parent.tick_height.load(Relaxed)),
             signature_count: AtomicU64::new(0),
             builtin_programs,
@@ -1964,6 +1978,7 @@ impl Bank {
             stakes_cache: StakesCache::new(fields.stakes),
             epoch_stakes: fields.epoch_stakes,
             is_delta: AtomicBool::new(fields.is_delta),
+            prior_roots: Vec::default(),
             builtin_programs: new(),
             compute_budget: None,
             builtin_feature_transitions: new(),
@@ -1987,6 +2002,14 @@ impl Bank {
             accounts_data_len: AtomicU64::new(accounts_data_len),
             fee_structure: FeeStructure::default(),
         };
+        if false
+        {
+            let mut writer = bank.rc.accounts.accounts_db.accounts_index.roots_tracker.write().unwrap();
+            for x in fields.prior_roots {
+                writer.roots_original.insert(x);
+            }
+        }
+
         bank.finish_init(
             genesis_config,
             additional_builtins,
@@ -2035,6 +2058,9 @@ impl Bank {
         &'a self,
         ancestors: &'a HashMap<Slot, usize>,
     ) -> BankFieldsToSerialize<'a> {
+        let prior_roots = {
+            self.rc.accounts.accounts_db.accounts_index.roots_tracker.read().unwrap().roots_original.get_all()
+        };
         BankFieldsToSerialize {
             blockhash_queue: &self.blockhash_queue,
             ancestors,
@@ -2066,6 +2092,7 @@ impl Bank {
             stakes: &self.stakes_cache,
             epoch_stakes: &self.epoch_stakes,
             is_delta: self.is_delta.load(Relaxed),
+            prior_roots,
         }
     }
 
