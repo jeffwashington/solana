@@ -638,7 +638,8 @@ impl RollingBitField {
 
 #[derive(Debug)]
 pub struct RootsTracker {
-    roots: RollingBitField,
+    pub roots: RollingBitField,
+    pub roots_original: RollingBitField,
     uncleaned_roots: HashSet<Slot>,
     previous_uncleaned_roots: HashSet<Slot>,
 }
@@ -656,6 +657,7 @@ impl RootsTracker {
     pub fn new(max_width: u64) -> Self {
         Self {
             roots: RollingBitField::new(max_width),
+            roots_original: RollingBitField::new(max_width),
             uncleaned_roots: HashSet::new(),
             previous_uncleaned_roots: HashSet::new(),
         }
@@ -855,7 +857,7 @@ pub struct AccountsIndex<T: IndexValue> {
     program_id_index: SecondaryIndex<DashMapSecondaryIndexEntry>,
     spl_token_mint_index: SecondaryIndex<DashMapSecondaryIndexEntry>,
     spl_token_owner_index: SecondaryIndex<RwLockSecondaryIndexEntry>,
-    roots_tracker: RwLock<RootsTracker>,
+    pub roots_tracker: RwLock<RootsTracker>,
     ongoing_scan_roots: RwLock<BTreeMap<Slot, u64>>,
     // Each scan has some latest slot `S` that is the tip of the fork the scan
     // is iterating over. The unique id of that slot `S` is recorded here (note we don't use
