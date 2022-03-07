@@ -779,6 +779,7 @@ pub fn bank_from_snapshot_archives(
         unpacked_append_vec_map.extend(incremental_snapshot_unpacked_append_vec_map.into_iter());
     }
 
+    use log::*;error!("{} {}", file!(), line!());
     let mut measure_rebuild = Measure::start("rebuild bank from snapshots");
     let bank = rebuild_bank_from_snapshots(
         &unarchived_full_snapshot.unpacked_snapshots_dir_and_version,
@@ -800,6 +801,7 @@ pub fn bank_from_snapshot_archives(
         accounts_db_config,
         accounts_update_notifier,
     )?;
+    use log::*;error!("{} {}", file!(), line!());
     measure_rebuild.stop();
     info!("{}", measure_rebuild);
 
@@ -957,7 +959,7 @@ where
         unpack_dir.path(),
         account_paths,
         archive_format,
-        parallel_divisions,
+        1,
     )?;
     measure_untar.stop();
     info!("{}", measure_untar);
@@ -1469,10 +1471,12 @@ fn rebuild_bank_from_snapshots(
         incremental_snapshot_root_file_path: incremental_snapshot_root_paths
             .map(|root_paths| root_paths.snapshot_path),
     };
+    use log::*;error!("{} {}", file!(), line!());
 
     let bank = deserialize_snapshot_data_files(&snapshot_root_paths, |snapshot_streams| {
-        Ok(
-            match incremental_snapshot_version.unwrap_or(full_snapshot_version) {
+        Ok({
+            use log::*;error!("{} {}", file!(), line!());
+            let r = match incremental_snapshot_version.unwrap_or(full_snapshot_version) {
                 SnapshotVersion::V1_2_0 => bank_from_streams(
                     SerdeStyle::Newer,
                     snapshot_streams,
@@ -1489,7 +1493,11 @@ fn rebuild_bank_from_snapshots(
                     accounts_db_config,
                     accounts_update_notifier,
                 ),
-            }?,
+            }?;
+            use log::*;error!("{} {}", file!(), line!());
+
+            r
+        }
         )
     })?;
 
