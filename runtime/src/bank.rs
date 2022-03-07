@@ -5100,9 +5100,13 @@ impl Bank {
         let (parent_epoch, mut parent_slot_index) =
             self.get_epoch_and_slot_index(self.parent_slot());
         error!(
-            "variable_cycle_partitions: slot: {}, current_slot_index: {}",
+            "variable_cycle_partitions: slot: {}, current_slot_index: {}, current_epoch: {}, first normal slot, epoch: {}, {}, cycle_params: {:?}",
             self.slot(),
-            current_slot_index
+            current_slot_index,
+            current_epoch,
+            self.epoch_schedule().first_normal_slot, self.epoch_schedule().first_normal_epoch,
+            self.determine_collection_cycle_params(current_epoch)
+
         );
 
         let mut partitions = vec![];
