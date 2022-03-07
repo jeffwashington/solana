@@ -2004,7 +2004,7 @@ impl Bank {
             stakes_cache: StakesCache::new(fields.stakes),
             epoch_stakes: fields.epoch_stakes,
             is_delta: AtomicBool::new(fields.is_delta),
-            prior_roots: fields.prior_roots,
+            prior_roots: Vec::default(),
             builtin_programs: new(),
             compute_budget: None,
             builtin_feature_transitions: new(),
@@ -2032,6 +2032,14 @@ impl Bank {
             accounts_data_len: AtomicU64::new(accounts_data_len),
             fee_structure: FeeStructure::default(),
         };
+        if false
+        {
+            let mut writer = bank.rc.accounts.accounts_db.accounts_index.roots_tracker.write().unwrap();
+            for x in fields.prior_roots {
+                writer.roots_original.insert(x);
+            }
+        }
+
         bank.finish_init(
             genesis_config,
             additional_builtins,
@@ -2080,6 +2088,9 @@ impl Bank {
         &'a self,
         ancestors: &'a HashMap<Slot, usize>,
     ) -> BankFieldsToSerialize<'a> {
+        let prior_roots = {
+            self.rc.accounts.accounts_db.accounts_index.roots_tracker.read().unwrap().roots_original.get_all()
+        };
         BankFieldsToSerialize {
             blockhash_queue: &self.blockhash_queue,
             ancestors,
@@ -2111,7 +2122,7 @@ impl Bank {
             stakes: &self.stakes_cache,
             epoch_stakes: &self.epoch_stakes,
             is_delta: self.is_delta.load(Relaxed),
-            prior_roots: self.prior_roots.clone(),
+            prior_roots,
         }
     }
 

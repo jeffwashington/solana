@@ -30,6 +30,7 @@ use {
         hash::Hash,
         inflation::Inflation,
         pubkey::Pubkey,
+        deserialize_utils::default_on_eof,
     },
     std::{
         collections::{HashMap, HashSet},
@@ -67,6 +68,8 @@ struct AccountsDbFields<T>(
     StoredMetaWriteVersion,
     Slot,
     BankHashInfo,
+    #[serde(deserialize_with = "default_on_eof")]
+    Vec<Slot>,
 );
 
 /// Helper type to wrap BufReader streams when deserializing and reconstructing from either just a
@@ -97,6 +100,7 @@ impl<T> SnapshotAccountsDbFields<T> {
                 incremental_snapshot_version,
                 incremental_snapshot_slot,
                 incremental_snapshot_bank_hash_info,
+                incremental_snapshot_prior_roots,
             )) => {
                 let full_snapshot_storages = self.full_snapshot_accounts_db_fields.0;
                 let full_snapshot_slot = self.full_snapshot_accounts_db_fields.2;
@@ -119,6 +123,7 @@ impl<T> SnapshotAccountsDbFields<T> {
                     incremental_snapshot_version,
                     incremental_snapshot_slot,
                     incremental_snapshot_bank_hash_info,
+                    incremental_snapshot_prior_roots
                 ))
             }
         }
@@ -199,9 +204,11 @@ where
 {
     macro_rules! INTO {
         ($style:ident) => {{
+            use log::*;error!("{} {} before deserialize", file!(), line!());
             let (full_snapshot_bank_fields, full_snapshot_accounts_db_fields) =
                 $style::Context::deserialize_bank_fields(snapshot_streams.full_snapshot_stream)?;
-            let (incremental_snapshot_bank_fields, incremental_snapshot_accounts_db_fields) =
+                use log::*;error!("{} {} after deserialize", file!(), line!());
+                let (incremental_snapshot_bank_fields, incremental_snapshot_accounts_db_fields) =
                 if let Some(ref mut incremental_snapshot_stream) =
                     snapshot_streams.incremental_snapshot_stream
                 {
@@ -235,6 +242,7 @@ where
             Ok(bank)
         }};
     }
+    use log::*;error!("{} {}", file!(), line!());
     match serde_style {
         SerdeStyle::Newer => INTO!(newer),
     }
@@ -294,6 +302,9 @@ struct SerializableAccountsDb<'a, C> {
     slot: Slot,
     account_storage_entries: &'a [SnapshotStorage],
     phantom: std::marker::PhantomData<C>,
+    //#[serde(deserialize_with = "default_on_eof")]
+    //prior_roots: Vec<Slot>,
+
 }
 
 impl<'a, C: TypeContext<'a>> Serialize for SerializableAccountsDb<'a, C> {
@@ -412,13 +423,20 @@ where
         accounts_db_config,
         accounts_update_notifier,
     );
-
     let AccountsDbFields(
         snapshot_storages,
         snapshot_version,
         snapshot_slot,
         snapshot_bank_hash_info,
+        snapshot_prior_roots,
     ) = snapshot_accounts_db_fields.collapse_into()?;
+
+    {
+        let mut writer = accounts_db.accounts_index.roots_tracker.write().unwrap();
+        for x in snapshot_prior_roots {
+            writer.roots_original.insert(x);
+        }
+    }
 
     let snapshot_storages = snapshot_storages.into_iter().collect::<Vec<_>>();
 
