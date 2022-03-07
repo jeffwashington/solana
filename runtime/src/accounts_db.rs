@@ -243,7 +243,7 @@ impl ExpectedRentCollection {
 ) -> Option<Self> {
         assert!(epoch_schedule.is_some());
         let epoch_schedule = epoch_schedule.unwrap();
-        let slots_per_epoch = epoch_schedule.slots_per_epoch;
+        let slots_per_epoch = epoch_schedule.get_slots_in_epoch(rent_collector.epoch);
 
         assert!(max_slot_in_storages_exclusive > 0);
         let max_slot_in_storages = max_slot_in_storages_exclusive.saturating_sub(1);
