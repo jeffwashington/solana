@@ -212,7 +212,7 @@ where
         ($style:ident) => {{
             let (full_snapshot_bank_fields, full_snapshot_accounts_db_fields) =
                 $style::Context::deserialize_bank_fields(snapshot_streams.full_snapshot_stream)?;
-            let (incremental_snapshot_bank_fields, incremental_snapshot_accounts_db_fields) =
+                let (incremental_snapshot_bank_fields, incremental_snapshot_accounts_db_fields) =
                 if let Some(ref mut incremental_snapshot_stream) =
                     snapshot_streams.incremental_snapshot_stream
                 {
@@ -429,9 +429,16 @@ where
         snapshot_version,
         snapshot_slot,
         snapshot_bank_hash_info,
-        _snapshot_prior_roots,
+        snapshot_prior_roots,
         _snapshot_prior_roots_with_hash,
     ) = snapshot_accounts_db_fields.collapse_into()?;
+
+    {
+        let mut writer = accounts_db.accounts_index.roots_tracker.write().unwrap();
+        for x in snapshot_prior_roots {
+            writer.roots_original.insert(x);
+        }
+    }
 
     let snapshot_storages = snapshot_storages.into_iter().collect::<Vec<_>>();
 
