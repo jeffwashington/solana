@@ -4750,11 +4750,9 @@ impl Bank {
         let mut i = 0;
         let target_slot = self.slot();
         for (pubkey, mut account) in accounts {
-            /*
             let found = Self::partition_from_pubkey(&pubkey, partition.2);
             assert!(found <= partition.1, "{}, {}, {:?}", pubkey, found, partition);
             assert!(found > partition.0 || (found == 0 && partition.0 == 0), "{}, {}, {:?}", pubkey, found, partition);
-            */
             let old_rent_epoch = account.rent_epoch();
             let collected = self.rent_collector.collect_from_existing_account(
                 &pubkey,
