@@ -5771,13 +5771,12 @@ match self.rent_collector.calculate_rent_result(pubkey, &account, None) {
                             // we could have an account where we skipped rewrite last epoch. But, this epoch we haven't skipped it yet. So, we would then expect to see 
                             let (current_epoch, current_slot_index) = self.get_epoch_and_slot_index(self.slot());
                             let (storage_epoch, storage_slot_index) = self.get_epoch_and_slot_index(storage_slot);
-                            let slot_index_of_pubkey = Self::partition_from_pubkey(pubkey, self.epoch_schedule().slots_per_epoch);
+                            let slot_index_of_pubkey = Self::partition_from_pubkey(pubkey, self.epoch_schedule().get_slots_in_epoch(self.epoch()));
                             let mut can_update = true;
                             if current_epoch == storage_epoch {
                                 // storage is in same epoch as bank
                                 if slot_index_of_pubkey > current_slot_index { // >?
                                     // we haven't hit the slot's rent collection slot yet, and the storage was within this slot, so do not update
-                                    error!("{} {} {} {}", file!(), line!(), slot_index_of_pubkey, current_slot_index);
                                     can_update = false;
                                 }
                                 else if slot_index_of_pubkey < current_slot_index {
@@ -5794,14 +5793,12 @@ match self.rent_collector.calculate_rent_result(pubkey, &account, None) {
                                 else if slot_index_of_pubkey >= current_slot_index {
                                     // todo - think about skipped slots. ugggh
                                     // we did do rewrite in last epoch, and we have not yet hit the rent collection slot in THIS epoch
-                                    error!("{} {} {} {}", file!(), line!(), slot_index_of_pubkey, current_slot_index);
                                     can_update = false;
                                 }
                             } // if more than 1 epoch old, then we need to collect rent because we clearly skipped it. todo: once again, skipped slots... ugh
                             let rent_epoch = account.rent_epoch();
                             if rent_epoch == 0 && self.epoch() > 1 {
                                 can_update = false;
-                                error!("{} {} {} {}", file!(), line!(), slot_index_of_pubkey, current_slot_index);
                             }
 
                             // there is an account created maybe 3CKKAoVi94EnfX8QcVxEmk8CAvZTc6nAYzXp1WkSUofX, 120253355 with rent_epoch = 0
