@@ -5777,6 +5777,7 @@ match self.rent_collector.calculate_rent_result(pubkey, &account, None) {
                                 // storage is in same epoch as bank
                                 if slot_index_of_pubkey > current_slot_index { // >?
                                     // we haven't hit the slot's rent collection slot yet, and the storage was within this slot, so do not update
+                                    error!("{} {} {} {}", file!(), line!(), slot_index_of_pubkey, current_slot_index);
                                     can_update = false;
                                 }
                                 else if slot_index_of_pubkey < current_slot_index {
@@ -5793,12 +5794,14 @@ match self.rent_collector.calculate_rent_result(pubkey, &account, None) {
                                 else if slot_index_of_pubkey >= current_slot_index {
                                     // todo - think about skipped slots. ugggh
                                     // we did do rewrite in last epoch, and we have not yet hit the rent collection slot in THIS epoch
+                                    error!("{} {} {} {}", file!(), line!(), slot_index_of_pubkey, current_slot_index);
                                     can_update = false;
                                 }
                             } // if more than 1 epoch old, then we need to collect rent because we clearly skipped it. todo: once again, skipped slots... ugh
                             let rent_epoch = account.rent_epoch();
                             if rent_epoch == 0 && self.epoch() > 1 {
                                 can_update = false;
+                                error!("{} {} {} {}", file!(), line!(), slot_index_of_pubkey, current_slot_index);
                             }
 
                             // there is an account created maybe 3CKKAoVi94EnfX8QcVxEmk8CAvZTc6nAYzXp1WkSUofX, 120253355 with rent_epoch = 0
@@ -5824,7 +5827,7 @@ match self.rent_collector.calculate_rent_result(pubkey, &account, None) {
                             }
                             else {
                                 if !can_update {
-                                    assert!(!self.rewrites.contains_key(pubkey), "NOT updating rent_epoch: {}, next_epoch: {}, old: {}, current epoch: {}, rent_collected_this_slot: {}, can_update: {}", pubkey, rent_epoch, next_epoch, current_epoch, rent_collected_this_slot, can_update);
+                                    assert!(!self.rewrites.contains_key(pubkey), "NOT updating rent_epoch: {}, account.rent_epoch(): {}, next_epoch: {}, current epoch: {}, self.epoch(): {}, rent_collected_this_slot: {}, can_update: {}", pubkey, rent_epoch, next_epoch, current_epoch, self.epoch(), rent_collected_this_slot, can_update);
                                 }
                                 if interesting {
                                     error!("NOT updating rent_epoch: {}, next_epoch: {}, old: {}, current epoch: {}, rent_collected_this_slot: {}", pubkey, rent_epoch, next_epoch, current_epoch, rent_collected_this_slot);
