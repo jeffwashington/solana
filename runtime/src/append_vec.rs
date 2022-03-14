@@ -306,10 +306,12 @@ impl AppendVec {
         // This mutex forces append to be single threaded, but concurrent with reads
         // See UNSAFE usage in `append_ptr`
         let _lock = self.append_lock.lock().unwrap();
-        assert!(!self.is_ancient());
         self.current_len.store(0, Ordering::Release);
-        self.ancient_append_vec.store(false, Ordering::Relaxed); // todo ordering
-        self.full_ancient_append_vec.store(false, Ordering::Relaxed); // todo ordering
+        if self.is_ancient() {
+            error!("reseting ancient");
+        }
+        self.ancient_append_vec.store(false, Ordering::Release); // todo ordering
+        self.full_ancient_append_vec.store(false, Ordering::Release); // todo ordering
     }
 
     pub fn remaining_bytes(&self) -> u64 {
