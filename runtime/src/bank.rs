@@ -5802,7 +5802,7 @@ match self.rent_collector.calculate_rent_result(pubkey, &account, None) {
                             // we could have an account where we skipped rewrite last epoch. But, this epoch we haven't skipped it yet. So, we would then expect to see 
                             let (current_epoch, current_slot_index) = self.get_epoch_and_slot_index(self.slot());
                             let (storage_epoch, storage_slot_index) = self.get_epoch_and_slot_index(storage_slot);
-                            let slot_index_of_pubkey = Self::partition_from_pubkey(pubkey, self.epoch_schedule().get_slots_per_epoch(self.epoch()));
+                            let slot_index_of_pubkey = Self::partition_from_pubkey(pubkey, self.epoch_schedule().get_slots_in_epoch(self.epoch()));
                             let mut can_update = true;
                             if current_epoch == storage_epoch {
                                 // storage is in same epoch as bank
