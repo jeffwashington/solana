@@ -966,9 +966,11 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
 
         let in_mem_count = self.stats().count_in_mem.load(Ordering::Relaxed);
         let limit = self.storage.mem_budget_mb;
+        let estimate_mem = in_mem_count * Self::approx_size_of_one_entry();
         let exceeds_budget = limit
-            .map(|limit| in_mem_count * Self::approx_size_of_one_entry() >= limit * 1024 * 1024)
+            .map(|limit| estimate_mem >= limit * 1024 * 1024)
             .unwrap_or_default();
+        Self::update_stat(&self.stats().estimate_mem, estimate_mem as u64);
 
         let mut flush_entries_updated_on_disk = 0;
         // may have to loop if disk has to grow and we have to restart
@@ -987,7 +989,10 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                 evictions = Vec::with_capacity(map.len());
                 let m = Measure::start("flush_scan_and_update"); // we don't care about lock time in this metric - bg threads can wait
                 for (k, v) in map.iter() {
-                    if self.should_evict_from_mem(current_age, v, startup, true, exceeds_budget) {
+                    let mse = Measure::start("flush_scan_and_update"); // we don't care about lock time in this metric - bg threads can wait
+                    let should_evict = self.should_evict_from_mem(current_age, v, startup, true, exceeds_budget);
+                    Self::update_time_stat(&self.stats().flush_should_evict_us, mse);
+                    if  should_evict {
                         evictions.push(*k);
                     } else if Self::random_chance_of_eviction() {
                         evictions_random.push(*k);
@@ -997,7 +1002,10 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                     }
 
                     // if we are removing it, then we need to update disk if we're dirty
-                    if v.clear_dirty() {
+                    let mse = Measure::start("flush_scan_and_update"); // we don't care about lock time in this metric - bg threads can wait
+                    let clear_dirty =  v.clear_dirty();
+                    Self::update_time_stat(&self.stats().flush_clear_dirty_us, mse);
+                    if clear_dirty {
                         // step 1: clear the dirty flag
                         // step 2: perform the update on disk based on the fields in the entry
                         // If a parallel operation dirties the item again - even while this flush is occurring,
