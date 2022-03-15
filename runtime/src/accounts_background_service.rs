@@ -14,10 +14,7 @@ use {
     log::*,
     rand::{thread_rng, Rng},
     solana_measure::measure::Measure,
-    solana_sdk::{
-        clock::{BankId, Slot},
-        hash::Hash,
-    },
+    solana_sdk::clock::{BankId, Slot},
     std::{
         boxed::Box,
         fmt::{Debug, Formatter},
@@ -108,12 +105,12 @@ impl SnapshotRequestHandler {
                     status_cache_slot_deltas,
                 } = snapshot_request;
 
-                let previous_hash = if test_hash_calculation {
+                let hash_for_testing = if test_hash_calculation {
                     // We have to use the index version here.
-                    // We cannot calculate the non-index way because cache has not been flushed and stores don't match reality.
-                    snapshot_root_bank.update_accounts_hash_with_index_option(true, false, false)
+                    // We cannot calculate the non-index way because cache has not been flushed and stores don't match reality. This comment is out of date and can be re-evaluated.
+                    Some(snapshot_root_bank.update_accounts_hash_with_index_option(true, false, false))
                 } else {
-                    Hash::default()
+                    None
                 };
 
                 let mut shrink_time = Measure::start("shrink_time");
@@ -144,20 +141,6 @@ impl SnapshotRequestHandler {
                     );
                 }
                 flush_accounts_cache_time.stop();
-
-                let mut hash_time = Measure::start("hash_time");
-                let this_hash = snapshot_root_bank.update_accounts_hash_with_index_option(
-                    use_index_hash_calculation,
-                    test_hash_calculation,
-                    false,
-                );
-                let hash_for_testing = if test_hash_calculation {
-                    assert_eq!(previous_hash, this_hash);
-                    Some(snapshot_root_bank.get_accounts_hash())
-                } else {
-                    None
-                };
-                hash_time.stop();
 
                 let mut clean_time = Measure::start("clean_time");
                 // Don't clean the slot we're snapshotting because it may have zero-lamport
@@ -205,6 +188,7 @@ impl SnapshotRequestHandler {
                     self.snapshot_config.archive_format,
                     hash_for_testing,
                     snapshot_type,
+                    use_index_hash_calculation,
                 );
                 if let Err(e) = result {
                     warn!(
@@ -234,7 +218,6 @@ impl SnapshotRequestHandler {
 
                 datapoint_info!(
                     "handle_snapshot_requests-timing",
-                    ("hash_time", hash_time.as_us(), i64),
                     (
                         "flush_accounts_cache_time",
                         flush_accounts_cache_time.as_us(),
