@@ -1263,6 +1263,7 @@ fn load_frozen_forks(
                             snapshot_config.accounts_hash_debug_verify,
                             false,
                         );
+                        let use_index_hash_calculation = false;
                         snapshot_utils::snapshot_bank(
                             new_root_bank,
                             new_root_bank.src.slot_deltas(&new_root_bank.src.roots()),
@@ -1273,6 +1274,7 @@ fn load_frozen_forks(
                             snapshot_config.archive_format,
                             None,
                             Some(SnapshotType::FullSnapshot),
+                            use_index_hash_calculation,
                         )
                         .expect("Failed to snapshot bank while loading frozen banks");
                         trace!(

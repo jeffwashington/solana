@@ -288,6 +288,7 @@ mod tests {
             snapshot_version,
             None,
             Some(SnapshotType::FullSnapshot),
+            false,
         )
         .unwrap();
         let snapshot_package = SnapshotPackage::from(accounts_package);
@@ -416,6 +417,7 @@ mod tests {
                 snapshot_config.archive_format,
                 None,
                 Some(SnapshotType::FullSnapshot),
+                false,
             )
             .unwrap();
 

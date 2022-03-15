@@ -1,7 +1,9 @@
 use {
     crate::{
-        accounts_db::SnapshotStorages,
+        accounts::Accounts,
+        accounts_db::{AccountsDb, SnapshotStorages},
         bank::{Bank, BankSlotDelta},
+        rent_collector::RentCollector,
         snapshot_archive_info::{SnapshotArchiveInfo, SnapshotArchiveInfoGetter},
         snapshot_utils::{
             self, ArchiveFormat, BankSnapshotInfo, Result, SnapshotVersion,
@@ -10,7 +12,7 @@ use {
     },
     crossbeam_channel::{Receiver, SendError, Sender},
     log::*,
-    solana_sdk::{clock::Slot, genesis_config::ClusterType, hash::Hash},
+    solana_sdk::{clock::Slot, genesis_config::ClusterType, hash::Hash, epoch_schedule::EpochSchedule},
     std::{
         fs,
         path::{Path, PathBuf},
@@ -47,6 +49,11 @@ pub struct AccountsPackage {
     pub hash_for_testing: Option<Hash>,
     pub cluster_type: ClusterType,
     pub snapshot_type: Option<SnapshotType>,
+    pub num_hash_scan_passes: Option<usize>,
+    pub use_index_hash_calculation: bool,
+    pub maybe_db: Option<Arc<Accounts>>,
+    pub epoch_schedule: EpochSchedule,
+    pub rent_collector: RentCollector,
 }
 
 impl AccountsPackage {
@@ -63,6 +70,7 @@ impl AccountsPackage {
         snapshot_version: SnapshotVersion,
         hash_for_testing: Option<Hash>,
         snapshot_type: Option<SnapshotType>,
+        use_index_hash_calculation: bool,
     ) -> Result<Self> {
         info!(
             "Package snapshot for bank {} has {} account storage entries (snapshot type: {:?})",
@@ -115,6 +123,11 @@ impl AccountsPackage {
             hash_for_testing,
             cluster_type: bank.cluster_type(),
             snapshot_type,
+            num_hash_scan_passes: bank.num_hash_scan_passes(),
+            use_index_hash_calculation,
+            maybe_db: Some(bank.accounts()),
+            epoch_schedule: bank.epoch_schedule().clone(),
+            rent_collector: bank.rent_collector().clone(),
         })
     }
 }
