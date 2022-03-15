@@ -126,26 +126,29 @@ impl AccountsHashVerifier {
         thread_pool: Option<&ThreadPool>,
         ledger_path: &Path,
     ) {
-        let mut measure_hash = Measure::start("hash"); /*
-                                                       if let Some(expected_hash) = accounts_package.hash_for_testing {
-                                                           let sorted_storages = SortedStorages::new(&accounts_package.snapshot_storages);
-                                                           let (hash, lamports) = AccountsDb::calculate_accounts_hash_without_index(
-                                                               ledger_path,
-                                                               &sorted_storages,
-                                                               thread_pool,
-                                                               HashStats::default(),
-                                                               false,
-                                                               None,
-                                                               None, // this will fail with filler accounts
-                                                               None, // this code path is only for testing, so use default # passes here
-                                                               None,
-                                                               &None,
-                                                           )
-                                                           .unwrap();
+        let mut measure_hash = Measure::start("hash");
+        let sorted_storages = SortedStorages::new(&accounts_package.snapshot_storages);
+        let check_hash = false;
+        let maybe_db = accounts_package.maybe_db.as_ref().map(|a| &*a.accounts_db);
+        let (hash, lamports) = AccountsDb::calculate_accounts_hash_without_index2(
+            ledger_path,
+            &sorted_storages,
+            thread_pool,
+            HashStats::default(),
+            check_hash,
+            None,
+            None, // this will fail with filler accounts
+            accounts_package.num_hash_scan_passes,
+            Some(&accounts_package.epoch_schedule),
+            &accounts_package.rent_collector,
+            &maybe_db,
+        )
+        .unwrap(); // unwrap is safe because check_hash is false
 
-                                                           assert_eq!(accounts_package.expected_capitalization, lamports);
-                                                           assert_eq!(expected_hash, hash);
-                                                       };*/
+        if let Some(expected_hash) = accounts_package.hash_for_testing {
+            assert_eq!(accounts_package.expected_capitalization, lamports);
+            assert_eq!(expected_hash, hash);
+        };
         measure_hash.stop();
         datapoint_info!(
             "accounts_hash_verifier",
@@ -370,6 +373,8 @@ mod tests {
                 hash_for_testing: None,
                 cluster_type: ClusterType::MainnetBeta,
                 snapshot_type: None,
+                num_hash_scan_passes: None,
+                use_index_hash_calculation: false,
             };
 
             let ledger_path = TempDir::new().unwrap();

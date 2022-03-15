@@ -1609,6 +1609,7 @@ where
 /// function is called from AccountsBackgroundService to handle snapshot requests.  Since taking a
 /// snapshot is not permitted to fail, any errors returned here will trigger the node to shutdown.
 /// So, be careful whenever adding new code that may return errors.
+#[allow(clippy::too_many_arguments)]
 pub fn snapshot_bank(
     root_bank: &Bank,
     status_cache_slot_deltas: Vec<BankSlotDelta>,
@@ -1619,6 +1620,7 @@ pub fn snapshot_bank(
     archive_format: ArchiveFormat,
     hash_for_testing: Option<Hash>,
     snapshot_type: Option<SnapshotType>,
+    use_index_hash_calculation: bool,
 ) -> Result<()> {
     let snapshot_storages = get_snapshot_storages(root_bank, snapshot_type);
 
@@ -1643,6 +1645,7 @@ pub fn snapshot_bank(
         snapshot_version,
         hash_for_testing,
         snapshot_type,
+        use_index_hash_calculation,
     )
     .expect("failed to hard link bank snapshot into a tmpdir");
 
@@ -1802,6 +1805,7 @@ pub fn package_and_archive_full_snapshot(
         snapshot_version,
         None,
         Some(SnapshotType::FullSnapshot),
+        false,
     )?;
 
     let snapshot_package = SnapshotPackage::from(accounts_package);
@@ -1843,6 +1847,7 @@ pub fn package_and_archive_incremental_snapshot(
         Some(SnapshotType::IncrementalSnapshot(
             incremental_snapshot_base_slot,
         )),
+        false,
     )?;
 
     let snapshot_package = SnapshotPackage::from(accounts_package);
