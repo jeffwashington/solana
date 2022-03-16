@@ -970,7 +970,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         let exceeds_budget = limit
             .map(|limit| estimate_mem >= limit * 1024 * 1024)
             .unwrap_or_default();
-        Self::update_stat(&self.stats().estimate_mem, estimate_mem as u64);
+        self.stats().estimate_mem.store(estimate_mem as u64, Ordering::Relaxed);
 
         let mut flush_entries_updated_on_disk = 0;
         // may have to loop if disk has to grow and we have to restart
