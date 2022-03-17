@@ -289,6 +289,10 @@ impl AppendVec {
         self.current_len.store(0, Ordering::Release);
     }
 
+    pub fn remaining_bytes(&self) -> u64 {
+        self.capacity() - self.len() as u64
+    }
+
     pub fn len(&self) -> usize {
         self.current_len.load(Ordering::Acquire)
     }
