@@ -1036,27 +1036,29 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                 drop(map);
                 // write to disk outside giant read lock
                 let m = Measure::start("flush_scan_and_update"); // we don't care about lock time in this metric - bg threads can wait
-                let dirty_item_len = dirty_items.len();
-                for i in (0..dirty_items.len()).rev() {
-                    let (k,v) = &dirty_items[i];
+                for (k, v) in dirty_items {
                     if v.dirty() {
                         // already marked dirty again, skip it
                         continue;
                     }
-                    let m = Measure::start("flush_scan_and_update"); // we don't care about lock time in this metric - bg threads can wait
-                    let slot_list = v.slot_list.read().unwrap();
-                    disk_resize = disk.try_write(k, (&slot_list, v.ref_count()));
-                    drop(slot_list);
-                    Self::update_time_stat(&self.stats().flush_update_disk_us, m);
-                    if disk_resize.is_ok() {
-                        // dirty_items is not drained if every item could be flushed without needing to resize.
-                        // Below, we 'return' and leave dirty_items as-is. It will be ignored since we don't loop.
-                        flush_entries_updated_on_disk += 1;
-                    } else {
-                        // disk needs to resize. This item did not get resized. Save it for next pass.
-                        let m = Measure::start("flush_evict_or_grow");
-                        disk.grow(disk_resize.unwrap_err());
-                        Self::update_time_stat(&self.stats().flush_grow_us, m);
+                    loop {
+                        let m = Measure::start("flush_scan_and_update"); // we don't care about lock time in this metric - bg threads can wait
+                        {
+                            let slot_list = v.slot_list.read().unwrap();
+                            disk_resize = disk.try_write(&k, (&slot_list, v.ref_count()));
+                        }
+                        Self::update_time_stat(&self.stats().flush_update_disk_us, m);
+                        if disk_resize.is_ok() {
+                            // dirty_items is not drained if every item could be flushed without needing to resize.
+                            // Below, we 'return' and leave dirty_items as-is. It will be ignored since we don't loop.
+                            flush_entries_updated_on_disk += 1;
+                            break;
+                        } else {
+                            // disk needs to resize. This item did not get resized. Save it for next pass.
+                            let m = Measure::start("flush_evict_or_grow");
+                            disk.grow(disk_resize.unwrap_err());
+                            Self::update_time_stat(&self.stats().flush_grow_us, m);
+                        }
                     }
                 }
                 Self::update_time_stat(&self.stats().flush_update_us, m);
