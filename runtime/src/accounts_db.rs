@@ -3645,6 +3645,8 @@ impl AccountsDb {
         append_vec_slot: Slot,
         recent: &Vec<(&Pubkey, &StoredAccountMeta<'a>, u64)>,
     ) {
+        return;
+        /*
         if true {
             let store_id = writer.append_vec_id();
             for c in recent {
@@ -3723,6 +3725,7 @@ impl AccountsDb {
                 }
             }
         }
+        */
     }
     /*
         fn write_accounts_to_ancient_append_vec(storage: &Arc<AccountStorageEntry>, )
