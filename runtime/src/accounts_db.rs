@@ -20,6 +20,7 @@
 
 use {
     crate::{
+        accounts_index_storage::Startup,
         account_info::{AccountInfo, Offset, StorageLocation, StoredSize},
         accounts_background_service::{DroppedSlotsSender, SendDroppedBankCallback},
         accounts_cache::{AccountsCache, CachedAccount, SlotCache},
@@ -8097,7 +8098,7 @@ impl AccountsDb {
         let account = AccountSharedData::new(lamports, space, &owner);
         let added = AtomicUsize::default();
         for pass in 0..=passes {
-            self.accounts_index.set_startup(true);
+            self.accounts_index.set_startup(Startup::StartupWithExtraThreads);
             let roots_in_this_pass = roots
                 .iter()
                 .skip(pass * per_pass)
@@ -8148,7 +8149,7 @@ impl AccountsDb {
                 self.maybe_throttle_index_generation();
                 self.store_accounts_frozen((*slot, &add[..]), Some(&hashes[..]), None, None);
             });
-            self.accounts_index.set_startup(false);
+            self.accounts_index.set_startup(Startup::Normal);
         }
         info!("added {} filler accounts", added.load(Ordering::Relaxed));
     }
@@ -8182,7 +8183,7 @@ impl AccountsDb {
         let passes = if verify { 2 } else { 1 };
         for pass in 0..passes {
             if pass == 0 {
-                self.accounts_index.set_startup(true);
+                self.accounts_index.set_startup(Startup::StartupWithExtraThreads);
             }
             let storage_info = StorageSizeAndCountMap::default();
             let total_processed_slots_across_all_threads = AtomicU64::new(0);
@@ -8320,7 +8321,7 @@ impl AccountsDb {
             if pass == 0 {
                 // tell accounts index we are done adding the initial accounts at startup
                 let mut m = Measure::start("accounts_index_idle_us");
-                self.accounts_index.set_startup(false);
+                self.accounts_index.set_startup(Startup::Normal);
                 m.stop();
                 index_flush_us = m.as_us();
             }
