@@ -982,11 +982,11 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
 
         let mut flush_entries_updated_on_disk = 0;
         // may have to loop if disk has to grow and we have to restart
-        loop {
+        {
             let mut evictions;
             let mut evictions_random;
             let disk = self.bucket.as_ref().unwrap();
-
+            let mut dirty_items = Vec::default();
             let mut disk_resize = Ok(());
             // scan and update loop
             // holds read lock
@@ -996,10 +996,13 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                 Self::update_time_stat(&self.stats().flush_read_lock_us, m);
                 evictions = Vec::with_capacity(map.len());
                 evictions_random = Vec::default();                
+                if dirty_items.capacity() == 0 {
+                    dirty_items.reserve(map.len());
+                }
                 let m = Measure::start("flush_scan_and_update"); // we don't care about lock time in this metric - bg threads can wait
                 for (k, v) in map.iter() {
-let mse = Measure::start("flush_scan_and_update"); // we don't care about lock time in this metric - bg threads can wait
-let (evict_for_age, slot_list) =
+                    let mse = Measure::start("flush_scan_and_update"); // we don't care about lock time in this metric - bg threads can wait
+                    let (evict_for_age, slot_list) =
                         self.should_evict_from_mem(current_age, v, startup, true, exceeds_budget);
                     Self::update_time_stat(&self.stats().flush_should_evict_us, mse);
                     if !evict_for_age && !Self::random_chance_of_eviction() {
@@ -1019,18 +1022,7 @@ let (evict_for_age, slot_list) =
                         //  That prevents dropping an item from cache before disk is updated to latest in mem.
                         // happens inside of lock on in-mem cache. This is because of deleting items
                         // it is possible that the item in the cache is marked as dirty while these updates are happening. That is ok.
-                        let m = Measure::start("flush_scan_and_update"); // we don't care about lock time in this metric - bg threads can wait
-                        let slot_list =
-                            slot_list.unwrap_or_else(|| v.slot_list.read().unwrap());
-                        disk_resize = disk.try_write(k, (&slot_list, v.ref_count()));
-                        Self::update_time_stat(&self.stats().flush_update_disk_us, m);
-                        if disk_resize.is_ok() {
-                            flush_entries_updated_on_disk += 1;
-                        } else {
-                            // disk needs to resize, so mark all unprocessed items as dirty again so we pick them up after the resize
-                            v.set_dirty(true);
-                            break;
-                        }
+                        dirty_items.push((*k, Arc::clone(&v)));
                     } else {
                         drop(slot_list);
                     }
@@ -1040,42 +1032,57 @@ let (evict_for_age, slot_list) =
                         evictions_random.push(*k);
                     }
                 }
-                drop(map);
                 Self::update_time_stat(&self.stats().flush_scan_update_us, m);
+                drop(map);
+                // write to disk outside giant read lock
+                let m = Measure::start("flush_scan_and_update"); // we don't care about lock time in this metric - bg threads can wait
+                let dirty_item_len = dirty_items.len();
+                for i in (0..dirty_items.len()).rev() {
+                    let (k,v) = &dirty_items[i];
+                    if v.dirty() {
+                        // already marked dirty again, skip it
+                        continue;
+                    }
+                    let m = Measure::start("flush_scan_and_update"); // we don't care about lock time in this metric - bg threads can wait
+                    let slot_list = v.slot_list.read().unwrap();
+                    disk_resize = disk.try_write(k, (&slot_list, v.ref_count()));
+                    drop(slot_list);
+                    Self::update_time_stat(&self.stats().flush_update_disk_us, m);
+                    if disk_resize.is_ok() {
+                        // dirty_items is not drained if every item could be flushed without needing to resize.
+                        // Below, we 'return' and leave dirty_items as-is. It will be ignored since we don't loop.
+                        flush_entries_updated_on_disk += 1;
+                    } else {
+                        // disk needs to resize. This item did not get resized. Save it for next pass.
+                        let m = Measure::start("flush_evict_or_grow");
+                        disk.grow(disk_resize.unwrap_err());
+                        Self::update_time_stat(&self.stats().flush_grow_us, m);
+                    }
+                }
+                Self::update_time_stat(&self.stats().flush_update_us, m);
             }
 
             let m = Measure::start("flush_evict_or_grow");
-            match disk_resize {
-                Ok(_) => {
-                    if !self.evict_from_cache(evictions, current_age, startup, false)
-                        || !self.evict_from_cache(evictions_random, current_age, startup, true)
-                    {
-                        self.stats()
-                            .restarted_flush_calls
-                            .fetch_add(1, Ordering::Relaxed);
+            if !self.evict_from_cache(evictions, current_age, startup, false)
+                || !self.evict_from_cache(evictions_random, current_age, startup, true)
+            {
+                self.stats()
+                    .restarted_flush_calls
+                    .fetch_add(1, Ordering::Relaxed);
 
-                        iterate_for_age = false; // did not make it all the way through this bucket, so didn't handle age completely
-                    }
-                    Self::update_time_stat(&self.stats().flush_remove_us, m);
-
-                    if iterate_for_age {
-                        // completed iteration of the buckets at the current age
-                        assert_eq!(current_age, self.storage.current_age());
-                        self.set_has_aged(current_age);
-                    }
-                    Self::update_stat(
-                        &self.stats().flush_entries_updated_on_disk,
-                        flush_entries_updated_on_disk,
-                    );
-                    return;
-                }
-                Err(err) => {
-                    // grow the bucket, outside of all in-mem locks.
-                    // then, loop to try again
-                    disk.grow(err);
-                    Self::update_time_stat(&self.stats().flush_grow_us, m);
-                }
+                iterate_for_age = false; // did not make it all the way through this bucket, so didn't handle age completely
             }
+            Self::update_time_stat(&self.stats().flush_remove_us, m);
+
+            if iterate_for_age {
+                // completed iteration of the buckets at the current age
+                assert_eq!(current_age, self.storage.current_age());
+                self.set_has_aged(current_age);
+            }
+            Self::update_stat(
+                &self.stats().flush_entries_updated_on_disk,
+                flush_entries_updated_on_disk,
+            );
         }
     }
 
