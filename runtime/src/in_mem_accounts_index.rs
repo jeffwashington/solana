@@ -19,7 +19,7 @@ use {
         ops::{Bound, RangeBounds, RangeInclusive},
         sync::{
             atomic::{AtomicBool, AtomicU64, AtomicU8, Ordering},
-            Arc, RwLock, RwLockWriteGuard,
+            Arc, RwLock, RwLockReadGuard, RwLockWriteGuard,
         },
     },
 };
@@ -1086,15 +1086,22 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         }
     }
 
-    fn move_age_to_future(&self, next_age: Age, current_age: Age, key: &Pubkey) {
-        if let Some(entry) = self.map().read().unwrap().get(key) {
+    fn move_age_to_future<'a>(&self, next_age: Age, current_age: Age, key: &Pubkey, map: &'a RwLockReadGuard<'a, HashMap<Pubkey, AccountMapEntry<T>>>) {
+        if let Some(entry) = map.get(key) {
+            Self::bump_age(next_age, current_age, entry);
+        }
+    }
+
+    fn move_age_to_future_write<'a>(&self, next_age: Age, current_age: Age, key: &Pubkey, map: &'a RwLockWriteGuard<'a, HashMap<Pubkey, AccountMapEntry<T>>>) {
+        if let Some(entry) = map.get(key) {
             Self::bump_age(next_age, current_age, entry);
         }
     }
 
     fn move_ages_to_future(&self, next_age: Age, current_age: Age, entries: &[Pubkey]) {
+        let map = self.map().read().unwrap();
         entries.iter().for_each(|k| {
-            self.move_age_to_future(next_age, current_age, k);
+            self.move_age_to_future(next_age, current_age, k, &map);
         });
     }
 
@@ -1127,7 +1134,8 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                 if ranges.iter().any(|range| range.contains(&k)) {
                     // this item is held in mem by range, so don't remove
                     //completed_scan = false;
-                    self.move_age_to_future(next_age_on_failure, current_age, k);
+                    let mut map = self.map().read().unwrap();
+                    self.move_age_to_future(next_age_on_failure, current_age, k, &map);
                     false
                 } else {
                     true
@@ -1143,7 +1151,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                 let v = occupied.get();
                 if Arc::strong_count(v) > 1 {
                     // someone is holding the value arc's ref count and could modify it, so do not remove this from in-mem cache
-                    self.move_age_to_future(next_age_on_failure, current_age, &k);
+                    self.move_age_to_future_write(next_age_on_failure, current_age, &k, &map);
                     continue;
                 }
 
@@ -1158,7 +1166,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                 }
 
                 if stop_evictions_changes_at_start != self.get_stop_evictions_changes() {
-                    self.move_age_to_future(next_age_on_failure, current_age, &k);
+                    self.move_age_to_future_write(next_age_on_failure, current_age, &k, &map);
                     continue; //return false; // did NOT complete, ranges were changed, so have to restart
                 }
 
