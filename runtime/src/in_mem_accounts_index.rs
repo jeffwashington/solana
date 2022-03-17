@@ -984,7 +984,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         // may have to loop if disk has to grow and we have to restart
         loop {
             let mut evictions;
-            let mut evictions_random = Vec::default();
+            let mut evictions_random;
             let disk = self.bucket.as_ref().unwrap();
 
             let mut disk_resize = Ok(());
@@ -995,6 +995,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                 let map = self.map().read().unwrap();
                 Self::update_time_stat(&self.stats().flush_read_lock_us, m);
                 evictions = Vec::with_capacity(map.len());
+                evictions_random = Vec::default();                
                 let m = Measure::start("flush_scan_and_update"); // we don't care about lock time in this metric - bg threads can wait
                 for (k, v) in map.iter() {
 let mse = Measure::start("flush_scan_and_update"); // we don't care about lock time in this metric - bg threads can wait
