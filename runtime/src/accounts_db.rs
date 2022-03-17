@@ -68,6 +68,7 @@ use {
         pubkey::Pubkey,
         timing::AtomicInterval,
     },
+    solana_vote_program::vote_state::MAX_LOCKOUT_HISTORY,
     std::{
         borrow::{Borrow, Cow},
         boxed::Box,
@@ -5693,8 +5694,9 @@ impl AccountsDb {
         &self,
         slot: Slot,
         ancestors: &Ancestors,
-        check_hash: bool,
+        _check_hash: bool,
     ) -> Result<(Hash, u64), BankHashVerificationError> {
+        let check_hash = false;
         use BankHashVerificationError::*;
         let mut collect = Measure::start("collect");
         let keys: Vec<_> = self
@@ -6064,11 +6066,12 @@ impl AccountsDb {
         use_index: bool,
         slot: Slot,
         ancestors: &Ancestors,
-        check_hash: bool,
+        _check_hash: bool,
         can_cached_slot_be_unflushed: bool,
         slots_per_epoch: Option<Slot>,
         is_startup: bool,
     ) -> Result<(Hash, u64), BankHashVerificationError> {
+        let check_hash = false;
         if !use_index {
             let accounts_cache_and_ancestors = if can_cached_slot_be_unflushed {
                 Some((&self.accounts_cache, ancestors, &self.accounts_index))
