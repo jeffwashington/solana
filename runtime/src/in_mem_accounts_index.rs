@@ -1086,6 +1086,18 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         }
     }
 
+    fn move_age_to_future(&self, next_age: Age, current_age: Age, key: &Pubkey) {
+        if let Some(entry) = self.map().read().unwrap().get(key) {
+            Self::bump_age(next_age, current_age, entry);
+        }
+    }
+
+    fn move_ages_to_future(&self, next_age: Age, current_age: Age, entries: &[Pubkey]) {
+        entries.iter().for_each(|k| {
+            self.move_age_to_future(next_age, current_age, k);
+        });
+    }
+
     // remove keys in 'evictions' from in-mem cache, likely due to age
     // return true if the removal was completed
     fn evict_from_cache(
@@ -1101,8 +1113,11 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         }
 
         let stop_evictions_changes_at_start = self.get_stop_evictions_changes();
+        let next_age_on_failure = self.storage.future_age_to_flush();
+        let current_age = self.storage.current_age();
         if self.get_stop_evictions() {
-            return false; // did NOT complete, ranges were changed, so have to restart
+            self.move_ages_to_future(next_age_on_failure, current_age, &evictions);
+            return true;//false; // did NOT complete, ranges were changed, so have to restart
         }
 
         // skip any keys that are held in memory because of ranges being held
@@ -1111,7 +1126,8 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
             evictions.retain(|k| {
                 if ranges.iter().any(|range| range.contains(&k)) {
                     // this item is held in mem by range, so don't remove
-                    completed_scan = false;
+                    //completed_scan = false;
+                    self.move_age_to_future(next_age_on_failure, current_age, k);
                     false
                 } else {
                     true
@@ -1127,7 +1143,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                 let v = occupied.get();
                 if Arc::strong_count(v) > 1 {
                     // someone is holding the value arc's ref count and could modify it, so do not remove this from in-mem cache
-                    completed_scan = false;
+                    self.move_age_to_future(next_age_on_failure, current_age, &k);
                     continue;
                 }
 
@@ -1142,7 +1158,8 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                 }
 
                 if stop_evictions_changes_at_start != self.get_stop_evictions_changes() {
-                    return false; // did NOT complete, ranges were changed, so have to restart
+                    self.move_age_to_future(next_age_on_failure, current_age, &k);
+                    continue; //return false; // did NOT complete, ranges were changed, so have to restart
                 }
 
                 // all conditions for removing succeeded, so really remove item from in-mem cache
@@ -1159,6 +1176,10 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         Self::update_stat(&self.stats().flush_entries_removed_from_mem, removed as u64);
 
         completed_scan
+    }
+
+    fn bump_age(next_age: Age, expected_age: Age, entry: &AccountMapEntry<T>) {
+        entry.meta.age.compare_exchange(expected_age, next_age, Ordering::AcqRel, Ordering::Relaxed);
     }
 
     pub fn stats(&self) -> &BucketMapHolderStats {
