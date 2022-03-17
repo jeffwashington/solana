@@ -5,6 +5,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 #[derive(Debug, Default)]
 pub struct ActiveStats {
     clean: AtomicUsize,
+    shrink_ancient: AtomicUsize,
     shrink: AtomicUsize,
     hash: AtomicUsize,
     flush: AtomicUsize,
@@ -14,6 +15,7 @@ pub struct ActiveStats {
 pub enum ActiveStatItem {
     Clean,
     Shrink,
+    ShrinkAncient,
     Hash,
     Flush,
 }
@@ -49,12 +51,16 @@ impl ActiveStats {
         let stat = match item {
             ActiveStatItem::Clean => &self.clean,
             ActiveStatItem::Shrink => &self.shrink,
+            ActiveStatItem::ShrinkAncient => &self.shrink_ancient,
             ActiveStatItem::Hash => &self.hash,
             ActiveStatItem::Flush => &self.flush,
         };
         let value = modify_stat(stat);
         match item {
             ActiveStatItem::Clean => datapoint_info!("accounts_db_active", ("clean", value, i64)),
+            ActiveStatItem::ShrinkAncient => {
+                datapoint_info!("accounts_db_active", ("shrink_ancient", value, i64))
+            }
             ActiveStatItem::Shrink => {
                 datapoint_info!("accounts_db_active", ("shrink", value, i64))
             }
