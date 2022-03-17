@@ -38,6 +38,7 @@ use solana_sdk::recent_blockhashes_account;
 use {
     crate::{
         accounts::{AccountAddressFilter, Accounts, LoadedTransaction, TransactionLoadResult},
+        accounts_index_storage::Startup,
         accounts_db::{
             AccountShrinkThreshold, AccountsDbConfig, ErrorCounters, Rewrites, SnapshotStorages,
             ACCOUNTS_DB_CONFIG_FOR_BENCHMARKS, ACCOUNTS_DB_CONFIG_FOR_TESTING,
@@ -6258,7 +6259,7 @@ match self.rent_collector.calculate_rent_result(pubkey, &account, None) {
             .accounts
             .accounts_db
             .accounts_index
-            .set_startup(true);
+            .set_startup(Startup::Startup);
         let mut shrink_all_slots_time = Measure::start("shrink_all_slots");
         if !accounts_db_skip_shrink && self.slot() > 0 {
             info!("shrinking..");
@@ -6275,7 +6276,7 @@ match self.rent_collector.calculate_rent_result(pubkey, &account, None) {
             .accounts
             .accounts_db
             .accounts_index
-            .set_startup(false);
+            .set_startup(Startup::Normal);
 
         info!("verify_hash..");
         let mut verify2_time = Measure::start("verify_hash");
