@@ -18,8 +18,6 @@
 //! tracks the number of commits to the entire data store. So the latest
 //! commit for each slot entry would be indexed.
 
-#[cfg(test)]
-use std::{thread::sleep, time::Duration};
 use {
     crate::{
         account_info::{AccountInfo, Offset, StorageLocation, StoredSize},
@@ -80,8 +78,8 @@ use {
             atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering},
             Arc, Condvar, Mutex, MutexGuard, RwLock,
         },
-        thread::Builder,
-        time::Instant,
+        thread::{sleep, Builder},
+        time::{Duration, Instant},
     },
     tempfile::TempDir,
 };
@@ -6928,6 +6926,7 @@ impl AccountsDb {
                     .map(|key| (key, &account))
                     .collect::<Vec<_>>();
                 let hashes = (0..filler_entries).map(|_| hash).collect::<Vec<_>>();
+                self.maybe_throttle_index_generation();
                 self.store_accounts_frozen((*slot, &add[..]), Some(&hashes[..]), None, None);
             });
             self.accounts_index.set_startup(false);
@@ -7009,6 +7008,7 @@ impl AccountsDb {
 
                         let insert_us = if pass == 0 {
                             // generate index
+                            self.maybe_throttle_index_generation();
                             let SlotIndexGenerationInfo {
                                 insert_time_us: insert_us,
                                 num_accounts: total_this_slot,
@@ -7136,6 +7136,19 @@ impl AccountsDb {
 
         IndexGenerationInfo {
             accounts_data_len: accounts_data_len.load(Ordering::Relaxed),
+        }
+    }
+
+    /// Startup processes can consume large amounts of memory while inserting accounts into the index as fast as possible.
+    /// Calling this can slow down the insertion process to allow flushing ot disk to keep pace.
+    fn maybe_throttle_index_generation(&self) {
+        const LIMIT: usize = 10_000_000;
+        while self
+            .accounts_index
+            .get_startup_remaining_items_to_flush_estimate()
+            > LIMIT
+        {
+            sleep(Duration::from_millis(10));
         }
     }
 
@@ -7526,8 +7539,7 @@ pub mod tests {
         std::{
             iter::FromIterator,
             str::FromStr,
-            thread::{self, sleep, Builder, JoinHandle},
-            time::Duration,
+            thread::{self, Builder, JoinHandle},
         },
     };
 
