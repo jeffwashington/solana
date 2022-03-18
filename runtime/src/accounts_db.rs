@@ -3129,7 +3129,7 @@ impl AccountsDb {
         for slot in sorted_slots {
             if first {
                 first = false;
-                error!("ancient_append_vec: combine_ancient_slots max_root: {}, first slot: {}, distance from max: {}", max_root, slot, max_root.saturating_sub(slot));
+                error!("ancient_append_vec: combine_ancient_slots max_root: {}, first slot: {}, distance from max: {}, storages: {}", max_root, slot, max_root.saturating_sub(slot), self.storage.map.len());
             }
             if let Some(storages) = self.storage.map.get(&slot) {
                 let mut dead_storages = Vec::default();
@@ -3374,9 +3374,10 @@ impl AccountsDb {
 
         t.stop();
         error!(
-            "ancient_append_vec: done. slots: {:?}, time(ms): {}",
+            "ancient_append_vec: done. slots: {:?}, time(ms): {}, storages after: {}",
             len,
-            t.as_ms()
+            t.as_ms(),
+            self.storage.map.len(),
         );
     }
     /*
