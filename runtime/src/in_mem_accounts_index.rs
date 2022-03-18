@@ -1002,7 +1002,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                 if dirty_items.capacity() == 0 {
                     dirty_items.reserve(map.len());
                 }
-                let m = Measure::start("flush_scan_and_update"); // we don't care about lock time in this metric - bg threads can wait
+                let mut m = Measure::start("flush_scan_and_update"); // we don't care about lock time in this metric - bg threads can wait
                 for (k, v) in map.iter() {
                     let mse = Measure::start("flush_scan_and_update"); // we don't care about lock time in this metric - bg threads can wait
                     let (evict_for_age, slot_list) =
@@ -1035,7 +1035,13 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                         evictions_random.push(*k);
                     }
                 }
-                Self::update_time_stat(&self.stats().flush_scan_update_us, m);
+                m.stop();
+                let time = m.as_us();
+                Self::update_stat(&self.stats().flush_scan_update_us, time);
+                if evictions.is_empty() && evictions_random.is_empty() {
+                    Self::update_stat(&self.stats().flush_with_no_work, 1);
+                    Self::update_stat(&self.stats().flush_with_no_work_us, time);
+                }
                 drop(map);
                 // write to disk outside giant read lock
                 let m = Measure::start("flush_scan_and_update"); // we don't care about lock time in this metric - bg threads can wait

@@ -43,6 +43,8 @@ pub struct BucketMapHolderStats {
     pub per_bucket_count: Vec<AtomicUsize>,
     pub flush_entries_updated_on_disk: AtomicU64,
     pub flush_entries_removed_from_mem: AtomicU64,
+    pub flush_with_no_work_us: AtomicU64,
+    pub flush_with_no_work: AtomicU64,
     pub active_threads: AtomicU64,
     pub get_range_us: AtomicU64,
     pub range_held_already: AtomicU64,
@@ -371,6 +373,16 @@ impl BucketMapHolderStats {
                 (
                     "restarted_flush_calls",
                     self.restarted_flush_calls.swap(0, Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "flush_with_no_work",
+                    self.flush_with_no_work.swap(0, Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "flush_with_no_work_us",
+                    self.flush_with_no_work_us.swap(0, Ordering::Relaxed),
                     i64
                 ),
                 (
