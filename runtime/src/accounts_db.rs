@@ -2484,10 +2484,12 @@ impl AccountsDb {
         if purge_stats.is_none() {
             assert!(dead_slots.is_empty());
         } else if let Some(expected_single_dead_slot) = expected_single_dead_slot {
+            /*
             assert!(dead_slots.len() <= 1);
             if dead_slots.len() == 1 {
                 assert!(dead_slots.contains(&expected_single_dead_slot));
             }
+            */
         }
 
         if let Some(purge_stats) = purge_stats {
