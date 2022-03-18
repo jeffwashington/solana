@@ -81,8 +81,8 @@ use {
             atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering},
             Arc, Condvar, Mutex, MutexGuard, RwLock,
         },
-        thread::Builder,
-        time::Instant,
+        thread::{sleep, Builder},
+        time::{Duration, Instant},
     },
     tempfile::TempDir,
 };
@@ -8238,6 +8238,10 @@ impl AccountsDb {
 
                         let insert_us = if pass == 0 {
                             // generate index
+                            const LIMIT: usize = 10_000_000;
+                            while self.accounts_index.get_startup_remaining_items_to_flush_estimate() > LIMIT {
+                                sleep(Duration::from_millis(10));
+                            }
                             let SlotIndexGenerationInfo {
                                 insert_time_us: insert_us,
                                 num_accounts: total_this_slot,
@@ -8755,8 +8759,7 @@ pub mod tests {
         std::{
             iter::FromIterator,
             str::FromStr,
-            thread::{self, sleep, Builder, JoinHandle},
-            time::Duration,
+            thread::{self, Builder, JoinHandle},
         },
     };
 
