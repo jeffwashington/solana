@@ -85,6 +85,11 @@ enum Operation {
     Run,
 }
 
+use std::alloc::System;
+
+#[global_allocator]
+static GLOBAL: System = System;
+
 const EXCLUDE_KEY: &str = "account-index-exclude-key";
 const INCLUDE_KEY: &str = "account-index-include-key";
 // The default minimal snapshot download speed (bytes/second)
