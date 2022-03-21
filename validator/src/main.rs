@@ -2433,11 +2433,12 @@ pub fn main() {
 
     let account_paths: Vec<PathBuf> =
         if let Ok(account_paths) = values_t!(matches, "account_paths", String) {
-            account_paths
+            /*account_paths
                 .join(",")
                 .split(',')
                 .map(PathBuf::from)
-                .collect()
+                .collect();/*/
+            vec![ledger_path.join("accounts")] // don't use an alternate accounts directory to avoid ram disk issues
         } else {
             vec![ledger_path.join("accounts")]
         };
