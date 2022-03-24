@@ -13,6 +13,7 @@ use {
     solana_sdk::{
         feature_set,
         instruction::InstructionError,
+        keyed_account::keyed_account_at_index,
         program_utils::limited_deserialize,
         pubkey::Pubkey,
         stake::{
@@ -52,6 +53,7 @@ pub fn process_instruction(
     let transaction_context = &invoke_context.transaction_context;
     let instruction_context = transaction_context.get_current_instruction_context()?;
     let data = instruction_context.get_instruction_data();
+    let keyed_accounts = invoke_context.get_keyed_accounts()?;
 
     trace!("process_instruction: {:?}", data);
 
@@ -64,7 +66,7 @@ pub fn process_instruction(
     };
 
     let signers = instruction_context.get_signers(transaction_context);
-    match limited_deserialize(data) {
+    match limited_deserialize(data)? {
         Ok(StakeInstruction::Initialize(authorized, lockup)) => {
             let mut me = get_stake_account()?;
             let rent = get_sysvar_with_account_check::rent(invoke_context, instruction_context, 1)?;
