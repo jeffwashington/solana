@@ -46,6 +46,7 @@ use {
 mod archive_format;
 pub use archive_format::*;
 
+pub const SNAPSHOT_BANK_TEMPORARY_FILENAME_EXTENSION: &str = ".without_accounts_hash";
 pub const SNAPSHOT_STATUS_CACHE_FILENAME: &str = "status_cache";
 pub const SNAPSHOT_ARCHIVE_DOWNLOAD_DIR: &str = "remote";
 pub const DEFAULT_FULL_SNAPSHOT_ARCHIVE_INTERVAL_SLOTS: Slot = 25_000;
@@ -393,7 +394,7 @@ pub fn archive_snapshot_package(
 }
 
 /// Get a list of bank snapshots in a directory
-pub fn get_bank_snapshots<P>(bank_snapshots_dir: P) -> Vec<BankSnapshotInfo>
+pub fn get_bank_snapshots<P>(bank_snapshots_dir: P, creating: bool) -> Vec<BankSnapshotInfo>
 where
     P: AsRef<Path>,
 {
@@ -411,10 +412,14 @@ where
                 let snapshot_file_name = get_snapshot_file_name(slot);
                 // So nice I join-ed it twice!  The redundant `snapshot_file_name` is unintentional
                 // and should be simplified.  Kept for compatibility.
-                let snapshot_path = bank_snapshots_dir
-                    .as_ref()
-                    .join(&snapshot_file_name)
-                    .join(snapshot_file_name);
+                let folder = snapshot_file_name.clone();
+                let file_name = if creating {
+                    // during creation, this is temporarily present
+                    snapshot_file_name + SNAPSHOT_BANK_TEMPORARY_FILENAME_EXTENSION
+                } else {
+                    snapshot_file_name
+                };
+                let snapshot_path = bank_snapshots_dir.as_ref().join(folder).join(file_name);
                 BankSnapshotInfo {
                     slot,
                     snapshot_path,
@@ -433,11 +438,15 @@ where
 }
 
 /// Get the bank snapshot with the highest slot in a directory
-pub fn get_highest_bank_snapshot_info<P>(bank_snapshots_dir: P) -> Option<BankSnapshotInfo>
+/// only called from tests
+pub fn get_highest_bank_snapshot_info<P>(
+    bank_snapshots_dir: P,
+    creating: bool,
+) -> Option<BankSnapshotInfo>
 where
     P: AsRef<Path>,
 {
-    let mut bank_snapshot_infos = get_bank_snapshots(bank_snapshots_dir);
+    let mut bank_snapshot_infos = get_bank_snapshots(bank_snapshots_dir, creating);
     bank_snapshot_infos.sort_unstable();
     bank_snapshot_infos.into_iter().rev().next()
 }
@@ -623,8 +632,9 @@ pub fn add_bank_snapshot<P: AsRef<Path>>(
     let bank_snapshots_dir = get_bank_snapshots_dir(bank_snapshots_dir, slot);
     fs::create_dir_all(&bank_snapshots_dir)?;
 
-    // the bank snapshot is stored as bank_snapshots_dir/slot/slot
-    let snapshot_bank_file_path = bank_snapshots_dir.join(get_snapshot_file_name(slot));
+    // the bank snapshot is stored as bank_snapshots_dir/slot/slot(SNAPSHOT_BANK_TEMPORARY_FILENAME_EXTENSION)
+    let snapshot_bank_file_path = bank_snapshots_dir
+        .join(get_snapshot_file_name(slot) + SNAPSHOT_BANK_TEMPORARY_FILENAME_EXTENSION);
     info!(
         "Creating snapshot for slot {}, path: {:?}",
         slot, snapshot_bank_file_path,
@@ -1446,8 +1456,10 @@ fn verify_unpacked_snapshots_dir_and_version(
                     &unpacked_snapshots_dir_and_version.snapshot_version,
                 ))
             })?;
-    let mut bank_snapshot_infos =
-        get_bank_snapshots(&unpacked_snapshots_dir_and_version.unpacked_snapshots_dir);
+    let mut bank_snapshot_infos = get_bank_snapshots(
+        &unpacked_snapshots_dir_and_version.unpacked_snapshots_dir,
+        false,
+    );
     if bank_snapshot_infos.len() > 1 {
         return Err(get_io_error("invalid snapshot format"));
     }
@@ -1612,7 +1624,7 @@ pub fn purge_old_bank_snapshots<P>(bank_snapshots_dir: P)
 where
     P: AsRef<Path>,
 {
-    let mut bank_snapshot_infos = get_bank_snapshots(&bank_snapshots_dir);
+    let mut bank_snapshot_infos = get_bank_snapshots(&bank_snapshots_dir, false);
     bank_snapshot_infos.sort_unstable();
     bank_snapshot_infos
         .into_iter()
@@ -1807,6 +1819,11 @@ pub fn package_and_archive_full_snapshot(
         Some(SnapshotType::FullSnapshot),
     )?;
 
+    crate::serde_snapshot::reserialize_bank(
+        accounts_package.snapshot_links.path(),
+        accounts_package.slot,
+    );
+
     let snapshot_package = SnapshotPackage::from(accounts_package);
     archive_snapshot_package(
         &snapshot_package,
@@ -1847,6 +1864,11 @@ pub fn package_and_archive_incremental_snapshot(
             incremental_snapshot_base_slot,
         )),
     )?;
+
+    crate::serde_snapshot::reserialize_bank(
+        accounts_package.snapshot_links.path(),
+        accounts_package.slot,
+    );
 
     let snapshot_package = SnapshotPackage::from(accounts_package);
     archive_snapshot_package(
@@ -2243,7 +2265,7 @@ mod tests {
         let max_slot = 20;
         common_create_bank_snapshot_files(temp_snapshots_dir.path(), min_slot, max_slot);
 
-        let bank_snapshot_infos = get_bank_snapshots(temp_snapshots_dir.path());
+        let bank_snapshot_infos = get_bank_snapshots(temp_snapshots_dir.path(), false);
         assert_eq!(bank_snapshot_infos.len() as Slot, max_slot - min_slot);
     }
 
@@ -2255,7 +2277,8 @@ mod tests {
         let max_slot = 123;
         common_create_bank_snapshot_files(temp_snapshots_dir.path(), min_slot, max_slot);
 
-        let highest_bank_snapshot_info = get_highest_bank_snapshot_info(temp_snapshots_dir.path());
+        let highest_bank_snapshot_info =
+            get_highest_bank_snapshot_info(temp_snapshots_dir.path(), true);
         assert!(highest_bank_snapshot_info.is_some());
         assert_eq!(highest_bank_snapshot_info.unwrap().slot, max_slot - 1);
     }

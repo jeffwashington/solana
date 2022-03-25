@@ -3282,7 +3282,7 @@ pub mod tests {
         assert_eq!(received_accounts_package_slots, expected_slots);
 
         // Ensure all the bank snapshots were created
-        let bank_snapshots = snapshot_utils::get_bank_snapshots(&bank_snapshots_tempdir);
+        let bank_snapshots = snapshot_utils::get_bank_snapshots(&bank_snapshots_tempdir, false);
         let mut bank_snapshot_slots = bank_snapshots
             .into_iter()
             .map(|bank_snapshot| bank_snapshot.slot)
