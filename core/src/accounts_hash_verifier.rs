@@ -135,7 +135,9 @@ impl AccountsHashVerifier {
             )
             .unwrap();
 
-        assert_eq!(accounts_package.expected_capitalization, lamports);
+        if accounts_package.expected_capitalization != lamports {
+            error!("failed to match cap: {}, {}, {}", accounts_package.expected_capitalization, lamports, accounts_package.slot);
+        }
         if let Some(expected_hash) = accounts_package.hash_for_testing {
             assert_eq!(expected_hash, hash);
         }
