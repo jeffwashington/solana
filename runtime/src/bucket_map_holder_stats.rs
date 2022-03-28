@@ -59,6 +59,9 @@ pub struct BucketMapHolderStats {
     bins: u64,
     pub estimate_mem: AtomicU64,
     pub flush_should_evict_us: AtomicU64,
+    pub flush_scan_calls: AtomicU64,
+    pub flush_scan_items: AtomicU64,
+    pub flush_scan_possible: AtomicU64,
 }
 
 impl BucketMapHolderStats {
@@ -266,6 +269,21 @@ impl BucketMapHolderStats {
                 ("max_in_bin_disk", disk_stats.1, i64),
                 ("count_from_bins_disk", disk_stats.2, i64),
                 ("median_from_bins_disk", disk_stats.3, i64),
+                (
+                    "flush_scan_calls",
+                    self.flush_scan_calls.swap(0, Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "flush_scan_items",
+                    self.flush_scan_items.swap(0, Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "flush_scan_possible",
+                    self.flush_scan_possible.swap(0, Ordering::Relaxed),
+                    i64
+                ),
                 (
                     "gets_from_mem",
                     self.gets_from_mem.swap(0, Ordering::Relaxed),

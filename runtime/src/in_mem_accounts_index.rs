@@ -964,28 +964,44 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         _flush_guard: &FlushGuard,
     ) -> FlushScanResult<T> {
         let m;
-        let mut evictions_random = Vec::default();
-        let mut evictions_age_possible;
+        let mut evictions_random = None;
+        let mut evictions_age_possible = None;
+        Self::update_stat(&self.stats().flush_scan_calls, 1);
+        let mut count = 0;
         {
             let map = self.map().read().unwrap();
-            evictions_age_possible = Vec::with_capacity(map.len());
             m = Measure::start("flush_scan"); // we don't care about lock time in this metric - bg threads can wait
             for (k, v) in map.iter() {
+                count += 1;
                 let random = Self::random_chance_of_eviction();
                 if !random && !Self::should_evict_based_on_age(current_age, v, startup) {
                     // not planning to evict this item from memory now, so don't write it to disk yet
                     continue;
                 }
 
-                if random {
+                let mut vec = if random {
+                    if evictions_random.is_none() {
+                        evictions_random = Some(Vec::default());
+                    }
                     &mut evictions_random
                 } else {
+                    if evictions_age_possible.is_none() {
+                        evictions_age_possible = Some(Vec::with_capacity(map.len()));
+                    }
                     &mut evictions_age_possible
-                }
-                .push((*k, Some(Arc::clone(v))));
+                };
+                let mut vec= vec.as_mut().unwrap();
+                vec.push((*k, Some(Arc::clone(v))));
             }
         }
+        Self::update_stat(&self.stats().flush_scan_items, count);
         Self::update_time_stat(&self.stats().flush_scan_us, m);
+        let evictions_age_possible = evictions_age_possible.unwrap_or_default();
+        let evictions_random = evictions_random.unwrap_or_default();
+        Self::update_stat(&self.stats().flush_scan_possible, evictions_age_possible.len() as u64);
+        if evictions_age_possible.is_empty() {
+            Self::update_stat(&self.stats().empty_flush_calls, 1);
+        }
 
         FlushScanResult {
             evictions_age_possible,
