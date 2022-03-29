@@ -45,6 +45,7 @@ pub fn process_instruction(
             me.initialize(&authorized, &lockup, &rent)
         }
         StakeInstruction::Authorize(authorized_pubkey, stake_authorize) => {
+            instruction_context.check_number_of_instruction_accounts(3)?;
             let require_custodian_for_locked_stake_authorize = invoke_context
                 .feature_set
                 .is_active(&feature_set::require_custodian_for_locked_stake_authorize::id());
@@ -79,6 +80,7 @@ pub fn process_instruction(
             }
         }
         StakeInstruction::AuthorizeWithSeed(args) => {
+            instruction_context.check_number_of_instruction_accounts(2)?;
             let authority_base =
                 keyed_account_at_index(keyed_accounts, first_instruction_account + 1)?;
             let require_custodian_for_locked_stake_authorize = invoke_context
@@ -117,6 +119,7 @@ pub fn process_instruction(
             }
         }
         StakeInstruction::DelegateStake => {
+            instruction_context.check_number_of_instruction_accounts(2)?;
             let vote = keyed_account_at_index(keyed_accounts, first_instruction_account + 1)?;
             let clock =
                 get_sysvar_with_account_check::clock(invoke_context, instruction_context, 2)?;
@@ -125,6 +128,7 @@ pub fn process_instruction(
                 instruction_context,
                 3,
             )?;
+            instruction_context.check_number_of_instruction_accounts(5)?;
             let config_account =
                 keyed_account_at_index(keyed_accounts, first_instruction_account + 4)?;
             if !config::check_id(config_account.unsigned_key()) {
@@ -135,11 +139,13 @@ pub fn process_instruction(
             me.delegate(vote, &clock, &stake_history, &config, &signers)
         }
         StakeInstruction::Split(lamports) => {
+            instruction_context.check_number_of_instruction_accounts(2)?;
             let split_stake =
                 &keyed_account_at_index(keyed_accounts, first_instruction_account + 1)?;
             me.split(lamports, split_stake, &signers)
         }
         StakeInstruction::Merge => {
+            instruction_context.check_number_of_instruction_accounts(2)?;
             let source_stake =
                 &keyed_account_at_index(keyed_accounts, first_instruction_account + 1)?;
             let clock =
@@ -158,6 +164,7 @@ pub fn process_instruction(
             )
         }
         StakeInstruction::Withdraw(lamports) => {
+            instruction_context.check_number_of_instruction_accounts(2)?;
             let to = &keyed_account_at_index(keyed_accounts, first_instruction_account + 1)?;
             let clock =
                 get_sysvar_with_account_check::clock(invoke_context, instruction_context, 2)?;
@@ -166,6 +173,7 @@ pub fn process_instruction(
                 instruction_context,
                 3,
             )?;
+            instruction_context.check_number_of_instruction_accounts(5)?;
             me.withdraw(
                 lamports,
                 to,
@@ -189,6 +197,7 @@ pub fn process_instruction(
                 .feature_set
                 .is_active(&feature_set::vote_stake_checked_instructions::id())
             {
+                instruction_context.check_number_of_instruction_accounts(4)?;
                 let authorized = Authorized {
                     staker: *keyed_account_at_index(keyed_accounts, first_instruction_account + 2)?
                         .unsigned_key(),
@@ -214,6 +223,7 @@ pub fn process_instruction(
             {
                 let clock =
                     get_sysvar_with_account_check::clock(invoke_context, instruction_context, 1)?;
+                instruction_context.check_number_of_instruction_accounts(4)?;
                 let _current_authority =
                     keyed_account_at_index(keyed_accounts, first_instruction_account + 2)?;
                 let authorized_pubkey =
@@ -242,10 +252,12 @@ pub fn process_instruction(
                 .feature_set
                 .is_active(&feature_set::vote_stake_checked_instructions::id())
             {
+                instruction_context.check_number_of_instruction_accounts(2)?;
                 let authority_base =
                     keyed_account_at_index(keyed_accounts, first_instruction_account + 1)?;
                 let clock =
                     get_sysvar_with_account_check::clock(invoke_context, instruction_context, 2)?;
+                instruction_context.check_number_of_instruction_accounts(4)?;
                 let authorized_pubkey =
                     &keyed_account_at_index(keyed_accounts, first_instruction_account + 3)?
                         .signer_key()
