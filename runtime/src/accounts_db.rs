@@ -5112,9 +5112,11 @@ impl AccountsDb {
 
     fn calculate_accounts_hash(
         &self,
-        slot: Slot,
+        max_root: Slot,
         ancestors: &Ancestors,
         check_hash: bool, // this will not be supported anymore
+        _epoch_schedule: Option<&EpochSchedule>,
+        _rent_collector: &RentCollector,
     ) -> Result<(Hash, u64), BankHashVerificationError> {
         use BankHashVerificationError::*;
         let mut collect = Measure::start("collect");
@@ -5147,7 +5149,7 @@ impl AccountsDb {
                                 return None;
                             }
                             if let AccountIndexGetResult::Found(lock, index) =
-                                self.accounts_index.get(pubkey, Some(ancestors), Some(slot))
+                                self.accounts_index.get(pubkey, Some(ancestors), Some(max_root))
                             {
                                 let (slot, account_info) = &lock.slot_list()[index];
                                 if !account_info.is_zero_lamport() {
@@ -5235,9 +5237,23 @@ impl AccountsDb {
         bank_hash_info.snapshot_hash
     }
 
-    pub fn update_accounts_hash(&self, slot: Slot, ancestors: &Ancestors) -> (Hash, u64) {
+    pub fn update_accounts_hash(
+        &self,
+        slot: Slot,
+        ancestors: &Ancestors,
+        epoch_schedule: Option<&EpochSchedule>,
+        rent_collector: &RentCollector,
+    ) -> (Hash, u64) {
         self.update_accounts_hash_with_index_option(
-            true, false, slot, ancestors, None, false, None, None, false,
+            true,
+            false,
+            slot,
+            ancestors,
+            None,
+            false,
+            epoch_schedule,
+            Some(rent_collector),
+            false,
         )
     }
 
@@ -5487,9 +5503,11 @@ impl AccountsDb {
         ancestors: &Ancestors,
         check_hash: bool, // this will not be supported anymore
         can_cached_slot_be_unflushed: bool,
-        slots_per_epoch: Option<Slot>,
+        epoch_schedule: Option<&EpochSchedule>,
+        rent_collector: &RentCollector,
         is_startup: bool,
     ) -> Result<(Hash, u64), BankHashVerificationError> {
+        assert!(epoch_schedule.is_some());
         if !use_index {
             let mut collect_time = Measure::start("collect");
             let (combined_maps, slots) = self.get_snapshot_storages(slot, None, Some(ancestors));
@@ -5503,7 +5521,7 @@ impl AccountsDb {
                 Some(slot),
             );
 
-            self.mark_old_slots_as_dirty(&storages, slots_per_epoch);
+            self.mark_old_slots_as_dirty(&storages, Some(epoch_schedule.unwrap().slots_per_epoch));
             sort_time.stop();
 
             let mut timings = HashStats {
@@ -5521,9 +5539,17 @@ impl AccountsDb {
                     ancestors: can_cached_slot_be_unflushed.then(|| ancestors),
                 },
                 timings,
+                epoch_schedule,
+                rent_collector,
             )
         } else {
-            self.calculate_accounts_hash(slot, ancestors, check_hash)
+            self.calculate_accounts_hash(
+                slot,
+                ancestors,
+                check_hash,
+                epoch_schedule,
+                rent_collector,
+            )
         }
     }
 
@@ -5537,9 +5563,11 @@ impl AccountsDb {
         expected_capitalization: Option<u64>,
         can_cached_slot_be_unflushed: bool,
         check_hash: bool,
-        slots_per_epoch: Option<Slot>,
+        epoch_schedule: Option<&EpochSchedule>,
+        rent_collector: &RentCollector,
         is_startup: bool,
     ) -> Result<(Hash, u64), BankHashVerificationError> {
+        assert!(epoch_schedule.is_some());
         let _guard = self.active_stats.activate(ActiveStatItem::Hash);
         let (hash, total_lamports) = self.calculate_accounts_hash_helper(
             use_index,
@@ -5547,7 +5575,8 @@ impl AccountsDb {
             ancestors,
             check_hash,
             can_cached_slot_be_unflushed,
-            slots_per_epoch,
+            epoch_schedule,
+            rent_collector,
             is_startup,
         )?;
         if debug_verify {
@@ -5558,7 +5587,8 @@ impl AccountsDb {
                 ancestors,
                 check_hash,
                 can_cached_slot_be_unflushed,
-                None,
+                epoch_schedule,
+                rent_collector,
                 is_startup,
             )?;
 
@@ -5580,11 +5610,11 @@ impl AccountsDb {
         expected_capitalization: Option<u64>,
         can_cached_slot_be_unflushed: bool,
         epoch_schedule: Option<&EpochSchedule>,
-        _rent_collector: Option<&RentCollector>,
+        rent_collector: Option<&RentCollector>,
         is_startup: bool,
     ) -> (Hash, u64) {
+        assert!(epoch_schedule.is_some());
         let check_hash = false;
-        let slots_per_epoch = epoch_schedule.map(|epoch_schedule| epoch_schedule.slots_per_epoch);
         let (hash, total_lamports) = self
             .calculate_accounts_hash_helper_with_verify(
                 use_index,
@@ -5594,7 +5624,8 @@ impl AccountsDb {
                 expected_capitalization,
                 can_cached_slot_be_unflushed,
                 check_hash,
-                slots_per_epoch,
+                epoch_schedule,
+                rent_collector.unwrap(),
                 is_startup,
             )
             .unwrap(); // unwrap here will never fail since check_hash = false
@@ -5605,6 +5636,7 @@ impl AccountsDb {
     }
 
     fn scan_snapshot_stores_with_cache(
+        &self,
         cache_hash_data: &CacheHashData,
         storage: &SortedStorages,
         mut stats: &mut crate::accounts_hash::HashStats,
@@ -5617,7 +5649,10 @@ impl AccountsDb {
             &AccountInfoAccountsIndex,
         )>,
         filler_account_suffix: Option<&Pubkey>,
+        epoch_schedule: Option<&EpochSchedule>,
+        _rent_collector: &RentCollector,
     ) -> Result<Vec<BinnedHashData>, BankHashVerificationError> {
+        assert!(epoch_schedule.is_some());
         let bin_calculator = PubkeyBinCalculator24::new(bins);
         assert!(bin_range.start < bins && bin_range.end <= bins && bin_range.start < bin_range.end);
         let mut time = Measure::start("scan all accounts");
@@ -5719,7 +5754,10 @@ impl AccountsDb {
         &self,
         config: &CalcAccountsHashConfig<'_>,
         mut stats: HashStats,
+        epoch_schedule: Option<&EpochSchedule>,
+        rent_collector: &RentCollector,
     ) -> Result<(Hash, u64), BankHashVerificationError> {
+        assert!(epoch_schedule.is_some());
         let (num_hash_scan_passes, bins_per_pass) = Self::bins_per_pass(self.num_hash_scan_passes);
         let use_bg_thread_pool = config.use_bg_thread_pool;
         let mut scan_and_hash = move || {
@@ -5742,7 +5780,7 @@ impl AccountsDb {
                     },
                 };
 
-                let result = Self::scan_snapshot_stores_with_cache(
+                let result = self.scan_snapshot_stores_with_cache(
                     &cache_hash_data,
                     config.storages,
                     &mut stats,
@@ -5753,6 +5791,8 @@ impl AccountsDb {
                         .ancestors
                         .map(|a| (&self.accounts_cache, a, &self.accounts_index)),
                     hash.filler_account_suffix.as_ref(),
+                    epoch_schedule,
+                    rent_collector,
                 )?;
 
                 let (hash, lamports, for_next_pass) = hash.rest_of_hash_calculation(
@@ -5787,6 +5827,8 @@ impl AccountsDb {
         ancestors: &Ancestors,
         total_lamports: u64,
         test_hash_calculation: bool,
+        _epoch_schedule: Option<&EpochSchedule>,
+        _rent_collector: &RentCollector,
     ) -> Result<(), BankHashVerificationError> {
         self.verify_bank_hash_and_lamports_new(
             slot,
@@ -5805,8 +5847,8 @@ impl AccountsDb {
         ancestors: &Ancestors,
         total_lamports: u64,
         test_hash_calculation: bool,
-        _epoch_schedule: Option<&EpochSchedule>,
-        _rent_collector: Option<&RentCollector>,
+        epoch_schedule: Option<&EpochSchedule>,
+        rent_collector: Option<&RentCollector>,
     ) -> Result<(), BankHashVerificationError> {
         use BankHashVerificationError::*;
 
@@ -5823,7 +5865,8 @@ impl AccountsDb {
                 None,
                 can_cached_slot_be_unflushed,
                 check_hash,
-                None, // could use epoch_schedule.slots_per_epoch here
+                epoch_schedule,
+                rent_collector.unwrap(),
                 is_startup,
             )?;
 
@@ -7571,6 +7614,7 @@ pub mod tests {
                 check_hash,
                 None,
                 None,
+                None,
             )
         }
     }
@@ -7928,6 +7972,8 @@ pub mod tests {
                     ancestors: None,
                 },
                 HashStats::default(),
+                None,
+                None,
             )
             .unwrap();
         let expected_hash = Hash::from_str("GKot5hBsd81kMupNCXHaqbhv3huEbxAFMLnpcX2hniwn").unwrap();
