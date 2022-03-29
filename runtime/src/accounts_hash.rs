@@ -1,9 +1,13 @@
 use {
-    crate::{accounts_db::SnapshotStorages, ancestors::Ancestors, sorted_storages::SortedStorages},
+    crate::{
+        accounts_db::SnapshotStorages, ancestors::Ancestors, rent_collector::RentCollector,
+        sorted_storages::SortedStorages,
+    },
     log::*,
     rayon::prelude::*,
     solana_measure::measure::Measure,
     solana_sdk::{
+        epoch_schedule::EpochSchedule,
         hash::{Hash, Hasher},
         pubkey::Pubkey,
     },
@@ -25,11 +29,8 @@ pub struct CalcAccountsHashConfig<'a> {
     pub use_bg_thread_pool: bool,
     pub check_hash: bool,
     pub ancestors: Option<&'a Ancestors>,
-    // to come soon
-    /*
-    pub rent_collector: RentCollector,
-    pub epoch_schedule: EpochSchedule,
-    */
+    pub rent_collector: &'a RentCollector,
+    pub epoch_schedule: &'a EpochSchedule,
 }
 
 // smallest, 3 quartiles, largest, average
