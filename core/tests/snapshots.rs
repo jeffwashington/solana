@@ -283,9 +283,10 @@ mod tests {
             Some(SnapshotType::FullSnapshot),
         )
         .unwrap();
-        solana_runtime::serde_snapshot::reserialize_bank(
+        solana_runtime::serde_snapshot::reserialize_bank_with_new_accounts_hash(
             accounts_package.snapshot_links.path(),
             accounts_package.slot,
+            &Hash::default(),
         );
         let snapshot_package = SnapshotPackage::from(accounts_package);
         snapshot_utils::archive_snapshot_package(
@@ -510,9 +511,10 @@ mod tests {
                         accounts_package = new_accounts_package;
                     }
 
-                    solana_runtime::serde_snapshot::reserialize_bank(
+                    solana_runtime::serde_snapshot::reserialize_bank_with_new_accounts_hash(
                         accounts_package.snapshot_links.path(),
                         accounts_package.slot,
+                        &Hash::default(),
                     );
 
                     let snapshot_package = SnapshotPackage::from(accounts_package);
@@ -555,7 +557,11 @@ mod tests {
         .unwrap();
 
         // files were saved off before we reserialized the bank in the hacked up accounts_hash_verifier stand-in.
-        solana_runtime::serde_snapshot::reserialize_bank(saved_snapshots_dir.path(), saved_slot);
+        solana_runtime::serde_snapshot::reserialize_bank_with_new_accounts_hash(
+            saved_snapshots_dir.path(),
+            saved_slot,
+            &Hash::default(),
+        );
 
         snapshot_utils::verify_snapshot_archive(
             saved_archive_path.unwrap(),
