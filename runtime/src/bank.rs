@@ -2647,6 +2647,8 @@ impl Bank {
         let tracer = AtomicU64::default();
         let load_time = AtomicU64::default();
         let load_time2 = AtomicU64::default();
+        let vote_state_ver = AtomicU64::default();
+        
         let rest_time = AtomicU64::default();
         let inserted = AtomicUsize::default();
         let bote_accounts_loaded = AtomicUsize::default();
@@ -2681,7 +2683,11 @@ impl Bank {
                                     continue;
                                 }
 
-                                match stake_account.state().ok() {
+                                let mut m2 = Measure::start("");
+                                let s = stake_account.state().ok();
+                                m2.stop();
+                                tracer.fetch_add(m2.as_us(), Ordering::Relaxed);
+                                match s {
                                     Some(stake_state) => {
                                         (**stake_pubkey, (stake_state, stake_account))
                                     }
@@ -2729,6 +2735,7 @@ impl Bank {
                                 }
                             };
 
+                            let mut m2 = Measure::start("");
                             let vote_state = if let Ok(vote_state) =
                                 StateMut::<VoteStateVersions>::state(&vote_account)
                             {
@@ -2738,6 +2745,8 @@ impl Bank {
                                     .insert(*vote_pubkey, InvalidCacheEntryReason::BadState);
                                 continue;
                             };
+                            m2.stop();
+                            vote_state_ver.fetch_add(m2.as_us(), Ordering::Relaxed);
 
                             vote_with_stake_delegations_map
                                 .entry(*vote_pubkey)
@@ -2771,7 +2780,7 @@ impl Bank {
                 });
         });
 
-        error!("jwash stake delegations: data size: {}, invalid stake keys: {}, invalid_vote_keys: {},map: {}, inserted_into_map: {}, vote account loaded: {}, load_us: {}, rest_us: {}, not_load: {}, vote load: {}, tracer: {}", data_len.load(Ordering::Relaxed), invalid_stake_keys.len(), invalid_vote_keys.len(), 
+        error!("jwash stake delegations: data size: {}, invalid stake keys: {}, invalid_vote_keys: {},map: {}, inserted_into_map: {}, vote account loaded: {}, load_us: {}, rest_us: {}, not_load: {}, vote load: {}, state: {}, vote_state_vers: {}", data_len.load(Ordering::Relaxed), invalid_stake_keys.len(), invalid_vote_keys.len(), 
     vote_with_stake_delegations_map.len(), inserted.load(Ordering::Relaxed),
     bote_accounts_loaded.load(Ordering::Relaxed),
     load_time.load(Ordering::Relaxed),
@@ -2779,6 +2788,7 @@ impl Bank {
     rest_time.load(Ordering::Relaxed) - load_time.load(Ordering::Relaxed),
     load_time2.load(Ordering::Relaxed),
     tracer.load(Ordering::Relaxed),
+    vote_state_ver.load(Ordering::Relaxed),
 );
 
         LoadVoteAndStakeAccountsResult {
