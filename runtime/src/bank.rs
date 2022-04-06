@@ -2630,6 +2630,9 @@ impl Bank {
         use std::sync::atomic::AtomicUsize;        
         use std::sync::atomic::Ordering;        
         let data_len = AtomicUsize::default();
+        let load_time = AtomicU64::default();
+        let load_time2 = AtomicU64::default();
+        let rest_time = AtomicU64::default();
         let inserted = AtomicUsize::default();
         let bote_accounts_loaded = AtomicUsize::default();
         use rayon::prelude::ParallelSlice;
@@ -2638,14 +2641,19 @@ impl Bank {
 
             stake_delegations
                 .par_chunks(INDEX_CLEAN_BULK_COUNT)
-                .for_each(|chunk|
+                .for_each(|chunk|{
+                    let mut all_time = Measure::start("");
                     for (stake_pubkey, delegation) in chunk{
                     let vote_pubkey = &delegation.voter_pubkey;
                     if invalid_vote_keys.contains_key(vote_pubkey) {
                         return;
                     }
 
-                    let stake_delegation = match self.get_account_with_fixed_root(stake_pubkey) {
+                    let mut m = Measure::start("");
+                    let r = self.get_account_with_fixed_root(stake_pubkey);
+                    m.stop();
+                    load_time.fetch_add(m.as_us(), Ordering::Relaxed);
+                    let stake_delegation = match r {
                         Some(stake_account) => {
                             data_len.fetch_add(stake_account.data().len(), Ordering::Relaxed);
                             if stake_account.owner() != &solana_stake_program::id() {
@@ -2676,7 +2684,11 @@ impl Bank {
                         vote_delegations
                     } else {
                         bote_accounts_loaded.fetch_add(1, Ordering::Relaxed);
-                        let vote_account = match self.get_account_with_fixed_root(vote_pubkey) {
+                        let mut m = Measure::start("");
+                        let r = self.get_account_with_fixed_root(vote_pubkey);
+                        m.stop();
+                        load_time2.fetch_add(m.as_us(), Ordering::Relaxed);
+                        let vote_account = match r {
                             Some(vote_account) => {
                                 if vote_account.owner() != &solana_vote_program::id() {
                                     invalid_vote_keys
@@ -2724,12 +2736,19 @@ impl Bank {
                     }
 
                     vote_delegations.delegations.push(stake_delegation);
+                    all_time.stop();
+                    rest_time.fetch_add(all_time.as_us(), Ordering::Relaxed);
+                }
                 });
         });
 
-        error!("jwash stake delegations: data size: {}, invalid stake keys: {}, invalid_vote_keys: {},map: {}, inserted_into_map: {}, vote account loaded: {}", data_len.load(Ordering::Relaxed), invalid_stake_keys.len(), invalid_vote_keys.len(), 
+        error!("jwash stake delegations: data size: {}, invalid stake keys: {}, invalid_vote_keys: {},map: {}, inserted_into_map: {}, vote account loaded: {}, load_us: {}, rest_us: {}, not_load: {}, vote load: {}", data_len.load(Ordering::Relaxed), invalid_stake_keys.len(), invalid_vote_keys.len(), 
     vote_with_stake_delegations_map.len(), inserted.load(Ordering::Relaxed),
     bote_accounts_loaded.load(Ordering::Relaxed),
+    load_time.load(Ordering::Relaxed),
+    rest_time.load(Ordering::Relaxed),
+    rest_time.load(Ordering::Relaxed) - load_time.load(Ordering::Relaxed),
+    load_time2.load(Ordering::Relaxed),
 );
 
         LoadVoteAndStakeAccountsResult {
