@@ -402,7 +402,7 @@ pub fn process_entries_for_tests(
     debug!("process_entries: {:?}", timings);
     result
 }
-
+/*
 // In the bg, load all referenced accounts into accounts index and read only accounts cache.
 // This reduces the latency when we later ask for an account during transaction processing.
 fn prefetch_accounts(bank: &Arc<Bank>, entries: &mut [EntryType]) {
@@ -423,6 +423,7 @@ fn prefetch_accounts(bank: &Arc<Bank>, entries: &mut [EntryType]) {
         }
     });
 }
+*/
 
 // Note: If randomize is true this will shuffle entries' transactions in-place.
 fn process_entries_with_callback(
