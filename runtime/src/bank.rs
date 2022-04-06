@@ -2630,6 +2630,7 @@ impl Bank {
         use std::sync::atomic::AtomicUsize;        
         use std::sync::atomic::Ordering;        
         let data_len = AtomicUsize::default();
+        let tracer = AtomicU64::default();
         let load_time = AtomicU64::default();
         let load_time2 = AtomicU64::default();
         let rest_time = AtomicU64::default();
@@ -2728,6 +2729,7 @@ impl Bank {
                     };
 
                     if let Some(reward_calc_tracer) = reward_calc_tracer.as_ref() {
+                        let mut m2 = Measure::start("");
                         reward_calc_tracer(&RewardCalculationEvent::Staking(
                             stake_pubkey,
                             &InflationPointCalculationEvent::Delegation(
@@ -2735,6 +2737,8 @@ impl Bank {
                                 solana_vote_program::id(),
                             ),
                         ));
+                        m2.stop();
+                        tracer.fetch_add(m2.as_us(), Ordering::Relaxed);
                     }
 
                     vote_delegations.delegations.push(stake_delegation);
@@ -2744,13 +2748,14 @@ impl Bank {
                 });
         });
 
-        error!("jwash stake delegations: data size: {}, invalid stake keys: {}, invalid_vote_keys: {},map: {}, inserted_into_map: {}, vote account loaded: {}, load_us: {}, rest_us: {}, not_load: {}, vote load: {}", data_len.load(Ordering::Relaxed), invalid_stake_keys.len(), invalid_vote_keys.len(), 
+        error!("jwash stake delegations: data size: {}, invalid stake keys: {}, invalid_vote_keys: {},map: {}, inserted_into_map: {}, vote account loaded: {}, load_us: {}, rest_us: {}, not_load: {}, vote load: {}, tracer: {}", data_len.load(Ordering::Relaxed), invalid_stake_keys.len(), invalid_vote_keys.len(), 
     vote_with_stake_delegations_map.len(), inserted.load(Ordering::Relaxed),
     bote_accounts_loaded.load(Ordering::Relaxed),
     load_time.load(Ordering::Relaxed),
     rest_time.load(Ordering::Relaxed),
     rest_time.load(Ordering::Relaxed) - load_time.load(Ordering::Relaxed),
     load_time2.load(Ordering::Relaxed),
+    tracer.load(Ordering::Relaxed),
 );
 
         LoadVoteAndStakeAccountsResult {
