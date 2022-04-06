@@ -2627,6 +2627,10 @@ impl Bank {
 
         let stake_delegations: Vec<_> = stakes.stake_delegations().iter().collect();
         error!("jwash stake delegations: {}", stake_delegations.len());
+        use std::sync::atomic::AtomicUsize;        
+        use std::sync::atomic::Ordering;        
+        let data_len = AtomicUsize::default();
+        let inserted = AtomicUsize::default();
         thread_pool.install(|| {
             stake_delegations
                 .into_par_iter()
@@ -2638,6 +2642,7 @@ impl Bank {
 
                     let stake_delegation = match self.get_account_with_fixed_root(stake_pubkey) {
                         Some(stake_account) => {
+                            data_len.fetch_add(stake_account.data().len(), Ordering::Relaxed);
                             if stake_account.owner() != &solana_stake_program::id() {
                                 invalid_stake_keys
                                     .insert(*stake_pubkey, InvalidCacheEntryReason::WrongOwner);
@@ -2693,11 +2698,13 @@ impl Bank {
 
                         vote_with_stake_delegations_map
                             .entry(*vote_pubkey)
-                            .or_insert_with(|| VoteWithStakeDelegations {
+                            .or_insert_with(|| {
+                                inserted.fetch_add(1, Ordering::Relaxed);
+                                VoteWithStakeDelegations {
                                 vote_state: Arc::new(vote_state),
                                 vote_account,
                                 delegations: vec![],
-                            })
+                            }})
                     };
 
                     if let Some(reward_calc_tracer) = reward_calc_tracer.as_ref() {
@@ -2713,6 +2720,9 @@ impl Bank {
                     vote_delegations.delegations.push(stake_delegation);
                 });
         });
+
+        error!("jwash stake delegations: data size: {}, invalid stake keys: {}, invalid_vote_keys: {},map: {}, inserted_into_map: {}", data_len.load(Ordering::Relaxed), invalid_stake_keys.len(), invalid_vote_keys.len(), 
+    vote_with_stake_delegations_map.len(), inserted.load(Ordering::Relaxed));
 
         LoadVoteAndStakeAccountsResult {
             vote_with_stake_delegations_map,
