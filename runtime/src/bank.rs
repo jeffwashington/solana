@@ -161,6 +161,18 @@ use {
     },
 };
 
+#[derive(Debug, Default)]
+struct RewardsMetrics {
+    pay_validator_rewards_with_thread_pool: AtomicU64,
+    load_vote_and_stake_accounts_with_thread_pool: AtomicU64,
+    handle_invalid_keys: AtomicU64,
+    clone_stakes_history: AtomicU64,
+    points: AtomicU64,
+    redeem_rewards: AtomicU64,
+    checked_add_lamports: AtomicU64,
+    redeem_rewards_get: AtomicU64,
+}
+
 mod address_lookup_table;
 mod builtin_programs;
 mod sysvar_cache;
@@ -1769,6 +1781,7 @@ impl Bank {
                         "update_epoch_stakes",
                     );
 
+                    let metrics = RewardsMetrics::default();
                     // After saving a snapshot of stakes, apply stake rewards and commission
                     let (_, update_rewards_with_thread_pool_time) = Measure::this(
                         |_| {
@@ -1776,6 +1789,7 @@ impl Bank {
                                 parent_epoch,
                                 reward_calc_tracer,
                                 &thread_pool,
+                                &metrics,
                             )
                         },
                         (),
@@ -1802,6 +1816,44 @@ impl Bank {
                         (
                             "update_rewards_with_thread_pool_us",
                             update_rewards_with_thread_pool_time.as_us(),
+                            i64
+                        ),
+                        (
+                            "pay_validator_rewards_with_thread_pool_us",
+                            metrics.pay_validator_rewards_with_thread_pool.load(Relaxed),
+                            i64
+                        ),
+                        (
+                            "load_vote_and_stake_accounts_with_thread_pool_us",
+                            metrics
+                                .load_vote_and_stake_accounts_with_thread_pool
+                                .load(Relaxed),
+                            i64
+                        ),
+                        (
+                            "handle_invalid_keys_us",
+                            metrics.handle_invalid_keys.load(Relaxed),
+                            i64
+                        ),
+                        (
+                            "clone_stakes_history_us",
+                            metrics.clone_stakes_history.load(Relaxed),
+                            i64
+                        ),
+                        ("points_us", metrics.points.load(Relaxed), i64),
+                        (
+                            "redeem_rewards_us",
+                            metrics.redeem_rewards.load(Relaxed),
+                            i64
+                        ),
+                        (
+                            "checked_add_lamports_us",
+                            metrics.checked_add_lamports.load(Relaxed),
+                            i64
+                        ),
+                        (
+                            "redeem_rewards_get_us",
+                            metrics.redeem_rewards_get.load(Relaxed),
                             i64
                         ),
                     );
@@ -2460,6 +2512,7 @@ impl Bank {
         prev_epoch: Epoch,
         reward_calc_tracer: Option<impl Fn(&RewardCalculationEvent) + Send + Sync>,
         thread_pool: &ThreadPool,
+        metrics: &RewardsMetrics,
     ) {
         let slot_in_year = self.slot_in_year_for_inflation();
         let epoch_duration_in_years = self.epoch_duration_in_years(prev_epoch);
@@ -2478,13 +2531,19 @@ impl Bank {
 
         let old_vote_balance_and_staked = self.stakes_cache.stakes().vote_balance_and_staked();
 
+        let mut m = Measure::start("");
         let validator_point_value = self.pay_validator_rewards_with_thread_pool(
             prev_epoch,
             validator_rewards,
             reward_calc_tracer,
             self.stake_program_advance_activating_credits_observed(),
             thread_pool,
+            &metrics,
         );
+        m.stop();
+        metrics
+            .pay_validator_rewards_with_thread_pool
+            .fetch_add(m.as_us(), Relaxed);
 
         if !self
             .feature_set
@@ -2672,9 +2731,14 @@ impl Bank {
         reward_calc_tracer: Option<impl Fn(&RewardCalculationEvent) + Send + Sync>,
         fix_activating_credits_observed: bool,
         thread_pool: &ThreadPool,
+        metrics: &RewardsMetrics,
     ) -> f64 {
+        let mut m = Measure::start("");
         let stake_history = self.stakes_cache.stakes().history().clone();
+        m.stop();
+        metrics.clone_stakes_history.fetch_add(m.as_us(), Relaxed);
         let vote_with_stake_delegations_map = {
+            let mut m = Measure::start("");
             let LoadVoteAndStakeAccountsResult {
                 vote_with_stake_delegations_map,
                 invalid_stake_keys,
@@ -2683,7 +2747,12 @@ impl Bank {
                 thread_pool,
                 reward_calc_tracer.as_ref(),
             );
+            m.stop();
+            metrics
+                .load_vote_and_stake_accounts_with_thread_pool
+                .fetch_add(m.as_us(), Relaxed);
 
+            let mut m = Measure::start("");
             let evict_invalid_stakes_cache_entries = self
                 .feature_set
                 .is_active(&feature_set::evict_invalid_stakes_cache_entries::id());
@@ -2693,9 +2762,12 @@ impl Bank {
                 evict_invalid_stakes_cache_entries,
                 self.slot(),
             );
+            m.stop();
+            metrics.handle_invalid_keys.fetch_add(m.as_us(), Relaxed);
             vote_with_stake_delegations_map
         };
 
+        let mut m = Measure::start("");
         let points: u128 = thread_pool.install(|| {
             vote_with_stake_delegations_map
                 .par_iter()
@@ -2720,6 +2792,8 @@ impl Bank {
                 })
                 .sum()
         });
+        m.stop();
+        metrics.points.fetch_add(m.as_us(), Relaxed);
 
         if points == 0 {
             return 0.0;
@@ -2746,6 +2820,7 @@ impl Bank {
             },
         );
 
+        let mut m = Measure::start("");
         let mut stake_rewards = thread_pool.install(|| {
             stake_delegation_iterator
                 .filter_map(
@@ -2773,6 +2848,7 @@ impl Bank {
                         );
                         if let Ok((stakers_reward, voters_reward)) = redeemed {
                             // track voter rewards
+                            let mut mm = Measure::start("");
                             if let Some((
                                 _vote_account,
                                 _commission,
@@ -2784,9 +2860,11 @@ impl Bank {
                                 *vote_rewards_sum = vote_rewards_sum.saturating_add(voters_reward);
                             }
 
+                            mm.stop();
                             // store stake account even if stakers_reward is 0
                             // because credits observed has changed
                             self.store_account(&stake_pubkey, &stake_account);
+                            metrics.redeem_rewards_get.fetch_add(mm.as_us(), Relaxed);
 
                             if stakers_reward > 0 {
                                 return Some((
@@ -2810,7 +2888,10 @@ impl Bank {
                 )
                 .collect()
         });
+        m.stop();
+        metrics.redeem_rewards.fetch_add(m.as_us(), Relaxed);
 
+        let mut m = Measure::start("");
         let mut vote_rewards = vote_account_rewards
             .into_iter()
             .filter_map(
@@ -2840,6 +2921,9 @@ impl Bank {
                 },
             )
             .collect();
+
+        m.stop();
+        metrics.checked_add_lamports.fetch_add(m.as_us(), Relaxed);
 
         {
             let mut rewards = self.rewards.write().unwrap();
