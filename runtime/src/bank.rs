@@ -2653,6 +2653,8 @@ impl Bank {
         let inserted = AtomicUsize::default();
         let bote_accounts_loaded = AtomicUsize::default();
         use rayon::prelude::ParallelSlice;
+        let stake_program_pubkey = solana_stake_program::id();
+        let vote_program_pubkey = solana_vote_program::id();
         thread_pool.install(|| {
             // just something to break up into a smaller # of parallel chunks with each chunk having up to this many pubkeys
             // order of stake_delegations is 400k
@@ -2675,7 +2677,7 @@ impl Bank {
                         let stake_delegation = match r {
                             Some(stake_account) => {
                                 data_len.fetch_add(stake_account.data().len(), Ordering::Relaxed);
-                                if stake_account.owner() != &solana_stake_program::id() {
+                                if stake_account.owner() != &stake_program_pubkey {
                                     invalid_stake_keys.insert(
                                         **stake_pubkey,
                                         InvalidCacheEntryReason::WrongOwner,
@@ -2719,7 +2721,7 @@ impl Bank {
                             load_time2.fetch_add(m.as_us(), Ordering::Relaxed);
                             let vote_account = match r {
                                 Some(vote_account) => {
-                                    if vote_account.owner() != &solana_vote_program::id() {
+                                    if vote_account.owner() != &vote_program_pubkey {
                                         invalid_vote_keys.insert(
                                             *vote_pubkey,
                                             InvalidCacheEntryReason::WrongOwner,
@@ -2766,7 +2768,7 @@ impl Bank {
                                 stake_pubkey,
                                 &InflationPointCalculationEvent::Delegation(
                                     **delegation,
-                                    solana_vote_program::id(),
+                                    vote_program_pubkey,
                                 ),
                             ));
                             m2.stop();
