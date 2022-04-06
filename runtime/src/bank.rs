@@ -2637,10 +2637,12 @@ impl Bank {
         let bote_accounts_loaded = AtomicUsize::default();
         use rayon::prelude::ParallelSlice;
         thread_pool.install(|| {
-            const INDEX_CLEAN_BULK_COUNT: usize = 4096;
+            // just something to break up into a smaller # of parallel chunks with each chunk having up to this many pubkeys
+            // order of stake_delegations is 400k
+            const PUBKEYS_PER_CHUNK: usize = 4096;
 
             stake_delegations
-                .par_chunks(INDEX_CLEAN_BULK_COUNT)
+                .par_chunks(PUBKEYS_PER_CHUNK)
                 .for_each(|chunk|{
                     let mut all_time = Measure::start("");
                     for (stake_pubkey, delegation) in chunk{
