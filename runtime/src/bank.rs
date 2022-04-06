@@ -1837,27 +1837,42 @@ impl Bank {
                     );
                 } else {
                     let distance = 9;
-                    let nearing_epoch_boundary = parent.epoch_schedule.get_epoch(parent.slot + distance) == parent_epoch && parent.epoch_schedule.get_epoch(parent.slot + distance + 1) > parent_epoch;
+                    let nearing_epoch_boundary =
+                        parent.epoch_schedule.get_epoch(parent.slot + distance) == parent_epoch
+                            && parent.epoch_schedule.get_epoch(parent.slot + distance + 1)
+                                > parent_epoch;
                     if nearing_epoch_boundary {
                         let stakes = parent.stakes_cache.stakes();
-                        let pubkeys = Arc::new(stakes.stake_delegations().keys().cloned().collect::<Vec<_>>());
+                        let pubkeys = Arc::new(
+                            stakes
+                                .stake_delegations()
+                                .keys()
+                                .cloned()
+                                .collect::<Vec<_>>(),
+                        );
                         drop(stakes);
-                        use log::*;error!("jwash: nearing epoch boundary, prefetching: {}", pubkeys.len());
+                        use log::*;
+                        error!(
+                            "jwash: nearing epoch boundary, prefetching: {}",
+                            pubkeys.len()
+                        );
                         let bank_ = parent.clone();
-                        let half = pubkeys.len() /2 ;
+                        let half = pubkeys.len() / 2;
                         let pubkeys_ = pubkeys.clone();
                         rayon::spawn(move || {
                             for key in pubkeys_.iter().skip(half) {
                                 bank_.load_accounts_into_read_only_cache(key);
                             }
-                            use log::*;error!("jwash: prefetch complete");
+                            use log::*;
+                            error!("jwash: prefetch complete");
                         });
                         let bank_ = parent.clone();
                         rayon::spawn(move || {
                             for key in pubkeys.iter().take(half) {
                                 bank_.load_accounts_into_read_only_cache(key);
                             }
-                            use log::*;error!("jwash: prefetch complete");
+                            use log::*;
+                            error!("jwash: prefetch complete");
                         });
                     } else {
                         // Save a snapshot of stakes for use in consensus and stake weighted networking
@@ -2627,8 +2642,7 @@ impl Bank {
 
         let stake_delegations: Vec<_> = stakes.stake_delegations().iter().collect();
         error!("jwash stake delegations: {}", stake_delegations.len());
-        use std::sync::atomic::AtomicUsize;        
-        use std::sync::atomic::Ordering;        
+        use std::sync::atomic::{AtomicUsize, Ordering};
         let data_len = AtomicUsize::default();
         let tracer = AtomicU64::default();
         let load_time = AtomicU64::default();
@@ -2644,107 +2658,116 @@ impl Bank {
 
             stake_delegations
                 .par_chunks(PUBKEYS_PER_CHUNK)
-                .for_each(|chunk|{
+                .for_each(|chunk| {
                     let mut all_time = Measure::start("");
-                    for (stake_pubkey, delegation) in chunk{
-                    let vote_pubkey = &delegation.voter_pubkey;
-                    if invalid_vote_keys.contains_key(vote_pubkey) {
-                        continue;
-                    }
-
-                    let mut m = Measure::start("");
-                    let r = self.get_account_with_fixed_root(stake_pubkey);
-                    m.stop();
-                    load_time.fetch_add(m.as_us(), Ordering::Relaxed);
-                    let stake_delegation = match r {
-                        Some(stake_account) => {
-                            data_len.fetch_add(stake_account.data().len(), Ordering::Relaxed);
-                            if stake_account.owner() != &solana_stake_program::id() {
-                                invalid_stake_keys
-                                    .insert(**stake_pubkey, InvalidCacheEntryReason::WrongOwner);
-                                continue;
-                            }
-
-                            match stake_account.state().ok() {
-                                Some(stake_state) => (**stake_pubkey, (stake_state, stake_account)),
-                                None => {
-                                    invalid_stake_keys
-                                        .insert(**stake_pubkey, InvalidCacheEntryReason::BadState);
-                                    continue;
-                                }
-                            }
-                        }
-                        None => {
-                            invalid_stake_keys
-                                .insert(**stake_pubkey, InvalidCacheEntryReason::Missing);
+                    for (stake_pubkey, delegation) in chunk {
+                        let vote_pubkey = &delegation.voter_pubkey;
+                        if invalid_vote_keys.contains_key(vote_pubkey) {
                             continue;
                         }
-                    };
 
-                    let mut vote_delegations = if let Some(vote_delegations) =
-                        vote_with_stake_delegations_map.get_mut(vote_pubkey)
-                    {
-                        vote_delegations
-                    } else {
-                        bote_accounts_loaded.fetch_add(1, Ordering::Relaxed);
                         let mut m = Measure::start("");
-                        let r = self.get_account_with_fixed_root(vote_pubkey);
+                        let r = self.get_account_with_fixed_root(stake_pubkey);
                         m.stop();
-                        load_time2.fetch_add(m.as_us(), Ordering::Relaxed);
-                        let vote_account = match r {
-                            Some(vote_account) => {
-                                if vote_account.owner() != &solana_vote_program::id() {
-                                    invalid_vote_keys
-                                        .insert(*vote_pubkey, InvalidCacheEntryReason::WrongOwner);
+                        load_time.fetch_add(m.as_us(), Ordering::Relaxed);
+                        let stake_delegation = match r {
+                            Some(stake_account) => {
+                                data_len.fetch_add(stake_account.data().len(), Ordering::Relaxed);
+                                if stake_account.owner() != &solana_stake_program::id() {
+                                    invalid_stake_keys.insert(
+                                        **stake_pubkey,
+                                        InvalidCacheEntryReason::WrongOwner,
+                                    );
                                     continue;
                                 }
-                                vote_account
+
+                                match stake_account.state().ok() {
+                                    Some(stake_state) => {
+                                        (**stake_pubkey, (stake_state, stake_account))
+                                    }
+                                    None => {
+                                        invalid_stake_keys.insert(
+                                            **stake_pubkey,
+                                            InvalidCacheEntryReason::BadState,
+                                        );
+                                        continue;
+                                    }
+                                }
                             }
                             None => {
-                                invalid_vote_keys
-                                    .insert(*vote_pubkey, InvalidCacheEntryReason::Missing);
+                                invalid_stake_keys
+                                    .insert(**stake_pubkey, InvalidCacheEntryReason::Missing);
                                 continue;
                             }
                         };
 
-                        let vote_state = if let Ok(vote_state) =
-                            StateMut::<VoteStateVersions>::state(&vote_account)
+                        let mut vote_delegations = if let Some(vote_delegations) =
+                            vote_with_stake_delegations_map.get_mut(vote_pubkey)
                         {
-                            vote_state.convert_to_current()
+                            vote_delegations
                         } else {
-                            invalid_vote_keys
-                                .insert(*vote_pubkey, InvalidCacheEntryReason::BadState);
-                            continue;
+                            bote_accounts_loaded.fetch_add(1, Ordering::Relaxed);
+                            let mut m = Measure::start("");
+                            let r = self.get_account_with_fixed_root(vote_pubkey);
+                            m.stop();
+                            load_time2.fetch_add(m.as_us(), Ordering::Relaxed);
+                            let vote_account = match r {
+                                Some(vote_account) => {
+                                    if vote_account.owner() != &solana_vote_program::id() {
+                                        invalid_vote_keys.insert(
+                                            *vote_pubkey,
+                                            InvalidCacheEntryReason::WrongOwner,
+                                        );
+                                        continue;
+                                    }
+                                    vote_account
+                                }
+                                None => {
+                                    invalid_vote_keys
+                                        .insert(*vote_pubkey, InvalidCacheEntryReason::Missing);
+                                    continue;
+                                }
+                            };
+
+                            let vote_state = if let Ok(vote_state) =
+                                StateMut::<VoteStateVersions>::state(&vote_account)
+                            {
+                                vote_state.convert_to_current()
+                            } else {
+                                invalid_vote_keys
+                                    .insert(*vote_pubkey, InvalidCacheEntryReason::BadState);
+                                continue;
+                            };
+
+                            vote_with_stake_delegations_map
+                                .entry(*vote_pubkey)
+                                .or_insert_with(|| {
+                                    inserted.fetch_add(1, Ordering::Relaxed);
+                                    VoteWithStakeDelegations {
+                                        vote_state: Arc::new(vote_state),
+                                        vote_account,
+                                        delegations: vec![],
+                                    }
+                                })
                         };
 
-                        vote_with_stake_delegations_map
-                            .entry(*vote_pubkey)
-                            .or_insert_with(|| {
-                                inserted.fetch_add(1, Ordering::Relaxed);
-                                VoteWithStakeDelegations {
-                                vote_state: Arc::new(vote_state),
-                                vote_account,
-                                delegations: vec![],
-                            }})
-                    };
+                        if let Some(reward_calc_tracer) = reward_calc_tracer.as_ref() {
+                            let mut m2 = Measure::start("");
+                            reward_calc_tracer(&RewardCalculationEvent::Staking(
+                                stake_pubkey,
+                                &InflationPointCalculationEvent::Delegation(
+                                    **delegation,
+                                    solana_vote_program::id(),
+                                ),
+                            ));
+                            m2.stop();
+                            tracer.fetch_add(m2.as_us(), Ordering::Relaxed);
+                        }
 
-                    if let Some(reward_calc_tracer) = reward_calc_tracer.as_ref() {
-                        let mut m2 = Measure::start("");
-                        reward_calc_tracer(&RewardCalculationEvent::Staking(
-                            stake_pubkey,
-                            &InflationPointCalculationEvent::Delegation(
-                                **delegation,
-                                solana_vote_program::id(),
-                            ),
-                        ));
-                        m2.stop();
-                        tracer.fetch_add(m2.as_us(), Ordering::Relaxed);
+                        vote_delegations.delegations.push(stake_delegation);
                     }
-
-                    vote_delegations.delegations.push(stake_delegation);
                     all_time.stop();
                     rest_time.fetch_add(all_time.as_us(), Ordering::Relaxed);
-                }
                 });
         });
 
