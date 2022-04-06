@@ -1839,15 +1839,16 @@ impl Bank {
                     let distance = 3;
                     let nearing_epoch_boundary = parent.epoch_schedule.get_epoch(parent.slot + distance) == parent_epoch && parent.epoch_schedule.get_epoch(parent.slot + distance + 1) > parent_epoch;
                     if nearing_epoch_boundary {
-                        use log::*;error!("jwash: nearing epoch boundary");
                         let stakes = parent.stakes_cache.stakes();
                         let pubkeys = stakes.stake_delegations().keys().cloned().collect::<Vec<_>>();
                         drop(stakes);
+                        use log::*;error!("jwash: nearing epoch boundary, prefetching: {}", pubkeys.len());
                         let bank_ = parent.clone();
                         rayon::spawn(move || {
                             for key in pubkeys {
                                 bank_.load_accounts_into_read_only_cache(&key);
                             }
+                            use log::*;error!("jwash: prefetch complete");
                         });
                     } else {
                         // Save a snapshot of stakes for use in consensus and stake weighted networking
@@ -2619,7 +2620,7 @@ impl Bank {
         error!("jwash stake delegations: {}", stake_delegations.len());
         thread_pool.install(|| {
             stake_delegations
-                .into_iter()
+                .into_par_iter()
                 .for_each(|(stake_pubkey, delegation)| {
                     let vote_pubkey = &delegation.voter_pubkey;
                     if invalid_vote_keys.contains_key(vote_pubkey) {
