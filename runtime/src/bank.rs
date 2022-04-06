@@ -1836,17 +1836,26 @@ impl Bank {
                         ),
                     );
                 } else {
-                    let distance = 3;
+                    let distance = 9;
                     let nearing_epoch_boundary = parent.epoch_schedule.get_epoch(parent.slot + distance) == parent_epoch && parent.epoch_schedule.get_epoch(parent.slot + distance + 1) > parent_epoch;
                     if nearing_epoch_boundary {
                         let stakes = parent.stakes_cache.stakes();
-                        let pubkeys = stakes.stake_delegations().keys().cloned().collect::<Vec<_>>();
+                        let pubkeys = Arc::new(stakes.stake_delegations().keys().cloned().collect::<Vec<_>>());
                         drop(stakes);
                         use log::*;error!("jwash: nearing epoch boundary, prefetching: {}", pubkeys.len());
                         let bank_ = parent.clone();
+                        let half = pubkeys.len() /2 ;
+                        let pubkeys_ = pubkeys.clone();
                         rayon::spawn(move || {
-                            for key in pubkeys {
-                                bank_.load_accounts_into_read_only_cache(&key);
+                            for key in pubkeys_.iter().skip(half) {
+                                bank_.load_accounts_into_read_only_cache(key);
+                            }
+                            use log::*;error!("jwash: prefetch complete");
+                        });
+                        let bank_ = parent.clone();
+                        rayon::spawn(move || {
+                            for key in pubkeys.iter().take(half) {
+                                bank_.load_accounts_into_read_only_cache(key);
                             }
                             use log::*;error!("jwash: prefetch complete");
                         });
