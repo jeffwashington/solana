@@ -2656,7 +2656,7 @@ impl Bank {
         thread_pool.install(|| {
             // just something to break up into a smaller # of parallel chunks with each chunk having up to this many pubkeys
             // order of stake_delegations is 400k
-            const PUBKEYS_PER_CHUNK: usize = 4096;
+            const PUBKEYS_PER_CHUNK: usize = 40;
 
             stake_delegations
                 .par_chunks(PUBKEYS_PER_CHUNK)
