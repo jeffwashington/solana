@@ -2601,9 +2601,10 @@ impl Bank {
         let invalid_vote_keys: DashMap<Pubkey, InvalidCacheEntryReason> = DashMap::new();
 
         let stake_delegations: Vec<_> = stakes.stake_delegations().iter().collect();
+        error!("jwash stake delegations: {}", stake_delegations.len());
         thread_pool.install(|| {
             stake_delegations
-                .into_par_iter()
+                .into_iter()
                 .for_each(|(stake_pubkey, delegation)| {
                     let vote_pubkey = &delegation.voter_pubkey;
                     if invalid_vote_keys.contains_key(vote_pubkey) {
