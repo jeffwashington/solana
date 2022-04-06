@@ -2648,7 +2648,7 @@ impl Bank {
                     for (stake_pubkey, delegation) in chunk{
                     let vote_pubkey = &delegation.voter_pubkey;
                     if invalid_vote_keys.contains_key(vote_pubkey) {
-                        return;
+                        continue;
                     }
 
                     let mut m = Measure::start("");
@@ -2661,7 +2661,7 @@ impl Bank {
                             if stake_account.owner() != &solana_stake_program::id() {
                                 invalid_stake_keys
                                     .insert(**stake_pubkey, InvalidCacheEntryReason::WrongOwner);
-                                return;
+                                continue;
                             }
 
                             match stake_account.state().ok() {
@@ -2669,14 +2669,14 @@ impl Bank {
                                 None => {
                                     invalid_stake_keys
                                         .insert(**stake_pubkey, InvalidCacheEntryReason::BadState);
-                                    return;
+                                    continue;
                                 }
                             }
                         }
                         None => {
                             invalid_stake_keys
                                 .insert(**stake_pubkey, InvalidCacheEntryReason::Missing);
-                            return;
+                            continue;
                         }
                     };
 
@@ -2695,14 +2695,14 @@ impl Bank {
                                 if vote_account.owner() != &solana_vote_program::id() {
                                     invalid_vote_keys
                                         .insert(*vote_pubkey, InvalidCacheEntryReason::WrongOwner);
-                                    return;
+                                    continue;
                                 }
                                 vote_account
                             }
                             None => {
                                 invalid_vote_keys
                                     .insert(*vote_pubkey, InvalidCacheEntryReason::Missing);
-                                return;
+                                continue;
                             }
                         };
 
@@ -2713,7 +2713,7 @@ impl Bank {
                         } else {
                             invalid_vote_keys
                                 .insert(*vote_pubkey, InvalidCacheEntryReason::BadState);
-                            return;
+                            continue;
                         };
 
                         vote_with_stake_delegations_map
