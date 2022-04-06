@@ -2631,10 +2631,15 @@ impl Bank {
         use std::sync::atomic::Ordering;        
         let data_len = AtomicUsize::default();
         let inserted = AtomicUsize::default();
+        let bote_accounts_loaded = AtomicUsize::default();
+        use rayon::prelude::ParallelSlice;
         thread_pool.install(|| {
+            const INDEX_CLEAN_BULK_COUNT: usize = 4096;
+
             stake_delegations
-                .into_par_iter()
-                .for_each(|(stake_pubkey, delegation)| {
+                .par_chunks(INDEX_CLEAN_BULK_COUNT)
+                .for_each(|chunk|
+                    for (stake_pubkey, delegation) in chunk{
                     let vote_pubkey = &delegation.voter_pubkey;
                     if invalid_vote_keys.contains_key(vote_pubkey) {
                         return;
@@ -2645,22 +2650,22 @@ impl Bank {
                             data_len.fetch_add(stake_account.data().len(), Ordering::Relaxed);
                             if stake_account.owner() != &solana_stake_program::id() {
                                 invalid_stake_keys
-                                    .insert(*stake_pubkey, InvalidCacheEntryReason::WrongOwner);
+                                    .insert(**stake_pubkey, InvalidCacheEntryReason::WrongOwner);
                                 return;
                             }
 
                             match stake_account.state().ok() {
-                                Some(stake_state) => (*stake_pubkey, (stake_state, stake_account)),
+                                Some(stake_state) => (**stake_pubkey, (stake_state, stake_account)),
                                 None => {
                                     invalid_stake_keys
-                                        .insert(*stake_pubkey, InvalidCacheEntryReason::BadState);
+                                        .insert(**stake_pubkey, InvalidCacheEntryReason::BadState);
                                     return;
                                 }
                             }
                         }
                         None => {
                             invalid_stake_keys
-                                .insert(*stake_pubkey, InvalidCacheEntryReason::Missing);
+                                .insert(**stake_pubkey, InvalidCacheEntryReason::Missing);
                             return;
                         }
                     };
@@ -2670,6 +2675,7 @@ impl Bank {
                     {
                         vote_delegations
                     } else {
+                        bote_accounts_loaded.fetch_add(1, Ordering::Relaxed);
                         let vote_account = match self.get_account_with_fixed_root(vote_pubkey) {
                             Some(vote_account) => {
                                 if vote_account.owner() != &solana_vote_program::id() {
@@ -2711,7 +2717,7 @@ impl Bank {
                         reward_calc_tracer(&RewardCalculationEvent::Staking(
                             stake_pubkey,
                             &InflationPointCalculationEvent::Delegation(
-                                *delegation,
+                                **delegation,
                                 solana_vote_program::id(),
                             ),
                         ));
@@ -2721,8 +2727,10 @@ impl Bank {
                 });
         });
 
-        error!("jwash stake delegations: data size: {}, invalid stake keys: {}, invalid_vote_keys: {},map: {}, inserted_into_map: {}", data_len.load(Ordering::Relaxed), invalid_stake_keys.len(), invalid_vote_keys.len(), 
-    vote_with_stake_delegations_map.len(), inserted.load(Ordering::Relaxed));
+        error!("jwash stake delegations: data size: {}, invalid stake keys: {}, invalid_vote_keys: {},map: {}, inserted_into_map: {}, vote account loaded: {}", data_len.load(Ordering::Relaxed), invalid_stake_keys.len(), invalid_vote_keys.len(), 
+    vote_with_stake_delegations_map.len(), inserted.load(Ordering::Relaxed),
+    bote_accounts_loaded.load(Ordering::Relaxed),
+);
 
         LoadVoteAndStakeAccountsResult {
             vote_with_stake_delegations_map,
