@@ -1255,14 +1255,18 @@ impl Default for BlockhashQueue {
     }
 }
 
+pub type Delegations = Arc<RwLock<Vec<(Pubkey, (StakeState, AccountSharedData))>>>;
+
 struct VoteWithStakeDelegations {
     vote_state: Arc<VoteState>,
     vote_account: AccountSharedData,
-    delegations: Vec<(Pubkey, (StakeState, AccountSharedData))>,
+    delegations: Delegations,
 }
 
+type VoteWithStakeDelegationsMap = DashMap<Pubkey, VoteWithStakeDelegations>;
+
 struct LoadVoteAndStakeAccountsResult {
-    vote_with_stake_delegations_map: DashMap<Pubkey, VoteWithStakeDelegations>,
+    vote_with_stake_delegations_map: VoteWithStakeDelegationsMap,
     invalid_stake_keys: DashMap<Pubkey, InvalidCacheEntryReason>,
     invalid_vote_keys: DashMap<Pubkey, InvalidCacheEntryReason>,
 }
@@ -2635,8 +2639,13 @@ impl Bank {
         reward_calc_tracer: Option<impl Fn(&RewardCalculationEvent) + Send + Sync>,
     ) -> LoadVoteAndStakeAccountsResult {
         let stakes = self.stakes_cache.stakes();
-        let vote_with_stake_delegations_map =
-            DashMap::with_capacity(stakes.vote_accounts().as_ref().len());
+        let vote_with_stake_delegations_map: HashMap<Pubkey, Delegations> = stakes
+            .vote_accounts()
+            .as_ref()
+            .iter()
+            .map(|(k, _v)| (*k, Delegations::default()))
+            .collect();
+        //DashMap::with_capacity(stakes.vote_accounts().as_ref().len());
         let invalid_stake_keys: DashMap<Pubkey, InvalidCacheEntryReason> = DashMap::new();
         let invalid_vote_keys: DashMap<Pubkey, InvalidCacheEntryReason> = DashMap::new();
 
@@ -2650,7 +2659,7 @@ impl Bank {
         let get_time = AtomicU64::default();
         let load_time2 = AtomicU64::default();
         let vote_state_ver = AtomicU64::default();
-        
+
         let insert = AtomicU64::default();
         let rest_time = AtomicU64::default();
         let inserted = AtomicUsize::default();
@@ -2713,15 +2722,17 @@ impl Bank {
                         };
 
                         let mut m3 = Measure::start("");
-                        let get = vote_with_stake_delegations_map.get_mut(vote_pubkey);
+                        let get = vote_with_stake_delegations_map.get(vote_pubkey);
                         m3.stop();
                         get_time.fetch_add(m3.as_us(), Ordering::Relaxed);
 
-                        let mut vote_delegations = if let Some(vote_delegations) =
-                        get    
-                        {
-                            vote_delegations
+                        if let Some(vote_delegations) = get {
+                            let mut m2 = Measure::start("");
+                            m2.stop();
+                            vote_delegations.write().unwrap().push(stake_delegation);
+                            push.fetch_add(m2.as_us(), Ordering::Relaxed);
                         } else {
+                            /*
                             bote_accounts_loaded.fetch_add(1, Ordering::Relaxed);
                             let mut m = Measure::start("");
                             let r = self.get_account_with_fixed_root(vote_pubkey);
@@ -2759,20 +2770,22 @@ impl Bank {
                             vote_state_ver.fetch_add(m2.as_us(), Ordering::Relaxed);
 
                             let mut m2 = Measure::start("");
-                            let r = vote_with_stake_delegations_map
+                            let delegations = Arc::default();
+                            vote_with_stake_delegations_map
                                 .entry(*vote_pubkey)
                                 .or_insert_with(|| {
                                     inserted.fetch_add(1, Ordering::Relaxed);
                                     VoteWithStakeDelegations {
                                         vote_state: Arc::new(vote_state),
                                         vote_account,
-                                        delegations: vec![],
+                                        delegations: Arc::clone(&delegations),
                                     }
                                 });
                                 m2.stop();
                                 insert.fetch_add(m2.as_us(), Ordering::Relaxed);
-    
-                            r
+
+                            delegations
+                            */
                         };
 
                         if let Some(reward_calc_tracer) = reward_calc_tracer.as_ref() {
@@ -2787,19 +2800,61 @@ impl Bank {
                             m2.stop();
                             tracer.fetch_add(m2.as_us(), Ordering::Relaxed);
                         }
-
-                        let mut m2 = Measure::start("");
-                        vote_delegations.delegations.push(stake_delegation);
-                        m2.stop();
-                        push.fetch_add(m2.as_us(), Ordering::Relaxed);
                     }
                     all_time.stop();
                     rest_time.fetch_add(all_time.as_us(), Ordering::Relaxed);
                 });
         });
 
+        let vote_with_stake_delegations_map: VoteWithStakeDelegationsMap =
+            vote_with_stake_delegations_map
+                .into_iter()
+                .filter_map(|(vote_pubkey, delegations)| {
+                    bote_accounts_loaded.fetch_add(1, Ordering::Relaxed);
+                    let mut m = Measure::start("");
+                    let r = self.get_account_with_fixed_root(&vote_pubkey);
+                    m.stop();
+                    load_time2.fetch_add(m.as_us(), Ordering::Relaxed);
+                    let vote_account = match r {
+                        Some(vote_account) => {
+                            if vote_account.owner() != &vote_program_pubkey {
+                                invalid_vote_keys
+                                    .insert(vote_pubkey, InvalidCacheEntryReason::WrongOwner);
+                                return None;
+                            }
+                            vote_account
+                        }
+                        None => {
+                            invalid_vote_keys.insert(vote_pubkey, InvalidCacheEntryReason::Missing);
+                            return None;
+                        }
+                    };
+
+                    let mut m2 = Measure::start("");
+                    let vote_state = if let Ok(vote_state) =
+                        StateMut::<VoteStateVersions>::state(&vote_account)
+                    {
+                        vote_state.convert_to_current()
+                    } else {
+                        invalid_vote_keys.insert(vote_pubkey, InvalidCacheEntryReason::BadState);
+                        return None;
+                    };
+                    m2.stop();
+                    vote_state_ver.fetch_add(m2.as_us(), Ordering::Relaxed);
+
+                    Some((
+                        vote_pubkey,
+                        VoteWithStakeDelegations {
+                            vote_state: Arc::new(vote_state),
+                            vote_account,
+                            delegations,
+                        },
+                    ))
+                })
+                .collect();
+
         error!("jwash stake delegations: data size: {}, invalid stake keys: {}, invalid_vote_keys: {},map: {}, inserted_into_map: {}, vote account loaded: {}, load_us: {}, rest_us: {}, not_load: {}, vote load: {}, state: {}, vote_state_vers: {}, push: {}, get: {}, insert: {}",
-        data_len.load(Ordering::Relaxed), invalid_stake_keys.len(), invalid_vote_keys.len(), 
+        data_len.load(Ordering::Relaxed), invalid_stake_keys.len(), invalid_vote_keys.len(),
     vote_with_stake_delegations_map.len(), inserted.load(Ordering::Relaxed),
     bote_accounts_loaded.load(Ordering::Relaxed),
     load_time.load(Ordering::Relaxed),
@@ -2871,6 +2926,8 @@ impl Bank {
                     } = entry.value();
 
                     delegations
+                        .read()
+                        .unwrap()
                         .par_iter()
                         .map(|(_stake_pubkey, (stake_state, _stake_account))| {
                             stake_state::calculate_points(
@@ -2906,7 +2963,9 @@ impl Bank {
             )| {
                 vote_account_rewards
                     .insert(vote_pubkey, (vote_account, vote_state.commission, 0, false));
-                delegations
+                let mut empty = Vec::default();
+                std::mem::swap(&mut empty, &mut *delegations.write().unwrap());
+                empty
                     .into_par_iter()
                     .map(move |delegation| (vote_pubkey, Arc::clone(&vote_state), delegation))
             },
