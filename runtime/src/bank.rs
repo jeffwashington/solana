@@ -1806,9 +1806,24 @@ impl Bank {
                         ),
                     );
                 } else {
-                    // Save a snapshot of stakes for use in consensus and stake weighted networking
-                    let leader_schedule_epoch = epoch_schedule.get_leader_schedule_epoch(slot);
-                    new.update_epoch_stakes(leader_schedule_epoch);
+                    let distance = 3;
+                    let nearing_epoch_boundary = parent.epoch_schedule.get_epoch(parent.slot + distance) == parent_epoch && parent.epoch_schedule.get_epoch(parent.slot + distance + 1) > parent_epoch;
+                    if nearing_epoch_boundary {
+                        use log::*;error!("jwash: nearing epoch boundary");
+                        let stakes = parent.stakes_cache.stakes();
+                        let pubkeys = stakes.stake_delegations().keys().cloned().collect::<Vec<_>>();
+                        drop(stakes);
+                        let bank_ = parent.clone();
+                        rayon::spawn(move || {
+                            for key in pubkeys {
+                                bank_.load_accounts_into_read_only_cache(&key);
+                            }
+                        });
+                    } else {
+                        // Save a snapshot of stakes for use in consensus and stake weighted networking
+                        let leader_schedule_epoch = epoch_schedule.get_leader_schedule_epoch(slot);
+                        new.update_epoch_stakes(leader_schedule_epoch);
+                    }
                 }
             },
             (),
