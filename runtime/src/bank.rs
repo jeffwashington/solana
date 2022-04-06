@@ -2646,6 +2646,8 @@ impl Bank {
         let data_len = AtomicUsize::default();
         let tracer = AtomicU64::default();
         let load_time = AtomicU64::default();
+        let push = AtomicU64::default();
+        let get_time = AtomicU64::default();
         let load_time2 = AtomicU64::default();
         let vote_state_ver = AtomicU64::default();
         
@@ -2709,8 +2711,13 @@ impl Bank {
                             }
                         };
 
+                        let mut m3 = Measure::start("");
+                        let get = vote_with_stake_delegations_map.get_mut(vote_pubkey);
+                        m3.stop();
+                        get_time.fetch_add(m3.as_us(), Ordering::Relaxed);
+
                         let mut vote_delegations = if let Some(vote_delegations) =
-                            vote_with_stake_delegations_map.get_mut(vote_pubkey)
+                        get    
                         {
                             vote_delegations
                         } else {
@@ -2775,14 +2782,18 @@ impl Bank {
                             tracer.fetch_add(m2.as_us(), Ordering::Relaxed);
                         }
 
+                        let mut m2 = Measure::start("");
                         vote_delegations.delegations.push(stake_delegation);
+                        m2.stop();
+                        push.fetch_add(m2.as_us(), Ordering::Relaxed);
                     }
                     all_time.stop();
                     rest_time.fetch_add(all_time.as_us(), Ordering::Relaxed);
                 });
         });
 
-        error!("jwash stake delegations: data size: {}, invalid stake keys: {}, invalid_vote_keys: {},map: {}, inserted_into_map: {}, vote account loaded: {}, load_us: {}, rest_us: {}, not_load: {}, vote load: {}, state: {}, vote_state_vers: {}", data_len.load(Ordering::Relaxed), invalid_stake_keys.len(), invalid_vote_keys.len(), 
+        error!("jwash stake delegations: data size: {}, invalid stake keys: {}, invalid_vote_keys: {},map: {}, inserted_into_map: {}, vote account loaded: {}, load_us: {}, rest_us: {}, not_load: {}, vote load: {}, state: {}, vote_state_vers: {}, push: {}, get: {}",
+        data_len.load(Ordering::Relaxed), invalid_stake_keys.len(), invalid_vote_keys.len(), 
     vote_with_stake_delegations_map.len(), inserted.load(Ordering::Relaxed),
     bote_accounts_loaded.load(Ordering::Relaxed),
     load_time.load(Ordering::Relaxed),
@@ -2791,6 +2802,8 @@ impl Bank {
     load_time2.load(Ordering::Relaxed),
     tracer.load(Ordering::Relaxed),
     vote_state_ver.load(Ordering::Relaxed),
+    push.load(Ordering::Relaxed),
+    get_time.load(Ordering::Relaxed),
 );
 
         LoadVoteAndStakeAccountsResult {
