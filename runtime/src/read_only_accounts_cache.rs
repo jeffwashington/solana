@@ -73,6 +73,10 @@ impl ReadOnlyAccountsCache {
         Some(entry.account.clone())
     }
 
+    pub fn in_cache(&self, pubkey: Pubkey, slot: Slot) -> bool {
+        self.cache.contains_key(&(pubkey, slot))
+    }
+
     fn account_size(&self, account: &AccountSharedData) -> usize {
         CACHE_ENTRY_SIZE + account.data().len()
     }
