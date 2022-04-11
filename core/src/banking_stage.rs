@@ -118,7 +118,7 @@ pub struct ExecuteAndCommitTransactionsOutput {
     commit_transactions_result: Result<(), PohRecorderError>,
     execute_and_commit_timings: LeaderExecuteAndCommitTimings,
     // True if transaction was-executed()
-    transactions_executed_status: Vec<bool>,
+    transactions_execute_and_record_status: Vec<bool>,
 }
 
 #[derive(Debug, Default)]
@@ -1253,6 +1253,11 @@ impl BankingStage {
         } = record_transactions_summary;
         execute_and_commit_timings.record_transactions_timings = record_transactions_timings;
 
+        // mark transactions that were executed but not recorded
+        retryable_record_transaction_indexes.iter().for_each(|i| {
+            transactions_execute_and_record_status[*i] = false;
+        });
+
         inc_new_counter_info!(
             "banking_stage-record_transactions_num_to_commit",
             *commit_transactions_result.as_ref().unwrap_or(&0)
@@ -1271,7 +1276,7 @@ impl BankingStage {
                 retryable_transaction_indexes,
                 commit_transactions_result: Err(e),
                 execute_and_commit_timings,
-                transactions_executed_status,
+                transactions_execute_and_record_status,
             };
         }
 
@@ -1362,7 +1367,7 @@ impl BankingStage {
             retryable_transaction_indexes,
             commit_transactions_result: Ok(()),
             execute_and_commit_timings,
-            transactions_executed_status,
+            transactions_execute_and_record_status,
         }
     }
 
@@ -1419,7 +1424,7 @@ impl BankingStage {
         let ExecuteAndCommitTransactionsOutput {
             ref mut retryable_transaction_indexes,
             ref execute_and_commit_timings,
-            ref transactions_executed_status,
+            ref transactions_execute_and_record_status,
             ..
         } = execute_and_commit_transactions_output;
 
@@ -1429,7 +1434,7 @@ impl BankingStage {
         QosService::update_or_remove_transaction_costs(
             transaction_costs.iter(),
             transactions_qos_results.iter(),
-            transactions_executed_status.iter(),
+            transactions_execute_and_record_status.iter(),
             bank,
         );
 
