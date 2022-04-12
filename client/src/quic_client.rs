@@ -94,7 +94,7 @@ impl TpuConnection for QuicTpuConnection {
         T: AsRef<[u8]>,
     {
         let _guard = RUNTIME.enter();
-        let send_buffer = self.client.send_buffer(wire_transaction, stats);
+        let send_buffer = self.client.send_buffer(wire_transaction);
         RUNTIME.block_on(send_buffer)?;
         Ok(())
     }
@@ -108,42 +108,23 @@ impl TpuConnection for QuicTpuConnection {
         T: AsRef<[u8]>,
     {
         let _guard = RUNTIME.enter();
-        let send_batch = self.client.send_batch(buffers, stats);
+        let send_batch = self.client.send_batch(buffers);
         RUNTIME.block_on(send_batch)?;
         Ok(())
     }
 
-    fn send_wire_transaction_async(
-        &self,
-        wire_transaction: Vec<u8>,
-        stats: Arc<ClientStats>,
-    ) -> TransportResult<()> {
+    fn send_wire_transaction_async(&self, wire_transaction: Vec<u8>) -> TransportResult<()> {
         let _guard = RUNTIME.enter();
-        let client = self.client.clone();
         //drop and detach the task
+        let client = self.client.clone();
+        inc_new_counter_info!("send_wire_transaction_async", 1);
         let _ = RUNTIME.spawn(async move {
-            let send_buffer = client.send_buffer(wire_transaction, &stats);
+            let send_buffer = client.send_buffer(wire_transaction);
             if let Err(e) = send_buffer.await {
+                inc_new_counter_warn!("send_wire_transaction_async_fail", 1);
                 warn!("Failed to send transaction async to {:?}", e);
-                datapoint_warn!("send-wire-async", ("failure", 1, i64),);
-            }
-        });
-        Ok(())
-    }
-
-    fn send_wire_transaction_batch_async(
-        &self,
-        buffers: Vec<Vec<u8>>,
-        stats: Arc<ClientStats>,
-    ) -> TransportResult<()> {
-        let _guard = RUNTIME.enter();
-        let client = self.client.clone();
-        //drop and detach the task
-        let _ = RUNTIME.spawn(async move {
-            let send_batch = client.send_batch(&buffers, &stats);
-            if let Err(e) = send_batch.await {
-                warn!("Failed to send transaction batch async to {:?}", e);
-                datapoint_warn!("send-wire-batch-async", ("failure", 1, i64),);
+            } else {
+                inc_new_counter_info!("send_wire_transaction_async_pass", 1);
             }
         });
         Ok(())
