@@ -5932,6 +5932,7 @@ dependencies = [
  "solana-ledger",
  "solana-logger 1.11.0",
  "solana-net-utils",
+ "solana-program-runtime",
  "solana-program-test",
  "solana-rpc",
  "solana-runtime",
