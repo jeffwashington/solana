@@ -167,6 +167,7 @@ struct RewardsMetrics {
     calculate_points_us: AtomicU64,
     store_stake_accounts_us: AtomicU64,
     store_vote_accounts_us: AtomicU64,
+    time_after_higher_root_us: AtomicU64,
 }
 
 mod address_lookup_table;
@@ -1834,6 +1835,11 @@ impl Bank {
                             metrics.store_vote_accounts_us.load(Relaxed),
                             i64
                         ),
+                        (
+                            "time_after_higher_root_us",
+                            metrics.time_after_higher_root_us.load(Relaxed),
+                            i64
+                        ),
                     );
                 } else {
                     // Save a snapshot of stakes for use in consensus and stake weighted networking
@@ -2762,6 +2768,15 @@ impl Bank {
         m.stop();
         metrics.calculate_points_us.fetch_add(m.as_us(), Relaxed);
 
+        let max_root = self
+            .accounts()
+            .accounts_db
+            .accounts_index
+            .max_root_inclusive();
+        if max_root > self.slot() {
+            error!("root has advanced: {}, {}", max_root, self.slot());
+        }
+
         if points == 0 {
             return 0.0;
         }
@@ -2857,6 +2872,14 @@ impl Bank {
             .store_stake_accounts_us
             .fetch_add(m.as_us(), Relaxed);
 
+        let max_root = self
+            .accounts()
+            .accounts_db
+            .accounts_index
+            .max_root_inclusive();
+        if max_root > self.slot() {
+            error!("root has advanced2: {}, {}", max_root, self.slot());
+        }
         let mut m = Measure::start("store_vote_accounts");
         let mut vote_rewards = vote_account_rewards
             .into_iter()
@@ -2890,6 +2913,15 @@ impl Bank {
 
         m.stop();
         metrics.store_vote_accounts_us.fetch_add(m.as_us(), Relaxed);
+
+        let max_root = self
+            .accounts()
+            .accounts_db
+            .accounts_index
+            .max_root_inclusive();
+        if max_root > self.slot() {
+            error!("root has advanced3: {}, {}", max_root, self.slot());
+        }
 
         {
             let mut rewards = self.rewards.write().unwrap();
