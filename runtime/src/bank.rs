@@ -2712,6 +2712,8 @@ impl Bank {
         thread_pool: &ThreadPool,
         metrics: &RewardsMetrics,
     ) -> f64 {
+        use log::*;
+        error!("jwash: pay_validator_rewards_with_thread_pool: slot: {}, ancestors: {:?}", self.slot, self.ancestors.keys());
         let stake_history = self.stakes_cache.stakes().history().clone();
         let vote_with_stake_delegations_map = {
             let mut m = Measure::start("load_vote_and_stake_accounts_us");
