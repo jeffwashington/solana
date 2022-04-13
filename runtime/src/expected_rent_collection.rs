@@ -310,7 +310,7 @@ impl ExpectedRentCollection {
                 }
             } else if !possibly_update {
                 // This is a non-trivial lookup. Would be nice to skip this.
-                assert!(!rewrites_skipped_this_slot.contains_key(pubkey), "did not update rent_epoch: {}, new value for rent_epoch: {}, old: {}, current epoch: {}", pubkey, rent_epoch, next_epoch, current_epoch);
+                //assert!(!rewrites_skipped_this_slot.contains_key(pubkey), "did not update rent_epoch: {}, new value for rent_epoch: {}, old: {}, current epoch: {}", pubkey, rent_epoch, next_epoch, current_epoch);
             }
         }
         None
