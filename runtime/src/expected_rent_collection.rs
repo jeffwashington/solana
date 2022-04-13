@@ -310,10 +310,7 @@ impl ExpectedRentCollection {
                 storage_slot_info_inner.epoch,
                 storage_slot_info_inner.partition_index,
             );
-            let partition_from_pubkey = Bank::partition_from_pubkey(
-                pubkey,
-                inner.slots_in_epoch,
-            );
+            let partition_from_pubkey = Bank::partition_from_pubkey(pubkey, inner.slots_in_epoch);
             let mut possibly_update = true;
             if current_epoch == storage_epoch {
                 // storage is in same epoch as bank
@@ -331,19 +328,20 @@ impl ExpectedRentCollection {
                 }
             } // if more than 1 epoch old, then we need to collect rent because we clearly skipped it.
             let rent_epoch = account.rent_epoch();
-            if possibly_update
-                && rent_epoch == 0
-                && current_epoch > 1
-                && !rewrites_skipped_this_slot.contains_key(pubkey)
-            {
-                // we know we're done
-                return None;
+            if possibly_update && rent_epoch == 0 && current_epoch > 1 {
+                if rewrites_skipped_this_slot.contains_key(pubkey) {
+                    return Some(next_epoch);
+                } else {
+                    // we know we're done
+                    return None;
+                }
             }
 
             // if an account was written >= its rent collection slot within the last epoch worth of slots, then we don't want to update it here
             if possibly_update && rent_epoch < current_epoch {
                 let new_rent_epoch = if partition_from_pubkey < partition_from_current_slot
-                    || rewrites_skipped_this_slot.contains_key(pubkey)
+                    || (partition_from_pubkey == partition_from_current_slot
+                        && rewrites_skipped_this_slot.contains_key(pubkey))
                 {
                     // partition_from_pubkey < partition_from_current_slot:
                     //  we already would have done a rewrite on this account IN this epoch

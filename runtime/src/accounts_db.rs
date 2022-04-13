@@ -1316,6 +1316,7 @@ impl LatestAccountsIndexRootsStats {
     fn report(&self) {
         datapoint_info!(
             "accounts_index_roots_len",
+            /*
             (
                 "roots_len",
                 self.roots_len.load(Ordering::Relaxed) as i64,
@@ -1356,6 +1357,7 @@ impl LatestAccountsIndexRootsStats {
                 self.clean_dead_slot_us.swap(0, Ordering::Relaxed) as i64,
                 i64
             ),
+            */
             (
                 "load_adjust_rent_epoch",
                 self.load_adjust_rent_epoch.swap(0, Ordering::Relaxed) as i64,
