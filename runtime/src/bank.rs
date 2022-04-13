@@ -42,6 +42,7 @@ use {
             AccountShrinkThreshold, AccountsDbConfig, ErrorCounters, SnapshotStorages,
             ACCOUNTS_DB_CONFIG_FOR_BENCHMARKS, ACCOUNTS_DB_CONFIG_FOR_TESTING,
         },
+        expected_rent_collection::SlotInfoInEpoch,
         accounts_index::{AccountSecondaryIndexes, IndexKey, ScanConfig, ScanResult},
         accounts_index_storage::Startup,
         accounts_update_notifier_interface::AccountsUpdateNotifier,
@@ -1092,6 +1093,8 @@ pub struct Bank {
     /// References to accounts, parent and signature status
     pub rc: BankRc,
 
+    pub slot_info: SlotInfoInEpoch,
+
     pub src: StatusCacheRc,
 
     /// FIFO queue of `recent_blockhash` items
@@ -1336,6 +1339,7 @@ impl Bank {
     fn default_with_accounts(accounts: Accounts) -> Self {
         let bank = Self {
             rc: BankRc::new(accounts, Slot::default()),
+            slot_info: SlotInfoInEpoch::default(),
             src: StatusCacheRc::default(),
             blockhash_queue: RwLock::<BlockhashQueue>::default(),
             ancestors: Ancestors::default(),
@@ -1661,6 +1665,7 @@ impl Bank {
         let accounts_data_len = parent.load_accounts_data_len();
         let mut new = Bank {
             rc,
+            slot_info: SlotInfoInEpoch::new(slot, &epoch_schedule),
             src,
             slot,
             bank_id,
@@ -1984,6 +1989,7 @@ impl Bank {
         let feature_set = new();
         let mut bank = Self {
             rc: bank_rc,
+            slot_info: SlotInfoInEpoch::new(fields.slot, &fields.epoch_schedule),
             src: new(),
             blockhash_queue: RwLock::new(fields.blockhash_queue),
             ancestors: Ancestors::from(&fields.ancestors),
@@ -5692,8 +5698,8 @@ impl Bank {
                 let mut m = Measure::start("maybe_update_rent_epoch_on_load");
                 crate::expected_rent_collection::ExpectedRentCollection::maybe_update_rent_epoch_on_load(
                     &mut account,
-                    storage_slot,
-                    self.slot(),
+                    &SlotInfoInEpoch::new_small(storage_slot),
+                    &self.slot_info,
                     self.epoch_schedule(),
                     self.rent_collector(),
                     pubkey,

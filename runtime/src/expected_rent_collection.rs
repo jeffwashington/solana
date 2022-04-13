@@ -208,14 +208,61 @@ Every highest_root >= 432k * 2 + 80 and < 432k * 3 + 80 is this same result
 
 */
 
+#[derive(Debug, Default, Copy, Clone)]
+pub struct SlotInfoInEpoch {
+    /// the slot
+    pub slot: Slot,
+    /// possible info about this slot
+    pub epoch_info: Option<SlotInfoInEpochInner>,
+}
+
+#[derive(Debug, Default, Copy, Clone)]
+pub struct SlotInfoInEpochInner {
+    /// epoch of the slot
+    pub epoch: Epoch,
+    /// partition index of the slot within the epoch
+    pub partition_index: PartitionIndex,
+    /// first slot in this epoch (ie. partition_index=0 for this slot)
+    pub first_slot_in_epoch: Slot,
+    /// number of slots in this epoch
+    pub slots_in_epoch: Slot,
+}
+
+impl SlotInfoInEpoch {
+    pub fn new(slot: Slot, epoch_schedule: &EpochSchedule) -> Self {
+        let mut result = Self::new_small(slot);
+        result.epoch_info = Some(result.get_inner(epoch_schedule));
+        result
+    }
+    pub fn new_small(slot: Slot) -> Self {
+        SlotInfoInEpoch {
+            slot,
+            ..SlotInfoInEpoch::default()
+        }
+    }
+    pub fn get_inner(&self, epoch_schedule: &EpochSchedule) -> SlotInfoInEpochInner {
+        if let Some(inner) = &self.epoch_info {
+            *inner
+        } else {
+            let (epoch, partition_index) = epoch_schedule.get_epoch_and_slot_index(self.slot);
+            SlotInfoInEpochInner {
+                epoch,
+                partition_index,
+                first_slot_in_epoch: self.slot.saturating_sub(partition_index),
+                slots_in_epoch: epoch_schedule.get_slots_in_epoch(epoch),
+            }
+        }
+    }
+}
+
 impl ExpectedRentCollection {
     #[allow(dead_code)]
     /// 'account' is being loaded from 'storage_slot' in 'bank_slot'
     /// adjusts 'account.rent_epoch' if we skipped the last rewrite on this account
     pub fn maybe_update_rent_epoch_on_load(
         account: &mut AccountSharedData,
-        storage_slot: Slot,
-        bank_slot: Slot,
+        storage_slot: &SlotInfoInEpoch,
+        bank_slot: &SlotInfoInEpoch,
         epoch_schedule: &EpochSchedule,
         rent_collector: &RentCollector,
         pubkey: &Pubkey,
@@ -241,8 +288,8 @@ impl ExpectedRentCollection {
     /// returns None if the account is up to date
     fn get_corrected_rent_epoch_on_load(
         account: &AccountSharedData,
-        storage_slot: Slot,
-        bank_slot: Slot,
+        storage_slot: &SlotInfoInEpoch,
+        bank_slot: &SlotInfoInEpoch,
         epoch_schedule: &EpochSchedule,
         rent_collector: &RentCollector,
         pubkey: &Pubkey,
@@ -256,13 +303,16 @@ impl ExpectedRentCollection {
                 return None;
             }
 
-            let (current_epoch, partition_from_current_slot) =
-                epoch_schedule.get_epoch_and_slot_index(bank_slot);
-            let (storage_epoch, storage_slot_partition) =
-                epoch_schedule.get_epoch_and_slot_index(storage_slot);
+            let inner = bank_slot.get_inner(epoch_schedule);
+            let (current_epoch, partition_from_current_slot) = (inner.epoch, inner.partition_index);
+            let storage_slot_info_inner = storage_slot.get_inner(epoch_schedule);
+            let (storage_epoch, storage_slot_partition) = (
+                storage_slot_info_inner.epoch,
+                storage_slot_info_inner.partition_index,
+            );
             let partition_from_pubkey = Bank::partition_from_pubkey(
                 pubkey,
-                epoch_schedule.get_slots_in_epoch(current_epoch),
+                inner.slots_in_epoch,
             );
             let mut possibly_update = true;
             if current_epoch == storage_epoch {
