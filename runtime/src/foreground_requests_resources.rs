@@ -46,19 +46,23 @@ impl ForegroundRequestsResources {
     /// could also sleep until request is satisfied
     pub fn possibly_sleep(&self) {
         if self.get_busy() {
-            self.wait.wait_timeout(Duration::from_millis(1));
+            //self.wait.wait_timeout(Duration::from_millis(1));
         }
     }
 
     /// specify that foreground is busy or not
     fn set_busy(&self, busy: bool) {
         if busy {
-            self.busy_count.fetch_add(1, Ordering::Release);
+            let r = self.busy_count.fetch_add(1, Ordering::Release);
+            use log::*;
+            error!("jwash: set_busy: {}", r+ 1);
         } else {
             let result = self.busy_count.fetch_sub(1, Ordering::Release);
             if result == 1 {
                 self.wait.notify_all();
             }
+            use log::*;
+            error!("jwash: unbusy: {}", r.saturating_sub(1));
         }
     }
 }
