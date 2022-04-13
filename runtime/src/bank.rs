@@ -6105,7 +6105,6 @@ impl Bank {
                 &self.ancestors,
                 Some(self.capitalization()),
                 false,
-                self.epoch_schedule(),
                 &self.rent_collector,
                 is_startup,
             );
@@ -6131,7 +6130,6 @@ impl Bank {
                         &self.ancestors,
                         Some(self.capitalization()),
                         false,
-                        self.epoch_schedule(),
                         &self.rent_collector,
                         is_startup,
                     );
