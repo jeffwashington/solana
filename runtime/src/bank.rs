@@ -2782,7 +2782,7 @@ impl Bank {
             .accounts_index
             .max_root_inclusive();
         if max_root > self.slot() {
-            error!("root has advanced: {}, {}", max_root, self.slot());
+            error!("jwash root has advanced: {}, {}", max_root, self.slot());
         }
 
         if points == 0 {
@@ -2886,7 +2886,7 @@ impl Bank {
             .accounts_index
             .max_root_inclusive();
         if max_root > self.slot() {
-            error!("root has advanced2: {}, {}", max_root, self.slot());
+            error!("jwash root has advanced2: {}, {}", max_root, self.slot());
         }
         let mut m = Measure::start("store_vote_accounts");
         let mut vote_rewards = vote_account_rewards
@@ -2928,7 +2928,7 @@ impl Bank {
             .accounts_index
             .max_root_inclusive();
         if max_root > self.slot() {
-            error!("root has advanced3: {}, {}", max_root, self.slot());
+            error!("jwash root has advanced3: {}, {}", max_root, self.slot());
         }
 
         {
