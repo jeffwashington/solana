@@ -327,12 +327,14 @@ impl ExpectedRentCollection {
                     possibly_update = false;
                 }
             } // if more than 1 epoch old, then we need to collect rent because we clearly skipped it.
+
+            let rewrites_skipped_this_pubkey_this_slot = || rewrites_skipped_this_slot
+            .read()
+            .unwrap()
+            .contains_key(pubkey);
             let rent_epoch = account.rent_epoch();
             if possibly_update && rent_epoch == 0 && current_epoch > 1 {
-                if rewrites_skipped_this_slot
-                    .read()
-                    .unwrap()
-                    .contains_key(pubkey)
+                if rewrites_skipped_this_pubkey_this_slot()
                 {
                     return Some(next_epoch);
                 } else {
@@ -345,10 +347,7 @@ impl ExpectedRentCollection {
             if possibly_update && rent_epoch < current_epoch {
                 let new_rent_epoch = if partition_from_pubkey < partition_from_current_slot
                     || (partition_from_pubkey == partition_from_current_slot
-                        && rewrites_skipped_this_slot
-                            .read()
-                            .unwrap()
-                            .contains_key(pubkey))
+                        && rewrites_skipped_this_pubkey_this_slot())
                 {
                     // partition_from_pubkey < partition_from_current_slot:
                     //  we already would have done a rewrite on this account IN this epoch
