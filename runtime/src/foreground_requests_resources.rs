@@ -62,7 +62,7 @@ impl ForegroundRequestsResources {
                 self.wait.notify_all();
             }
             use log::*;
-            error!("jwash: unbusy: {}", r.saturating_sub(1));
+            error!("jwash: unbusy: {}", result.saturating_sub(1));
         }
     }
 }
