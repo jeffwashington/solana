@@ -200,8 +200,8 @@ impl RentCollector {
         account: &impl ReadableAccount,
         filler_account_suffix: Option<&Pubkey>,
     ) -> bool {
-        !self.should_collect_rent(address, account)
-            || account.rent_epoch() > self.epoch
+        account.rent_epoch() > self.epoch
+            || !self.should_collect_rent(address, account)
             || crate::accounts_db::AccountsDb::is_filler_account_helper(
                 address,
                 filler_account_suffix,
