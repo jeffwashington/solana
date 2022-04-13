@@ -1066,7 +1066,7 @@ pub struct AccountsDb {
 
     stats: AccountsStats,
 
-    clean_accounts_stats: CleanAccountsStats,
+    pub clean_accounts_stats: CleanAccountsStats,
 
     // Stats for purges called outside of clean_accounts()
     external_purge_slots_stats: PurgeStats,
@@ -1259,7 +1259,7 @@ struct FlushStats {
 }
 
 #[derive(Debug, Default)]
-struct LatestAccountsIndexRootsStats {
+pub struct LatestAccountsIndexRootsStats {
     roots_len: AtomicUsize,
     uncleaned_roots_len: AtomicUsize,
     previous_uncleaned_roots_len: AtomicUsize,
@@ -1268,6 +1268,9 @@ struct LatestAccountsIndexRootsStats {
     unrooted_cleaned_count: AtomicUsize,
     clean_unref_from_storage_us: AtomicU64,
     clean_dead_slot_us: AtomicU64,
+    pub load_adjust_rent_epoch: AtomicUsize,
+    pub load_adjust_rent_epoch_us: AtomicU64,
+    pub load_prior_to_adjust_rent_epoch_us: AtomicU64,
 }
 
 impl LatestAccountsIndexRootsStats {
@@ -1298,6 +1301,14 @@ impl LatestAccountsIndexRootsStats {
         );
         self.clean_dead_slot_us.fetch_add(
             accounts_index_roots_stats.clean_dead_slot_us,
+            Ordering::Relaxed,
+        );
+        self.load_adjust_rent_epoch.fetch_add(
+            accounts_index_roots_stats.load_adjust_rent_epoch,
+            Ordering::Relaxed,
+        );
+        self.load_adjust_rent_epoch_us.fetch_add(
+            accounts_index_roots_stats.load_adjust_rent_epoch_us,
             Ordering::Relaxed,
         );
     }
@@ -1345,6 +1356,21 @@ impl LatestAccountsIndexRootsStats {
                 self.clean_dead_slot_us.swap(0, Ordering::Relaxed) as i64,
                 i64
             ),
+            (
+                "load_adjust_rent_epoch",
+                self.load_adjust_rent_epoch.swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "load_adjust_rent_epoch_us",
+                self.load_adjust_rent_epoch_us.swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "load_prior_to_adjust_rent_epoch_us",
+                self.load_prior_to_adjust_rent_epoch_us.swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
         );
 
         // Don't need to reset since this tracks the latest updates, not a cumulative total
@@ -1352,9 +1378,9 @@ impl LatestAccountsIndexRootsStats {
 }
 
 #[derive(Debug, Default)]
-struct CleanAccountsStats {
+pub struct CleanAccountsStats {
     purge_stats: PurgeStats,
-    latest_accounts_index_roots_stats: LatestAccountsIndexRootsStats,
+    pub latest_accounts_index_roots_stats: LatestAccountsIndexRootsStats,
 
     // stats held here and reported by clean_accounts
     clean_old_root_us: AtomicU64,

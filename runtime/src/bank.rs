@@ -5684,7 +5684,48 @@ impl Bank {
         ancestors: &Ancestors,
         pubkey: &Pubkey,
     ) -> Option<(AccountSharedData, Slot)> {
-        self.rc.accounts.load_with_fixed_root(ancestors, pubkey)
+        let mut m2 = Measure::start("load_slow_with_fixed_root");
+
+        match self.rc.accounts.load_with_fixed_root(ancestors, pubkey) {
+            Some((mut account, storage_slot)) => {
+                m2.stop();
+                let mut m = Measure::start("maybe_update_rent_epoch_on_load");
+                crate::expected_rent_collection::ExpectedRentCollection::maybe_update_rent_epoch_on_load(
+                    &mut account,
+                    storage_slot,
+                    self.slot(),
+                    self.epoch_schedule(),
+                    self.rent_collector(),
+                    pubkey,
+                    &Rewrites::default(),
+                );
+                m.stop();
+                self.rc
+                    .accounts
+                    .accounts_db
+                    .clean_accounts_stats
+                    .latest_accounts_index_roots_stats
+                    .load_adjust_rent_epoch
+                    .fetch_add(1, Relaxed);
+                self.rc
+                    .accounts
+                    .accounts_db
+                    .clean_accounts_stats
+                    .latest_accounts_index_roots_stats
+                    .load_adjust_rent_epoch_us
+                    .fetch_add(m.as_us(), Relaxed);
+                self.rc
+                    .accounts
+                    .accounts_db
+                    .clean_accounts_stats
+                    .latest_accounts_index_roots_stats
+                    .load_prior_to_adjust_rent_epoch_us
+                    .fetch_add(m2.as_us(), Relaxed);
+
+                Some((account, storage_slot))
+            }
+            None => None,
+        }
     }
 
     pub fn get_program_accounts(

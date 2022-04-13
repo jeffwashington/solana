@@ -466,6 +466,8 @@ pub struct AccountsIndexRootsStats {
     pub unrooted_cleaned_count: usize,
     pub clean_unref_from_storage_us: u64,
     pub clean_dead_slot_us: u64,
+    pub load_adjust_rent_epoch: usize,
+    pub load_adjust_rent_epoch_us: u64,
 }
 
 pub struct AccountsIndexIterator<'a, T: IndexValue> {
