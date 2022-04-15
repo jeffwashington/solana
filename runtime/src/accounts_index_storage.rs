@@ -92,14 +92,6 @@ impl<T: IndexValue> AccountsIndexStorage<T> {
     ///      also creates some additional bg threads to facilitate flushing to disk asap
     /// startup=false is 'normal' operation
     pub fn set_startup(&self, value: bool) {
-        if value {
-            // create some additional bg threads to help get things to the disk index asap
-            *self.startup_worker_threads.lock().unwrap() = Some(BgThreads::new(
-                &self.storage,
-                &self.in_mem,
-                Self::num_threads(),
-            ));
-        }
         self.storage.set_startup(value);
         if !value {
             // shutdown the bg threads
@@ -133,3 +125,4 @@ impl<T: IndexValue> AccountsIndexStorage<T> {
         }
     }
 }
+   
