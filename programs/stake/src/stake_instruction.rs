@@ -1925,7 +1925,8 @@ mod tests {
     fn test_authorize_delegated_stake() {
         let authority_address = solana_sdk::pubkey::new_rand();
         let stake_address = solana_sdk::pubkey::new_rand();
-        let stake_lamports = 42;
+        let minimum_delegation = crate::get_minimum_delegation(&FeatureSet::all_enabled());
+        let stake_lamports = minimum_delegation;
         let stake_account = AccountSharedData::new_data_with_space(
             stake_lamports,
             &StakeState::Initialized(Meta::auto(&stake_address)),
@@ -2123,7 +2124,8 @@ mod tests {
         vote_account_2
             .set_state(&VoteStateVersions::new_current(vote_state))
             .unwrap();
-        let stake_lamports = 42;
+        let minimum_delegation = crate::get_minimum_delegation(&FeatureSet::all_enabled());
+        let stake_lamports = minimum_delegation;
         let stake_address = solana_sdk::pubkey::new_rand();
         let mut stake_account = AccountSharedData::new_data_with_space(
             stake_lamports,
@@ -2939,8 +2941,9 @@ mod tests {
     fn test_withdraw_stake_before_warmup() {
         let recipient_address = solana_sdk::pubkey::new_rand();
         let stake_address = solana_sdk::pubkey::new_rand();
-        let stake_lamports = 42;
-        let total_lamports = 100;
+        let minimum_delegation = crate::get_minimum_delegation(&FeatureSet::all_enabled());
+        let stake_lamports = minimum_delegation;
+        let total_lamports = stake_lamports + 33;
         let stake_account = AccountSharedData::new_data_with_space(
             total_lamports,
             &StakeState::Initialized(Meta::auto(&stake_address)),
@@ -3290,7 +3293,8 @@ mod tests {
     #[test]
     fn test_deactivate() {
         let stake_address = solana_sdk::pubkey::new_rand();
-        let stake_lamports = 42;
+        let minimum_delegation = crate::get_minimum_delegation(&FeatureSet::all_enabled());
+        let stake_lamports = minimum_delegation;
         let stake_account = AccountSharedData::new_data_with_space(
             stake_lamports,
             &StakeState::Initialized(Meta::auto(&stake_address)),
