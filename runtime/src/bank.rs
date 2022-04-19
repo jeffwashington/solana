@@ -38,7 +38,7 @@ use solana_sdk::recent_blockhashes_account;
 use {
     crate::{
         account_overrides::AccountOverrides,
-        accounts::{AccountAddressFilter, Accounts, LoadedTransaction, TransactionLoadResult},
+        accounts::{AccountAddressFilter, Accounts, LoadedTransaction, PubkeyAccountSlot, TransactionLoadResult},
         accounts_db::{
             AccountShrinkThreshold, AccountsDbConfig, SnapshotStorages,
             ACCOUNTS_DB_CONFIG_FOR_BENCHMARKS, ACCOUNTS_DB_CONFIG_FOR_TESTING,
@@ -4769,7 +4769,7 @@ impl Bank {
         let mut total_collected = CollectedInfo::default();
         let mut dump = vec![];
         for (pubkey, mut account, loaded_slot) in accounts {
-            if bank_slot == 133561360{
+            if self.slot() == 133561360{
                 dump.push((pubkey, crate::accounts_db::AccountsDb::hash_account(0, &account, &pubkey), loaded_slot));
             }
             let collected = self.rent_collector.collect_from_existing_account(
@@ -5710,9 +5710,7 @@ impl Bank {
         self.rc.accounts.account_indexes_include_key(key)
     }
 
-    pub fn get_all_accounts_with_modified_slots(
-        &self,
-    ) -> ScanResult<Vec<(Pubkey, AccountSharedData, Slot)>> {
+    pub fn get_all_accounts_with_modified_slots(&self) -> ScanResult<Vec<PubkeyAccountSlot>> {
         self.rc.accounts.load_all(&self.ancestors, self.bank_id)
     }
 
