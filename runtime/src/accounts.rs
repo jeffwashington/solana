@@ -10,7 +10,7 @@ use {
         accounts_update_notifier_interface::AccountsUpdateNotifier,
         ancestors::Ancestors,
         bank::{
-            Bank, NonceFull, NonceInfo, RentDebits, TransactionCheckResult,
+            Bank, NonceFull, NonceInfo, RentDebits, Rewrites, TransactionCheckResult,
             TransactionExecutionResult,
         },
         blockhash_queue::BlockhashQueue,
@@ -1034,12 +1034,14 @@ impl Accounts {
         }
     }
 
-    pub fn bank_hash_at(&self, slot: Slot) -> Hash {
-        self.bank_hash_info_at(slot).hash
+    pub fn bank_hash_at(&self, slot: Slot, rewrites: &Rewrites) -> Hash {
+        self.bank_hash_info_at(slot, rewrites).hash
     }
 
-    pub fn bank_hash_info_at(&self, slot: Slot) -> BankHashInfo {
-        let delta_hash = self.accounts_db.get_accounts_delta_hash(slot);
+    pub fn bank_hash_info_at(&self, slot: Slot, rewrites: &Rewrites) -> BankHashInfo {
+        let delta_hash = self
+            .accounts_db
+            .get_accounts_delta_hash_with_rewrites(slot, rewrites);
         let bank_hashes = self.accounts_db.bank_hashes.read().unwrap();
         let mut hash_info = bank_hashes
             .get(&slot)
@@ -2401,7 +2403,7 @@ mod tests {
             false,
             AccountShrinkThreshold::default(),
         );
-        accounts.bank_hash_at(1);
+        accounts.bank_hash_at(1, &Rewrites::default());
     }
 
     #[test]
