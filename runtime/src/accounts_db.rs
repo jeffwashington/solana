@@ -3516,6 +3516,12 @@ impl AccountsDb {
                 shrink_candidates_slots.len()
             );
         }
+        else {
+            error!(
+                "ancient_append_vec skipping: shrink_candidate_slots, len: {}",
+                shrink_candidates_slots.len()
+            );
+        }
 
         let (shrink_slots, shrink_slots_next_batch) = {
             if let AccountShrinkThreshold::TotalSpace { shrink_ratio } = self.shrink_ratio {
