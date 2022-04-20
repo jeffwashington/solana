@@ -3369,18 +3369,12 @@ impl AccountsDb {
                     );
                 }
 
-                let clone = &ancient_store.clone();
                 // write the rest to the next ancient storage
-                let _store_accounts_timing = self.store_accounts_frozen(
-                    (ancient_slot, &accounts[index_first_item_overflow..]),
-                    Some(&hashes[index_first_item_overflow..]),
-                    Some(Box::new(move |_, _| Arc::clone(clone))),
-                    None,
-                );
-                self.verify_contents(
-                    &ancient_store,
+                self.store_ancient_accounts(
                     ancient_slot,
                     &accounts[index_first_item_overflow..],
+                    &hashes[index_first_item_overflow..],
+                    &ancient_store,
                 );
             }
 
