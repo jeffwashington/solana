@@ -4897,7 +4897,7 @@ impl Bank {
         // parallelize?
         let mut rent_debits = RentDebits::default();
         let mut total_collected = CollectedInfo::default();
-        for (pubkey, mut account) in accounts {
+        for (pubkey, mut account, _loaded_slot) in accounts {
             let collected = self.rent_collector.collect_from_existing_account(
                 &pubkey,
                 &mut account,
