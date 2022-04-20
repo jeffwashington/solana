@@ -3335,9 +3335,9 @@ impl AccountsDb {
             };
 
             if num_accounts > index_first_item_overflow {
+                // we need a new ancient append vec
                 created_this_slot = true;
                 drop_root = false;
-                // we need a new ancient append vec
                 assert!(
                     slot > ancient_slot,
                     "slot: {}, ancient_slot: {}, remaining accounts: {}, available_bytes: {}",
@@ -3347,11 +3347,14 @@ impl AccountsDb {
                     available_bytes
                 );
                 // our oldest slot is not an append vec of max size, so we need to start with rewriting that storage to create an ancient append vec for the oldest slot
-                let (ancient_store, _time) =
-                    self.get_store_for_shrink(slot, Self::get_ancient_append_vec_capacity());
-                //error!("ancient_append_vec: creating ancient append vec because previous one was full, old one: {}, full one: {}, additional: {}, {}", slot, ancient_slot, accounts[0..index_first_item_overflow].len(), hashes[index_first_item_overflow..].len());
+                current_ancient_storage = None; // done with last ancient append vec
+                self.maybe_create_ancient_append_vec(&mut current_ancient_storage, slot);
+                let (ancient_slot, ancient_store) = current_ancient_storage
+                    .as_ref()
+                    .map(|(a, b)| (*a, b))
+                    .unwrap();
+
                 error!("ancient_append_vec: creating ancient append vec because previous one was full: {}, full one: {}, additional: {}, {}, items in full one: {} {}", slot, ancient_slot, accounts[index_first_item_overflow..].len(), hashes[index_first_item_overflow..].len(), ancient_store.count(), ancient_store.approx_stored_count());
-                current_ancient_storage = Some((slot, ancient_store.clone()));
                 ids.push(ancient_store.append_vec_id());
                 if created_this_slot {
                     error!(
@@ -3374,7 +3377,7 @@ impl AccountsDb {
                     ancient_slot,
                     &accounts[index_first_item_overflow..],
                     &hashes[index_first_item_overflow..],
-                    &ancient_store,
+                    ancient_store,
                 );
             }
 
