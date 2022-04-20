@@ -3201,8 +3201,6 @@ impl AccountsDb {
                     continue;
                 }
             };
-            let mut created_this_slot = false;
-
             let (stored_accounts, _num_stores, _original_bytes) =
                 self.get_unique_accounts_from_storages(all_storages.iter());
             if stored_accounts.is_empty() {
@@ -3212,20 +3210,9 @@ impl AccountsDb {
                 );
                 continue; // skipping empty slot
             }
-            if current_ancient_storage.is_none() {
-                // our oldest slot is not an append vec of max size, or we filled the previous one.
-                // So, create a new ancient append vec at 'slot'
-                let (new_ancient_storage, _time) =
-                    self.get_store_for_shrink(slot, Self::get_ancient_append_vec_capacity());
-                error!(
-                    "ancient_append_vec: creating initial ancient append vec: {}, size: {}, id: {}",
-                    slot,
-                    Self::get_ancient_append_vec_capacity(),
-                    new_ancient_storage.append_vec_id(),
-                );
-                created_this_slot = true;
-                current_ancient_storage = Some((slot, new_ancient_storage));
-            }
+            let num_accounts = stored_accounts.len();
+            let mut created_this_slot =
+                self.maybe_create_ancient_append_vec(&mut current_ancient_storage, slot);
             let (ancient_slot, ancient_store) = current_ancient_storage
                 .as_ref()
                 .map(|(a, b)| (*a, b))
