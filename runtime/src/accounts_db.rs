@@ -3132,6 +3132,30 @@ impl AccountsDb {
         storage.capacity() == Self::get_ancient_append_vec_capacity()
     }
 
+    /// return true if created
+    fn maybe_create_ancient_append_vec(
+        &self,
+        current_ancient_storage: &mut Option<(Slot, Arc<AccountStorageEntry>)>,
+        slot: Slot,
+    ) -> bool {
+        if current_ancient_storage.is_none() {
+            // our oldest slot is not an append vec of max size, or we filled the previous one.
+            // So, create a new ancient append vec at 'slot'
+            let (new_ancient_storage, _time) =
+                self.get_store_for_shrink(slot, Self::get_ancient_append_vec_capacity());
+            error!(
+                "ancient_append_vec: creating initial ancient append vec: {}, size: {}, id: {}",
+                slot,
+                Self::get_ancient_append_vec_capacity(),
+                new_ancient_storage.append_vec_id(),
+            );
+            *current_ancient_storage = Some((slot, new_ancient_storage));
+            true
+        } else {
+            false
+        }
+    }
+
     fn get_ancient_append_vec(
         &self,
         all_storages: &SnapshotStorage,
@@ -3218,21 +3242,22 @@ impl AccountsDb {
                 .map(|(a, b)| (*a, b))
                 .unwrap();
             let mut available_bytes = ancient_store.accounts.remaining_bytes();
-            let mut hashes_this_append_vec = Vec::default();
-            let mut hashes_next_append_vec = Vec::default();
-            let mut accounts_this_append_vec = Vec::default();
-            let mut accounts_next_append_vec = Vec::default();
-
+            let mut hashes = Vec::with_capacity(num_accounts);
+            let mut accounts = Vec::with_capacity(num_accounts);
+            // index of the first account that doesn't fit in the current append vec
+            let mut index_first_item_overflow = num_accounts; // assume all fit
             stored_accounts.iter().for_each(|account| {
-                available_bytes = available_bytes.saturating_sub(account.1.account_size as u64);
-                if available_bytes > 0 {
-                    hashes_this_append_vec.push(account.1.account.hash);
-                    &mut accounts_this_append_vec
-                } else {
-                    hashes_next_append_vec.push(account.1.account.hash);
-                    &mut accounts_next_append_vec
+                let account_size = account.1.account_size as u64;
+                if available_bytes >= account_size {
+                    available_bytes = available_bytes.saturating_sub(account_size);
+                } else if index_first_item_overflow == num_accounts {
+                    available_bytes = 0;
+                    // the # of accounts we have so far seen is the most that will fit in the current ancient append vec
+                    index_first_item_overflow = hashes.len();
                 }
-                .push((&account.1.account.meta.pubkey, &account.1.account, slot));
+                hashes.push(account.1.account.hash);
+                // we have to specify 'slot' here because we are writing to an ancient append vec and squashing slots, so we need to update the previous index entry for this account from 'slot' to 'ancient_slot'
+                accounts.push((&account.1.account.meta.pubkey, &account.1.account, slot));
             });
 
             /*
@@ -3250,7 +3275,7 @@ impl AccountsDb {
                 error!(
                     "rewrites from same slot as ancient: {}, {:?}",
                     slot,
-                    accounts_this_append_vec
+                    accounts[0..index_first_item_overflow]
                         .iter()
                         .take(10_000)
                         .map(|(a, b, c)| (a, c, b.offset))
@@ -3261,37 +3286,35 @@ impl AccountsDb {
             let mut ids = vec![ancient_store.append_vec_id()];
             let mut drop_root = slot > ancient_slot;
             let prev = if true {
-                //accounts_next_append_vec.is_empty() {
+                //accounts[index_first_item_overflow..].is_empty() {
                 // write what we can to the current ancient storage
                 let _store_accounts_timing = self.store_accounts_frozen(
-                    (ancient_slot, &accounts_this_append_vec[..]),
-                    Some(&hashes_this_append_vec),
+                    (ancient_slot, &accounts[0..index_first_item_overflow]),
+                    Some(&hashes[0..index_first_item_overflow]),
                     Some(Box::new(move |_, _| ancient_store.clone())),
                     None,
                 );
-                self.verify_contents(&ancient_store, ancient_slot, &accounts_this_append_vec);
+                self.verify_contents(
+                    &ancient_store,
+                    ancient_slot,
+                    &accounts[0..index_first_item_overflow],
+                );
 
                 let prev = format!(
                     "{:?}",
-                    accounts_this_append_vec
+                    accounts[0..index_first_item_overflow]
                         .iter()
                         .take(10_000)
                         .map(|(a, b, c)| (a, c, b.offset))
                         .collect::<Vec<_>>()
                 );
-                accounts_this_append_vec.clear();
-                hashes_this_append_vec.clear();
                 prev
             } else {
                 String::new()
             };
 
-            if !accounts_next_append_vec.is_empty() {
+            if num_accounts > index_first_item_overflow {
                 created_this_slot = true;
-                accounts_this_append_vec.append(&mut accounts_next_append_vec);
-                hashes_this_append_vec.append(&mut hashes_next_append_vec);
-                accounts_next_append_vec = accounts_this_append_vec;
-                hashes_next_append_vec = hashes_this_append_vec;
                 drop_root = false;
                 // we need a new ancient append vec
                 assert!(
@@ -3299,14 +3322,14 @@ impl AccountsDb {
                     "slot: {}, ancient_slot: {}, remaining accounts: {}, available_bytes: {}",
                     slot,
                     ancient_slot,
-                    accounts_next_append_vec.len(),
+                    accounts[index_first_item_overflow..].len(),
                     available_bytes
                 );
                 // our oldest slot is not an append vec of max size, so we need to start with rewriting that storage to create an ancient append vec for the oldest slot
                 let (ancient_store, _time) =
                     self.get_store_for_shrink(slot, Self::get_ancient_append_vec_capacity());
-                //error!("ancient_append_vec: creating ancient append vec because previous one was full, old one: {}, full one: {}, additional: {}, {}", slot, ancient_slot, accounts_this_append_vec.len(), hashes_next_append_vec.len());
-                error!("ancient_append_vec: creating ancient append vec because previous one was full: {}, full one: {}, additional: {}, {}, items in full one: {} {}", slot, ancient_slot, accounts_next_append_vec.len(), hashes_next_append_vec.len(), ancient_store.count(), ancient_store.approx_stored_count());
+                //error!("ancient_append_vec: creating ancient append vec because previous one was full, old one: {}, full one: {}, additional: {}, {}", slot, ancient_slot, accounts[0..index_first_item_overflow].len(), hashes[index_first_item_overflow..].len());
+                error!("ancient_append_vec: creating ancient append vec because previous one was full: {}, full one: {}, additional: {}, {}, items in full one: {} {}", slot, ancient_slot, accounts[index_first_item_overflow..].len(), hashes[index_first_item_overflow..].len(), ancient_store.count(), ancient_store.approx_stored_count());
                 current_ancient_storage = Some((slot, ancient_store.clone()));
                 ids.push(ancient_store.append_vec_id());
                 if created_this_slot {
@@ -3317,7 +3340,7 @@ impl AccountsDb {
                     error!(
                         "rewrites2 from same slot as ancient: {}, {:?}",
                         slot,
-                        accounts_next_append_vec
+                        accounts[index_first_item_overflow..]
                             .iter()
                             .take(10_000)
                             .map(|(a, b, c)| (a, c, b.offset))
@@ -3328,12 +3351,16 @@ impl AccountsDb {
                 let clone = &ancient_store.clone();
                 // write the rest to the next ancient storage
                 let _store_accounts_timing = self.store_accounts_frozen(
-                    (ancient_slot, &accounts_next_append_vec[..]),
-                    Some(&hashes_next_append_vec),
+                    (ancient_slot, &accounts[index_first_item_overflow..]),
+                    Some(&hashes[index_first_item_overflow..]),
                     Some(Box::new(move |_, _| Arc::clone(clone))),
                     None,
                 );
-                self.verify_contents(&ancient_store, ancient_slot, &accounts_next_append_vec);
+                self.verify_contents(
+                    &ancient_store,
+                    ancient_slot,
+                    &accounts[index_first_item_overflow..],
+                );
             }
 
             // Purge old, overwritten storage entries
