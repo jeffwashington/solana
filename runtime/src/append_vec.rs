@@ -740,6 +740,21 @@ pub mod tests {
     }
 
     #[test]
+    fn test_remaining_bytes() {
+        let path = get_append_vec_path("test_append");
+        let sz = 1024 * 1024;
+        let sz64 = 1024 * 1024 as u64;
+        let av = AppendVec::new(&path.path, true, sz);
+        assert_eq!(av.capacity(), sz64);
+        assert_eq!(av.remaining_bytes(), sz64);
+        let account = create_test_account(0);
+        let acct_size = 136;
+        av.append_account_test(&account).unwrap();
+        assert_eq!(av.capacity(), sz64);
+        assert_eq!(av.remaining_bytes(), sz64 - acct_size);
+    }
+
+    #[test]
     fn test_append_vec_data() {
         let path = get_append_vec_path("test_append_data");
         let av = AppendVec::new(&path.path, true, 1024 * 1024);
