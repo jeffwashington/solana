@@ -3207,7 +3207,6 @@ impl AccountsDb {
                     continue;
                 }
             };
-            let mut dead_storages = Vec::default();
             let mut created_this_slot = false;
 
             let (stored_accounts, _num_stores, _original_bytes) =
@@ -3357,6 +3356,7 @@ impl AccountsDb {
             }
 
             // Purge old, overwritten storage entries
+            let mut dead_storages = Vec::default();
             let mut start = Measure::start("write_storage_elapsed");
             if let Some(slot_stores) = self.storage.get_slot_stores(slot) {
                 let mut stores = slot_stores.write().unwrap();
