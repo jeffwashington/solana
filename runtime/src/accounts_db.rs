@@ -3239,6 +3239,22 @@ impl AccountsDb {
         })
     }
 
+    fn store_ancient_accounts(
+        &self,
+        ancient_slot: Slot,
+        accounts: &[(&Pubkey, &StoredAccountMeta<'_>, Slot)],
+        hashes: &[&Hash],
+        ancient_store: &Arc<AccountStorageEntry>,
+    ) {
+        let _store_accounts_timing = self.store_accounts_frozen(
+            (ancient_slot, accounts),
+            Some(hashes),
+            Some(Box::new(move |_, _| ancient_store.clone())),
+            None,
+        );
+        self.verify_contents(&ancient_store, ancient_slot, accounts);
+    }
+
     /// combine all entries in 'sorted_slots' into ancient append vecs
     fn combine_ancient_slots(&self, sorted_slots: Vec<Slot>, max_root: Slot) {
         let mut current_ancient_storage = None;
@@ -3303,18 +3319,12 @@ impl AccountsDb {
             let mut ids = vec![ancient_store.append_vec_id()];
             let mut drop_root = slot > ancient_slot;
             let prev = if true {
-                //accounts[index_first_item_overflow..].is_empty() {
                 // write what we can to the current ancient storage
-                let _store_accounts_timing = self.store_accounts_frozen(
-                    (ancient_slot, &accounts[0..index_first_item_overflow]),
-                    Some(&hashes[0..index_first_item_overflow]),
-                    Some(Box::new(move |_, _| ancient_store.clone())),
-                    None,
-                );
-                self.verify_contents(
-                    &ancient_store,
+                self.store_ancient_accounts(
                     ancient_slot,
                     &accounts[0..index_first_item_overflow],
+                    &hashes[0..index_first_item_overflow],
+                    ancient_store,
                 );
 
                 let prev = format!(
