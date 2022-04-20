@@ -3228,10 +3228,6 @@ impl AccountsDb {
             let (stored_accounts, _num_stores, _original_bytes) =
                 self.get_unique_accounts_from_storages(all_storages.iter());
             if stored_accounts.is_empty() {
-                error!(
-                    "ancient_append_vec: skipping slot because there are no accounts to write: {}",
-                    slot
-                );
                 continue; // skipping empty slot
             }
             let num_accounts = stored_accounts.len();
