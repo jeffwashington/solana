@@ -289,6 +289,11 @@ impl AppendVec {
         self.current_len.store(0, Ordering::Release);
     }
 
+    /// how many more bytes can be stored in this append vec
+    pub fn remaining_bytes(&self) -> u64 {
+        (self.capacity()).saturating_sub(self.len() as u64)
+    }
+
     pub fn len(&self) -> usize {
         self.current_len.load(Ordering::Acquire)
     }
