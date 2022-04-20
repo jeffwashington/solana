@@ -3075,6 +3075,36 @@ impl AccountsDb {
         (shrink_slots, shrink_slots_next_batch)
     }
 
+    fn prepare_to_store<'a>(
+        mut available_bytes: u64,
+        stored_accounts: &'a HashMap<Pubkey, FoundStoredAccount>,
+        slot: Slot,
+    ) -> (
+        Vec<&'a Hash>,
+        Vec<(&'a Pubkey, &'a StoredAccountMeta<'a>, Slot)>,
+        usize,
+    ) {
+        let num_accounts = stored_accounts.len();
+        let mut hashes = Vec::with_capacity(num_accounts);
+        let mut accounts = Vec::with_capacity(num_accounts);
+        // index of the first account that doesn't fit in the current append vec
+        let mut index_first_item_overflow = num_accounts; // assume all fit
+        stored_accounts.iter().for_each(|account| {
+            let account_size = account.1.account_size as u64;
+            if available_bytes >= account_size {
+                available_bytes = available_bytes.saturating_sub(account_size);
+            } else if index_first_item_overflow == num_accounts {
+                available_bytes = 0;
+                // the # of accounts we have so far seen is the most that will fit in the current ancient append vec
+                index_first_item_overflow = hashes.len();
+            }
+            hashes.push(account.1.account.hash);
+            // we have to specify 'slot' here because we are writing to an ancient append vec and squashing slots, so we need to update the previous index entry for this account from 'slot' to 'ancient_slot'
+            accounts.push((&account.1.account.meta.pubkey, &account.1.account, slot));
+        });
+        (hashes, accounts, index_first_item_overflow)
+    }
+
     fn shrink_ancient_slots(&self) {
         // let _guard = self.active_stats.activate(ActiveStatItem::ShrinkAncient);
 
@@ -3237,24 +3267,9 @@ impl AccountsDb {
                 .as_ref()
                 .map(|(a, b)| (*a, b))
                 .unwrap();
-            let mut available_bytes = ancient_store.accounts.remaining_bytes();
-            let mut hashes = Vec::with_capacity(num_accounts);
-            let mut accounts = Vec::with_capacity(num_accounts);
-            // index of the first account that doesn't fit in the current append vec
-            let mut index_first_item_overflow = num_accounts; // assume all fit
-            stored_accounts.iter().for_each(|account| {
-                let account_size = account.1.account_size as u64;
-                if available_bytes >= account_size {
-                    available_bytes = available_bytes.saturating_sub(account_size);
-                } else if index_first_item_overflow == num_accounts {
-                    available_bytes = 0;
-                    // the # of accounts we have so far seen is the most that will fit in the current ancient append vec
-                    index_first_item_overflow = hashes.len();
-                }
-                hashes.push(account.1.account.hash);
-                // we have to specify 'slot' here because we are writing to an ancient append vec and squashing slots, so we need to update the previous index entry for this account from 'slot' to 'ancient_slot'
-                accounts.push((&account.1.account.meta.pubkey, &account.1.account, slot));
-            });
+            let available_bytes = ancient_store.accounts.remaining_bytes();
+            let (hashes, accounts, index_first_item_overflow) =
+                Self::prepare_to_store(available_bytes, &stored_accounts, slot);
 
             /*
             if i % 1000 == 0 {
