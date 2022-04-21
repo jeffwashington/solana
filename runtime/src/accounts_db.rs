@@ -37,6 +37,10 @@ use {
         accounts_update_notifier_interface::AccountsUpdateNotifier,
         active_stats::{ActiveStatItem, ActiveStats},
         ancestors::Ancestors,
+        ancient_append_vecs::{
+            get_ancient_append_vec, get_ancient_append_vec_capacity, purge_squashed_stores,
+            verify_contents, AccountsToStore, StorageSelector,
+        },
         append_vec::{AppendVec, StoredAccountMeta, StoredMeta, StoredMetaWriteVersion},
         bank::Rewrites,
         cache_hash_data::CacheHashData,
@@ -183,7 +187,7 @@ pub struct AccountsDbConfig {
     pub skip_rewrites: bool,
 }
 
-struct FoundStoredAccount<'a> {
+pub struct FoundStoredAccount<'a> {
     pub account: StoredAccountMeta<'a>,
     pub store_id: AppendVecId,
     pub account_size: usize,
@@ -1091,7 +1095,7 @@ pub struct AccountsDb {
     /// Set of stores which are recently rooted or had accounts removed
     /// such that potentially a 0-lamport account update could be present which
     /// means we can remove the account from the index entirely.
-    dirty_stores: DashMap<(Slot, AppendVecId), Arc<AccountStorageEntry>>,
+    pub dirty_stores: DashMap<(Slot, AppendVecId), Arc<AccountStorageEntry>>,
 
     /// Zero-lamport accounts that are *not* purged during clean because they need to stay alive
     /// for incremental snapshot support.
@@ -1546,45 +1550,6 @@ impl<'a> ReadableAccount for StoredAccountMeta<'a> {
     }
     fn rent_epoch(&self) -> Epoch {
         self.account_meta.rent_epoch
-    }
-}
-
-struct AccountsToStore<'a> {
-    hashes: Vec<&'a Hash>,
-    accounts: Vec<(&'a Pubkey, &'a StoredAccountMeta<'a>, Slot)>,
-    index_first_item_overflow: usize,
-}
-
-impl<'a> AccountsToStore<'a> {
-    pub fn new(
-        mut available_bytes: u64,
-        stored_accounts: &'a HashMap<Pubkey, FoundStoredAccount>,
-        slot: Slot,
-    ) -> Self {
-        let num_accounts = stored_accounts.len();
-        let mut hashes = Vec::with_capacity(num_accounts);
-        let mut accounts = Vec::with_capacity(num_accounts);
-        // index of the first account that doesn't fit in the current append vec
-        let mut index_first_item_overflow = num_accounts; // assume all fit
-        stored_accounts.iter().for_each(|account| {
-            let account_size = account.1.account_size as u64;
-            if available_bytes >= account_size {
-                available_bytes = available_bytes.saturating_sub(account_size);
-            } else if index_first_item_overflow == num_accounts {
-                available_bytes = 0;
-                // the # of accounts we have so far seen is the most that will fit in the current ancient append vec
-                index_first_item_overflow = hashes.len();
-            }
-            hashes.push(account.1.account.hash);
-            // we have to specify 'slot' here because we are writing to an ancient append vec and squashing slots,
-            // so we need to update the previous accounts index entry for this account from 'slot' to 'ancient_slot'
-            accounts.push((&account.1.account.meta.pubkey, &account.1.account, slot));
-        });
-        Self {
-            hashes,
-            accounts,
-            index_first_item_overflow,
-        }
     }
 }
 
@@ -3148,24 +3113,6 @@ impl AccountsDb {
         self.combine_ancient_slots(old_slots, max_root);
     }
 
-    /// capacity of an ancient append vec
-    fn get_ancient_append_vec_capacity() -> u64 {
-        use crate::append_vec::MAXIMUM_APPEND_VEC_FILE_SIZE;
-        // smaller than max by a bit just in case
-        MAXIMUM_APPEND_VEC_FILE_SIZE - 2048
-    }
-
-    /// true iff storage is ancient size and is almost completely full
-    fn is_full_ancient(storage: &AppendVec) -> bool {
-        let threshold = 10_000; // just a guess here?
-        Self::is_ancient(storage) && storage.remaining_bytes() < threshold
-    }
-
-    /// is this a max-size append vec designed to be used as an ancient append vec?
-    fn is_ancient(storage: &AppendVec) -> bool {
-        storage.capacity() == Self::get_ancient_append_vec_capacity()
-    }
-
     /// return true if created
     fn maybe_create_ancient_append_vec(
         &self,
@@ -3176,11 +3123,11 @@ impl AccountsDb {
             // our oldest slot is not an append vec of max size, or we filled the previous one.
             // So, create a new ancient append vec at 'slot'
             let (new_ancient_storage, _time) =
-                self.get_store_for_shrink(slot, Self::get_ancient_append_vec_capacity());
+                self.get_store_for_shrink(slot, get_ancient_append_vec_capacity());
             error!(
                 "ancient_append_vec: creating initial ancient append vec: {}, size: {}, id: {}",
                 slot,
-                Self::get_ancient_append_vec_capacity(),
+                get_ancient_append_vec_capacity(),
                 new_ancient_storage.append_vec_id(),
             );
             *current_ancient_storage = Some((slot, new_ancient_storage));
@@ -3190,43 +3137,9 @@ impl AccountsDb {
         }
     }
 
-    fn get_ancient_append_vec(
-        &self,
-        all_storages: &SnapshotStorage,
-        current_ancient_storage: &mut Option<(Slot, Arc<AccountStorageEntry>)>,
-        slot: Slot,
-    ) -> Option<()> {
-        let size = Self::get_ancient_append_vec_capacity();
-        if current_ancient_storage.is_none() && all_storages.len() == 1 {
-            // maybe this is good
-            let first_storage = all_storages.first().unwrap();
-            let capacity = first_storage.accounts.capacity();
-            if Self::is_ancient(&first_storage.accounts) {
-                if Self::is_full_ancient(&first_storage.accounts) {
-                    error!("ancient_append_vec: skipping existing full ancient append vec: {}, capacity: {}, free% {}, accounts: {}, cap of expected% {}", slot, capacity, first_storage.accounts.remaining_bytes() * 100 / capacity, first_storage.count(), capacity * 100 / size);
-                    return None; // skip this full ancient append vec completely
-                }
-                error!("ancient_append_vec: reusing existing ancient append vec: {}, capacity: {}, free%: {}, accounts: {}", slot, capacity, first_storage.accounts.remaining_bytes() * 100 / capacity, first_storage.count());
-                *current_ancient_storage = Some((slot, Arc::clone(first_storage)));
-                return None; // we're done with this slot - this slot IS the ancient append vec
-            } else if capacity > size * 8 / 10 {
-                // if the existing append vec is 80% of the size we desire for ancient, then don't recopy it all
-                error!("ancient_append_vec: skipping existing LARGE NON-ancient append vec: {}, capacity: {}, free% {}, accounts: {}, id: {}, cap of expected% {}", slot, capacity, first_storage.accounts.remaining_bytes() * 100 / capacity, first_storage.count(), first_storage.append_vec_id(), capacity * 100 / size);
-                return None;
-            } else {
-                error!("ancient_append_vec: NOT reusing existing ancient append vec: {}, capacity: {}, size: {}, short: {}, id: {}", slot, capacity, size, size.saturating_sub(capacity), first_storage.append_vec_id());
-            }
-        } else if current_ancient_storage.is_none() && all_storages.len() > 1 {
-            let first_storage = all_storages.first().unwrap();
-            let capacity = first_storage.accounts.capacity();
-            error!("ancient_append_vec: we have {} storages: NOT reusing existing ancient append vec: {}, capacity: {}, size: {}, short: {}", all_storages.len(), slot, capacity, size, size.saturating_sub(capacity));
-        }
-        Some(())
-    }
-
     fn get_storages_for_slot(&self, slot: Slot) -> Option<SnapshotStorage> {
         self.storage.map.get(&slot).map(|storages| {
-            // per slot, get the storages. There should only be 1.
+            // per slot, get the storages. There should usually only be 1.
             storages
                 .value()
                 .read()
@@ -3250,7 +3163,7 @@ impl AccountsDb {
             Some(Box::new(move |_, _| ancient_store.clone())),
             None,
         );
-        self.verify_contents(ancient_store, ancient_slot, accounts);
+        verify_contents(self, ancient_store, ancient_slot, accounts);
     }
 
     /// combine all entries in 'sorted_slots' into ancient append vecs
@@ -3266,8 +3179,8 @@ impl AccountsDb {
         let mut t = Measure::start("");
         for slot in sorted_slots.iter().cloned() {
             let all_storages = match self.get_storages_for_slot(slot).and_then(|all_storages| {
-                self.get_ancient_append_vec(&all_storages, &mut current_ancient_storage, slot)
-                    .map(|_| all_storages)
+                get_ancient_append_vec(&all_storages, &mut current_ancient_storage, slot)
+                    .then(|| all_storages)
             }) {
                 Some(all_storages) => all_storages,
                 None => {
@@ -3280,7 +3193,6 @@ impl AccountsDb {
             if stored_accounts.is_empty() {
                 continue; // skipping empty slot
             }
-            let num_accounts = stored_accounts.len();
             let mut created_this_slot =
                 self.maybe_create_ancient_append_vec(&mut current_ancient_storage, slot);
             let (ancient_slot, ancient_store) = current_ancient_storage
@@ -3290,22 +3202,22 @@ impl AccountsDb {
             let available_bytes = ancient_store.accounts.remaining_bytes();
             let to_store = AccountsToStore::new(available_bytes, &stored_accounts, slot);
 
+            let (accounts, hashes) = to_store.get(StorageSelector::Primary);
             /*
             if i % 1000 == 0 {
                 error!(
                     "ancient_append_vec: writing to ancient append vec: slot: {}, # accts: {}, available bytes after: {}, distance to max: {}, id: {:?}, # stores: {}, # stores {}, original bytes: {}",
                   slot, accounts_this_append_vec.len(),
                   available_bytes, max_root.saturating_sub(slot),
-                  all_storages.iter().map(|store| (store.append_vec_id(), store.accounts.capacity(), Self::is_ancient(&store.accounts))).collect::<Vec<_>>(), all_storages.len(), num_stores, original_bytes
+                  all_storages.iter().map(|store| (store.append_vec_id(), store.accounts.capacity(), is_ancient(&store.accounts))).collect::<Vec<_>>(), all_storages.len(), num_stores, original_bytes
                 );
             }
             */
-
             if created_this_slot {
                 error!(
                     "rewrites from same slot as ancient: {}, {:?}",
                     slot,
-                    to_store.accounts[0..to_store.index_first_item_overflow]
+                    accounts
                         .iter()
                         .take(10_000)
                         .map(|(a, b, c)| (a, c, b.offset))
@@ -3315,29 +3227,11 @@ impl AccountsDb {
 
             let mut ids = vec![ancient_store.append_vec_id()];
             let mut drop_root = slot > ancient_slot;
-            let prev = if true {
-                // write what we can to the current ancient storage
-                self.store_ancient_accounts(
-                    ancient_slot,
-                    &to_store.accounts[0..to_store.index_first_item_overflow],
-                    &to_store.hashes[0..to_store.index_first_item_overflow],
-                    ancient_store,
-                );
+            // write what we can to the current ancient storage
+            self.store_ancient_accounts(ancient_slot, accounts, hashes, ancient_store);
 
-                let prev = format!(
-                    "{:?}",
-                    to_store.accounts[0..to_store.index_first_item_overflow]
-                        .iter()
-                        .take(10_000)
-                        .map(|(a, b, c)| (a, c, b.offset))
-                        .collect::<Vec<_>>()
-                );
-                prev
-            } else {
-                String::new()
-            };
-
-            if num_accounts > to_store.index_first_item_overflow {
+            let (accounts, hashes) = to_store.get(StorageSelector::Overflow);
+            if !accounts.is_empty() {
                 // we need a new ancient append vec
                 created_this_slot = true;
                 drop_root = false;
@@ -3346,7 +3240,7 @@ impl AccountsDb {
                     "slot: {}, ancient_slot: {}, remaining accounts: {}, available_bytes: {}",
                     slot,
                     ancient_slot,
-                    to_store.accounts[to_store.index_first_item_overflow..].len(),
+                    accounts.len(),
                     available_bytes
                 );
                 // our oldest slot is not an append vec of max size, so we need to start with rewriting that storage to create an ancient append vec for the oldest slot
@@ -3357,67 +3251,17 @@ impl AccountsDb {
                     .map(|(a, b)| (*a, b))
                     .unwrap();
 
-                error!("ancient_append_vec: creating ancient append vec because previous one was full: {}, full one: {}, additional: {}, {}, items in full one: {} {}", slot, ancient_slot, to_store.accounts[to_store.index_first_item_overflow..].len(), to_store.hashes[to_store.index_first_item_overflow..].len(), ancient_store.count(), ancient_store.approx_stored_count());
                 ids.push(ancient_store.append_vec_id());
-                if created_this_slot {
-                    error!(
-                        "rewrites2 from same slot as ancient_previous: {}, {:?}",
-                        slot, prev
-                    );
-                    error!(
-                        "rewrites2 from same slot as ancient: {}, {:?}",
-                        slot,
-                        to_store.accounts[to_store.index_first_item_overflow..]
-                            .iter()
-                            .take(10_000)
-                            .map(|(a, b, c)| (a, c, b.offset))
-                            .collect::<Vec<_>>()
-                    );
-                }
 
                 // write the rest to the next ancient storage
-                self.store_ancient_accounts(
-                    ancient_slot,
-                    &to_store.accounts[to_store.index_first_item_overflow..],
-                    &to_store.hashes[to_store.index_first_item_overflow..],
-                    ancient_store,
-                );
+                self.store_ancient_accounts(ancient_slot, accounts, hashes, ancient_store);
             }
 
             // Purge old, overwritten storage entries
-            let mut dead_storages = Vec::default();
             let mut start = Measure::start("write_storage_elapsed");
-            if let Some(slot_stores) = self.storage.get_slot_stores(slot) {
-                let mut stores = slot_stores.write().unwrap();
-                stores.retain(|_key, store| {
-                    if store.count() == 0 || !ids.contains(&store.append_vec_id()) {
-                        self.dirty_stores
-                            .insert((slot, store.append_vec_id()), store.clone());
-                        dead_storages.push(store.clone());
-                        if created_this_slot {
-                            error!(
-                                "ancient_append_vec: NOT retaining store: {}, slot: {}",
-                                store.append_vec_id(),
-                                slot
-                            );
-                        }
-                        //error!("reset append_vec: {}", store.append_vec_id());
-                        store.accounts.reset();
-                        false
-                    } else {
-                        if created_this_slot {
-                            error!(
-                                "ancient_append_vec: retaining store: {}, slot: {}",
-                                store.append_vec_id(),
-                                slot
-                            );
-                        }
-                        true
-                    }
-                });
-                if stores.is_empty() {
-                    dropped_roots_storages.push(slot);
-                }
+            let mut dead_storages = purge_squashed_stores(self, &mut drop_root, slot, &ids);
+            if drop_root {
+                dropped_roots_storages.push(slot);
             }
             start.stop();
 
@@ -3457,90 +3301,6 @@ impl AccountsDb {
             sorted_slots.len(),
             t.as_ms()
         );
-    }
-    fn verify_contents<'a>(
-        &self,
-        writer: &Arc<AccountStorageEntry>,
-        append_vec_slot: Slot,
-        recent: &[(&Pubkey, &StoredAccountMeta<'a>, u64)],
-    ) {
-        //if true {
-        let store_id = writer.append_vec_id();
-        for c in recent {
-            if let AccountIndexGetResult::Found(g, _) =
-                self.accounts_index.get(c.0, None, Some(append_vec_slot))
-            {
-                assert!(
-                    g.slot_list().iter().any(|(slot, info)| {
-                        if slot == &append_vec_slot {
-                            assert_eq!(info.store_id(), store_id);
-                            true
-                        } else {
-                            false
-                        }
-                    }),
-                    "{}, {:?}, id: {}",
-                    c.0,
-                    g.slot_list(),
-                    writer.append_vec_id()
-                )
-            } else {
-                panic!("not found: {}", c.0);
-            }
-        }
-        /* } else if true {
-            let mut start = 0;
-            let store_id = writer.append_vec_id();
-            let mut current = 0;
-            while let Some((account, next)) = writer.accounts.get_account(start) {
-                let _account_size = next - start;
-                let c = &recent[current];
-                if c.0 == &account.meta.pubkey {
-                    match self
-                        .accounts_index
-                        .get(&account.meta.pubkey, None, Some(append_vec_slot))
-                    {
-                        AccountIndexGetResult::Found(g, _) => assert!(
-                            g.slot_list().iter().any(|(slot, info)| {
-                                if slot == &append_vec_slot {
-                                    assert_eq!(info.store_id(), store_id);
-                                    true
-                                } else {
-                                    false
-                                }
-                            }),
-                            "{}, {:?}, id: {}",
-                            account.meta.pubkey,
-                            g.slot_list(),
-                            writer.append_vec_id()
-                        ),
-                        _ => {}
-                    }
-                    current += 1;
-                }
-                start = next;
-            }
-            assert_eq!(current, recent.len());
-        } else {
-            let temp = Arc::clone(writer);
-            let temp2 = [temp];
-            let (stored_accounts, _num_stores, _original_bytes) =
-                self.get_unique_accounts_from_storages(temp2.iter());
-            for (pubkey, found) in stored_accounts.iter() {
-                match self.accounts_index.get(pubkey, None, Some(append_vec_slot)) {
-                    AccountIndexGetResult::Found(g, _) => assert!(
-                        g.slot_list().iter().any(|(slot, info)| {
-                            slot == &append_vec_slot && info.store_id() == found.store_id
-                        }),
-                        "{}, {:?}, id: {}",
-                        pubkey,
-                        g.slot_list(),
-                        writer.append_vec_id()
-                    ),
-                    _ => {}
-                }
-            }
-        }*/
     }
 
     pub fn shrink_candidate_slots(&self) -> usize {
