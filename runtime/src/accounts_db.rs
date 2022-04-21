@@ -3129,7 +3129,7 @@ impl AccountsDb {
             .iter()
             .filter_map(|k| {
                 let slot = *k.key() as Slot;
-                if slot <= old_root {
+                if slot < old_root {
                     Some(slot)
                 } else {
                     None
@@ -3140,17 +3140,6 @@ impl AccountsDb {
         old_slots.sort_unstable();
         // old_slots.truncate(3); // artificially limit to 3 slots
         self.combine_ancient_slots(old_slots, max_root);
-        /*
-        if false {
-            let _x: Vec<usize> = self.range_scan_accounts(
-                "dummy",
-                &Ancestors::default(),
-                Pubkey::default()..=Pubkey::new(&[0xff; 32]),
-                &ScanConfig::default(),
-                |_dummy, _got| {},
-            );
-        }
-        */
     }
 
     /// capacity of an ancient append vec
@@ -3265,7 +3254,7 @@ impl AccountsDb {
         let mut dropped_roots_storages = vec![];
 
         if let Some(first_slot) = sorted_slots.first() {
-            error!("ancient_append_vec: combine_ancient_slots max_root: {}, first slot: {}, distance from max: {}", max_root, first_slot, max_root.saturating_sub(*first_slot));
+            error!("ancient_append_vec: combine_ancient_slots max_root: {}, first slot: {}, distance from max: {}, num_roots: {}", max_root, first_slot, max_root.saturating_sub(*first_slot), sorted_slots.len());
         }
 
         let mut t = Measure::start("");
@@ -13250,6 +13239,7 @@ pub mod tests {
     }
 
     fn run_test_shrink_unref(do_intra_cache_clean: bool) {
+        solana_logger::setup();
         // Enable caching so that we use the straightforward implementation
         // of shrink that will shrink all candidate slots
         let caching_enabled = true;
