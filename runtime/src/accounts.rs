@@ -1400,6 +1400,7 @@ mod tests {
             inner_instructions: None,
             durable_nonce_fee: nonce.map(DurableNonceFee::from),
             return_data: None,
+            executed_units: 0u64,
         })
     }
 
