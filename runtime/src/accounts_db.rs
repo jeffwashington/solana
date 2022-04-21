@@ -3167,10 +3167,9 @@ impl AccountsDb {
         let mut dropped_roots_storages = vec![];
 
         if let Some(first_slot) = sorted_slots.first() {
-            error!("ancient_append_vec: combine_ancient_slots max_root: {}, first slot: {}, distance from max: {}, num_roots: {}", max_root, first_slot, max_root.saturating_sub(*first_slot), sorted_slots.len());
+            info!("ancient_append_vec: combine_ancient_slots max_root: {}, first slot: {}, distance from max: {}, num_roots: {}", max_root, first_slot, max_root.saturating_sub(*first_slot), sorted_slots.len());
         }
 
-        let mut t = Measure::start("");
         for slot in sorted_slots.iter().cloned() {
             let all_storages = match self.get_storages_for_slot(slot).and_then(|all_storages| {
                 get_ancient_append_vec(&all_storages, &mut current_ancient_storage, slot)
@@ -3187,8 +3186,7 @@ impl AccountsDb {
             if stored_accounts.is_empty() {
                 continue; // skipping empty slot
             }
-            let mut created_this_slot =
-                self.maybe_create_ancient_append_vec(&mut current_ancient_storage, slot);
+            self.maybe_create_ancient_append_vec(&mut current_ancient_storage, slot);
             let (ancient_slot, ancient_store) = current_ancient_storage
                 .as_ref()
                 .map(|(a, b)| (*a, b))
@@ -3196,38 +3194,17 @@ impl AccountsDb {
             let available_bytes = ancient_store.accounts.remaining_bytes();
             let to_store = AccountsToStore::new(available_bytes, &stored_accounts, slot);
 
-            let (accounts, hashes) = to_store.get(StorageSelector::Primary);
-            /*
-            if i % 1000 == 0 {
-                error!(
-                    "ancient_append_vec: writing to ancient append vec: slot: {}, # accts: {}, available bytes after: {}, distance to max: {}, id: {:?}, # stores: {}, # stores {}, original bytes: {}",
-                  slot, accounts_this_append_vec.len(),
-                  available_bytes, max_root.saturating_sub(slot),
-                  all_storages.iter().map(|store| (store.append_vec_id(), store.accounts.capacity(), is_ancient(&store.accounts))).collect::<Vec<_>>(), all_storages.len(), num_stores, original_bytes
-                );
-            }
-            */
-            if created_this_slot {
-                error!(
-                    "rewrites from same slot as ancient: {}, {:?}",
-                    slot,
-                    accounts
-                        .iter()
-                        .take(10_000)
-                        .map(|(a, b, c)| (a, c, b.offset))
-                        .collect::<Vec<_>>()
-                );
-            }
-
             let mut ids = vec![ancient_store.append_vec_id()];
+            // if this slot is not the ancient slot we're writing to, then this root will be dropped
             let mut drop_root = slot > ancient_slot;
             // write what we can to the current ancient storage
+            let (accounts, hashes) = to_store.get(StorageSelector::Primary);
             self.store_ancient_accounts(ancient_slot, accounts, hashes, ancient_store);
 
             let (accounts, hashes) = to_store.get(StorageSelector::Overflow);
             if !accounts.is_empty() {
                 // we need a new ancient append vec
-                created_this_slot = true;
+                // now that this slot will be used to create a new ancient append vec, there will still be a root present at this slot
                 drop_root = false;
                 assert!(
                     slot > ancient_slot,
@@ -3270,31 +3247,11 @@ impl AccountsDb {
 
         if !dropped_roots.is_empty() {
             // todo: afterwards, we need to remove the roots sometime
-            error!(
-                "ancient_append_vec: dropping roots: first {:?}, last {:?}, len {:?}, ",
-                dropped_roots.first(),
-                dropped_roots.last(),
-                dropped_roots.len()
-            );
             dropped_roots.iter().for_each(|slot| {
                 self.accounts_index
                     .clean_dead_slot(*slot, &mut AccountsIndexRootsStats::default());
             });
         }
-        error!(
-            "ancient_append_vec: purge_dead_slots_from_storage: first {:?}, last {:?}, len {:?}, ",
-            dropped_roots_storages.first(),
-            dropped_roots_storages.last(),
-            dropped_roots_storages.len()
-        );
-        self.purge_dead_slots_from_storage(dropped_roots_storages.iter(), &PurgeStats::default());
-
-        t.stop();
-        error!(
-            "ancient_append_vec: done. slots: {:?}, time(ms): {}",
-            sorted_slots.len(),
-            t.as_ms()
-        );
     }
 
     pub fn shrink_candidate_slots(&self) -> usize {
