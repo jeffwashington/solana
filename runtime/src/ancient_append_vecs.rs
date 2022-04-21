@@ -8,7 +8,6 @@ use {
         accounts_index::AccountIndexGetResult,
         append_vec::{AppendVec, StoredAccountMeta},
     },
-    log::*,
     solana_sdk::{clock::Slot, hash::Hash, pubkey::Pubkey},
     std::{collections::HashMap, sync::Arc},
 };
@@ -185,30 +184,15 @@ pub fn get_ancient_append_vec(
     current_ancient_storage: &mut Option<(Slot, Arc<AccountStorageEntry>)>,
     slot: Slot,
 ) -> bool {
-    let size = get_ancient_append_vec_capacity();
     if current_ancient_storage.is_none() && all_storages.len() == 1 {
-        // maybe this is good
         let first_storage = all_storages.first().unwrap();
-        let capacity = first_storage.accounts.capacity();
         if is_ancient(&first_storage.accounts) {
             if is_full_ancient(&first_storage.accounts) {
-                error!("ancient_append_vec: skipping existing full ancient append vec: {}, capacity: {}, free% {}, accounts: {}, cap of expected% {}", slot, capacity, first_storage.accounts.remaining_bytes() * 100 / capacity, first_storage.count(), capacity * 100 / size);
                 return false; // skip this full ancient append vec completely
             }
-            error!("ancient_append_vec: reusing existing ancient append vec: {}, capacity: {}, free%: {}, accounts: {}", slot, capacity, first_storage.accounts.remaining_bytes() * 100 / capacity, first_storage.count());
             *current_ancient_storage = Some((slot, Arc::clone(first_storage)));
             return false; // we're done with this slot - this slot IS the ancient append vec
-        } else if capacity > size * 8 / 10 {
-            // if the existing append vec is 80% of the size we desire for ancient, then don't recopy it all
-            error!("ancient_append_vec: skipping existing LARGE NON-ancient append vec: {}, capacity: {}, free% {}, accounts: {}, id: {}, cap of expected% {}", slot, capacity, first_storage.accounts.remaining_bytes() * 100 / capacity, first_storage.count(), first_storage.append_vec_id(), capacity * 100 / size);
-            return false;
-        } else {
-            error!("ancient_append_vec: NOT reusing existing ancient append vec: {}, capacity: {}, size: {}, short: {}, id: {}", slot, capacity, size, size.saturating_sub(capacity), first_storage.append_vec_id());
         }
-    } else if current_ancient_storage.is_none() && all_storages.len() > 1 {
-        let first_storage = all_storages.first().unwrap();
-        let capacity = first_storage.accounts.capacity();
-        error!("ancient_append_vec: we have {} storages: NOT reusing existing ancient append vec: {}, capacity: {}, size: {}, short: {}", all_storages.len(), slot, capacity, size, size.saturating_sub(capacity));
     }
     true
 }
