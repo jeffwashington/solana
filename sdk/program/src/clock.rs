@@ -1,4 +1,4 @@
-//! Provides information about the network's clock which is made up of ticks, slots, etc...
+//! Information about the network's clock, ticks, slots, etc.
 
 use {
     crate::{clone_zeroed, copy_field},
