@@ -3096,7 +3096,7 @@ impl AccountsDb {
     }
 
     fn shrink_ancient_slots(&self) {
-        // let _guard = self.active_stats.activate(ActiveStatItem::ShrinkAncient);
+        let _guard = self.active_stats.activate(ActiveStatItem::ShrinkAncient);
 
         let max_root = self.accounts_index.max_root_inclusive();
         use solana_sdk::clock::DEFAULT_SLOTS_PER_EPOCH;
