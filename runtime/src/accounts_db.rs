@@ -3079,7 +3079,7 @@ impl AccountsDb {
         (shrink_slots, shrink_slots_next_batch)
     }
 
-    fn get_roots_less_than(&self, slot: Slot) {
+    fn get_roots_less_than(&self, slot: Slot) -> Vec<Slot> {
         self.accounts_index
             .roots_tracker
             .read()
@@ -3089,7 +3089,7 @@ impl AccountsDb {
     }
 
     fn shrink_ancient_slots(&self) {
-        let _guard = self.active_stats.activate(ActiveStatItem::ShrinkAncient);
+        let _guard = self.active_stats.activate(ActiveStatItem::SquashAncient);
 
         let max_root = self.accounts_index.max_root_inclusive();
         let epoch_width = solana_sdk::clock::DEFAULT_SLOTS_PER_EPOCH;
@@ -3155,13 +3155,21 @@ impl AccountsDb {
 
     /// combine all entries in 'sorted_slots' into ancient append vecs
     fn combine_ancient_slots(&self, sorted_slots: Vec<Slot>, max_root: Slot) {
+        let higher_slot_squash = true;
+        let num_slots = sorted_slots.len();
         let mut current_ancient_storage = None;
         let mut dropped_roots = vec![];
         if let Some(first_slot) = sorted_slots.first() {
             info!("ancient_append_vec: combine_ancient_slots max_root: {}, first slot: {}, distance from max: {}, num_roots: {}", max_root, first_slot, max_root.saturating_sub(*first_slot), sorted_slots.len());
         }
 
-        for slot in sorted_slots.iter().cloned() {
+        for i in 0..num_slots {
+            let i = if higher_slot_squash {
+                num_slots - i - 1
+            } else {
+                i
+            };
+            let slot = sorted_slots[i];
             let all_storages = match self.get_storages_for_slot(slot).and_then(|all_storages| {
                 get_ancient_append_vec(&all_storages, &mut current_ancient_storage, slot)
                     .then(|| all_storages)
