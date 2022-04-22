@@ -3164,8 +3164,6 @@ impl AccountsDb {
     fn combine_ancient_slots(&self, sorted_slots: Vec<Slot>, max_root: Slot) {
         let mut current_ancient_storage = None;
         let mut dropped_roots = vec![];
-        let mut dropped_roots_storages = vec![];
-
         if let Some(first_slot) = sorted_slots.first() {
             info!("ancient_append_vec: combine_ancient_slots max_root: {}, first slot: {}, distance from max: {}, num_roots: {}", max_root, first_slot, max_root.saturating_sub(*first_slot), sorted_slots.len());
         }
@@ -3231,9 +3229,6 @@ impl AccountsDb {
             // Purge old, overwritten storage entries
             let mut start = Measure::start("write_storage_elapsed");
             let mut dead_storages = purge_squashed_stores(self, &mut drop_root, slot, &ids);
-            if drop_root {
-                dropped_roots_storages.push(slot);
-            }
             start.stop();
 
             dead_storages.extend(all_storages.iter().map(Arc::clone));
