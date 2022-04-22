@@ -398,7 +398,10 @@ impl ExpectedRentCollection {
 
         let partition_from_pubkey =
             crate::bank::Bank::partition_from_pubkey(pubkey, slots_per_epoch);
-        if partition_from_pubkey > 10_000 {
+            /*
+            10_000 failed
+            */
+        if partition_from_pubkey > 5_000 {
             return None;
         }
         
