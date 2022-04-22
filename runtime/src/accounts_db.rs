@@ -38,8 +38,8 @@ use {
         active_stats::{ActiveStatItem, ActiveStats},
         ancestors::Ancestors,
         ancient_append_vecs::{
-            get_ancient_append_vec, get_ancient_append_vec_capacity, purge_squashed_stores,
-            verify_contents, AccountsToStore, StorageSelector,
+            get_ancient_append_vec, get_ancient_append_vec_capacity, is_ancient,
+            purge_squashed_stores, verify_contents, AccountsToStore, StorageSelector,
         },
         append_vec::{AppendVec, StoredAccountMeta, StoredMeta, StoredMetaWriteVersion},
         bank::Rewrites,
@@ -5609,6 +5609,14 @@ impl AccountsDb {
             stats
                 .accounts_in_roots_older_than_epoch
                 .fetch_add(num_accounts, Ordering::Relaxed);
+                let ancients = sub_storages
+                        .iter()
+                        .map(|storage| if is_ancient(&storage.accounts) { 1 } else { 0 })
+                        .sum();
+            stats
+                .ancient_append_vecs
+                .fetch_add(ancients, Ordering::Relaxed);
+
         }
     }
 
