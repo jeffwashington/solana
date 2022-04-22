@@ -401,8 +401,10 @@ impl ExpectedRentCollection {
             /*
             10_000 failed
             5000 failed
+            2500 failed
+            300
             */
-        if partition_from_pubkey > 2500 {
+        if partition_from_pubkey > 300 {
             return None;
         }
         
