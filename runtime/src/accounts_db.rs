@@ -3080,8 +3080,7 @@ impl AccountsDb {
     }
 
     fn get_roots_less_than(&self, slot: Slot) {
-        self
-            .accounts_index
+        self.accounts_index
             .roots_tracker
             .read()
             .unwrap()
@@ -3193,9 +3192,9 @@ impl AccountsDb {
             let mut drop_root = slot > ancient_slot;
 
             {
-            // write what we can to the current ancient storage
-            let (accounts, hashes) = to_store.get(StorageSelector::Primary);
-            self.store_ancient_accounts(ancient_slot, accounts, hashes, ancient_store);
+                // write what we can to the current ancient storage
+                let (accounts, hashes) = to_store.get(StorageSelector::Primary);
+                self.store_ancient_accounts(ancient_slot, accounts, hashes, ancient_store);
             }
 
             // handle accounts from 'slot' which did not fit into the current ancient append vec
