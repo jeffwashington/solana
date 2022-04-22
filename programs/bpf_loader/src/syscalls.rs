@@ -314,7 +314,7 @@ pub fn bind_syscall_context_objects<'a, 'b>(
 
     vm.bind_syscall_context_object(
         Box::new(SyscallAbort {
-            _invoke_context: invoke_context.clone(),
+            invoke_context: invoke_context.clone(),
         }),
         None,
     )?;
@@ -651,14 +651,33 @@ fn translate_string_and_do(
     }
 }
 
-/// Abort syscall functions, called when the BPF program calls `abort()`
-/// LLVM will insert calls to `abort()` if it detects an untenable situation,
-/// `abort()` is not intended to be called explicitly by the program.
-/// Causes the BPF program to be halted immediately
-pub struct SyscallAbort<'a, 'b> {
-    _invoke_context: Rc<RefCell<&'a mut InvokeContext<'b>>>,
+type SyscallContext<'a, 'b> = Rc<RefCell<&'a mut InvokeContext<'b>>>;
+
+macro_rules! declare_syscall {
+    ($(#[$attr:meta])* $name:ident, $call:item) => {
+        $(#[$attr])*
+        pub struct $name<'a, 'b> {
+            invoke_context: SyscallContext<'a, 'b>,
+        }
+        impl<'a, 'b> $name<'a, 'b> {
+            pub fn init(
+                invoke_context: SyscallContext<'a, 'b>,
+            ) -> Box<(dyn SyscallObject<BpfError> + 'a)> {
+                Box::new(Self { invoke_context })
+            }
+        }
+        impl<'a, 'b> SyscallObject<BpfError> for $name<'a, 'b> {
+            $call
+        }
+    };
 }
-impl<'a, 'b> SyscallObject<BpfError> for SyscallAbort<'a, 'b> {
+
+declare_syscall!(
+    /// Abort syscall functions, called when the BPF program calls `abort()`
+    /// LLVM will insert calls to `abort()` if it detects an untenable situation,
+    /// `abort()` is not intended to be called explicitly by the program.
+    /// Causes the BPF program to be halted immediately
+    SyscallAbort,
     fn call(
         &mut self,
         _arg1: u64,
@@ -671,15 +690,12 @@ impl<'a, 'b> SyscallObject<BpfError> for SyscallAbort<'a, 'b> {
     ) {
         *result = Err(SyscallError::Abort.into());
     }
-}
+);
 
-/// Panic syscall function, called when the BPF program calls 'sol_panic_()`
-/// Causes the BPF program to be halted immediately
-/// Log a user's info message
-pub struct SyscallPanic<'a, 'b> {
-    invoke_context: Rc<RefCell<&'a mut InvokeContext<'b>>>,
-}
-impl<'a, 'b> SyscallObject<BpfError> for SyscallPanic<'a, 'b> {
+declare_syscall!(
+    /// Panic syscall function, called when the BPF program calls 'sol_panic_()`
+    /// Causes the BPF program to be halted immediately
+    SyscallPanic,
     fn call(
         &mut self,
         file: u64,
@@ -712,13 +728,11 @@ impl<'a, 'b> SyscallObject<BpfError> for SyscallPanic<'a, 'b> {
             &mut |string: &str| Err(SyscallError::Panic(string.to_string(), line, column).into()),
         );
     }
-}
+);
 
-/// Log a user's info message
-pub struct SyscallLog<'a, 'b> {
-    invoke_context: Rc<RefCell<&'a mut InvokeContext<'b>>>,
-}
-impl<'a, 'b> SyscallObject<BpfError> for SyscallLog<'a, 'b> {
+declare_syscall!(
+    /// Log a user's info message
+    SyscallLog,
     fn call(
         &mut self,
         addr: u64,
@@ -764,13 +778,11 @@ impl<'a, 'b> SyscallObject<BpfError> for SyscallLog<'a, 'b> {
         );
         *result = Ok(0);
     }
-}
+);
 
-/// Log 5 64-bit values
-pub struct SyscallLogU64<'a, 'b> {
-    invoke_context: Rc<RefCell<&'a mut InvokeContext<'b>>>,
-}
-impl<'a, 'b> SyscallObject<BpfError> for SyscallLogU64<'a, 'b> {
+declare_syscall!(
+    /// Log 5 64-bit values
+    SyscallLogU64,
     fn call(
         &mut self,
         arg1: u64,
@@ -799,13 +811,11 @@ impl<'a, 'b> SyscallObject<BpfError> for SyscallLogU64<'a, 'b> {
         );
         *result = Ok(0);
     }
-}
+);
 
-/// Log current compute consumption
-pub struct SyscallLogBpfComputeUnits<'a, 'b> {
-    invoke_context: Rc<RefCell<&'a mut InvokeContext<'b>>>,
-}
-impl<'a, 'b> SyscallObject<BpfError> for SyscallLogBpfComputeUnits<'a, 'b> {
+declare_syscall!(
+    /// Log current compute consumption
+    SyscallLogBpfComputeUnits,
     fn call(
         &mut self,
         _arg1: u64,
@@ -839,13 +849,11 @@ impl<'a, 'b> SyscallObject<BpfError> for SyscallLogBpfComputeUnits<'a, 'b> {
         );
         *result = Ok(0);
     }
-}
+);
 
-/// Log 5 64-bit values
-pub struct SyscallLogPubkey<'a, 'b> {
-    invoke_context: Rc<RefCell<&'a mut InvokeContext<'b>>>,
-}
-impl<'a, 'b> SyscallObject<BpfError> for SyscallLogPubkey<'a, 'b> {
+declare_syscall!(
+    /// Log 5 64-bit values
+    SyscallLogPubkey,
     fn call(
         &mut self,
         pubkey_addr: u64,
@@ -876,18 +884,16 @@ impl<'a, 'b> SyscallObject<BpfError> for SyscallLogPubkey<'a, 'b> {
         stable_log::program_log(&invoke_context.get_log_collector(), &pubkey.to_string());
         *result = Ok(0);
     }
-}
+);
 
-/// Dynamic memory allocation syscall called when the BPF program calls
-/// `sol_alloc_free_()`.  The allocator is expected to allocate/free
-/// from/to a given chunk of memory and enforce size restrictions.  The
-/// memory chunk is given to the allocator during allocator creation and
-/// information about that memory (start address and size) is passed
-/// to the VM to use for enforcement.
-pub struct SyscallAllocFree<'a, 'b> {
-    invoke_context: Rc<RefCell<&'a mut InvokeContext<'b>>>,
-}
-impl<'a, 'b> SyscallObject<BpfError> for SyscallAllocFree<'a, 'b> {
+declare_syscall!(
+    /// Dynamic memory allocation syscall called when the BPF program calls
+    /// `sol_alloc_free_()`.  The allocator is expected to allocate/free
+    /// from/to a given chunk of memory and enforce size restrictions.  The
+    /// memory chunk is given to the allocator during allocator creation and
+    /// information about that memory (start address and size) is passed
+    /// to the VM to use for enforcement.
+    SyscallAllocFree,
     fn call(
         &mut self,
         size: u64,
@@ -939,7 +945,7 @@ impl<'a, 'b> SyscallObject<BpfError> for SyscallAllocFree<'a, 'b> {
             Ok(0)
         };
     }
-}
+);
 
 fn translate_and_check_program_address_inputs<'a>(
     seeds_addr: u64,
@@ -978,11 +984,9 @@ fn translate_and_check_program_address_inputs<'a>(
     Ok((seeds, program_id))
 }
 
-/// Create a program address
-struct SyscallCreateProgramAddress<'a, 'b> {
-    invoke_context: Rc<RefCell<&'a mut InvokeContext<'b>>>,
-}
-impl<'a, 'b> SyscallObject<BpfError> for SyscallCreateProgramAddress<'a, 'b> {
+declare_syscall!(
+    /// Create a program address
+    SyscallCreateProgramAddress,
     fn call(
         &mut self,
         seeds_addr: u64,
@@ -1036,13 +1040,11 @@ impl<'a, 'b> SyscallObject<BpfError> for SyscallCreateProgramAddress<'a, 'b> {
         address.copy_from_slice(new_address.as_ref());
         *result = Ok(0);
     }
-}
+);
 
-/// Create a program address
-struct SyscallTryFindProgramAddress<'a, 'b> {
-    invoke_context: Rc<RefCell<&'a mut InvokeContext<'b>>>,
-}
-impl<'a, 'b> SyscallObject<BpfError> for SyscallTryFindProgramAddress<'a, 'b> {
+declare_syscall!(
+    /// Create a program address
+    SyscallTryFindProgramAddress,
     fn call(
         &mut self,
         seeds_addr: u64,
@@ -1114,13 +1116,11 @@ impl<'a, 'b> SyscallObject<BpfError> for SyscallTryFindProgramAddress<'a, 'b> {
         }
         *result = Ok(1);
     }
-}
+);
 
-/// SHA256
-pub struct SyscallSha256<'a, 'b> {
-    invoke_context: Rc<RefCell<&'a mut InvokeContext<'b>>>,
-}
-impl<'a, 'b> SyscallObject<BpfError> for SyscallSha256<'a, 'b> {
+declare_syscall!(
+    /// SHA256
+    SyscallSha256,
     fn call(
         &mut self,
         vals_addr: u64,
@@ -1213,7 +1213,7 @@ impl<'a, 'b> SyscallObject<BpfError> for SyscallSha256<'a, 'b> {
         hash_result.copy_from_slice(&hasher.result().to_bytes());
         *result = Ok(0);
     }
-}
+);
 
 fn get_sysvar<T: std::fmt::Debug + Sysvar + SysvarId + Clone>(
     sysvar: Result<Arc<T>, InstructionError>,
@@ -1236,11 +1236,9 @@ fn get_sysvar<T: std::fmt::Debug + Sysvar + SysvarId + Clone>(
     Ok(SUCCESS)
 }
 
-/// Get a Clock sysvar
-struct SyscallGetClockSysvar<'a, 'b> {
-    invoke_context: Rc<RefCell<&'a mut InvokeContext<'b>>>,
-}
-impl<'a, 'b> SyscallObject<BpfError> for SyscallGetClockSysvar<'a, 'b> {
+declare_syscall!(
+    /// Get a Clock sysvar
+    SyscallGetClockSysvar,
     fn call(
         &mut self,
         var_addr: u64,
@@ -1265,12 +1263,11 @@ impl<'a, 'b> SyscallObject<BpfError> for SyscallGetClockSysvar<'a, 'b> {
             &mut invoke_context,
         );
     }
-}
-/// Get a EpochSchedule sysvar
-struct SyscallGetEpochScheduleSysvar<'a, 'b> {
-    invoke_context: Rc<RefCell<&'a mut InvokeContext<'b>>>,
-}
-impl<'a, 'b> SyscallObject<BpfError> for SyscallGetEpochScheduleSysvar<'a, 'b> {
+);
+
+declare_syscall!(
+    /// Get a EpochSchedule sysvar
+    SyscallGetEpochScheduleSysvar,
     fn call(
         &mut self,
         var_addr: u64,
@@ -1295,13 +1292,11 @@ impl<'a, 'b> SyscallObject<BpfError> for SyscallGetEpochScheduleSysvar<'a, 'b> {
             &mut invoke_context,
         );
     }
-}
-/// Get a Fees sysvar
-struct SyscallGetFeesSysvar<'a, 'b> {
-    invoke_context: Rc<RefCell<&'a mut InvokeContext<'b>>>,
-}
-#[allow(deprecated)]
-impl<'a, 'b> SyscallObject<BpfError> for SyscallGetFeesSysvar<'a, 'b> {
+);
+
+declare_syscall!(
+    /// Get a Fees sysvar
+    SyscallGetFeesSysvar,
     fn call(
         &mut self,
         var_addr: u64,
@@ -1318,20 +1313,22 @@ impl<'a, 'b> SyscallObject<BpfError> for SyscallGetFeesSysvar<'a, 'b> {
                 .map_err(|_| SyscallError::InvokeContextBorrowFailed),
             result
         );
-        *result = get_sysvar(
-            invoke_context.get_sysvar_cache().get_fees(),
-            var_addr,
-            invoke_context.get_check_aligned(),
-            memory_mapping,
-            &mut invoke_context,
-        );
+        #[allow(deprecated)]
+        {
+            *result = get_sysvar(
+                invoke_context.get_sysvar_cache().get_fees(),
+                var_addr,
+                invoke_context.get_check_aligned(),
+                memory_mapping,
+                &mut invoke_context,
+            );
+        }
     }
-}
-/// Get a Rent sysvar
-struct SyscallGetRentSysvar<'a, 'b> {
-    invoke_context: Rc<RefCell<&'a mut InvokeContext<'b>>>,
-}
-impl<'a, 'b> SyscallObject<BpfError> for SyscallGetRentSysvar<'a, 'b> {
+);
+
+declare_syscall!(
+    /// Get a Rent sysvar
+    SyscallGetRentSysvar,
     fn call(
         &mut self,
         var_addr: u64,
@@ -1356,13 +1353,11 @@ impl<'a, 'b> SyscallObject<BpfError> for SyscallGetRentSysvar<'a, 'b> {
             &mut invoke_context,
         );
     }
-}
+);
 
-// Keccak256
-pub struct SyscallKeccak256<'a, 'b> {
-    invoke_context: Rc<RefCell<&'a mut InvokeContext<'b>>>,
-}
-impl<'a, 'b> SyscallObject<BpfError> for SyscallKeccak256<'a, 'b> {
+declare_syscall!(
+    // Keccak256
+    SyscallKeccak256,
     fn call(
         &mut self,
         vals_addr: u64,
@@ -1455,7 +1450,7 @@ impl<'a, 'b> SyscallObject<BpfError> for SyscallKeccak256<'a, 'b> {
         hash_result.copy_from_slice(&hasher.result().to_bytes());
         *result = Ok(0);
     }
-}
+);
 
 /// This function is incorrect due to arithmetic overflow and only exists for
 /// backwards compatibility. Instead use program_stubs::is_nonoverlapping.
@@ -1483,11 +1478,9 @@ fn mem_op_consume<'a, 'b>(
     invoke_context.get_compute_meter().consume(cost)
 }
 
-/// memcpy
-pub struct SyscallMemcpy<'a, 'b> {
-    invoke_context: Rc<RefCell<&'a mut InvokeContext<'b>>>,
-}
-impl<'a, 'b> SyscallObject<BpfError> for SyscallMemcpy<'a, 'b> {
+declare_syscall!(
+    /// memcpy
+    SyscallMemcpy,
     fn call(
         &mut self,
         dst_addr: u64,
@@ -1576,12 +1569,11 @@ impl<'a, 'b> SyscallObject<BpfError> for SyscallMemcpy<'a, 'b> {
         }
         *result = Ok(0);
     }
-}
-/// memmove
-pub struct SyscallMemmove<'a, 'b> {
-    invoke_context: Rc<RefCell<&'a mut InvokeContext<'b>>>,
-}
-impl<'a, 'b> SyscallObject<BpfError> for SyscallMemmove<'a, 'b> {
+);
+
+declare_syscall!(
+    /// memmove
+    SyscallMemmove,
     fn call(
         &mut self,
         dst_addr: u64,
@@ -1625,12 +1617,11 @@ impl<'a, 'b> SyscallObject<BpfError> for SyscallMemmove<'a, 'b> {
         }
         *result = Ok(0);
     }
-}
-/// memcmp
-pub struct SyscallMemcmp<'a, 'b> {
-    invoke_context: Rc<RefCell<&'a mut InvokeContext<'b>>>,
-}
-impl<'a, 'b> SyscallObject<BpfError> for SyscallMemcmp<'a, 'b> {
+);
+
+declare_syscall!(
+    /// memcmp
+    SyscallMemcmp,
     fn call(
         &mut self,
         s1_addr: u64,
@@ -1701,12 +1692,11 @@ impl<'a, 'b> SyscallObject<BpfError> for SyscallMemcmp<'a, 'b> {
         *cmp_result = 0;
         *result = Ok(0);
     }
-}
-/// memset
-pub struct SyscallMemset<'a, 'b> {
-    invoke_context: Rc<RefCell<&'a mut InvokeContext<'b>>>,
-}
-impl<'a, 'b> SyscallObject<BpfError> for SyscallMemset<'a, 'b> {
+);
+
+declare_syscall!(
+    /// memset
+    SyscallMemset,
     fn call(
         &mut self,
         s_addr: u64,
@@ -1740,13 +1730,11 @@ impl<'a, 'b> SyscallObject<BpfError> for SyscallMemset<'a, 'b> {
         }
         *result = Ok(0);
     }
-}
+);
 
-/// secp256k1_recover
-pub struct SyscallSecp256k1Recover<'a, 'b> {
-    invoke_context: Rc<RefCell<&'a mut InvokeContext<'b>>>,
-}
-impl<'a, 'b> SyscallObject<BpfError> for SyscallSecp256k1Recover<'a, 'b> {
+declare_syscall!(
+    /// secp256k1_recover
+    SyscallSecp256k1Recover,
     fn call(
         &mut self,
         hash_addr: u64,
@@ -1853,12 +1841,10 @@ impl<'a, 'b> SyscallObject<BpfError> for SyscallSecp256k1Recover<'a, 'b> {
         secp256k1_recover_result.copy_from_slice(&public_key[1..65]);
         *result = Ok(SUCCESS);
     }
-}
+);
 
-pub struct SyscallZkTokenElgamalOp<'a, 'b> {
-    invoke_context: Rc<RefCell<&'a mut InvokeContext<'b>>>,
-}
-impl<'a, 'b> SyscallObject<BpfError> for SyscallZkTokenElgamalOp<'a, 'b> {
+declare_syscall!(
+    SyscallZkTokenElgamalOp,
     fn call(
         &mut self,
         op: u64,
@@ -1915,12 +1901,10 @@ impl<'a, 'b> SyscallObject<BpfError> for SyscallZkTokenElgamalOp<'a, 'b> {
             *result = Ok(1);
         }
     }
-}
+);
 
-pub struct SyscallZkTokenElgamalOpWithLoHi<'a, 'b> {
-    invoke_context: Rc<RefCell<&'a mut InvokeContext<'b>>>,
-}
-impl<'a, 'b> SyscallObject<BpfError> for SyscallZkTokenElgamalOpWithLoHi<'a, 'b> {
+declare_syscall!(
+    SyscallZkTokenElgamalOpWithLoHi,
     fn call(
         &mut self,
         op: u64,
@@ -1985,12 +1969,10 @@ impl<'a, 'b> SyscallObject<BpfError> for SyscallZkTokenElgamalOpWithLoHi<'a, 'b>
             *result = Ok(1);
         }
     }
-}
+);
 
-pub struct SyscallZkTokenElgamalOpWithScalar<'a, 'b> {
-    invoke_context: Rc<RefCell<&'a mut InvokeContext<'b>>>,
-}
-impl<'a, 'b> SyscallObject<BpfError> for SyscallZkTokenElgamalOpWithScalar<'a, 'b> {
+declare_syscall!(
+    SyscallZkTokenElgamalOpWithScalar,
     fn call(
         &mut self,
         op: u64,
@@ -2039,13 +2021,11 @@ impl<'a, 'b> SyscallObject<BpfError> for SyscallZkTokenElgamalOpWithScalar<'a, '
             *result = Ok(1);
         }
     }
-}
+);
 
-// Blake3
-pub struct SyscallBlake3<'a, 'b> {
-    invoke_context: Rc<RefCell<&'a mut InvokeContext<'b>>>,
-}
-impl<'a, 'b> SyscallObject<BpfError> for SyscallBlake3<'a, 'b> {
+declare_syscall!(
+    // Blake3
+    SyscallBlake3,
     fn call(
         &mut self,
         vals_addr: u64,
@@ -2146,7 +2126,7 @@ impl<'a, 'b> SyscallObject<BpfError> for SyscallBlake3<'a, 'b> {
         hash_result.copy_from_slice(&hasher.result().to_bytes());
         *result = Ok(0);
     }
-}
+);
 
 // Cross-program invocation syscalls
 
@@ -2191,11 +2171,9 @@ trait SyscallInvokeSigned<'a, 'b> {
     ) -> Result<Vec<Pubkey>, EbpfError<BpfError>>;
 }
 
-/// Cross-SyscallInvokeSignedRust invocation called from Rust
-pub struct SyscallInvokeSignedRust<'a, 'b> {
-    invoke_context: Rc<RefCell<&'a mut InvokeContext<'b>>>,
-}
-impl<'a, 'b> SyscallObject<BpfError> for SyscallInvokeSignedRust<'a, 'b> {
+declare_syscall!(
+    /// Cross-program invocation called from Rust
+    SyscallInvokeSignedRust,
     fn call(
         &mut self,
         instruction_addr: u64,
@@ -2216,7 +2194,7 @@ impl<'a, 'b> SyscallObject<BpfError> for SyscallInvokeSignedRust<'a, 'b> {
             memory_mapping,
         );
     }
-}
+);
 
 impl<'a, 'b> SyscallInvokeSigned<'a, 'b> for SyscallInvokeSignedRust<'a, 'b> {
     fn get_context_mut(&self) -> Result<RefMut<&'a mut InvokeContext<'b>>, EbpfError<BpfError>> {
@@ -2484,11 +2462,9 @@ struct SolSignerSeedsC {
     len: u64,
 }
 
-/// Cross-program invocation called from C
-pub struct SyscallInvokeSignedC<'a, 'b> {
-    invoke_context: Rc<RefCell<&'a mut InvokeContext<'b>>>,
-}
-impl<'a, 'b> SyscallObject<BpfError> for SyscallInvokeSignedC<'a, 'b> {
+declare_syscall!(
+    /// Cross-program invocation called from C
+    SyscallInvokeSignedC,
     fn call(
         &mut self,
         instruction_addr: u64,
@@ -2509,7 +2485,7 @@ impl<'a, 'b> SyscallObject<BpfError> for SyscallInvokeSignedC<'a, 'b> {
             memory_mapping,
         );
     }
-}
+);
 
 impl<'a, 'b> SyscallInvokeSigned<'a, 'b> for SyscallInvokeSignedC<'a, 'b> {
     fn get_context_mut(&self) -> Result<RefMut<&'a mut InvokeContext<'b>>, EbpfError<BpfError>> {
@@ -3079,11 +3055,9 @@ fn call<'a, 'b: 'a>(
     Ok(SUCCESS)
 }
 
-// Return data handling
-pub struct SyscallSetReturnData<'a, 'b> {
-    invoke_context: Rc<RefCell<&'a mut InvokeContext<'b>>>,
-}
-impl<'a, 'b> SyscallObject<BpfError> for SyscallSetReturnData<'a, 'b> {
+declare_syscall!(
+    /// Set return data
+    SyscallSetReturnData,
     fn call(
         &mut self,
         addr: u64,
@@ -3155,12 +3129,11 @@ impl<'a, 'b> SyscallObject<BpfError> for SyscallSetReturnData<'a, 'b> {
 
         *result = Ok(0);
     }
-}
+);
 
-pub struct SyscallGetReturnData<'a, 'b> {
-    invoke_context: Rc<RefCell<&'a mut InvokeContext<'b>>>,
-}
-impl<'a, 'b> SyscallObject<BpfError> for SyscallGetReturnData<'a, 'b> {
+declare_syscall!(
+    /// Get return data
+    SyscallGetReturnData,
     fn call(
         &mut self,
         return_data_addr: u64,
@@ -3243,13 +3216,11 @@ impl<'a, 'b> SyscallObject<BpfError> for SyscallGetReturnData<'a, 'b> {
         // Return the actual length, rather the length returned
         *result = Ok(return_data.len() as u64);
     }
-}
+);
 
-// Log data handling
-pub struct SyscallLogData<'a, 'b> {
-    invoke_context: Rc<RefCell<&'a mut InvokeContext<'b>>>,
-}
-impl<'a, 'b> SyscallObject<BpfError> for SyscallLogData<'a, 'b> {
+declare_syscall!(
+    /// Log data handling
+    SyscallLogData,
     fn call(
         &mut self,
         addr: u64,
@@ -3324,12 +3295,11 @@ impl<'a, 'b> SyscallObject<BpfError> for SyscallLogData<'a, 'b> {
 
         *result = Ok(0);
     }
-}
+);
 
-pub struct SyscallGetProcessedSiblingInstruction<'a, 'b> {
-    invoke_context: Rc<RefCell<&'a mut InvokeContext<'b>>>,
-}
-impl<'a, 'b> SyscallObject<BpfError> for SyscallGetProcessedSiblingInstruction<'a, 'b> {
+declare_syscall!(
+    /// Get a processed sigling instruction
+    SyscallGetProcessedSiblingInstruction,
     fn call(
         &mut self,
         index: u64,
@@ -3453,12 +3423,11 @@ impl<'a, 'b> SyscallObject<BpfError> for SyscallGetProcessedSiblingInstruction<'
         }
         *result = Ok(false as u64);
     }
-}
+);
 
-pub struct SyscallGetStackHeight<'a, 'b> {
-    invoke_context: Rc<RefCell<&'a mut InvokeContext<'b>>>,
-}
-impl<'a, 'b> SyscallObject<BpfError> for SyscallGetStackHeight<'a, 'b> {
+declare_syscall!(
+    /// Get current call stack height
+    SyscallGetStackHeight,
     fn call(
         &mut self,
         _arg1: u64,
@@ -3486,7 +3455,7 @@ impl<'a, 'b> SyscallObject<BpfError> for SyscallGetStackHeight<'a, 'b> {
 
         *result = Ok(invoke_context.get_stack_height() as u64);
     }
-}
+);
 
 #[cfg(test)]
 mod tests {
