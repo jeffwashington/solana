@@ -572,8 +572,6 @@ pub mod ed25519_program;
 pub mod entrypoint;
 pub mod entrypoint_deprecated;
 pub mod epoch_schedule;
-#[cfg(not(target_arch = "bpf"))]
-pub mod example_mocks;
 pub mod feature;
 pub mod fee_calculator;
 pub mod hash;
@@ -826,6 +824,7 @@ where
 // rustdoc fails to generate documentation for the re-exports within
 // `solana_sdk`.
 #[cfg(not(target_arch = "bpf"))]
+pub mod example_mocks;
 
 #[cfg(test)]
 mod tests {
