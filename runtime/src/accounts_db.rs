@@ -3180,8 +3180,38 @@ impl AccountsDb {
                     continue;
                 }
             };
-            let (stored_accounts, _num_stores, _original_bytes) =
+            let (mut stored_accounts, _num_stores, _original_bytes) =
                 self.get_unique_accounts_from_storages(all_storages.iter());
+            if higher_slot_squash {
+                let mut duplicates = Vec::default();
+                if let Some((ancient_slot, _)) = current_ancient_storage {
+                    let mut illegal = false;
+                    for k in stored_accounts.keys() {
+                        if let Some(entry) = self.accounts_index.get_account_read_entry(k) {
+                            for (slot, _) in entry.slot_list() {
+                                if slot == &ancient_slot {
+                                    duplicates.push(*k);
+                                } else if slot == slot {
+                                    illegal = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if illegal {
+                            break;
+                        }
+                    }
+                    if illegal {
+                        // we cannot squash this slot because it contains items that are already written to the ancient slot, which is higher than our slot
+                        continue;
+                    }
+                }
+                // these accounts already exist in the newer slot, so we cannot write them to
+                duplicates.into_iter().for_each(|k| {
+                    stored_accounts.remove(&k);
+                });
+            }
+
             // we could sort these
             // we could also check for alive accounts here
             if stored_accounts.is_empty() {
