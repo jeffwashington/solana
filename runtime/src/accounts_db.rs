@@ -3189,10 +3189,14 @@ impl AccountsDb {
             let mut ids = vec![ancient_store.append_vec_id()];
             // if this slot is not the ancient slot we're writing to, then this root will be dropped
             let mut drop_root = slot > ancient_slot;
+
+            {
             // write what we can to the current ancient storage
             let (accounts, hashes) = to_store.get(StorageSelector::Primary);
             self.store_ancient_accounts(ancient_slot, accounts, hashes, ancient_store);
+            }
 
+            // handle accounts from 'slot' which did not fit into the current ancient append vec
             let (accounts, hashes) = to_store.get(StorageSelector::Overflow);
             if !accounts.is_empty() {
                 // we need a new ancient append vec
