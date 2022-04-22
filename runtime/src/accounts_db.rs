@@ -3079,31 +3079,26 @@ impl AccountsDb {
         (shrink_slots, shrink_slots_next_batch)
     }
 
+    fn get_roots_less_than(&self, slot: Slot) {
+        self
+            .accounts_index
+            .roots_tracker
+            .read()
+            .unwrap()
+            .alive_roots
+            .get_all_less_than(slot)
+    }
+
     fn shrink_ancient_slots(&self) {
         // let _guard = self.active_stats.activate(ActiveStatItem::ShrinkAncient);
 
         let max_root = self.accounts_index.max_root_inclusive();
         use solana_sdk::clock::DEFAULT_SLOTS_PER_EPOCH;
-        let epoch_width = DEFAULT_SLOTS_PER_EPOCH; // put some 'in-this-epoch' slots into an ancient append vec
+        let epoch_width = DEFAULT_SLOTS_PER_EPOCH;
         let old_root = max_root.saturating_sub(epoch_width + 1000);
 
-        let mut m = Measure::start("get slots");
-        let mut old_slots = self
-            .storage
-            .map
-            .iter()
-            .filter_map(|k| {
-                let slot = *k.key() as Slot;
-                if slot < old_root {
-                    Some(slot)
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
-        m.stop();
+        let mut old_slots = self.get_roots_less_than(old_root);
         old_slots.sort_unstable();
-        // old_slots.truncate(3); // artificially limit to 3 slots
         self.combine_ancient_slots(old_slots, max_root);
     }
 
@@ -5589,14 +5584,13 @@ impl AccountsDb {
             stats
                 .accounts_in_roots_older_than_epoch
                 .fetch_add(num_accounts, Ordering::Relaxed);
-                let ancients = sub_storages
-                        .iter()
-                        .map(|storage| if is_ancient(&storage.accounts) { 1 } else { 0 })
-                        .sum();
+            let ancients = sub_storages
+                .iter()
+                .map(|storage| if is_ancient(&storage.accounts) { 1 } else { 0 })
+                .sum();
             stats
                 .ancient_append_vecs
                 .fetch_add(ancients, Ordering::Relaxed);
-
         }
     }
 
