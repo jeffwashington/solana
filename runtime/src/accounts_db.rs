@@ -3175,6 +3175,8 @@ impl AccountsDb {
             };
             let (stored_accounts, _num_stores, _original_bytes) =
                 self.get_unique_accounts_from_storages(all_storages.iter());
+            // we could sort these
+            // we could also check for alive accounts here
             if stored_accounts.is_empty() {
                 continue; // skipping empty slot
             }
