@@ -6641,7 +6641,7 @@ impl AccountsDb {
         if let Some(purged_stored_account_slots) = purged_stored_account_slots {
             let len = purged_stored_account_slots.len();
             // we could build a higher level function in accounts_index to group by bin
-            const BATCH_SIZE: usize = 5_000;
+            const BATCH_SIZE: usize = 10_000;
             let batches = 1 + (len / BATCH_SIZE);
             self.thread_pool_clean.install(|| {
                 (0..batches).into_par_iter().for_each(|batch| {
