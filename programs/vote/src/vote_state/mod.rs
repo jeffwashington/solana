@@ -709,7 +709,7 @@ impl VoteState {
             // This means the newest slot in the `vote_slots` has a match that
             // doesn't match the expected hash for that slot on this
             // fork
-            warn!(
+            panic!(
                 "{} dropped vote slots {:?} failed to match hash {} {}",
                 self.node_pubkey, vote_slots, vote_hash, slot_hashes[j].1
             );
