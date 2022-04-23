@@ -454,7 +454,8 @@ impl ExpectedRentCollection {
         if pubkey != &Pubkey::from_str("17PitUaQmjxzgqU6UhfmdF241pEvfsPSXGaegeApZvy").unwrap() {
             return None;
         }
-        error!("rehash: {}, slot: {}, expected_slot: {}, rent_epoch: {}, expected rent_epoch: {}, recalc hash: {}, loaded hash: {}", pubkey, storage_slot, loaded_account.rent_epoch(), expected.expected_rent_collection_slot_max_epoch, expected.rent_epoch, recalc_hash, loaded_hash);
+        error!("rehash: {}, slot: {}, expected_slot: {}, rent_epoch: {}, expected rent_epoch: {}, recalc hash: {}, loaded hash: {}, index pubkey: {}, index max slot: {}, epoch and slot index of storage: {:?}", pubkey, storage_slot, expected.expected_rent_collection_slot_max_epoch, loaded_account.rent_epoch(), expected.rent_epoch, recalc_hash, loaded_hash,
+    expected.partition_from_pubkey, expected.partition_index_from_max_slot, config.rent_collector.epoch_schedule.get_epoch_and_slot_index(storage_slot));
         stats.rehash_required.fetch_add(1, Ordering::Relaxed);
 
         // recomputed based on rent collection/rewrite slot
