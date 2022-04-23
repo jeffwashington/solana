@@ -448,7 +448,7 @@ impl ExpectedRentCollection {
         use log::*;
         use std::str::FromStr;
         error!("rehash: {}", pubkey);
-        if pubkey != Pubkey::from_str("17PitUaQmjxzgqU6UhfmdF241pEvfsPSXGaegeApZvy").unwrap() {
+        if pubkey != &Pubkey::from_str("17PitUaQmjxzgqU6UhfmdF241pEvfsPSXGaegeApZvy").unwrap() {
             return None;
         }
 
