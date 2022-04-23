@@ -450,6 +450,7 @@ impl ExpectedRentCollection {
             return None;
         }
         stats.rehash_required.fetch_add(1, Ordering::Relaxed);
+        error!("rehash: {}", pubkey);
 
         // recomputed based on rent collection/rewrite slot
         // Rent would have been collected AT 'expected_rent_collection_slot', so hash according to that slot.
