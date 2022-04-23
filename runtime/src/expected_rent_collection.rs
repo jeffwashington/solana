@@ -300,6 +300,11 @@ impl ExpectedRentCollection {
         pubkey: &Pubkey,
         rewrites_skipped_this_slot: &Rewrites,
     ) -> Option<Epoch> {
+        let return_early = true;
+        if return_early {
+            return None;
+        }
+
         if let RentResult::CollectRent((next_epoch, rent_due)) =
             rent_collector.calculate_rent_result(pubkey, account, None)
         {
@@ -392,6 +397,10 @@ impl ExpectedRentCollection {
         find_unskipped_slot: impl Fn(Slot) -> Option<Slot>,
         filler_account_suffix: Option<&Pubkey>,
     ) -> Option<Hash> {
+        let return_early = true;
+        if return_early {
+            return None;
+        }
         use solana_measure::measure::Measure;
         let mut m = Measure::start("rehash_calc_us");
         let expected = ExpectedRentCollection::new(
