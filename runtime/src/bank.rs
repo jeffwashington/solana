@@ -2091,6 +2091,8 @@ impl Bank {
         fn new<T: Default>() -> T {
             T::default()
         }
+        let rc = Self::get_rent_collector_from(&fields.rent_collector, fields.epoch);
+        assert_eq!(fields.epoch_schedule, rc.epoch_schedule);
         let feature_set = new();
         let mut bank = Self {
             rewrites_skipped_this_slot: Rewrites::default(),
