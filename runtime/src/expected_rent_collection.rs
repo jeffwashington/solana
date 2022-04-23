@@ -408,7 +408,7 @@ impl ExpectedRentCollection {
             2500 failed
             300 failed
             */
-        if partition_from_pubkey > 0 {
+        if partition_from_pubkey > 0 || pubkey.as_ref()[31] > 128 {
             return None;
         }
         
