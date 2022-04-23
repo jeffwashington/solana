@@ -450,7 +450,6 @@ impl ExpectedRentCollection {
             return None;
         }
         error!("rehash: {}, slot: {}, expected_slot: {}, rent_epoch: {}, recalc hash: {}, loaded hash: {}", pubkey, storage_slot, expected.expected_rent_collection_slot_max_epoch, expected.rent_epoch, recalc_hash, loaded_hash);
-        return None;
         stats.rehash_required.fetch_add(1, Ordering::Relaxed);
 
         // recomputed based on rent collection/rewrite slot
