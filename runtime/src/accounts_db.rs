@@ -3182,11 +3182,21 @@ impl AccountsDb {
             };
             let (mut stored_accounts, _num_stores, _original_bytes) =
                 self.get_unique_accounts_from_storages(all_storages.iter());
+                use std::str::FromStr;
+                let interesting = Pubkey::from_str("17PitUaQmjxzgqU6UhfmdF241pEvfsPSXGaegeApZvy").unwrap();
             if higher_slot_squash {
+
                 let mut duplicates = Vec::default();
                 if let Some((ancient_slot, _)) = current_ancient_storage {
                     let mut illegal = false;
                     for k in stored_accounts.keys() {
+                        use log::*;
+                        if k == &interesting {
+                            let v = stored_accounts.get(k).unwrap();
+                            error!("shrinking {}, slot: {}, rent_epoch: {}, ancient_slot: {}", k, slot, v.account.rent_epoch(), ancient_slot);
+
+                        }
+                
                         if let Some(entry) = self.accounts_index.get_account_read_entry(k) {
                             for (slot, _) in entry.slot_list() {
                                 if slot == &ancient_slot {

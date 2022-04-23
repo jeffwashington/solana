@@ -444,13 +444,14 @@ impl ExpectedRentCollection {
             stats.rehash_unnecessary.fetch_add(1, Ordering::Relaxed);
             return None;
         }
-        stats.rehash_required.fetch_add(1, Ordering::Relaxed);
         use log::*;
         use std::str::FromStr;
-        error!("rehash: {}", pubkey);
         if pubkey != &Pubkey::from_str("17PitUaQmjxzgqU6UhfmdF241pEvfsPSXGaegeApZvy").unwrap() {
             return None;
         }
+        error!("rehash: {}, slot: {}, rent_epoch: {}, recalc hash: {}, loaded hash: {}", pubkey, expected.expected_rent_collection_slot_max_epoch, expected.rent_epoch, recalc_hash, loaded_hash);
+        return None;
+        stats.rehash_required.fetch_add(1, Ordering::Relaxed);
 
         // recomputed based on rent collection/rewrite slot
         // Rent would have been collected AT 'expected_rent_collection_slot', so hash according to that slot.
