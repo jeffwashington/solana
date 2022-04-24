@@ -2065,7 +2065,7 @@ impl Bank {
     pub(crate) fn new_from_fields(
         bank_rc: BankRc,
         genesis_config: &GenesisConfig,
-        fields: BankFieldsToDeserialize,
+        mut fields: BankFieldsToDeserialize,
         debug_keys: Option<Arc<HashSet<Pubkey>>>,
         additional_builtins: Option<&Builtins>,
         debug_do_not_add_builtins: bool,
@@ -2091,6 +2091,7 @@ impl Bank {
         fn new<T: Default>() -> T {
             T::default()
         }
+        fields.rent_collector.epoch_schedule = fields.epoch_schedule;
         let rc = Self::get_rent_collector_from(&fields.rent_collector, fields.epoch);
         assert_eq!(fields.epoch_schedule, rc.epoch_schedule);
         let feature_set = new();
