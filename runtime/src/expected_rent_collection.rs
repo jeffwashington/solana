@@ -396,6 +396,7 @@ impl ExpectedRentCollection {
             .epoch_schedule
             .get_slots_in_epoch(rent_collector.epoch);
 
+            /*
         let partition_from_pubkey =
             crate::bank::Bank::partition_from_pubkey(pubkey, slots_per_epoch);
             /*
@@ -407,7 +408,7 @@ impl ExpectedRentCollection {
             */
         if partition_from_pubkey > 0 || pubkey.as_ref()[31] > 16 {
             return None;
-        }
+        }*/
         
         use solana_measure::measure::Measure;
         let mut m = Measure::start("rehash_calc_us");
@@ -444,6 +445,7 @@ impl ExpectedRentCollection {
             stats.rehash_unnecessary.fetch_add(1, Ordering::Relaxed);
             return None;
         }
+        /*
         use log::*;
         use std::str::FromStr;
         if pubkey != &Pubkey::from_str("17PitUaQmjxzgqU6UhfmdF241pEvfsPSXGaegeApZvy").unwrap() {
@@ -452,6 +454,7 @@ impl ExpectedRentCollection {
         error!("rehash: {}, slot: {}, expected_slot: {}, rent_epoch: {}, expected rent_epoch: {}, recalc hash: {}, loaded hash: {}, index pubkey: {}, index max slot: {}, epoch and slot index of storage: {:?}", pubkey, storage_slot, expected.expected_rent_collection_slot_max_epoch, loaded_account.rent_epoch(), expected.rent_epoch, recalc_hash, loaded_hash,
     expected.partition_from_pubkey, expected.partition_index_from_max_slot,
     (rent_collector.epoch_schedule.get_epoch_and_slot_index(storage_slot), rent_collector.epoch, rent_collector.epoch_schedule.slots_per_epoch, rent_collector.epoch_schedule.get_epoch(storage_slot), rent_collector.epoch_schedule.get_slots_in_epoch(rent_collector.epoch)));
+    */
         stats.rehash_required.fetch_add(1, Ordering::Relaxed);
 
         // recomputed based on rent collection/rewrite slot
