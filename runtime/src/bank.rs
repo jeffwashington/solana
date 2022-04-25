@@ -6187,7 +6187,7 @@ impl Bank {
             self.signature_count(),
             self.last_blockhash(),
             self.capitalization(),
-            self.rewrites_skipped_this_slot.read().unwrap().len().
+            self.rewrites_skipped_this_slot.read().unwrap().len(),
         );
 
         info!(
