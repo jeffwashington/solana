@@ -3188,8 +3188,6 @@ impl AccountsDb {
             };
             let (mut stored_accounts, _num_stores, _original_bytes) =
                 self.get_unique_accounts_from_storages(all_storages.iter());
-                use std::str::FromStr;
-                let interesting = Pubkey::from_str("17PitUaQmjxzgqU6UhfmdF241pEvfsPSXGaegeApZvy").unwrap();
             if higher_slot_squash {
 
                 let mut duplicates = Vec::default();
@@ -3197,11 +3195,6 @@ impl AccountsDb {
                     let mut illegal = false;
                     for k in stored_accounts.keys() {
                         use log::*;
-                        if k == &interesting {
-                            let v = stored_accounts.get(k).unwrap();
-                            error!("shrinking {}, slot: {}, rent_epoch: {}, ancient_slot: {}", k, slot, v.account.rent_epoch(), ancient_slot);
-
-                        }
                 
                         if let Some(entry) = self.accounts_index.get_account_read_entry(k) {
                             for (slot, _) in entry.slot_list() {
@@ -5991,9 +5984,6 @@ impl AccountsDb {
 
         let find_unskipped_slot = |slot: Slot| self.find_unskipped_slot(slot, config.ancestors);
 
-        use std::str::FromStr;
-        let interesting = Pubkey::from_str("17PitUaQmjxzgqU6UhfmdF241pEvfsPSXGaegeApZvy").unwrap();
-
         let result: Vec<BinnedHashData> = self.scan_account_storage_no_bank(
             cache_hash_data,
             config,
@@ -6029,10 +6019,6 @@ impl AccountsDb {
                     find_unskipped_slot,
                     filler_account_suffix,
                 );
-                if pubkey == &interesting {
-                    use log::*;
-                    error!("found hash: {}, {}, maybe_rehash: {:?}, loaded_slot: {}", pubkey, loaded_hash, new_hash, slot);
-                }
                 let loaded_hash = new_hash.unwrap_or(loaded_hash);
 
                 let source_item = CalculateHashIntermediate::new(loaded_hash, balance, *pubkey);
