@@ -12,8 +12,8 @@ use {
         leader_schedule_cache::LeaderScheduleCache,
         next_slots_iterator::NextSlotsIterator,
         shred::{
-            max_ticks_per_n_shreds, ErasureSetId, Result as ShredResult, Shred, ShredId, ShredType,
-            Shredder, SHRED_PAYLOAD_SIZE,
+            self, max_ticks_per_n_shreds, ErasureSetId, Shred, ShredId, ShredType, Shredder,
+            SHRED_PAYLOAD_SIZE,
         },
         slot_stats::{ShredSource, SlotsStats},
     },
@@ -1367,7 +1367,7 @@ impl Blockstore {
     }
 
     fn should_insert_coding_shred(shred: &Shred, last_root: &RwLock<u64>) -> bool {
-        shred.is_code() && shred.sanitize() && shred.slot() > *last_root.read().unwrap()
+        shred.is_code() && shred.sanitize().is_ok() && shred.slot() > *last_root.read().unwrap()
     }
 
     fn insert_coding_shred(
@@ -1381,7 +1381,7 @@ impl Blockstore {
 
         // Assert guaranteed by integrity checks on the shred that happen before
         // `insert_coding_shred` is called
-        assert!(shred.is_code() && shred.sanitize());
+        assert!(shred.is_code() && shred.sanitize().is_ok());
 
         // Commit step: commit all changes to the mutable structures at once, or none at all.
         // We don't want only a subset of these changes going through.
@@ -1430,7 +1430,7 @@ impl Blockstore {
         } else {
             false
         };
-        if !shred.sanitize() {
+        if let Err(err) = shred.sanitize() {
             let leader_pubkey = leader_schedule
                 .and_then(|leader_schedule| leader_schedule.slot_leader_at(slot, None));
 
@@ -1439,8 +1439,8 @@ impl Blockstore {
                 (
                     "error",
                     format!(
-                        "Leader {:?}, slot {}: received invalid shred",
-                        leader_pubkey, slot,
+                        "Leader {:?}, slot {}: received invalid shred: {:?}",
+                        leader_pubkey, slot, err,
                     ),
                     String
                 )
@@ -1637,7 +1637,7 @@ impl Blockstore {
         &self,
         slot: Slot,
         start_index: u64,
-    ) -> ShredResult<Vec<Shred>> {
+    ) -> std::result::Result<Vec<Shred>, shred::Error> {
         self.slot_data_iterator(slot, start_index)
             .expect("blockstore couldn't fetch iterator")
             .map(|data| Shred::new_from_serialized_shred(data.1.to_vec()))
@@ -1693,7 +1693,7 @@ impl Blockstore {
         &self,
         slot: Slot,
         start_index: u64,
-    ) -> ShredResult<Vec<Shred>> {
+    ) -> std::result::Result<Vec<Shred>, shred::Error> {
         self.slot_coding_iterator(slot, start_index)
             .expect("blockstore couldn't fetch iterator")
             .map(|code| Shred::new_from_serialized_shred(code.1.to_vec()))
