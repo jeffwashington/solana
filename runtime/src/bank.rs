@@ -6205,7 +6205,7 @@ impl Bank {
     /// Only called from startup or test code.
     #[must_use]
     pub fn verify_bank_hash(&self, test_hash_calculation: bool) -> bool {
-        panic!("rent collector: {:?}", (self.rent_collector.epoch_schedule.get_slots_in_epoch(299), self.epoch_schedule().get_slots_in_epoch(299)));
+        assert_eq!(self.rent_collector.epoch_schedule.get_slots_in_epoch(self.epoch()), self.epoch_schedule().get_slots_in_epoch(self.epoch()));
         self.rc.accounts.verify_bank_hash_and_lamports(
             self.slot(),
             &self.ancestors,
