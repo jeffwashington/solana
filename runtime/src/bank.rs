@@ -4957,7 +4957,7 @@ impl Bank {
 
     fn collect_rent_eagerly(&self, just_rewrites: bool) {
         if self.lazy_rent_collection.load(Relaxed) {
-            use log:*; error!("{} {}", file!(), line!());
+            use log::*; error!("{} {}", file!(), line!());
             return;
         }
 
@@ -5015,7 +5015,7 @@ impl Bank {
     /// return # accounts loaded
     fn collect_rent_in_partition(&self, partition: Partition, just_rewrites: bool) -> usize {
         let subrange = Self::pubkey_range_from_partition(partition);
-        use log:*; error!("{} {}, just_rewrites: {}", file!(), line!(), just_rewrites);
+        use log::*; error!("{} {}, just_rewrites: {}", file!(), line!(), just_rewrites);
 
         let thread_pool = &self.rc.accounts.accounts_db.thread_pool;
         self.rc
