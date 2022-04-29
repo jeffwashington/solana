@@ -1,8 +1,5 @@
 use {
-    crate::{
-        erasure::ErasureConfig,
-        shred::{Shred, ShredType},
-    },
+    crate::shred::{Shred, ShredType},
     serde::{Deserialize, Deserializer, Serialize, Serializer},
     solana_sdk::{
         clock::{Slot, UnixTimestamp},
@@ -94,6 +91,12 @@ pub struct ErasureMeta {
     __unused_size: usize,
     /// Erasure configuration for this erasure set
     config: ErasureConfig,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub(crate) struct ErasureConfig {
+    num_data: usize,
+    num_coding: usize,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -236,10 +239,10 @@ impl ErasureMeta {
         match shred.shred_type() {
             ShredType::Data => None,
             ShredType::Code => {
-                let config = ErasureConfig::new(
-                    usize::from(shred.num_data_shreds().ok()?),
-                    usize::from(shred.num_coding_shreds().ok()?),
-                );
+                let config = ErasureConfig {
+                    num_data: usize::from(shred.num_data_shreds().ok()?),
+                    num_coding: usize::from(shred.num_coding_shreds().ok()?),
+                };
                 let first_coding_index = u64::from(shred.first_coding_index()?);
                 let erasure_meta = ErasureMeta {
                     set_index: u64::from(shred.fec_set_index()),
@@ -268,12 +271,12 @@ impl ErasureMeta {
     }
 
     pub(crate) fn data_shreds_indices(&self) -> Range<u64> {
-        let num_data = self.config.num_data() as u64;
+        let num_data = self.config.num_data as u64;
         self.set_index..self.set_index + num_data
     }
 
     pub(crate) fn coding_shreds_indices(&self) -> Range<u64> {
-        let num_coding = self.config.num_coding() as u64;
+        let num_coding = self.config.num_coding as u64;
         self.first_coding_index..self.first_coding_index + num_coding
     }
 
@@ -284,8 +287,8 @@ impl ErasureMeta {
         let num_data = index.data().range(self.data_shreds_indices()).count();
 
         let (data_missing, num_needed) = (
-            self.config.num_data().saturating_sub(num_data),
-            self.config.num_data().saturating_sub(num_data + num_coding),
+            self.config.num_data.saturating_sub(num_data),
+            self.config.num_data.saturating_sub(num_data + num_coding),
         );
 
         if data_missing == 0 {
@@ -367,8 +370,10 @@ mod test {
         use ErasureMetaStatus::*;
 
         let set_index = 0;
-        let erasure_config = ErasureConfig::new(8, 16);
-
+        let erasure_config = ErasureConfig {
+            num_data: 8,
+            num_coding: 16,
+        };
         let e_meta = ErasureMeta {
             set_index,
             first_coding_index: set_index,
@@ -378,10 +383,10 @@ mod test {
         let mut rng = thread_rng();
         let mut index = Index::new(0);
 
-        let data_indexes = 0..erasure_config.num_data() as u64;
-        let coding_indexes = 0..erasure_config.num_coding() as u64;
+        let data_indexes = 0..erasure_config.num_data as u64;
+        let coding_indexes = 0..erasure_config.num_coding as u64;
 
-        assert_eq!(e_meta.status(&index), StillNeed(erasure_config.num_data()));
+        assert_eq!(e_meta.status(&index), StillNeed(erasure_config.num_data));
 
         for ix in data_indexes.clone() {
             index.data_mut().insert(ix);
@@ -396,7 +401,7 @@ mod test {
         for &idx in data_indexes
             .clone()
             .collect::<Vec<_>>()
-            .choose_multiple(&mut rng, erasure_config.num_data())
+            .choose_multiple(&mut rng, erasure_config.num_data)
         {
             index.data_mut().index.remove(&idx);
 
@@ -409,7 +414,7 @@ mod test {
 
         for &idx in coding_indexes
             .collect::<Vec<_>>()
-            .choose_multiple(&mut rng, erasure_config.num_coding())
+            .choose_multiple(&mut rng, erasure_config.num_coding)
         {
             index.coding_mut().index.remove(&idx);
 
