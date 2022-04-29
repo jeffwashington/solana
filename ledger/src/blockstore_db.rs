@@ -756,7 +756,8 @@ impl Rocks {
     }
 
     fn write(&self, batch: RWriteBatch) -> Result<()> {
-        let is_perf_context_enabled = maybe_collect_perf_context();
+        let is_perf_context_enabled =
+            maybe_collect_perf_context(self.column_options.rocks_perf_sample_interval);
         let result = self.db.write(batch);
         if is_perf_context_enabled {
             report_write_perf_context(rocksdb_metric_header!(
@@ -2048,6 +2049,11 @@ pub struct LedgerColumnOptions {
     // Determine the way to compress column families which are eligible for
     // compression.
     pub compression_type: BlockstoreCompressionType,
+
+    // Control how often RocksDB read/write performance samples are collected.
+    // If the value is greater than 0, then RocksDB read/write perf sample
+    // will be collected once for every `rocks_perf_sample_interval` ops.
+    pub rocks_perf_sample_interval: usize,
 }
 
 impl Default for LedgerColumnOptions {
@@ -2055,6 +2061,7 @@ impl Default for LedgerColumnOptions {
         Self {
             shred_storage_type: ShredStorageType::RocksLevel,
             compression_type: BlockstoreCompressionType::default(),
+            rocks_perf_sample_interval: 0,
         }
     }
 }
@@ -2224,7 +2231,8 @@ where
     C: Column + ColumnName + ColumnMetrics,
 {
     pub fn get_bytes(&self, key: C::Index) -> Result<Option<Vec<u8>>> {
-        let is_perf_context_enabled = maybe_collect_perf_context();
+        let is_perf_context_enabled =
+            maybe_collect_perf_context(self.column_options.rocks_perf_sample_interval);
         let result = self.backend.get_cf(self.handle(), &C::key(key));
         if is_perf_context_enabled {
             report_read_perf_context(C::rocksdb_get_perf_metric_header(&self.column_options));
@@ -2299,7 +2307,8 @@ where
     }
 
     pub fn put_bytes(&self, key: C::Index, value: &[u8]) -> Result<()> {
-        let is_perf_context_enabled = maybe_collect_perf_context();
+        let is_perf_context_enabled =
+            maybe_collect_perf_context(self.column_options.rocks_perf_sample_interval);
         let result = self.backend.put_cf(self.handle(), &C::key(key), value);
         if is_perf_context_enabled {
             report_write_perf_context(C::rocksdb_put_perf_metric_header(&self.column_options));
@@ -2326,32 +2335,16 @@ mod rocks_metrics_utils {
         },
         std::cell::RefCell,
     };
-    const METRIC_SAMPLES_1K: i32 = 1000;
-    // The default number of rocksdb perf samples in 1K
-    const ROCKSDB_PERF_CONTEXT_SAMPLES_IN_1K_DEFAULT: i32 = 0;
-    lazy_static! {
-    // The number of RocksDB performance counter samples in 1000.
-    static ref ROCKSDB_PERF_CONTEXT_SAMPLES_IN_1K: i32 =
-    std::env::var("SOLANA_METRICS_ROCKSDB_PERF_SAMPLES_IN_1K")
-        .map(|x| {
-            x.parse().expect("Failed to parse SOLANA_METRICS_ROCKSDB_PERF_SAMPLES_IN_1K")
-
-        }).unwrap_or(ROCKSDB_PERF_CONTEXT_SAMPLES_IN_1K_DEFAULT);
-
-    }
 
     // Thread local instance of RocksDB's PerfContext.
     thread_local! {static PER_THREAD_ROCKS_PERF_CONTEXT: RefCell<PerfContext> = RefCell::new(PerfContext::default());}
 
-    /// The function enables RocksDB's PerfContext in N out of 1000
-    /// where N is ROCKSDB_PERF_CONTEXT_SAMPLES_IN_1K.
-    ///
     /// Returns true if the PerfContext is enabled.
-    pub fn maybe_collect_perf_context() -> bool {
-        if *ROCKSDB_PERF_CONTEXT_SAMPLES_IN_1K <= 0 {
+    pub(crate) fn maybe_collect_perf_context(sample_interval: usize) -> bool {
+        if sample_interval == 0 {
             return false;
         }
-        if thread_rng().gen_range(0, METRIC_SAMPLES_1K) > *ROCKSDB_PERF_CONTEXT_SAMPLES_IN_1K {
+        if thread_rng().gen_range(0, sample_interval) > 0 {
             return false;
         }
         set_perf_stats(PerfStatsLevel::EnableTime);
@@ -2363,7 +2356,7 @@ mod rocks_metrics_utils {
 
     /// Reports the collected PerfContext and disables the PerfContext after
     /// reporting.
-    pub fn report_read_perf_context(metric_header: &'static str) {
+    pub(crate) fn report_read_perf_context(metric_header: &'static str) {
         PER_THREAD_ROCKS_PERF_CONTEXT.with(|perf_context_cell| {
             set_perf_stats(PerfStatsLevel::Disable);
             let perf_context = perf_context_cell.borrow();
@@ -2617,7 +2610,8 @@ where
 {
     pub fn get(&self, key: C::Index) -> Result<Option<C::Type>> {
         let mut result = Ok(None);
-        let is_perf_context_enabled = maybe_collect_perf_context();
+        let is_perf_context_enabled =
+            maybe_collect_perf_context(self.column_options.rocks_perf_sample_interval);
         if let Some(serialized_value) = self.backend.get_cf(self.handle(), &C::key(key))? {
             let value = deserialize(&serialized_value)?;
 
@@ -2631,7 +2625,8 @@ where
     }
 
     pub fn put(&self, key: C::Index, value: &C::Type) -> Result<()> {
-        let is_perf_context_enabled = maybe_collect_perf_context();
+        let is_perf_context_enabled =
+            maybe_collect_perf_context(self.column_options.rocks_perf_sample_interval);
         let serialized_value = serialize(value)?;
 
         let result = self
@@ -2645,7 +2640,8 @@ where
     }
 
     pub fn delete(&self, key: C::Index) -> Result<()> {
-        let is_perf_context_enabled = maybe_collect_perf_context();
+        let is_perf_context_enabled =
+            maybe_collect_perf_context(self.column_options.rocks_perf_sample_interval);
         let result = self.backend.delete_cf(self.handle(), &C::key(key));
         if is_perf_context_enabled {
             report_write_perf_context(C::rocksdb_delete_perf_metric_header(&self.column_options));
@@ -2662,7 +2658,8 @@ where
         &self,
         key: C::Index,
     ) -> Result<Option<C::Type>> {
-        let is_perf_context_enabled = maybe_collect_perf_context();
+        let is_perf_context_enabled =
+            maybe_collect_perf_context(self.column_options.rocks_perf_sample_interval);
         let result = self.backend.get_cf(self.handle(), &C::key(key));
         if is_perf_context_enabled {
             report_read_perf_context(C::rocksdb_get_perf_metric_header(&self.column_options));
@@ -2680,7 +2677,8 @@ where
     }
 
     pub fn get_protobuf(&self, key: C::Index) -> Result<Option<C::Type>> {
-        let is_perf_context_enabled = maybe_collect_perf_context();
+        let is_perf_context_enabled =
+            maybe_collect_perf_context(self.column_options.rocks_perf_sample_interval);
         let result = self.backend.get_cf(self.handle(), &C::key(key));
         if is_perf_context_enabled {
             report_read_perf_context(C::rocksdb_get_perf_metric_header(&self.column_options));
@@ -2697,7 +2695,8 @@ where
         let mut buf = Vec::with_capacity(value.encoded_len());
         value.encode(&mut buf)?;
 
-        let is_perf_context_enabled = maybe_collect_perf_context();
+        let is_perf_context_enabled =
+            maybe_collect_perf_context(self.column_options.rocks_perf_sample_interval);
         let result = self.backend.put_cf(self.handle(), &C::key(key), &buf);
         if is_perf_context_enabled {
             report_write_perf_context(C::rocksdb_put_perf_metric_header(&self.column_options));
