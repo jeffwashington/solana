@@ -2104,17 +2104,6 @@ impl Bank {
         }
         // on devnet snapshots:
         // fields.rent_collector.epoch_schedule != fields.epoch_schedule
-        if fields.rent_collector.epoch_schedule != fields.epoch_schedule {
-            info!(
-                "fields.rent_collector.epoch_schedule != fields.epoch_schedule: {:?} != {:?}",
-                fields.rent_collector.epoch_schedule, fields.epoch_schedule
-            );
-            fields.rent_collector.epoch_schedule = fields.epoch_schedule;
-        }
-        assert_eq!(
-            fields.epoch_schedule,
-            Self::get_rent_collector_from(&fields.rent_collector, fields.epoch).epoch_schedule
-        );
         let feature_set = new();
         let mut bank = Self {
             rewrites_skipped_this_slot: Rewrites::default(),
