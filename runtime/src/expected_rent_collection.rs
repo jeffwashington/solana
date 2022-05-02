@@ -396,11 +396,11 @@ impl ExpectedRentCollection {
         find_unskipped_slot: impl Fn(Slot) -> Option<Slot>,
         filler_account_suffix: Option<&Pubkey>,
     ) -> Option<Hash> {
+            /*
         let slots_per_epoch = rent_collector
             .epoch_schedule
             .get_slots_in_epoch(rent_collector.epoch);
 
-            /*
         let partition_from_pubkey =
             crate::bank::Bank::partition_from_pubkey(pubkey, slots_per_epoch);
             /*
