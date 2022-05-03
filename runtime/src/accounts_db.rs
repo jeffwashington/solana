@@ -4857,6 +4857,13 @@ impl AccountsDb {
                 1
             );
         }
+        else {
+            let interesting = slot == 131551403;
+            if interesting {
+                error!("cache flush slot: {}, dead!", slot);
+            }
+
+        }
 
         // Remove this slot from the cache, which will to AccountsDb's new readers should look like an
         // atomic switch from the cache to storage.
