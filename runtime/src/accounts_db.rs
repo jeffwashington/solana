@@ -6059,13 +6059,13 @@ impl AccountsDb {
     }
 
     pub fn get_accounts_delta_hash(&self, slot: Slot) -> Hash {
-        self.get_accounts_delta_hash_with_rewrites(slot, &Rewrites::default())
+        self.get_accounts_delta_hash_with_rewrites(slot, &Rewrites::default()).0
     }
     pub fn get_accounts_delta_hash_with_rewrites(
         &self,
         slot: Slot,
         skipped_rewrites: &Rewrites,
-    ) -> Hash {
+    ) -> (Hash, Vec<(Pubkey, Hash)>) {
         let mut scan = Measure::start("scan");
 
         let scan_result: ScanStorageResult<(Pubkey, Hash), DashMapVersionHash> = self
@@ -6111,7 +6111,7 @@ impl AccountsDb {
 
         Self::extend_hashes_with_skipped_rewrites(&mut hashes, skipped_rewrites);
 
-        let ret = AccountsHash::accumulate_account_hashes(hashes);
+        let ret = AccountsHash::accumulate_account_hashes(&mut hashes);
         accumulate.stop();
         let mut uncleaned_time = Measure::start("uncleaned_index");
         self.uncleaned_pubkeys.insert(slot, dirty_keys);
@@ -6127,7 +6127,7 @@ impl AccountsDb {
             .delta_hash_accumulate_time_total_us
             .fetch_add(accumulate.as_us(), Ordering::Relaxed);
         self.stats.delta_hash_num.fetch_add(1, Ordering::Relaxed);
-        ret
+        (ret, hashes)
     }
 
     /// add all items from 'skipped_rewrites' to 'hashes' where the pubkey doesn't already exist in 'hashes'

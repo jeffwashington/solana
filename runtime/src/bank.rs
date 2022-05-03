@@ -999,6 +999,7 @@ impl PartialEq for Bank {
             return true;
         }
         let Self {
+            final_account_hashes: _,
             rc: _,
             src: _,
             blockhash_queue,
@@ -1165,6 +1166,8 @@ impl AbiExample for BuiltinPrograms {
 /// are implemented elsewhere for versioning
 #[derive(AbiExample, Debug)]
 pub struct Bank {
+    pub final_account_hashes: RwLock<Vec<(Pubkey, Hash)>>,
+
     /// References to accounts, parent and signature status
     pub rc: BankRc,
 
@@ -1421,6 +1424,7 @@ impl Bank {
 
     fn default_with_accounts(accounts: Accounts) -> Self {
         let bank = Self {
+            final_account_hashes: RwLock::default(),
             rewrites_skipped_this_slot: Rewrites::default(),
             rc: BankRc::new(accounts, Slot::default()),
             src: StatusCacheRc::default(),
@@ -1748,6 +1752,7 @@ impl Bank {
 
         let accounts_data_len = parent.load_accounts_data_len();
         let mut new = Bank {
+            final_account_hashes: RwLock::default(),
             rewrites_skipped_this_slot: Rewrites::default(),
             rc,
             src,
@@ -2104,6 +2109,7 @@ impl Bank {
         }
         let feature_set = new();
         let mut bank = Self {
+            final_account_hashes: RwLock::default(),
             rewrites_skipped_this_slot: Rewrites::default(),
             rc: bank_rc,
             src: new(),
@@ -6204,10 +6210,11 @@ impl Bank {
     ///  of the delta of the ledger since the last vote and up to now
     fn hash_internal_state(&self) -> Hash {
         // If there are no accounts, return the hash of the previous state and the latest blockhash
-        let accounts_delta_hash = self
+        let (accounts_delta_hash, hashes) = self
             .rc
             .accounts
             .bank_hash_info_at(self.slot(), &self.rewrites_skipped_this_slot);
+        *self.final_account_hashes.write().unwrap() = hashes;
         let mut signature_count_buf = [0u8; 8];
         LittleEndian::write_u64(&mut signature_count_buf[..], self.signature_count() as u64);
 

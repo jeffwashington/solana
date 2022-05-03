@@ -1061,10 +1061,10 @@ impl Accounts {
     }
 
     pub fn bank_hash_at(&self, slot: Slot, rewrites: &Rewrites) -> Hash {
-        self.bank_hash_info_at(slot, rewrites).hash
+        self.bank_hash_info_at(slot, rewrites).0.hash
     }
 
-    pub fn bank_hash_info_at(&self, slot: Slot, rewrites: &Rewrites) -> BankHashInfo {
+    pub fn bank_hash_info_at(&self, slot: Slot, rewrites: &Rewrites) -> (BankHashInfo, Vec<(Pubkey, Hash)>) {
         let delta_hash = self
             .accounts_db
             .get_accounts_delta_hash_with_rewrites(slot, rewrites);
@@ -1073,8 +1073,9 @@ impl Accounts {
             .get(&slot)
             .expect("No bank hash was found for this bank, that should not be possible")
             .clone();
-        hash_info.hash = delta_hash;
-        hash_info
+        hash_info.hash = delta_hash.0;
+        let hashes = delta_hash.1;
+        (hash_info, hashes)
     }
 
     /// This function will prevent multiple threads from modifying the same account state at the

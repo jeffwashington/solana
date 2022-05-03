@@ -371,12 +371,12 @@ impl AccountsHash {
         (result.0, hash_total)
     }
 
-    pub fn compute_merkle_root(hashes: Vec<(Pubkey, Hash)>, fanout: usize) -> Hash {
+    pub fn compute_merkle_root(hashes: &Vec<(Pubkey, Hash)>, fanout: usize) -> Hash {
         Self::compute_merkle_root_loop(hashes, fanout, |t| t.1)
     }
 
     // this function avoids an infinite recursion compiler error
-    pub fn compute_merkle_root_recurse(hashes: Vec<Hash>, fanout: usize) -> Hash {
+    pub fn compute_merkle_root_recurse(hashes: &Vec<Hash>, fanout: usize) -> Hash {
         Self::compute_merkle_root_loop(hashes, fanout, |t: &Hash| *t)
     }
 
@@ -390,7 +390,7 @@ impl AccountsHash {
 
     // For the first iteration, there could be more items in the tuple than just hash and lamports.
     // Using extractor allows us to avoid an unnecessary array copy on the first iteration.
-    pub fn compute_merkle_root_loop<T, F>(hashes: Vec<T>, fanout: usize, extractor: F) -> Hash
+    pub fn compute_merkle_root_loop<T, F>(hashes: &Vec<T>, fanout: usize, extractor: F) -> Hash
     where
         F: Fn(&T) -> Hash + std::marker::Sync,
         T: std::marker::Sync,
@@ -425,7 +425,7 @@ impl AccountsHash {
         if result.len() == 1 {
             result[0]
         } else {
-            Self::compute_merkle_root_recurse(result, fanout)
+            Self::compute_merkle_root_recurse(&result, fanout)
         }
     }
 
@@ -614,7 +614,7 @@ impl AccountsHash {
                 if result.len() == 1 {
                     result[0]
                 } else {
-                    Self::compute_merkle_root_recurse(result, fanout)
+                    Self::compute_merkle_root_recurse(&result, fanout)
                 },
                 vec![], // no intermediate results needed by caller
             )
@@ -636,8 +636,8 @@ impl AccountsHash {
         )
     }
 
-    pub fn accumulate_account_hashes(mut hashes: Vec<(Pubkey, Hash)>) -> Hash {
-        Self::sort_hashes_by_pubkey(&mut hashes);
+    pub fn accumulate_account_hashes(hashes: &mut Vec<(Pubkey, Hash)>) -> Hash {
+        Self::sort_hashes_by_pubkey(hashes);
 
         Self::compute_merkle_root_loop(hashes, MERKLE_FANOUT, |i| i.1)
     }
