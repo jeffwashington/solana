@@ -4834,6 +4834,11 @@ impl AccountsDb {
             // will be able to find the account in storage
             let flushed_store =
                 self.create_and_insert_store(slot, aligned_total_size, "flush_slot_cache");
+                let interesting = slot == 131551403;
+                if interesting {
+                    error!("cache flush slot: {}, entries: {:?}", slot, accounts.iter().map(|(k, v)| (k, v.lamports())));
+                }
+        
             self.store_accounts_frozen(
                 (slot, &accounts[..]),
                 Some(&hashes),
