@@ -29,6 +29,10 @@ pub struct PreviousPass {
 use std::collections::HashSet;
 use std::str::FromStr;
 
+pub fn has(pubkey: &Pubkey) -> bool {
+    H.contains(pubkey)
+}
+
 lazy_static! {
     static ref H: HashSet<Pubkey> = 
     [

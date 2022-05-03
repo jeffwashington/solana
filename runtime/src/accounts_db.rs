@@ -105,7 +105,7 @@ pub const DEFAULT_NUM_DIRS: u32 = 4;
 // When calculating hashes, it is helpful to break the pubkeys found into bins based on the pubkey value.
 // More bins means smaller vectors to sort, copy, etc.
 pub const PUBKEY_BINS_FOR_CALCULATING_HASHES: usize = 65536;
-pub const NUM_SCAN_PASSES_DEFAULT: usize = 2;
+pub const NUM_SCAN_PASSES_DEFAULT: usize = 1;
 
 // Without chunks, we end up with 1 output vec for each outer snapshot storage.
 // This results in too many vectors to be efficient.
@@ -5752,6 +5752,10 @@ impl AccountsDb {
                 } else {
                     raw_lamports
                 };
+
+                if crate::accounts_hash::has(pubkey) {
+                    error!("abc {:?}", (pubkey, loaded_account.lamports(), slot));
+                }
 
                 let loaded_hash = loaded_account.loaded_hash();
                 let new_hash = ExpectedRentCollection::maybe_rehash_skipped_rewrite(
