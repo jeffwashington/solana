@@ -5352,6 +5352,11 @@ impl AccountsDb {
                 progress.push(iterator);
             }
         }
+        let interesting = slot == 131551403;
+        if interesting {
+            error!("slot: {}, entries: {:?}", slot, storages.first().map(|s| s.count()));
+        }
+
         while !progress.is_empty() {
             let mut min = current[0].0;
             let mut min_index = 0;
@@ -5537,7 +5542,11 @@ impl AccountsDb {
                 }
 
                 for (slot, sub_storages) in snapshot_storages.iter_range(start..end) {
+                    let interesting = slot == 131551403;
                     let valid_slot = sub_storages.is_some();
+                    if interesting {
+                        error!("slot: {}, use_write_cache: {}, valid_slot: {}", slot, config.use_write_cache, valid_slot);
+                    }
                     if config.use_write_cache {
                         let ancestors = config.ancestors.as_ref().unwrap();
                         if let Some(slot_cache) = self.accounts_cache.slot_cache(slot) {
