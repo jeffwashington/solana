@@ -6214,6 +6214,11 @@ impl Bank {
             .rc
             .accounts
             .bank_hash_info_at(self.slot(), &self.rewrites_skipped_this_slot);
+        if self.slot() == 131551403 {
+            hashes.iter().for_each(|(k, h)| {
+                //error!("{} {}", k, h);
+            });
+        }
         *self.final_account_hashes.write().unwrap() = hashes;
         let mut signature_count_buf = [0u8; 8];
         LittleEndian::write_u64(&mut signature_count_buf[..], self.signature_count() as u64);

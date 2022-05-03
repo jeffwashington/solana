@@ -6068,16 +6068,25 @@ impl AccountsDb {
     ) -> (Hash, Vec<(Pubkey, Hash)>) {
         let mut scan = Measure::start("scan");
 
+        let mut c = RwLock::new(Vec::default());//Vec::default();
+        let interesting = slot == 131551403;
+
         let scan_result: ScanStorageResult<(Pubkey, Hash), DashMapVersionHash> = self
             .scan_account_storage(
                 slot,
                 |loaded_account: LoadedAccount| {
                     // Cache only has one version per key, don't need to worry about versioning
+                    if interesting {
+                    
+                    c.write().unwrap().push((*loaded_account.pubkey(), 0, loaded_account.lamports()));}
                     Some((*loaded_account.pubkey(), loaded_account.loaded_hash()))
                 },
                 |accum: &DashMap<Pubkey, (u64, Hash)>, loaded_account: LoadedAccount| {
                     let loaded_write_version = loaded_account.write_version();
                     let loaded_hash = loaded_account.loaded_hash();
+                    if interesting {
+                        c.write().unwrap().push((*loaded_account.pubkey(), loaded_write_version, loaded_account.lamports()));
+                    }
                     // keep the latest write version for each pubkey
                     match accum.entry(*loaded_account.pubkey()) {
                         Occupied(mut occupied_entry) => {
@@ -6094,6 +6103,16 @@ impl AccountsDb {
             );
         scan.stop();
 
+        if interesting {
+            let mut c = c.write().unwrap();
+            c.sort_unstable();
+            c.iter().for_each(|v| {
+                error!("{:?}", v);
+            });
+            c.iter().for_each(|v| {
+                error!("^{:?}&", v.0);
+            });
+        }
         let mut accumulate = Measure::start("accumulate");
         let mut hashes: Vec<_> = match scan_result {
             ScanStorageResult::Cached(cached_result) => cached_result,
