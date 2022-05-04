@@ -4622,6 +4622,8 @@ impl AccountsDb {
         #[cfg(not(test))]
         assert!(requested_flush_root.is_some());
 
+        error!("flush_accounts_cache: slot: {:?}, aggressively: {}, slots in write cache: {:?}", requested_flush_root, self.should_aggressively_flush_cache(), self.accounts_cache.cache.iter().map(|e| *e.key()).collect::<Vec<_>>());
+
         if !force_flush && !self.should_aggressively_flush_cache() {
             return;
         }
@@ -5635,6 +5637,8 @@ impl AccountsDb {
         let _guard = self.active_stats.activate(ActiveStatItem::Hash);
         if !use_index {
             let mut collect_time = Measure::start("collect");
+            error!("calculate_accounts_hash_helper, slots in write cache: {:?}", self.accounts_cache.cache.iter().map(|e| *e.key()).collect::<Vec<_>>());
+
             let (combined_maps, slots) = self.get_snapshot_storages(slot, None, config.ancestors);
             collect_time.stop();
 
