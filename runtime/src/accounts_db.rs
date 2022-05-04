@@ -2503,6 +2503,7 @@ impl AccountsDb {
             reclaimed_offsets,
             reset_accounts,
         );
+        error!("remove_dead_accounts. dead_slots: {:?}", dead_slots);
         if purge_stats.is_none() {
             assert!(dead_slots.is_empty());
         } else if let Some(expected_single_dead_slot) = expected_single_dead_slot {
@@ -6288,6 +6289,7 @@ impl AccountsDb {
         let mut dead_slots = HashSet::new();
         let mut new_shrink_candidates: ShrinkCandidates = HashMap::new();
         let mut measure = Measure::start("remove");
+        error!("reclaims: {:?}", reclaims);
         for (slot, account_info) in reclaims {
             // No cached accounts should make it here
             assert!(!account_info.is_cached());
@@ -6312,6 +6314,7 @@ impl AccountsDb {
                 let count =
                     store.remove_account(account_info.stored_size() as usize, reset_accounts);
                 if count == 0 {
+                    error!("removing dead slot: {}", slot);
                     self.dirty_stores
                         .insert((*slot, store.append_vec_id()), store.clone());
                     dead_slots.insert(*slot);
