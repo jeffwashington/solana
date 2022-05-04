@@ -6289,7 +6289,7 @@ impl AccountsDb {
         let mut dead_slots = HashSet::new();
         let mut new_shrink_candidates: ShrinkCandidates = HashMap::new();
         let mut measure = Measure::start("remove");
-        error!("reclaims: {:?}", reclaims);
+        error!("reclaims: {:?}", reclaims.len());
         for (slot, account_info) in reclaims {
             // No cached accounts should make it here
             assert!(!account_info.is_cached());
