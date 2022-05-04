@@ -793,6 +793,7 @@ impl Accounts {
         test_hash_calculation: bool,
         epoch_schedule: &EpochSchedule,
         rent_collector: &RentCollector,
+        can_cached_slot_be_unflushed: bool,
     ) -> bool {
         if let Err(err) = self.accounts_db.verify_bank_hash_and_lamports_new(
             slot,
@@ -801,6 +802,7 @@ impl Accounts {
             test_hash_calculation,
             epoch_schedule,
             rent_collector,
+            can_cached_slot_be_unflushed,
         ) {
             warn!("verify_bank_hash failed: {:?}", err);
             false
