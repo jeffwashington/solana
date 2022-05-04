@@ -778,12 +778,14 @@ impl Accounts {
         ancestors: &Ancestors,
         total_lamports: u64,
         test_hash_calculation: bool,
+        can_cached_slot_be_unflushed: bool,
     ) -> bool {
         if let Err(err) = self.accounts_db.verify_bank_hash_and_lamports(
             slot,
             ancestors,
             total_lamports,
             test_hash_calculation,
+            can_cached_slot_be_unflushed,
         ) {
             warn!("verify_bank_hash failed: {:?}", err);
             false

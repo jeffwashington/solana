@@ -5812,13 +5812,13 @@ impl AccountsDb {
         ancestors: &Ancestors,
         total_lamports: u64,
         test_hash_calculation: bool,
+        can_cached_slot_be_unflushed: bool,
     ) -> Result<(), BankHashVerificationError> {
         use BankHashVerificationError::*;
 
         let use_index = false;
         let check_hash = false; // this will not be supported anymore
         let is_startup = true;
-        let can_cached_slot_be_unflushed = false;
         let (calculated_hash, calculated_lamports) = self
             .calculate_accounts_hash_helper_with_verify(
                 use_index,
