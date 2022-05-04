@@ -4837,7 +4837,7 @@ impl AccountsDb {
                 self.create_and_insert_store(slot, aligned_total_size, "flush_slot_cache");
                 let interesting = slot == 131551403;
                 if interesting {
-                    error!("cache flush slot: {}, entries: {:?}", slot, accounts.iter().map(|(k, v)| (k, v.lamports())));
+                    //error!("cache flush slot: {}, entries: {:?}", slot, accounts.iter().map(|(k, v)| (k, v.lamports())));
                 }
         
             self.store_accounts_frozen(
@@ -5367,7 +5367,7 @@ impl AccountsDb {
         }
         let interesting = slot == 131551403;
         if interesting {
-            error!("slot: {}, entries: {:?}", slot, storages.first().map(|s| s.count()));
+            //error!("slot: {}, entries: {:?}", slot, storages.first().map(|s| s.count()));
         }
 
         while !progress.is_empty() {
@@ -5917,7 +5917,7 @@ impl AccountsDb {
                 final_result
             );
             if storages.range().end == 131551403 {
-                panic!("why?");
+                //panic!("why?");
             }
             Ok(final_result)
         };
@@ -6098,7 +6098,7 @@ impl AccountsDb {
         let mut scan = Measure::start("scan");
 
         let mut c = RwLock::new(Vec::default());//Vec::default();
-        let interesting = slot == 131551403;
+        let interesting = false && slot == 131551403;
 
         let scan_result: ScanStorageResult<(Pubkey, Hash), DashMapVersionHash> = self
             .scan_account_storage(

@@ -30,9 +30,9 @@ use std::collections::HashSet;
 use std::str::FromStr;
 
 pub fn has(pubkey: &Pubkey) -> bool {
-    H.contains(pubkey)
+    false//H.contains(pubkey)
 }
-
+/*
 lazy_static! {
     static ref H: HashSet<Pubkey> = 
     [
@@ -383,7 +383,7 @@ Pubkey::from_str("J8WkGZVj3eEVB1MeX24YL6ytQRgdGvpbEFgeW5iyg8ju").unwrap(),
 Pubkey::from_str("JAe1wPF7HgueCbqVcM5qfjskmURgyDhptKhTnC1PahaW").unwrap(),
 ].into_iter().collect();
 }
-
+*/
 /// parameters to calculate accounts hash
 #[derive(Debug)]
 pub struct CalcAccountsHashConfig<'a> {
@@ -1188,9 +1188,10 @@ impl AccountsHash {
                 );
                 hashes.push(&item.hash);
             }
+            /*
             if H.contains(&item.pubkey) {
                 error!("{:?}", (item.pubkey, item.lamports));
-            }
+            }*/
             if !duplicate_pubkey_indexes.is_empty() {
                 // skip past duplicate keys in earlier slots
                 // reverse this list because get_item can remove first_items[*i] when *i is exhausted
