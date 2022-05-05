@@ -3215,7 +3215,7 @@ impl AccountsDb {
                         continue;
                     }
                 }
-                // these accounts already exist in the newer slot, so we cannot write them to
+                // these accounts already exist in the newer slot, so we cannot write them to the ancient append vec
                 duplicates.into_iter().for_each(|k| {
                     stored_accounts.remove(&k);
                 });
@@ -3242,6 +3242,9 @@ impl AccountsDb {
             else {
                 slot > ancient_slot
             };
+            if !drop_root {
+                error!("ancient_append_vec: not dropping, slot: {}, ancient_slot: {}, accounts: {}", slot, ancient_slot, accounts.len());
+            }
 
             {
                 // write what we can to the current ancient storage
