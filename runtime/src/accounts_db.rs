@@ -6214,20 +6214,24 @@ impl AccountsDb {
         previous_slot_entry_was_cached: bool,
     ) -> SlotList<AccountInfo> {
         let len = std::cmp::min(accounts.len(), infos.len());
-        let chunk_size = std::cmp::max(1, len / quarter_thread_count()); // # pubkeys/thread
-        let batches = 1 + len / chunk_size;
-        //use log::*; error!("len: {}", len);
-        thread_pool.install(|| {
-            (0..batches)
-                .into_par_iter()
-                .map(|batch| {
-                    let start = batch * chunk_size;
-                    let end = std::cmp::min(start + chunk_size, len);
-                    self.update_index_range(&infos, &accounts, previous_slot_entry_was_cached, start, end)
-                })
-                .flatten()
-                .collect::<Vec<_>>()
-        })
+        if len > 10 {
+            let chunk_size = std::cmp::max(1, len / quarter_thread_count()); // # pubkeys/thread
+            let batches = 1 + len / chunk_size;
+            thread_pool.install(|| {
+                (0..batches)
+                    .into_par_iter()
+                    .map(|batch| {
+                        let start = batch * chunk_size;
+                        let end = std::cmp::min(start + chunk_size, len);
+                        self.update_index_range(&infos, &accounts, previous_slot_entry_was_cached, start, end)
+                    })
+                    .flatten()
+                    .collect::<Vec<_>>()
+            })
+        }
+        else {
+            self.update_index_range(&infos, &accounts, previous_slot_entry_was_cached, 0, len)
+        }
     }
 
     fn should_not_shrink(aligned_bytes: u64, total_bytes: u64, num_stores: usize) -> bool {
