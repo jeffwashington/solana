@@ -3169,7 +3169,9 @@ impl AccountsDb {
             info!("ancient_append_vec: combine_ancient_slots max_root: {}, first slot: {}, distance from max: {}, num_roots: {}", max_root, first_slot, max_root.saturating_sub(*first_slot), sorted_slots.len());
         }
 
+        let mut m = 0;
         for i2 in 0..num_slots {
+            m += 1;
             let i = if higher_slot_squash {
                 num_slots - i2 - 1
             } else {
@@ -3296,6 +3298,7 @@ impl AccountsDb {
                 dropped_roots.push(slot);
             }
         }
+        error!("ancient_append_vec: ran this many: {}", m);
 
         error!("ancient_append_vec: cleaning old roots: {:?}", (dropped_roots.len(), dropped_roots.iter().min(), dropped_roots.iter().max()));
         if !dropped_roots.is_empty() {
