@@ -3241,7 +3241,7 @@ impl AccountsDb {
             }  
             else {
                 slot > ancient_slot
-            }
+            };
 
             {
                 // write what we can to the current ancient storage
