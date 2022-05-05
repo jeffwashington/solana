@@ -6214,9 +6214,9 @@ impl AccountsDb {
         previous_slot_entry_was_cached: bool,
     ) -> SlotList<AccountInfo> {
         let len = std::cmp::min(accounts.len(), infos.len());
-        if len > 100000 {
-            let chunk_size = std::cmp::max(1, len / quarter_thread_count()); // # pubkeys/thread
-            let batches = 1 + len / chunk_size;
+        if len > 0 {
+            let chunk_size = usize::MAX;//std::cmp::max(1, len / quarter_thread_count()); // # pubkeys/thread
+            let batches = 1;// + len / chunk_size;
             thread_pool.install(|| {
                 (0..batches)
                     .into_par_iter()
