@@ -3247,10 +3247,10 @@ impl AccountsDb {
                 // write what we can to the current ancient storage
                 let (accounts, hashes) = to_store.get(StorageSelector::Primary);
                 self.store_ancient_accounts(ancient_slot, accounts, hashes, ancient_store);
-            }
-            if !drop_root {
-                error!("ancient_append_vec: not dropping, slot: {}, ancient_slot: {}, accounts: {}", slot, ancient_slot, accounts.len());
-            }
+                if !drop_root {
+                    error!("ancient_append_vec: not dropping, slot: {}, ancient_slot: {}, accounts: {}", slot, ancient_slot, accounts.len());
+                }
+                }
 
             // handle accounts from 'slot' which did not fit into the current ancient append vec
             let (accounts, hashes) = to_store.get(StorageSelector::Overflow);
