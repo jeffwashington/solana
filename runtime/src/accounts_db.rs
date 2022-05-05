@@ -6169,6 +6169,18 @@ impl AccountsDb {
         });
         hashes.extend(skipped_rewrites.into_iter());
     }
+/*
+    fn update_index_range<'a, T: ReadableAccount + Sync>(
+        &self,
+        thread_pool: &ThreadPool,
+        infos: &[AccountInfo],
+        accounts: impl StorableAccounts<'a, T>,
+        previous_slot_entry_was_cached: bool,
+        start: usize,
+        end: usize,
+    ) -> SlotList<AccountInfo> {
+    }
+    */
 
     // previous_slot_entry_was_cached = true means we just need to assert that after this update is complete
     //  that there are no items we would have put in reclaims that are not cached
@@ -6186,8 +6198,8 @@ impl AccountsDb {
     ) -> SlotList<AccountInfo> {
         let target_slot = accounts.target_slot();
         let len = std::cmp::min(accounts.len(), infos.len());
-        let chunk_size = std::cmp::max(1, len / quarter_thread_count()); // # pubkeys/thread
-        let batches = 2;//1 + len / chunk_size;
+        let chunk_size = len / 2;//std::cmp::max(1, len / quarter_thread_count()); // # pubkeys/thread
+        let batches = 1 + len / chunk_size;
         //use log::*; error!("len: {}", len);
         thread_pool.install(|| {
             (0..batches)
