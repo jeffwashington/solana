@@ -6237,7 +6237,7 @@ impl AccountsDb {
             self.update_index_range(&infos, &accounts, previous_slot_entry_was_cached, 0, len)
         };
         if l.len() == 256 {
-            panic!("call stack");
+            //panic!("call stack");
         }
 
         //error!("reclaims: {}", l.len());
