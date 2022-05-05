@@ -6187,8 +6187,8 @@ impl AccountsDb {
         let target_slot = accounts.target_slot();
         let len = std::cmp::min(accounts.len(), infos.len());
         let chunk_size = std::cmp::max(1, len / quarter_thread_count()); // # pubkeys/thread
-        let batches = 1 + len / chunk_size;
-        use log::*; error!("len: {}", len);
+        let batches = 2;//1 + len / chunk_size;
+        //use log::*; error!("len: {}", len);
         thread_pool.install(|| {
             (0..batches)
                 .into_par_iter()
