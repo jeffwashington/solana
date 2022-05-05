@@ -6218,6 +6218,8 @@ impl AccountsDb {
             let chunk_size = usize::MAX;//std::cmp::max(1, len / quarter_thread_count()); // # pubkeys/thread
             let batches = 1;// + len / chunk_size;
             thread_pool.install(|| {
+                self.update_index_range(&infos, &accounts, previous_slot_entry_was_cached, 0, len)
+/*
                 (0..batches)
                     .into_par_iter()
                     .map(|batch| {
@@ -6227,6 +6229,7 @@ impl AccountsDb {
                     })
                     .flatten()
                     .collect::<Vec<_>>()
+                    */
             })
         }
         else {
