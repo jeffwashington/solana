@@ -3183,6 +3183,7 @@ impl AccountsDb {
                 Some(all_storages) => all_storages,
                 None => {
                     // nothing to do on this slot
+                    error!("ancient_append_vec: nothing to do on this slot, slot: {}", slot);
                     continue;
                 }
             };
@@ -3224,6 +3225,7 @@ impl AccountsDb {
             // we could sort these
             // we could also check for alive accounts here
             if stored_accounts.is_empty() {
+                error!("ancient_append_vec: reports empty, slot: {}", slot);
                 continue; // skipping empty slot
             }
             self.maybe_create_ancient_append_vec(&mut current_ancient_storage, slot);
