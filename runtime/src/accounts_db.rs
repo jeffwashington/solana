@@ -3288,6 +3288,7 @@ impl AccountsDb {
 
         if !dropped_roots.is_empty() {
             // todo: afterwards, we need to remove the roots sometime
+            error!("cleaning old roots: {:?}", (dropped_roots.len(), dropped_roots.min(), dropped_roots.max()));
             dropped_roots.iter().for_each(|slot| {
                 self.accounts_index
                     .clean_dead_slot(*slot, &mut AccountsIndexRootsStats::default());
