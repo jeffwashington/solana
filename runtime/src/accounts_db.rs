@@ -6218,6 +6218,7 @@ impl AccountsDb {
         if len > 0 {
             let chunk_size = usize::MAX;//std::cmp::max(1, len / quarter_thread_count()); // # pubkeys/thread
             let batches = 1;// + len / chunk_size;
+            panic!("thread pool");
             thread_pool.install(|| {
                 //self.update_index_range(&infos, &accounts, previous_slot_entry_was_cached, 0, len)
                 (0..batches)
@@ -6236,7 +6237,11 @@ impl AccountsDb {
         else {
             self.update_index_range(&infos, &accounts, previous_slot_entry_was_cached, 0, len)
         };
-        error!("reclaims: {}", l.len());
+        if l.len() == 256 {
+            panic!("call stack");
+        }
+
+        //error!("reclaims: {}", l.len());
         l
     }
 
