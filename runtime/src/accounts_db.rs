@@ -3169,11 +3169,11 @@ impl AccountsDb {
             info!("ancient_append_vec: combine_ancient_slots max_root: {}, first slot: {}, distance from max: {}, num_roots: {}", max_root, first_slot, max_root.saturating_sub(*first_slot), sorted_slots.len());
         }
 
-        for i in 0..num_slots {
+        for i2 in 0..num_slots {
             let i = if higher_slot_squash {
-                num_slots - i - 1
+                num_slots - i2 - 1
             } else {
-                i
+                i2
             };
             let slot = sorted_slots[i];
             let all_storages = match self.get_storages_for_slot(slot).and_then(|all_storages| {
