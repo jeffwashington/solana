@@ -3161,7 +3161,7 @@ impl AccountsDb {
 
     /// combine all entries in 'sorted_slots' into ancient append vecs
     fn combine_ancient_slots(&self, sorted_slots: Vec<Slot>, max_root: Slot) {
-        let higher_slot_squash = true;
+        let higher_slot_squash = false;
         let num_slots = sorted_slots.len();
         let mut current_ancient_storage = None;
         let mut dropped_roots = vec![];
@@ -3204,7 +3204,7 @@ impl AccountsDb {
                                 if slot_list_slot == &ancient_slot {
                                     duplicates.push(*k);
                                 } else if slot_list_slot == &slot {
-                                    illegal = true;
+                                    //illegal = true;
                                     break;
                                 }
                             }
@@ -3215,6 +3215,7 @@ impl AccountsDb {
                     }
                     if illegal {
                         // we cannot squash this slot because it contains items that are already written to the ancient slot, which is higher than our slot
+                        error!("ancient_append_vec: reports empty, slot: {}", slot);
                         continue;
                     }
                 }
