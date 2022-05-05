@@ -6173,7 +6173,7 @@ impl AccountsDb {
     fn update_index_range<'a, T: ReadableAccount + Sync>(
         &self,
         infos: &[AccountInfo],
-        accounts: impl StorableAccounts<'a, T>,
+        accounts: &impl StorableAccounts<'a, T>,
         previous_slot_entry_was_cached: bool,
         start: usize,
         end: usize,
@@ -6213,7 +6213,6 @@ impl AccountsDb {
         accounts: impl StorableAccounts<'a, T>,
         previous_slot_entry_was_cached: bool,
     ) -> SlotList<AccountInfo> {
-        let target_slot = accounts.target_slot();
         let len = std::cmp::min(accounts.len(), infos.len());
         let chunk_size = std::cmp::max(1, len / quarter_thread_count()); // # pubkeys/thread
         let batches = 1 + len / chunk_size;
@@ -6224,24 +6223,7 @@ impl AccountsDb {
                 .map(|batch| {
                     let start = batch * chunk_size;
                     let end = std::cmp::min(start + chunk_size, len);
-                    let mut reclaims = Vec::with_capacity((end - start) / 2);
-                    (start..end).into_iter().for_each(|i| {
-                        let info = infos[i];
-                        let pubkey_account = (accounts.pubkey(i), accounts.account(i));
-                        let pubkey = pubkey_account.0;
-                        let old_slot = accounts.slot(i);
-                        self.accounts_index.upsert(
-                            target_slot,
-                            old_slot,
-                            pubkey,
-                            pubkey_account.1,
-                            &self.account_indexes,
-                            info,
-                            &mut reclaims,
-                            previous_slot_entry_was_cached,
-                        );
-                    });
-                    reclaims
+                    self.update_index_range(&infos, &accounts, previous_slot_entry_was_cached, start, end)
                 })
                 .flatten()
                 .collect::<Vec<_>>()
