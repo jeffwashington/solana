@@ -3098,7 +3098,7 @@ impl AccountsDb {
         let _guard = self.active_stats.activate(ActiveStatItem::SquashAncient);
 
         let max_root = self.accounts_index.max_root_inclusive();
-        let epoch_width = solana_sdk::clock::DEFAULT_SLOTS_PER_EPOCH * 50 / 100;
+        let epoch_width = solana_sdk::clock::DEFAULT_SLOTS_PER_EPOCH * 90 / 100;
         let old_root = max_root.saturating_sub(epoch_width + 1000);
 
         let mut old_slots = self.get_roots_less_than(old_root);
