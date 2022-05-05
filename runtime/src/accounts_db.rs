@@ -3252,17 +3252,18 @@ impl AccountsDb {
             // handle accounts from 'slot' which did not fit into the current ancient append vec
             let (accounts, hashes) = to_store.get(StorageSelector::Overflow);
             if !accounts.is_empty() {
+                error!("ancient_append_vec: overflow, slot: {}, ancient_slot: {}, accounts: {}", slot, ancient_slot, accounts.len());
                 // we need a new ancient append vec
                 // now that this slot will be used to create a new ancient append vec, there will still be a root present at this slot
-                drop_root = false;
                 assert!(
-                    slot > ancient_slot,
+                    drop_root,
                     "slot: {}, ancient_slot: {}, remaining accounts: {}, available_bytes: {}",
                     slot,
                     ancient_slot,
                     accounts.len(),
                     available_bytes
                 );
+                drop_root = false;
                 // our oldest slot is not an append vec of max size, so we need to start with rewriting that storage to create an ancient append vec for the oldest slot
                 current_ancient_storage = None; // done with last ancient append vec
                 self.maybe_create_ancient_append_vec(&mut current_ancient_storage, slot);
@@ -3291,9 +3292,9 @@ impl AccountsDb {
             }
         }
 
+        error!("ancient_append_vec: cleaning old roots: {:?}", (dropped_roots.len(), dropped_roots.iter().min(), dropped_roots.iter().max()));
         if !dropped_roots.is_empty() {
             // todo: afterwards, we need to remove the roots sometime
-            error!("ancient_append_vec: cleaning old roots: {:?}", (dropped_roots.len(), dropped_roots.iter().min(), dropped_roots.iter().max()));
             dropped_roots.iter().for_each(|slot| {
                 self.accounts_index
                     .clean_dead_slot(*slot, &mut AccountsIndexRootsStats::default());
