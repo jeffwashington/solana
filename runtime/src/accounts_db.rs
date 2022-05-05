@@ -3236,7 +3236,12 @@ impl AccountsDb {
 
             let mut ids = vec![ancient_store.append_vec_id()];
             // if this slot is not the ancient slot we're writing to, then this root will be dropped
-            let mut drop_root = slot > ancient_slot;
+            let mut drop_root = if higher_slot_squash {
+                slot < ancient_slot
+            }  
+            else {
+                slot > ancient_slot
+            }
 
             {
                 // write what we can to the current ancient storage
