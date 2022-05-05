@@ -3200,10 +3200,10 @@ impl AccountsDb {
                         use log::*;
                 
                         if let Some(entry) = self.accounts_index.get_account_read_entry(k) {
-                            for (slot, _) in entry.slot_list() {
-                                if slot == &ancient_slot {
+                            for (slot_list_slot, _) in entry.slot_list() {
+                                if slot_list_slot == &ancient_slot {
                                     duplicates.push(*k);
-                                } else if slot == slot {
+                                } else if slot_list_slot == &slot {
                                     illegal = true;
                                     break;
                                 }
