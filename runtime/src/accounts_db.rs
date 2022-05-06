@@ -1803,12 +1803,12 @@ impl AccountsDb {
                 else {
                     *occupied.get_mut() -= 1;
                 }
-                error!("{} {}", line, occupied.get());
+                error!("jwash {} {}", line, occupied.get());
             }
             dashmap::mapref::entry::Entry::Vacant(vacant) => {
                 assert!(add);
                 vacant.insert(1);
-                error!("{} {}", line, 1);
+                error!("jwash {} {}", line, 1);
             }
         }
     }
