@@ -994,6 +994,7 @@ type AccountInfoAccountsIndex = AccountsIndex<AccountInfo>;
 // This structure handles the load/store of the accounts
 #[derive(Debug)]
 pub struct AccountsDb {
+    pub entries: Arc<DashMap<usize, usize>>,
     /// Keeps tracks of index into AppendVec on a per slot basis
     pub accounts_index: AccountInfoAccountsIndex,
 
@@ -1604,6 +1605,7 @@ impl AccountsDb {
         Self::bins_per_pass(num_hash_scan_passes);
 
         AccountsDb {
+            entries: Arc::default(),
             active_stats: ActiveStats::default(),
             skip_rewrites: false,
             accounts_index,
@@ -1790,6 +1792,27 @@ impl AccountsDb {
             .expect("Cluster type must be set at initialization")
     }
 
+    fn line(&self, line: u32, add: bool) {
+        let line = line as usize;
+        use log::*;
+        match self.entries.entry(line) {
+            dashmap::mapref::entry::Entry::Occupied(mut occupied) => {
+                if add {
+                    *occupied.get_mut() += 1;
+                }
+                else {
+                    *occupied.get_mut() -= 1;
+                }
+                error!("{} {}", line, occupied.get());
+            }
+            dashmap::mapref::entry::Entry::Vacant(vacant) => {
+                assert!(add);
+                vacant.insert(1);
+                error!("{} {}", line, 1);
+            }
+        }
+    }
+
     /// Reclaim older states of accounts older than max_clean_root for AccountsDb bloat mitigation
     fn clean_accounts_older_than_root(
         &self,
@@ -1804,7 +1827,9 @@ impl AccountsDb {
         const INDEX_CLEAN_BULK_COUNT: usize = 4096;
 
         let mut clean_rooted = Measure::start("clean_old_root-ms");
-        use log::*;error!("{} {}", file!(), line!());
+        let l = line!();
+        self.line(l, true);
+        //use log::*;error!("{} {}", file!(), line!());
         let reclaims: Vec<_> = self.thread_pool_clean.install(|| {
             purges
                 .par_chunks(INDEX_CLEAN_BULK_COUNT)
@@ -1822,7 +1847,7 @@ impl AccountsDb {
                 .flatten()
                 .collect()
         });
-        use log::*;error!("{} {}", file!(), line!());
+        self.line(l, false);
         clean_rooted.stop();
         inc_new_counter_info!("clean-old-root-par-clean-ms", clean_rooted.as_ms() as usize);
         self.clean_accounts_stats
@@ -6190,7 +6215,7 @@ impl AccountsDb {
         let len = std::cmp::min(accounts.len(), infos.len());
         let chunk_size = std::cmp::max(1, len / quarter_thread_count()); // # pubkeys/thread
         let batches = 1 + len / chunk_size;
-        use log::*;error!("{} {}", file!(), line!());
+        //use log::*;error!("{} {}", file!(), line!());
         let r  =thread_pool.install(|| {
             (0..batches)
                 .into_par_iter()
@@ -6219,7 +6244,7 @@ impl AccountsDb {
                 .flatten()
                 .collect::<Vec<_>>()
         });
-        use log::*;error!("{} {}", file!(), line!());
+        //use log::*;error!("{} {}", file!(), line!());
         r
     }
 
@@ -6675,7 +6700,7 @@ impl AccountsDb {
 
         // self.thread_pool (and not self.thread_pool_clean) here because this
         // function is only invoked from replay and fg processes.
-        use log::*;error!("{} {}", file!(), line!());
+        //use log::*;error!("{} {}", file!(), line!());
         self.store_accounts_custom(
             &self.thread_pool,
             accounts,
@@ -6685,7 +6710,7 @@ impl AccountsDb {
             is_cached_store,
             reset_accounts,
         );
-        use log::*;error!("{} {}", file!(), line!());
+        //use log::*;error!("{} {}", file!(), line!());
     }
 
     fn store_accounts_frozen<'a, T: ReadableAccount + Sync + ZeroLamport>(
@@ -6702,7 +6727,7 @@ impl AccountsDb {
         let is_cached_store = false;
         // self.thread_pool_clean (and not self.thread_pool) here because this
         // function is only invoked from cleanup and bg processes.
-        use log::*;error!("{} {}", file!(), line!());
+        //use log::*;error!("{} {}", file!(), line!());
         let r = self.store_accounts_custom(
             &self.thread_pool_clean,
             accounts,
@@ -6712,7 +6737,7 @@ impl AccountsDb {
             is_cached_store,
             reset_accounts,
         );
-        use log::*;error!("{} {}", file!(), line!());
+        //use log::*;error!("{} {}", file!(), line!());
 r
     }
 
@@ -6766,10 +6791,10 @@ r
         // after the account are stored by the above `store_accounts_to`
         // call and all the accounts are stored, all reads after this point
         // will know to not check the cache anymore
-        use log::*;error!("{} {}", file!(), line!());
+        //use log::*;error!("{} {}", file!(), line!());
         let mut reclaims =
             self.update_index(thread_pool, infos, accounts, previous_slot_entry_was_cached);
-            use log::*;error!("{} {}", file!(), line!());
+            //use log::*;error!("{} {}", file!(), line!());
 
         // For each updated account, `reclaims` should only have at most one
         // item (if the account was previously updated in this slot).
