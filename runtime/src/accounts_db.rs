@@ -6131,9 +6131,9 @@ impl AccountsDb {
                     previous_pass,
                     bins_per_pass,
                 );
+                l2amports.push(for_next_pass.lamports);
                 previous_pass = for_next_pass;
                 final_result = (hash, lamports);
-                l2amports.push(for_next_pass.lamports);
             }
             use log::*;error!("jw2ash lamports: {:?}", l2amports);
 
