@@ -6099,7 +6099,7 @@ impl AccountsDb {
             let mut final_result = (Hash::default(), 0);
 
             let cache_hash_data = CacheHashData::new(&self.accounts_hash_cache_path);
-
+            let mut l2amports = vec![];
             for pass in 0..num_hash_scan_passes {
                 let bounds = Range {
                     start: pass * bins_per_pass,
@@ -6133,8 +6133,9 @@ impl AccountsDb {
                 );
                 previous_pass = for_next_pass;
                 final_result = (hash, lamports);
-                use log::*;error!("pass: {}, lamports: {}", pass, lamports);
+                l2amports.push(for_next_pass.lamports);
             }
+            use log::*;error!("lamports: {:?}", l2amports);
 
             info!(
                 "calculate_accounts_hash_without_index: slot (exclusive): {} {:?}",
