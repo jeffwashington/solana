@@ -6135,7 +6135,7 @@ impl AccountsDb {
                 final_result = (hash, lamports);
                 l2amports.push(for_next_pass.lamports);
             }
-            use log::*;error!("lamports: {:?}", l2amports);
+            use log::*;error!("jw2ash lamports: {:?}", l2amports);
 
             info!(
                 "calculate_accounts_hash_without_index: slot (exclusive): {} {:?}",
