@@ -1803,7 +1803,7 @@ impl AccountsDb {
                 else {
                     *occupied.get_mut() -= 1;
                 }
-                if occupied.get() > 15000 {
+                if occupied.get() > &15000 {
                     panic!("too deep");
                 }
                 error!("jwash {} {}", line, occupied.get());
