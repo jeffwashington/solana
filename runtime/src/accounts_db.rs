@@ -6713,7 +6713,7 @@ impl AccountsDb {
             reset_accounts,
         );
         use log::*;error!("{} {}", file!(), line!());
-
+r
     }
 
     fn store_accounts_custom<'a, 'b, T: ReadableAccount + Sync + ZeroLamport>(
