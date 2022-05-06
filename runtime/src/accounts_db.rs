@@ -6094,6 +6094,7 @@ impl AccountsDb {
     ) -> Result<(Hash, u64), BankHashVerificationError> {
         let (num_hash_scan_passes, bins_per_pass) = Self::bins_per_pass(self.num_hash_scan_passes);
         let use_bg_thread_pool = config.use_bg_thread_pool;
+        error!("jwash: sarting hash calc");
         let mut scan_and_hash = move || {
             let mut previous_pass = PreviousPass::default();
             let mut final_result = (Hash::default(), 0);
@@ -6133,6 +6134,9 @@ impl AccountsDb {
                 );
                 l2amports.push(for_next_pass.lamports);
                 previous_pass = for_next_pass;
+                if pass % 1000 == 0 {
+                    use log::*;error!("jw3ash progress: {:?}", pass);
+                }
                 final_result = (hash, lamports);
             }
             use log::*;error!("jw2ash lamports: {:?}", l2amports);
