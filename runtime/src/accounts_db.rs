@@ -6215,6 +6215,8 @@ impl AccountsDb {
         let len = std::cmp::min(accounts.len(), infos.len());
         let chunk_size = std::cmp::max(1, len / quarter_thread_count()); // # pubkeys/thread
         let batches = 1 + len / chunk_size;
+        let l = line!();
+        self.line(l, true);
         //use log::*;error!("{} {}", file!(), line!());
         let r  =thread_pool.install(|| {
             (0..batches)
@@ -6244,6 +6246,7 @@ impl AccountsDb {
                 .flatten()
                 .collect::<Vec<_>>()
         });
+        self.line(l, false);
         //use log::*;error!("{} {}", file!(), line!());
         r
     }
@@ -6701,6 +6704,8 @@ impl AccountsDb {
         // self.thread_pool (and not self.thread_pool_clean) here because this
         // function is only invoked from replay and fg processes.
         //use log::*;error!("{} {}", file!(), line!());
+        let l = line!();
+        self.line(l, true);
         self.store_accounts_custom(
             &self.thread_pool,
             accounts,
@@ -6710,6 +6715,7 @@ impl AccountsDb {
             is_cached_store,
             reset_accounts,
         );
+        self.line(l, false);
         //use log::*;error!("{} {}", file!(), line!());
     }
 
@@ -6727,6 +6733,8 @@ impl AccountsDb {
         let is_cached_store = false;
         // self.thread_pool_clean (and not self.thread_pool) here because this
         // function is only invoked from cleanup and bg processes.
+        let l = line!();
+        self.line(l, true);
         //use log::*;error!("{} {}", file!(), line!());
         let r = self.store_accounts_custom(
             &self.thread_pool_clean,
@@ -6738,6 +6746,7 @@ impl AccountsDb {
             reset_accounts,
         );
         //use log::*;error!("{} {}", file!(), line!());
+        self.line(l, false);
 r
     }
 
@@ -6791,10 +6800,13 @@ r
         // after the account are stored by the above `store_accounts_to`
         // call and all the accounts are stored, all reads after this point
         // will know to not check the cache anymore
+        let l = line!();
+        self.line(l, true);
         //use log::*;error!("{} {}", file!(), line!());
         let mut reclaims =
             self.update_index(thread_pool, infos, accounts, previous_slot_entry_was_cached);
             //use log::*;error!("{} {}", file!(), line!());
+            self.line(l, false);
 
         // For each updated account, `reclaims` should only have at most one
         // item (if the account was previously updated in this slot).
