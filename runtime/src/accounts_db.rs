@@ -6133,7 +6133,7 @@ impl AccountsDb {
                 );
                 previous_pass = for_next_pass;
                 final_result = (hash, lamports);
-                use log::*;error!("pass: {}, lamports: {}", lamports);
+                use log::*;error!("pass: {}, lamports: {}", pass, lamports);
             }
 
             info!(
