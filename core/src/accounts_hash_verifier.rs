@@ -138,7 +138,7 @@ impl AccountsHashVerifier {
                     use_bg_thread_pool: true,
                     check_hash: false,
                     ancestors: None,
-                    use_write_cache: false,
+                    use_write_cache: true,
                     epoch_schedule: &accounts_package.epoch_schedule,
                     rent_collector: &accounts_package.rent_collector,
                 },
