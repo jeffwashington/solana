@@ -7396,11 +7396,11 @@ impl AccountsDb {
                     let mut j = 0;
                     while true {
                         if i >= raw.len() {
-                            error!("left over in j: {:?}", &r[i..]);
+                            error!("left over in j: {:?}", &r[j..]);
                             break;
                         }
                         if j >= r.len() {
-                            error!("left over in i: {:?}", &raw[j..]);
+                            error!("left over in i: {:?}", &raw[i..]);
                             break;
                         }
                         for i_next in (i+1)..raw.len() {
