@@ -6125,6 +6125,12 @@ impl AccountsDb {
                     hash.filler_account_suffix.as_ref(),
                 )?;
 
+                if pass == 0 {
+                    let mut copy = result.iter().map(|i| i.iter().map(|i| i.iter().cloned().collect::<Vec<CalculateHashIntermediate>>()).flatten().collect::<Vec<CalculateHashIntermediate>>()).flatten().collect::<Vec<CalculateHashIntermediate>>();
+                    copy.sort_by(AccountsHash::compare_two_hash_entries);
+                    error!("jw4ash: slot: {}, {:?}", storages.range().end, copy.iter().map(|i| (i.pubkey, i.lamports)).collect::<Vec<_>>());
+                }
+
                 let (hash, lamports, for_next_pass) = hash.rest_of_hash_calculation(
                     result,
                     &mut stats,
