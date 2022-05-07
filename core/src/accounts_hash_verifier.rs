@@ -8,6 +8,7 @@ use {
     solana_gossip::cluster_info::{ClusterInfo, MAX_SNAPSHOT_HASHES},
     solana_measure::measure::Measure,
     solana_runtime::{
+        ancestors::Ancestors,
         accounts_hash::{CalcAccountsHashConfig, HashStats},
         snapshot_config::SnapshotConfig,
         snapshot_package::{
