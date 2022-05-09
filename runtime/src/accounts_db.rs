@@ -6020,6 +6020,9 @@ impl AccountsDb {
                     find_unskipped_slot,
                     filler_account_suffix,
                 );
+                if pubkey == &interesting {
+                    error!("jwash15 found: {}, {:?}, balance: {}, new hash: {:?}", pubkey, (loaded_account.lamports(), slot), balance, new_hash);
+                }
                 let loaded_hash = new_hash.unwrap_or(loaded_hash);
 
                 let source_item = CalculateHashIntermediate::new(loaded_hash, balance, *pubkey);
@@ -6040,7 +6043,10 @@ impl AccountsDb {
                 if accum.is_empty() {
                     accum.append(&mut vec![Vec::new(); range]);
                 }
-                accum[pubkey_to_bin_index].push(source_item);
+                accum[pubkey_to_bin_index].push(source_item.clone());
+                if pubkey == &interesting {
+                    error!("jwash15 found: {}, {:?}, balance: {}, source_item: {:?}", pubkey, (loaded_account.lamports(), slot), balance, source_item);
+                }
             },
             |x| {
                 let (result, timing) = Self::sort_slot_storage_scan(x);
