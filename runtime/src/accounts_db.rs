@@ -6129,7 +6129,8 @@ impl AccountsDb {
                     hash.filler_account_suffix.as_ref(),
                 )?;
 
-                if pass == 3668 {
+                let desired_pass = 3668;
+                if pass == desired_pass {
                     let expected = [
                         (Pubkey::from_str("GRtxya4mLXDxNXy2KZvWQq86xpM5ScnTbaDc3uv2H9o4").unwrap(), 1000000000),
                         (Pubkey::from_str("GRtyQ4t94bxkXWFqJzmuZp77g5An7vS2dz2Xi15nHUai").unwrap(), 2039280),
@@ -7345,8 +7346,10 @@ impl AccountsDb {
                     previous_pass,
                     bins_per_pass,
                 );
-                if storages.range().end == 131332978 {
-                    error!("jwash12: slot: {}, lamport sum: {}, lamport sum prev: {:?}", storages.range().end, for_next_pass.lamports, l2amports.last());
+                if pass == desired_pass {
+                    if storages.range().end == 131332978 {
+                        error!("jwash12: slot: {}, lamport sum: {}, lamport sum prev: {:?}", storages.range().end, for_next_pass.lamports, l2amports.last());
+                    }
                 }
                 l2amports.push(for_next_pass.lamports);
                 previous_pass = for_next_pass;
