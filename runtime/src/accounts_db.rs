@@ -7303,6 +7303,8 @@ impl AccountsDb {
                     let mut j_found = 0;
                     let mut final_sorted = vec![];
                     let mut sum = 0;
+                    let mut matched = 0;
+                    let mut unique = 0;
                     loop {
                         if i_expected >= expected.len() {
                             if j_found >= results.len() {
@@ -7338,11 +7340,12 @@ impl AccountsDb {
                             final_sorted.push(results[j_found]);
                             i_expected += 1;
                             j_found += 1;
+                            matched += 1;
                         } else if results[j_found].0 < expected[i_expected].0 {
-                            error!("jdiff: missing in expected: {:?}", results[j_found]);
+                            error!("jdiff: missing in expected: {:?}, current expected: {:?}", results[j_found], expected[i_expected]);
                             j_found += 1;
                         } else {
-                            error!("jdiff: missing in results: {:?}", expected[i_expected]);
+                            error!("jdiff: missing in results: {:?}, current results: {:?}", expected[i_expected], result[j_found]);
                             i_expected += 1;
                         }
                     }
