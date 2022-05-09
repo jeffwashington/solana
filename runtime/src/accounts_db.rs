@@ -3240,6 +3240,9 @@ impl AccountsDb {
                 // write what we can to the current ancient storage
                 let (accounts, hashes) = to_store.get(StorageSelector::Primary);
                 self.store_ancient_accounts(ancient_slot, accounts, hashes, ancient_store);
+                if slot >= 130943203 && slot <= 130943206 {
+                    error!("ancient_append_vec: writing {} to slot {}, ancient_slot: {}", accounts.len(), slot, ancient_slot);
+                }
             }
 
             // handle accounts from 'slot' which did not fit into the current ancient append vec
