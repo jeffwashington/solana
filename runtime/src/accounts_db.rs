@@ -6125,7 +6125,7 @@ impl AccountsDb {
                     hash.filler_account_suffix.as_ref(),
                 )?;
 
-                if pass == 0 {
+                if pass == 3668 {
                     let raw = [
                         (
                             Pubkey::from_str("11111111111111111111111111111111").unwrap(),
