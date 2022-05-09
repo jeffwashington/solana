@@ -7351,7 +7351,7 @@ impl AccountsDb {
                     }
                     if storages.range().end == 131332978 {
                         error!("jw4ash: slot: {}, {:?}", storages.range().end, results);
-                        error!("jw5ash: slot: {}, sum: {}, {:?}", storages.range().end, sum, final_sorted);
+                        error!("jw5ash: slot: {}, sum: {}, {:?}, matched: {}, unique: {}", storages.range().end, sum, final_sorted, matched, unique);
                     }
                 }
 
