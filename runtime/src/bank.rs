@@ -4852,6 +4852,7 @@ impl Bank {
             loaded_txs,
             &self.rent_collector,
             &durable_nonce,
+            &last_blockhash,
             lamports_per_signature,
             self.leave_nonce_on_success(),
         );
