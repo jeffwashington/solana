@@ -5978,6 +5978,7 @@ impl AccountsDb {
         let mismatch_found = AtomicU64::new(0);
         let range = bin_range.end - bin_range.start;
         let sort_time = AtomicU64::new(0);
+        let interesting = Pubkey::from_str("GS5Fj1dtTSLeNN51Bo1zs9ZWB2kVsA66LEHmFZTZbtNa").unwrap();
 
         let find_unskipped_slot = |slot: Slot| self.find_unskipped_slot(slot, config.ancestors);
 
@@ -5990,6 +5991,9 @@ impl AccountsDb {
                 let mut pubkey_to_bin_index = bin_calculator.bin_from_pubkey(pubkey);
                 if !bin_range.contains(&pubkey_to_bin_index) {
                     return;
+                }
+                if pubkey == &interesting {
+                    error!("jwash11 found: {}, {:?}", pubkey, (loaded_account.lamports(), slot));
                 }
 
                 // when we are scanning with bin ranges, we don't need to use exact bin numbers. Subtract to make first bin we care about at index 0.
@@ -7971,9 +7975,15 @@ impl AccountsDb {
             return;
         }
 
+        let interesting = Pubkey::from_str("GS5Fj1dtTSLeNN51Bo1zs9ZWB2kVsA66LEHmFZTZbtNa").unwrap();
+
         let mut stats = BankHashStats::default();
         let mut total_data = 0;
         (0..accounts.len()).for_each(|index| {
+            if accounts.pubkey(index) == &interesting {
+                error!("jwash9: store: {}, {:?}", interesting, (accounts.account(index).lamports(), accounts.target_slot()));
+            }
+
             let account = accounts.account(index);
             total_data += account.data().len();
             stats.update(account);
