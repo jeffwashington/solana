@@ -3241,7 +3241,7 @@ impl AccountsDb {
                 let (accounts, hashes) = to_store.get(StorageSelector::Primary);
                 self.store_ancient_accounts(ancient_slot, accounts, hashes, ancient_store);
                 if slot >= 130943203 && slot <= 130943206 {
-                    error!("ancient_append_vec: writing {} to slot {}, ancient_slot: {}", accounts.len(), slot, ancient_slot);
+                    error!("ancient_append_vec: tw: writing {} to slot {}, ancient_slot: {}", accounts.len(), slot, ancient_slot);
                 }
             }
 
@@ -5590,6 +5590,10 @@ impl AccountsDb {
         let mut current = Vec::with_capacity(len);
         for storage in storages {
             let accounts = storage.accounts.accounts(0);
+            if slot >= 130943203 && slot <= 130943206 {
+                error!("tw: scanning: slot: {}, store_id: {}", slot, storage.append_vec_id());
+            }
+
             let mut iterator: std::vec::IntoIter<StoredAccountMeta<'_>> = accounts.into_iter();
             if let Some(item) = iterator
                 .next()
