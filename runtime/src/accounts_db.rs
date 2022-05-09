@@ -5978,7 +5978,7 @@ impl AccountsDb {
         let mismatch_found = AtomicU64::new(0);
         let range = bin_range.end - bin_range.start;
         let sort_time = AtomicU64::new(0);
-        let interesting = Pubkey::from_str("GS5Fj1dtTSLeNN51Bo1zs9ZWB2kVsA66LEHmFZTZbtNa").unwrap();
+        let interesting = Pubkey::from_str("GS5XWQdLrHUMxfgEExbp4N9XvY2odqaYtu8nkWo9JLGx").unwrap();
 
         let find_unskipped_slot = |slot: Slot| self.find_unskipped_slot(slot, config.ancestors);
 
@@ -7981,7 +7981,7 @@ impl AccountsDb {
             return;
         }
 
-        let interesting = Pubkey::from_str("GS5Fj1dtTSLeNN51Bo1zs9ZWB2kVsA66LEHmFZTZbtNa").unwrap();
+        let interesting = Pubkey::from_str("GS5XWQdLrHUMxfgEExbp4N9XvY2odqaYtu8nkWo9JLGx").unwrap();
 
         let mut stats = BankHashStats::default();
         let mut total_data = 0;
