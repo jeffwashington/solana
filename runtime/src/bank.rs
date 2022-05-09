@@ -1269,6 +1269,20 @@ pub struct NewBankOptions {
     pub vote_only_bank: bool,
 }
 
+#[derive(Debug)]
+struct PrevEpochInflationRewards {
+    validator_rewards: u64,
+    prev_epoch_duration_in_years: f64,
+    validator_rate: f64,
+    foundation_rate: f64,
+}
+
+pub struct CommitTransactionCounts {
+    pub committed_transactions_count: u64,
+    pub committed_with_failure_result_count: u64,
+    pub signature_count: u64,
+}
+
 impl Bank {
     pub fn default_for_tests() -> Self {
         Self::default_with_accounts(Accounts::default_for_tests())
@@ -4471,15 +4485,21 @@ impl Bank {
         sanitized_txs: &[SanitizedTransaction],
         loaded_txs: &mut [TransactionLoadResult],
         execution_results: Vec<TransactionExecutionResult>,
-        committed_transactions_count: u64,
-        committed_with_failure_result_count: u64,
-        signature_count: u64,
+        last_blockhash: Hash,
+        lamports_per_signature: u64,
+        counts: CommitTransactionCounts,
         timings: &mut ExecuteTimings,
     ) -> TransactionResults {
         assert!(
             !self.freeze_started(),
             "commit_transactions() working on a bank that is already frozen or is undergoing freezing!"
         );
+
+        let CommitTransactionCounts {
+            committed_transactions_count,
+            committed_with_failure_result_count,
+            signature_count,
+        } = counts;
 
         let tx_count = if self.bank_tranaction_count_fix_enabled() {
             committed_transactions_count
@@ -4509,7 +4529,6 @@ impl Bank {
                 .fetch_max(committed_transactions_count, Relaxed);
         }
 
-        let (blockhash, lamports_per_signature) = self.last_blockhash_and_lamports_per_signature();
         let mut write_time = Measure::start("write_time");
         self.rc.accounts.store_cached(
             self.slot(),
@@ -4517,7 +4536,7 @@ impl Bank {
             &execution_results,
             loaded_txs,
             &self.rent_collector,
-            &blockhash,
+            &last_blockhash,
             lamports_per_signature,
             self.leave_nonce_on_success(),
         );
@@ -5347,14 +5366,21 @@ impl Bank {
             timings,
         );
 
+        let (last_blockhash, lamports_per_signature) =
+            self.last_blockhash_and_lamports_per_signature();
         let results = self.commit_transactions(
             batch.sanitized_transactions(),
             &mut loaded_transactions,
             execution_results,
-            executed_transactions_count as u64,
-            executed_transactions_count.saturating_sub(executed_with_successful_result_count)
-                as u64,
-            signature_count,
+            last_blockhash,
+            lamports_per_signature,
+            CommitTransactionCounts {
+                committed_transactions_count: executed_transactions_count as u64,
+                committed_with_failure_result_count: executed_transactions_count
+                    .saturating_sub(executed_with_successful_result_count)
+                    as u64,
+                signature_count,
+            },
             timings,
         );
         let post_balances = if collect_balances {
