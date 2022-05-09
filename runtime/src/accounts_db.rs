@@ -6126,7 +6126,7 @@ impl AccountsDb {
                 )?;
 
                 if pass == 3668 {
-                    let raw = [
+                    let expected = [
                         (Pubkey::from_str("GRtxya4mLXDxNXy2KZvWQq86xpM5ScnTbaDc3uv2H9o4").unwrap(), 1000000000),
                         (Pubkey::from_str("GRtyQ4t94bxkXWFqJzmuZp77g5An7vS2dz2Xi15nHUai").unwrap(), 2039280),
                         (Pubkey::from_str("GRtyoUyRTQorayMN19ryH8echkPaDcfpTD6mPTSdjSAq").unwrap(), 2509993),
@@ -7281,51 +7281,51 @@ impl AccountsDb {
                         .iter()
                         .map(|i| (i.pubkey, i.lamports))
                         .collect::<Vec<_>>();
-                    let mut i = 0;
-                    let mut j = 0;
+                    let mut i_expected = 0;
+                    let mut j_found = 0;
                     let mut final_sorted = vec![];
                     let mut sum = 0;
                     loop {
-                        if i >= raw.len() {
-                            if j >= r.len() {
-                                error!("jdiff: both finished: slot: {}, {}, {}", storages.range().end, i, j);
+                        if i_expected >= expected.len() {
+                            if j_found >= r.len() {
+                                error!("jdiff: both finished: slot: {}, {}, {}", storages.range().end, i_expected, j_found);
                                 break;
                             }
-                            error!("jdiff: left over in j: {:?}", &r[j..]);
+                            error!("jdiff: left over in j_found: {:?}", &r[j_found..]);
                             break;
                         }
-                        if j >= r.len() {
-                            error!("jdiff: left over in i: {:?}", &raw[i..]);
+                        if j_found >= r.len() {
+                            error!("jdiff: left over in i_expected: {:?}", &expected[i_expected..]);
                             break;
                         }
-                        for i_next in (i + 1)..raw.len() {
-                            if raw[i_next].0 == raw[i].0 {
-                                i = i_next;
+                        for i_next in (i_expected + 1)..expected.len() {
+                            if expected[i_next].0 == expected[i_expected].0 {
+                                i_expected = i_next;
                             } else {
                                 break;
                             }
                         }
-                        for j_next in (j + 1)..r.len() {
-                            if r[j_next].0 == r[j].0 {
-                                j = j_next;
+                        for j_next in (j_found + 1)..r.len() {
+                            if r[j_next].0 == r[j_found].0 {
+                                j_found = j_next;
                             } else {
                                 break;
                             }
                         }
-                        if r[j].0 == raw[i].0 {
-                            if r[j].1 != raw[i].1 {
-                                error!("jdiff: lamporst mismatch: {:?}, {:?}", r[j], raw[i]);
+                        if r[j_found].0 == expected[i_expected].0 {
+                            if r[j_found].1 != expected[i_expected].1 {
+                                error!("jdiff: lamporst mismatch: {:?}, {:?}", r[j_found], expected[i_expected]);
                             }
-                            sum += r[j].1;
-                            final_sorted.push(r[j]);
-                            i += 1;
-                            j += 1;
-                        } else if r[j].0 < raw[i].0 {
-                            error!("jdiff: missing in raw: {:?}", r[j]);
-                            j += 1;
+                            sum += r[j_found].1;
+                            final_sorted.push(r[j_found]);
+                            i_expected += 1;
+                            j_found += 1;
+                        } else if r[j_found].0 < expected[i_expected].0 {
+                            error!("jdiff: missing in expected: {:?}", r[j_found]);
+                            j_found += 1;
                         } else {
-                            error!("jdiff: missing in r: {:?}", raw[i]);
-                            i += 1;
+                            error!("jdiff: missing in r: {:?}", expected[i_expected]);
+                            i_expected += 1;
                         }
                     }
                     if storages.range().end == 131332978 {
