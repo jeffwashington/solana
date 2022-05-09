@@ -3217,6 +3217,7 @@ impl AccountsDb {
                     stored_accounts.remove(&k);
                 });
             }
+            error!("jwash34: ancient_shrinking: {}", slot);
 
             // we could sort these
             // we could also check for alive accounts here
@@ -7345,7 +7346,16 @@ impl AccountsDb {
                             error!("jdiff: missing in expected: {:?}, current expected: {:?}", results[j_found], expected[i_expected]);
                             j_found += 1;
                         } else {
-                            error!("jdiff: missing in results: {:?}, current results: {:?}", expected[i_expected], results[j_found]);
+                            let k = &expected[i_expected].0;
+                            let l = if let Some(entry) = self.accounts_index.get_account_read_entry(k) {
+                                entry.slot_list().clone()
+                            }
+                            else {
+                                vec![]
+                            };
+                            error!("jdiff: missing in results: {:?}, current results: {:?}, slot_list: {:?}", expected[i_expected], results[j_found], l);
+
+    
                             i_expected += 1;
                         }
                     }
