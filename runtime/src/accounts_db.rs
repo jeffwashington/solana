@@ -12441,7 +12441,7 @@ impl AccountsDb {
                     loop {
                         if i >= raw.len() {
                             if j >= r.len() {
-                                error!("jdiff: both finished: {}, {}", i, j);
+                                error!("jdiff: both finished: slot: {}, {}, {}", storages.range().end, i, j);
                                 break;
                             }
                             error!("jdiff: left over in j: {:?}", &r[j..]);
