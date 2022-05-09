@@ -7345,6 +7345,9 @@ impl AccountsDb {
                     previous_pass,
                     bins_per_pass,
                 );
+                if storages.range().end == 131332978 {
+                    error!("jwash12: slot: {}, lamport sum: {}, lamport sum prev: {:?}", storages.range().end, for_next_pass.lamports, l2amports.last());
+                }
                 l2amports.push(for_next_pass.lamports);
                 previous_pass = for_next_pass;
                 if pass % 1000 == 0 {
