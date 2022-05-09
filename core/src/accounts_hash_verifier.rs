@@ -131,6 +131,7 @@ impl AccountsHashVerifier {
         };
         timings.calc_storage_size_quartiles(&accounts_package.snapshot_storages);
 
+        let _guard = self.active_stats.activate(ActiveStatItem::Hash);
         let (accounts_hash, lamports) = accounts_package
             .accounts
             .accounts_db
@@ -147,6 +148,7 @@ impl AccountsHashVerifier {
                 timings,
             )
             .unwrap();
+        drop(_guard);
 
         assert_eq!(accounts_package.expected_capitalization, lamports);
         if let Some(expected_hash) = accounts_package.accounts_hash_for_testing {
