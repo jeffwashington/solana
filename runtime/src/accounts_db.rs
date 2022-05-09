@@ -7345,7 +7345,7 @@ impl AccountsDb {
                             error!("jdiff: missing in expected: {:?}, current expected: {:?}", results[j_found], expected[i_expected]);
                             j_found += 1;
                         } else {
-                            error!("jdiff: missing in results: {:?}, current results: {:?}", expected[i_expected], result[j_found]);
+                            error!("jdiff: missing in results: {:?}, current results: {:?}", expected[i_expected], results[j_found]);
                             i_expected += 1;
                         }
                     }
