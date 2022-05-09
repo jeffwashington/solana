@@ -6130,7 +6130,7 @@ impl AccountsDb {
                 )?;
 
                 let desired_pass = 3668;
-                if pass == desired_pass {
+                if pass == desired_pass && storages.range().end == 131332978 {
                     let expected = [
                         (Pubkey::from_str("GS4wbEShgkQcKw1eQos2uwgN4eLZPakDc5vjDR974VTj").unwrap(), 18446744073709551615),
                         (Pubkey::from_str("GS5Fj1dtTSLeNN51Bo1zs9ZWB2kVsA66LEHmFZTZbtNa").unwrap(), 1000000000),
@@ -7287,7 +7287,7 @@ impl AccountsDb {
                         .flatten()
                         .collect::<Vec<CalculateHashIntermediate>>();
                     copy.sort_by(AccountsHash::compare_two_hash_entries);
-                    let r = copy
+                    let results = copy
                         .iter()
                         .map(|i| (i.pubkey, i.lamports))
                         .collect::<Vec<_>>();
@@ -7297,14 +7297,14 @@ impl AccountsDb {
                     let mut sum = 0;
                     loop {
                         if i_expected >= expected.len() {
-                            if j_found >= r.len() {
+                            if j_found >= results.len() {
                                 error!("jdiff: both finished: slot: {}, {}, {}", storages.range().end, i_expected, j_found);
                                 break;
                             }
-                            error!("jdiff: left over in j_found: {:?}", &r[j_found..]);
+                            error!("jdiff: left over in j_found: {:?}", &results[j_found..]);
                             break;
                         }
-                        if j_found >= r.len() {
+                        if j_found >= results.len() {
                             error!("jdiff: left over in i_expected: {:?}", &expected[i_expected..]);
                             break;
                         }
@@ -7315,31 +7315,31 @@ impl AccountsDb {
                                 break;
                             }
                         }
-                        for j_next in (j_found + 1)..r.len() {
-                            if r[j_next].0 == r[j_found].0 {
+                        for j_next in (j_found + 1)..results.len() {
+                            if results[j_next].0 == results[j_found].0 {
                                 j_found = j_next;
                             } else {
                                 break;
                             }
                         }
-                        if r[j_found].0 == expected[i_expected].0 {
-                            if r[j_found].1 != expected[i_expected].1 {
-                                error!("jdiff: lamporst mismatch: {:?}, {:?}", r[j_found], expected[i_expected]);
+                        if results[j_found].0 == expected[i_expected].0 {
+                            if results[j_found].1 != expected[i_expected].1 {
+                                error!("jdiff: lamporst mismatch: {:?}, {:?}", results[j_found], expected[i_expected]);
                             }
-                            sum += r[j_found].1;
-                            final_sorted.push(r[j_found]);
+                            sum += results[j_found].1;
+                            final_sorted.push(results[j_found]);
                             i_expected += 1;
                             j_found += 1;
-                        } else if r[j_found].0 < expected[i_expected].0 {
-                            error!("jdiff: missing in expected: {:?}", r[j_found]);
+                        } else if results[j_found].0 < expected[i_expected].0 {
+                            error!("jdiff: missing in expected: {:?}", results[j_found]);
                             j_found += 1;
                         } else {
-                            error!("jdiff: missing in r: {:?}", expected[i_expected]);
+                            error!("jdiff: missing in results: {:?}", expected[i_expected]);
                             i_expected += 1;
                         }
                     }
                     if storages.range().end == 131332978 {
-                        error!("jw4ash: slot: {}, {:?}", storages.range().end, r);
+                        error!("jw4ash: slot: {}, {:?}", storages.range().end, results);
                         error!("jw5ash: slot: {}, sum: {}, {:?}", storages.range().end, sum, final_sorted);
                     }
                 }
