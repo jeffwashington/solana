@@ -12436,7 +12436,9 @@ impl AccountsDb {
                         .collect::<Vec<_>>();
                     let mut i = 0;
                     let mut j = 0;
-                    while true {
+                    let mut final_sorted = vec![];
+                    let mut sum = 0;
+                    loop {
                         if i >= raw.len() {
                             if j >= r.len() {
                                 error!("jdiff: both finished: {}, {}", i, j);
@@ -12467,6 +12469,8 @@ impl AccountsDb {
                             if r[j].1 != raw[i].1 {
                                 error!("jdiff: lamporst mismatch: {:?}, {:?}", r[j], raw[i]);
                             }
+                            sum += r[j].1;
+                            final_sorted.push((r[j]));
                             i += 1;
                             j += 1;
                         } else if r[j].0 < raw[i].0 {
@@ -12477,7 +12481,10 @@ impl AccountsDb {
                             i += 1;
                         }
                     }
-                    error!("jw4ash: slot: {}, {:?}", storages.range().end, r);
+                    if storages.range().end == 131332978 {
+                        error!("jw4ash: slot: {}, {:?}", storages.range().end, r);
+                        error!("jw5ash: slot: {}, sum: {}, {:?}", storages.range().end, sum, final_sorted);
+                    }
                 }
 
                 let (hash, lamports, for_next_pass) = hash.rest_of_hash_calculation(
