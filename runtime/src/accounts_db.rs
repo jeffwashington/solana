@@ -7355,6 +7355,11 @@ impl AccountsDb {
                     }
                 }
 
+                if pass == desired_pass {
+                    if storages.range().end == 131332978 {
+                        error!("jwash12: befire slot: {}, lamport sum prev: {:?}", storages.range().end, l2amports.last());
+                    }
+                }
                 let (hash, lamports, for_next_pass) = hash.rest_of_hash_calculation(
                     result,
                     &mut stats,
