@@ -12496,7 +12496,7 @@ impl AccountsDb {
                 final_result = (hash, lamports);
             }
             use log::*;
-            error!("jw2ash lamports: {:?}, slot: {}", l2amports, storages.range().end);
+            error!("jw2ash slot: {}, lamports: {:?}", storages.range().end, l2amports);
 
             info!(
                 "calculate_accounts_hash_without_index: slot (exclusive): {} {:?}",
