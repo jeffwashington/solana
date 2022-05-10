@@ -3194,25 +3194,39 @@ impl AccountsDb {
                     let mut illegal = false;
                     for k in stored_accounts.keys() {
                         if let Some(entry) = self.accounts_index.get_account_read_entry(k) {
-                            for (slot, _) in entry.slot_list() {
-                                if slot == &ancient_slot {
+                            let mut ancient_slot_in_index = false;
+                            let mut slot_in_index = false;
+                            let list = entry.slot_list();
+                            if list.len() > 1 {
+                                for (index_slot, _) in list {
+                                    if index_slot == &ancient_slot {
+                                        // already exists in ancient slot
+                                        ancient_slot_in_index = true;
+                                    }
+                                    else if index_slot == &slot {
+                                        // the entry in 'slot' is in the index
+                                        slot_in_index = true;
+                                    }
+                                }
+                                if !slot_in_index {
                                     duplicates.push(*k);
-                                } else if slot == slot {
+                                }
+                                else if ancient_slot_in_index {
+                                    // both slot and ancient_slot are in index. we need to clean first
+                                    // refcounts are a concern here
                                     illegal = true;
                                     break;
                                 }
                             }
                         }
-                        if illegal {
-                            break;
-                        }
                     }
                     if illegal {
-                        // we cannot squash this slot because it contains items that are already written to the ancient slot, which is higher than our slot
+                        error!("ancient_append_vec: illegal slot: {}", slot);
+                        current_ancient_storage = None; // have to start over on next slot
                         continue;
                     }
                 }
-                // these accounts already exist in the newer slot, so we cannot write them to
+                // these accounts already exist in the newer slot, so we cannot write them to older slot
                 duplicates.into_iter().for_each(|k| {
                     stored_accounts.remove(&k);
                 });
