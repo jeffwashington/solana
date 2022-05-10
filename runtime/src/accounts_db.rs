@@ -5591,7 +5591,7 @@ impl AccountsDb {
         for storage in storages {
             let accounts = storage.accounts.accounts(0);
             if slot >= 130943203 && slot <= 130943206 {
-                error!("tw: scanning: slot: {}, store_id: {}", slot, storage.append_vec_id());
+                //error!("tw: scanning: slot: {}, store_id: {}", slot, storage.append_vec_id());
             }
 
             let mut iterator: std::vec::IntoIter<StoredAccountMeta<'_>> = accounts.into_iter();
@@ -6114,6 +6114,14 @@ impl AccountsDb {
         let use_bg_thread_pool = config.use_bg_thread_pool;
         let _guard = self.active_stats.activate(ActiveStatItem::Hash);
         error!("jwash: sarting hash calc");
+
+        for  (slot, sub_storages)  in storages.iter_range(storages.range().clone()) {
+            
+            if slot >= 130943203 && slot <= 130943206 {
+                error!("tw: scanning: slot: {}, store_id: {:?}", slot, sub_storages.map(|s|s.iter().map(|s| s.append_vec_id()).collect::<Vec<_>>()));
+            }
+        }
+
         let mut scan_and_hash = move || {
             let mut previous_pass = PreviousPass::default();
             let mut final_result = (Hash::default(), 0);
