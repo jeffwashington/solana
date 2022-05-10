@@ -3161,7 +3161,7 @@ impl AccountsDb {
 
     /// combine all entries in 'sorted_slots' into ancient append vecs
     fn combine_ancient_slots(&self, sorted_slots: Vec<Slot>, max_root: Slot) {
-        let higher_slot_squash = true;
+        let higher_slot_squash = false;
         let num_slots = sorted_slots.len();
         let mut current_ancient_storage = None;
         let mut dropped_roots = vec![];
