@@ -211,7 +211,8 @@ pub fn purge_squashed_stores(
                 db.dirty_stores
                     .insert((slot, store.append_vec_id()), store.clone());
                 dead_storages.push(store.clone());
-                store.accounts.reset();
+                // can't reset because hash calc may still have a ref
+                // store.accounts.reset();
                 false
             } else {
                 true
