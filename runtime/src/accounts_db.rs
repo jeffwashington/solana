@@ -854,6 +854,16 @@ impl AccountStorageEntry {
     }
 }
 
+struct PrepareShrink<'a> {
+    stored_accounts: Vec<(Pubkey, FoundStoredAccount<'a>)>,
+    num_stores: usize,
+    original_bytes: u64,
+    alive_total: usize,
+    unrefed_pubkeys: Vec<&'a Pubkey>,
+    alive_accounts: Vec<(&'a Pubkey, &'a FoundStoredAccount<'a>)>,
+    index_read_elapsed: Measure,
+}
+
 pub fn get_temp_accounts_paths(count: u32) -> IoResult<(Vec<TempDir>, Vec<PathBuf>)> {
     let temp_dirs: IoResult<Vec<TempDir>> = (0..count).map(|_| TempDir::new()).collect();
     let temp_dirs = temp_dirs?;
@@ -2657,7 +2667,7 @@ impl AccountsDb {
     }
 
     fn load_accounts_index_for_shrink<'a, I>(
-        &'a self,
+        &self,
         iter: I,
         alive_accounts: &mut Vec<(&'a Pubkey, &'a FoundStoredAccount<'a>)>,
         unrefed_pubkeys: &mut Vec<&'a Pubkey>,
@@ -2705,8 +2715,8 @@ impl AccountsDb {
 
     /// get all accounts in all the storages passed in
     /// for duplicate pubkeys, the account with the highest write_value is returned
-    fn get_unique_accounts_from_storages<'a, I>(
-        &'a self,
+    fn get_unique_accounts_from_storages<'a: 'b, 'b, I>(
+        &'b self,
         stores: I,
     ) -> (HashMap<Pubkey, FoundStoredAccount>, usize, u64)
     where
@@ -2744,27 +2754,11 @@ impl AccountsDb {
         (stored_accounts, num_stores, original_bytes)
     }
 
-    fn do_shrink_slot_stores<'a, I>(&'a self, slot: Slot, stores: I) -> usize
-    where
-        I: Iterator<Item = &'a Arc<AccountStorageEntry>>,
-    {
-        debug!("do_shrink_slot_stores: slot: {}", slot);
-        let (stored_accounts, num_stores, original_bytes) =
-            self.get_unique_accounts_from_storages(stores);
-
-        // sort by pubkey to keep account index lookups close
-        let mut stored_accounts = stored_accounts.into_iter().collect::<Vec<_>>();
-        stored_accounts.sort_unstable_by(|a, b| a.0.cmp(&b.0));
-
-        let mut index_read_elapsed = Measure::start("index_read_elapsed");
+    fn load_accounts_index<'a: 'b, 'b>(&'b self, mut result: PrepareShrink<'a>) -> PrepareShrink<'a> {
         let alive_total_collect = AtomicUsize::new(0);
-
-        let len = stored_accounts.len();
+        let len = result.stored_accounts.len();
         let alive_accounts_collect = Mutex::new(Vec::with_capacity(len));
         let unrefed_pubkeys_collect = Mutex::new(Vec::with_capacity(len));
-        self.shrink_stats
-            .accounts_loaded
-            .fetch_add(len as u64, Ordering::Relaxed);
 
         self.thread_pool_clean.install(|| {
             let chunk_size = 50; // # accounts/thread
@@ -2774,11 +2768,46 @@ impl AccountsDb {
 
                 let mut alive_accounts = Vec::with_capacity(chunk_size);
                 let mut unrefed_pubkeys = Vec::with_capacity(chunk_size);
-                let alive_total = self.load_accounts_index_for_shrink(
-                    stored_accounts.iter().skip(skip).take(chunk_size),
-                    &mut alive_accounts,
-                    &mut unrefed_pubkeys,
-                );
+                let alive_total = {
+                    let iter = result.stored_accounts.iter().skip(skip).take(chunk_size);
+                    let mut alive_total = 0;
+
+                    let mut alive = 0;
+                    let mut dead = 0;
+                    iter.for_each(|(pubkey, stored_account)| {
+                        let lookup = self.accounts_index.get_account_read_entry(pubkey);
+                        if let Some(locked_entry) = lookup {
+                            let is_alive =
+                                locked_entry.slot_list().iter().any(|(_slot, acct_info)| {
+                                    acct_info.matches_storage_location(
+                                        stored_account.store_id,
+                                        stored_account.account.offset,
+                                    )
+                                });
+                            if !is_alive {
+                                // This pubkey was found in the storage, but no longer exists in the index.
+                                // It would have had a ref to the storage from the initial store, but it will
+                                // not exist in the re-written slot. Unref it to keep the index consistent with
+                                // rewriting the storage entries.
+                                unrefed_pubkeys.push(pubkey);
+                                locked_entry.unref();
+                                dead += 1;
+                            } else {
+                                alive_accounts.push((pubkey, stored_account));
+                                alive_total += stored_account.account_size;
+                                alive += 1;
+                            }
+                        }
+                    });
+                    self.shrink_stats
+                        .alive_accounts
+                        .fetch_add(alive, Ordering::Relaxed);
+                    self.shrink_stats
+                        .dead_accounts
+                        .fetch_add(dead, Ordering::Relaxed);
+
+                    alive_total
+                };
 
                 // collect
                 alive_accounts_collect
@@ -2793,19 +2822,58 @@ impl AccountsDb {
             });
         });
 
-        let alive_accounts = alive_accounts_collect.into_inner().unwrap();
-        let unrefed_pubkeys = unrefed_pubkeys_collect.into_inner().unwrap();
-        let alive_total = alive_total_collect.load(Ordering::Relaxed);
+        result.alive_accounts = alive_accounts_collect.into_inner().unwrap();
+        result.unrefed_pubkeys = unrefed_pubkeys_collect.into_inner().unwrap();
+        result.alive_total = alive_total_collect.load(Ordering::Relaxed);
+        result
+    }
 
-        index_read_elapsed.stop();
-        let aligned_total: u64 = Self::page_align(alive_total as u64);
+    fn get_prepare_shrink<'b: 'a, 'a, I>(&'b self, stores: I) -> PrepareShrink<'a>
+    where
+        I: Iterator<Item = &'a Arc<AccountStorageEntry>>,
+    {
+        let (stored_accounts, num_stores, original_bytes) =
+            self.get_unique_accounts_from_storages(stores);
+
+        // sort by pubkey to keep account index lookups close
+        let mut stored_accounts = stored_accounts.into_iter().collect::<Vec<_>>();
+        stored_accounts.sort_unstable_by(|a, b| a.0.cmp(&b.0));
+
+        let index_read_elapsed = Measure::start("index_read_elapsed");
+        let len = stored_accounts.len();
+        self.shrink_stats
+            .accounts_loaded
+            .fetch_add(len as u64, Ordering::Relaxed);
+
+        let mut result = PrepareShrink {
+            stored_accounts,
+            num_stores,
+            original_bytes,
+            alive_total: 0,
+            unrefed_pubkeys: Vec::default(),
+            alive_accounts: Vec::default(),
+            index_read_elapsed,
+        };
+        result = self.load_accounts_index(result);
+
+        // todo result.index_read_elapsed.stop();
+        result
+    }
+    fn do_shrink_slot_stores<'b: 'a, 'a, I>(&'b self, slot: Slot, stores: I) -> usize
+    where
+        I: Iterator<Item = &'a Arc<AccountStorageEntry>>,
+    {
+        debug!("do_shrink_slot_stores: slot: {}", slot);
+        let prepare = self.get_prepare_shrink(stores);
+
+        let aligned_total: u64 = Self::page_align(prepare.alive_total as u64);
 
         // This shouldn't happen if alive_bytes/approx_stored_count are accurate
-        if Self::should_not_shrink(aligned_total, original_bytes, num_stores) {
+        if Self::should_not_shrink(aligned_total, prepare.original_bytes, prepare.num_stores) {
             self.shrink_stats
                 .skipped_shrink
                 .fetch_add(1, Ordering::Relaxed);
-            for pubkey in unrefed_pubkeys {
+            for pubkey in prepare.unrefed_pubkeys {
                 if let Some(locked_entry) = self.accounts_index.get_account_read_entry(pubkey) {
                     locked_entry.addref();
                 }
@@ -2813,16 +2881,16 @@ impl AccountsDb {
             return 0;
         }
 
-        let total_starting_accounts = stored_accounts.len();
-        let total_accounts_after_shrink = alive_accounts.len();
+        let total_starting_accounts = prepare.stored_accounts.len();
+        let total_accounts_after_shrink = prepare.alive_accounts.len();
         debug!(
             "shrinking: slot: {}, accounts: ({} => {}) bytes: ({} ; aligned to: {}) original: {}",
             slot,
             total_starting_accounts,
             total_accounts_after_shrink,
-            alive_total,
+            prepare.alive_total,
             aligned_total,
-            original_bytes,
+            prepare.original_bytes,
         );
 
         let mut rewrite_elapsed = Measure::start("rewrite_elapsed");
@@ -2837,7 +2905,7 @@ impl AccountsDb {
             let mut hashes = Vec::with_capacity(total_accounts_after_shrink);
             let mut write_versions = Vec::with_capacity(total_accounts_after_shrink);
 
-            for (pubkey, alive_account) in alive_accounts {
+            for (pubkey, alive_account) in prepare.alive_accounts {
                 accounts.push((pubkey, &alive_account.account));
                 hashes.push(alive_account.account.hash);
                 write_versions.push(alive_account.account.meta.write_version);
@@ -2880,7 +2948,7 @@ impl AccountsDb {
             .fetch_add(1, Ordering::Relaxed);
         self.shrink_stats
             .index_read_elapsed
-            .fetch_add(index_read_elapsed.as_us(), Ordering::Relaxed);
+            .fetch_add(prepare.index_read_elapsed.as_us(), Ordering::Relaxed);
         self.shrink_stats
             .find_alive_elapsed
             .fetch_add(find_alive_elapsed, Ordering::Relaxed);
@@ -2910,7 +2978,7 @@ impl AccountsDb {
             Ordering::Relaxed,
         );
         self.shrink_stats.bytes_removed.fetch_add(
-            original_bytes.saturating_sub(aligned_total),
+            prepare.original_bytes.saturating_sub(aligned_total),
             Ordering::Relaxed,
         );
         self.shrink_stats
