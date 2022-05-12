@@ -6,11 +6,12 @@
 #![allow(dead_code)]
 use {
     crate::{
-        accounts_db::{AccountStorageEntry, FoundStoredAccount, SnapshotStorage},
+        accounts_db::{AccountStorageEntry, AccountsDb, FoundStoredAccount},
+        accounts_index::AccountIndexGetResult,
         append_vec::{AppendVec, StoredAccountMeta},
     },
     solana_sdk::{clock::Slot, hash::Hash, pubkey::Pubkey},
-    std::{collections::HashMap, sync::Arc},
+    std::sync::Arc,
 };
 
 /// a set of accounts need to be stored.
@@ -39,7 +40,7 @@ impl<'a> AccountsToStore<'a> {
     /// available_bytes: how many bytes remain in the primary storage. Excess accounts will be directed to an overflow storage
     pub fn new(
         mut available_bytes: u64,
-        stored_accounts: &'a HashMap<Pubkey, FoundStoredAccount>,
+        stored_accounts: &'a Vec<(&'a Pubkey, &'a FoundStoredAccount<'a>)>,
         slot: Slot,
     ) -> Self {
         let num_accounts = stored_accounts.len();
@@ -89,6 +90,38 @@ impl<'a> AccountsToStore<'a> {
     }
 }
 
+/// debug function to make sure that the index is correct after squashing ancient append vecs
+pub fn verify_contents<'a>(
+    db: &AccountsDb,
+    writer: &Arc<AccountStorageEntry>,
+    append_vec_slot: Slot,
+    recent: &[(&Pubkey, &StoredAccountMeta<'a>, u64)],
+) {
+    let store_id = writer.append_vec_id();
+    for c in recent {
+        if let AccountIndexGetResult::Found(g, _) =
+            db.accounts_index.get(c.0, None, Some(append_vec_slot))
+        {
+            assert!(
+                g.slot_list().iter().any(|(slot, info)| {
+                    if slot == &append_vec_slot {
+                        assert_eq!(info.store_id(), store_id);
+                        true
+                    } else {
+                        false
+                    }
+                }),
+                "{}, {:?}, id: {}",
+                c.0,
+                g.slot_list(),
+                writer.append_vec_id()
+            )
+        } else {
+            panic!("not found: {}", c.0);
+        }
+    }
+}
+
 /// capacity of an ancient append vec
 pub fn get_ancient_append_vec_capacity() -> u64 {
     use crate::append_vec::MAXIMUM_APPEND_VEC_FILE_SIZE;
@@ -108,28 +141,6 @@ pub fn is_full_ancient(storage: &AppendVec) -> bool {
 /// is this a max-size append vec designed to be used as an ancient append vec?
 pub fn is_ancient(storage: &AppendVec) -> bool {
     storage.capacity() >= get_ancient_append_vec_capacity()
-}
-
-/// return true if the accounts in this slot should be moved to an ancient append vec
-/// otherwise, return false and the caller can skip this slot
-/// side effect could be updating 'current_ancient'
-pub fn should_move_to_ancient_append_vec(
-    all_storages: &SnapshotStorage,
-    current_ancient: &mut Option<(Slot, Arc<AccountStorageEntry>)>,
-    slot: Slot,
-) -> bool {
-    if current_ancient.is_none() && all_storages.len() == 1 {
-        let first_storage = all_storages.first().unwrap();
-        if is_ancient(&first_storage.accounts) {
-            if is_full_ancient(&first_storage.accounts) {
-                return false; // skip this full ancient append vec completely
-            }
-            // this slot is ancient and can become the 'current' ancient for other slots to be squashed into
-            *current_ancient = Some((slot, Arc::clone(first_storage)));
-            return false; // we're done with this slot - this slot IS the ancient append vec
-        }
-    }
-    true
 }
 
 #[cfg(test)]
@@ -195,7 +206,8 @@ pub mod tests {
             store_id,
             account_size,
         };
-        let map = vec![(pubkey, found)].into_iter().collect();
+        let src = vec![(pubkey, found)];
+        let map = src.iter().map(|(a, b)| (a, b)).collect();
         for (selector, available_bytes) in [
             (StorageSelector::Primary, account_size),
             (StorageSelector::Overflow, account_size - 1),
@@ -206,7 +218,7 @@ pub mod tests {
             assert_eq!(
                 accounts,
                 map.iter()
-                    .map(|(a, b)| (a, &b.account, slot))
+                    .map(|(a, b)| (*a, &b.account, slot))
                     .collect::<Vec<_>>(),
                 "mismatch"
             );
