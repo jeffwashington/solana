@@ -109,7 +109,7 @@ pub const DEFAULT_NUM_DIRS: u32 = 4;
 // When calculating hashes, it is helpful to break the pubkeys found into bins based on the pubkey value.
 // More bins means smaller vectors to sort, copy, etc.
 pub const PUBKEY_BINS_FOR_CALCULATING_HASHES: usize = 65536;
-pub const NUM_SCAN_PASSES_DEFAULT: usize = 2;
+pub const NUM_SCAN_PASSES_DEFAULT: usize = 8;
 
 // Without chunks, we end up with 1 output vec for each outer snapshot storage.
 // This results in too many vectors to be efficient.
@@ -1850,14 +1850,8 @@ impl AccountsDb {
             .as_ref()
             .map(|config| config.filler_accounts_config)
             .unwrap_or_default();
-        let skip_rewrites = accounts_db_config
-            .as_ref()
-            .map(|config| config.skip_rewrites)
-            .unwrap_or_default();
-        let ancient_append_vecs = accounts_db_config
-            .as_ref()
-            .map(|config| config.ancient_append_vecs)
-            .unwrap_or_default();
+        let skip_rewrites = true;
+        let ancient_append_vecs = true;
 
         let filler_account_suffix = if filler_accounts_config.count > 0 {
             Some(solana_sdk::pubkey::new_rand())
