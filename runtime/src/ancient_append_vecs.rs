@@ -6,7 +6,8 @@
 #![allow(dead_code)]
 use {
     crate::{
-        accounts_db::{AccountStorageEntry, FoundStoredAccount, SnapshotStorage},
+        accounts_db::{AccountStorageEntry, AccountsDb, FoundStoredAccount, SnapshotStorage},
+        accounts_index::AccountIndexGetResult,
         append_vec::{AppendVec, StoredAccountMeta},
     },
     solana_sdk::{clock::Slot, hash::Hash, pubkey::Pubkey},
@@ -39,7 +40,7 @@ impl<'a> AccountsToStore<'a> {
     /// available_bytes: how many bytes remain in the primary storage. Excess accounts will be directed to an overflow storage
     pub fn new(
         mut available_bytes: u64,
-        stored_accounts: &'a HashMap<Pubkey, FoundStoredAccount>,
+        stored_accounts: &'a Vec<(&'a Pubkey, &'a FoundStoredAccount<'a>)>,
         slot: Slot,
     ) -> Self {
         let num_accounts = stored_accounts.len();
@@ -86,6 +87,38 @@ impl<'a> AccountsToStore<'a> {
             StorageSelector::Overflow => self.index_first_item_overflow..self.accounts.len(),
         };
         (&self.accounts[range.clone()], &self.hashes[range])
+    }
+}
+
+/// debug function to make sure that the index is correct after squashing ancient append vecs
+pub fn verify_contents<'a>(
+    db: &AccountsDb,
+    writer: &Arc<AccountStorageEntry>,
+    append_vec_slot: Slot,
+    recent: &[(&Pubkey, &StoredAccountMeta<'a>, u64)],
+) {
+    let store_id = writer.append_vec_id();
+    for c in recent {
+        if let AccountIndexGetResult::Found(g, _) =
+            db.accounts_index.get(c.0, None, Some(append_vec_slot))
+        {
+            assert!(
+                g.slot_list().iter().any(|(slot, info)| {
+                    if slot == &append_vec_slot {
+                        assert_eq!(info.store_id(), store_id);
+                        true
+                    } else {
+                        false
+                    }
+                }),
+                "{}, {:?}, id: {}",
+                c.0,
+                g.slot_list(),
+                writer.append_vec_id()
+            )
+        } else {
+            panic!("not found: {}", c.0);
+        }
     }
 }
 
