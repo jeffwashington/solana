@@ -1234,6 +1234,8 @@ impl Executor for BpfExecutor {
                             SyscallError::InstructionError(error),
                         )) => error,
                         err => {
+                            use log::*;
+                            error!( "Program failed to complete: {}", err);
                             ic_logger_msg!(log_collector, "Program failed to complete: {}", err);
                             InstructionError::ProgramFailedToComplete
                         }
