@@ -4465,7 +4465,7 @@ impl Bank {
                         timings,
                         &mut error_counters,
                     );
-                    if interesting {
+                    if intersting {
                         error!("tx done: {:?}, tx: {:?}", r, loaded_transaction.accounts.iter().map(|(a, b)| a).collect::<Vec<_>>());
                     }
 
