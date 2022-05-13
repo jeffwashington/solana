@@ -4366,7 +4366,14 @@ impl Bank {
             .iter_mut()
             .zip(sanitized_txs.iter())
             .map(|(accs, tx)| match accs {
-                (Err(e), _nonce) => TransactionExecutionResult::NotExecuted(e.clone()),
+                (Err(e), _nonce) => {
+                    if self.slot() == 133561360{
+
+                        error!("tx failed: {:?}, tx: {}", e, (0)/*tx.pubkey()*/);
+                    }
+                    TransactionExecutionResult::NotExecuted(e.clone())
+                }
+
                 (Ok(loaded_transaction), nonce) => {
                     let mut feature_set_clone_time = Measure::start("feature_set_clone");
                     let feature_set = self.feature_set.clone();
@@ -4409,7 +4416,7 @@ impl Bank {
                         compute_budget
                     };
 
-                    self.execute_loaded_transaction(
+                    let r = self.execute_loaded_transaction(
                         tx,
                         loaded_transaction,
                         compute_budget,
@@ -4419,7 +4426,12 @@ impl Bank {
                         enable_return_data_recording,
                         timings,
                         &mut error_counters,
-                    )
+                    );
+                    if self.slot() == 133561360{
+                        error!("tx done: {:?}, tx: {:?}", r, loaded_transaction.accounts.iter().map(|(a, b)| a).collect::<Vec<_>>());
+                    }
+
+                    r
                 }
             })
             .collect();
