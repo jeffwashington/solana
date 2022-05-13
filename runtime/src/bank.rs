@@ -4767,7 +4767,11 @@ impl Bank {
         // parallelize?
         let mut rent_debits = RentDebits::default();
         let mut total_collected = CollectedInfo::default();
+        let mut dump = vec![];
         for (pubkey, mut account) in accounts {
+            if bank_slot == 133561360{
+                dump.push((pubkey, crate::accounts_db::AccountsDb::hash_account(0, &account, &pubkey), loaded_slot));
+            }
             let collected = self.rent_collector.collect_from_existing_account(
                 &pubkey,
                 &mut account,
@@ -4782,6 +4786,12 @@ impl Bank {
             self.store_account(&pubkey, &account);
             rent_debits.insert(&pubkey, collected.rent_amount, account.lamports());
         }
+
+        if !dump.is_empty() {
+            dump.sort();
+            error!("mad: accounts: {:?}", dump);
+        }
+
         self.collected_rent
             .fetch_add(total_collected.rent_amount, Relaxed);
         self.rewards

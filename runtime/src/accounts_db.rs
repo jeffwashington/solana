@@ -5952,6 +5952,12 @@ impl AccountsDb {
             hashes.retain(|(pubkey, _hash)| !self.is_filler_account(pubkey));
         }
 
+
+        if slot == 133561360{
+            hashes.sort();
+            error!("mad2: accounts: {:?}", hashes);
+        }
+
         let ret = AccountsHash::accumulate_account_hashes(hashes);
         accumulate.stop();
         let mut uncleaned_time = Measure::start("uncleaned_index");
