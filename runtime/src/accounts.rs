@@ -258,6 +258,7 @@ impl Accounts {
             let mut accounts = Vec::with_capacity(account_keys.len());
             let mut account_deps = Vec::with_capacity(account_keys.len());
             let mut rent_debits = RentDebits::default();
+            use std::str::FromStr;let pk = Pubkey::from_str("eDi33G4BvNYnE3nosnDfDgNuWpRG2ZSnDBmaphHAmaW").unwrap();
             for (i, key) in account_keys.iter().enumerate() {
                 let account = if !message.is_non_loader_key(i) {
                     // Fill in an empty account for the program slots.
@@ -279,9 +280,11 @@ impl Accounts {
                         {
                             (account_override.clone(), 0)
                         } else {
-                            self.accounts_db
+                            let mut s = 0;
+                            let x = self.accounts_db
                                 .load_with_fixed_root(ancestors, key)
-                                .map(|(mut account, _)| {
+                                .map(|(mut account, slot)| {
+                                    s = slot;
                                     if message.is_writable(i) {
                                         let rent_due = rent_collector
                                             .collect_from_existing_account(
@@ -295,7 +298,11 @@ impl Accounts {
                                         (account, 0)
                                     }
                                 })
-                                .unwrap_or_default()
+                                .unwrap_or_default();
+                            if pk == *key {
+                                error!("interesting load: {}, {:?}, slot: {}", pk, x, s);
+                            }
+                            x
                         };
 
                         if bpf_loader_upgradeable::check_id(account.owner()) {
