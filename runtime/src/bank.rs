@@ -4440,8 +4440,10 @@ impl Bank {
                         compute_budget
                     };
 
+                    let mut intersting = false;
                     if self.slot() == 133561360{
                         if loaded_transaction.accounts.iter().any(|(a,b)| a == &pk) {
+                            intersting = true;
                             let mut a = loaded_transaction.accounts.iter().map(|(a, b)| {
                                 (a, crate::accounts_db::AccountsDb::hash_account(0, b, a), self.slots_by_pubkey(a, &self.ancestors))
                             }
@@ -4463,8 +4465,8 @@ impl Bank {
                         timings,
                         &mut error_counters,
                     );
-                    if self.slot() == 133561360{
-                        //error!("tx done: {:?}, tx: {:?}", r, loaded_transaction.accounts.iter().map(|(a, b)| a).collect::<Vec<_>>());
+                    if interesting {
+                        error!("tx done: {:?}, tx: {:?}", r, loaded_transaction.accounts.iter().map(|(a, b)| a).collect::<Vec<_>>());
                     }
 
                     r
