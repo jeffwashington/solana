@@ -4055,6 +4055,7 @@ impl Bank {
 
         let mut execution_time = Measure::start("execution_time");
         let mut signature_count: u64 = 0;
+        use std::str::FromStr;let pk = Pubkey::from_str("eDi33G4BvNYnE3nosnDfDgNuWpRG2ZSnDBmaphHAmaW").unwrap();
 
         let execution_results: Vec<TransactionExecutionResult> = loaded_transactions
             .iter_mut()
@@ -4103,7 +4104,16 @@ impl Bank {
                         compute_budget
                     };
 
-                    self.execute_loaded_transaction(
+                    if self.slot() == 133561360{
+                        if loaded_transaction.accounts.iter().any(|(a,b)| a == &pk) {
+                            let mut a = loaded_transaction.accounts.iter().map(|(a, b)| (a, crate::accounts_db::AccountsDb::hash_account(0, b, a))).collect::<Vec<_>>();
+                            a.sort();
+                            error!("tx {:?}", a);
+
+                        }
+                    }
+
+                    let r = self.execute_loaded_transaction(
                         tx,
                         loaded_transaction,
                         compute_budget,
@@ -4112,7 +4122,12 @@ impl Bank {
                         enable_log_recording,
                         timings,
                         &mut error_counters,
-                    )
+                    );
+                    if self.slot() == 133561360{
+                        error!("tx done: {:?}, tx: {:?}", r, loaded_transaction.accounts.iter().map(|(a, b)| a).collect::<Vec<_>>());
+                    }
+
+                    r
                 }
             })
             .collect();
