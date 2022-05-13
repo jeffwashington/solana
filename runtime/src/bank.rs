@@ -182,6 +182,29 @@ pub struct RentDebit {
     post_balance: u64,
 }
 
+impl Bank {
+    fn slots_by_pubkey(&self, pubkey: &Pubkey, ancestors: &Ancestors) -> Vec<Slot> {
+        if let crate::accounts_index::AccountIndexGetResult::Found(item, _) = self
+            .rc
+            .accounts
+            .accounts_db
+            .accounts_index
+            .get(pubkey, Some(ancestors), None) {
+
+            
+        item
+            .slot_list()
+            .iter()
+            .map(|(slot, _)| *slot)
+            .collect::<Vec<Slot>>()
+    }
+    else {
+        vec![]
+    }
+}
+}
+
+
 impl RentDebit {
     fn try_into_reward_info(self) -> Option<RewardInfo> {
         let rent_debit = i64::try_from(self.rent_collected)
@@ -4106,7 +4129,10 @@ impl Bank {
 
                     if self.slot() == 133561360{
                         if loaded_transaction.accounts.iter().any(|(a,b)| a == &pk) {
-                            let mut a = loaded_transaction.accounts.iter().map(|(a, b)| (a, crate::accounts_db::AccountsDb::hash_account(0, b, a))).collect::<Vec<_>>();
+                            let mut a = loaded_transaction.accounts.iter().map(|(a, b)| {
+                                (a, crate::accounts_db::AccountsDb::hash_account(0, b, a), self.slots_by_pubkey(a, &self.ancestors))
+                            }
+                            ).collect::<Vec<_>>();
                             a.sort();
                             error!("tx {:?}", a);
 
