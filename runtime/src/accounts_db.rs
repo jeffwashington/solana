@@ -4967,12 +4967,22 @@ impl AccountsDb {
         is_cached_store: bool,
     ) -> Vec<AccountInfo> {
         let mut calc_stored_meta_time = Measure::start("calc_stored_meta");
+
+        let pk = Pubkey::from_str("eDi33G4BvNYnE3nosnDfDgNuWpRG2ZSnDBmaphHAmaW").unwrap();
+
         let slot = accounts.target_slot();
         let accounts_and_meta_to_store: Vec<_> = (0..accounts.len())
             .into_iter()
             .map(|index| {
                 let (pubkey, account) = (accounts.pubkey(index), accounts.account(index));
-                self.read_only_accounts_cache.remove(*pubkey, slot);
+
+
+        
+                        if pubkey == &pk {
+                            error!("interesting store: {}, slot: {}, lamports: {}", pk, slot, account.lamports());
+                        }                
+
+                        self.read_only_accounts_cache.remove(*pubkey, slot);
                 // this is the source of Some(Account) or None.
                 // Some(Account) = store 'Account'
                 // None = store a default/empty account with 0 lamports
@@ -5953,7 +5963,7 @@ impl AccountsDb {
         }
 
 
-        if slot == 133561360{
+        if slot == 555133561360{
             hashes.sort();
             error!("mad2: accounts: {:?}", hashes);
         }
@@ -6747,6 +6757,7 @@ impl AccountsDb {
         if accounts_map.is_empty() {
             return SlotIndexGenerationInfo::default();
         }
+        let pk = Pubkey::from_str("eDi33G4BvNYnE3nosnDfDgNuWpRG2ZSnDBmaphHAmaW").unwrap();
 
         let secondary = !self.account_indexes.is_empty();
 
@@ -6772,6 +6783,11 @@ impl AccountsDb {
                 if !stored_account.is_zero_lamport() {
                     accounts_data_len += stored_account.data().len() as u64;
                 }
+
+                if pubkey == pk {
+                    error!("interesting: {}, slot: {}, lamports: {}", pk, slot, stored_account.lamports());
+                }
+
 
                 if !rent_collector.should_collect_rent(&pubkey, &stored_account)
                     || rent_collector.get_rent_due(&stored_account).is_exempt()
