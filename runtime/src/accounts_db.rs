@@ -6209,6 +6209,11 @@ impl AccountsDb {
 
         Self::extend_hashes_with_skipped_rewrites(&mut hashes, skipped_rewrites);
 
+        if slot == 133561360{
+            hashes.sort();
+            error!("mad2: accounts: {:?}", hashes);
+        }
+
         let ret = AccountsHash::accumulate_account_hashes(hashes);
         accumulate.stop();
         let mut uncleaned_time = Measure::start("uncleaned_index");
