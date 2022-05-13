@@ -5292,6 +5292,7 @@ impl AccountsDb {
             assert_eq!(hashes.len(), len);
             hashes
         });
+        let pk = Pubkey::from_str("eDi33G4BvNYnE3nosnDfDgNuWpRG2ZSnDBmaphHAmaW").unwrap();
 
         accounts_and_meta_to_store
             .iter()
@@ -5309,6 +5310,10 @@ impl AccountsDb {
                 );
 
                 self.notify_account_at_accounts_update(slot, meta, &account);
+
+                if &meta.pubkey == &pk {
+                    error!("interesting store to cache: {}, slot: {}, lamports: {}", pk, slot, account.lamports());
+                }                
 
                 let cached_account = self.accounts_cache.store(slot, &meta.pubkey, account, hash);
                 // hash this account in the bg
