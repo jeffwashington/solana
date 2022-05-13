@@ -5090,7 +5090,13 @@ impl Bank {
         let bank_slot = self.slot();
         let mut rewrites_skipped = Vec::with_capacity(accounts.len());
         let can_skip_rewrites = self.rc.accounts.accounts_db.skip_rewrites || just_rewrites;
+
+        let mut dump = vec![];
         for (pubkey, mut account, loaded_slot) in accounts {
+            if bank_slot == 133561360{
+                dump.push((pubkey, crate::accounts_db::AccountsDb::hash_account(0, &account, &pubkey), loaded_slot));
+            }
+    
             let old_rent_epoch = account.rent_epoch();
             let collected = self.rent_collector.collect_from_existing_account(
                 &pubkey,
@@ -5124,6 +5130,12 @@ impl Bank {
             }
             rent_debits.insert(&pubkey, collected.rent_amount, account.lamports());
         }
+
+        if !dump.is_empty() {
+            dump.sort();
+            error!("mad: accounts: {:?}", dump);
+        }
+
         self.remember_skipped_rewrites(rewrites_skipped);
         self.collected_rent
             .fetch_add(total_collected.rent_amount, Relaxed);
