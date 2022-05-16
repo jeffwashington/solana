@@ -6102,6 +6102,11 @@ impl AccountsDb {
 
         let find_unskipped_slot = |slot: Slot| self.find_unskipped_slot(slot, config.ancestors);
 
+        /*
+        16
+        */
+        let narrow = PubkeyBinCalculator24::new(2.pow(16));
+
         let result: Vec<BinnedHashData> = self.scan_account_storage_no_bank(
             cache_hash_data,
             config,
@@ -6110,6 +6115,9 @@ impl AccountsDb {
                 let pubkey = loaded_account.pubkey();
                 let mut pubkey_to_bin_index = bin_calculator.bin_from_pubkey(pubkey);
                 if !bin_range.contains(&pubkey_to_bin_index) {
+                    return;
+                }
+                if narrow.bin_from_pubkey(pubkey) != 0 {
                     return;
                 }
 
