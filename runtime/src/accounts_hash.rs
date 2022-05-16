@@ -858,7 +858,7 @@ impl AccountsHash {
                 duplicate_pubkey_indexes.clear();
             }
         }
-        error!("xi: {:?}", results);
+        use log::*;error!("xi: {:?}", results);
         (hashes, overall_sum, item_len)
     }
 
