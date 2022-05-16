@@ -6105,7 +6105,8 @@ impl AccountsDb {
         /*
         16
         */
-        let narrow = PubkeyBinCalculator24::new(2_i32.pow(6) as usize);
+        let nb = 2_i32.pow(20) as usize;
+        let narrow = PubkeyBinCalculator24::new(nb);
 
         let result: Vec<BinnedHashData> = self.scan_account_storage_no_bank(
             cache_hash_data,
@@ -6117,7 +6118,7 @@ impl AccountsDb {
                 if !bin_range.contains(&pubkey_to_bin_index) {
                     return;
                 }
-                if narrow.bin_from_pubkey(pubkey) != 0 {
+                if narrow.bin_from_pubkey(pubkey) > nb * 32 / 100 {
                     return;
                 }
 
