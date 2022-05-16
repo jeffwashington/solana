@@ -839,7 +839,7 @@ impl AccountsHash {
                 hashes.push(&item.hash);
             }
 
-            results.push((item.pubkey, item.hash));
+            result.push((item.pubkey, item.hash));
 
             if !duplicate_pubkey_indexes.is_empty() {
                 // skip past duplicate keys in earlier slots
@@ -858,7 +858,7 @@ impl AccountsHash {
                 duplicate_pubkey_indexes.clear();
             }
         }
-        use log::*;error!("xi: {:?}", results);
+        use log::*;error!("xi: {:?}", result);
         (hashes, overall_sum, item_len)
     }
 
