@@ -6028,7 +6028,7 @@ impl AccountsDb {
     ) -> Result<(Hash, u64), BankHashVerificationError> {
         let (hash, total_lamports) =
             self.calculate_accounts_hash_helper(use_index, slot, &config)?;
-        if debug_verify {
+        if false && debug_verify {
             // calculate the other way (store or non-store) and verify results match.
             let (hash_other, total_lamports_other) =
                 self.calculate_accounts_hash_helper(!use_index, slot, &config)?;
