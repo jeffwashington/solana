@@ -6132,10 +6132,11 @@ impl AccountsDb {
                 if !bin_range.contains(&pubkey_to_bin_index) {
                     return;
                 }
+                /*
                 let nbin = narrow.bin_from_pubkey(pubkey);
                 if !(nbin > nb * 99908 / 100000 && nbin <= nb * 9991 / 10000) {
                     return;
-                }
+                }*/
 
                 // when we are scanning with bin ranges, we don't need to use exact bin numbers. Subtract to make first bin we care about at index 0.
                 pubkey_to_bin_index -= bin_range.start;
