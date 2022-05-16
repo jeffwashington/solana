@@ -879,7 +879,7 @@ pub fn bank_from_snapshot_archives(
         Some(full_snapshot_archive_info.slot()),
     ) && limit_load_slot_count_from_snapshot.is_none()
     {
-        panic!("Snapshot bank for slot {} failed to verify", bank.slot());
+        error!("Snapshot bank for slot {} failed to verify", bank.slot());
     }
     measure_verify.stop();
 
