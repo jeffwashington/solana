@@ -788,6 +788,8 @@ impl AccountsHash {
         let mut duplicate_pubkey_indexes = Vec::with_capacity(len);
         let filler_accounts_enabled = self.filler_accounts_enabled();
 
+        let mut result = vec![];
+
         // this loop runs once per unique pubkey contained in any slot group
         while !first_items.is_empty() {
             let loop_stop = { first_items.len() - 1 }; // we increment at the beginning of the loop
@@ -836,6 +838,9 @@ impl AccountsHash {
                 );
                 hashes.push(&item.hash);
             }
+
+            results.push((item.pubkey, item.hash));
+
             if !duplicate_pubkey_indexes.is_empty() {
                 // skip past duplicate keys in earlier slots
                 // reverse this list because get_item can remove first_items[*i] when *i is exhausted
@@ -853,6 +858,7 @@ impl AccountsHash {
                 duplicate_pubkey_indexes.clear();
             }
         }
+        error!("xi: {:?}", results);
         (hashes, overall_sum, item_len)
     }
 
