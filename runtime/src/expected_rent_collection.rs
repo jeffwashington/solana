@@ -455,6 +455,7 @@ impl ExpectedRentCollection {
     ) -> Option<Self> {
         let slots_per_epoch = epoch_schedule.get_slots_in_epoch(rent_collector.epoch);
 
+        use std::str::FromStr;let pk = Pubkey::from_str("JDREJ13rKekzT56PVbYSo5kzNYx7Qf7ndvB1TKyQ1yB5").unwrap();
         let partition_from_pubkey =
             crate::bank::Bank::partition_from_pubkey(pubkey, slots_per_epoch);
         let (epoch_of_max_storage_slot, partition_index_from_max_slot) =
@@ -496,6 +497,10 @@ impl ExpectedRentCollection {
             || loaded_account.rent_epoch() == 0
         {
             // no need to update hash
+            if &pk == pubkey {
+                error!("xi3: {}, {:?}", pk, line!());
+            }
+    
             return None;
         }
 
@@ -509,6 +514,9 @@ impl ExpectedRentCollection {
                 if next_epoch > current_rent_epoch && rent_due != 0 {
                     // this is an account that would have had rent collected since this storage slot, so just use the hash we have since there must be a newer version of this account already in a newer slot
                     // It would be a waste of time to recalcluate a hash.
+                    if &pk == pubkey {
+                        error!("xi3: {}, {:?}", pk, line!());
+                    }
                     return None;
                 }
                 if first_slot_in_max_epoch > expected_rent_collection_slot_max_epoch {
@@ -528,7 +536,10 @@ impl ExpectedRentCollection {
         if expected_rent_collection_slot_max_epoch == storage_slot
             && new_rent_epoch == loaded_account.rent_epoch()
         {
-            // no rewrite would have occurred
+            if &pk == pubkey {
+                error!("xi3: {}, {:?}", pk, line!());
+            }
+    // no rewrite would have occurred
             return None;
         }
 
