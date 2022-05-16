@@ -6161,8 +6161,8 @@ impl AccountsDb {
                     find_unskipped_slot,
                     filler_account_suffix,
                 );
-                if pubkey == &pk || pubkey == &pk2 {
-                    error!("xi2: {:?}, {:?}", (slot, pubkey, loaded_hash, loaded_account.lamports()), new_hash);
+                if pubkey == &pk /*|| pubkey == &pk2*/ {
+                    error!("xi2: {:?}, {:?}", (slot, pubkey, loaded_hash, loaded_account.lamports(), loaded_account.rent_epoch()), new_hash);
                 }
 
                 let loaded_hash = new_hash.unwrap_or(loaded_hash);
