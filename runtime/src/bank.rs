@@ -6495,7 +6495,7 @@ impl Bank {
             self.shrink_all_slots(true, last_full_snapshot_slot);
         }
         shrink_all_slots_time.stop();
-
+/*
         info!("verify_bank_hash..");
         let mut verify_time = Measure::start("verify_bank_hash");
         let mut verify = self.verify_bank_hash(test_hash_calculation, false);
@@ -6506,13 +6506,11 @@ impl Bank {
         // Order and short-circuiting is significant; verify_hash requires a valid bank hash
         verify = verify && self.verify_hash();
         verify2_time.stop();
-
+*/
         datapoint_info!(
             "verify_snapshot_bank",
             ("clean_us", clean_time.as_us(), i64),
             ("shrink_all_slots_us", shrink_all_slots_time.as_us(), i64),
-            ("verify_bank_hash_us", verify_time.as_us(), i64),
-            ("verify_hash_us", verify2_time.as_us(), i64),
         );
 
         verify
