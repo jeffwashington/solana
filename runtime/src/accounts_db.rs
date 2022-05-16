@@ -6120,6 +6120,8 @@ impl AccountsDb {
         let nb = 2_i32.pow(20) as usize;
         let narrow = PubkeyBinCalculator24::new(nb);
 
+        use std::str::FromStr;let pk = Pubkey::from_str("JDREJ13rKekzT56PVbYSo5kzNYx7Qf7ndvB1TKyQ1yB5").unwrap();        let pk2 = Pubkey::from_str("JDRAFbKToPewGvpYHHxQRmnmRLfq2YS2FiXvX6jA1Gw9").unwrap();
+
         let result: Vec<BinnedHashData> = self.scan_account_storage_no_bank(
             cache_hash_data,
             config,
@@ -6159,6 +6161,10 @@ impl AccountsDb {
                     find_unskipped_slot,
                     filler_account_suffix,
                 );
+                if pubkey == &pk || pubkey == &pk2 {
+                    error!("xi2: {:?}, {:?}", (slot, pubkey, loaded_hash, loaded_account.lamports()), new_hash);
+                }
+
                 let loaded_hash = new_hash.unwrap_or(loaded_hash);
 
                 let source_item = CalculateHashIntermediate::new(loaded_hash, balance, *pubkey);

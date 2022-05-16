@@ -790,6 +790,8 @@ impl AccountsHash {
 
         let mut result = vec![];
 
+        use std::str::FromStr;let pk = Pubkey::from_str("JDREJ13rKekzT56PVbYSo5kzNYx7Qf7ndvB1TKyQ1yB5").unwrap();        let pk2 = Pubkey::from_str("JDRAFbKToPewGvpYHHxQRmnmRLfq2YS2FiXvX6jA1Gw9").unwrap();
+
         // this loop runs once per unique pubkey contained in any slot group
         while !first_items.is_empty() {
             let loop_stop = { first_items.len() - 1 }; // we increment at the beginning of the loop
@@ -839,7 +841,9 @@ impl AccountsHash {
                 hashes.push(&item.hash);
             }
 
-            result.push((item.pubkey, item.hash));
+            if item.pubkey == pk || item.pubkey == pk2 {
+                result.push(item);
+            }
 
             if !duplicate_pubkey_indexes.is_empty() {
                 // skip past duplicate keys in earlier slots
