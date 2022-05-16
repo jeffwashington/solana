@@ -6105,7 +6105,7 @@ impl AccountsDb {
         /*
         16
         */
-        let narrow = PubkeyBinCalculator24::new(2_i32.pow(20) as usize);
+        let narrow = PubkeyBinCalculator24::new(2_i32.pow(14) as usize);
 
         let result: Vec<BinnedHashData> = self.scan_account_storage_no_bank(
             cache_hash_data,
