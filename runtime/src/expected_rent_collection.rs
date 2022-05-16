@@ -516,7 +516,8 @@ impl ExpectedRentCollection {
                     // this is an account that would have had rent collected since this storage slot, so just use the hash we have since there must be a newer version of this account already in a newer slot
                     // It would be a waste of time to recalcluate a hash.
                     if &pk == pubkey {
-                        error!("xi3: {}, {:?}, next_epoch: {}, current_rent_epoch: {}, rent_due: {}", pk, line!(), next_epoch, current_rent_epoch, rent_due);
+                        error!("xi3: {}, {:?}, next_epoch: {}, current_rent_epoch: {}, rent_due: {}, indexes: {:?}", pk, line!(), next_epoch, current_rent_epoch, rent_due,
+                    (calculated_from_index_expected_rent_collection_slot_max_epoch, partition_from_pubkey, partition_index_from_max_slot));
                     }
                     return None;
                 }
