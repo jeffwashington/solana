@@ -6103,7 +6103,7 @@ impl AccountsDb {
         let find_unskipped_slot = |slot: Slot| self.find_unskipped_slot(slot, config.ancestors);
 
         /*
-        16
+        64
         */
         let nb = 2_i32.pow(20) as usize;
         let narrow = PubkeyBinCalculator24::new(nb);
