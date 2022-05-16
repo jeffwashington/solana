@@ -6513,7 +6513,7 @@ impl Bank {
             ("shrink_all_slots_us", shrink_all_slots_time.as_us(), i64),
         );
 
-        verify
+        true
     }
 
     /// Return the number of hashes per tick
