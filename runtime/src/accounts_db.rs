@@ -6113,6 +6113,9 @@ impl AccountsDb {
         99 fail
         999 
         9999 succeeded
+        in range: 
+        9999 fail
+        9995
         */
         let nb = 2_i32.pow(20) as usize;
         let narrow = PubkeyBinCalculator24::new(nb);
@@ -6128,7 +6131,7 @@ impl AccountsDb {
                     return;
                 }
                 let nbin = narrow.bin_from_pubkey(pubkey);
-                if nbin <= nb * 999/1000 ||  nbin > nb * 9995 / 10000 {
+                if nbin <= nb * 999/1000 ||  nbin > nb * 9992 / 10000 {
                     return;
                 }
 
