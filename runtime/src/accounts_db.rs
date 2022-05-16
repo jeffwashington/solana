@@ -6124,7 +6124,7 @@ impl AccountsDb {
                 if !bin_range.contains(&pubkey_to_bin_index) {
                     return;
                 }
-                if narrow.bin_from_pubkey(pubkey) <= nb * 99 / 100 {
+                if narrow.bin_from_pubkey(pubkey) <= nb * 999 / 1000 {
                     return;
                 }
 
