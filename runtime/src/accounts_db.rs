@@ -6131,7 +6131,7 @@ impl AccountsDb {
                     return;
                 }
                 let nbin = narrow.bin_from_pubkey(pubkey);
-                if !(nbin > nb * 99905 / 100000 && nbin <= nb * 9991 / 10000) {
+                if !(nbin > nb * 99908 / 100000 && nbin <= nb * 9991 / 10000) {
                     return;
                 }
 
