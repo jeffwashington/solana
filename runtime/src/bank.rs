@@ -2184,7 +2184,7 @@ impl Bank {
             block_height: self.block_height,
             collector_id: self.collector_id,
             collector_fees: self.collector_fees.load(Relaxed),
-            fee_calculator: self.fee_calculator.clone(),
+            fee_calculator: self.fee_calculator,
             fee_rate_governor: self.fee_rate_governor.clone(),
             collected_rent: self.collected_rent.load(Relaxed),
             rent_collector: self.rent_collector.clone(),
@@ -12638,7 +12638,7 @@ pub(crate) mod tests {
                     StateMut::<nonce::state::Versions>::state(&acc).map(|v| v.convert_to_current());
                 match state {
                     Ok(nonce::State::Initialized(ref data)) => {
-                        Some((data.blockhash, data.fee_calculator.clone()))
+                        Some((data.blockhash, data.fee_calculator))
                     }
                     _ => None,
                 }
@@ -12675,7 +12675,7 @@ pub(crate) mod tests {
                     StateMut::<nonce::state::Versions>::state(&acc).map(|v| v.convert_to_current());
                 match state {
                     Ok(nonce::State::Initialized(ref data)) => {
-                        Some((data.blockhash, data.fee_calculator.clone()))
+                        Some((data.blockhash, data.fee_calculator))
                     }
                     _ => None,
                 }
@@ -12708,7 +12708,7 @@ pub(crate) mod tests {
                     StateMut::<nonce::state::Versions>::state(&acc).map(|v| v.convert_to_current());
                 match state {
                     Ok(nonce::State::Initialized(ref data)) => {
-                        Some((data.blockhash, data.fee_calculator.clone()))
+                        Some((data.blockhash, data.fee_calculator))
                     }
                     _ => None,
                 }
@@ -12745,7 +12745,7 @@ pub(crate) mod tests {
                     StateMut::<nonce::state::Versions>::state(&acc).map(|v| v.convert_to_current());
                 match state {
                     Ok(nonce::State::Initialized(ref data)) => {
-                        Some((data.blockhash, data.fee_calculator.clone()))
+                        Some((data.blockhash, data.fee_calculator))
                     }
                     _ => None,
                 }
