@@ -5101,7 +5101,7 @@ impl Bank {
             );
 
             if pubkey == pk {
-                error!("xi5: collect rent: {}, {:?}, {:?}, old lamports: {}", pubkey, account, collected, old_lamports);
+                error!("xi5: collect rent: {}, {:?}, {:?}, old lamports: {}, old rent epoch: {}, current rent epoch: {}", pubkey, account, collected, old_lamports, old_rent_epoch, self.epoch());
             }
     
             // only store accounts where we collected rent
