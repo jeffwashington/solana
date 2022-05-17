@@ -448,11 +448,12 @@ impl ExpectedRentCollection {
         loaded_account: &impl ReadableAccount,
         storage_slot: Slot,
         epoch_schedule: &EpochSchedule,
-        rent_collector: &RentCollector,
+        rent_collector_max_epoch: &RentCollector,
         max_slot_in_storages_inclusive: Slot,
         find_unskipped_slot: impl Fn(Slot) -> Option<Slot>,
         filler_account_suffix: Option<&Pubkey>,
     ) -> Option<Self> {
+        let mut rent_collector = rent_collector_max_epoch;
         let slots_per_epoch = epoch_schedule.get_slots_in_epoch(rent_collector.epoch);
 
         use log::*;
@@ -478,6 +479,7 @@ impl ExpectedRentCollection {
                 expected_rent_collection_slot_max_epoch = find;
             }
         }
+        let mut rent_collector_previous = None;
         if expected_rent_collection_slot_max_epoch > max_slot_in_storages_inclusive {
             // max slot has not hit the slot in the max epoch where we would have collected rent yet, so the most recent rent-collected rewrite slot for this pubkey would be in the previous epoch
             expected_rent_collection_slot_max_epoch =
@@ -488,6 +490,15 @@ impl ExpectedRentCollection {
                 // found a root (because we have a storage) that is >= expected_rent_collection_slot.
                 expected_rent_collection_slot_max_epoch = find;
             }
+
+            // since we have not hit the slot in the rent collector's epoch yet, we need to collect rent according to the previous epoch's rent collector.
+            // keep in mind the storage slot could be 0..inf epochs in the past
+            // we want to swap the rent collector for one whose epoch is the previous epoch
+            // we could move this to later somehow. Not sure how expensive this is. We should consider passing a second rent collector all the way up the chain.
+            let mut rent_collector_temp = rent_collector.clone();
+            rent_collector_temp.epoch = rent_collector.epoch.saturating_sub(1); // previous epoch
+            rent_collector_previous = Some(rent_collector_temp);
+            rent_collector = rent_collector_previous.as_ref().unwrap();
         }
 
         // the slot we're dealing with is where we expected the rent to be collected for this pubkey, so use what is in this slot
