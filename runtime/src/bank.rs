@@ -5084,6 +5084,7 @@ impl Bank {
             .load_to_collect_rent_eagerly(&self.ancestors, subrange.clone());
         let account_count = accounts.len();
 
+        use std::str::FromStr;let pk = Pubkey::from_str("JDREJ13rKekzT56PVbYSo5kzNYx7Qf7ndvB1TKyQ1yB5").unwrap();
         // parallelize?
         let mut rent_debits = RentDebits::default();
         let mut total_collected = CollectedInfo::default();
@@ -5092,11 +5093,17 @@ impl Bank {
         let can_skip_rewrites = self.rc.accounts.accounts_db.skip_rewrites || just_rewrites;
         for (pubkey, mut account, loaded_slot) in accounts {
             let old_rent_epoch = account.rent_epoch();
+            let old_lamports = account.lamports();
             let collected = self.rent_collector.collect_from_existing_account(
                 &pubkey,
                 &mut account,
                 self.rc.accounts.accounts_db.filler_account_suffix.as_ref(),
             );
+
+            if pubkey == pk {
+                error!("xi5: collect rent: {}, {:?}, {:?}, old lamports: {}", pubkey, account, collected, old_lamports);
+            }
+    
             // only store accounts where we collected rent
             // but get the hash for all these accounts even if collected rent is 0 (= not updated).
             // Also, there's another subtle side-effect from this: this
