@@ -6543,6 +6543,15 @@ impl AccountsDb {
 
         Self::extend_hashes_with_skipped_rewrites(&mut hashes, skipped_rewrites);
 
+        use std::str::FromStr;let pk = Pubkey::from_str("JDREJ13rKekzT56PVbYSo5kzNYx7Qf7ndvB1TKyQ1yB5").unwrap();
+
+        for (k,h) in &hashes {
+            if k == &pk {
+                error!("xi5: delta hash: {}, {}", k, h);
+                break;
+            }
+        }
+
         let ret = AccountsHash::accumulate_account_hashes(hashes);
         accumulate.stop();
         let mut uncleaned_time = Measure::start("uncleaned_index");
@@ -6931,10 +6940,17 @@ impl AccountsDb {
             return;
         }
 
+        use std::str::FromStr;let pk = Pubkey::from_str("JDREJ13rKekzT56PVbYSo5kzNYx7Qf7ndvB1TKyQ1yB5").unwrap();
+
         let mut stats = BankHashStats::default();
         let mut total_data = 0;
         (0..accounts.len()).for_each(|index| {
             let account = accounts.account(index);
+            let key = accounts.pubkey(index);
+            if key == &pk {
+                let slot = accounts.target_slot();
+                error!("xi5: store: {}, slot: {}, {:?}", key, slot, (account.lamports(), Self::hash_account(slot, account, key), account.rent_epoch()));
+            }
             total_data += account.data().len();
             stats.update(account);
         });

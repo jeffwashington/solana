@@ -841,7 +841,7 @@ impl AccountsHash {
                 hashes.push(&item.hash);
             }
 
-            if item.pubkey == pk || item.pubkey == pk2 {
+            if item.pubkey == pk {//|| item.pubkey == pk2 {
                 result.push(item);
             }
 
