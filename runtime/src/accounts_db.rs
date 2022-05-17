@@ -5504,6 +5504,7 @@ impl AccountsDb {
         max_slot: Slot,
         config: &CalcAccountsHashConfig<'_>,
     ) -> Result<(Hash, u64), BankHashVerificationError> {
+        panic!("oops");
         return Ok((Hash::default(), 0));
         use BankHashVerificationError::*;
         let mut collect = Measure::start("collect");
