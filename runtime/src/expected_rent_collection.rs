@@ -505,6 +505,27 @@ impl ExpectedRentCollection {
             return None;
         }
 
+        if storage_slot == 133919611 && &pk == pubkey{
+            let future_slot = 133920063;
+            let hypo = Self::new(
+                pubkey,
+                loaded_account,
+                133818591, // this is the last write prior to rent collection
+                epoch_schedule,
+                &RentCollector {
+                    epoch: epoch_schedule.get_epoch(future_slot),
+                    epoch_schedule: *epoch_schedule,
+                    slots_per_year: rent_collector.slots_per_year,
+                    rent: rent_collector.rent,
+                
+                },
+                future_slot,
+                find_unskipped_slot,
+                filler_account_suffix,
+            );
+            error!("hypo: {}, slot: {}, {:?}", pubkey, future_slot, hypo);
+        }
+        
         // ask the rent collector what rent should be collected.
         // Rent collector knows the current epoch.
         let rent_result =
