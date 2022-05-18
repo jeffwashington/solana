@@ -2554,7 +2554,7 @@ fn main() {
                             }
                         }
 
-                        bank.set_capitalization();
+                        bank.set_capitalization(true);
 
                         let bank = if let Some(warp_slot) = warp_slot {
                             Arc::new(Bank::warp_from_parent(
