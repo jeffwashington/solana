@@ -140,6 +140,7 @@ pub const ACCOUNTS_DB_CONFIG_FOR_TESTING: AccountsDbConfig = AccountsDbConfig {
     write_cache_limit_bytes: None,
     skip_rewrites: false,
     ancient_append_vecs: false,
+    skip_initial_hash_calc: false,
 };
 pub const ACCOUNTS_DB_CONFIG_FOR_BENCHMARKS: AccountsDbConfig = AccountsDbConfig {
     index: Some(ACCOUNTS_INDEX_CONFIG_FOR_BENCHMARKS),
@@ -149,6 +150,7 @@ pub const ACCOUNTS_DB_CONFIG_FOR_BENCHMARKS: AccountsDbConfig = AccountsDbConfig
     write_cache_limit_bytes: None,
     skip_rewrites: false,
     ancient_append_vecs: false,
+    skip_initial_hash_calc: false,
 };
 
 pub type BinnedHashData = Vec<Vec<CalculateHashIntermediate>>;
@@ -188,6 +190,7 @@ pub struct AccountsDbConfig {
     pub write_cache_limit_bytes: Option<u64>,
     pub skip_rewrites: bool,
     pub ancient_append_vecs: bool,
+    pub skip_initial_hash_calc    : bool,
 }
 
 pub struct FoundStoredAccount<'a> {
@@ -1012,6 +1015,9 @@ pub struct AccountsDb {
     /// true iff we want to squash old append vecs together into 'ancient append vecs'
     pub ancient_append_vecs: bool,
 
+    /// true iff we want to skip the initial hash calculation on startup
+    pub skip_initial_hash_calc: bool,
+
     pub storage: AccountStorage,
 
     pub accounts_cache: AccountsCache,
@@ -1620,6 +1626,7 @@ impl AccountsDb {
             active_stats: ActiveStats::default(),
             accounts_hash_complete_one_epoch_old: RwLock::default(),
             skip_rewrites: false,
+            skip_initial_hash_calc: false,
             ancient_append_vecs: false,
             accounts_index,
             storage: AccountStorage::default(),
@@ -1717,6 +1724,11 @@ impl AccountsDb {
             .as_ref()
             .map(|config| config.skip_rewrites)
             .unwrap_or_default();
+            let skip_initial_hash_calc = accounts_db_config
+            .as_ref()
+            .map(|config| config.skip_initial_hash_calc)
+            .unwrap_or_default();
+                        
         let ancient_append_vecs = accounts_db_config
             .as_ref()
             .map(|config| config.ancient_append_vecs)
@@ -1731,6 +1743,7 @@ impl AccountsDb {
         let mut new = Self {
             paths,
             skip_rewrites,
+            skip_initial_hash_calc,
             ancient_append_vecs,
             cluster_type: Some(*cluster_type),
             account_indexes,

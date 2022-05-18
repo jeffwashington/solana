@@ -985,11 +985,17 @@ fn main() {
     let no_os_memory_stats_reporting_arg = Arg::with_name("no_os_memory_stats_reporting")
         .long("no-os-memory-stats-reporting")
         .help("Disable reporting of OS memory statistics.");
-    let skip_rewrites_arg = Arg::with_name("accounts_db_skip_rewrites")
+        let skip_rewrites_arg = Arg::with_name("accounts_db_skip_rewrites")
         .long("accounts-db-skip-rewrites")
         .help(
             "Accounts that are rent exempt and have no changes are not rewritten. \
                   This produces snapshots that older versions cannot read.",
+        )
+        .hidden(true);
+        let accounts_db_skip_initial_hash_calc_arg = Arg::with_name("accounts_db_skip_initial_hash_calc")
+        .long("accounts-db-skip-initial-hash-calc")
+        .help(
+            "Do not verify accounts hash at startup.",
         )
         .hidden(true);
     let ancient_append_vecs = Arg::with_name("accounts_db_ancient_append_vecs")
@@ -1337,6 +1343,7 @@ fn main() {
             .arg(&accounts_filler_size)
             .arg(&verify_index_arg)
             .arg(&skip_rewrites_arg)
+            .arg(&accounts_db_skip_initial_hash_calc_arg)
             .arg(&ancient_append_vecs)
             .arg(&hard_forks_arg)
             .arg(&no_accounts_db_caching_arg)
@@ -2143,6 +2150,7 @@ fn main() {
                     filler_accounts_config,
                     skip_rewrites: matches.is_present("accounts_db_skip_rewrites"),
                     ancient_append_vecs: matches.is_present("accounts_db_ancient_append_vecs"),
+                    skip_initial_hash_calc: matches.is_present("accounts_db_skip_initial_hash_calc_arg"),
                     ..AccountsDbConfig::default()
                 });
 

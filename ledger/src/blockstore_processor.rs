@@ -679,6 +679,7 @@ pub fn process_blockstore_from_root(
     transaction_status_sender: Option<&TransactionStatusSender>,
     cache_block_meta_sender: Option<&CacheBlockMetaSender>,
     accounts_background_request_sender: &AbsRequestSender,
+    is_startup: bool,
 ) -> result::Result<(), BlockstoreProcessorError> {
     // Starting slot must be a root, and thus has no parents
     assert_eq!(bank_forks.read().unwrap().banks().len(), 1);
@@ -743,7 +744,7 @@ pub fn process_blockstore_from_root(
         .read()
         .unwrap()
         .root_bank()
-        .calculate_and_verify_capitalization(debug_verify)
+        .calculate_and_verify_capitalization(debug_verify, is_startup)
     {
         return Err(
             BlockstoreProcessorError::RootBankWithMismatchedCapitalization(

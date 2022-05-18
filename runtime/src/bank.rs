@@ -6307,8 +6307,6 @@ impl Bank {
         test_hash_calculation: bool,
         can_cached_slot_be_unflushed: bool,
     ) -> bool {
-        let is_startup = true;
-
         self.rc.accounts.verify_bank_hash_and_lamports(
             self.slot(),
             &self.ancestors,
@@ -6317,7 +6315,6 @@ impl Bank {
             self.epoch_schedule(),
             &self.rent_collector,
             can_cached_slot_be_unflushed,
-            is_startup,
         )
     }
 
@@ -6532,10 +6529,16 @@ impl Bank {
         }
         shrink_all_slots_time.stop();
 
+        let (mut verify, verify_time_us) = if !self.rc.accounts.accounts_db.skip_initial_hash_calc {
+
         info!("verify_bank_hash..");
         let mut verify_time = Measure::start("verify_bank_hash");
-        let mut verify = self.verify_bank_hash(test_hash_calculation, false);
+        let verify = self.verify_bank_hash(test_hash_calculation, false);
         verify_time.stop();
+        (verify, verify_time.as_us())
+    } else {
+        (true, 0)
+    };
 
         info!("verify_hash..");
         let mut verify2_time = Measure::start("verify_hash");
@@ -6547,7 +6550,7 @@ impl Bank {
             "verify_snapshot_bank",
             ("clean_us", clean_time.as_us(), i64),
             ("shrink_all_slots_us", shrink_all_slots_time.as_us(), i64),
-            ("verify_bank_hash_us", verify_time.as_us(), i64),
+            ("verify_bank_hash_us", verify_time_us, i64),
             ("verify_hash_us", verify2_time.as_us(), i64),
         );
 
