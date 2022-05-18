@@ -6327,6 +6327,8 @@ impl AccountsDb {
 
         let find_unskipped_slot = |slot: Slot| self.find_unskipped_slot(slot, config.ancestors);
 
+        let list = RwLock::new(Vec::default());
+
         let result: Vec<BinnedHashData> = self.scan_account_storage_no_bank(
             cache_hash_data,
             config,
@@ -6362,6 +6364,11 @@ impl AccountsDb {
                     find_unskipped_slot,
                     filler_account_suffix,
                 );
+
+                if slot == 131040 {
+                    list.write().unwrap().push((*pubkey, loaded_hash, new_hash));
+                }
+
                 let loaded_hash = new_hash.unwrap_or(loaded_hash);
 
                 let source_item = CalculateHashIntermediate::new(loaded_hash, balance, *pubkey);
@@ -6393,6 +6400,14 @@ impl AccountsDb {
             &bin_calculator,
             stats,
         );
+
+        let mut list = list.write().unwrap();
+        if list.is_empty() {
+            list.sort();
+            error!("jw3: {:?}", list);
+        }
+  
+
 
         stats.sort_time_total_us += sort_time.load(Ordering::Relaxed);
 
