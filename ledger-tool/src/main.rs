@@ -798,6 +798,7 @@ fn load_bank_forks(
         None,
         None,
         None,
+        true,
     )
     .map(|(bank_forks, .., starting_snapshot_hashes)| (bank_forks, starting_snapshot_hashes))
 }
@@ -873,7 +874,7 @@ fn open_genesis_config_by(ledger_path: &Path, matches: &ArgMatches<'_>) -> Genes
 
 fn assert_capitalization(bank: &Bank) {
     let debug_verify = true;
-    assert!(bank.calculate_and_verify_capitalization(debug_verify));
+    assert!(bank.calculate_and_verify_capitalization(debug_verify, true));
 }
 #[cfg(not(target_env = "msvc"))]
 use jemallocator::Jemalloc;
@@ -2740,7 +2741,7 @@ fn main() {
 
                         if arg_matches.is_present("recalculate_capitalization") {
                             println!("Recalculating capitalization");
-                            let old_capitalization = bank.set_capitalization();
+                            let old_capitalization = bank.set_capitalization(true);
                             if old_capitalization == bank.capitalization() {
                                 eprintln!(
                                     "Capitalization was identical: {}",
@@ -2839,7 +2840,7 @@ fn main() {
                                 if store_failed_count >= 1 {
                                     // we have no choice; maybe locally created blank cluster with
                                     // not-Development cluster type.
-                                    let old_cap = base_bank.set_capitalization();
+                                    let old_cap = base_bank.set_capitalization(true);
                                     let new_cap = base_bank.capitalization();
                                     warn!(
                                         "Skewing capitalization a bit to enable credits_auto_rewind as \
