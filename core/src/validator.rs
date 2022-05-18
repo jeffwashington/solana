@@ -1586,6 +1586,7 @@ impl<'a> ProcessBlockStore<'a> {
                 self.transaction_status_sender,
                 self.cache_block_meta_sender.as_ref(),
                 &self.accounts_background_request_sender,
+                true,
             )
             .unwrap_or_else(|err| {
                 error!("Failed to load ledger: {:?}", err);

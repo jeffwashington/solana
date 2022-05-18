@@ -629,6 +629,7 @@ pub fn test_process_blockstore(
         None,
         None,
         &AbsRequestSender::default(),
+        true,
     )
     .unwrap();
     (bank_forks, leader_schedule_cache)
@@ -3256,6 +3257,7 @@ pub mod tests {
             None,
             None,
             &AbsRequestSender::default(),
+            true,
         )
         .unwrap();
 

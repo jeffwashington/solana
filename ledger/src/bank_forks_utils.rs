@@ -49,6 +49,7 @@ pub fn load(
     transaction_status_sender: Option<&TransactionStatusSender>,
     cache_block_meta_sender: Option<&CacheBlockMetaSender>,
     accounts_update_notifier: Option<AccountsUpdateNotifier>,
+    is_startup: bool,
 ) -> LoadResult {
     let (bank_forks, leader_schedule_cache, starting_snapshot_hashes, ..) = load_bank_forks(
         genesis_config,
@@ -69,6 +70,7 @@ pub fn load(
         transaction_status_sender,
         cache_block_meta_sender,
         &solana_runtime::accounts_background_service::AbsRequestSender::default(),
+        is_startup,
     )
     .map(|_| (bank_forks, leader_schedule_cache, starting_snapshot_hashes))
 }
