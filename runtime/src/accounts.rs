@@ -767,6 +767,7 @@ impl Accounts {
         epoch_schedule: &EpochSchedule,
         rent_collector: &RentCollector,
     ) -> u64 {
+        use log::*;error!("calculate_capitalization {} {}", file!(), line!());
         let use_index = false;
         let is_startup = false; // there may be conditions where this is called at startup.
         self.accounts_db

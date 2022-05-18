@@ -6383,6 +6383,7 @@ impl Bank {
     }
 
     pub fn calculate_capitalization(&self, debug_verify: bool) -> u64 {
+        use log::*;error!("calculate_capitalization {} {}", file!(), line!());
         let can_cached_slot_be_unflushed = true; // implied yes
         self.rc.accounts.calculate_capitalization(
             &self.ancestors,
@@ -6395,6 +6396,8 @@ impl Bank {
     }
 
     pub fn calculate_and_verify_capitalization(&self, debug_verify: bool) -> bool {
+        use log::*;error!("calculate_and_verify_capitalization {} {}", file!(), line!());
+
         let calculated = self.calculate_capitalization(debug_verify);
         let expected = self.capitalization();
         if calculated == expected {
@@ -6411,6 +6414,7 @@ impl Bank {
     /// Forcibly overwrites current capitalization by actually recalculating accounts' balances.
     /// This should only be used for developing purposes.
     pub fn set_capitalization(&self) -> u64 {
+        use log::*;error!("set_capitalization {} {}", file!(), line!());
         let old = self.capitalization();
         let debug_verify = true;
         self.capitalization
