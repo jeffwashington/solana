@@ -6307,6 +6307,8 @@ impl Bank {
         test_hash_calculation: bool,
         can_cached_slot_be_unflushed: bool,
     ) -> bool {
+        let is_startup = true;
+
         self.rc.accounts.verify_bank_hash_and_lamports(
             self.slot(),
             &self.ancestors,
@@ -6315,6 +6317,7 @@ impl Bank {
             self.epoch_schedule(),
             &self.rent_collector,
             can_cached_slot_be_unflushed,
+            is_startup,
         )
     }
 
@@ -6382,8 +6385,9 @@ impl Bank {
         Ok(sanitized_tx)
     }
 
-    pub fn calculate_capitalization(&self, debug_verify: bool) -> u64 {
-        use log::*;error!("calculate_capitalization {} {}", file!(), line!());
+    pub fn calculate_capitalization(&self, debug_verify: bool, is_startup: bool) -> u64 {
+        use log::*;
+        error!("calculate_capitalization {} {}", file!(), line!());
         let can_cached_slot_be_unflushed = true; // implied yes
         self.rc.accounts.calculate_capitalization(
             &self.ancestors,
@@ -6392,13 +6396,23 @@ impl Bank {
             debug_verify,
             self.epoch_schedule(),
             &self.rent_collector,
+            is_startup,
         )
     }
 
-    pub fn calculate_and_verify_capitalization(&self, debug_verify: bool) -> bool {
-        use log::*;error!("calculate_and_verify_capitalization {} {}", file!(), line!());
+    pub fn calculate_and_verify_capitalization(
+        &self,
+        debug_verify: bool,
+        is_startup: bool,
+    ) -> bool {
+        use log::*;
+        error!(
+            "calculate_and_verify_capitalization {} {}",
+            file!(),
+            line!()
+        );
 
-        let calculated = self.calculate_capitalization(debug_verify);
+        let calculated = self.calculate_capitalization(debug_verify, is_startup);
         let expected = self.capitalization();
         if calculated == expected {
             true
@@ -6413,12 +6427,15 @@ impl Bank {
 
     /// Forcibly overwrites current capitalization by actually recalculating accounts' balances.
     /// This should only be used for developing purposes.
-    pub fn set_capitalization(&self) -> u64 {
-        use log::*;error!("set_capitalization {} {}", file!(), line!());
+    pub fn set_capitalization(&self, is_startup: bool) -> u64 {
+        use log::*;
+        error!("set_capitalization {} {}", file!(), line!());
         let old = self.capitalization();
         let debug_verify = true;
-        self.capitalization
-            .store(self.calculate_capitalization(debug_verify), Relaxed);
+        self.capitalization.store(
+            self.calculate_capitalization(debug_verify, is_startup),
+            Relaxed,
+        );
         old
     }
 

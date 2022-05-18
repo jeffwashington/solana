@@ -766,10 +766,10 @@ impl Accounts {
         debug_verify: bool,
         epoch_schedule: &EpochSchedule,
         rent_collector: &RentCollector,
+        is_startup: bool,
     ) -> u64 {
         use log::*;error!("calculate_capitalization {} {}", file!(), line!());
         let use_index = false;
-        let is_startup = false; // there may be conditions where this is called at startup.
         self.accounts_db
             .update_accounts_hash_with_index_option(
                 use_index,
