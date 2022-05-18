@@ -6190,7 +6190,7 @@ impl AccountsDb {
         );
 
         let mut list = list.write().unwrap();
-        if list.is_empty() {
+        if !list.is_empty() {
             list.sort();
             error!("jw3: {:?}", list);
         }
