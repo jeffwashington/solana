@@ -534,7 +534,7 @@ where
     let mut measure_remap = Measure::start("remap");
     let a_slot = snapshot_storages
         .first()
-        .map(|(slot, _)| slot)
+        .map(|(slot, _)| *slot)
         .unwrap_or_default();
     let mut storage = (0..snapshot_storages.len())
         .into_par_iter()
@@ -649,7 +649,7 @@ where
     accounts_db.maybe_add_filler_accounts(
         &genesis_config.epoch_schedule,
         &genesis_config.rent,
-        genesis_config.epoch_schedule.get_epoch(*a_slot),
+        genesis_config.epoch_schedule.get_epoch(a_slot),
     );
 
     handle.join().unwrap();
