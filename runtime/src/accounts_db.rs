@@ -6163,7 +6163,7 @@ impl AccountsDb {
                 }
                 if max_slot == 131040 {
 
-                    if &pk == pubkey {
+                    if &pk == pubkey || list2.read().unwrap().is_empty() {
                         let epoch = config.epoch_schedule.get_epoch(max_slot);
                         let prev_epoch = config.epoch_schedule.get_epoch(max_slot - 1);
                         let mut rc2 = config.rent_collector.clone();
@@ -6180,8 +6180,9 @@ impl AccountsDb {
                             find_unskipped_slot,
                             filler_account_suffix,
                         );
-                        error!("jw6: {:?}, {:?}", previous_new_hash, new_hash);
-                        error!("jw7: {:?}, {:?}, epoch: {}, prev_epoch: {}", 
+                        if previous_new_hash != new_hash {
+                            error!("jw6: {} {:?}, {:?}", pubkey, previous_new_hash, new_hash);
+                        error!("jw7: {} {:?}, {:?}, epoch: {}, prev_epoch: {}", pubkey,
                         ExpectedRentCollection::new(
                             pubkey,
                             &loaded_account,
@@ -6204,7 +6205,6 @@ impl AccountsDb {
                         ),
                         epoch,prev_epoch,
                     );
-                        if previous_new_hash != new_hash && false {
                             list2.write().unwrap().push((
                                 *pubkey,
                                 loaded_hash,
