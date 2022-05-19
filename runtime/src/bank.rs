@@ -5132,6 +5132,11 @@ impl Bank {
             }
             rent_debits.insert(&pubkey, collected.rent_amount, account.lamports());
         }
+        if self.slot() ==                  131040 {
+            use log::*;
+            error!("rewrites in slot: {}, skipped: {:?}", self.slot(), rewrites_skipped);
+        }
+
         self.remember_skipped_rewrites(rewrites_skipped);
         self.collected_rent
             .fetch_add(total_collected.rent_amount, Relaxed);

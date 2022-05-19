@@ -491,7 +491,12 @@ impl ExpectedRentCollection {
                 // the newer epoch has a different # of slots, so the partition index will be different in the prior epoch
                 partition_from_pubkey =
                     crate::bank::Bank::partition_from_pubkey(pubkey, slots_per_epoch_previous_epoch);
-                first_slot_in_max_epoch.saturating_sub(slots_per_epoch_previous_epoch).saturating_add(partition_from_pubkey)
+                let result = first_slot_in_max_epoch.saturating_sub(slots_per_epoch_previous_epoch).saturating_add(partition_from_pubkey);
+                if max_slot_in_storages_inclusive == 131040 {
+                    use log::*;
+                    error!("updated because of epoch change: {}, result: {}", pubkey, result);
+                }
+                result
             };
             // since we are looking a different root, we have to call this again
             if let Some(find) = find_unskipped_slot(expected_rent_collection_slot_max_epoch) {
