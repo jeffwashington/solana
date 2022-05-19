@@ -6297,10 +6297,13 @@ impl AccountsDb {
                 final_result = (hash, lamports);
             }
 
+            let epoch = config.rent_collector.epoch();
             info!(
-                "calculate_accounts_hash_without_index: slot: {} {:?}",
+                "calculate_accounts_hash_without_index: slot: {} {:?}, slots in epoch: {}, epoch: {}",
                 storages.max_slot_inclusive(),
-                final_result
+                final_result,
+                config.slots_in_epoch(epoch),
+                epoch,
             );
             Ok(final_result)
         };
