@@ -6112,10 +6112,12 @@ impl AccountsDb {
         let mismatch_found = AtomicU64::new(0);
         let range = bin_range.end - bin_range.start;
         let sort_time = AtomicU64::new(0);
+        let max_slot = storage.max_slot_inclusive();
 
         let find_unskipped_slot = |slot: Slot| self.find_unskipped_slot(slot, config.ancestors);
 
         let list = RwLock::new(Vec::default());
+        let list2 = RwLock::new(Vec::default());
 
         let result: Vec<BinnedHashData> = self.scan_account_storage_no_bank(
             cache_hash_data,
@@ -6156,6 +6158,23 @@ impl AccountsDb {
                 if slot == 131040 {
                     list.write().unwrap().push((*pubkey, loaded_hash, new_hash));
                 }
+                if max_slot == 131040 {
+                    let previous_new_hash = ExpectedRentCollection::maybe_rehash_skipped_rewrite(
+                        &loaded_account,
+                        &loaded_hash,
+                        pubkey,
+                        slot,
+                        config.epoch_schedule,
+                        config.rent_collector,
+                        stats,
+                        max_slot - 1,
+                        find_unskipped_slot,
+                        filler_account_suffix,
+                    );
+                    if previous_new_hash != new_hash {
+                        list2.write().unwrap().push((*pubkey, loaded_hash, new_hash, previous_new_hash));
+                    }
+                }
 
                 let loaded_hash = new_hash.unwrap_or(loaded_hash);
 
@@ -6192,6 +6211,11 @@ impl AccountsDb {
         let mut list = list.write().unwrap();
         if !list.is_empty() {
             list.sort();
+            error!("jw3: {:?}", list);
+        }
+        let mut list2 = list2.write().unwrap();
+        if !list2.is_empty() {
+            list2.sort();
             error!("jw3: {:?}", list);
         }
   
