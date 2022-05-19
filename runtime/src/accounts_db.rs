@@ -41,7 +41,9 @@ use {
             get_ancient_append_vec_capacity, is_ancient, is_full_ancient, AccountsToStore,
             StorageSelector,
         },
-        append_vec::{AppendVec, AccountsInAppendVec, StoredAccountMeta, StoredMeta, StoredMetaWriteVersion},
+        append_vec::{
+            AccountsInAppendVec, AppendVec, StoredAccountMeta, StoredMeta, StoredMetaWriteVersion,
+        },
         bank::Rewrites,
         cache_hash_data::CacheHashData,
         contains::Contains,
@@ -190,7 +192,7 @@ pub struct AccountsDbConfig {
     pub write_cache_limit_bytes: Option<u64>,
     pub skip_rewrites: bool,
     pub ancient_append_vecs: bool,
-    pub skip_initial_hash_calc    : bool,
+    pub skip_initial_hash_calc: bool,
 }
 
 pub struct FoundStoredAccount<'a> {
@@ -1724,11 +1726,11 @@ impl AccountsDb {
             .as_ref()
             .map(|config| config.skip_rewrites)
             .unwrap_or_default();
-            let skip_initial_hash_calc = accounts_db_config
+        let skip_initial_hash_calc = accounts_db_config
             .as_ref()
             .map(|config| config.skip_initial_hash_calc)
             .unwrap_or_default();
-                        
+
         let ancient_append_vecs = accounts_db_config
             .as_ref()
             .map(|config| config.ancient_append_vecs)
@@ -6171,7 +6173,12 @@ impl AccountsDb {
                         filler_account_suffix,
                     );
                     if previous_new_hash != new_hash {
-                        list2.write().unwrap().push((*pubkey, loaded_hash, new_hash, previous_new_hash));
+                        list2.write().unwrap().push((
+                            *pubkey,
+                            loaded_hash,
+                            new_hash,
+                            previous_new_hash,
+                        ));
                     }
                 }
 
@@ -6217,8 +6224,6 @@ impl AccountsDb {
             list2.sort();
             error!("jw4: {:?}", list2);
         }
-  
-
 
         stats.sort_time_total_us += sort_time.load(Ordering::Relaxed);
 
@@ -7506,7 +7511,12 @@ impl AccountsDb {
     /// The filler accounts are added to each slot in the snapshot after index generation.
     /// The accounts added in a slot are setup to have pubkeys such that rent will be collected from them before (or when?) their slot becomes an epoch old.
     /// Thus, the filler accounts are rewritten by rent and the old slot can be thrown away successfully.
-    pub fn maybe_add_filler_accounts(&self, epoch_schedule: &EpochSchedule, rent: &Rent) {
+    pub fn maybe_add_filler_accounts(
+        &self,
+        epoch_schedule: &EpochSchedule,
+        rent: &Rent,
+        rent_epoch: Epoch,
+    ) {
         if self.filler_accounts_config.count == 0 {
             return;
         }
@@ -7534,7 +7544,9 @@ impl AccountsDb {
         let space = self.filler_accounts_config.size;
         let rent_exempt_reserve = rent.minimum_balance(space);
         let lamports = rent_exempt_reserve;
-        let account = AccountSharedData::new(lamports, space, &owner);
+        let mut account = AccountSharedData::new(lamports, space, &owner);
+        // needs to be non-zero
+        account.set_rent_epoch(rent_epoch);
         let added = AtomicUsize::default();
         for pass in 0..=passes {
             self.accounts_index
