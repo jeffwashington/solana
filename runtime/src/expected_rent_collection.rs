@@ -480,7 +480,8 @@ impl ExpectedRentCollection {
         let mut use_previous_epoch_rent_collector = false;
         if expected_rent_collection_slot_max_epoch > max_slot_in_storages_inclusive {
             // max slot has not hit the slot in the max epoch where we would have collected rent yet, so the most recent rent-collected rewrite slot for this pubkey would be in the previous epoch
-            let slots_per_epoch_previous_epoch = epoch_schedule.get_slots_in_epoch(epoch_of_max_storage_slot);
+            let previous_epoch = epoch_of_max_storage_slot.saturating_sub(1);
+            let slots_per_epoch_previous_epoch = epoch_schedule.get_slots_in_epoch(previous_epoch);
             expected_rent_collection_slot_max_epoch = if slots_per_epoch_previous_epoch == slots_per_epoch_max_epoch {
                 // partition index remains the same
                 calculated_from_index_expected_rent_collection_slot_max_epoch
