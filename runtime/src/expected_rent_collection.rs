@@ -480,9 +480,19 @@ impl ExpectedRentCollection {
         let mut use_previous_epoch_rent_collector = false;
         if expected_rent_collection_slot_max_epoch > max_slot_in_storages_inclusive {
             // max slot has not hit the slot in the max epoch where we would have collected rent yet, so the most recent rent-collected rewrite slot for this pubkey would be in the previous epoch
-            expected_rent_collection_slot_max_epoch =
+            let previous_epoch = epoch_of_max_storage_slot.saturating_sub(1);
+            let slots_per_epoch_previous_epoch = epoch_schedule.get_slots_in_epoch(previous_epoch);
+            expected_rent_collection_slot_max_epoch = if slots_per_epoch_previous_epoch == slots_per_epoch_max_epoch {
+                // partition index remains the same
                 calculated_from_index_expected_rent_collection_slot_max_epoch
-                    .saturating_sub(slots_per_epoch);
+                    .saturating_sub(slots_per_epoch_max_epoch)
+            }
+            else {
+                // the newer epoch has a different # of slots, so the partition index will be different in the prior epoch
+                partition_from_pubkey =
+                    crate::bank::Bank::partition_from_pubkey(pubkey, slots_per_epoch_previous_epoch);
+                first_slot_in_max_epoch.saturating_sub(slots_per_epoch_previous_epoch).saturating_add(partition_from_pubkey)
+            };
             // since we are looking a different root, we have to call this again
             if let Some(find) = find_unskipped_slot(expected_rent_collection_slot_max_epoch) {
                 // found a root (because we have a storage) that is >= expected_rent_collection_slot.
@@ -492,7 +502,6 @@ impl ExpectedRentCollection {
             // since we have not hit the slot in the rent collector's epoch yet, we need to collect rent according to the previous epoch's rent collector.
             use_previous_epoch_rent_collector = true;
         }
-
         // the slot we're dealing with is where we expected the rent to be collected for this pubkey, so use what is in this slot
         // however, there are cases, such as adjusting the clock, where we store the account IN the same slot, but we do so BEFORE we collect rent. We later store the account AGAIN for rewrite/rent collection.
         // So, if storage_slot == expected_rent_collection_slot..., then we MAY have collected rent or may not have. So, it has to be >
