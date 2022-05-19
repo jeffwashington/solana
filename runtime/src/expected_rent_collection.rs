@@ -454,10 +454,10 @@ impl ExpectedRentCollection {
         filler_account_suffix: Option<&Pubkey>,
     ) -> Option<Self> {
         let mut rent_collector = rent_collector_max_epoch;
-        let slots_per_epoch = epoch_schedule.get_slots_in_epoch(rent_collector.epoch);
+        let slots_per_epoch_max_epoch = epoch_schedule.get_slots_in_epoch(rent_collector.epoch);
 
-        let partition_from_pubkey =
-            crate::bank::Bank::partition_from_pubkey(pubkey, slots_per_epoch);
+        let mut partition_from_pubkey =
+            crate::bank::Bank::partition_from_pubkey(pubkey, slots_per_epoch_max_epoch);
         let (epoch_of_max_storage_slot, partition_index_from_max_slot) =
             epoch_schedule.get_epoch_and_slot_index(max_slot_in_storages_inclusive);
 
