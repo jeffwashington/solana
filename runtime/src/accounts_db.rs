@@ -6120,6 +6120,8 @@ impl AccountsDb {
         let list = RwLock::new(Vec::default());
         let list2 = RwLock::new(Vec::default());
 
+        // let pk = Pubkey::from_str("").unwrap();
+
         let result: Vec<BinnedHashData> = self.scan_account_storage_no_bank(
             cache_hash_data,
             config,
@@ -6159,7 +6161,8 @@ impl AccountsDb {
                 if slot == 131040 {
                     list.write().unwrap().push((*pubkey, loaded_hash, new_hash));
                 }
-                if max_slot == 131040 {
+                if max_slot == 131040 && false {
+
                     let previous_new_hash = ExpectedRentCollection::maybe_rehash_skipped_rewrite(
                         &loaded_account,
                         &loaded_hash,
