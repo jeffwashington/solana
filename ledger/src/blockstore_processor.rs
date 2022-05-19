@@ -1349,7 +1349,8 @@ fn load_frozen_forks(
                 bank.force_flush_accounts_cache();
                 let can_cached_slot_be_unflushed = true;
                 let _ = bank.verify_bank_hash(false, can_cached_slot_be_unflushed);
-                use log::*;error!("{} {}", file!(), line!());
+                use log::*;
+                error!("{} {}", file!(), line!());
                 break;
             }
         }

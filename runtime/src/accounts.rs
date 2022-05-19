@@ -768,7 +768,8 @@ impl Accounts {
         rent_collector: &RentCollector,
         is_startup: bool,
     ) -> u64 {
-        use log::*;error!("calculate_capitalization {} {}", file!(), line!());
+        use log::*;
+        error!("calculate_capitalization {} {}", file!(), line!());
         let use_index = false;
         self.accounts_db
             .update_accounts_hash_with_index_option(
