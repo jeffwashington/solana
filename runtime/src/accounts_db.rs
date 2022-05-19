@@ -6327,7 +6327,14 @@ impl AccountsDb {
 
         let find_unskipped_slot = |slot: Slot| self.find_unskipped_slot(slot, config.ancestors);
 
+        let max_slot = storage.max_slot_inclusive();
+
+        let find_unskipped_slot = |slot: Slot| self.find_unskipped_slot(slot, config.ancestors);
+
         let list = RwLock::new(Vec::default());
+        let list2 = RwLock::new(Vec::default());
+
+        let pk = Pubkey::from_str("1FecBfX2KNwZNxe8AjGyNodeqzpuLU64fBQUV8aKRWB").unwrap();
 
         let result: Vec<BinnedHashData> = self.scan_account_storage_no_bank(
             cache_hash_data,
