@@ -6299,11 +6299,12 @@ impl AccountsDb {
 
             let epoch = config.rent_collector.epoch;
             info!(
-                "calculate_accounts_hash_without_index: slot: {} {:?}, slots in epoch: {}, epoch: {}",
+                "calculate_accounts_hash_without_index: slot: {} {:?}, slots in epoch: {}, epoch: {}, first_normal: {}",
                 storages.max_slot_inclusive(),
                 final_result,
                 config.epoch_schedule.get_slots_in_epoch(epoch),
                 epoch,
+                config.epoch_schedule.first_normal_epoch,
             );
             Ok(final_result)
         };
