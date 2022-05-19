@@ -6255,7 +6255,7 @@ impl AccountsDb {
         let mut list2 = list2.write().unwrap();
         if !list2.is_empty() {
             list2.sort();
-            error!("jw4: {:?}", list2.len());
+            error!("jw4: {:?}", list2);
         }
 
         stats.sort_time_total_us += sort_time.load(Ordering::Relaxed);
