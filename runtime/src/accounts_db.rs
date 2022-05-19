@@ -6120,7 +6120,7 @@ impl AccountsDb {
         let list = RwLock::new(Vec::default());
         let list2 = RwLock::new(Vec::default());
 
-        // let pk = Pubkey::from_str("").unwrap();
+        let pk = Pubkey::from_str("1FecBfX2KNwZNxe8AjGyNodeqzpuLU64fBQUV8aKRWB").unwrap();
 
         let result: Vec<BinnedHashData> = self.scan_account_storage_no_bank(
             cache_hash_data,
@@ -6161,27 +6161,57 @@ impl AccountsDb {
                 if slot == 131040 {
                     list.write().unwrap().push((*pubkey, loaded_hash, new_hash));
                 }
-                if max_slot == 131040 && false {
+                if max_slot == 131040 {
 
-                    let previous_new_hash = ExpectedRentCollection::maybe_rehash_skipped_rewrite(
-                        &loaded_account,
-                        &loaded_hash,
-                        pubkey,
-                        slot,
-                        config.epoch_schedule,
-                        config.rent_collector,
-                        stats,
-                        max_slot - 1,
-                        find_unskipped_slot,
-                        filler_account_suffix,
+                    if &pk == pubkey {
+                        let epoch = config.epoch_schedule.get_epoch(max_slot);
+                        let prev_epoch = config.epoch_schedule.get_epoch(max_slot - 1);
+                        let mut rc2 = config.rent_collector.clone();
+                        rc2.epoch = prev_epoch; // previous epoch
+                        let previous_new_hash = ExpectedRentCollection::maybe_rehash_skipped_rewrite(
+                            &loaded_account,
+                            &loaded_hash,
+                            pubkey,
+                            slot,
+                            config.epoch_schedule,
+                            &rc2,
+                            stats,
+                            max_slot - 1,
+                            find_unskipped_slot,
+                            filler_account_suffix,
+                        );
+                        error!("jw6: {:?}, {:?}", previous_new_hash, new_hash);
+                        error!("jw7: {:?}, {:?}, epoch: {}, prev_epoch: {}", 
+                        ExpectedRentCollection::new(
+                            pubkey,
+                            &loaded_account,
+                            slot,
+                            config.epoch_schedule,
+                            config.rent_collector,
+                            max_slot - 0,
+                            find_unskipped_slot,
+                            filler_account_suffix,
+                        ),
+                        ExpectedRentCollection::new(
+                            pubkey,
+                            &loaded_account,
+                            slot,
+                            config.epoch_schedule,
+                            &rc2,
+                            max_slot - 1,
+                            find_unskipped_slot,
+                            filler_account_suffix,
+                        ),
+                        epoch,prev_epoch,
                     );
-                    if previous_new_hash != new_hash {
-                        list2.write().unwrap().push((
-                            *pubkey,
-                            loaded_hash,
-                            new_hash,
-                            previous_new_hash,
-                        ));
+                        if previous_new_hash != new_hash && false {
+                            list2.write().unwrap().push((
+                                *pubkey,
+                                loaded_hash,
+                                new_hash,
+                                previous_new_hash,
+                            ));
+                        }
                     }
                 }
 

@@ -443,7 +443,7 @@ impl ExpectedRentCollection {
     /// figure out whether the account stored at 'storage_slot' would have normally been rewritten at a slot that has already occurred: after 'storage_slot' but <= 'max_slot_in_storages_inclusive'
     /// returns Some(...) if the account would have normally been rewritten
     /// returns None if the account was updated wrt rent already or if it is known that there must exist a future rewrite of this account (for example, non-zero rent is due)
-    fn new(
+    pub fn new(
         pubkey: &Pubkey,
         loaded_account: &impl ReadableAccount,
         storage_slot: Slot,
