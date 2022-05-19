@@ -109,7 +109,7 @@ pub const DEFAULT_NUM_DIRS: u32 = 4;
 // When calculating hashes, it is helpful to break the pubkeys found into bins based on the pubkey value.
 // More bins means smaller vectors to sort, copy, etc.
 pub const PUBKEY_BINS_FOR_CALCULATING_HASHES: usize = 65536;
-pub const NUM_SCAN_PASSES_DEFAULT: usize = 8;
+pub const NUM_SCAN_PASSES_DEFAULT: usize = 1;
 
 // Without chunks, we end up with 1 output vec for each outer snapshot storage.
 // This results in too many vectors to be efficient.
@@ -6368,6 +6368,59 @@ impl AccountsDb {
                 if slot == 131040 {
                     list.write().unwrap().push((*pubkey, loaded_hash, new_hash));
                 }
+                if max_slot == 131040 {
+
+                    if &pk == pubkey || list2.read().unwrap().is_empty() {
+                        let epoch = config.epoch_schedule.get_epoch(max_slot);
+                        let prev_epoch = config.epoch_schedule.get_epoch(max_slot - 1);
+                        let mut rc2 = config.rent_collector.clone();
+                        rc2.epoch = prev_epoch; // previous epoch
+                        let previous_new_hash = ExpectedRentCollection::maybe_rehash_skipped_rewrite(
+                            &loaded_account,
+                            &loaded_hash,
+                            pubkey,
+                            slot,
+                            config.epoch_schedule,
+                            &rc2,
+                            stats,
+                            max_slot - 1,
+                            find_unskipped_slot,
+                            filler_account_suffix,
+                        );
+                        if previous_new_hash != new_hash {
+                            error!("jw6: {} {:?}, {:?}", pubkey, previous_new_hash, new_hash);
+                        error!("jw7: {} {:?}, {:?}, epoch: {}, prev_epoch: {}", pubkey,
+                        ExpectedRentCollection::new(
+                            pubkey,
+                            &loaded_account,
+                            slot,
+                            config.epoch_schedule,
+                            config.rent_collector,
+                            max_slot - 0,
+                            find_unskipped_slot,
+                            filler_account_suffix,
+                        ),
+                        ExpectedRentCollection::new(
+                            pubkey,
+                            &loaded_account,
+                            slot,
+                            config.epoch_schedule,
+                            &rc2,
+                            max_slot - 1,
+                            find_unskipped_slot,
+                            filler_account_suffix,
+                        ),
+                        epoch,prev_epoch,
+                    );
+                            list2.write().unwrap().push((
+                                *pubkey,
+                                loaded_hash,
+                                new_hash,
+                                previous_new_hash,
+                            ));
+                        }
+                    }
+                }
 
                 let loaded_hash = new_hash.unwrap_or(loaded_hash);
 
@@ -6406,8 +6459,11 @@ impl AccountsDb {
             list.sort();
             error!("jw3: {:?}", list);
         }
-  
-
+        let mut list2 = list2.write().unwrap();
+        if !list2.is_empty() {
+            list2.sort();
+            error!("jw4: {:?}", list2.len());
+        }
 
         stats.sort_time_total_us += sort_time.load(Ordering::Relaxed);
 
