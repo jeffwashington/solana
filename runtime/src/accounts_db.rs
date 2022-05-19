@@ -6302,7 +6302,7 @@ impl AccountsDb {
                 "calculate_accounts_hash_without_index: slot: {} {:?}, slots in epoch: {}, epoch: {}",
                 storages.max_slot_inclusive(),
                 final_result,
-                config.epoch_schedule.slots_in_epoch(epoch),
+                config.epoch_schedule.get_slots_in_epoch(epoch),
                 epoch,
             );
             Ok(final_result)
