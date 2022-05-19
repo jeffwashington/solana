@@ -6370,7 +6370,7 @@ impl AccountsDb {
                 }
                 if max_slot == 131040 {
 
-                    if &pk == pubkey || list2.read().unwrap().is_empty() {
+                    if &pk == pubkey || true {//list2.read().unwrap().is_empty() {
                         let epoch = config.epoch_schedule.get_epoch(max_slot);
                         let prev_epoch = config.epoch_schedule.get_epoch(max_slot - 1);
                         let mut rc2 = config.rent_collector.clone();
