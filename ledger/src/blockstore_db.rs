@@ -1030,7 +1030,7 @@ impl TypedColumn for columns::OptimisticSlots {
     type Type = blockstore_meta::OptimisticSlotMetaVersioned;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Database {
     backend: Arc<Rocks>,
     path: Arc<Path>,
