@@ -482,6 +482,10 @@ impl CachedExecutors {
         let _ = self.executors.remove(pubkey);
     }
 
+    fn clear(&mut self) {
+        *self = CachedExecutors::default();
+    }
+
     fn get_primer_count_upper_bound_inclusive(counts: &[(&Pubkey, u64)]) -> u64 {
         const PRIMER_COUNT_TARGET_PERCENTILE: u64 = 85;
         #[allow(clippy::assertions_on_constants)]
@@ -4210,6 +4214,11 @@ impl Bank {
     fn remove_executor(&self, pubkey: &Pubkey) {
         let mut cache = self.cached_executors.write().unwrap();
         Arc::make_mut(&mut cache).remove(pubkey);
+    }
+
+    pub fn clear_executors(&self) {
+        let mut cache = self.cached_executors.write().unwrap();
+        Arc::make_mut(&mut cache).clear();
     }
 
     /// Execute a transaction using the provided loaded accounts and update
