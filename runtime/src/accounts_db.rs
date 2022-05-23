@@ -1662,12 +1662,15 @@ impl<'a, T: Fn(Slot) -> Option<Slot> + Sync + Send + Clone> AppendVecScan for Sc
                 // mismatch_found.fetch_add(1, Ordering::Relaxed);
             }
         }
+        use log::*;error!("{} {}", file!(), line!());
         if self.accum.is_empty() {
+            use log::*;error!("{} {}", file!(), line!());
             self.accum.append(&mut vec![Vec::new(); self.range]);
         }
         self.accum[pubkey_to_bin_index].push(source_item);
     }
     fn scanning_complete(self) -> BinnedHashData {
+        use log::*;error!("{} {}", file!(), line!());
         let (result, timing) = AccountsDb::sort_slot_storage_scan(self.accum);
         self.sort_time.fetch_add(timing, Ordering::Relaxed);
         result
@@ -5924,6 +5927,7 @@ impl AccountsDb {
                 // calculate start, end
                 let (start, mut end) = if chunk == 0 {
                     if slot0 == first_boundary {
+                        use log::*;error!("{} {}", file!(), line!());
                         return scanner.scanning_complete(); // if we evenly divide, nothing for special chunk 0 to do
                     }
                     // otherwise first chunk is not 'full'
@@ -5936,6 +5940,7 @@ impl AccountsDb {
                 };
                 end = std::cmp::min(end, range.end);
                 if start == end {
+                    use log::*;error!("{} {}", file!(), line!());
                     return scanner.scanning_complete();
                 }
 
@@ -6028,6 +6033,7 @@ impl AccountsDb {
                 }
 
                 for (slot, sub_storages) in snapshot_storages.iter_range(start..end) {
+                    use log::*;error!("{} {}", file!(), line!());
                     scanner.set_slot(slot);
                     let valid_slot = sub_storages.is_some();
                     if config.use_write_cache {
@@ -6059,7 +6065,9 @@ impl AccountsDb {
                         );
                     }
                 }
+                use log::*;error!("{} {}", file!(), line!());
                 let r = scanner.scanning_complete();
+                use log::*;error!("{} {}", file!(), line!());
                 if !file_name.is_empty() {
                     let result = cache_hash_data.save(Path::new(&file_name), &r);
 
@@ -8516,6 +8524,7 @@ pub mod tests {
 
     #[test]
     fn test_accountsdb_scan_snapshot_stores_2nd_chunk() {
+        solana_logger::setup();
         // enough stores to get to 2nd chunk
         let bins = 1;
         let slot = MAX_ITEMS_PER_CHUNK as Slot;
