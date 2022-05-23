@@ -15,7 +15,7 @@ pub struct DurableNonce(Hash);
 /// Initialized data of a durable transaction nonce account.
 ///
 /// This is stored within [`State`] for initialized nonce accounts.
-#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct Data {
     /// Address of the account that signs transactions using the nonce account.
     pub authority: Pubkey,
@@ -71,7 +71,7 @@ impl DurableNonce {
 ///
 /// When created in memory with [`State::default`] or when deserialized from an
 /// uninitialized account, a nonce account will be [`State::Uninitialized`].
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub enum State {
     Uninitialized,
     Initialized(Data),
