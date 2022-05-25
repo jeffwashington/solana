@@ -538,14 +538,11 @@ lazy_static! {
         (add_shred_type_to_shred_seed::id(), "add shred-type to shred seed #25556"),
         (warp_timestamp_with_a_vengeance::id(), "warp timestamp again, adjust bounding to 150% slow #25666"),
         (separate_nonce_from_blockhash::id(), "separate durable nonce and blockhash domains #25744"),
-        (enable_durable_nonce::id(), "enable durable nonce #25744"),
         (vote_state_update_credit_per_dequeue::id(), "Calculate vote credits for VoteStateUpdate per vote dequeue to match credit awards for Vote instruction"),
         (quick_bail_on_panic::id(), "quick bail on panic"),
         (nonce_must_be_authorized::id(), "nonce must be authorized"),
         (nonce_must_be_advanceable::id(), "durable nonces must be advanceable"),
         /*************** ADD NEW FEATURES HERE ***************/
-    ]
-    .iter()
     .cloned()
     .collect();
 
