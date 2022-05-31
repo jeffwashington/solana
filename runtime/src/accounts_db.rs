@@ -2159,6 +2159,11 @@ impl AccountsDb {
             self.accounts_hash_complete_one_epoch_old.write().unwrap();
         *accounts_hash_complete_one_epoch_old =
             std::cmp::max(*accounts_hash_complete_one_epoch_old, one_epoch_old_slot);
+        let accounts_hash_complete_one_epoch_old = *accounts_hash_complete_one_epoch_old;
+
+        // now that calculate_accounts_hash_without_index is complete, we can remove old historical roots
+        self.remove_old_historical_roots(accounts_hash_complete_one_epoch_old);
+
     }
 
     /// get the slot that is one epoch older than the highest slot that has been used for hash calculation
@@ -6232,9 +6237,6 @@ impl AccountsDb {
 
             let result = self.calculate_accounts_hash_without_index(config, &storages, timings);
 
-            // now that calculate_accounts_hash_without_index is complete, we can remove old historical roots
-            self.remove_old_historical_roots(slot, config.epoch_schedule);
-
             result
         } else {
             self.calculate_accounts_hash(slot, config)
@@ -6513,44 +6515,36 @@ impl AccountsDb {
         result
     }
 
-    /// calculate oldest_slot_to_keep and alive_roots
-    fn calc_old_historical_roots(
+    /// return alive roots to retain, even though they are ancient
+    fn calc_alive_ancient_historical_roots(
         &self,
-        max_root_inclusive: Slot,
-        epoch_schedule: &EpochSchedule,
-    ) -> Option<(Slot, HashSet<Slot>)> {
-        let width = epoch_schedule.slots_per_epoch;
-        (max_root_inclusive > width).then(|| {
-            let oldest_slot_to_keep = max_root_inclusive - width;
-            let mut alive_roots = HashSet::default();
-            {
-                let all_roots = self.accounts_index.roots_tracker.read().unwrap();
+        min_root: Slot,
+    ) -> HashSet<Slot> {
+        let mut ancient_alive_roots = HashSet::default();
+        {
+            let all_roots = self.accounts_index.roots_tracker.read().unwrap();
 
-                if let Some(min) = all_roots.historical_roots.min() {
-                    for slot in min..oldest_slot_to_keep {
-                        if all_roots.alive_roots.contains(&slot) {
-                            // there was a storage for this root, so it counts as a root
-                            alive_roots.insert(slot);
-                        }
+            if let Some(min) = all_roots.historical_roots.min() {
+                for slot in min..min_root {
+                    if all_roots.alive_roots.contains(&slot) {
+                        // there was a storage for this root, so it counts as a root
+                        ancient_alive_roots.insert(slot);
                     }
                 }
             }
-            (oldest_slot_to_keep, alive_roots)
-        })
+        }
+        ancient_alive_roots
     }
 
     /// get rid of historical roots that are older than an epoch from 'max_root_inclusive'
     fn remove_old_historical_roots(
         &self,
-        max_root_inclusive: Slot,
-        epoch_schedule: &EpochSchedule,
+        min_root: Slot,
     ) {
-        if let Some((oldest_slot_to_keep, alive_roots)) =
-            self.calc_old_historical_roots(max_root_inclusive, epoch_schedule)
-        {
+        let alive_roots=
+            self.calc_alive_ancient_historical_roots(min_root);
             self.accounts_index
-                .remove_old_historical_roots(oldest_slot_to_keep, &alive_roots);
-        }
+                .remove_old_historical_roots(min_root, &alive_roots);
     }
 
     /// Only called from startup or test code.
@@ -14638,18 +14632,16 @@ pub mod tests {
     }
 
     #[test]
-    fn test_calc_old_historical_roots() {
+    fn test_calc_alive_ancient_historical_roots() {
         let db = AccountsDb::new_single_for_tests();
-        let epoch_schedule = EpochSchedule::default();
-        let max_root_inclusive = 0;
-        let result = db.calc_old_historical_roots(max_root_inclusive, &epoch_schedule);
-        assert_eq!(result, None);
+        let min_root = 0;
+        let result = db.calc_alive_ancient_historical_roots(min_root);
+        assert!(result.is_empty());
         for extra in 1..3 {
-            let max_root_inclusive = epoch_schedule.slots_per_epoch + extra;
-            let result = db.calc_old_historical_roots(max_root_inclusive, &epoch_schedule);
+            let result = db.calc_alive_ancient_historical_roots(extra);
             assert_eq!(
                 result,
-                Some((extra, HashSet::default())),
+                HashSet::default(),
                 "extra: {}",
                 extra
             );
@@ -14657,13 +14649,12 @@ pub mod tests {
 
         let extra = 3;
         let active_root = 2;
-        let max_root_inclusive = epoch_schedule.slots_per_epoch + extra;
         db.accounts_index.add_root(active_root, false);
-        let result = db.calc_old_historical_roots(max_root_inclusive, &epoch_schedule);
+        let result = db.calc_alive_ancient_historical_roots(extra);
         let expected_alive_roots = [active_root].into_iter().collect();
         assert_eq!(
             result,
-            Some((extra, expected_alive_roots)),
+            expected_alive_roots,
             "extra: {}",
             extra
         );
