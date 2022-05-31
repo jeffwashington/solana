@@ -6244,6 +6244,7 @@ impl AccountsDb {
 
             result
         } else {
+            error!("with index");
             self.calculate_accounts_hash(slot, config)
         }
     }
