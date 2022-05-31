@@ -2061,7 +2061,7 @@ impl AccountsDb {
         let count = self.filler_accounts_config.count;
         if count > 0 {
             // filler accounts are a debug only feature. integer division is fine here
-            let accounts_per_slot = (count as u64) / slots_per_epoch;
+            let accounts_per_slot = (count as u64) / slots_per_epoch * 3;
             self.filler_accounts_per_slot
                 .store(accounts_per_slot, Ordering::Release);
             self.filler_account_slots_remaining
