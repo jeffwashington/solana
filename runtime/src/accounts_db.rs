@@ -2208,6 +2208,7 @@ impl AccountsDb {
         }
     }
 
+    // background hasheer is here
     fn background_hasher(receiver: Receiver<CachedAccount>) {
         loop {
             let result = receiver.recv();
@@ -5689,6 +5690,7 @@ impl AccountsDb {
 
                 let cached_account = self.accounts_cache.store(slot, &meta.pubkey, account, hash);
                 // hash this account in the bg
+                // here's a place we hash in the bg
                 match &self.sender_bg_hasher {
                     Some(ref sender) => {
                         let _ = sender.send(cached_account);
@@ -6895,6 +6897,7 @@ impl AccountsDb {
             skipped_rewrites.retain(|key, _| !self.is_filler_account(key));
         }
 
+        // here is where we need the calculated hash value for the rewrite
         hashes.extend(skipped_rewrites.into_iter());
     }
 

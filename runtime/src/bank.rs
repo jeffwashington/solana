@@ -5266,6 +5266,7 @@ impl Bank {
                 // this would have been rewritten previously. Now we skip it.
                 // calculate the hash that we would have gotten if we did the rewrite.
                 // This will be needed to calculate the bank's hash.
+                // TODO: calculate this hash in the background instead of inline here
                 let hash =
                     crate::accounts_db::AccountsDb::hash_account(self.slot(), &account, &pubkey);
                 rewrites_skipped.push((pubkey, hash));
@@ -5276,6 +5277,7 @@ impl Bank {
             }
             rent_debits.insert(&pubkey, collected.rent_amount, account.lamports());
         }
+        // rewrites skipped would presumably contain a hash value that is being calculated in the bg and is ready on demand later
         self.remember_skipped_rewrites(rewrites_skipped);
         self.collected_rent
             .fetch_add(total_collected.rent_amount, Relaxed);
