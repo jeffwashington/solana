@@ -6509,7 +6509,7 @@ impl AccountsDb {
         let _guard = self.active_stats.activate(ActiveStatItem::Hash);
         if !use_index {
             let mut collect_time = Measure::start("collect");
-            let (combined_maps, slots) = self.get_snapshot_storages(slot, None, config.ancestors);
+            let (combined_maps, slots) = self.get_snapshot_storages(slot, None, config.ancestors, config.debug_startup);
             collect_time.stop();
             error!("maps: {}", combined_maps.len());
 
@@ -6592,6 +6592,7 @@ impl AccountsDb {
                     use_write_cache: can_cached_slot_be_unflushed,
                     epoch_schedule,
                     rent_collector,
+                    debug_startup: false,
                 },
                 expected_capitalization,
             )
@@ -6853,6 +6854,7 @@ impl AccountsDb {
                     use_write_cache: can_cached_slot_be_unflushed,
                     epoch_schedule,
                     rent_collector,
+                    debug_startup: false,
                 },
                 None,
             )?;
@@ -7729,6 +7731,7 @@ impl AccountsDb {
         snapshot_slot: Slot,
         snapshot_base_slot: Option<Slot>,
         ancestors: Option<&Ancestors>,
+        debug_startup: bool,
     ) -> (SnapshotStorages, Vec<Slot>) {
         let mut m = Measure::start("get slots");
         let slots = self
@@ -7765,7 +7768,7 @@ impl AccountsDb {
                                             .read()
                                             .unwrap()
                                             .values()
-                                            .filter(|x| x.has_accounts())
+                                            .filter(|x| x.has_accounts() || debug_startup)
                                             .cloned()
                                             .collect::<Vec<_>>();
                                         if !storages.is_empty() {
