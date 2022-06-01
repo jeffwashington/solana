@@ -3422,7 +3422,7 @@ impl AccountsDb {
         if sorted_slots.is_empty() {
             return;
         }
-        let _guard = self.active_stats.activate(ActiveStatItem::SquashAncient);
+        let mut guard = None;
 
         // the ancient append vec currently being written to
         let mut current_ancient = None;
@@ -3445,6 +3445,12 @@ impl AccountsDb {
                         continue;
                     }
                 };
+
+            if guard.is_none() {
+                // we are now doing interesting work in squashing ancient
+                guard = Some(self.active_stats.activate(ActiveStatItem::SquashAncient))
+            }
+                
             let (stored_accounts, _num_stores, original_bytes) =
                 self.get_unique_accounts_from_storages(old_storages.iter());
 
