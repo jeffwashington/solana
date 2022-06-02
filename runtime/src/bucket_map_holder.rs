@@ -73,7 +73,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
     pub fn increment_age(&self) {
         // since we are about to change age, there are now 0 buckets that have been flushed at this age
         // this should happen before the age.fetch_add
-        let previous = self.count_buckets_flushed.swap(0, Ordering::AcqRel);
+        let previous = self.count_buckets_flushed.swap(0, Ordering::Acquire);
         // fetch_add is defined to wrap.
         // That's what we want. 0..255, then back to 0.
         self.age.fetch_add(1, Ordering::Release);
@@ -129,7 +129,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
     }
 
     pub fn bucket_flushed_at_current_age(&self) {
-        let count_buckets_flushed = 1 + self.count_buckets_flushed.fetch_add(1, Ordering::AcqRel);
+        let count_buckets_flushed = 1 + self.count_buckets_flushed.fetch_add(1, Ordering::Release);
         self.maybe_advance_age_internal(
             self.all_buckets_flushed_at_current_age_internal(count_buckets_flushed),
         );
