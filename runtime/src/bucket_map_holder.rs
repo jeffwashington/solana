@@ -27,7 +27,7 @@ pub const DEFAULT_DISK_INDEX: Option<usize> = Some(10_000);
 pub struct BucketMapHolder<T: IndexValue> {
     pub disk: Option<BucketMap<SlotT<T>>>,
 
-    count_buckets_flushed: AtomicUsize,
+    pub count_buckets_flushed: AtomicUsize,
     pub age: AtomicU8,
     pub stats: BucketMapHolderStats,
 
@@ -66,14 +66,14 @@ impl<T: IndexValue> BucketMapHolder<T> {
     }
 
     fn assert_ready_to_increment_age(&self) {
-        let previous = self.count_buckets_flushed.load(Ordering::SeqCst);
+        let previous = self.count_buckets_flushed.load(Ordering::Acquire);
         assert!(previous <= self.bins / 100 || previous >= self.bins, "previous: {}, bins: {}", previous, self.bins);
     }
 
     pub fn increment_age(&self) {
         // since we are about to change age, there are now 0 buckets that have been flushed at this age
         // this should happen before the age.fetch_add
-        let previous = self.count_buckets_flushed.swap(0, Ordering::SeqCst);
+        let previous = self.count_buckets_flushed.swap(0, Ordering::AcqRel);
         // fetch_add is defined to wrap.
         // That's what we want. 0..255, then back to 0.
         self.age.fetch_add(1, Ordering::Release);
@@ -129,7 +129,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
     }
 
     pub fn bucket_flushed_at_current_age(&self) {
-        let count_buckets_flushed = 1 + self.count_buckets_flushed.fetch_add(1, Ordering::SeqCst);
+        let count_buckets_flushed = 1 + self.count_buckets_flushed.fetch_add(1, Ordering::AcqRel);
         self.maybe_advance_age_internal(
             self.all_buckets_flushed_at_current_age_internal(count_buckets_flushed),
         );
@@ -146,7 +146,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
     }
 
     pub fn count_buckets_flushed(&self) -> usize {
-        self.count_buckets_flushed.load(Ordering::SeqCst)
+        self.count_buckets_flushed.load(Ordering::Acquire)
     }
 
     /// if all buckets are flushed at the current age and time has elapsed, then advanced age
