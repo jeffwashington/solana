@@ -67,7 +67,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
 
     fn assert_ready_to_increment_age(&self) {
         let previous = self.count_buckets_flushed.load(Ordering::SeqCst);
-        assert!(previous >= self.bins, "previous: {}, bins: {}", previous, self.bins);
+        assert!(previous <= self.bins / 100 || previous >= self.bins, "previous: {}, bins: {}", previous, self.bins);
     }
 
     pub fn increment_age(&self) {
