@@ -5682,6 +5682,7 @@ impl AccountsDb {
             if filler_accounts > 0 {
                 error!("writing {} filler accounts, size: {}, time to create store: {}, time store: {}", filler_accounts, aligned_total_size, time.as_us(), time2.as_us());
                 // add extra filler accounts at the end of the append vec
+                let mut time = Measure::start("");
                 let (account, hash) = self.get_filler_account(&Rent::default());
                 let mut accounts = Vec::with_capacity(filler_accounts as usize);
                 let mut hashes = Vec::with_capacity(filler_accounts as usize);
@@ -5690,13 +5691,16 @@ impl AccountsDb {
                     accounts.push((key, &account));
                     hashes.push(hash);
                 });
+                time.stop();
+                let mut time2 = Measure::start("");
                 self.store_accounts_frozen(
                     (slot, &accounts[..]),
                     Some(&hashes),
                     Some(&flushed_store),
                     None,
                 );
-                error!("done writing {} filler accounts", filler_accounts);
+                time2.stop();
+                error!("done writing {} filler accounts, create pubkeys: {}, store: {}", filler_accounts, time.as_us(), time2.as_us());
             }
 
             // If the above sizing function is correct, just one AppendVec is enough to hold
