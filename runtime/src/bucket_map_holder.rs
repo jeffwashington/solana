@@ -65,6 +65,11 @@ impl<T: IndexValue> BucketMapHolder<T> {
         self.disk.is_some()
     }
 
+    fn assert_ready_to_increment_age(&self) {
+        let previous = self.count_buckets_flushed.load(Ordering::Acquire);
+        assert!(previous >= self.bins);
+    }
+
     pub fn increment_age(&self) {
         // since we are about to change age, there are now 0 buckets that have been flushed at this age
         // this should happen before the age.fetch_add
@@ -152,12 +157,14 @@ impl<T: IndexValue> BucketMapHolder<T> {
     /// if all buckets are flushed at the current age and time has elapsed, then advanced age
     fn maybe_advance_age_internal(&self, all_buckets_flushed_at_current_age: bool) -> bool {
         // call has_age_interval_elapsed last since calling it modifies state on success
-        if all_buckets_flushed_at_current_age && self.has_age_interval_elapsed() {
-            self.increment_age();
-            true
-        } else {
-            false
+        if all_buckets_flushed_at_current_age {
+            self.assert_ready_to_increment_age();
+            if self.has_age_interval_elapsed() {
+                self.increment_age();
+                return true;
+            }
         }
+        false
     }
 
     pub fn new(bins: usize, config: &Option<AccountsIndexConfig>, threads: usize) -> Self {
