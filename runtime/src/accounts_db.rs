@@ -5334,6 +5334,7 @@ impl AccountsDb {
                 // See if an account overflows the append vecs in the slot.
                 let data_len = (data_len + STORE_META_OVERHEAD) as u64;
                 if !self.has_space_available(slot, data_len) {
+                    error!("overflowed the store");
                     let special_store_size = std::cmp::max(data_len * 2, self.file_size);
                     if self
                         .try_recycle_and_insert_store(slot, special_store_size, std::u64::MAX)
@@ -5672,6 +5673,7 @@ impl AccountsDb {
             );
 
             if filler_accounts > 0 {
+                error!("writing {} filler accounts", filler_accounts);
                 // add extra filler accounts at the end of the append vec
                 let (account, hash) = self.get_filler_account(&Rent::default());
                 let mut accounts = Vec::with_capacity(filler_accounts as usize);
@@ -5687,6 +5689,7 @@ impl AccountsDb {
                     Some(&flushed_store),
                     None,
                 );
+                error!("done writing {} filler accounts", filler_accounts);
             }
 
             // If the above sizing function is correct, just one AppendVec is enough to hold
