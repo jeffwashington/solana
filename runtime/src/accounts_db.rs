@@ -7960,7 +7960,10 @@ impl AccountsDb {
         let owner = Pubkey::from_str(string).unwrap();
         let space = self.filler_accounts_config.size;
         let rent_exempt_reserve = rent.minimum_balance(space);
-        let lamports = rent_exempt_reserve;
+        if rent_exempt_reserve == 0 {
+            error!("get_filler_account returns zero lamports");
+        }
+        let lamports = std::cmp::max(1, rent_exempt_reserve);
         let mut account = AccountSharedData::new(lamports, space, &owner);
         // just non-zero rent epoch. filler accounts are rent-exempt
         let dummy_rent_epoch = 2;
