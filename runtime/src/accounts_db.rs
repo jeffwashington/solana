@@ -1008,6 +1008,12 @@ struct RemoveUnrootedSlotsSynchronization {
 
 type AccountInfoAccountsIndex = AccountsIndex<AccountInfo>;
 
+pub struct AddFillerAccounts {
+    slot: Slot,
+    num_accounts: u64,
+    flushed_store: Arc<AccountStorageEntry>,
+}
+
 // This structure handles the load/store of the accounts
 #[derive(Debug)]
 pub struct AccountsDb {
@@ -1033,6 +1039,8 @@ pub struct AccountsDb {
     write_cache_limit_bytes: Option<u64>,
 
     sender_bg_hasher: Option<Sender<CachedAccount>>,
+    sender_bg_filler_accounts: RwLock<Option<Sender<AddFillerAccounts>>>,
+
     read_only_accounts_cache: ReadOnlyAccountsCache,
 
     recycle_stores: RwLock<RecycleStores>,
@@ -1904,6 +1912,7 @@ impl AccountsDb {
             storage: AccountStorage::default(),
             accounts_cache: AccountsCache::default(),
             sender_bg_hasher: None,
+            sender_bg_filler_accounts: RwLock::default(),
             read_only_accounts_cache: ReadOnlyAccountsCache::new(MAX_READ_ONLY_CACHE_DATA_SIZE),
             recycle_stores: RwLock::new(RecycleStores::default()),
             uncleaned_pubkeys: DashMap::new(),
@@ -2241,6 +2250,35 @@ impl AccountsDb {
         }
     }
 
+    pub fn background_filler_accounts(receiver: Receiver<AddFillerAccounts>, db: Arc<AccountsDb>) {
+        loop {
+            let result = receiver.recv();
+            match result {
+                Ok(request) => {
+                    let filler_accounts = request.num_accounts;
+                    let (account, hash) = db.get_filler_account(&Rent::default());
+                    let mut accounts = Vec::with_capacity(filler_accounts as usize);
+                    let mut hashes = Vec::with_capacity(filler_accounts as usize);
+                    let pubkeys = db.get_filler_account_pubkeys(filler_accounts as usize);
+                    pubkeys.iter().for_each(|key| {
+                        accounts.push((key, &account));
+                        hashes.push(hash);
+                    });
+    
+                    db.store_accounts_frozen(
+                        (request.slot, &accounts[..]),
+                        Some(&hashes),
+                        Some(&request.flushed_store),
+                        None,
+                    );
+                }
+                Err(_) => {
+                    break;
+                }
+            }
+        }
+    }
+        
     fn background_hasher(receiver: Receiver<CachedAccount>) {
         loop {
             let result = receiver.recv();
@@ -2268,6 +2306,19 @@ impl AccountsDb {
             })
             .unwrap();
         self.sender_bg_hasher = Some(sender);
+    }
+
+    pub fn start_background_filler_accounts(db: Arc<AccountsDb>) {
+        let (sender, receiver) = unbounded();
+        *db.sender_bg_filler_accounts.write().unwrap() = Some(sender);
+        Builder::new()
+            .name("solana-db-filler-accounts".to_string())
+            .spawn(move || {
+                (0..4).into_par_iter().for_each(|_| {
+                    Self::background_filler_accounts(receiver.clone(), Arc::clone(&db));
+                });
+            })
+            .unwrap();
     }
 
     fn purge_keys_exact<'a, C: 'a>(
@@ -5627,6 +5678,8 @@ impl AccountsDb {
                         * ((self.filler_accounts_config.size + STORE_META_OVERHEAD) as u64);
                     total_size += addl_size;
                 }
+            } else if self.sender_bg_filler_accounts.read().unwrap().is_some() {
+                *self.sender_bg_filler_accounts.write().unwrap() = None;
             }
         }
 
@@ -5682,25 +5735,14 @@ impl AccountsDb {
             if filler_accounts > 0 {
                 error!("writing {} filler accounts, size: {}, time to create store: {}, time store: {}", filler_accounts, aligned_total_size, time.as_us(), time2.as_us());
                 // add extra filler accounts at the end of the append vec
-                let mut time = Measure::start("");
-                let (account, hash) = self.get_filler_account(&Rent::default());
-                let mut accounts = Vec::with_capacity(filler_accounts as usize);
-                let mut hashes = Vec::with_capacity(filler_accounts as usize);
-                let pubkeys = self.get_filler_account_pubkeys(filler_accounts as usize);
-                pubkeys.iter().for_each(|key| {
-                    accounts.push((key, &account));
-                    hashes.push(hash);
-                });
-                time.stop();
-                let mut time2 = Measure::start("");
-                self.store_accounts_frozen(
-                    (slot, &accounts[..]),
-                    Some(&hashes),
-                    Some(&flushed_store),
-                    None,
-                );
-                time2.stop();
-                error!("done writing {} filler accounts, create pubkeys: {}, store: {}", filler_accounts, time.as_us(), time2.as_us());
+
+                if let Some(sender) = self.sender_bg_filler_accounts.read().unwrap().as_ref() {
+                    let _ = sender.send(AddFillerAccounts {
+                        slot,
+                        num_accounts: filler_accounts,
+                        flushed_store,
+                    });
+                }
             }
 
             // If the above sizing function is correct, just one AppendVec is enough to hold

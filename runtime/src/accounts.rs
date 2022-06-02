@@ -191,16 +191,19 @@ impl Accounts {
         accounts_db_config: Option<AccountsDbConfig>,
         accounts_update_notifier: Option<AccountsUpdateNotifier>,
     ) -> Self {
+        let accounts_db = Arc::new(AccountsDb::new_with_config(
+            paths,
+            cluster_type,
+            account_indexes,
+            caching_enabled,
+            shrink_ratio,
+            accounts_db_config,
+            accounts_update_notifier,
+        ));
+
+        AccountsDb::start_background_filler_accounts        (Arc::clone(&accounts_db));
         Self {
-            accounts_db: Arc::new(AccountsDb::new_with_config(
-                paths,
-                cluster_type,
-                account_indexes,
-                caching_enabled,
-                shrink_ratio,
-                accounts_db_config,
-                accounts_update_notifier,
-            )),
+            accounts_db,
             account_locks: Mutex::new(AccountLocks::default()),
         }
     }
