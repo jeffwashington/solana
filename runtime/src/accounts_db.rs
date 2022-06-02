@@ -5556,6 +5556,7 @@ impl AccountsDb {
         // outdated updates in earlier roots
         let mut num_roots_flushed = 0;
         for &root in cached_roots.iter().rev() {
+            error!("flushing slot: {} from: slots: {}", root, cached_roots.len());
             if self
                 .flush_slot_cache_with_clean(&[root], should_flush_f.as_mut(), max_clean_root)
                 .is_some()
@@ -5572,6 +5573,7 @@ impl AccountsDb {
             // `max_flush_root` in the accounts cache.
             self.accounts_cache.set_max_flush_root(root);
         }
+        error!("done flushing slots: {}", cached_roots.len());
 
         // Only add to the uncleaned roots set *after* we've flushed the previous roots,
         // so that clean will actually be able to clean the slots.
@@ -5663,17 +5665,22 @@ impl AccountsDb {
             // This ensures that all updates are written to an AppendVec, before any
             // updates to the index happen, so anybody that sees a real entry in the index,
             // will be able to find the account in storage
+            let mut time = Measure::start("");
             let flushed_store =
                 self.create_and_insert_store(slot, aligned_total_size, "flush_slot_cache");
+                time.stop();
+                let mut time2 = Measure::start("");
+
             self.store_accounts_frozen(
                 (slot, &accounts[..]),
                 Some(&hashes),
                 Some(&flushed_store),
                 None,
             );
+            time2.stop();
 
             if filler_accounts > 0 {
-                error!("writing {} filler accounts", filler_accounts);
+                error!("writing {} filler accounts, size: {}, time to create store: {}, time store: {}", filler_accounts, aligned_total_size, time.as_us(), time2.as_us());
                 // add extra filler accounts at the end of the append vec
                 let (account, hash) = self.get_filler_account(&Rent::default());
                 let mut accounts = Vec::with_capacity(filler_accounts as usize);
