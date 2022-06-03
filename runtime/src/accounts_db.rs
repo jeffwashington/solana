@@ -1039,7 +1039,7 @@ pub struct AccountsDb {
     write_cache_limit_bytes: Option<u64>,
 
     sender_bg_hasher: Option<Sender<CachedAccount>>,
-    sender_bg_filler_accounts: RwLock<Option<Sender<AddFillerAccounts>>>,
+    pub sender_bg_filler_accounts: RwLock<Option<Sender<AddFillerAccounts>>>,
 
     read_only_accounts_cache: ReadOnlyAccountsCache,
 

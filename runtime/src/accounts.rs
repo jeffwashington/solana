@@ -138,6 +138,13 @@ pub enum AccountAddressFilter {
     Include, // only include addresses matching the filter
 }
 
+impl Drop for Accounts {
+    fn drop(&mut self) {
+        *self.accounts_db.sender_bg_filler_accounts.write().unwrap() = None;
+    }
+}
+
+
 impl Accounts {
     pub fn default_for_tests() -> Self {
         Self {
