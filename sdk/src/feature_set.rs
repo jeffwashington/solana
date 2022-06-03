@@ -331,6 +331,91 @@ pub mod disable_deprecated_loader {
     solana_sdk::declare_id!("GTUMCZ8LTNxVfxdrw7ZsDFTxXb7TutYkzJnFwinpE6dg");
 }
 
+pub mod check_slice_translation_size {
+    solana_sdk::declare_id!("GmC19j9qLn2RFk5NduX6QXaDhVpGncVVBzyM8e9WMz2F");
+}
+
+pub mod stake_split_uses_rent_sysvar {
+    solana_sdk::declare_id!("FQnc7U4koHqWgRvFaBJjZnV8VPg6L6wWK33yJeDp4yvV");
+}
+
+pub mod add_get_minimum_delegation_instruction_to_stake_program {
+    solana_sdk::declare_id!("St8k9dVXP97xT6faW24YmRSYConLbhsMJA4TJTBLmMT");
+}
+
+pub mod error_on_syscall_bpf_function_hash_collisions {
+    solana_sdk::declare_id!("8199Q2gMD2kwgfopK5qqVWuDbegLgpuFUFHCcUJQDN8b");
+}
+
+pub mod reject_callx_r10 {
+    solana_sdk::declare_id!("3NKRSwpySNwD3TvP5pHnRmkAQRsdkXWRr1WaQh8p4PWX");
+}
+
+pub mod drop_redundant_turbine_path {
+    solana_sdk::declare_id!("4Di3y24QFLt5QEUPZtbnjyfQKfm6ZMTfa6Dw1psfoMKU");
+}
+
+pub mod executables_incur_cpi_data_cost {
+    solana_sdk::declare_id!("7GUcYgq4tVtaqNCKT3dho9r4665Qp5TxCZ27Qgjx3829");
+}
+
+pub mod fix_recent_blockhashes {
+    solana_sdk::declare_id!("6iyggb5MTcsvdcugX7bEKbHV8c6jdLbpHwkncrgLMhfo");
+}
+
+pub mod update_rewards_from_cached_accounts {
+    solana_sdk::declare_id!("28s7i3htzhahXQKqmS2ExzbEoUypg9krwvtK2M9UWXh9");
+}
+
+pub mod spl_token_v3_4_0 {
+    solana_sdk::declare_id!("Ftok4njE8b7tDffYkC5bAbCaQv5sL6jispYrprzatUwN");
+}
+
+pub mod spl_associated_token_account_v1_1_0 {
+    solana_sdk::declare_id!("FaTa17gVKoqbh38HcfiQonPsAaQViyDCCSg71AubYZw8");
+}
+
+pub mod default_units_per_instruction {
+    solana_sdk::declare_id!("J2QdYx8crLbTVK8nur1jeLsmc3krDbfjoxoea2V1Uy5Q");
+}
+
+pub mod stake_allow_zero_undelegated_amount {
+    solana_sdk::declare_id!("sTKz343FM8mqtyGvYWvbLpTThw3ixRM4Xk8QvZ985mw");
+}
+
+pub mod require_static_program_ids_in_transaction {
+    solana_sdk::declare_id!("8FdwgyHFEjhAdjWfV2vfqk7wA1g9X3fQpKH7SBpEv3kC");
+}
+
+pub mod stake_raise_minimum_delegation_to_1_sol {
+    // This is a feature-proposal *feature id*.  The feature keypair address is `3YHAo6wWw5rDbQxb59BmJkQ3XwVhX3m8tdBVbtxnJmma`.
+    solana_sdk::declare_id!("4xmyBuR2VCXzy9H6qYpH9ckfgnTuMDQFPFBfTs4eBCY1");
+}
+
+pub mod add_set_compute_unit_price_ix {
+    solana_sdk::declare_id!("98std1NSHqXi9WYvFShfVepRdCoq1qvsp8fsR2XZtG8g");
+}
+
+pub mod disable_deploy_of_alloc_free_syscall {
+    solana_sdk::declare_id!("79HWsX9rpnnJBPcdNURVqygpMAfxdrAirzAGAVmf92im");
+}
+
+pub mod include_account_index_in_rent_error {
+    solana_sdk::declare_id!("2R72wpcQ7qV7aTJWUumdn8u5wmmTyXbK7qzEy7YSAgyY");
+}
+
+pub mod add_shred_type_to_shred_seed {
+    solana_sdk::declare_id!("Ds87KVeqhbv7Jw8W6avsS1mqz3Mw5J3pRTpPoDQ2QdiJ");
+}
+
+pub mod warp_timestamp_with_a_vengeance {
+    solana_sdk::declare_id!("3BX6SBeEBibHaVQXywdkcgyUk6evfYZkHdztXiDtEpFS");
+}
+
+pub mod separate_nonce_from_blockhash {
+    solana_sdk::declare_id!("Gea3ZkK2N4pHuVZVxWcnAtS6UEDdyumdYt4pFcKjA3ar");
+}
+
 lazy_static! {
     /// Map of feature identifiers to user-visible description
     pub static ref FEATURE_NAMES: HashMap<Pubkey, &'static str> = [
@@ -408,6 +493,27 @@ lazy_static! {
         (check_physical_overlapping::id(), "check physical overlapping regions"),
         (limit_secp256k1_recovery_id::id(), "limit secp256k1 recovery id"),
         (disable_deprecated_loader::id(), "disable the deprecated BPF loader"),
+        (check_slice_translation_size::id(), "check size when translating slices"),
+        (stake_split_uses_rent_sysvar::id(), "stake split instruction uses rent sysvar"),
+        (add_get_minimum_delegation_instruction_to_stake_program::id(), "add GetMinimumDelegation instruction to stake program"),
+        (error_on_syscall_bpf_function_hash_collisions::id(), "error on bpf function hash collisions"),
+        (reject_callx_r10::id(), "Reject bpf callx r10 instructions"),
+        (drop_redundant_turbine_path::id(), "drop redundant turbine path"),
+        (executables_incur_cpi_data_cost::id(), "Executables incure CPI data costs"),
+        (fix_recent_blockhashes::id(), "stop adding hashes for skipped slots to recent blockhashes"),
+        (update_rewards_from_cached_accounts::id(), "update rewards from cached accounts"),
+        (spl_token_v3_4_0::id(), "SPL Token Program version 3.4.0 release #24740"),
+        (spl_associated_token_account_v1_1_0::id(), "SPL Associated Token Account Program version 1.1.0 release #24741"),
+        (default_units_per_instruction::id(), "Default max tx-wide compute units calculated per instruction"),
+        (stake_allow_zero_undelegated_amount::id(), "Allow zero-lamport undelegated amount for initialized stakes #24670"),
+        (require_static_program_ids_in_transaction::id(), "require static program ids in versioned transactions"),
+        (stake_raise_minimum_delegation_to_1_sol::id(), "Raise minimum stake delegation to 1.0 SOL #24357"),
+        (add_set_compute_unit_price_ix::id(), "add compute budget ix for setting a compute unit price"),
+        (disable_deploy_of_alloc_free_syscall::id(), "disable new deployments of deprecated sol_alloc_free_ syscall"),
+        (include_account_index_in_rent_error::id(), "include account index in rent tx error #25190"),
+        (add_shred_type_to_shred_seed::id(), "add shred-type to shred seed #25556"),
+        (warp_timestamp_with_a_vengeance::id(), "warp timestamp again, adjust bounding to 150% slow #25666"),
+        (separate_nonce_from_blockhash::id(), "separate durable nonce and blockhash domains #25744"),
         /*************** ADD NEW FEATURES HERE ***************/
     ]
     .iter()
