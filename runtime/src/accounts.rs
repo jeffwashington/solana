@@ -226,7 +226,7 @@ impl Accounts {
     }
 
     pub(crate) fn new_empty(accounts_db: AccountsDb) -> Self {
-        let accounts_db Arc::new(accounts_db);
+        let accounts_db = Arc::new(accounts_db);
         AccountsDb::start_background_filler_accounts        (Arc::clone(&accounts_db));
         Self {
             accounts_db,
