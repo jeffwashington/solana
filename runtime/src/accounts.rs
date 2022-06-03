@@ -140,8 +140,9 @@ pub enum AccountAddressFilter {
 
 impl Drop for Accounts {
     fn drop(&mut self) {
-        error!("dropping sender");
-        *self.accounts_db.sender_bg_filler_accounts.write().unwrap() = None;
+        //error!("dropping sender");
+        //*self.accounts_db.sender_bg_filler_accounts.write().unwrap() = None;
+        //this doesn't work
     }
 }
 
