@@ -2321,8 +2321,12 @@ impl AccountsDb {
             .name("solana-db-filler-accounts".to_string())
             .spawn(move || {
                 (0..4).into_par_iter().for_each(|_| {
+                    error!("start_background_filler_accounts independent");
                     Self::background_filler_accounts(receiver.clone(), Arc::clone(&db));
+                    error!("start_background_filler_accounts independent done");
                 });
+                error!("start_background_filler_accounts exiting");
+
             })
             .unwrap();
     }
