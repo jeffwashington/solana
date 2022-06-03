@@ -2310,6 +2310,11 @@ impl AccountsDb {
     }
 
     pub fn start_background_filler_accounts(db: Arc<AccountsDb>) {
+        if !db.filler_accounts_enabled() {
+            error!("filler accounts not enabled");
+            return;
+        }
+        error!("start_background_filler_accounts");
         let (sender, receiver) = unbounded();
         *db.sender_bg_filler_accounts.write().unwrap() = Some(sender);
         Builder::new()
@@ -5737,15 +5742,17 @@ impl AccountsDb {
                 // add extra filler accounts at the end of the append vec
 
                 let mut send = false;
+                let mut err = false;
                 if let Some(sender) = self.sender_bg_filler_accounts.read().unwrap().as_ref() {
                     send = true;
-                    let _ = sender.send(AddFillerAccounts {
+                    let r = sender.send(AddFillerAccounts {
                         slot,
                         num_accounts: filler_accounts,
                         flushed_store,
                     });
+                    err = r.is_err();
                 }
-                error!("writing {} filler accounts, size: {}, time to create store: {}, time store: {}, sent: {}", filler_accounts, aligned_total_size, time.as_us(), time2.as_us(), send);
+                error!("writing {} filler accounts, size: {}, time to create store: {}, time store: {}, sent: {}, err: {}", filler_accounts, aligned_total_size, time.as_us(), time2.as_us(), send, err);
             }
 
             // If the above sizing function is correct, just one AppendVec is enough to hold

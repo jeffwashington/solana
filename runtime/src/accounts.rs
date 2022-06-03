@@ -140,6 +140,7 @@ pub enum AccountAddressFilter {
 
 impl Drop for Accounts {
     fn drop(&mut self) {
+        error!("dropping sender");
         *self.accounts_db.sender_bg_filler_accounts.write().unwrap() = None;
     }
 }
@@ -225,8 +226,10 @@ impl Accounts {
     }
 
     pub(crate) fn new_empty(accounts_db: AccountsDb) -> Self {
+        let accounts_db Arc::new(accounts_db);
+        AccountsDb::start_background_filler_accounts        (Arc::clone(&accounts_db));
         Self {
-            accounts_db: Arc::new(accounts_db),
+            accounts_db,
             account_locks: Mutex::new(AccountLocks::default()),
         }
     }
