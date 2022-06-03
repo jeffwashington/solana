@@ -2256,6 +2256,7 @@ impl AccountsDb {
             match result {
                 Ok(request) => {
                     let filler_accounts = request.num_accounts;
+                    error!("writing {} filler accounts", filler_accounts);
                     let (account, hash) = db.get_filler_account(&Rent::default());
                     let mut accounts = Vec::with_capacity(filler_accounts as usize);
                     let mut hashes = Vec::with_capacity(filler_accounts as usize);
@@ -5733,16 +5734,18 @@ impl AccountsDb {
             time2.stop();
 
             if filler_accounts > 0 {
-                error!("writing {} filler accounts, size: {}, time to create store: {}, time store: {}", filler_accounts, aligned_total_size, time.as_us(), time2.as_us());
                 // add extra filler accounts at the end of the append vec
 
+                let mut send = false;
                 if let Some(sender) = self.sender_bg_filler_accounts.read().unwrap().as_ref() {
+                    send = true;
                     let _ = sender.send(AddFillerAccounts {
                         slot,
                         num_accounts: filler_accounts,
                         flushed_store,
                     });
                 }
+                error!("writing {} filler accounts, size: {}, time to create store: {}, time store: {}, sent: {}", filler_accounts, aligned_total_size, time.as_us(), time2.as_us(), send);
             }
 
             // If the above sizing function is correct, just one AppendVec is enough to hold
