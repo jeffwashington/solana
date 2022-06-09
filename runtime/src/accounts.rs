@@ -1143,7 +1143,7 @@ impl Accounts {
         res: &'a [TransactionExecutionResult],
         loaded: &'a mut [TransactionLoadResult],
         rent_collector: &RentCollector,
-        durable_nonce: &DurableNonce,
+        durable_nonce: &(DurableNonce, /*separate_domains:*/ bool),
         lamports_per_signature: u64,
         leave_nonce_on_success: bool,
     ) {
@@ -1178,7 +1178,7 @@ impl Accounts {
         execution_results: &'a [TransactionExecutionResult],
         load_results: &'a mut [TransactionLoadResult],
         rent_collector: &RentCollector,
-        durable_nonce: &DurableNonce,
+        durable_nonce: &(DurableNonce, /*separate_domains:*/ bool),
         lamports_per_signature: u64,
         leave_nonce_on_success: bool,
     ) -> Vec<(&'a Pubkey, &'a AccountSharedData)> {
@@ -1265,7 +1265,7 @@ fn prepare_if_nonce_account<'a>(
     execution_result: &Result<()>,
     is_fee_payer: bool,
     maybe_nonce: Option<(&'a NonceFull, bool)>,
-    durable_nonce: &DurableNonce,
+    &(durable_nonce, separate_domains): &(DurableNonce, bool),
     lamports_per_signature: u64,
 ) -> bool {
     if let Some((nonce, rollback)) = maybe_nonce {
@@ -1284,17 +1284,15 @@ fn prepare_if_nonce_account<'a>(
             //
             // Since we know we are dealing with a valid nonce account,
             // unwrap is safe here
-            let state = StateMut::<NonceVersions>::state(nonce.account())
-                .unwrap()
-                .convert_to_current();
-            if let NonceState::Initialized(ref data) = state {
-                account
-                    .set_state(&NonceVersions::new_current(NonceState::new_initialized(
-                        &data.authority,
-                        *durable_nonce,
-                        lamports_per_signature,
-                    )))
-                    .unwrap();
+            let nonce_versions = StateMut::<NonceVersions>::state(nonce.account()).unwrap();
+            if let NonceState::Initialized(ref data) = nonce_versions.state() {
+                let nonce_state = NonceState::new_initialized(
+                    &data.authority,
+                    durable_nonce,
+                    lamports_per_signature,
+                );
+                let nonce_versions = NonceVersions::new(nonce_state, separate_domains);
+                account.set_state(&nonce_versions).unwrap();
             }
             true
         } else {
@@ -1352,6 +1350,7 @@ mod tests {
             bank::{DurableNonceFee, TransactionExecutionDetails},
             rent_collector::RentCollector,
         },
+        assert_matches::assert_matches,
         solana_address_lookup_table_program::state::LookupTableMeta,
         solana_sdk::{
             account::{AccountSharedData, WritableAccount},
@@ -1665,7 +1664,10 @@ mod tests {
             nonce.pubkey(),
             AccountSharedData::new_data(
                 min_balance * 2,
-                &NonceVersions::new_current(NonceState::Initialized(nonce::state::Data::default())),
+                &NonceVersions::new(
+                    NonceState::Initialized(nonce::state::Data::default()),
+                    true, // separate_domains
+                ),
                 &system_program::id(),
             )
             .unwrap(),
@@ -2968,7 +2970,7 @@ mod tests {
             &execution_results,
             loaded.as_mut_slice(),
             &rent_collector,
-            &DurableNonce::default(),
+            &(DurableNonce::default(), /*separate_domains:*/ true),
             0,
             true, // leave_nonce_on_success
         );
@@ -3073,20 +3075,24 @@ mod tests {
         Pubkey,
         AccountSharedData,
         AccountSharedData,
-        DurableNonce,
+        (DurableNonce, /*separate_domains:*/ bool),
         u64,
         Option<AccountSharedData>,
     ) {
-        let data =
-            NonceVersions::new_current(NonceState::Initialized(nonce::state::Data::default()));
+        let data = NonceVersions::new(
+            NonceState::Initialized(nonce::state::Data::default()),
+            true, // separate_domains
+        );
         let account = AccountSharedData::new_data(42, &data, &system_program::id()).unwrap();
         let mut pre_account = account.clone();
         pre_account.set_lamports(43);
+        let durable_nonce =
+            DurableNonce::from_blockhash(&Hash::new(&[1u8; 32]), /*separate_domains:*/ true);
         (
             Pubkey::default(),
             pre_account,
             account,
-            DurableNonce::from_blockhash(&Hash::new(&[1u8; 32]), /*separate_domains:*/ true),
+            (durable_nonce, /*separate_domains:*/ true),
             1234,
             None,
         )
@@ -3098,7 +3104,7 @@ mod tests {
         tx_result: &Result<()>,
         is_fee_payer: bool,
         maybe_nonce: Option<(&NonceFull, bool)>,
-        durable_nonce: &DurableNonce,
+        durable_nonce: &(DurableNonce, /*separate_domains:*/ bool),
         lamports_per_signature: u64,
         expect_account: &AccountSharedData,
     ) -> bool {
@@ -3144,9 +3150,14 @@ mod tests {
 
         let mut expect_account = pre_account;
         expect_account
-            .set_state(&NonceVersions::new_current(NonceState::Initialized(
-                nonce::state::Data::new(Pubkey::default(), blockhash, lamports_per_signature),
-            )))
+            .set_state(&NonceVersions::new(
+                NonceState::Initialized(nonce::state::Data::new(
+                    Pubkey::default(),
+                    blockhash.0,
+                    lamports_per_signature,
+                )),
+                true, // separate_domains
+            ))
             .unwrap();
 
         assert!(run_prepare_if_nonce_account_test(
@@ -3230,9 +3241,14 @@ mod tests {
         let nonce = NonceFull::new(pre_account_address, pre_account, maybe_fee_payer_account);
 
         expect_account
-            .set_state(&NonceVersions::new_current(NonceState::Initialized(
-                nonce::state::Data::new(Pubkey::default(), blockhash, lamports_per_signature),
-            )))
+            .set_state(&NonceVersions::new(
+                NonceState::Initialized(nonce::state::Data::new(
+                    Pubkey::default(),
+                    blockhash.0,
+                    lamports_per_signature,
+                )),
+                true, // separate_domains
+            ))
             .unwrap();
 
         assert!(run_prepare_if_nonce_account_test(
@@ -3272,7 +3288,7 @@ mod tests {
             )),
             false,
             Some((&nonce, true)),
-            &DurableNonce::default(),
+            &(DurableNonce::default(), /*separate_domains:*/ true),
             1,
             &post_fee_payer_account.clone(),
         ));
@@ -3283,7 +3299,7 @@ mod tests {
             &Ok(()),
             true,
             Some((&nonce, true)),
-            &DurableNonce::default(),
+            &(DurableNonce::default(), /*separate_domains:*/ true),
             1,
             &post_fee_payer_account.clone(),
         ));
@@ -3297,7 +3313,7 @@ mod tests {
             )),
             true,
             None,
-            &DurableNonce::default(),
+            &(DurableNonce::default(), /*separate_domains:*/ true),
             1,
             &post_fee_payer_account.clone(),
         ));
@@ -3311,7 +3327,7 @@ mod tests {
             )),
             true,
             Some((&nonce, true)),
-            &DurableNonce::default(),
+            &(DurableNonce::default(), /*separate_domains:*/ true),
             1,
             &pre_fee_payer_account,
         ));
@@ -3328,9 +3344,14 @@ mod tests {
         let to_address = Pubkey::new_unique();
         let durable_nonce =
             DurableNonce::from_blockhash(&Hash::new_unique(), /*separate_domains:*/ true);
-        let nonce_state = NonceVersions::new_current(NonceState::Initialized(
-            nonce::state::Data::new(nonce_authority.pubkey(), durable_nonce, 0),
-        ));
+        let nonce_state = NonceVersions::new(
+            NonceState::Initialized(nonce::state::Data::new(
+                nonce_authority.pubkey(),
+                durable_nonce,
+                0,
+            )),
+            true, // separate_domains
+        );
         let nonce_account_post =
             AccountSharedData::new_data(43, &nonce_state, &system_program::id()).unwrap();
         let from_account_post = AccountSharedData::new(4199, 0, &Pubkey::default());
@@ -3355,9 +3376,14 @@ mod tests {
 
         let durable_nonce =
             DurableNonce::from_blockhash(&Hash::new_unique(), /*separate_domains:*/ true);
-        let nonce_state = NonceVersions::new_current(NonceState::Initialized(
-            nonce::state::Data::new(nonce_authority.pubkey(), durable_nonce, 0),
-        ));
+        let nonce_state = NonceVersions::new(
+            NonceState::Initialized(nonce::state::Data::new(
+                nonce_authority.pubkey(),
+                durable_nonce,
+                0,
+            )),
+            true, // separate_domains
+        );
         let nonce_account_pre =
             AccountSharedData::new_data(42, &nonce_state, &system_program::id()).unwrap();
         let from_account_pre = AccountSharedData::new(4242, 0, &Pubkey::default());
@@ -3402,7 +3428,7 @@ mod tests {
             &execution_results,
             loaded.as_mut_slice(),
             &rent_collector,
-            &durable_nonce,
+            &(durable_nonce, /*separate_domains:*/ true),
             0,
             true, // leave_nonce_on_success
         );
@@ -3426,11 +3452,14 @@ mod tests {
             collected_nonce_account.lamports(),
             nonce_account_pre.lamports(),
         );
-        assert!(nonce_account::verify_nonce_account(
-            &collected_nonce_account,
-            durable_nonce.as_hash(),
-        )
-        .is_some());
+        assert_matches!(
+            nonce_account::verify_nonce_account(
+                &collected_nonce_account,
+                durable_nonce.as_hash(),
+                true, // separate_domins
+            ),
+            Some(_)
+        );
     }
 
     #[test]
@@ -3444,9 +3473,14 @@ mod tests {
         let to_address = Pubkey::new_unique();
         let durable_nonce =
             DurableNonce::from_blockhash(&Hash::new_unique(), /*separate_domains:*/ true);
-        let nonce_state = NonceVersions::new_current(NonceState::Initialized(
-            nonce::state::Data::new(nonce_authority.pubkey(), durable_nonce, 0),
-        ));
+        let nonce_state = NonceVersions::new(
+            NonceState::Initialized(nonce::state::Data::new(
+                nonce_authority.pubkey(),
+                durable_nonce,
+                0,
+            )),
+            true, // separate_domains
+        );
         let nonce_account_post =
             AccountSharedData::new_data(43, &nonce_state, &system_program::id()).unwrap();
         let from_account_post = AccountSharedData::new(4200, 0, &Pubkey::default());
@@ -3471,9 +3505,14 @@ mod tests {
 
         let durable_nonce =
             DurableNonce::from_blockhash(&Hash::new_unique(), /*separate_domains:*/ true);
-        let nonce_state = NonceVersions::new_current(NonceState::Initialized(
-            nonce::state::Data::new(nonce_authority.pubkey(), durable_nonce, 0),
-        ));
+        let nonce_state = NonceVersions::new(
+            NonceState::Initialized(nonce::state::Data::new(
+                nonce_authority.pubkey(),
+                durable_nonce,
+                0,
+            )),
+            true, // separate_domains
+        );
         let nonce_account_pre =
             AccountSharedData::new_data(42, &nonce_state, &system_program::id()).unwrap();
 
@@ -3517,7 +3556,7 @@ mod tests {
             &execution_results,
             loaded.as_mut_slice(),
             &rent_collector,
-            &durable_nonce,
+            &(durable_nonce, /*separate_domains:*/ true),
             0,
             true, // leave_nonce_on_success
         );
@@ -3532,11 +3571,14 @@ mod tests {
             collected_nonce_account.lamports(),
             nonce_account_pre.lamports()
         );
-        assert!(nonce_account::verify_nonce_account(
-            &collected_nonce_account,
-            durable_nonce.as_hash(),
-        )
-        .is_some());
+        assert_matches!(
+            nonce_account::verify_nonce_account(
+                &collected_nonce_account,
+                durable_nonce.as_hash(),
+                true, // separate_domins
+            ),
+            Some(_)
+        );
     }
 
     #[test]
