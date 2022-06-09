@@ -5394,11 +5394,10 @@ pub mod tests {
                 let authority = Pubkey::new_unique();
                 let account = AccountSharedData::new_data(
                     42,
-                    &nonce::state::Versions::new_current(nonce::State::new_initialized(
-                        &authority,
-                        DurableNonce::default(),
-                        1000,
-                    )),
+                    &nonce::state::Versions::new(
+                        nonce::State::new_initialized(&authority, DurableNonce::default(), 1000),
+                        true, // separate_domains
+                    ),
                     &system_program::id(),
                 )
                 .unwrap();
@@ -5429,8 +5428,8 @@ pub mod tests {
                 system_program::id().to_string(),
                 {"filters": [{
                     "memcmp": {
-                        "offset": 0,
-                        "bytes": bs58::encode(vec![1, 0, 0, 0]).into_string(),
+                        "offset": 4,
+                        "bytes": bs58::encode(vec![0, 0, 0, 0]).into_string(),
                     },
                 }]},
             ])),
