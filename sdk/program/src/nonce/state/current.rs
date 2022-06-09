@@ -109,4 +109,14 @@ mod test {
     fn default_is_uninitialized() {
         assert_eq!(State::default(), State::Uninitialized)
     }
+
+    #[test]
+    fn test_nonce_state_size() {
+        let data = Versions::new(
+            State::Initialized(Data::default()),
+            true, // separate_domains
+        );
+        let size = bincode::serialized_size(&data).unwrap();
+        assert_eq!(State::size() as u64, size);
+    }
 }
