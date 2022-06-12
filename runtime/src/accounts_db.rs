@@ -8285,7 +8285,7 @@ impl AccountsDb {
             if pass == 0 {
                 // Need to add these last, otherwise older updates will be cleaned
                 for slot in &slots {
-                    self.accounts_index.add_root(*slot, false);
+                    self.accounts_index.add_root(*slot, true); // stop doing initial uncleaned_roots temporarily
                 }
 
                 self.set_storage_count_and_alive_bytes(storage_info, &mut timings);
