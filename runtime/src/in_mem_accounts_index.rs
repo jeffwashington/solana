@@ -260,7 +260,8 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
 
                         if add_to_cache {
                             stats.inc_mem_count(self.bin);
-                            // this is the one that adds them! use log::*;error!("{} {}", file!(), line!());
+                            // this is the one that adds them! 
+                            use log::*;error!("{} {}", file!(), line!());
                             vacant.insert(disk_entry);
                         }
                         rt
