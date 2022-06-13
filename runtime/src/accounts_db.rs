@@ -8252,6 +8252,7 @@ impl AccountsDb {
                 let mut m = Measure::start("accounts_index_idle_us");
                 error!("generate_index - waiting for idle");
                 self.accounts_index.set_startup(Startup::Normal);
+                error!("generate_index - waiting for idle DONE");
                 m.stop();
                 index_flush_us = m.as_us();
 
@@ -8268,6 +8269,7 @@ impl AccountsDb {
                         }
                     }
                 }                
+                error!("generate_index - done getting uncleaned_pubkeys");
             }
 
             let mut timings = GenerateIndexTimings {
