@@ -4,7 +4,7 @@ use {
         ancestors::Ancestors,
         bucket_map_holder::{Age, BucketMapHolder},
         contains::Contains,
-        in_mem_accounts_index::{InMemAccountsIndex, InsertNewEntryResults},
+        in_mem_accounts_index::InMemAccountsIndex,
         inline_spl_token::{self, GenericTokenAccount},
         inline_spl_token_2022,
         pubkey_bins::PubkeyBinCalculator24,
@@ -1287,6 +1287,10 @@ impl<T: IndexValue> AccountsIndex<T> {
         self.storage.set_startup(value);
     }
 
+    pub fn wait_for_idle(&self) {
+        self.storage.wait_for_idle();
+    }
+
     pub fn get_startup_remaining_items_to_flush_estimate(&self) -> usize {
         self.storage.get_startup_remaining_items_to_flush_estimate()
     }
@@ -1510,7 +1514,6 @@ impl<T: IndexValue> AccountsIndex<T> {
         // offset bin 0 in the 'binned' array by a random amount.
         // This results in calls to insert_new_entry_if_missing_with_lock from different threads starting at different bins.
         let random_offset = thread_rng().gen_range(0, bins);
-        let use_disk = self.storage.storage.disk.is_some();
         let mut binned = (0..bins)
             .into_iter()
             .map(|mut pubkey_bin| {
@@ -1523,7 +1526,7 @@ impl<T: IndexValue> AccountsIndex<T> {
                 (pubkey_bin, Vec::with_capacity(expected_items_per_bin))
             })
             .collect::<Vec<_>>();
-        let mut dirty_pubkeys = items
+        let dirty_pubkeys = items
             .filter_map(|(pubkey, account_info)| {
                 let pubkey_bin = self.bin_calculator.bin_from_pubkey(&pubkey);
                 let binned_index = (pubkey_bin + random_offset) % bins;
@@ -1531,12 +1534,7 @@ impl<T: IndexValue> AccountsIndex<T> {
                 let is_zero_lamport = account_info.is_zero_lamport();
                 let result = if is_zero_lamport { Some(pubkey) } else { None };
 
-                let info = PreAllocatedAccountMapEntry::new(
-                    slot,
-                    account_info,
-                    &self.storage.storage,
-                    use_disk,
-                );
+                let info = account_info;
                 binned[binned_index].1.push((pubkey, info));
                 result
             })
@@ -1548,19 +1546,22 @@ impl<T: IndexValue> AccountsIndex<T> {
         binned.into_iter().for_each(|(pubkey_bin, items)| {
             let w_account_maps = self.account_maps[pubkey_bin].write().unwrap();
             let mut insert_time = Measure::start("insert_into_primary_index");
-            items.into_iter().for_each(|(pubkey, new_item)| {
-                if let InsertNewEntryResults::ExistedNewEntryNonZeroLamports =
-                    w_account_maps.insert_new_entry_if_missing_with_lock(pubkey, new_item)
-                {
-                    // zero lamports were already added to dirty_pubkeys above
-                    dirty_pubkeys.push(pubkey);
-                }
-            });
+            w_account_maps.startup_insert_only(slot, items.into_iter());
             insert_time.stop();
             insertion_time.fetch_add(insert_time.as_us(), Ordering::Relaxed);
         });
 
         (dirty_pubkeys, insertion_time.load(Ordering::Relaxed))
+    }
+
+    pub fn get_startup_duplicates(&self) -> Vec<Vec<(Slot, Pubkey)>> {
+        (0..self.bins())
+            .into_iter()
+            .map(|pubkey_bin| {
+                let r_account_maps = self.account_maps[pubkey_bin].read().unwrap();
+                r_account_maps.get_startup_duplicates()
+            })
+            .collect()
     }
 
     /// Updates the given pubkey at the given slot with the new account information.

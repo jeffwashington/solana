@@ -125,6 +125,10 @@ impl<T: IndexValue> AccountsIndexStorage<T> {
         }
     }
 
+    pub fn wait_for_idle(&self) {
+        self.storage.wait_for_idle()
+    }
+
     /// estimate how many items are still needing to be flushed to the disk cache.
     pub fn get_startup_remaining_items_to_flush_estimate(&self) -> usize {
         self.storage

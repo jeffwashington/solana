@@ -8249,6 +8249,20 @@ impl AccountsDb {
                 self.accounts_index.set_startup(Startup::Normal);
                 m.stop();
                 index_flush_us = m.as_us();
+
+                for (slot, key) in self
+                    .accounts_index
+                    .get_startup_duplicates()
+                    .into_iter()
+                    .flatten()
+                {
+                    match self.uncleaned_pubkeys.entry(slot) {
+                        Occupied(mut occupied) => occupied.get_mut().push(key),
+                        Vacant(vacant) => {
+                            vacant.insert(vec![key]);
+                        }
+                    }
+                }                
             }
 
             let mut timings = GenerateIndexTimings {
