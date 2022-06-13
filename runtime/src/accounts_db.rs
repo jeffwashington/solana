@@ -8299,6 +8299,8 @@ impl AccountsDb {
             }
             timings.report();
         }
+        error!("generate_index {} {}", file!(), line!());
+
 
         self.accounts_index.log_secondary_indexes();
 
