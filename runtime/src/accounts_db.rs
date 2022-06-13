@@ -8331,6 +8331,7 @@ impl AccountsDb {
     /// Note this should only be used when ALL entries in the accounts index are roots.
     fn pubkeys_to_duplicate_accounts_data_len(&self, pubkeys: &[Pubkey]) -> u64 {
         let mut accounts_data_len_from_duplicates = 0;
+        use log::*;error!("{} {}", file!(), line!());
         pubkeys.iter().for_each(|pubkey| {
             if let Some(entry) = self.accounts_index.get_account_read_entry(pubkey) {
                 let slot_list = entry.slot_list();

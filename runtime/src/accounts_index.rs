@@ -1057,7 +1057,7 @@ impl<T: IndexValue> AccountsIndex<T> {
     }
 
     pub fn get_account_read_entry(&self, pubkey: &Pubkey) -> Option<ReadAccountMapEntry<T>> {
-        use log::*;error!("{} {}", file!(), line!());
+        //use log::*;error!("{} {}", file!(), line!());
         let lock = self.get_account_maps_read_lock(pubkey);
         self.get_account_read_entry_with_lock(pubkey, &lock)
     }
