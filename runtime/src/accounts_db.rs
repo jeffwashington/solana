@@ -8250,6 +8250,7 @@ impl AccountsDb {
             if pass == 0 {
                 // tell accounts index we are done adding the initial accounts at startup
                 let mut m = Measure::start("accounts_index_idle_us");
+                error!("generate_index - waiting for idle");
                 self.accounts_index.set_startup(Startup::Normal);
                 m.stop();
                 index_flush_us = m.as_us();
