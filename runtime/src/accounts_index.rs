@@ -1056,17 +1056,19 @@ impl<T: IndexValue> AccountsIndex<T> {
         }
     }
 
-    pub fn get_account_read_entry(&self, pubkey: &Pubkey) -> Option<ReadAccountMapEntry<T>> {
+    pub fn get_account_read_entry2(&self, pubkey: &Pubkey) -> Option<ReadAccountMapEntry<T>> {
+        panic!("");
         let lock = self.get_account_maps_read_lock(pubkey);
-        self.get_account_read_entry_with_lock(pubkey, &lock)
+        self.get_account_read_entry_with_lock2(pubkey, &lock)
     }
 
-    pub fn get_account_read_entry_with_lock(
+    pub fn get_account_read_entry_with_lock2(
         &self,
         pubkey: &Pubkey,
         lock: &AccountMapsReadLock<'_, T>,
     ) -> Option<ReadAccountMapEntry<T>> {
-        lock.get(pubkey)
+        panic!("");
+        lock.get2(pubkey)
             .map(ReadAccountMapEntry::from_account_map_entry)
     }
 
@@ -1349,8 +1351,9 @@ impl<T: IndexValue> AccountsIndex<T> {
         let read_lock = self.account_maps[self.bin_calculator.bin_from_pubkey(pubkey)]
             .read()
             .unwrap();
-        let account = read_lock
-            .get(pubkey)
+            panic!("");
+            let account = read_lock
+            .get2(pubkey)
             .map(ReadAccountMapEntry::from_account_map_entry);
 
         match account {
@@ -1618,7 +1621,8 @@ impl<T: IndexValue> AccountsIndex<T> {
     }
 
     pub fn ref_count_from_storage(&self, pubkey: &Pubkey) -> RefCount {
-        if let Some(locked_entry) = self.get_account_read_entry(pubkey) {
+        panic!("");
+        if let Some(locked_entry) = self.get_account_read_entry2(pubkey) {
             locked_entry.ref_count()
         } else {
             0

@@ -144,6 +144,7 @@ impl<T: IndexValue> AccountsIndexStorage<T> {
 
     fn num_threads() -> usize {
         std::cmp::max(2, num_cpus::get() / 4)
+        //2//std::cmp::max(2, num_cpus::get() / 4)
     }
 
     /// allocate BucketMapHolder and InMemAccountsIndex[]

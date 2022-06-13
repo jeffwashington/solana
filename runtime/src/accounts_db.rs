@@ -2997,7 +2997,8 @@ impl AccountsDb {
         let mut alive = 0;
         let mut dead = 0;
         iter.for_each(|(pubkey, stored_account)| {
-            let lookup = self.accounts_index.get_account_read_entry(pubkey);
+            panic!("");
+            let lookup = self.accounts_index.get_account_read_entry2(pubkey);
             if let Some(locked_entry) = lookup {
                 let is_alive = locked_entry.slot_list().iter().any(|(_slot, acct_info)| {
                     acct_info.matches_storage_location(
@@ -3133,7 +3134,8 @@ impl AccountsDb {
                 .skipped_shrink
                 .fetch_add(1, Ordering::Relaxed);
             for pubkey in unrefed_pubkeys {
-                if let Some(locked_entry) = self.accounts_index.get_account_read_entry(pubkey) {
+                panic!("");
+                if let Some(locked_entry) = self.accounts_index.get_account_read_entry2(pubkey) {
                     locked_entry.addref();
                 }
             }
@@ -8120,6 +8122,7 @@ impl AccountsDb {
                 // seems to be a good hueristic given varying # cpus for in-mem disk index
                 8
             };
+            //let chunk_size = outer_slots_len;//(outer_slots_len / (std::cmp::max(1, threads.saturating_sub(1)))) + 1; // approximately 400k slots in a snapshot
             let chunk_size = (outer_slots_len / (std::cmp::max(1, threads.saturating_sub(1)))) + 1; // approximately 400k slots in a snapshot
             let mut index_time = Measure::start("index");
             let insertion_time_us = AtomicU64::new(0);
@@ -8172,7 +8175,8 @@ impl AccountsDb {
                             for account in accounts_map.into_iter() {
                                 let (key, account_info) = account;
                                 let lock = self.accounts_index.get_account_maps_read_lock(&key);
-                                let x = lock.get(&key).unwrap();
+                                panic!("");
+                                let x = lock.get2(&key).unwrap();
                                 let sl = x.slot_list.read().unwrap();
                                 let mut count = 0;
                                 for (slot2, account_info2) in sl.iter() {
@@ -8230,7 +8234,7 @@ impl AccountsDb {
                     .into_iter()
                     .collect::<Vec<_>>()
                     .par_chunks(4096)
-                    .map(|pubkeys| self.pubkeys_to_duplicate_accounts_data_len(pubkeys))
+                    .map(|pubkeys| self.pubkeys_to_duplicate_accounts_data_len2(pubkeys))
                     .sum();
                 accounts_data_len.fetch_sub(accounts_data_len_from_duplicates, Ordering::Relaxed);
                 info!(
@@ -8249,6 +8253,20 @@ impl AccountsDb {
                 self.accounts_index.set_startup(Startup::Normal);
                 m.stop();
                 index_flush_us = m.as_us();
+
+                for (slot, key) in self
+                    .accounts_index
+                    .get_startup_duplicates()
+                    .into_iter()
+                    .flatten()
+                {
+                    match self.uncleaned_pubkeys.entry(slot) {
+                        Occupied(mut occupied) => occupied.get_mut().push(key),
+                        Vacant(vacant) => {
+                            vacant.insert(vec![key]);
+                        }
+                    }
+                }                
             }
 
             let mut timings = GenerateIndexTimings {
@@ -8269,24 +8287,6 @@ impl AccountsDb {
             };
 
             if pass == 0 {
-                // Efficient delayed insertion to disk acct idx calculates duplicate keys later
-                // But, we have to wait for all flushing to complete.
-                self.accounts_index.wait_for_idle();
-
-                for (slot, key) in self
-                    .accounts_index
-                    .get_startup_duplicates()
-                    .into_iter()
-                    .flatten()
-                {
-                    match self.uncleaned_pubkeys.entry(slot) {
-                        Occupied(mut occupied) => occupied.get_mut().push(key),
-                        Vacant(vacant) => {
-                            vacant.insert(vec![key]);
-                        }
-                    }
-                }
-
                 // Need to add these last, otherwise older updates will be cleaned
                 for slot in &slots {
                     self.accounts_index.add_root(*slot, false);
@@ -8328,10 +8328,11 @@ impl AccountsDb {
 
     /// Used during generate_index() to get the _duplicate_ accounts data len from the given pubkeys
     /// Note this should only be used when ALL entries in the accounts index are roots.
-    fn pubkeys_to_duplicate_accounts_data_len(&self, pubkeys: &[Pubkey]) -> u64 {
+    fn pubkeys_to_duplicate_accounts_data_len2(&self, pubkeys: &[Pubkey]) -> u64 {
         let mut accounts_data_len_from_duplicates = 0;
+        /*
         pubkeys.iter().for_each(|pubkey| {
-            if let Some(entry) = self.accounts_index.get_account_read_entry(pubkey) {
+            if let Some(entry) = self.accounts_index.get_account_read_entry2(pubkey) {
                 let slot_list = entry.slot_list();
                 if slot_list.len() < 2 {
                     return;
@@ -8356,6 +8357,7 @@ impl AccountsDb {
                     });
             }
         });
+        */
         accounts_data_len_from_duplicates as u64
     }
 
