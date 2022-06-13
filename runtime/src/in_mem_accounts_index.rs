@@ -227,7 +227,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
 
     /// lookup 'pubkey' in index (in mem or on disk)
     pub fn get(&self, pubkey: &K) -> Option<AccountMapEntry<T>> {
-        use log::*;error!("{} {}", file!(), line!());
+        // use log::*;error!("{} {}", file!(), line!());
         self.get_internal(pubkey, |entry| (true, entry.map(Arc::clone)))
     }
 

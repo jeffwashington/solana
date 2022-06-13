@@ -1067,7 +1067,7 @@ impl<T: IndexValue> AccountsIndex<T> {
         pubkey: &Pubkey,
         lock: &AccountMapsReadLock<'_, T>,
     ) -> Option<ReadAccountMapEntry<T>> {
-        use log::*;error!("{} {}", file!(), line!());
+        //use log::*;error!("{} {}", file!(), line!());
         lock.get(pubkey)
             .map(ReadAccountMapEntry::from_account_map_entry)
     }
