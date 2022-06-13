@@ -7899,7 +7899,7 @@ impl AccountsDb {
                                 stored_account,
                             });
                         } else {
-                            assert_ne!(occupied_version, this_version);
+                            assert_ne!(occupied_version, this_version, "key: {}", pubkey);
                         }
                     }
                 }
