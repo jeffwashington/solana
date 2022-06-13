@@ -2997,6 +2997,7 @@ impl AccountsDb {
         let mut alive = 0;
         let mut dead = 0;
         iter.for_each(|(pubkey, stored_account)| {
+            use log::*;error!("{} {}", file!(), line!());
             let lookup = self.accounts_index.get_account_read_entry(pubkey);
             if let Some(locked_entry) = lookup {
                 let is_alive = locked_entry.slot_list().iter().any(|(_slot, acct_info)| {
@@ -3133,6 +3134,7 @@ impl AccountsDb {
                 .skipped_shrink
                 .fetch_add(1, Ordering::Relaxed);
             for pubkey in unrefed_pubkeys {
+                use log::*;error!("{} {}", file!(), line!());
                 if let Some(locked_entry) = self.accounts_index.get_account_read_entry(pubkey) {
                     locked_entry.addref();
                 }
@@ -8120,6 +8122,7 @@ impl AccountsDb {
                 // seems to be a good hueristic given varying # cpus for in-mem disk index
                 8
             };
+            //let chunk_size = outer_slots_len;//(outer_slots_len / (std::cmp::max(1, threads.saturating_sub(1)))) + 1; // approximately 400k slots in a snapshot
             let chunk_size = (outer_slots_len / (std::cmp::max(1, threads.saturating_sub(1)))) + 1; // approximately 400k slots in a snapshot
             let mut index_time = Measure::start("index");
             let insertion_time_us = AtomicU64::new(0);
@@ -8172,6 +8175,7 @@ impl AccountsDb {
                             for account in accounts_map.into_iter() {
                                 let (key, account_info) = account;
                                 let lock = self.accounts_index.get_account_maps_read_lock(&key);
+                                use log::*;error!("{} {}", file!(), line!());
                                 let x = lock.get(&key).unwrap();
                                 let sl = x.slot_list.read().unwrap();
                                 let mut count = 0;

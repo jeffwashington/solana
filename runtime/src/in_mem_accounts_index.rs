@@ -227,6 +227,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
 
     /// lookup 'pubkey' in index (in mem or on disk)
     pub fn get(&self, pubkey: &K) -> Option<AccountMapEntry<T>> {
+        use log::*;error!("{} {}", file!(), line!());
         self.get_internal(pubkey, |entry| (true, entry.map(Arc::clone)))
     }
 
@@ -259,6 +260,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
 
                         if add_to_cache {
                             stats.inc_mem_count(self.bin);
+                            use log::*;error!("{} {}", file!(), line!());
                             vacant.insert(disk_entry);
                         }
                         rt
@@ -341,6 +343,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         pubkey: &Pubkey,
         user: impl for<'a> FnOnce(&mut RwLockWriteGuard<'a, SlotList<T>>) -> RT,
     ) -> Option<RT> {
+        use log::*;error!("{} {}", file!(), line!());
         self.get_internal(pubkey, |entry| {
             (
                 true,
@@ -354,6 +357,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
     }
 
     pub fn unref(&self, pubkey: &Pubkey) {
+        use log::*;error!("{} {}", file!(), line!());
         self.get_internal(pubkey, |entry| {
             if let Some(entry) = entry {
                 entry.add_un_ref(false)
@@ -440,6 +444,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                                 new_value.into_account_map_entry(&self.storage)
                             };
                             assert!(new_value.dirty());
+                            use log::*;error!("{} {}", file!(), line!());
                             vacant.insert(new_value);
                             self.stats().inc_mem_count(self.bin);
                         }
@@ -656,6 +661,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                             &mut Vec::default(),
                             false,
                         );
+                        use log::*;error!("{} {}", file!(), line!());
                         vacant.insert(disk_entry);
                         (
                             false, /* found in mem */
@@ -666,6 +672,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                         let new_entry: AccountMapEntry<T> =
                             new_entry.into_account_map_entry(&self.storage);
                         assert!(new_entry.dirty());
+                        use log::*;error!("{} {}", file!(), line!());
                         vacant.insert(new_entry);
                         (false, false)
                     }
@@ -730,6 +737,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
             self.stats().inc_mem_count(self.bin);
             let new_entry: AccountMapEntry<T> = new_entry.into_account_map_entry(&self.storage);
             assert!(new_entry.dirty());
+            use log::*;error!("{} {}", file!(), line!());
             vacant.insert(new_entry);
             false // not using disk, not in mem, so did not exist
         }
@@ -879,6 +887,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                         occupied.get().set_age(future_age);
                     }
                     Entry::Vacant(vacant) => {
+                        use log::*;error!("{} {}", file!(), line!());
                         vacant.insert(self.disk_to_cache_entry(item.slot_list, item.ref_count));
                         added_to_mem += 1;
                     }
