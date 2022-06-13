@@ -8269,6 +8269,24 @@ impl AccountsDb {
             };
 
             if pass == 0 {
+                // Efficient delayed insertion to disk acct idx calculates duplicate keys later
+                // But, we have to wait for all flushing to complete.
+                self.accounts_index.wait_for_idle();
+
+                for (slot, key) in self
+                    .accounts_index
+                    .get_startup_duplicates()
+                    .into_iter()
+                    .flatten()
+                {
+                    match self.uncleaned_pubkeys.entry(slot) {
+                        Occupied(mut occupied) => occupied.get_mut().push(key),
+                        Vacant(vacant) => {
+                            vacant.insert(vec![key]);
+                        }
+                    }
+                }
+
                 // Need to add these last, otherwise older updates will be cleaned
                 for slot in &slots {
                     self.accounts_index.add_root(*slot, false);
