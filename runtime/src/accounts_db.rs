@@ -8220,32 +8220,6 @@ impl AccountsDb {
                 })
                 .sum();
 
-            // subtract data.len() from accounts_data_len for all old accounts that are in the index twice
-            let mut accounts_data_len_dedup_timer =
-                Measure::start("handle accounts data len duplicates");
-            if pass == 0 {
-                let mut unique_pubkeys = HashSet::<Pubkey>::default();
-                self.uncleaned_pubkeys.iter().for_each(|entry| {
-                    entry.value().iter().for_each(|pubkey| {
-                        unique_pubkeys.insert(*pubkey);
-                    })
-                });
-                let accounts_data_len_from_duplicates = unique_pubkeys
-                    .into_iter()
-                    .collect::<Vec<_>>()
-                    .par_chunks(4096)
-                    .map(|pubkeys| self.pubkeys_to_duplicate_accounts_data_len(pubkeys))
-                    .sum();
-                accounts_data_len.fetch_sub(accounts_data_len_from_duplicates, Ordering::Relaxed);
-                info!(
-                    "accounts data len: {}",
-                    accounts_data_len.load(Ordering::Relaxed)
-                );
-            }
-            accounts_data_len_dedup_timer.stop();
-
-            let storage_info_timings = storage_info_timings.into_inner().unwrap();
-
             let mut index_flush_us = 0;
             if pass == 0 {
                 // tell accounts index we are done adding the initial accounts at startup
@@ -8271,6 +8245,31 @@ impl AccountsDb {
                 }                
                 error!("generate_index - done getting uncleaned_pubkeys");
             }
+            // subtract data.len() from accounts_data_len for all old accounts that are in the index twice
+            let mut accounts_data_len_dedup_timer =
+                Measure::start("handle accounts data len duplicates");
+            if pass == 0 {
+                let mut unique_pubkeys = HashSet::<Pubkey>::default();
+                self.uncleaned_pubkeys.iter().for_each(|entry| {
+                    entry.value().iter().for_each(|pubkey| {
+                        unique_pubkeys.insert(*pubkey);
+                    })
+                });
+                let accounts_data_len_from_duplicates = unique_pubkeys
+                    .into_iter()
+                    .collect::<Vec<_>>()
+                    .par_chunks(4096)
+                    .map(|pubkeys| self.pubkeys_to_duplicate_accounts_data_len(pubkeys))
+                    .sum();
+                accounts_data_len.fetch_sub(accounts_data_len_from_duplicates, Ordering::Relaxed);
+                info!(
+                    "accounts data len: {}",
+                    accounts_data_len.load(Ordering::Relaxed)
+                );
+            }
+            accounts_data_len_dedup_timer.stop();
+
+            let storage_info_timings = storage_info_timings.into_inner().unwrap();
 
             let mut timings = GenerateIndexTimings {
                 index_flush_us,
