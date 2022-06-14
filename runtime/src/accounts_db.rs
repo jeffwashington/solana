@@ -8039,12 +8039,17 @@ impl AccountsDb {
         (account, hash)
     }
 
+    /// approximation for filler accounts
+    fn get_approximate_partition_index_for_slot(slot: Slot) -> u64 {
+        slot
+    }
+
     fn get_filler_account_pubkeys(&self, count: usize, storage_slot: Slot) -> Vec<Pubkey> {
         use solana_sdk::clock::DEFAULT_SLOTS_PER_EPOCH;
         (0..count)
             .map(|_| {
                 // spread out the pubkeys over the range where rent collection will not find them for 1/4 an epoch
-                let partition_index = ((thread_rng().gen_range(0, DEFAULT_SLOTS_PER_EPOCH / 4) + (DEFAULT_SLOTS_PER_EPOCH / 2) + storage_slot) % DEFAULT_SLOTS_PER_EPOCH).min(DEFAULT_SLOTS_PER_EPOCH - 1);
+                let partition_index = ((thread_rng().gen_range(0, DEFAULT_SLOTS_PER_EPOCH / 4) + (DEFAULT_SLOTS_PER_EPOCH / 2) + Self::get_approximate_partition_index_for_slot(storage_slot)) % DEFAULT_SLOTS_PER_EPOCH).min(DEFAULT_SLOTS_PER_EPOCH - 1);
                 let subrange = crate::bank::Bank::pubkey_range_from_partition((partition_index, partition_index.saturating_add(1), DEFAULT_SLOTS_PER_EPOCH));
                 self.get_filler_account_pubkey(&subrange.start())
             })
@@ -8075,6 +8080,13 @@ impl AccountsDb {
     ) {
         if self.filler_accounts_config.count == 0 {
             return;
+        }
+
+        {
+            let (_, partition_index) = epoch_schedule.get_epoch_and_slot_index(slot);
+            let approx_index = Self::get_approximate_partition_index_for_slot(slot);
+            let dist = partition_index.abs_diff(approx_index);
+            assert!(dist < solana_sdk::clock::DEFAULT_SLOTS_PER_EPOCH / 8, "distance: {}, slot: {}", dist, slot);
         }
 
         if ADD_FILLER_ACCOUNTS_GRADUALLY {
