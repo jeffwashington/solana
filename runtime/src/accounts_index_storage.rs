@@ -9,7 +9,7 @@ use {
         fmt::Debug,
         sync::{
             atomic::{AtomicBool, Ordering},
-            Arc, Mutex,
+            Arc, Mutex, RwLock,
         },
         thread::{Builder, JoinHandle},
     },
@@ -24,6 +24,11 @@ pub struct AccountsIndexStorage<T: IndexValue> {
 
     /// set_startup(true) creates bg threads which are kept alive until set_startup(false)
     startup_worker_threads: Mutex<Option<BgThreads>>,
+
+    /// when we wait for idle, we want to use all threads possible to help us finish as fast as possible
+    wait_for_idle_worker_threads: Mutex<Option<BgThreads>>,
+
+    startup: RwLock<Startup>,
 }
 
 impl<T: IndexValue> Debug for AccountsIndexStorage<T> {
@@ -109,20 +114,32 @@ impl<T: IndexValue> AccountsIndexStorage<T> {
         let value = !matches!(startup, Startup::Normal);
         if matches!(startup, Startup::StartupWithExtraThreads) {
             // create some additional bg threads to help get things to the disk index asap
-            *self.startup_worker_threads.lock().unwrap() = Some(BgThreads::new(
-                &self.storage,
-                &self.in_mem,
-                Self::num_threads(),
-            ));
+            *self.startup_worker_threads.lock().unwrap() = self.create_threads(Self::num_threads());
+        } else if matches!(startup, Startup::Normal)
+            && matches!(
+                *self.startup.read().unwrap(),
+                Startup::StartupWithExtraThreads
+            )
+        {
+            // If we are transitioning to normal from 'StartupWithExtraThreads', then add more threads to help the flush finish asap.
+            // This only occurs during startup of a validator when we are blocked waiting on this to complete.
+            *self.wait_for_idle_worker_threads.lock().unwrap() =
+                self.create_threads(Self::num_threads() * 2);
         }
+        *self.startup.write().unwrap() = startup;
         self.storage.set_startup(value);
         if !value {
             // transitioning from startup to !startup (ie. steady state)
             // shutdown the bg threads
             *self.startup_worker_threads.lock().unwrap() = None;
+            *self.wait_for_idle_worker_threads.lock().unwrap() = None;
             // maybe shrink hashmaps
             self.shrink_to_fit();
         }
+    }
+
+    fn create_threads(&self, num: usize) -> Option<BgThreads> {
+        Some(BgThreads::new(&self.storage, &self.in_mem, num))
     }
 
     /// estimate how many items are still needing to be flushed to the disk cache.
@@ -161,6 +178,8 @@ impl<T: IndexValue> AccountsIndexStorage<T> {
             storage,
             in_mem,
             startup_worker_threads: Mutex::default(),
+            wait_for_idle_worker_threads: Mutex::default(),
+            startup: RwLock::new(Startup::Normal),
         }
     }
 }
