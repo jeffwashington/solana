@@ -88,7 +88,7 @@ use {
         path::{Path, PathBuf},
         str::FromStr,
         sync::{
-            atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering},
+            atomic::{AtomicBool, AtomicU8, AtomicU32, AtomicU64, AtomicUsize, Ordering},
             Arc, Condvar, Mutex, MutexGuard, RwLock,
         },
         thread::{sleep, Builder},
@@ -1147,6 +1147,9 @@ pub struct AccountsDb {
     /// number of slots remaining where filler accounts should be added
     pub filler_account_slots_remaining: AtomicU64,
 
+    /// number of slots remaining where filler accounts should be added
+    pub filler_account_adding_idle: AtomicU8,
+
     // # of passes should be a function of the total # of accounts that are active.
     // higher passes = slower total time, lower dynamic memory usage
     // lower passes = faster total time, higher dynamic memory usage
@@ -1903,6 +1906,7 @@ impl AccountsDb {
         AccountsDb {
             filler_accounts_per_slot: AtomicU64::default(),
             filler_account_slots_remaining: AtomicU64::default(),
+            filler_account_adding_idle: AtomicU8::default(),
             active_stats: ActiveStats::default(),
             accounts_hash_complete_one_epoch_old: RwLock::default(),
             skip_rewrites: false,
@@ -2253,6 +2257,7 @@ impl AccountsDb {
     pub fn background_filler_accounts(receiver: Receiver<AddFillerAccounts>, db: Arc<AccountsDb>) {
         loop {
             let result = receiver.recv();
+            db.filler_account_adding_idle.fetch_add(1, Ordering::Relaxed);
             match result {
                 Ok(request) => {
                     let filler_accounts = request.num_accounts;
@@ -2277,6 +2282,7 @@ impl AccountsDb {
                     break;
                 }
             }
+            db.filler_account_adding_idle.fetch_sub(1, Ordering::Relaxed);
         }
     }
         
@@ -5669,7 +5675,7 @@ impl AccountsDb {
         }
 
         let mut filler_accounts = 0;
-        if self.filler_accounts_enabled() {
+        if self.filler_accounts_enabled() && self.filler_account_adding_idle.load(Ordering::Relaxed) == 0 {
             let slots_remaining = self.filler_account_slots_remaining.load(Ordering::Acquire);
             if slots_remaining > 0 {
                 // figure out
