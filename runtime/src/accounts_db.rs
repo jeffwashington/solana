@@ -2260,7 +2260,7 @@ impl AccountsDb {
                     let (account, hash) = db.get_filler_account(&Rent::default());
                     let mut accounts = Vec::with_capacity(filler_accounts as usize);
                     let mut hashes = Vec::with_capacity(filler_accounts as usize);
-                    let pubkeys = db.get_filler_account_pubkeys(filler_accounts as usize);
+                    let pubkeys = db.get_filler_account_pubkeys(filler_accounts as usize, request.slot);
                     pubkeys.iter().for_each(|key| {
                         accounts.push((key, &account));
                         hashes.push(hash);
@@ -8039,11 +8039,14 @@ impl AccountsDb {
         (account, hash)
     }
 
-    fn get_filler_account_pubkeys(&self, count: usize) -> Vec<Pubkey> {
+    fn get_filler_account_pubkeys(&self, count: usize, storage_slot: Slot) -> Vec<Pubkey> {
+        use solana_sdk::clock::DEFAULT_SLOTS_PER_EPOCH;
         (0..count)
             .map(|_| {
-                let subrange = solana_sdk::pubkey::new_rand();
-                self.get_filler_account_pubkey(&subrange)
+                // spread out the pubkeys over the range where rent collection will not find them for 1/4 an epoch
+                let partition_index = ((thread_rng().gen_range(0, DEFAULT_SLOTS_PER_EPOCH / 4) + (DEFAULT_SLOTS_PER_EPOCH / 2) + storage_slot) % DEFAULT_SLOTS_PER_EPOCH).min(DEFAULT_SLOTS_PER_EPOCH - 1);
+                let subrange = crate::bank::Bank::pubkey_range_from_partition((partition_index, partition_index.saturating_add(1), DEFAULT_SLOTS_PER_EPOCH));
+                self.get_filler_account_pubkey(&subrange.start())
             })
             .collect()
     }
