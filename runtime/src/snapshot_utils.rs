@@ -427,7 +427,7 @@ where
             "invalid snapshot data file: {:?} has {} bytes, however consumed {} bytes to deserialize",
             data_file_path, file_size, consumed_size
         );
-        return Err(get_io_error(&error_message));
+        error!("{}", error_message);//return Err(get_io_error(&error_message));
     }
 
     Ok(ret)
