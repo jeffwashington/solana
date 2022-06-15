@@ -2326,7 +2326,7 @@ impl AccountsDb {
         Builder::new()
             .name("solana-db-filler-accounts".to_string())
             .spawn(move || {
-                let threads = 2;
+                let threads = 3;
                 db.filler_account_adding_idle.store(threads, Ordering::Relaxed);
                 (0..threads).into_par_iter().for_each(|_| {
                     error!("start_background_filler_accounts independent");
