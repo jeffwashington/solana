@@ -2277,7 +2277,7 @@ impl AccountsDb {
                         Some(&request.flushed_store),
                         None,
                     );
-                    error!("writing {} filler accounts, {:?}, update_index: {}us", accounts.len(), pubkeys.take(2).collect::<Vec<_>>(), timings.update_index_elapsed);
+                    error!("writing {} filler accounts, {:?}, update_index: {}us", accounts.len(), pubkeys.iter().take(2).collect::<Vec<_>>(), timings.update_index_elapsed);
                 }
                 Err(_) => {
                     break;
@@ -8063,6 +8063,7 @@ impl AccountsDb {
                 let mut key = self.get_filler_account_pubkey(&subrange.start());
                 let idx = thread_rng().gen_range(0, u32::MAX);                
                 let my_id_bytes = u32::to_be_bytes(idx);
+                let rent_prefix_bytes = Self::filler_rent_partition_prefix_bytes();
                 key.as_mut()[rent_prefix_bytes
                     ..(rent_prefix_bytes + Self::filler_unique_id_bytes())]
                     .copy_from_slice(&my_id_bytes);
