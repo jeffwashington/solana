@@ -2257,7 +2257,7 @@ impl AccountsDb {
     pub fn background_filler_accounts(receiver: Receiver<AddFillerAccounts>, db: Arc<AccountsDb>) {
         loop {
             let result = receiver.recv();
-            db.filler_account_adding_idle.fetch_add(1, Ordering::Relaxed);
+            db.filler_account_adding_idle.fetch_sub(1, Ordering::Relaxed);
             match result {
                 Ok(request) => {
                     let filler_accounts = request.num_accounts;
@@ -2282,7 +2282,7 @@ impl AccountsDb {
                     break;
                 }
             }
-            db.filler_account_adding_idle.fetch_sub(1, Ordering::Relaxed);
+            db.filler_account_adding_idle.fetch_add(1, Ordering::Relaxed);
         }
     }
         
@@ -2327,6 +2327,7 @@ impl AccountsDb {
             .name("solana-db-filler-accounts".to_string())
             .spawn(move || {
                 let threads = 2;
+                db.filler_account_adding_idle.store(threads, Ordering::Relaxed);
                 (0..threads).into_par_iter().for_each(|_| {
                     error!("start_background_filler_accounts independent");
                     Self::background_filler_accounts(receiver.clone(), Arc::clone(&db));
@@ -5675,7 +5676,7 @@ impl AccountsDb {
         }
 
         let mut filler_accounts = 0;
-        if self.filler_accounts_enabled() && self.filler_account_adding_idle.load(Ordering::Relaxed) == 0 {
+        if self.filler_accounts_enabled() && self.filler_account_adding_idle.load(Ordering::Relaxed) != 0 {
             let slots_remaining = self.filler_account_slots_remaining.load(Ordering::Acquire);
             if slots_remaining > 0 {
                 // figure out
