@@ -8047,7 +8047,7 @@ impl AccountsDb {
 
     /// approximation for filler accounts
     fn get_approximate_partition_index_for_slot(slot: Slot) -> u64 {
-        slot
+        slot % solana_sdk::clock::DEFAULT_SLOTS_PER_EPOCH
     }
 
     fn get_filler_account_pubkeys(&self, count: usize, storage_slot: Slot) -> Vec<Pubkey> {
