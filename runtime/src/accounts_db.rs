@@ -8055,7 +8055,7 @@ impl AccountsDb {
         (0..count)
             .map(|_| {
                 // spread out the pubkeys over the range where rent collection will not find them for 1/4 an epoch
-                let partition_index = ((thread_rng().gen_range(0, DEFAULT_SLOTS_PER_EPOCH / 4) + (DEFAULT_SLOTS_PER_EPOCH / 2) + Self::get_approximate_partition_index_for_slot(storage_slot)) % DEFAULT_SLOTS_PER_EPOCH).min(DEFAULT_SLOTS_PER_EPOCH - 1);
+                let partition_index = ((thread_rng().gen_range(0, DEFAULT_SLOTS_PER_EPOCH / 4) + (DEFAULT_SLOTS_PER_EPOCH / 2) + Self::get_approximate_partition_index_for_slot(storage_slot)) % DEFAULT_SLOTS_PER_EPOCH).min(DEFAULT_SLOTS_PER_EPOCH - 2);
                 let subrange = crate::bank::Bank::pubkey_range_from_partition((partition_index, partition_index.saturating_add(1), DEFAULT_SLOTS_PER_EPOCH));
                 self.get_filler_account_pubkey(&subrange.start())
             })
