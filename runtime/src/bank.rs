@@ -2758,7 +2758,8 @@ impl Bank {
                     })
                     .sum::<i64>()
             )
-            .unwrap()
+            .unwrap(),
+            "slot: {}", self.slot
         );
 
         // verify that we didn't pay any more than we expected to
