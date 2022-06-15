@@ -5676,7 +5676,7 @@ impl AccountsDb {
         }
 
         let mut filler_accounts = 0;
-        if self.filler_accounts_enabled() && self.filler_account_adding_idle.load(Ordering::Relaxed) != 0 {
+        if self.filler_accounts_enabled() {//&& self.filler_account_adding_idle.load(Ordering::Relaxed) != 0 {
             let slots_remaining = self.filler_account_slots_remaining.load(Ordering::Acquire);
             if slots_remaining > 0 {
                 // figure out
