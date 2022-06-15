@@ -2271,12 +2271,13 @@ impl AccountsDb {
                         hashes.push(hash);
                     });
     
-                    db.store_accounts_frozen(
+                    let timings = db.store_accounts_frozen(
                         (request.slot, &accounts[..]),
                         Some(&hashes),
                         Some(&request.flushed_store),
                         None,
                     );
+                    error!("writing {} filler accounts, {:?}, update_index: {}us", accounts.len(), pubkeys.take(2).collect::<Vec<_>>(), timings.update_index_elapsed);
                 }
                 Err(_) => {
                     break;
@@ -5763,8 +5764,9 @@ impl AccountsDb {
                         flushed_store,
                     });
                     err = r.is_err();
+                    assert!(!err);
                 }
-                error!("writing {} filler accounts, size: {}, time to create store: {}, time store: {}, sent: {}, err: {}", filler_accounts, aligned_total_size, time.as_us(), time2.as_us(), send, err);
+                //error!("writing {} filler accounts, size: {}, time to create store: {}, time store: {}, sent: {}, err: {}", filler_accounts, aligned_total_size, time.as_us(), time2.as_us(), send, err);
             }
 
             // If the above sizing function is correct, just one AppendVec is enough to hold
@@ -8058,7 +8060,14 @@ impl AccountsDb {
                 // spread out the pubkeys over the range where rent collection will not find them for 1/4 an epoch
                 let partition_index = ((thread_rng().gen_range(0, DEFAULT_SLOTS_PER_EPOCH / 4) + (DEFAULT_SLOTS_PER_EPOCH / 2) + Self::get_approximate_partition_index_for_slot(storage_slot)) % DEFAULT_SLOTS_PER_EPOCH).min(DEFAULT_SLOTS_PER_EPOCH - 2);
                 let subrange = crate::bank::Bank::pubkey_range_from_partition((partition_index, partition_index.saturating_add(1), DEFAULT_SLOTS_PER_EPOCH));
-                self.get_filler_account_pubkey(&subrange.start())
+                let mut key = self.get_filler_account_pubkey(&subrange.start());
+                let idx = thread_rng().gen_range(0, u32::MAX);                
+                let my_id_bytes = u32::to_be_bytes(idx);
+                key.as_mut()[rent_prefix_bytes
+                    ..(rent_prefix_bytes + Self::filler_unique_id_bytes())]
+                    .copy_from_slice(&my_id_bytes);
+                key
+
             })
             .collect()
     }
