@@ -2327,7 +2327,7 @@ impl AccountsDb {
         Builder::new()
             .name("solana-db-filler-accounts".to_string())
             .spawn(move || {
-                let threads = 3;
+                let threads = 2;
                 db.filler_account_adding_idle.store(threads, Ordering::Relaxed);
                 (0..threads).into_par_iter().for_each(|_| {
                     error!("start_background_filler_accounts independent");
@@ -5677,7 +5677,7 @@ impl AccountsDb {
         }
 
         let mut filler_accounts = 0;
-        if self.filler_accounts_enabled() {//&& self.filler_account_adding_idle.load(Ordering::Relaxed) != 0 {
+        if self.filler_accounts_enabled() && self.filler_account_adding_idle.load(Ordering::Relaxed) != 0 {
             let slots_remaining = self.filler_account_slots_remaining.load(Ordering::Acquire);
             if slots_remaining > 0 {
                 // figure out
