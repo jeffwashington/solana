@@ -2936,7 +2936,7 @@ impl Blockstore {
             frozen_hash,
             is_duplicate_confirmed,
         });
-        self.bank_hash_cf.put(slot, &data).unwrap()
+        let _ = self.bank_hash_cf.put(slot, &data);//.unwrap()
     }
 
     pub fn get_bank_hash(&self, slot: Slot) -> Option<Hash> {
