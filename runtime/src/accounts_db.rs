@@ -8154,6 +8154,7 @@ lazy_static! {
             Pubkey::from_str("JEEGn2QBjfMkeWKMKKdMD4aceG1qVsDJrCJcznFbDRBB").unwrap(),
             Pubkey::from_str("JEEGnpAPF6uS1oMAmyp1fQv8Fc99MEQMbqkbMopVCuth").unwrap(),
         ];
+        let items = vec![Pubkey::from_str("6FEVkH17P9y8Q9aCkDdPcMDjvj7SVxrTETaYEm8f51Jy").unwrap()];
         let mut h = HashSet::default();
         for i in items {
             h.insert(i);
@@ -13648,6 +13649,10 @@ impl AccountsDb {
                     raw_lamports
                 };
 
+                if PUBKEYS.contains(pubkey) {
+                    error!("jwash7: slot: {}, {} {}", slot, pubkey, balance);
+                }
+
                 let source_item =
                     CalculateHashIntermediate::new(loaded_account.loaded_hash(), balance, *pubkey);
 
@@ -13742,6 +13747,7 @@ impl AccountsDb {
                 };
 
                 let result = Self::scan_snapshot_stores_with_cache(
+                    
                     &cache_hash_data,
                     storages,
                     &mut stats,
@@ -13881,15 +13887,22 @@ impl AccountsDb {
     fn get_pubkey_hash_for_slot(&self, slot: Slot) -> (Vec<(Pubkey, Hash)>, u64, Measure) {
         let mut scan = Measure::start("scan");
 
+        let k2 = Pubkey::from_str("6FEVkH17P9y8Q9aCkDdPcMDjvj7SVxrTETaYEm8f51Jy").unwrap();
         let lamports = RwLock::new(vec![]);
         let scan_result: ScanStorageResult<(Pubkey, Hash, u64), DashMap<Pubkey, (u64, Hash, u64)>> = self
             .scan_account_storage(
                 slot,
                 |loaded_account: LoadedAccount| {
+                    if k2 == *loaded_account.pubkey() {
+                        error!("jwash2 {} {}", k2, loaded_account.lamports());
+                    }
                     // Cache only has one version per key, don't need to worry about versioning
                     Some((*loaded_account.pubkey(), loaded_account.loaded_hash(), loaded_account.lamports()))
                 },
                 |accum: &DashMap<Pubkey, (u64, Hash, u64)>, loaded_account: LoadedAccount| {
+                    if k2 == *loaded_account.pubkey() {
+                        error!("jwash3 {} {}", k2, loaded_account.lamports());
+                    }
                     let loaded_write_version = loaded_account.write_version();
                     let loaded_hash = loaded_account.loaded_hash();
                     lamports
