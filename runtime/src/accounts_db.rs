@@ -18237,7 +18237,7 @@ impl AccountsDb {
             slots_per_epoch,
             is_startup,
         )?;
-        if debug_verify {
+        if debug_verify && false {
             // calculate the other way (store or non-store) and verify results match.
             let (hash_other, total_lamports_other) = self.calculate_accounts_hash_helper(
                 !use_index,

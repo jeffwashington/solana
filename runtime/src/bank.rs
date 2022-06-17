@@ -6005,7 +6005,7 @@ impl Bank {
                 ("capitalization", self.capitalization(), i64),
             );
 
-            if !debug_verify {
+            if false && !debug_verify {
                 // cap mismatch detected. It has been logged to metrics above.
                 // Run both versions of the calculation to attempt to get more info.
                 debug_verify = true;
