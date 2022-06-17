@@ -13912,7 +13912,39 @@ impl AccountsDb {
             );
         scan.stop();
         let mut lamports = lamports.into_inner().unwrap();
+/*
+        lamports.sort();
+        error!(
+            "lamports234: [{:?}], \n{:?}",
+            lamports
+                .iter()
+                .map(|(k, _l)| format!("Pubkey::from_str({}).unwrap()", k))
+                .collect::<Vec<_>>(),
+            lamports
+        );
+        */
 
+        let accumulate = Measure::start("accumulate");
+        let mut lamports: Vec<(Pubkey, u64)>;
+        let hashes: Vec<_> = match scan_result {
+            ScanStorageResult::Cached(cached_result) => {
+lamports = cached_result.iter()
+.map(|(pubkey, hash, l)| (*pubkey, *l))
+.collect();
+                cached_result.into_iter()
+            .map(|(pubkey, hash, _)| (pubkey, hash))
+            .collect()}
+            ScanStorageResult::Stored(stored_result) => {
+                lamports = stored_result.iter()
+                .map(|r| {let (pubkey, (_latest_write_version, hash, l)) = (r.key(),*r); (*pubkey, l)})
+                .collect();
+                
+                stored_result
+                .into_iter()
+                .map(|(pubkey, (_latest_write_version, hash, _))| (pubkey, hash))
+                .collect()
+            }
+        };
         lamports.sort();
         error!(
             "lamports234: [{:?}], \n{:?}",
@@ -13923,16 +13955,6 @@ impl AccountsDb {
             lamports
         );
 
-        let accumulate = Measure::start("accumulate");
-        let hashes: Vec<_> = match scan_result {
-            ScanStorageResult::Cached(cached_result) => cached_result.into_iter()
-            .map(|(pubkey, hash, _)| (pubkey, hash))
-            .collect(),
-            ScanStorageResult::Stored(stored_result) => stored_result
-                .into_iter()
-                .map(|(pubkey, (_latest_write_version, hash, _))| (pubkey, hash))
-                .collect(),
-        };
         (hashes, scan.as_us(), accumulate)
     }
 
