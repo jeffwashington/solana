@@ -8401,6 +8401,12 @@ impl Versioned for (u64, Hash) {
     }
 }
 
+impl Versioned for (u64, Hash, u64) {
+    fn version(&self) -> u64 {
+        self.0
+    }
+}
+
 impl Versioned for (u64, AccountInfo) {
     fn version(&self) -> u64 {
         self.0
@@ -13876,14 +13882,14 @@ impl AccountsDb {
         let mut scan = Measure::start("scan");
 
         let lamports = RwLock::new(vec![]);
-        let scan_result: ScanStorageResult<(Pubkey, Hash), DashMapVersionHash> = self
+        let scan_result: ScanStorageResult<(Pubkey, Hash, u64), DashMap<Pubkey, (u64, Hash, u64)>> = self
             .scan_account_storage(
                 slot,
                 |loaded_account: LoadedAccount| {
                     // Cache only has one version per key, don't need to worry about versioning
-                    Some((*loaded_account.pubkey(), loaded_account.loaded_hash()))
+                    Some((*loaded_account.pubkey(), loaded_account.loaded_hash(), loaded_account.lamports()))
                 },
-                |accum: &DashMap<Pubkey, (u64, Hash)>, loaded_account: LoadedAccount| {
+                |accum: &DashMap<Pubkey, (u64, Hash, u64)>, loaded_account: LoadedAccount| {
                     let loaded_write_version = loaded_account.write_version();
                     let loaded_hash = loaded_account.loaded_hash();
                     lamports
@@ -13894,12 +13900,12 @@ impl AccountsDb {
                     match accum.entry(*loaded_account.pubkey()) {
                         Occupied(mut occupied_entry) => {
                             if loaded_write_version > occupied_entry.get().version() {
-                                occupied_entry.insert((loaded_write_version, loaded_hash));
+                                occupied_entry.insert((loaded_write_version, loaded_hash, loaded_account.lamports()));
                             }
                         }
 
                         Vacant(vacant_entry) => {
-                            vacant_entry.insert((loaded_write_version, loaded_hash));
+                            vacant_entry.insert((loaded_write_version, loaded_hash, loaded_account.lamports()));
                         }
                     }
                 },
@@ -13919,10 +13925,12 @@ impl AccountsDb {
 
         let accumulate = Measure::start("accumulate");
         let hashes: Vec<_> = match scan_result {
-            ScanStorageResult::Cached(cached_result) => cached_result,
+            ScanStorageResult::Cached(cached_result) => cached_result.into_iter()
+            .map(|(pubkey, hash, _)| (pubkey, hash))
+            .collect(),
             ScanStorageResult::Stored(stored_result) => stored_result
                 .into_iter()
-                .map(|(pubkey, (_latest_write_version, hash))| (pubkey, hash))
+                .map(|(pubkey, (_latest_write_version, hash, _))| (pubkey, hash))
                 .collect(),
         };
         (hashes, scan.as_us(), accumulate)
