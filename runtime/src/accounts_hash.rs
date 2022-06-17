@@ -631,6 +631,7 @@ impl AccountsHash {
         let mut hashes: Vec<&Hash> = Vec::with_capacity(item_len);
         let mut duplicate_pubkey_indexes = Vec::with_capacity(len);
         let filler_accounts_enabled = self.filler_accounts_enabled();
+        let mut lamports = vec![];
 
         // this loop runs once per unique pubkey contained in any slot group
         while !first_items.is_empty() {
@@ -678,6 +679,10 @@ impl AccountsHash {
                 overall_sum = Self::checked_cast_for_capitalization(
                     item.lamports as u128 + overall_sum as u128,
                 );
+                use crate::accounts_db::PUBKEYS;
+                if PUBKEYS.contains(&min_pubkey) {
+                    lamports.push((min_pubkey, item.lamports));
+                }
                 hashes.push(&item.hash);
             }
             if !duplicate_pubkey_indexes.is_empty() {
@@ -696,6 +701,10 @@ impl AccountsHash {
                 });
                 duplicate_pubkey_indexes.clear();
             }
+        }
+        if !lamports.is_empty() {
+            lamports.sort();
+            error!("last ones: {:?}", lamports);
         }
         (hashes, overall_sum, item_len)
     }
