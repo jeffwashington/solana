@@ -2737,7 +2737,10 @@ impl Bank {
         );*/
 
         // verify that we didn't pay any more than we expected to
-        assert!(validator_rewards >= validator_rewards_paid);
+        //assert!(validator_rewards >= validator_rewards_paid);
+        if validator_rewards < validator_rewards_paid {
+            error!("difference in validator rewards: {}, {}", validator_rewards, validator_rewards_paid);
+        }
 
         info!(
             "distributed inflation: {} (rounded from: {})",
