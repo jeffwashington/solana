@@ -5864,6 +5864,7 @@ impl AccountsDb {
     fn get_pubkey_hash_for_slot(&self, slot: Slot) -> (Vec<(Pubkey, Hash)>, u64, Measure) {
         let mut scan = Measure::start("scan");
 
+        let mut lamports = RwLock::new(vec![]);
         let scan_result: ScanStorageResult<(Pubkey, Hash), DashMapVersionHash> = self
             .scan_account_storage(
                 slot,
@@ -5874,6 +5875,7 @@ impl AccountsDb {
                 |accum: &DashMap<Pubkey, (u64, Hash)>, loaded_account: LoadedAccount| {
                     let loaded_write_version = loaded_account.write_version();
                     let loaded_hash = loaded_account.loaded_hash();
+                    lamports.write().unwrap().push((*loaded_account.pubkey(), loaded_account.lamports()));
                     // keep the latest write version for each pubkey
                     match accum.entry(*loaded_account.pubkey()) {
                         Occupied(mut occupied_entry) => {
@@ -5889,6 +5891,10 @@ impl AccountsDb {
                 },
             );
         scan.stop();
+        let mut lamports = lamports.into_inner().unwrap();
+
+            lamports.sort();
+            error!("lamports234: [{:?}], \n{:?}", lamports.iter().map(|(k,l)| format!("Pubkey::from_str(\"{}\").unwrap(),", k)).collect::<Vec<_>>(),lamports );
 
         let accumulate = Measure::start("accumulate");
         let hashes: Vec<_> = match scan_result {
