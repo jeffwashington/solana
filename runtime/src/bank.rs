@@ -1354,15 +1354,16 @@ pub struct Bank {
     pub fee_structure: FeeStructure,
 }
 
-struct VoteWithStakeDelegations {
+struct VoteWithStakeDelegations<'a> {
     vote_state: Arc<VoteState>,
-    vote_account: AccountSharedData,
+    vote_account_ref: Option<&'a VoteAccount>,
+    vote_account_source: Option<AccountSharedData>,
     // TODO: use StakeAccount<Delegation> once the old code is deleted.
     delegations: Vec<(Pubkey, StakeAccount<()>)>,
 }
 
-struct LoadVoteAndStakeAccountsResult {
-    vote_with_stake_delegations_map: DashMap<Pubkey, VoteWithStakeDelegations>,
+struct LoadVoteAndStakeAccountsResult<'a> {
+    vote_with_stake_delegations_map: DashMap<Pubkey, VoteWithStakeDelegations<'a>>,
     invalid_stake_keys: DashMap<Pubkey, InvalidCacheEntryReason>,
     invalid_vote_keys: DashMap<Pubkey, InvalidCacheEntryReason>,
     invalid_cached_vote_accounts: usize,
@@ -2892,7 +2893,8 @@ impl Bank {
                             .entry(*vote_pubkey)
                             .or_insert_with(|| VoteWithStakeDelegations {
                                 vote_state: Arc::new(vote_state),
-                                vote_account,
+                                vote_account_ref: None,
+                                vote_account_source:Some(vote_account),
                                 delegations: vec![],
                             })
                     };
@@ -2958,48 +2960,80 @@ impl Bank {
         let cached_vote_accounts = stakes.vote_accounts();
         let solana_vote_program: Pubkey = solana_vote_program::id();
         let vote_accounts_cache_miss_count = AtomicUsize::default();
-        let get_vote_account = |vote_pubkey: &Pubkey| -> Option<VoteAccount> {
+        let get_vote_account = |vote_pubkey: &Pubkey| -> Option<(Option<&VoteAccount>, Option<AccountSharedData>)> {
             if let Some((_stake, vote_account)) = cached_vote_accounts.get(vote_pubkey) {
-                return Some(vote_account.clone());
+                return Some((Some(vote_account), None))
             }
             // If accounts-db contains a valid vote account, then it should
             // already have been cached in cached_vote_accounts; so the code
             // below is only for sanity check, and can be removed once
             // vote_accounts_cache_miss_count is shown to be always zero.
-            let account = self.get_account_with_fixed_root(vote_pubkey)?;
+            let account = self.get_account_with_fixed_root(vote_pubkey);
+            if account.is_none() {
+                return None;
+            }
+            let account = account.unwrap();
             if account.owner() == &solana_vote_program
                 && VoteState::deserialize(account.data()).is_ok()
             {
                 vote_accounts_cache_miss_count.fetch_add(1, Relaxed);
             }
-            VoteAccount::try_from(account).ok()
+            Some((None, Some(account)))
         };
         let invalid_vote_keys = DashMap::<Pubkey, InvalidCacheEntryReason>::new();
         let make_vote_delegations_entry = |vote_pubkey| {
-            let vote_account = match get_vote_account(&vote_pubkey) {
-                Some(vote_account) => vote_account,
+            let result = match get_vote_account(&vote_pubkey) {
+                Some(result) => result,
                 None => {
                     invalid_vote_keys.insert(vote_pubkey, InvalidCacheEntryReason::Missing);
                     return None;
                 }
             };
-            if vote_account.owner() != &solana_vote_program {
-                invalid_vote_keys.insert(vote_pubkey, InvalidCacheEntryReason::WrongOwner);
-                return None;
-            }
-            let vote_state = match vote_account.vote_state().deref() {
-                Ok(vote_state) => vote_state.clone(),
-                Err(_) => {
-                    invalid_vote_keys.insert(vote_pubkey, InvalidCacheEntryReason::BadState);
+
+            let (vote_account_ref, vote_account_source) = result;
+
+            if let Some(vote_account_ref) = vote_account_ref {
+                if vote_account_ref.owner() != &solana_vote_program {
+                    invalid_vote_keys.insert(vote_pubkey, InvalidCacheEntryReason::WrongOwner);
                     return None;
                 }
-            };
-            let vote_with_stake_delegations = VoteWithStakeDelegations {
-                vote_state: Arc::new(vote_state),
-                vote_account: AccountSharedData::from(vote_account),
-                delegations: Vec::default(),
-            };
-            Some((vote_pubkey, vote_with_stake_delegations))
+                let vote_state = match vote_account_ref.vote_state().deref() {
+                    Ok(vote_state) => vote_state.clone(),
+                    Err(_) => {
+                        invalid_vote_keys.insert(vote_pubkey, InvalidCacheEntryReason::BadState);
+                        return None;
+                    }
+                };
+                let vote_with_stake_delegations = VoteWithStakeDelegations {
+                    vote_state: Arc::new(vote_state),
+                    vote_account_ref: Some(vote_account_ref),
+                    vote_account_source: None,
+                    delegations: Vec::default(),
+                };
+                Some((vote_pubkey, vote_with_stake_delegations))
+            }
+            else {
+                let vote_account_source = vote_account_source.unwrap();
+                if vote_account_source.owner() != &solana_vote_program {
+                    invalid_vote_keys.insert(vote_pubkey, InvalidCacheEntryReason::WrongOwner);
+                    return None;
+                }
+                let vote_account = VoteAccount::try_from(vote_account_source.clone()).unwrap();
+                let vote_state = match vote_account.vote_state().deref() {
+                    Ok(vote_state) => vote_state.clone(),
+                    Err(_) => {
+                        invalid_vote_keys.insert(vote_pubkey, InvalidCacheEntryReason::BadState);
+                        return None;
+                    }
+                };
+                let vote_with_stake_delegations = VoteWithStakeDelegations {
+                    vote_state: Arc::new(vote_state),
+                    vote_account_ref: None,
+                    vote_account_source: Some(vote_account_source),
+                    delegations: Vec::default(),
+                };
+                Some((vote_pubkey, vote_with_stake_delegations))
+            }
         };
         let vote_with_stake_delegations_map: DashMap<Pubkey, VoteWithStakeDelegations> =
             thread_pool.install(|| {
@@ -3124,19 +3158,20 @@ impl Bank {
 
         // pay according to point value
         let point_value = PointValue { rewards, points };
-        let vote_account_rewards: DashMap<Pubkey, (AccountSharedData, u8, u64, bool)> =
+        let vote_account_rewards: DashMap<Pubkey, (Option<&VoteAccount>, Option<AccountSharedData>, u8, u64, bool)> =
             DashMap::with_capacity(vote_with_stake_delegations_map.len());
         let stake_delegation_iterator = vote_with_stake_delegations_map.into_par_iter().flat_map(
             |(
                 vote_pubkey,
                 VoteWithStakeDelegations {
                     vote_state,
-                    vote_account,
+                    vote_account_ref,
+                    vote_account_source,
                     delegations,
                 },
             )| {
                 vote_account_rewards
-                    .insert(vote_pubkey, (vote_account, vote_state.commission, 0, false));
+                    .insert(vote_pubkey, (vote_account_ref, vote_account_source, vote_state.commission, 0, false));
                 delegations
                     .into_par_iter()
                     .map(move |delegation| (vote_pubkey, Arc::clone(&vote_state), delegation))
@@ -3169,6 +3204,7 @@ impl Bank {
                     if let Ok((stakers_reward, voters_reward)) = redeemed {
                         // track voter rewards
                         if let Some((
+                            _vote_account_ref,
                             _vote_account,
                             _commission,
                             vote_rewards_sum,
@@ -3222,15 +3258,32 @@ impl Bank {
         let mut vote_rewards = vote_account_rewards
             .into_iter()
             .filter_map(
-                |(vote_pubkey, (mut vote_account, commission, vote_rewards, vote_needs_store))| {
-                    if let Err(err) = vote_account.checked_add_lamports(vote_rewards) {
-                        debug!("reward redemption failed for {}: {:?}", vote_pubkey, err);
-                        return None;
-                    }
+                |(vote_pubkey, (vote_account_ref, account_copy, commission, vote_rewards, vote_needs_store))| {
+                    let post_balance =
+                    if let Some(vote_account_ref) = vote_account_ref {
+                        let mut vote_account = AccountSharedData::from(vote_account_ref);
+                        if let Err(err) = vote_account.checked_add_lamports(vote_rewards) {
+                            debug!("reward redemption failed for {}: {:?}", vote_pubkey, err);
+                            return None;
+                        }
 
-                    if vote_needs_store {
-                        self.store_account(&vote_pubkey, &vote_account);
+                        if vote_needs_store {
+                            self.store_account(&vote_pubkey, &vote_account);
+                        }
+                        vote_account.lamports()
                     }
+                    else {
+                        let mut vote_account = account_copy.unwrap();
+                        if let Err(err) = vote_account.checked_add_lamports(vote_rewards) {
+                            debug!("reward redemption failed for {}: {:?}", vote_pubkey, err);
+                            return None;
+                        }
+
+                        if vote_needs_store {
+                            self.store_account(&vote_pubkey, &vote_account);
+                        }
+                        vote_account.lamports()
+                    };
 
                     if vote_rewards > 0 {
                         Some((
@@ -3238,7 +3291,7 @@ impl Bank {
                             RewardInfo {
                                 reward_type: RewardType::Voting,
                                 lamports: vote_rewards as i64,
-                                post_balance: vote_account.lamports(),
+                                post_balance,
                                 commission: Some(commission),
                             },
                         ))
