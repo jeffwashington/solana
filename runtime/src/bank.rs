@@ -2798,6 +2798,7 @@ impl Bank {
                     };
                     if cached_stake_account != &stake_account {
                         invalid_cached_stake_accounts.fetch_add(1, Relaxed);
+                        error!("jwash: stake account diff: {:?}, {:?}", cached_stake_account, stake_account);
                     }
                     let stake_delegation = (*stake_pubkey, stake_account);
                     let mut vote_delegations = if let Some(vote_delegations) =
@@ -2864,6 +2865,9 @@ impl Bank {
                     vote_delegations.delegations.push(stake_delegation);
                 });
         });
+        if invalid_stake_keys.len() > 0 {
+            error!("jwash: stake account {:?}", invalid_stake_keys);
+        }
         invalid_cached_stake_accounts.fetch_add(invalid_stake_keys.len(), Relaxed);
         LoadVoteAndStakeAccountsResult {
             vote_with_stake_delegations_map,
@@ -6156,6 +6160,7 @@ impl Bank {
         parents
     }
 
+    // todo: fix this unnecessary insert(0). how big can this list of parents be? caller wants in reverse order anyway
     /// Compute all the parents of the bank including this bank itself
     pub fn parents_inclusive(self: Arc<Self>) -> Vec<Arc<Bank>> {
         let mut parents = self.parents();
