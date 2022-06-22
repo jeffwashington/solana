@@ -2865,20 +2865,20 @@ impl Bank {
             let vote_account = match get_vote_account(&vote_pubkey) {
                 Some(vote_account) => vote_account,
                 None => {
-                    error!("inserting: {}{}", file!(), line!());
+                    panic!("inserting: {}{}", file!(), line!());
                     invalid_vote_keys.insert(vote_pubkey, InvalidCacheEntryReason::Missing);
                     return None;
                 }
             };
             if vote_account.owner() != &solana_vote_program {
-                error!("inserting: {}{}", file!(), line!());
+                panic!("inserting: {}{}", file!(), line!());
                 invalid_vote_keys.insert(vote_pubkey, InvalidCacheEntryReason::WrongOwner);
                 return None;
             }
             let vote_state = match vote_account.vote_state().deref() {
                 Ok(vote_state) => vote_state.clone(),
                 Err(_) => {
-                    error!("inserting: {}{}", file!(), line!());
+                    panic!("inserting: {}{}", file!(), line!());
                     invalid_vote_keys.insert(vote_pubkey, InvalidCacheEntryReason::BadState);
                     return None;
                 }
