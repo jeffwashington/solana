@@ -802,7 +802,7 @@ fn load_bank_forks(
                 "Unable to load bank forks at slot {} due to disconnected blocks.",
                 halt_slot,
             );
-            exit(1);
+            //exit(1);
         }
     }
 
