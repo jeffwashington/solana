@@ -2769,6 +2769,7 @@ impl Bank {
                         {
                             vote_state.convert_to_current()
                         } else {
+                            panic!("");
                             invalid_vote_keys
                                 .insert(*vote_pubkey, InvalidCacheEntryReason::BadState);
                             return;
