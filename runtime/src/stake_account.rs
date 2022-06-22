@@ -18,7 +18,7 @@ use {
 /// wraps any account with stake state.
 #[derive(Clone, Debug, Default)]
 pub struct StakeAccount<T> {
-    account: AccountSharedData,
+    pub account: AccountSharedData,
     stake_state: StakeState,
     _phantom: PhantomData<T>,
 }

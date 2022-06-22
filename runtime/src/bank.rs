@@ -2702,7 +2702,10 @@ impl Bank {
                     };
                     if cached_stake_account != &stake_account {
                         invalid_cached_stake_accounts.fetch_add(1, Relaxed);
-                        error!("jwash: stake account diff: {:?}, {:?}", cached_stake_account, stake_account);
+                        let mut account = cached_stake_account.account.clone();
+                        account.set_rent_epoch(stake_account.account.rent_epoch());
+                        assert_eq!(account, stake_account.account);
+                        //error!("jwash: stake account diff: {:?}, {:?}", cached_stake_account, stake_account);
                     }
                     let stake_delegation = (*stake_pubkey, stake_account);
                     let mut vote_delegations = if let Some(vote_delegations) =
