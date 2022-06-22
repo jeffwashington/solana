@@ -2757,7 +2757,7 @@ impl Bank {
                                 if cached_vote_account.is_some() {
                                     invalid_cached_vote_accounts.fetch_add(1, Relaxed);
                                 }
-                                panic!("");
+                                panic!("stake pubkey: {}, vote pubkey: {}, delegation: {:?}", stake_pubkey, vote_pubkey, delegation);
                                 invalid_vote_keys
                                     .insert(*vote_pubkey, InvalidCacheEntryReason::Missing);
                                 return;
