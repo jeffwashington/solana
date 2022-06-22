@@ -5243,7 +5243,7 @@ impl Bank {
         let start_pubkey_final = Pubkey::new_from_array(start_pubkey);
         let end_pubkey_final = Pubkey::new_from_array(end_pubkey);
         if start_index != 0 && start_index == end_index {
-            error!(
+            panic!(
                 "start=end, {}, {}, start, end: {:?}, {:?}, pubkeys: {}, {}",
                 start_pubkey.iter().map(|x| format!("{:02x}", x)).join(""),
                 end_pubkey.iter().map(|x| format!("{:02x}", x)).join(""),
