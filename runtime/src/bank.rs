@@ -2721,6 +2721,14 @@ impl Bank {
                             );
                             invalid_cached_stake_accounts.fetch_add(1, Relaxed);
                         }
+                        else {
+                            info!(
+                                "cached stake account differed only by rent_epoch: {}: {:?}, {:?}",
+                                stake_pubkey,
+                                cached_stake_account.account(),
+                                stake_account.account()
+                            );
+                        }
                     }
                     let stake_delegation = (*stake_pubkey, stake_account);
                     let mut vote_delegations = if let Some(vote_delegations) =
