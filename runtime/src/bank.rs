@@ -5244,13 +5244,14 @@ impl Bank {
         let end_pubkey_final = Pubkey::new_from_array(end_pubkey);
         if start_index != 0 && start_index == end_index {
             panic!(
-                "start=end, {}, {}, start, end: {:?}, {:?}, pubkeys: {}, {}",
+                "start=end, {}, {}, start, end: {:?}, {:?}, pubkeys: {}, {}, partition_count: {}",
                 start_pubkey.iter().map(|x| format!("{:02x}", x)).join(""),
                 end_pubkey.iter().map(|x| format!("{:02x}", x)).join(""),
                 start_key_prefix,
                 end_key_prefix,
                 start_pubkey_final,
-                end_pubkey_final
+                end_pubkey_final,
+                partition_count,
             );
         }
         trace!(
