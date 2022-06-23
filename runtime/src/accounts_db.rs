@@ -6982,6 +6982,13 @@ impl AccountsDb {
 
         self.extend_hashes_with_skipped_rewrites(&mut hashes, skipped_rewrites);
 
+        if slot == 138672000 {
+            hashes.sort();
+            error!("jwash2: {:?}",
+            hashes.iter().map(|(k, h)| format!("(Pubkey::from_str({:?}), Hash::from_str({:?})),", k, h)).collect::<Vec<_>>()
+            );
+        }
+
         let ret = AccountsHash::accumulate_account_hashes(hashes);
         accumulate.stop();
         let mut uncleaned_time = Measure::start("uncleaned_index");
