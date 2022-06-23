@@ -6984,9 +6984,31 @@ impl AccountsDb {
 
         if slot == 138672000 {
             hashes.sort();
+            /*
             error!("jwash2: {:?}",
             hashes.iter().map(|(k, h)| format!("(Pubkey::from_str({:?}), Hash::from_str({:?})),", k, h)).collect::<Vec<_>>()
-            );
+            );*/
+
+            let expected = crate::accounts_hash::get_raw();
+            let mut map = HashMap::new();
+            expected.iter().for_each(|(k, h)|{
+                map.insert(k, h);
+            });
+
+            hashes.iter().for_each(|(k, h)|{
+                if let Some(v) = map.get(k) {
+                    if v != &h {
+                        error!("jwash3: diff: {}, {}, {}", k, v, h);
+                    }
+                    map.remove(k);
+                }
+                else {
+                    error!("jwash3: missing: {}", k);
+                }
+            });
+            map.iter().for_each(|(k,_v)| {
+                error!("jwash3: not found: {}", k);
+            });
         }
 
         let ret = AccountsHash::accumulate_account_hashes(hashes);
