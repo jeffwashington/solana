@@ -1150,6 +1150,14 @@ impl ColumnName for columns::TransactionStatusIndex {
 }
 
 impl SlotColumn for columns::Rewards {}
+impl ColumnMetrics for columns::OptimisticSlots {
+    fn report_cf_metrics(
+        cf_metrics: BlockstoreRocksDbColumnFamilyMetrics,
+        column_options: &Arc<LedgerColumnOptions>,
+    ) {
+    }
+}
+
 impl ColumnMetrics for columns::Rewards {
     fn report_cf_metrics(
         cf_metrics: BlockstoreRocksDbColumnFamilyMetrics,
