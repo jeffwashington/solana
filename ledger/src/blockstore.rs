@@ -159,6 +159,7 @@ pub struct Blockstore {
     block_height_cf: LedgerColumn<cf::BlockHeight>,
     program_costs_cf: LedgerColumn<cf::ProgramCosts>,
     bank_hash_cf: LedgerColumn<cf::BankHash>,
+    optimistic_slots_cf: LedgerColumn<cf::OptimisticSlots>,
     last_root: RwLock<Slot>,
     insert_shreds_lock: Mutex<()>,
     new_shreds_signals: Mutex<Vec<Sender<bool>>>,
@@ -380,6 +381,7 @@ impl Blockstore {
         let block_height_cf = db.column();
         let program_costs_cf = db.column();
         let bank_hash_cf = db.column();
+        let optimistic_slots_cf = db.column();
 
         let db = Arc::new(db);
 
@@ -431,6 +433,7 @@ impl Blockstore {
             block_height_cf,
             program_costs_cf,
             bank_hash_cf,
+optimistic_slots_cf,
             new_shreds_signals: Mutex::default(),
             completed_slots_senders: Mutex::default(),
             shred_timing_point_sender: None,

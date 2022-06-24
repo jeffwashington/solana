@@ -98,6 +98,8 @@ const PERF_SAMPLES_CF: &str = "perf_samples";
 const BLOCK_HEIGHT_CF: &str = "block_height";
 /// Column family for ProgramCosts
 const PROGRAM_COSTS_CF: &str = "program_costs";
+/// Column family for optimistic slots
+const OPTIMISTIC_SLOTS_CF: &str = "optimistic_slots";
 
 // 1 day is chosen for the same reasoning of DEFAULT_COMPACTION_SLOT_INTERVAL
 const PERIODIC_COMPACTION_SECONDS: u64 = 60 * 60 * 24;
@@ -432,6 +434,10 @@ pub mod columns {
     /// The program costs column
     pub struct ProgramCosts;
 
+    #[derive(Debug)]
+    /// The optimistic slot column
+    pub struct OptimisticSlots;
+
     // When adding a new column ...
     // - Add struct below and implement `Column` and `ColumnName` traits
     // - Add descriptor in Rocks::cf_descriptors() and name in Rocks::columns()
@@ -661,6 +667,7 @@ impl Rocks {
             new_cf_descriptor::<PerfSamples>(options, oldest_slot),
             new_cf_descriptor::<BlockHeight>(options, oldest_slot),
             new_cf_descriptor::<ProgramCosts>(options, oldest_slot),
+            new_cf_descriptor::<OptimisticSlots>(options, oldest_slot),
         ]
     }
 
@@ -687,6 +694,7 @@ impl Rocks {
             PerfSamples::NAME,
             BlockHeight::NAME,
             ProgramCosts::NAME,
+            OptimisticSlots::NAME,
         ]
     }
 
@@ -1133,6 +1141,37 @@ impl ColumnName for columns::TransactionStatusIndex {
 }
 
 impl SlotColumn for columns::Rewards {}
+impl ColumnMetrics for columns::OptimisticSlots {
+        fn report_cf_metrics(
+            cf_metrics: BlockstoreRocksDbColumnFamilyMetrics,
+            column_options: &Arc<LedgerColumnOptions>,
+        ) {
+        }
+        fn rocksdb_get_perf_metric_header(column_options: &Arc<LedgerColumnOptions>) -> &'static str {
+            rocksdb_metric_header!(
+                "blockstore_rocksdb_read_perf,op=get",
+                "rewards",
+                column_options
+            )
+        }
+        fn rocksdb_put_perf_metric_header(column_options: &Arc<LedgerColumnOptions>) -> &'static str {
+            rocksdb_metric_header!(
+                "blockstore_rocksdb_write_perf,op=put",
+                "rewards",
+                column_options
+            )
+        }
+        fn rocksdb_delete_perf_metric_header(
+            column_options: &Arc<LedgerColumnOptions>,
+        ) -> &'static str {
+            rocksdb_metric_header!(
+                "blockstore_rocksdb_write_perf,op=delete",
+                "rewards",
+                column_options
+            )
+        }
+    }
+        
 impl ColumnMetrics for columns::Rewards {
     fn report_cf_metrics(
         cf_metrics: BlockstoreRocksDbColumnFamilyMetrics,
@@ -1168,6 +1207,7 @@ impl ColumnMetrics for columns::Rewards {
         )
     }
 }
+
 impl ColumnName for columns::Rewards {
     const NAME: &'static str = REWARDS_CF;
 }
@@ -1863,6 +1903,14 @@ impl ColumnName for columns::ErasureMeta {
 }
 impl TypedColumn for columns::ErasureMeta {
     type Type = blockstore_meta::ErasureMeta;
+}
+
+impl SlotColumn for columns::OptimisticSlots {}
+impl ColumnName for columns::OptimisticSlots {
+    const NAME: &'static str = OPTIMISTIC_SLOTS_CF;
+}
+impl TypedColumn for columns::OptimisticSlots {
+    type Type = blockstore_meta::OptimisticSlotMetaVersioned;
 }
 
 #[derive(Debug, Clone)]
