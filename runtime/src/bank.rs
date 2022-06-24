@@ -2774,6 +2774,14 @@ impl Bank {
                             return;
                         }
                     };
+
+                    let pk: &Pubkey = &crate::accounts_db::INTERSTING_ID;
+                    if stake_pubkey == pk {
+                        let a = &stake_account;
+                        error!("loading for rewards: {}, {:?}, partition: {}", accounts.pubkey(index), (a.lamports(), a.executable(), a.data().len(), a.rent_epoch(), a.owner()), Self::partition_from_pubkey(stake_pubkey, 432000));
+                        
+                    }
+
                     let stake_account = match StakeAccount::<()>::try_from(stake_account) {
                         Ok(stake_account) => stake_account,
                         Err(stake_account::Error::InvalidOwner { .. }) => {
@@ -3016,6 +3024,7 @@ impl Bank {
                 invalid_cached_stake_accounts,
                 vote_accounts_cache_miss_count,
             } = if update_rewards_from_cached_accounts {
+                panic!("");
                 self.load_vote_and_stake_accounts(thread_pool, reward_calc_tracer.as_ref())
             } else {
                 self.load_vote_and_stake_accounts_with_thread_pool(
