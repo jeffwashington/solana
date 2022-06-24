@@ -171,6 +171,7 @@ pub struct Blockstore {
     block_height_cf: LedgerColumn<cf::BlockHeight>,
     program_costs_cf: LedgerColumn<cf::ProgramCosts>,
     bank_hash_cf: LedgerColumn<cf::BankHash>,
+    optimistic_slots_cf: LedgerColumn<cf::OptimisticSlots>,
     last_root: RwLock<Slot>,
     insert_shreds_lock: Mutex<()>,
     pub new_shreds_signals: Vec<Sender<bool>>,
@@ -606,6 +607,7 @@ impl Blockstore {
         let block_height_cf = db.column();
         let program_costs_cf = db.column();
         let bank_hash_cf = db.column();
+        let optimistic_slots_cf = db.column();
 
         let db = Arc::new(db);
 
@@ -657,7 +659,8 @@ impl Blockstore {
             block_height_cf,
             program_costs_cf,
             bank_hash_cf,
-            new_shreds_signals: vec![],
+optimistic_slots_cf,
+new_shreds_signals: vec![],
             completed_slots_senders: vec![],
             insert_shreds_lock: Mutex::<()>::default(),
             last_root,
@@ -961,162 +964,6 @@ impl Blockstore {
     /// Collects and reports [`BlockstoreRocksDbColumnFamilyMetrics`] for the
     /// all the column families.
     pub fn submit_rocksdb_cf_metrics_for_all_cfs(&self) {
-        let column_options = &self.column_options;
-        self.submit_rocksdb_cf_metrics::<cf::SlotMeta>(rocksdb_metric_header!(
-            "blockstore_rocksdb_cfs",
-            "slot_meta",
-            column_options
-        ));
-        self.submit_rocksdb_cf_metrics::<cf::DeadSlots>(rocksdb_metric_header!(
-            "blockstore_rocksdb_cfs",
-            "dead_slots",
-            column_options
-        ));
-        self.submit_rocksdb_cf_metrics::<cf::DuplicateSlots>(rocksdb_metric_header!(
-            "blockstore_rocksdb_cfs",
-            "duplicate_slots",
-            column_options
-        ));
-        self.submit_rocksdb_cf_metrics::<cf::ErasureMeta>(rocksdb_metric_header!(
-            "blockstore_rocksdb_cfs",
-            "erasure_meta",
-            column_options
-        ));
-        self.submit_rocksdb_cf_metrics::<cf::Orphans>(rocksdb_metric_header!(
-            "blockstore_rocksdb_cfs",
-            "orphans",
-            column_options
-        ));
-        self.submit_rocksdb_cf_metrics::<cf::BankHash>(rocksdb_metric_header!(
-            "blockstore_rocksdb_cfs",
-            "bank_hash",
-            column_options
-        ));
-        self.submit_rocksdb_cf_metrics::<cf::Root>(rocksdb_metric_header!(
-            "blockstore_rocksdb_cfs",
-            "root",
-            column_options
-        ));
-        self.submit_rocksdb_cf_metrics::<cf::Index>(rocksdb_metric_header!(
-            "blockstore_rocksdb_cfs",
-            "index",
-            column_options
-        ));
-        self.submit_rocksdb_cf_metrics::<cf::ShredData>(rocksdb_metric_header!(
-            "blockstore_rocksdb_cfs",
-            "shred_data",
-            column_options
-        ));
-        self.submit_rocksdb_cf_metrics::<cf::ShredCode>(rocksdb_metric_header!(
-            "blockstore_rocksdb_cfs",
-            "shred_code",
-            column_options
-        ));
-        self.submit_rocksdb_cf_metrics::<cf::TransactionStatus>(rocksdb_metric_header!(
-            "blockstore_rocksdb_cfs",
-            "transaction_status",
-            column_options
-        ));
-        self.submit_rocksdb_cf_metrics::<cf::AddressSignatures>(rocksdb_metric_header!(
-            "blockstore_rocksdb_cfs",
-            "address_signature",
-            column_options
-        ));
-        self.submit_rocksdb_cf_metrics::<cf::TransactionMemos>(rocksdb_metric_header!(
-            "blockstore_rocksdb_cfs",
-            "transaction_memos",
-            column_options
-        ));
-        self.submit_rocksdb_cf_metrics::<cf::TransactionStatusIndex>(rocksdb_metric_header!(
-            "blockstore_rocksdb_cfs",
-            "transaction_status_index",
-            column_options
-        ));
-        self.submit_rocksdb_cf_metrics::<cf::Rewards>(rocksdb_metric_header!(
-            "blockstore_rocksdb_cfs",
-            "rewards",
-            column_options
-        ));
-        self.submit_rocksdb_cf_metrics::<cf::Blocktime>(rocksdb_metric_header!(
-            "blockstore_rocksdb_cfs",
-            "blocktime",
-            column_options
-        ));
-        self.submit_rocksdb_cf_metrics::<cf::PerfSamples>(rocksdb_metric_header!(
-            "blockstore_rocksdb_cfs",
-            "perf_sample",
-            column_options
-        ));
-        self.submit_rocksdb_cf_metrics::<cf::BlockHeight>(rocksdb_metric_header!(
-            "blockstore_rocksdb_cfs",
-            "block_height",
-            column_options
-        ));
-        self.submit_rocksdb_cf_metrics::<cf::ProgramCosts>(rocksdb_metric_header!(
-            "blockstore_rocksdb_cfs",
-            "program_costs",
-            column_options
-        ));
-    }
-
-    /// Collects and reports [`BlockstoreRocksDbColumnFamilyMetrics`] for the
-    /// given column family.
-    fn submit_rocksdb_cf_metrics<C: 'static + Column + ColumnName>(
-        &self,
-        metric_name_and_cf_tag: &'static str,
-    ) {
-        let cf = self.db.column::<C>();
-        let cf_rocksdb_metrics = BlockstoreRocksDbColumnFamilyMetrics {
-            total_sst_files_size: cf
-                .get_int_property(RocksProperties::TOTAL_SST_FILES_SIZE)
-                .unwrap_or(BLOCKSTORE_METRICS_ERROR),
-            size_all_mem_tables: cf
-                .get_int_property(RocksProperties::SIZE_ALL_MEM_TABLES)
-                .unwrap_or(BLOCKSTORE_METRICS_ERROR),
-            num_snapshots: cf
-                .get_int_property(RocksProperties::NUM_SNAPSHOTS)
-                .unwrap_or(BLOCKSTORE_METRICS_ERROR),
-            oldest_snapshot_time: cf
-                .get_int_property(RocksProperties::OLDEST_SNAPSHOT_TIME)
-                .unwrap_or(BLOCKSTORE_METRICS_ERROR),
-            actual_delayed_write_rate: cf
-                .get_int_property(RocksProperties::ACTUAL_DELAYED_WRITE_RATE)
-                .unwrap_or(BLOCKSTORE_METRICS_ERROR),
-            is_write_stopped: cf
-                .get_int_property(RocksProperties::IS_WRITE_STOPPED)
-                .unwrap_or(BLOCKSTORE_METRICS_ERROR),
-            block_cache_capacity: cf
-                .get_int_property(RocksProperties::BLOCK_CACHE_CAPACITY)
-                .unwrap_or(BLOCKSTORE_METRICS_ERROR),
-            block_cache_usage: cf
-                .get_int_property(RocksProperties::BLOCK_CACHE_USAGE)
-                .unwrap_or(BLOCKSTORE_METRICS_ERROR),
-            block_cache_pinned_usage: cf
-                .get_int_property(RocksProperties::BLOCK_CACHE_PINNED_USAGE)
-                .unwrap_or(BLOCKSTORE_METRICS_ERROR),
-            estimate_table_readers_mem: cf
-                .get_int_property(RocksProperties::ESTIMATE_TABLE_READERS_MEM)
-                .unwrap_or(BLOCKSTORE_METRICS_ERROR),
-            mem_table_flush_pending: cf
-                .get_int_property(RocksProperties::MEM_TABLE_FLUSH_PENDING)
-                .unwrap_or(BLOCKSTORE_METRICS_ERROR),
-            compaction_pending: cf
-                .get_int_property(RocksProperties::COMPACTION_PENDING)
-                .unwrap_or(BLOCKSTORE_METRICS_ERROR),
-            num_running_compactions: cf
-                .get_int_property(RocksProperties::NUM_RUNNING_COMPACTIONS)
-                .unwrap_or(BLOCKSTORE_METRICS_ERROR),
-            num_running_flushes: cf
-                .get_int_property(RocksProperties::NUM_RUNNING_FLUSHES)
-                .unwrap_or(BLOCKSTORE_METRICS_ERROR),
-            estimate_oldest_key_time: cf
-                .get_int_property(RocksProperties::ESTIMATE_OLDEST_KEY_TIME)
-                .unwrap_or(BLOCKSTORE_METRICS_ERROR),
-            background_errors: cf
-                .get_int_property(RocksProperties::BACKGROUND_ERRORS)
-                .unwrap_or(BLOCKSTORE_METRICS_ERROR),
-        };
-        cf_rocksdb_metrics.report_metrics(metric_name_and_cf_tag);
     }
 
     fn try_shred_recovery(
