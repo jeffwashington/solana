@@ -1189,6 +1189,11 @@ struct PurgeStats {
     handle_reclaims_elapsed: AtomicU64,
 }
 
+lazy_static! {
+    pub static ref INTERSTING_ID: Pubkey = {
+
+Pubkey::from_str("118GK7bmNwcb9A7VM1gcuQJGaDDigKddk3U7H24dX2X").unwrap()};}
+
 impl PurgeStats {
     fn report(&self, metric_name: &'static str, report_interval_ms: Option<u64>) {
         let should_report = report_interval_ms
@@ -6995,6 +7000,7 @@ impl AccountsDb {
                 map.insert(k, h);
             });
 
+            //[2022-06-23T23:35:20.483726983Z ERROR solana_runtime::accounts_db] jwash3: diff: 118GK7bmNwcb9A7VM1gcuQJGaDDigKddk3U7H24dX2X, Ez5sDBs7xroHWNscTVfR2FMh9n7Ka4sykaH75byYdMfR, FyXS5ZXsgX6JP6ULH9g7wpbtUTXzgmz3m9GE8YyBH5wm            
             hashes.iter().for_each(|(k, h)|{
                 if let Some(v) = map.get(k) {
                     if v != &h {
@@ -7433,6 +7439,11 @@ impl AccountsDb {
         let mut stats = BankHashStats::default();
         let mut total_data = 0;
         (0..accounts.len()).for_each(|index| {
+            let pk: &Pubkey = &INTERSTING_ID;
+            if accounts.pubkey(index) == pk {
+                let a = accounts.account(index);
+                error!("writing: {}, {:?}", accounts.pubkey(index), (a.lamports(), a.executable(), a.data().len(), a.rent_epoch(), a.owner()));
+            }
             let account = accounts.account(index);
             total_data += account.data().len();
             stats.update(account);

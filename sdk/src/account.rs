@@ -364,7 +364,7 @@ impl ReadableAccount for Ref<'_, Account> {
     }
 }
 
-fn debug_fmt<T: ReadableAccount>(item: &T, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+pub fn debug_fmt<T: ReadableAccount>(item: &T, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     let mut f = f.debug_struct("Account");
 
     f.field("lamports", &item.lamports())
