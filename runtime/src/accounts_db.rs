@@ -7442,7 +7442,7 @@ impl AccountsDb {
             let pk: &Pubkey = &INTERSTING_ID;
             if accounts.pubkey(index) == pk {
                 let a = accounts.account(index);
-                error!("writing: {}, {:?}", accounts.pubkey(index), (a.lamports(), a.executable(), a.data().len(), a.rent_epoch(), a.owner()));
+                error!("writing: {}, {:?}, slot: {}", accounts.pubkey(index), (a.lamports(), a.executable(), a.data().len(), a.rent_epoch(), a.owner()), accounts.target_slot());
             }
             let account = accounts.account(index);
             total_data += account.data().len();

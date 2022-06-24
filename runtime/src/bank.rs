@@ -2778,7 +2778,7 @@ impl Bank {
                     let pk: &Pubkey = &crate::accounts_db::INTERSTING_ID;
                     if stake_pubkey == pk {
                         let a = &stake_account;
-                        error!("loading for rewards: {}, {:?}, partition: {}", pk, (a.lamports(), a.executable(), a.data().len(), a.rent_epoch(), a.owner()), Self::partition_from_pubkey(stake_pubkey, 432000));
+                        error!("loading for rewards: {}, {:?}, partition: {}, slot: {}", pk, (a.lamports(), a.executable(), a.data().len(), a.rent_epoch(), a.owner()), Self::partition_from_pubkey(stake_pubkey, 432000), self.slot());
                         
                     }
 
