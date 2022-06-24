@@ -5304,10 +5304,17 @@ impl Bank {
                     bank_slot,
                     rent_collected_info.rent_amount,
                     *loaded_slot,
-                    account.rent_epoch(),
+                    self.epoch(),
                     account,
                 )
             {
+                                    let pk: &Pubkey = &crate::accounts_db::INTERSTING_ID;
+                if pubkey == pk {
+                    let a = &account;
+                    error!("skipping rent collection: {}, {:?}, partition: {}, slot: {}", pk, (a.lamports(), a.executable(), a.data().len(), a.rent_epoch(), a.owner()), Self::partition_from_pubkey(pubkey, 432000), self.slot());
+                    
+                }
+           
                 // this would have been rewritten previously. Now we skip it.
                 // calculate the hash that we would have gotten if we did the rewrite.
                 // This will be needed to calculate the bank's hash.
@@ -5320,6 +5327,13 @@ impl Bank {
                 rewrites_skipped.push((*pubkey, hash));
                 assert_eq!(rent_collected_info, CollectedInfo::default());
             } else if !just_rewrites {
+                let pk: &Pubkey = &crate::accounts_db::INTERSTING_ID;
+                if pubkey == pk {
+                    let a = &account;
+                    error!("NOT skipping rent collection: {}, {:?}, partition: {}, slot: {}", pk, (a.lamports(), a.executable(), a.data().len(), a.rent_epoch(), a.owner()), Self::partition_from_pubkey(pubkey, 432000), self.slot());
+                    
+                }
+
                 total_rent_collected_info += rent_collected_info;
                 accounts_to_store.push((pubkey, account));
             }
@@ -5463,7 +5477,7 @@ impl Bank {
         bank_slot: Slot,
         rent_amount: u64,
         loaded_slot: Slot,
-        old_rent_epoch: Epoch,
+        new_rent_epoch: Epoch,
         account: &AccountSharedData,
     ) -> bool {
         if rent_amount != 0 || account.rent_epoch() == 0 {
@@ -5472,7 +5486,7 @@ impl Bank {
             // these cannot be skipped and must be written
             return false;
         }
-        if old_rent_epoch != account.rent_epoch() && loaded_slot == bank_slot {
+        if new_rent_epoch != account.rent_epoch() && loaded_slot == bank_slot {
             // account's rent_epoch should increment even though we're not collecting rent.
             // and we already wrote this account in this slot, but we did not adjust rent_epoch (sys vars for example)
             // so, force ourselves to rewrite account if account was already written in this slot
