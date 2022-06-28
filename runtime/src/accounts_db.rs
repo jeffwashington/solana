@@ -2860,10 +2860,10 @@ impl AccountsDb {
     }
 
     fn drop_or_recycle_stores(&self, dead_storages: Vec<Arc<AccountStorageEntry>>) {
-        error!("drop_or_recylce_stores: {:?}, {:?}", dead_storages.len(), dead_storages.first().map(|x| x.slot()));
         let mut recycle_stores_write_elapsed = Measure::start("recycle_stores_write_time");
         let mut recycle_stores = self.recycle_stores.write().unwrap();
         recycle_stores_write_elapsed.stop();
+        error!("drop_or_recylce_stores: {:?}, {:?}, recycled: {}", dead_storages.len(), dead_storages.first().map(|x| x.slot(), recycle_stores.entry_count()));
 
         let mut drop_storage_entries_elapsed = Measure::start("drop_storage_entries_elapsed");
         if recycle_stores.entry_count() < MAX_RECYCLE_STORES {
