@@ -7102,6 +7102,7 @@ impl AccountsDb {
                         unique_pubkeys.insert(*pubkey);
                     })
                 });
+                error!("duplicate pubkeys: {}", self.uncleaned_pubkeys.iter().map(|l| l.len()).sum::<usize>());
                 let accounts_data_len_from_duplicates = unique_pubkeys
                     .into_iter()
                     .collect::<Vec<_>>()
