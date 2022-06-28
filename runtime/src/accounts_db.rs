@@ -906,6 +906,11 @@ impl RecycleStores {
         for new_entry in new_entries {
             self.entries.push((now, new_entry));
         }
+        let mut sum = 0;
+        for e in self.entries {
+            sum += e.1.capacity();
+        }
+        error!("recycled stores total count: {}, total_bytes: {}", sum, self.total_bytes);
     }
 
     fn expire_old_entries(&mut self) -> Vec<Arc<AccountStorageEntry>> {
@@ -2863,7 +2868,7 @@ impl AccountsDb {
         let mut recycle_stores_write_elapsed = Measure::start("recycle_stores_write_time");
         let mut recycle_stores = self.recycle_stores.write().unwrap();
         recycle_stores_write_elapsed.stop();
-        error!("drop_or_recylce_stores: {:?}, {:?}, recycled: {}", dead_storages.len(), dead_storages.first().map(|x| x.slot(), recycle_stores.entry_count()));
+        error!("drop_or_recylce_stores: {:?}, {:?}, recycled: {}, len of this store: {}", dead_storages.len(), dead_storages.first().map(|x| x.slot(), recycle_stores.entry_count(), dead_storages.first().map(|x| x.capacity(), ));
 
         let mut drop_storage_entries_elapsed = Measure::start("drop_storage_entries_elapsed");
         if recycle_stores.entry_count() < MAX_RECYCLE_STORES {
