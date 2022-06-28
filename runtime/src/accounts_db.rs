@@ -954,7 +954,7 @@ impl RecycleStores {
             self.entries.push((now, new_entry));
         }
         let mut sum = 0;
-        for e in self.entries {
+        for e in &self.entries {
             sum += e.1.accounts.capacity();
         }
         error!("recycled stores total count: {}, total_bytes: {}", sum, self.total_bytes);
