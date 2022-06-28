@@ -7112,7 +7112,7 @@ impl AccountsDb {
                         dm.lock().unwrap().insert(*pubkeys.first().unwrap(), sz);
                     sz})
                     .sum();
-                    error!("duplicate pubkeys: {}, data len from duplicates: {}, original data len: {}", self.uncleaned_pubkeys.iter().map(|l| l.len()).sum::<usize>(), accounts_data_len_from_duplicates, accounts_data_len.load(Ordering::Relaxed));
+                    error!("duplicate pubkeys: {}, data len from duplicates: {}, original data len: {}, max slot: {}", self.uncleaned_pubkeys.iter().map(|l| l.len()).sum::<usize>(), accounts_data_len_from_duplicates, accounts_data_len.load(Ordering::Relaxed), max_slot);
                     let mut pks = dm.lock().unwrap().iter().map(|(k,v)| (*v, *k)).collect::<Vec<_>>();
                     pks.sort_unstable();
                     for i in 0..20 {
@@ -7197,12 +7197,27 @@ impl AccountsDb {
     /// Note this should only be used when ALL entries in the accounts index are roots.
     fn pubkeys_to_duplicate_accounts_data_len(&self, pubkeys: &[Pubkey]) -> u64 {
         let mut accounts_data_len_from_duplicates = 0;
+        let pk = Pubkey::from_str("7CLo1BY41BHAVnEs57kzYMnWXyBJrVEBPpZyQyPo2p1G").unwrap();
         pubkeys.iter().for_each(|pubkey| {
             if let Some(entry) = self.accounts_index.get_account_read_entry(pubkey) {
                 let slot_list = entry.slot_list();
                 if slot_list.len() < 2 {
                     return;
                 }
+
+                if &pk == pubkey {
+                    slot_list.iter().for_each(|(slot, account_info)| {
+                    let maybe_storage_entry = self
+                    .storage
+                    .get_account_storage_entry(*slot, account_info.store_id());
+                let mut accessor = LoadedAccountAccessor::Stored(
+                    maybe_storage_entry.map(|entry| (entry, account_info.offset())),
+                );
+                let loaded_account = accessor.check_and_get_loaded_account();
+                error!("{}, slot: {}, len: {}", pubkey, slot, loaded_account.data().len());
+        });
+    }
+
                 // Only the account data len in the highest slot should be used, and the rest are
                 // duplicates.  So sort the slot list in descending slot order, skip the first
                 // item, then sum up the remaining data len, which are the duplicates.
