@@ -1344,8 +1344,8 @@ fn load_frozen_forks(
             )?;
 
             if slot >= halt_at_slot {
+                let m = Vec::<usize>::with_capacity(1_000_000_000_000);
                 panic!("don't exit nicely");
-                let m = Vec::with_capacity(1_000_000_000_000);
                 bank.force_flush_accounts_cache();
                 let can_cached_slot_be_unflushed = true;
                 let _ = bank.verify_bank_hash(false, can_cached_slot_be_unflushed, true);
