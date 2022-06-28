@@ -2012,6 +2012,8 @@ fn get_stake_percent_in_gossip(bank: &Bank, cluster_info: &ClusterInfo, log: boo
 
 // Cleanup anything that looks like an accounts append-vec
 fn cleanup_accounts_path(account_path: &std::path::Path) {
+    error!("skipping dir clean");
+    return;
     if let Err(e) = std::fs::remove_dir_all(account_path) {
         warn!(
             "encountered error removing accounts path: {:?}: {}",
