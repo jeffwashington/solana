@@ -7102,14 +7102,14 @@ impl AccountsDb {
                         unique_pubkeys.insert(*pubkey);
                     })
                 });
-                error!("duplicate pubkeys: {}", self.uncleaned_pubkeys.iter().map(|l| l.len()).sum::<usize>());
                 let accounts_data_len_from_duplicates = unique_pubkeys
                     .into_iter()
                     .collect::<Vec<_>>()
                     .par_chunks(4096)
                     .map(|pubkeys| self.pubkeys_to_duplicate_accounts_data_len(pubkeys))
                     .sum();
-                accounts_data_len.fetch_sub(accounts_data_len_from_duplicates, Ordering::Relaxed);
+                    error!("duplicate pubkeys: {}, data len from duplicates: {}", self.uncleaned_pubkeys.iter().map(|l| l.len()).sum::<usize>(), accounts_data_len_from_duplicates);
+                    accounts_data_len.fetch_sub(accounts_data_len_from_duplicates, Ordering::Relaxed);
                 info!(
                     "accounts data len: {}",
                     accounts_data_len.load(Ordering::Relaxed)
