@@ -7102,13 +7102,23 @@ impl AccountsDb {
                         unique_pubkeys.insert(*pubkey);
                     })
                 });
+                let dm = Mutex::new(HashMap::<Pubkey, u64>::default());
                 let accounts_data_len_from_duplicates = unique_pubkeys
                     .into_iter()
                     .collect::<Vec<_>>()
-                    .par_chunks(4096)
-                    .map(|pubkeys| self.pubkeys_to_duplicate_accounts_data_len(pubkeys))
+                    .par_chunks(1)
+                    .map(|pubkeys| {
+                        let sz = self.pubkeys_to_duplicate_accounts_data_len(pubkeys);
+                        dm.lock().unwrap().insert(*pubkeys.first().unwrap(), sz);
+                    sz})
                     .sum();
-                    error!("duplicate pubkeys: {}, data len from duplicates: {}", self.uncleaned_pubkeys.iter().map(|l| l.len()).sum::<usize>(), accounts_data_len_from_duplicates);
+                    error!("duplicate pubkeys: {}, data len from duplicates: {}, original data len: {}", self.uncleaned_pubkeys.iter().map(|l| l.len()).sum::<usize>(), accounts_data_len_from_duplicates, accounts_data_len.load(Ordering::Relaxed));
+                    let mut pks = dm.lock().unwrap().iter().map(|(k,v)| (*v, *k)).collect::<Vec<_>>();
+                    pks.sort_unstable();
+                    for i in 0..20 {
+                        error!("{:?}", pks[pks.len()-i-1]);
+                    }
+
                     accounts_data_len.fetch_sub(accounts_data_len_from_duplicates, Ordering::Relaxed);
                 info!(
                     "accounts data len: {}",
