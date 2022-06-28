@@ -2860,7 +2860,7 @@ impl AccountsDb {
     }
 
     fn drop_or_recycle_stores(&self, dead_storages: Vec<Arc<AccountStorageEntry>>) {
-        error!("drop_or_recylce_stores: {:?}", dead_storages.len());
+        error!("drop_or_recylce_stores: {:?}, {:?}", dead_storages.len(), dead_storages.first().map(|x| x.slot()));
         let mut recycle_stores_write_elapsed = Measure::start("recycle_stores_write_time");
         let mut recycle_stores = self.recycle_stores.write().unwrap();
         recycle_stores_write_elapsed.stop();
