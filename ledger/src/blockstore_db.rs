@@ -1139,7 +1139,7 @@ impl ColumnMetrics for columns::TransactionStatusIndex {
 impl ColumnName for columns::TransactionStatusIndex {
     const NAME: &'static str = TRANSACTION_STATUS_INDEX_CF;
 }
-use crate::blockstore::BlockstoreRocksDbColumnFamilyMetrics;
+//use crate::blockstore::BlockstoreRocksDbColumnFamilyMetrics;
 impl SlotColumn for columns::Rewards {}
 impl ColumnMetrics for columns::OptimisticSlots {
         fn report_cf_metrics(
