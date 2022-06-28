@@ -58,7 +58,7 @@ use {
         collections::{HashMap, HashSet},
         path::PathBuf,
         result,
-        sync::{Arc, RwLock},
+        sync::{Arc, RwLock, Ordering},
         time::{Duration, Instant},
     },
     thiserror::Error,
