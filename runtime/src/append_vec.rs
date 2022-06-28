@@ -22,7 +22,7 @@ use {
         mem,
         path::{Path, PathBuf},
         sync::{
-            atomic::{AtomicUsize, Ordering},
+            atomic::{AtomicUsize, Ordering, AtomicBool},
             Mutex,
         },
     },
@@ -192,7 +192,7 @@ pub struct AppendVec {
 
 impl Drop for AppendVec {
     fn drop(&mut self) {
-        if self.remove_on_drop {
+        if self.remove_on_drop && !STOP_DELETE.load(Ordering::Relaxed) {
             if let Err(_e) = remove_file(&self.path) {
                 // promote this to panic soon.
                 // disabled due to many false positive warnings while running tests.
@@ -205,6 +205,11 @@ impl Drop for AppendVec {
         }
     }
 }
+
+lazy_static! {
+    pub static ref STOP_DELETE: AtomicBool = AtomicBool::default();
+}
+
 
 impl AppendVec {
     pub fn new(file: &Path, create: bool, size: usize) -> Self {
