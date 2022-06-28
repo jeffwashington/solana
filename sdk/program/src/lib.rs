@@ -803,8 +803,6 @@ where
 // `solana_program`'s top-level modules, if this module is not lexically last
 // rustdoc fails to generate documentation for the re-exports within
 // `solana_sdk`.
-#[cfg(not(target_arch = "bpf"))]
-pub mod example_mocks;
 
 #[cfg(test)]
 mod tests {
