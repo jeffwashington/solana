@@ -825,6 +825,7 @@ fn load_bank_forks(
 
         if non_primary_accounts_path.exists() {
             info!("Clearing {:?}", non_primary_accounts_path);
+            /*
             if let Err(err) = std::fs::remove_dir_all(&non_primary_accounts_path) {
                 eprintln!(
                     "error deleting accounts path {:?}: {}",
@@ -832,6 +833,7 @@ fn load_bank_forks(
                 );
                 exit(1);
             }
+            */
         }
 
         vec![non_primary_accounts_path]
