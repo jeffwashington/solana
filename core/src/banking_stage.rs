@@ -1276,6 +1276,7 @@ impl BankingStage {
             };
         }
 
+        let e = execution_results.clone();
         let sanitized_txs = batch.sanitized_transactions();
         let committed_transaction_count = commit_transactions_result.unwrap();
         // Note: `committed_transaction_count` should equal `executed_transactions_count`, since
@@ -1287,7 +1288,7 @@ impl BankingStage {
                     bank.commit_transactions(
                         sanitized_txs,
                         &mut loaded_transactions,
-                        execution_results,
+                        e,
                         last_blockhash,
                         lamports_per_signature,
                         CommitTransactionCounts {
