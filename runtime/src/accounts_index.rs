@@ -34,7 +34,7 @@ use {
         },
         path::PathBuf,
         sync::{
-            atomic::{AtomicBool, AtomicU64, AtomicU8, Ordering},
+            atomic::{AtomicBool, AtomicU64, AtomicU8, AtomicUsize, Ordering},
             Arc, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard,
         },
     },
@@ -887,6 +887,11 @@ pub struct AccountsIndex<T: IndexValue> {
 
     /// when a scan's accumulated data exceeds this limit, abort the scan
     pub scan_results_limit_bytes: Option<usize>,
+
+    /// # roots added since last check
+    pub roots_added: AtomicUsize,
+    /// # roots removed since last check
+    pub roots_removed: AtomicUsize,
 }
 
 impl<T: IndexValue> AccountsIndex<T> {
@@ -916,6 +921,8 @@ impl<T: IndexValue> AccountsIndex<T> {
             removed_bank_ids: Mutex::<HashSet<BankId>>::default(),
             storage,
             scan_results_limit_bytes,
+            roots_added: AtomicUsize::default(),
+            roots_removed: AtomicUsize::default(),
         }
     }
 
@@ -1932,6 +1939,7 @@ impl<T: IndexValue> AccountsIndex<T> {
     }
 
     pub fn add_root(&self, slot: Slot, caching_enabled: bool) {
+        self.roots_added.fetch_add(1, Ordering::Relaxed);
         let mut w_roots_tracker = self.roots_tracker.write().unwrap();
         // `AccountsDb::flush_accounts_cache()` relies on roots being added in order
         assert!(slot >= w_roots_tracker.roots.max_inclusive());
@@ -1984,6 +1992,8 @@ impl<T: IndexValue> AccountsIndex<T> {
             stats.uncleaned_roots_len = w_roots_tracker.uncleaned_roots.len();
             stats.previous_uncleaned_roots_len = w_roots_tracker.previous_uncleaned_roots.len();
             stats.roots_range = w_roots_tracker.roots.range_width();
+            drop(w_roots_tracker);
+            self.roots_removed.fetch_add(1, Ordering::Relaxed);
             true
         }
     }
