@@ -1207,6 +1207,7 @@ impl BankingStage {
         } = load_and_execute_transactions_output;
 
         let transactions_attempted_execution_count = execution_results.len();
+        let e = execution_results.clone();
         let (executed_transactions, execution_results_to_transactions_time): (Vec<_>, Measure) =
             Measure::this(
                 |_| {
@@ -1237,7 +1238,7 @@ impl BankingStage {
                 Self::record_transactions(
                     bank.slot(),
                     batch.sanitized_transactions(),
-                    &execution_results,
+                    &e,
                     poh,
                 )
             },
