@@ -543,6 +543,8 @@ lazy_static! {
         (nonce_must_be_authorized::id(), "nonce must be authorized"),
         (nonce_must_be_advanceable::id(), "durable nonces must be advanceable"),
         /*************** ADD NEW FEATURES HERE ***************/
+    ]
+    .iter()
     .cloned()
     .collect();
 

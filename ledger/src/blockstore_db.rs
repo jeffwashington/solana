@@ -789,36 +789,6 @@ impl ColumnName for columns::TransactionStatusIndex {
 }
 
 impl SlotColumn for columns::Rewards {}
-impl ColumnMetrics for columns::OptimisticSlots {
-    fn report_cf_metrics(
-        cf_metrics: BlockstoreRocksDbColumnFamilyMetrics,
-        column_options: &Arc<LedgerColumnOptions>,
-    ) {
-    }
-    fn rocksdb_get_perf_metric_header(column_options: &Arc<LedgerColumnOptions>) -> &'static str {
-        rocksdb_metric_header!(
-            "blockstore_rocksdb_read_perf,op=get",
-            "rewards",
-            column_options
-        )
-    }
-    fn rocksdb_put_perf_metric_header(column_options: &Arc<LedgerColumnOptions>) -> &'static str {
-        rocksdb_metric_header!(
-            "blockstore_rocksdb_write_perf,op=put",
-            "rewards",
-            column_options
-        )
-    }
-    fn rocksdb_delete_perf_metric_header(
-        column_options: &Arc<LedgerColumnOptions>,
-    ) -> &'static str {
-        rocksdb_metric_header!(
-            "blockstore_rocksdb_write_perf,op=delete",
-            "rewards",
-            column_options
-        )
-    }
-}
 impl ColumnName for columns::Rewards {
     const NAME: &'static str = REWARDS_CF;
 }
