@@ -117,8 +117,8 @@ pub struct ExecuteAndCommitTransactionsOutput {
     // how many such transactions were committed
     commit_transactions_result: Result<(), PohRecorderError>,
     execute_and_commit_timings: LeaderExecuteAndCommitTimings,
-    // Transaction execution detail results
-    execution_results: Vec<TransactionExecutionResult>,
+    // True if transaction was-executed()
+    transactions_executed_status: Vec<bool>,
 }
 
 #[derive(Debug, Default)]
@@ -1206,33 +1206,16 @@ impl BankingStage {
             ..
         } = load_and_execute_transactions_output;
 
-        let transactions_attempted_execution_count = execution_results.len();
-        let e = execution_results.clone();
-        let (executed_transactions, execution_results_to_transactions_time): (Vec<_>, Measure) =
-            Measure::this(
-                |_| {
-                    execution_results
-                        .iter()
-                        .zip(batch.sanitized_transactions())
-                        .filter_map(|(execution_result, tx)| {
-                            if execution_result.was_executed() {
-                                Some(tx.to_versioned_transaction())
-                            } else {
-                                None
-                            }
-                        })
-                        .collect()
-                },
-                (),
-                "execution_results_to_transactions",
-            );
+        let transactions_executed_status = execution_results
+            .iter()
+            .map(|execution_result| execution_result.was_executed())
+            .collect();
 
-        let (last_blockhash, lamports_per_signature) =
-            bank.last_blockhash_and_lamports_per_signature();
         let (freeze_lock, freeze_lock_time) =
             Measure::this(|_| bank.freeze_lock(), (), "freeze_lock");
         execute_and_commit_timings.freeze_lock_us = freeze_lock_time.as_us();
 
+        let e = execution_results.clone();
         let (record_transactions_summary, record_time) = Measure::this(
             |_| {
                 Self::record_transactions(
@@ -1272,7 +1255,7 @@ impl BankingStage {
                 retryable_transaction_indexes,
                 commit_transactions_result: Err(e),
                 execute_and_commit_timings,
-                execution_results,
+                transactions_executed_status,
             };
         }
 
@@ -1289,15 +1272,11 @@ impl BankingStage {
                         sanitized_txs,
                         &mut loaded_transactions,
                         e,
-                        last_blockhash,
-                        lamports_per_signature,
-                        CommitTransactionCounts {
-                            committed_transactions_count: executed_transactions_count as u64,
-                            committed_with_failure_result_count: executed_transactions_count
+                        executed_transactions_count as u64,
+                        executed_transactions_count
                             .saturating_sub(executed_with_successful_result_count)
                             as u64,
                         signature_count,
-                        },
                         &mut execute_and_commit_timings.execute_timings,
                     )
                 },
@@ -1364,7 +1343,7 @@ impl BankingStage {
             retryable_transaction_indexes,
             commit_transactions_result: Ok(()),
             execute_and_commit_timings,
-            execution_results,
+            transactions_executed_status,
         }
     }
 
@@ -1421,7 +1400,7 @@ impl BankingStage {
         let ExecuteAndCommitTransactionsOutput {
             ref mut retryable_transaction_indexes,
             ref execute_and_commit_timings,
-            ref execution_results,
+            ref transactions_executed_status,
             ..
         } = execute_and_commit_transactions_output;
 
@@ -1431,7 +1410,7 @@ impl BankingStage {
         QosService::update_or_remove_transaction_costs(
             transaction_costs.iter(),
             transactions_qos_results.iter(),
-            execution_results.iter(),
+            transactions_executed_status.iter(),
             bank,
         );
 
