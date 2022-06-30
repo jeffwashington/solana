@@ -356,6 +356,7 @@ impl CumulativeOffsets {
 #[derive(Debug, Default)]
 pub struct AccountsHash {
     pub filler_account_suffix: Option<Pubkey>,
+    pub bin_caps: Vec<AtomicU64>,
 }
 
 impl AccountsHash {
@@ -788,6 +789,9 @@ impl AccountsHash {
         let mut duplicate_pubkey_indexes = Vec::with_capacity(len);
         let filler_accounts_enabled = self.filler_accounts_enabled();
 
+        use crate::pubkey_bins::PubkeyBinCalculator24;
+        let binner = PubkeyBinCalculator24::new(65536);
+
         // this loop runs once per unique pubkey contained in any slot group
         while !first_items.is_empty() {
             let loop_stop = { first_items.len() - 1 }; // we increment at the beginning of the loop
@@ -831,6 +835,9 @@ impl AccountsHash {
             if item.lamports != ZERO_RAW_LAMPORTS_SENTINEL
                 && (!filler_accounts_enabled || !self.is_filler_account(&item.pubkey))
             {
+                let bin2 = binner.bin_from_pubkey(&item.pubkey);
+                self.bin_caps[bin2].fetch_add(item.lamports, Ordering::Relaxed);
+
                 overall_sum = Self::checked_cast_for_capitalization(
                     item.lamports as u128 + overall_sum as u128,
                 );

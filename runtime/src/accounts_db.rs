@@ -111,7 +111,7 @@ pub const DEFAULT_NUM_DIRS: u32 = 4;
 // When calculating hashes, it is helpful to break the pubkeys found into bins based on the pubkey value.
 // More bins means smaller vectors to sort, copy, etc.
 pub const PUBKEY_BINS_FOR_CALCULATING_HASHES: usize = 65536;
-pub const NUM_SCAN_PASSES_DEFAULT: usize = 2;
+pub const NUM_SCAN_PASSES_DEFAULT: usize = 1;
 
 // Without chunks, we end up with 1 output vec for each outer snapshot storage.
 // This results in too many vectors to be efficient.
@@ -6280,12 +6280,13 @@ impl AccountsDb {
                     end: (pass + 1) * bins_per_pass,
                 };
 
-                let hash = AccountsHash {
+                let hash2 = AccountsHash {
                     filler_account_suffix: if self.filler_accounts_config.count > 0 {
                         self.filler_account_suffix
                     } else {
                         None
                     },
+                    bin_caps: (0..65536).into_iter().map(|_| AtomicU64::default()).collect(),
                 };
 
                 let result = self.scan_snapshot_stores_with_cache(
@@ -6295,16 +6296,17 @@ impl AccountsDb {
                     PUBKEY_BINS_FOR_CALCULATING_HASHES,
                     &bounds,
                     config,
-                    hash.filler_account_suffix.as_ref(),
+                    hash2.filler_account_suffix.as_ref(),
                 )?;
 
-                let (hash, lamports, for_next_pass) = hash.rest_of_hash_calculation(
+                let (hash, lamports, for_next_pass) = hash2.rest_of_hash_calculation(
                     result,
                     &mut stats,
                     pass == num_hash_scan_passes - 1,
                     previous_pass,
                     bins_per_pass,
                 );
+                error!("per_bin_cap: slot: {}, {:?}", storages.max_slot_inclusive(), hash2.bin_caps.iter().map(|c| c.load(Ordering::Relaxed)).collect::<Vec<_>>());
                 previous_pass = for_next_pass;
                 final_result = (hash, lamports);
             }
