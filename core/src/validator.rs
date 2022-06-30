@@ -896,6 +896,9 @@ impl Validator {
             abort();
         };
 
+        let ledger_metric_report_service =
+            LedgerMetricReportService::new(blockstore.clone(), &exit);
+
         let wait_for_vote_to_start_leader =
             !waited_for_supermajority && !config.no_wait_for_vote_to_start_leader;
 
