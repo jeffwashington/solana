@@ -3706,7 +3706,12 @@ impl Bank {
     }
 
     pub fn get_startup_verification_complete(&self) -> &Arc<AtomicBool> {
-        &self.rc.accounts.accounts_db.startup_verification_complete
+        &self
+            .rc
+            .accounts
+            .accounts_db
+            .verify_accounts_hash_in_bg
+            .verified
     }
 
     pub fn is_startup_verification_complete(&self) -> bool {
