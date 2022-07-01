@@ -487,8 +487,15 @@ impl AppendVec {
         let _lock = self.append_lock.lock().unwrap();
         let mut offset = self.len();
         let mut rv = Vec::with_capacity(accounts.len());
+
+        use std::str::FromStr;
+        let pk = Pubkey::from_str("121cur1YFVPZSoKQGNyjNr9sZZRa3eX2bSuYjXHtKD6").unwrap();
+
         for ((stored_meta, account), hash) in accounts.iter().zip(hashes) {
             let meta_ptr = stored_meta as *const StoredMeta;
+            if &pk == &stored_meta.pubkey {
+                error!("storing: {}, {}", pk, account.map(|account| account.lamports()).unwrap_or_default());
+            }
             let account_meta = AccountMeta::from(*account);
             let account_meta_ptr = &account_meta as *const AccountMeta;
             let data_len = stored_meta.data_len as usize;
