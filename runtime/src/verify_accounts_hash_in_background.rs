@@ -32,14 +32,17 @@ impl Default for VerifyAccountsHashInBackground {
 impl VerifyAccountsHashInBackground {
     /// notify that the bg process has completed
     pub(crate) fn finished(&self) {
+        error!("jw: finished");
         self.complete.notify_all();
     }
     /// notify that the bg process has started
     pub(crate) fn started(&self, thread: JoinHandle<bool>) {
+        error!("jw: started");
         *self.thread.lock().unwrap() = Some(thread);
     }
     /// block until bg process is complete
     pub fn wait_for_complete(&self) {
+        error!("jw: wait_for_complete");
         // just now completing
         let mut lock = self.thread.lock().unwrap();
         if lock.is_none() {
@@ -57,6 +60,7 @@ impl VerifyAccountsHashInBackground {
     /// return false if bg hash verification has not completed yet
     /// if hash verification failed, a panic will occur
     pub(crate) fn check_complete(&self) -> bool {
+        error!("jw: check_complete");
         if self.verified.load(Ordering::Relaxed) {
             // already completed
             return true;
