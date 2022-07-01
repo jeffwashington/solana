@@ -26,6 +26,7 @@ use {
             curve25519_syscall_enabled, disable_fees_sysvar, executables_incur_cpi_data_cost,
             libsecp256k1_0_5_upgrade_enabled, limit_secp256k1_recovery_id,
             prevent_calling_precompiles_as_programs, quick_bail_on_panic, syscall_saturated_math,
+            update_syscall_base_costs, zk_token_sdk_enabled,
         },
         hash::{Hasher, HASH_BYTES},
         instruction::{
@@ -550,9 +551,12 @@ declare_syscall!(
                 .map_err(|_| SyscallError::InvokeContextBorrowFailed),
             result
         );
-        if invoke_context
+        if !invoke_context
             .feature_set
-            .is_active(&quick_bail_on_panic::id())
+            .is_active(&update_syscall_base_costs::id())
+            || invoke_context
+                .feature_set
+                .is_active(&quick_bail_on_panic::id())
         {
             question_mark!(invoke_context.get_compute_meter().consume(len), result);
         }
@@ -587,10 +591,17 @@ declare_syscall!(
                 .map_err(|_| SyscallError::InvokeContextBorrowFailed),
             result
         );
-        let cost = invoke_context
-            .get_compute_budget()
-            .syscall_base_cost
-            .max(len);
+        let cost = if invoke_context
+            .feature_set
+            .is_active(&update_syscall_base_costs::id())
+        {
+            invoke_context
+                .get_compute_budget()
+                .syscall_base_cost
+                .max(len)
+        } else {
+            len
+        };
         question_mark!(invoke_context.get_compute_meter().consume(cost), result);
 
         question_mark!(
@@ -663,7 +674,14 @@ declare_syscall!(
                 .map_err(|_| SyscallError::InvokeContextBorrowFailed),
             result
         );
-        let cost = invoke_context.get_compute_budget().syscall_base_cost;
+        let cost = if invoke_context
+            .feature_set
+            .is_active(&update_syscall_base_costs::id())
+        {
+            invoke_context.get_compute_budget().syscall_base_cost
+        } else {
+            0
+        };
         question_mark!(invoke_context.get_compute_meter().consume(cost), result);
 
         ic_logger_msg!(
@@ -962,7 +980,11 @@ declare_syscall!(
             result
         );
         let compute_budget = invoke_context.get_compute_budget();
-        if compute_budget.sha256_max_slices < vals_len {
+        if invoke_context
+            .feature_set
+            .is_active(&update_syscall_base_costs::id())
+            && compute_budget.sha256_max_slices < vals_len
+        {
             ic_msg!(
                 invoke_context,
                 "Sha256 hashing {} sequences in one syscall is over the limit {}",
@@ -1012,11 +1034,20 @@ declare_syscall!(
                     ),
                     result
                 );
-                let cost = compute_budget.mem_op_base_cost.max(
+                let cost = if invoke_context
+                    .feature_set
+                    .is_active(&update_syscall_base_costs::id())
+                {
+                    compute_budget.mem_op_base_cost.max(
+                        compute_budget
+                            .sha256_byte_cost
+                            .saturating_mul((val.len() as u64).saturating_div(2)),
+                    )
+                } else {
                     compute_budget
                         .sha256_byte_cost
-                        .saturating_mul((val.len() as u64).saturating_div(2)),
-                );
+                        .saturating_mul((val.len() as u64).saturating_div(2))
+                };
                 question_mark!(invoke_context.get_compute_meter().consume(cost), result);
                 hasher.hash(bytes);
             }
@@ -1186,7 +1217,11 @@ declare_syscall!(
             result
         );
         let compute_budget = invoke_context.get_compute_budget();
-        if compute_budget.sha256_max_slices < vals_len {
+        if invoke_context
+            .feature_set
+            .is_active(&update_syscall_base_costs::id())
+            && compute_budget.sha256_max_slices < vals_len
+        {
             ic_msg!(
                 invoke_context,
                 "Keccak256 hashing {} sequences in one syscall is over the limit {}",
@@ -1236,11 +1271,20 @@ declare_syscall!(
                     ),
                     result
                 );
-                let cost = compute_budget.mem_op_base_cost.max(
+                let cost = if invoke_context
+                    .feature_set
+                    .is_active(&update_syscall_base_costs::id())
+                {
+                    compute_budget.mem_op_base_cost.max(
+                        compute_budget
+                            .sha256_byte_cost
+                            .saturating_mul((val.len() as u64).saturating_div(2)),
+                    )
+                } else {
                     compute_budget
                         .sha256_byte_cost
-                        .saturating_mul((val.len() as u64).saturating_div(2)),
-                );
+                        .saturating_mul((val.len() as u64).saturating_div(2))
+                };
                 question_mark!(invoke_context.get_compute_meter().consume(cost), result);
                 hasher.hash(bytes);
             }
@@ -1255,9 +1299,16 @@ fn mem_op_consume<'a, 'b>(
     n: u64,
 ) -> Result<(), EbpfError<BpfError>> {
     let compute_budget = invoke_context.get_compute_budget();
-    let cost = compute_budget
-        .mem_op_base_cost
-        .max(n.saturating_div(compute_budget.cpi_bytes_per_unit));
+    let cost = if invoke_context
+        .feature_set
+        .is_active(&update_syscall_base_costs::id())
+    {
+        compute_budget
+            .mem_op_base_cost
+            .max(n.saturating_div(compute_budget.cpi_bytes_per_unit))
+    } else {
+        n.saturating_div(compute_budget.cpi_bytes_per_unit)
+    };
     invoke_context.get_compute_meter().consume(cost)
 }
 
@@ -1280,7 +1331,17 @@ declare_syscall!(
                 .map_err(|_| SyscallError::InvokeContextBorrowFailed),
             result
         );
-        question_mark!(mem_op_consume(&invoke_context, n), result);
+        // When deprecating `update_syscall_base_costs` switch to `mem_op_consume`
+        let compute_budget = invoke_context.get_compute_budget();
+        let update_syscall_base_costs = invoke_context
+            .feature_set
+            .is_active(&update_syscall_base_costs::id());
+        if update_syscall_base_costs {
+            let cost = compute_budget
+                .mem_op_base_cost
+                .max(n.saturating_div(compute_budget.cpi_bytes_per_unit));
+            question_mark!(invoke_context.get_compute_meter().consume(cost), result);
+        }
 
         let do_check_physical_overlapping = invoke_context
             .feature_set
@@ -1290,6 +1351,11 @@ declare_syscall!(
             *result = Err(SyscallError::CopyOverlapping.into());
             return;
         }
+
+        if !update_syscall_base_costs {
+            let cost = n.saturating_div(compute_budget.cpi_bytes_per_unit);
+            question_mark!(invoke_context.get_compute_meter().consume(cost), result);
+        };
 
         let dst_ptr = question_mark!(
             translate_slice_mut::<u8>(
@@ -1953,7 +2019,11 @@ declare_syscall!(
             result
         );
         let compute_budget = invoke_context.get_compute_budget();
-        if compute_budget.sha256_max_slices < vals_len {
+        if invoke_context
+            .feature_set
+            .is_active(&update_syscall_base_costs::id())
+            && compute_budget.sha256_max_slices < vals_len
+        {
             ic_msg!(
                 invoke_context,
                 "Blake3 hashing {} sequences in one syscall is over the limit {}",
@@ -2003,11 +2073,28 @@ declare_syscall!(
                     ),
                     result
                 );
-                let cost = compute_budget.mem_op_base_cost.max(
+                let cost = if invoke_context
+                    .feature_set
+                    .is_active(&update_syscall_base_costs::id())
+                {
+                    compute_budget.mem_op_base_cost.max(
+                        compute_budget
+                            .sha256_byte_cost
+                            .saturating_mul((val.len() as u64).saturating_div(2)),
+                    )
+                } else if invoke_context
+                    .feature_set
+                    .is_active(&syscall_saturated_math::id())
+                {
                     compute_budget
                         .sha256_byte_cost
-                        .saturating_mul((val.len() as u64).saturating_div(2)),
-                );
+                        .saturating_mul((val.len() as u64).saturating_div(2))
+                } else {
+                    #[allow(clippy::integer_arithmetic)]
+                    {
+                        compute_budget.sha256_byte_cost * (val.len() as u64 / 2)
+                    }
+                };
                 question_mark!(invoke_context.get_compute_meter().consume(cost), result);
                 hasher.hash(bytes);
             }
