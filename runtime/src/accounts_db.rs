@@ -6640,6 +6640,9 @@ impl AccountsDb {
     }
 
     pub fn add_root(&self, slot: Slot) -> AccountsAddRootTiming {
+        if slot == 138773288 || 138773289 == slot {
+            use log::*;error!("add_root: {}", slot);
+        }
         let mut index_time = Measure::start("index_add_root");
         self.accounts_index.add_root(slot, self.caching_enabled);
         index_time.stop();
