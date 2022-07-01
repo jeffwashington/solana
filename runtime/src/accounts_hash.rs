@@ -196,11 +196,12 @@ impl CumulativeOffsets {
         raw.extract(index, start)
     }
 }
-
+use std::sync::Arc;
 #[derive(Debug, Default)]
 pub struct AccountsHash {
     pub filler_account_suffix: Option<Pubkey>,
     pub bin_caps: Vec<AtomicU64>,
+    pub pubkeys: Arc<Mutex<Vec<(Pubkey, u64)>>>,
 }
 
 impl AccountsHash {
@@ -680,6 +681,9 @@ impl AccountsHash {
                 && (!filler_accounts_enabled || !self.is_filler_account(&item.pubkey))
             {
                 let bin2 = binner.bin_from_pubkey(&item.pubkey);
+                if bin2 == 1 {
+                    self.pubkeys.lock().unwrap().push((item.pubkey, item.lamports));
+                }
                 self.bin_caps[bin2].fetch_add(item.lamports, Ordering::Relaxed);
 
                 overall_sum = Self::checked_cast_for_capitalization(

@@ -5787,6 +5787,7 @@ impl AccountsDb {
                 let hash2 = AccountsHash {
                     filler_account_suffix: filler_account_suffix.cloned(),
                     bin_caps: (0..65536).into_iter().map(|_| AtomicU64::default()).collect(),
+                    pubkeys: Arc::default(),
                 };
                 let (hash, lamports, for_next_pass) = hash2.rest_of_hash_calculation(
                     result,
@@ -5795,7 +5796,12 @@ impl AccountsDb {
                     previous_pass,
                     bins_per_pass,
                 );
-                error!("per_bin_cap: slot: {}, {:?}", storages.range().end - 1, hash2.bin_caps.iter().map(|c| c.load(Ordering::Relaxed)).collect::<Vec<_>>());
+                //error!("per_bin_cap: slot: {}, {:?}", storages.range().end - 1, hash2.bin_caps.iter().map(|c| c.load(Ordering::Relaxed)).collect::<Vec<_>>());
+                let mut m = hash2.pubkeys.lock().unwrap();
+                m.sort();
+                if storages.range().end - 1 == 138773289 {
+                    error!("pubkeys in bin: slot: {}, {:?}", storages.range().end - 1, m);
+                }
                 previous_pass = for_next_pass;
                 final_result = (hash, lamports);
             }
