@@ -4472,6 +4472,7 @@ impl AccountsDb {
         let mut infos: Vec<AccountInfo> = Vec::with_capacity(accounts_and_meta_to_store.len());
         let mut total_append_accounts_us = 0;
         let mut total_storage_find_us = 0;
+
         while infos.len() < accounts_and_meta_to_store.len() {
             let mut storage_find = Measure::start("storage_finder");
             let data_len = accounts_and_meta_to_store[infos.len()]
@@ -4588,6 +4589,7 @@ impl AccountsDb {
         assert!(requested_flush_root.is_some());
 
         if !force_flush && !self.should_aggressively_flush_cache() {
+            error!("{}{}", file!(), line!());
             return;
         }
 
@@ -4629,7 +4631,11 @@ impl AccountsDb {
         let mut excess_slot_count = 0;
         let mut unflushable_unrooted_slot_count = 0;
         let max_flushed_root = self.accounts_cache.fetch_max_flush_root();
+        let old_slots = self.accounts_cache.cached_frozen_slots();
+        error!("{}{}, frozen slots: {:?}", file!(), line!(), old_slots);
+
         if self.should_aggressively_flush_cache() {
+            error!("{}{}", file!(), line!());
             let old_slots = self.accounts_cache.cached_frozen_slots();
             excess_slot_count = old_slots.len();
             let mut flush_stats = FlushStats::default();
@@ -4707,11 +4713,15 @@ impl AccountsDb {
         requested_flush_root: Option<Slot>,
         should_clean: Option<(&mut usize, &mut usize)>,
     ) -> (usize, usize) {
+        error!("{}{}, requested_flush_root: {:?}", file!(), line!(), requested_flush_root);
         let max_clean_root = should_clean.as_ref().and_then(|_| {
             // If there is a long running scan going on, this could prevent any cleaning
             // based on updates from slots > `max_clean_root`.
             self.max_clean_root(requested_flush_root)
         });
+
+        error!("{}{}, max_clean_root: {:?}", file!(), line!(), max_clean_root);
+
 
         // Use HashMap because HashSet doesn't provide Entry api
         let mut written_accounts = HashMap::new();
@@ -4740,6 +4750,9 @@ impl AccountsDb {
 
         // Always flush up to `requested_flush_root`, which is necessary for things like snapshotting.
         let cached_roots: BTreeSet<Slot> = self.accounts_cache.clear_roots(requested_flush_root);
+
+        error!("{}{}, cached_roots: {:?}", file!(), line!(), cached_roots);
+
 
         // Iterate from highest to lowest so that we don't need to flush earlier
         // outdated updates in earlier roots
