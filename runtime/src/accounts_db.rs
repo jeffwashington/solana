@@ -5658,6 +5658,8 @@ impl AccountsDb {
         let range = bin_range.end - bin_range.start;
         let sort_time = AtomicU64::new(0);
 
+        let pk = Pubkey::from_str("121cur1YFVPZSoKQGNyjNr9sZZRa3eX2bSuYjXHtKD6").unwrap();
+
         let result: Vec<BinnedHashData> = Self::scan_account_storage_no_bank(
             cache_hash_data,
             accounts_cache_and_ancestors,
@@ -5682,6 +5684,10 @@ impl AccountsDb {
 
                 let source_item =
                     CalculateHashIntermediate::new(loaded_account.loaded_hash(), balance, *pubkey);
+
+                if &pk == pubkey {
+                    error!("jwfound: {}, lamports: {}, slot: {}", pubkey, balance, slot);
+                }
 
                 if check_hash && !Self::is_filler_account_helper(pubkey, filler_account_suffix) {
                     // this will not be supported anymore
@@ -6341,10 +6347,16 @@ impl AccountsDb {
             return;
         }
 
+        let pk = Pubkey::from_str("121cur1YFVPZSoKQGNyjNr9sZZRa3eX2bSuYjXHtKD6").unwrap();
+
         let mut stats = BankHashStats::default();
         let mut total_data = 0;
         (0..accounts.len()).for_each(|index| {
             let account = accounts.account(index);
+            if &pk == accounts.pubkey(index) {
+                error!("jwstore: {}, lamports: {}, slot: {}", pk, account.lamports(), accounts.target_slot());
+            }
+    
             total_data += account.data().len();
             stats.update(account);
         });
