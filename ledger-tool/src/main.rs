@@ -803,14 +803,14 @@ fn load_bank_forks(
                 if !slot_meta.is_full() {
                     eprintln!("Unable to process from slot {} to {} due to blockstore slot {} not being full",
                         starting_slot, halt_slot, slot);
-                    exit(1);
+                    //exit(1);
                 }
             } else {
                 eprintln!(
                     "Unable to process from slot {} to {} due to blockstore missing slot {}",
                     starting_slot, halt_slot, slot
                 );
-                exit(1);
+                //exit(1);
             }
         }
     }
