@@ -2189,7 +2189,7 @@ impl AccountsDb {
         purges: &HashMap<Pubkey, (SlotList<AccountInfo>, u64)>,
         store_counts: &mut HashMap<AppendVecId, (usize, HashSet<Pubkey>)>,
     ) {
-        let pk_special = Pubkey::from_str("EnWuWsJDqecxJSRbRN4hDw6mKPtfupLeYRaNK5PADqfR").unwrap();
+        let pk_special = Pubkey::from_str("7okRT3Cg9q7iTiDqoZrY3ymSPDsGADuYC4Qh8JYrWy9q").unwrap();
         
         // Another pass to check if there are some filtered accounts which
         // do not match the criteria of deleting all appendvecs which contain them
@@ -2460,7 +2460,7 @@ impl AccountsDb {
             }
         });
 
-        let pk_special = Pubkey::from_str("EnWuWsJDqecxJSRbRN4hDw6mKPtfupLeYRaNK5PADqfR").unwrap();
+        let pk_special = Pubkey::from_str("7okRT3Cg9q7iTiDqoZrY3ymSPDsGADuYC4Qh8JYrWy9q").unwrap();
         
         
         let dirty_stores_len = dirty_stores.len();
@@ -2572,7 +2572,7 @@ pubkeys.insert(account.meta.pubkey);
         let missing_accum = AtomicU64::new(0);
         let useful_accum = AtomicU64::new(0);
 
-        let pk_special = Pubkey::from_str("EnWuWsJDqecxJSRbRN4hDw6mKPtfupLeYRaNK5PADqfR").unwrap();
+        let pk_special = Pubkey::from_str("7okRT3Cg9q7iTiDqoZrY3ymSPDsGADuYC4Qh8JYrWy9q").unwrap();
 
         // parallel scan the index.
         let (mut purges_zero_lamports, purges_old_accounts) = {
@@ -2698,7 +2698,7 @@ pubkeys.insert(account.meta.pubkey);
                     .get(key)
                     .map(|slots_removed| slots_removed.contains(slot))
                     .unwrap_or(false);
-                if slot == &137801196 {
+                if slot == &136996254 {
                     error!("jw3: key: {}, was_slot_purged: {}, ref_count: {}", key, was_slot_purged, ref_count);
                 }
                 if was_slot_purged {
@@ -2713,13 +2713,13 @@ pubkeys.insert(account.meta.pubkey);
                     .map(|store_removed| store_removed.contains(&account_info.offset()))
                     .unwrap_or(false);
                 if was_reclaimed {
-                    if slot == &137801196 {
+                    if slot == &136996254 {
                         error!("jw3: key: {}, was_slot_purged: {}, ref_count: {}, was_reclaimed", key, was_slot_purged, ref_count);
                     }
                         return false;
                 }
                 if let Some(store_count) = store_counts.get_mut(&account_info.store_id()) {
-                    if slot == &137801196 {
+                    if slot == &136996254 {
                         error!("jw3: store count: key: {}, was_slot_purged: {}, ref_count: {}, {}", key, was_slot_purged, ref_count, store_count.0);
                     }
                     store_count.0 -= 1;
@@ -2742,7 +2742,7 @@ pubkeys.insert(account.meta.pubkey);
                         "store_counts, inserting slot: {}, store id: {}, count: {}",
                         slot, account_info.store_id(), count
                     );
-                    if slot == &137801196 {
+                    if slot == &136996254 {
                         error!("jw3: store count inserted: key: {}, was_slot_purged: {}, ref_count: {}, count: {}, key_set: {:?}", key, was_slot_purged, ref_count, count, key_set);
                     }
 
@@ -3088,7 +3088,7 @@ pubkeys.insert(account.meta.pubkey);
         store_counts: &HashMap<AppendVecId, (usize, HashSet<Pubkey>)>,
         purges_zero_lamports: &mut HashMap<Pubkey, (SlotList<AccountInfo>, RefCount)>,
     ) {
-        let pk_special = Pubkey::from_str("EnWuWsJDqecxJSRbRN4hDw6mKPtfupLeYRaNK5PADqfR").unwrap();
+        let pk_special = Pubkey::from_str("7okRT3Cg9q7iTiDqoZrY3ymSPDsGADuYC4Qh8JYrWy9q").unwrap();
         
         let should_filter_for_incremental_snapshots =
             max_clean_root.unwrap_or(Slot::MAX) > last_full_snapshot_slot.unwrap_or(Slot::MAX);
