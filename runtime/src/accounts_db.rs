@@ -2719,11 +2719,11 @@ pubkeys.insert(account.meta.pubkey);
                         return false;
                 }
                 if let Some(store_count) = store_counts.get_mut(&account_info.store_id()) {
-                    if slot == &136996254 {
-                        error!("jw3: store count: key: {}, was_slot_purged: {}, ref_count: {}, {}", key, was_slot_purged, ref_count, store_count.0);
-                    }
                     store_count.0 -= 1;
                     store_count.1.insert(*key);
+                    if slot == &136996254 || key == &pk_special {
+                        error!("jw3: store count: key: {}, was_slot_purged: {}, ref_count: {}, {}, store_id: {}", key, was_slot_purged, ref_count, store_count.0, account_info.store_id());
+                    }
                 } else {
                     let mut key_set = HashSet::new();
                     key_set.insert(*key);
@@ -2742,8 +2742,8 @@ pubkeys.insert(account.meta.pubkey);
                         "store_counts, inserting slot: {}, store id: {}, count: {}",
                         slot, account_info.store_id(), count
                     );
-                    if slot == &136996254 {
-                        error!("jw3: store count inserted: key: {}, was_slot_purged: {}, ref_count: {}, count: {}, key_set: {:?}", key, was_slot_purged, ref_count, count, key_set);
+                    if slot == &136996254 || key == &pk_special {
+                        error!("jw3: store count inserted: key: {}, was_slot_purged: {}, ref_count: {}, count: {}, key_set: {:?}, store_id: {}", key, was_slot_purged, ref_count, count, key_set, account_info.store_id());
                     }
 
                     store_counts.insert(account_info.store_id(), (count, key_set));
