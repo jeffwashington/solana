@@ -3103,7 +3103,8 @@ pubkeys.insert(account.meta.pubkey);
             for (_slot, account_info) in slot_account_infos.iter() {
                 if store_counts.get(&account_info.store_id()).unwrap().0 != 0 {
                     if pubkey == &pk_special {
-                        error!("jw3: filter_zero_lamport_clean_for_incremental_snapshots deleted: {}, store_counts.get(&account_info.store_id())", pubkey);
+                        let s = store_counts.get(&account_info.store_id()).unwrap();
+                        error!("jw3: filter_zero_lamport_clean_for_incremental_snapshots deleted: {}, store_counts.get(&account_info.store_id()): count: {}, pubkeys: {:?}, store_id: {}, last_full_snapshot_slot: {:?}", pubkey, s.0, s.1.iter().collect::<Vec<_>>(), account_info.store_id(), last_full_snapshot_slot);
                     }
                     return false;
                 }
