@@ -2189,6 +2189,8 @@ impl AccountsDb {
         purges: &HashMap<Pubkey, (SlotList<AccountInfo>, u64)>,
         store_counts: &mut HashMap<AppendVecId, (usize, HashSet<Pubkey>)>,
     ) {
+        let pk_special = Pubkey::from_str("EnWuWsJDqecxJSRbRN4hDw6mKPtfupLeYRaNK5PADqfR").unwrap();
+        
         // Another pass to check if there are some filtered accounts which
         // do not match the criteria of deleting all appendvecs which contain them
         // then increment their storage count.
@@ -2224,6 +2226,10 @@ impl AccountsDb {
                 }
                 no_delete
             };
+            if pubkey == &pk_special {
+                error!("jw3: {}, no_delete: {}, ref_count_from_storage: {}, infos: {:?}", pubkey, no_delete, ref_count_from_storage, account_infos);
+            }
+
             if no_delete {
                 let mut pending_store_ids = HashSet::new();
                 for (_bank_id, account_info) in account_infos {
