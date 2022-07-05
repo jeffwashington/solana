@@ -2441,10 +2441,10 @@ impl AccountsDb {
         last_full_snapshot_slot: Option<Slot>,
         timings: &mut CleanKeyTimings,
     ) -> Vec<Pubkey> {
-        let mut dirty_store_processing_time = Measure::start("dirty_store_processing");
         let max_slot = max_clean_root.unwrap_or_else(|| self.accounts_index.max_root_inclusive());
         let mut dirty_stores = Vec::with_capacity(self.dirty_stores.len());
         self.add_old_roots_to_dirty_stores();
+        let mut dirty_store_processing_time = Measure::start("dirty_store_processing");
         self.dirty_stores.retain(|(slot, _store_id), store| {
             if *slot > max_slot {
                 true
@@ -2774,6 +2774,12 @@ pubkeys.insert(account.meta.pubkey);
                 )
             })
             .collect();
+
+        for v in &pubkey_to_slot_set {
+            if v.0 == pk_special {
+                error!("jw3:pubkey_to_slot_set includes {}, {:?}", pk_special, v.1);
+            }
+        }
 
         let reclaims = self.purge_keys_exact(pubkey_to_slot_set.iter());
 
