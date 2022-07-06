@@ -2197,7 +2197,10 @@ impl AccountsDb {
         let mut already_counted = HashSet::new();
         for (pubkey, (account_infos, ref_count_from_storage)) in purges.iter() {
             let no_delete = if account_infos.len() as u64 != *ref_count_from_storage {
-                debug!(
+                if pubkey == &pk_special {
+                    error!("jw3: {}, calc_delete_dependencies no_delete: {}, ref_count_from_storage: {}, infos: {:?}", pubkey, true, ref_count_from_storage, account_infos);
+                }
+                    debug!(
                     "calc_delete_dependencies(),
                     pubkey: {},
                     account_infos: {:?},
@@ -2220,7 +2223,10 @@ impl AccountsDb {
                         store_counts.get(&account_info.store_id()).unwrap().0,
                     );
                     if store_counts.get(&account_info.store_id()).unwrap().0 != 0 {
-                        no_delete = true;
+                        if pubkey == &pk_special {
+                            error!("jw3: {}, foudn store count not 0 no_delete: {}, ref_count_from_storage: {}, store_id: {}, count of that store count: {}, infos: {:?}", pubkey, true, ref_count_from_storage, account_info.store_id(),store_counts.get(&account_info.store_id()).unwrap().0, account_infos);
+                        }
+                                no_delete = true;
                         break;
                     }
                 }
@@ -2243,7 +2249,10 @@ impl AccountsDb {
                     if already_counted.contains(&id) {
                         continue;
                     }
-                    store_counts.get_mut(&id).unwrap().0 += 1;
+                    if pubkey == &pk_special {
+                        error!("jw3: {}, increasing store count of: {}", pubkey, id);
+                    }
+                            store_counts.get_mut(&id).unwrap().0 += 1;
                     already_counted.insert(id);
 
                     let affected_pubkeys = &store_counts.get(&id).unwrap().1;
@@ -2722,7 +2731,7 @@ pubkeys.insert(account.meta.pubkey);
                     store_count.0 -= 1;
                     store_count.1.insert(*key);
                     if slot == &136996254 || key == &pk_special {
-                        error!("jw3: store count: key: {}, was_slot_purged: {}, ref_count: {}, {}, store_id: {}", key, was_slot_purged, ref_count, store_count.0, account_info.store_id());
+                        error!("jw3: store count: key: {}, was_slot_purged: {}, ref_count: {}, store_count: {}, store_id: {}", key, was_slot_purged, ref_count, store_count.0, account_info.store_id());
                     }
                 } else {
                     let mut key_set = HashSet::new();
