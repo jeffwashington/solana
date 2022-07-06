@@ -428,7 +428,7 @@ pub struct RootsTracker {
     /// more entries for that slot. 'alive_roots' will no longer contain such roots.
     /// This is a superset of 'alive_roots'
     pub(crate) historical_roots: RollingBitField,
-    uncleaned_roots: HashSet<Slot>,
+    pub uncleaned_roots: HashSet<Slot>,
     previous_uncleaned_roots: HashSet<Slot>,
 }
 

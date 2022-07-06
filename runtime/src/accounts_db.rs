@@ -2425,6 +2425,13 @@ impl AccountsDb {
             .unwrap()
             .alive_roots
             .get_all_less_than(accounts_hash_complete_one_epoch_old);
+            {
+            let mut w_roots_tracker = self.accounts_index.roots_tracker.write().unwrap();
+            old_roots.iter().for_each(|slot| {
+                w_roots_tracker.uncleaned_roots.insert(*slot);
+            });
+            }
+    
         old_roots.iter().for_each(|slot| {
             if let Some(storages) = self.get_storages_for_slot(*slot) {
                 storages.iter().for_each(|storage| {
