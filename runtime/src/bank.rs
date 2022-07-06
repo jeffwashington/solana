@@ -6825,16 +6825,6 @@ impl Bank {
                 info!("cleaning..");
                 self.clean_accounts(true, true, last_full_snapshot_slot);
             }
-        } else {
-            // if we are skipping shrink, there should be no uncleaned_roots deferred to later
-            assert_eq!(
-                self.rc
-                    .accounts
-                    .accounts_db
-                    .accounts_index
-                    .uncleaned_roots_len(),
-                0
-            );
         }
         clean_time.stop();
 

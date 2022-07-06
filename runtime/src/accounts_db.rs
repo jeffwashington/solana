@@ -8632,6 +8632,7 @@ pubkeys.insert(account.meta.pubkey);
     /// Note this should only be used when ALL entries in the accounts index are roots.
     fn pubkeys_to_duplicate_accounts_data_len(&self, pubkeys: &[Pubkey]) -> u64 {
         let mut accounts_data_len_from_duplicates = 0;
+        let mut uncleaned_roots = HashSet::<Slot>::default();
         pubkeys.iter().for_each(|pubkey| {
             if let Some(entry) = self.accounts_index.get_account_read_entry(pubkey) {
                 let slot_list = entry.slot_list();
@@ -8647,6 +8648,7 @@ pubkeys.insert(account.meta.pubkey);
                     .2
                     .iter()
                     .for_each(|(slot, account_info)| {
+                        uncleaned_roots.insert(*slot);
                         let maybe_storage_entry = self
                             .storage
                             .get_account_storage_entry(*slot, account_info.store_id());
@@ -8658,6 +8660,12 @@ pubkeys.insert(account.meta.pubkey);
                     });
             }
         });
+        {
+            let mut w_roots_tracker = self.accounts_index.roots_tracker.write().unwrap();
+            uncleaned_roots.iter().for_each(|slot| {
+                w_roots_tracker.uncleaned_roots.insert(*slot);
+            });
+            }
         accounts_data_len_from_duplicates as u64
     }
 
