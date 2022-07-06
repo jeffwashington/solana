@@ -2257,6 +2257,10 @@ impl AccountsDb {
 
                     let affected_pubkeys = &store_counts.get(&id).unwrap().1;
                     for key in affected_pubkeys {
+                        if key == &pk_special {
+                            error!("jw3: will be increasing store count of: {} because of store_id: {}", key, id);
+                        }
+    
                         for (_slot, account_info) in &purges.get(key).unwrap().0 {
                             if !already_counted.contains(&account_info.store_id()) {
                                 pending_store_ids.insert(account_info.store_id());
