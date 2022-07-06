@@ -2780,13 +2780,17 @@ pubkeys.insert(account.meta.pubkey);
         let pubkey_to_slot_set: Vec<_> = purges_zero_lamports
             .into_iter()
             .map(|(key, (slots_list, _ref_count))| {
-                (
+                let result = (
                     key,
                     slots_list
                         .into_iter()
                         .map(|(slot, _)| slot)
                         .collect::<HashSet<Slot>>(),
-                )
+                );
+                if key == pk_special {
+                    error!("jw3:Recalculate reclaims {:?}", result);
+                }
+                result
             })
             .collect();
 
