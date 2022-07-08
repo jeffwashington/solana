@@ -8,6 +8,7 @@ use {
         inline_spl_token::{self, GenericTokenAccount},
         inline_spl_token_2022,
         pubkey_bins::PubkeyBinCalculator24,
+        rent_paying_accounts_by_partition::RentPayingAccountsByPartition,
         rolling_bit_field::RollingBitField,
         secondary_index::*,
     },
@@ -54,6 +55,7 @@ pub const ACCOUNTS_INDEX_CONFIG_FOR_TESTING: AccountsIndexConfig = AccountsIndex
     ages_to_stay_in_cache: None,
     scan_results_limit_bytes: None,
     started_from_validator: false,
+    rent_paying_accounts_by_partition: None,
 };
 pub const ACCOUNTS_INDEX_CONFIG_FOR_BENCHMARKS: AccountsIndexConfig = AccountsIndexConfig {
     bins: Some(BINS_FOR_BENCHMARKS),
@@ -63,6 +65,7 @@ pub const ACCOUNTS_INDEX_CONFIG_FOR_BENCHMARKS: AccountsIndexConfig = AccountsIn
     ages_to_stay_in_cache: None,
     scan_results_limit_bytes: None,
     started_from_validator: false,
+    rent_paying_accounts_by_partition: None,
 };
 pub type ScanResult<T> = Result<T, ScanError>;
 pub type SlotList<T> = Vec<(Slot, T)>;
@@ -184,7 +187,7 @@ impl Default for IndexLimitMb {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default)]
 pub struct AccountsIndexConfig {
     pub bins: Option<usize>,
     pub flush_threads: Option<usize>,
@@ -194,6 +197,8 @@ pub struct AccountsIndexConfig {
     pub scan_results_limit_bytes: Option<usize>,
     /// true if the accounts index is being created as a result of being started as a validator (as opposed to test, etc.)
     pub started_from_validator: bool,
+    /// used by tests to specify the initial rent paying accounts
+    pub rent_paying_accounts_by_partition: Option<RentPayingAccountsByPartition>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -692,6 +697,8 @@ pub struct AccountsIndex<T: IndexValue> {
     pub active_scans: AtomicUsize,
     /// # of slots between latest max and latest scan
     pub max_distance_to_min_scan_slot: AtomicU64,
+
+    pub rent_paying_accounts_by_partition: RentPayingAccountsByPartition,
 }
 
 impl<T: IndexValue> AccountsIndex<T> {
@@ -699,10 +706,15 @@ impl<T: IndexValue> AccountsIndex<T> {
         Self::new(Some(ACCOUNTS_INDEX_CONFIG_FOR_TESTING))
     }
 
-    pub fn new(config: Option<AccountsIndexConfig>) -> Self {
+    pub fn new(mut config: Option<AccountsIndexConfig>) -> Self {
         let scan_results_limit_bytes = config
             .as_ref()
             .and_then(|config| config.scan_results_limit_bytes);
+        let rent_paying_accounts_by_partition = config
+            .as_mut()
+            .map(|c| c.rent_paying_accounts_by_partition.take())
+            .flatten()
+            .unwrap_or_default();
         let (account_maps, bin_calculator, storage) = Self::allocate_accounts_index(config);
         Self {
             account_maps,
@@ -725,6 +737,7 @@ impl<T: IndexValue> AccountsIndex<T> {
             roots_removed: AtomicUsize::default(),
             active_scans: AtomicUsize::default(),
             max_distance_to_min_scan_slot: AtomicU64::default(),
+            rent_paying_accounts_by_partition,
         }
     }
 
