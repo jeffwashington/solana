@@ -3724,6 +3724,16 @@ impl Bank {
         self.get_startup_verification_complete().load(Acquire)
     }
 
+    /// This can occur because it completed in the background
+    /// or if the verification was run in the foreground.
+    pub fn set_startup_verification_complete(&self) {
+        self.rc
+            .accounts
+            .accounts_db
+            .verify_accounts_hash_in_bg
+            .verification_complete()
+    }
+
     pub fn get_fee_for_message_with_lamports_per_signature(
         &self,
         message: &SanitizedMessage,
