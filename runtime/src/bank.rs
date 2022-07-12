@@ -5458,7 +5458,9 @@ impl Bank {
             .accounts
             .accounts_db
             .accounts_index
-            .rent_paying_accounts_by_partition;
+            .rent_paying_accounts_by_partition
+            .read()
+            .unwrap();
         rent_paying_accounts.is_initialized().then(|| {
             Self::get_partition_end_indexes(&partition)
                 .into_iter()

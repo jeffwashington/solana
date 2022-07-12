@@ -705,17 +705,6 @@ where
 
     let mut measure_notify = Measure::start("accounts_notify");
 
-    let IndexGenerationInfo {
-        accounts_data_len,
-        rent_paying_accounts_by_partition,
-    } = accounts_db.generate_index(
-        limit_load_slot_count_from_snapshot,
-        verify_index,
-        genesis_config,
-    );
-    accounts_db.accounts_index.rent_paying_accounts_by_partition =
-        rent_paying_accounts_by_partition;
-
     let accounts_db = Arc::new(accounts_db);
     let accounts_db_clone = accounts_db.clone();
     let handle = Builder::new()
@@ -724,6 +713,20 @@ where
             accounts_db_clone.notify_account_restore_from_snapshot();
         })
         .unwrap();
+
+    let IndexGenerationInfo {
+        accounts_data_len,
+        rent_paying_accounts_by_partition,
+    } = accounts_db.generate_index(
+        limit_load_slot_count_from_snapshot,
+        verify_index,
+        genesis_config,
+    );
+    *accounts_db
+        .accounts_index
+        .rent_paying_accounts_by_partition
+        .write()
+        .unwrap() = rent_paying_accounts_by_partition;
 
     accounts_db.maybe_add_filler_accounts(
         &genesis_config.epoch_schedule,

@@ -698,7 +698,8 @@ pub struct AccountsIndex<T: IndexValue> {
     /// # of slots between latest max and latest scan
     pub max_distance_to_min_scan_slot: AtomicU64,
 
-    pub rent_paying_accounts_by_partition: RentPayingAccountsByPartition,
+    /// populated at generate_index time - accounts that could possibly be rent paying
+    pub rent_paying_accounts_by_partition: RwLock<RentPayingAccountsByPartition>,
 }
 
 impl<T: IndexValue> AccountsIndex<T> {
@@ -737,7 +738,7 @@ impl<T: IndexValue> AccountsIndex<T> {
             roots_removed: AtomicUsize::default(),
             active_scans: AtomicUsize::default(),
             max_distance_to_min_scan_slot: AtomicU64::default(),
-            rent_paying_accounts_by_partition,
+            rent_paying_accounts_by_partition: RwLock::new(rent_paying_accounts_by_partition),
         }
     }
 
