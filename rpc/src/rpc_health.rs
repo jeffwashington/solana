@@ -55,6 +55,7 @@ impl RpcHealth {
         }
 
         if !self.startup_verification_complete.load(Ordering::Acquire) {
+            use log::*; error!("rpc health bad");
             return RpcHealthStatus::Unknown;
         }
 
