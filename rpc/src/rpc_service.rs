@@ -358,6 +358,7 @@ impl JsonRpcService {
     ) -> Self {
         info!("rpc bound to {:?}", rpc_addr);
         info!("rpc configuration: {:?}", config);
+        info!("jw: ready: {}", startup_verification_complete.load(Ordering::Acquire));
         let rpc_threads = 1.max(config.rpc_threads);
         let rpc_niceness_adj = config.rpc_niceness_adj;
 
