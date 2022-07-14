@@ -143,6 +143,7 @@ pub fn load_bank_forks(
             cache_block_meta_sender,
             accounts_update_notifier,
         );
+        use log::*;error!("set startup verification complete");
         bank_forks
             .read()
             .unwrap()

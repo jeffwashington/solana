@@ -278,7 +278,9 @@ impl BankForks {
                 {
                     let snapshot_root_bank = self.root_bank();
                     let root_slot = snapshot_root_bank.slot();
+                    use log::*;error!("jw: {}{}, {}", file!(), line!());
                     if snapshot_root_bank.is_startup_verification_complete() {
+                        use log::*;error!("jw: {}{}, {}", file!(), line!());
                         // Save off the status cache because these may get pruned if another
                         // `set_root()` is called before the snapshots package can be generated
                         let status_cache_slot_deltas = snapshot_root_bank
@@ -298,7 +300,7 @@ impl BankForks {
                             );
                         }
                     } else {
-                        info!("Not sending snapshot request for bank: {}, startup verification is incomplete", root_slot);
+                        info!("jw: Not sending snapshot request for bank: {}, startup verification is incomplete", root_slot);
                     }
                 }
                 snapshot_time.stop();
