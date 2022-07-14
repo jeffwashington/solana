@@ -3718,12 +3718,12 @@ impl Bank {
         .accounts_db
         .verify_accounts_hash_in_bg
         .verified.load(Acquire));
-        &self
+        self
             .rc
             .accounts
             .accounts_db
             .verify_accounts_hash_in_bg
-            .verified
+            .check_complete()
     }
 
     pub fn is_startup_verification_complete(&self) -> bool {
@@ -6791,6 +6791,9 @@ impl Bank {
                             &rent_collector,
                             config.can_cached_slot_be_unflushed,
                             config.ignore_mismatch,
+                        );
+                        info!(
+                            "jw: running initial verification accounts hash calculation in background - finished"
                         );
                         accounts_
                             .accounts_db
