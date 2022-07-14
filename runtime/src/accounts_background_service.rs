@@ -186,10 +186,10 @@ impl SnapshotRequestHandler {
                     status_cache_slot_deltas,
                 } = snapshot_request;
 
-                use log::*;error!("jw: {}{}, {}", file!(), line!());
+                use log::*;error!("jw: {}{}", file!(), line!());
                 // we should not rely on the state of this validator until startup verification is complete
                 assert!(snapshot_root_bank.is_startup_verification_complete());
-                use log::*;error!("jw: {}{}, {}", file!(), line!());
+                use log::*;error!("jw: {}{}", file!(), line!());
 
                 let previous_hash = if test_hash_calculation {
                     // We have to use the index version here.
