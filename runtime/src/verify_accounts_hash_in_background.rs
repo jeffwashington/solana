@@ -73,14 +73,18 @@ impl VerifyAccountsHashInBackground {
     /// return false if bg hash verification has not completed yet
     /// if hash verification failed, a panic will occur
     pub(crate) fn check_complete(&self) -> bool {
+        use log::*;
         if self.verified.load(Ordering::Acquire) {
+            error!("jw: already completed");
             // already completed
             return true;
         }
         if self.complete.wait_timeout(Duration::default()) {
+            error!("jw: timed out");
             // timed out, so not complete
             false
         } else {
+            error!("jw: notification on");
             // Did not time out, so thread finished. Join it.
             self.wait_for_complete();
             true

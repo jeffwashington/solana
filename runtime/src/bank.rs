@@ -3718,17 +3718,22 @@ impl Bank {
         .accounts_db
         .verify_accounts_hash_in_bg
         .verified.load(Acquire));
+        &self
+        .rc
+        .accounts
+        .accounts_db
+        .verify_accounts_hash_in_bg
+        .verified
+    }
+
+    pub fn is_startup_verification_complete(&self) -> bool {
+        use log::*;error!("jw: {}{}, {}", file!(), line!(), self.get_startup_verification_complete().load(Acquire));
         self
             .rc
             .accounts
             .accounts_db
             .verify_accounts_hash_in_bg
             .check_complete()
-    }
-
-    pub fn is_startup_verification_complete(&self) -> bool {
-        use log::*;error!("jw: {}{}, {}", file!(), line!(), self.get_startup_verification_complete().load(Acquire));
-        self.get_startup_verification_complete().load(Acquire)
     }
 
     /// This can occur because it completed in the background
