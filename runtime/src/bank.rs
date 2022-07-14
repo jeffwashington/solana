@@ -3727,7 +3727,7 @@ impl Bank {
     }
 
     pub fn is_startup_verification_complete(&self) -> bool {
-        use log::*;error!("jw: {}{}, {}", file!(), line!(), self.get_startup_verification_complete().load(Acquire);
+        use log::*;error!("jw: {}{}, {}", file!(), line!(), self.get_startup_verification_complete().load(Acquire));
         self.get_startup_verification_complete().load(Acquire)
     }
 
