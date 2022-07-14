@@ -3712,12 +3712,12 @@ impl Bank {
     }
 
     pub fn get_startup_verification_complete(&self) -> &Arc<AtomicBool> {
-        use log::*;error!("jw: {}{}, {}", file!(), line!(), self
+        use log::*;error!("jw: {}{}, {}, slot: {}", file!(), line!(), self
         .rc
         .accounts
         .accounts_db
         .verify_accounts_hash_in_bg
-        .verified.load(Acquire));
+        .verified.load(Acquire), self.slot());
         &self
         .rc
         .accounts
@@ -3727,7 +3727,7 @@ impl Bank {
     }
 
     pub fn is_startup_verification_complete(&self) -> bool {
-        use log::*;error!("jw: {}{}, {}", file!(), line!(), self.get_startup_verification_complete().load(Acquire));
+        use log::*;error!("jw: {}{}, {}, slot: {}", file!(), line!(), self.get_startup_verification_complete().load(Acquire), self.slot());
         self
             .rc
             .accounts

@@ -23,6 +23,7 @@ pub(crate) struct VerifyAccountsHashInBackground {
 
 impl Default for VerifyAccountsHashInBackground {
     fn default() -> Self {
+        error!("jw: new one");
         // initialize, expecting possible background verification to be started
         Self {
             complete: Arc::default(),
