@@ -19,6 +19,7 @@ pub(crate) struct VerifyAccountsHashInBackground {
     complete: Arc<WaitableCondvar>,
     /// thread doing verification
     thread: Mutex<Option<JoinHandle<bool>>>,
+    background_completed: Arc<AtomicBool>,
     id: u64,
 }
 
@@ -34,6 +35,7 @@ impl Default for VerifyAccountsHashInBackground {
             // no thread to start with
             thread: Mutex::new(None::<JoinHandle<bool>>),
             id: rand::thread_rng().gen::<u64>(),
+            background_completed: Arc::new(AtomicBool::new(false)),
         }
     }
 }
@@ -50,6 +52,7 @@ impl VerifyAccountsHashInBackground {
     pub(crate) fn background_finished(&self) {
         use log::*; error!("jw: notify, id: {}", self.id);
         self.complete.notify_all();
+        self.background_completed.store(true, Ordering::Release);
     }
 
     /// notify that verification was completed successfully
@@ -85,7 +88,7 @@ impl VerifyAccountsHashInBackground {
             // already completed
             return true;
         }
-        if self.complete.wait_timeout(Duration::default()) {
+        if self.complete.wait_timeout(Duration::default()) && !self.background_completed.load(Ordering::Acquire) {
             error!("jw: timed out: id: {}", self.id);
             // timed out, so not complete
             false
