@@ -3721,7 +3721,11 @@ impl Bank {
     }
 
     pub fn is_startup_verification_complete(&self) -> bool {
-        self.get_startup_verification_complete().load(Acquire)
+        self.rc
+            .accounts
+            .accounts_db
+            .verify_accounts_hash_in_bg
+            .check_complete()
     }
 
     /// This can occur because it completed in the background
