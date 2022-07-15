@@ -175,6 +175,7 @@ pub struct VerifyBankHash {
     pub can_cached_slot_be_unflushed: bool,
     pub ignore_mismatch: bool,
     pub require_rooted_bank: bool,
+    pub shrink_and_clean: bool,
 }
 
 #[derive(Debug, Default)]
@@ -6733,16 +6734,33 @@ impl Bank {
             }
         }
 
-        self.rc.accounts.verify_bank_hash_and_lamports(
-            self.slot(),
-            &self.ancestors,
-            self.capitalization(),
-            config.test_hash_calculation,
-            self.epoch_schedule(),
-            &self.rent_collector,
-            config.can_cached_slot_be_unflushed,
-            config.ignore_mismatch,
-        )
+        let mut limit = 1;
+        if config.shrink_and_clean {
+            limit = 10;
+        }
+        let mut result = true;
+
+        for _ in 0..limit {
+            if config.shrink_and_clean {
+                let slot = Some(self.slot());
+                info!("cleaning..");
+                self.clean_accounts(true, true, slot);
+                info!("shrinking..");
+                self.shrink_all_slots(true, slot);
+            }
+
+            result = self.rc.accounts.verify_bank_hash_and_lamports(
+                self.slot(),
+                &self.ancestors,
+                self.capitalization(),
+                config.test_hash_calculation,
+                self.epoch_schedule(),
+                &self.rent_collector,
+                config.can_cached_slot_be_unflushed,
+                config.ignore_mismatch,
+            );
+        }
+        result
     }
 
     /// return true if bg hash verification is complete
@@ -6964,6 +6982,7 @@ impl Bank {
                 can_cached_slot_be_unflushed: false,
                 ignore_mismatch: false,
                 require_rooted_bank: false,
+                shrink_and_clean: false,
             });
             verify_time.stop();
             (verify, verify_time.as_us())
@@ -10177,6 +10196,7 @@ pub(crate) mod tests {
                 can_cached_slot_be_unflushed: false,
                 ignore_mismatch: false,
                 require_rooted_bank: false,
+                shrink_and_clean: false,
             }
         }
     }
