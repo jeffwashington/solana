@@ -6786,7 +6786,7 @@ impl Bank {
                 self.clean_accounts(true, true, slot);
                 info!("shrinking..");
                 self.shrink_all_slots(true, slot);
-                self.exhaustively_free_unused_resource(Some(self.slot());
+                self.exhaustively_free_unused_resource(Some(self.slot()));
             }
         }
         result
