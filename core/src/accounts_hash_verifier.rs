@@ -130,6 +130,7 @@ impl AccountsHashVerifier {
         };
         timings.calc_storage_size_quartiles(&accounts_package.snapshot_storages);
 
+        error!("jw: {}{}", file!(), line!());
         let (accounts_hash, lamports) = accounts_package
             .accounts
             .accounts_db
@@ -149,6 +150,7 @@ impl AccountsHashVerifier {
             .unwrap();
 
         if accounts_package.expected_capitalization != lamports {
+            error!("jw: {}{}", file!(), line!());
             // before we assert, run the hash calc again. This helps track down whether it could have been a failure in a race condition possibly with shrink.
             // We could add diagnostics to the hash calc here to produce a per bin cap or something to help narrow down how many pubkeys are different.
             let _ = accounts_package

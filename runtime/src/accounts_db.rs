@@ -6434,7 +6434,7 @@ impl AccountsDb {
                 let eligible_for_caching =
                     !config.use_write_cache && end.saturating_sub(start) == MAX_ITEMS_PER_CHUNK;
 
-                if eligible_for_caching {
+                if eligible_for_caching  || config.store_detailed_debug_info{
                     let range = bin_range.end - bin_range.start;
                     scanner.init_accum(range);
                 }
@@ -6450,9 +6450,9 @@ impl AccountsDb {
 
                 let mut file_name = String::default();
                 // if we're using the write cache, we can't cache the hash calc results because not all accounts are in append vecs.
-                if should_cache_hash_data
-                    && eligible_for_caching
-                    && !config.store_detailed_debug_info
+                if (should_cache_hash_data
+                    && eligible_for_caching)
+                    || config.store_detailed_debug_info
                 {
                     let mut load_from_cache = true;
                     let mut hasher = std::collections::hash_map::DefaultHasher::new(); // wrong one?
