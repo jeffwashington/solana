@@ -6801,7 +6801,6 @@ impl AccountsDb {
             new.push(format!("hash_failures"));
             let new_file_name = format!("slot.{}", slot);
             new.push(new_file_name);
-            error!("jw: using path: {:?}", new);
             let _ = std::fs::remove_dir_all(&new);
             CacheHashData::new(&new)
         }
