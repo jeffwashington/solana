@@ -6450,7 +6450,10 @@ impl AccountsDb {
 
                 let mut file_name = String::default();
                 // if we're using the write cache, we can't cache the hash calc results because not all accounts are in append vecs.
-                if should_cache_hash_data && eligible_for_caching {
+                if should_cache_hash_data
+                    && eligible_for_caching
+                    && !config.store_detailed_debug_info
+                {
                     let mut load_from_cache = true;
                     let mut hasher = std::collections::hash_map::DefaultHasher::new(); // wrong one?
 
@@ -6487,7 +6490,7 @@ impl AccountsDb {
                             amod.hash(&mut hasher);
                         }
                     }
-                    if load_from_cache {
+                    if load_from_cache && eligible_for_caching {
                         // we have a hash value for all the storages in this slot
                         // so, build a file name:
                         let hash = hasher.finish();
@@ -6669,6 +6672,7 @@ impl AccountsDb {
                     use_write_cache: can_cached_slot_be_unflushed,
                     epoch_schedule,
                     rent_collector,
+                    store_detailed_debug_info: false,
                 },
                 expected_capitalization,
             )
@@ -6782,6 +6786,24 @@ impl AccountsDb {
         );
     }
 
+    fn get_cache_hash_data(
+        &self,
+        config: &CalcAccountsHashConfig<'_>,
+        slot: Slot,
+    ) -> CacheHashData {
+        if !config.store_detailed_debug_info {
+            CacheHashData::new(&self.accounts_hash_cache_path)
+        } else {
+            // this path executes when we are failing with a hash mismatch
+            let mut new = self.accounts_hash_cache_path.clone();
+            new.pop();
+            let new_file_name = format!("{}.{}", new.file_name().unwrap().to_str().unwrap(), slot);
+            new.push(new_file_name);
+            let _ = std::fs::remove_dir_all(&new);
+            CacheHashData::new(&new)
+        }
+    }
+
     // modeled after get_accounts_delta_hash
     // intended to be faster than calculate_accounts_hash
     pub fn calculate_accounts_hash_without_index(
@@ -6798,7 +6820,7 @@ impl AccountsDb {
             let mut previous_pass = PreviousPass::default();
             let mut final_result = (Hash::default(), 0);
 
-            let cache_hash_data = CacheHashData::new(&self.accounts_hash_cache_path);
+            let cache_hash_data = self.get_cache_hash_data(config, storages.max_slot_inclusive());
 
             for pass in 0..num_hash_scan_passes {
                 let bounds = Range {
@@ -6933,6 +6955,7 @@ impl AccountsDb {
                     use_write_cache: can_cached_slot_be_unflushed,
                     epoch_schedule,
                     rent_collector,
+                    store_detailed_debug_info: false,
                 },
                 None,
             )?;
