@@ -2566,13 +2566,15 @@ impl AccountsDb {
                                                 &slot_list[index_in_slot_list];
                                             if account_info.is_zero_lamport() {
                                                 useless = false;
+                                                let list =                                                         self.accounts_index.get_rooted_entries(
+                                                    slot_list,
+                                                    max_clean_root,
+                                                );
+                                                list.iter().for_each(|(slot, info)| assert!(!info.is_cached(), "slot: {}, max: {:?}, pk: {}", slot, max_clean_root, pubkey));
                                                 purges_zero_lamports.insert(
                                                     *pubkey,
                                                     (
-                                                        self.accounts_index.get_rooted_entries(
-                                                            slot_list,
-                                                            max_clean_root,
-                                                        ),
+                                                        list,
                                                         ref_count,
                                                     ),
                                                 );
