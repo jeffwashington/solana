@@ -6674,7 +6674,7 @@ impl AccountsDb {
                     use_write_cache: can_cached_slot_be_unflushed,
                     epoch_schedule,
                     rent_collector,
-                    store_detailed_debug_info: true,
+                    store_detailed_debug_info: false,
                 },
                 expected_capitalization,
             )
@@ -6957,7 +6957,7 @@ impl AccountsDb {
                     use_write_cache: can_cached_slot_be_unflushed,
                     epoch_schedule,
                     rent_collector,
-                    store_detailed_debug_info: true,
+                    store_detailed_debug_info: false,
                 },
                 None,
             )?;
