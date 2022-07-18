@@ -6798,9 +6798,13 @@ impl AccountsDb {
         } else {
             // this path executes when we are failing with a hash mismatch
             let mut new = self.accounts_hash_cache_path.clone();
+            error!("jw: started with path: {:?}", new);
             new.pop();
+            error!("jw: started with path: {:?}", new);
             let new_file_name = format!("{}.{}", new.file_name().unwrap().to_str().unwrap(), slot);
+            error!("jw: using path: {:?}", new_file_name);
             new.push(new_file_name);
+            error!("jw: using path: {:?}", new);
             let _ = std::fs::remove_dir_all(&new);
             CacheHashData::new(&new)
         }
