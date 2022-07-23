@@ -146,6 +146,7 @@ impl<T: Clone + Copy> Bucket<T> {
         &'a self,
         key: &Pubkey,
     ) -> Result<(bool, &'a mut IndexEntry, u64), BucketMapError> {
+        let mut m = Measure::start("find_entry_mut");
         let ix = Self::bucket_index_ix(&self.index, key, self.random);
         let mut first_free = None;
         for i in ix..ix + self.index.max_search() {
@@ -158,10 +159,19 @@ impl<T: Clone + Copy> Bucket<T> {
             }
             let elem: &mut IndexEntry = self.index.get_mut(ii);
             if elem.key == *key {
+                m.stop();
+                self.stats
+                    .index
+                    .find_entry_mut_us
+                    .fetch_add(m.as_us(), Ordering::Relaxed);
                 return Ok((true, elem, ii));
             }
         }
         m.stop();
+        self.stats
+            .index
+            .find_entry_mut_us
+            .fetch_add(m.as_us(), Ordering::Relaxed);
         match first_free {
             Some(ii) => {
                 let elem: &mut IndexEntry = self.index.get_mut(ii);
