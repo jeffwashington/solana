@@ -3266,7 +3266,15 @@ impl AccountsDb {
 
             // Purge old, overwritten storage entries
             let mut start = Measure::start("write_storage_elapsed");
-            self.mark_dirty_dead_stores(slot, &mut dead_storages, |store| store.count() > 0);
+            let remaining_stores =
+                self.mark_dirty_dead_stores(slot, &mut dead_storages, |store| store.count() > 0);
+            if remaining_stores > 1 {
+                inc_new_counter_info!("accounts_db_shrink_extra_stores", 1);
+                info!(
+                    "after shrink, slot has extra stores: {}, {}",
+                    slot, remaining_stores
+                );
+            }
             start.stop();
             write_storage_elapsed = start.as_us();
         }
@@ -3324,14 +3332,16 @@ impl AccountsDb {
     /// get stores for 'slot'
     /// retain only the stores where 'should_retain(store)' == true
     /// for stores not retained, insert in 'dirty_stores' and 'dead_storages'
+    /// returns # of remaining stores for this slot
     pub(crate) fn mark_dirty_dead_stores(
         &self,
         slot: Slot,
         dead_storages: &mut Vec<Arc<AccountStorageEntry>>,
         should_retain: impl Fn(&AccountStorageEntry) -> bool,
-    ) {
+    ) -> usize {
         if let Some(slot_stores) = self.storage.get_slot_stores(slot) {
-            slot_stores.write().unwrap().retain(|_key, store| {
+            let mut list = slot_stores.write().unwrap();
+            list.retain(|_key, store| {
                 if !should_retain(store) {
                     self.dirty_stores
                         .insert((slot, store.append_vec_id()), store.clone());
@@ -3341,6 +3351,9 @@ impl AccountsDb {
                     true
                 }
             });
+            list.len()
+        } else {
+            0
         }
     }
 
