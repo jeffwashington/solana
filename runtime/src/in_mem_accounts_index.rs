@@ -1015,6 +1015,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
     /// returns true if a dice roll indicates this call should result in a random eviction.
     /// This causes non-determinism in cache contents per validator.
     fn random_chance_of_eviction() -> bool {
+        return false;
         // random eviction
         const N: usize = 1000;
         // 1/N chance of eviction
