@@ -310,9 +310,9 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
             let mut slot_list = lock.unwrap();
             let slot_list2 = disk.slot_list.write().unwrap();
 
-            for (slot, new_entry) in slot_list2.iter().copied() {
-                if !slot_list.iter().map(|x| x.0.to_owned()).any(|x| x == slot) {
-                    slot_list.push((slot, new_entry));
+            for (slot, new_entry) in slot_list2.iter() {
+                if !slot_list.iter().any(|x| &x.0 == slot) {
+                    slot_list.push((*slot, *new_entry));
                 }
             }
 
