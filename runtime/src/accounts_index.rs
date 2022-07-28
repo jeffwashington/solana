@@ -466,10 +466,12 @@ impl<T: IndexValue> ReadAccountMapEntry<T> {
     }
 
     pub fn slot_list(&self) -> &SlotList<T> {
+        lock.push_slot_list_reader("runtime/src/accounts_index.rs:469");
         self.borrow_keep_track()
             .borrowed
             .store(true, Ordering::Relaxed);
-        self.borrow_slot_list_guard()
+        let result = self.borrow_slot_list_guard();
+        lock.pop_slot_list_reader("runtime/src/accounts_index.rs:469");
     }
 
     pub fn ref_count(&self) -> RefCount {
