@@ -109,6 +109,8 @@ impl CacheHashData {
         std::fs::create_dir_all(cache_folder.clone())
             .unwrap_or_else(|_| panic!("error creating cache dir: {:?}", cache_folder));
 
+        info!("accounts hash folder: {:?}", cache_folder);
+
         let result = CacheHashData {
             cache_folder,
             pre_existing_cache_files: Arc::new(Mutex::new(PreExistingCacheFiles::default())),
