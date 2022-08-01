@@ -97,12 +97,36 @@ pub struct CacheHashData {
 
 impl Drop for CacheHashData {
     fn drop(&mut self) {
-        self.delete_old_cache_files();
+        //self.delete_old_cache_files();
         self.stats.lock().unwrap().report();
     }
 }
 
 impl CacheHashData {
+    pub fn compare_two<P: AsRef<Path> + std::fmt::Debug>(files: &[&P; 2]) {
+        let datas = files.into_iter().map(|p| Self::new(p)).collect::<Vec<_>>();
+        use std::collections::HashMap;
+        let mut one = HashMap::<Pubkey, Vec<(CalculateHashIntermediate, std::string::String)>>::new();
+        let cache_one = &datas[0];
+        use solana_sdk::pubkey::Pubkey;
+        let files = cache_one.pre_existing_cache_files.lock().unwrap();
+        let bin_calc = PubkeyBinCalculator24::new(65536);
+        files.iter().for_each(|file| {
+            let mut accum = SavedType::default();
+            cache_one.load(file, &mut accum, 0, &bin_calc).unwrap();
+            accum.into_iter().flatten().for_each(|entry| {
+                let pk = entry.pubkey;
+                let new_one = (entry, format!("{:?}", file));
+                if let Some(current) = one.get_mut(&pk) {
+                    current.push(new_one);
+                }
+                else {
+                    one.insert(pk, vec![new_one]);
+                }
+            });
+        });
+    }
+
     pub fn new<P: AsRef<Path> + std::fmt::Debug>(parent_folder: &P) -> CacheHashData {
         let cache_folder = Self::get_cache_root_path(parent_folder);
 
