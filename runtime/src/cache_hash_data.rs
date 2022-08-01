@@ -132,7 +132,7 @@ impl CacheHashData {
             });
         });
         let cache_two = &datas[1];
-        let files = cache_two.pre_existing_cache_files.lock().unwrap().clone();;
+        let files = cache_two.pre_existing_cache_files.lock().unwrap().clone();
         files.iter().for_each(|file| {
             error!("file2: {:?}", file);
             let mut accum = SavedType::default();
