@@ -117,7 +117,10 @@ impl CacheHashData {
         files.iter().for_each(|file| {
             error!("file: {:?}", file);
             let mut accum = SavedType::default();
-            cache_one.load(file, &mut accum, 0, &bin_calc).unwrap();
+            let x = cache_one.load(file, &mut accum, 0, &bin_calc);
+            if x.is_err() {
+                error!("failure to load file :{:?}", x);
+            }
             accum.into_iter().flatten().for_each(|entry| {
                 let pk = entry.pubkey;
                 let new_one = (format!("{:?}", file), entry);
@@ -237,6 +240,7 @@ impl CacheHashData {
     ) -> Result<(), std::io::Error> {
         let mut m = Measure::start("overall");
         let path = self.cache_folder.join(file_name);
+        error!("loading: {:?}", path);
         let file_len = std::fs::metadata(path.clone())?.len();
         let mut m1 = Measure::start("read_file");
         let mmap = CacheHashDataFile::load_map(&path)?;
