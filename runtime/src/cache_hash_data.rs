@@ -115,6 +115,7 @@ impl CacheHashData {
         let files = cache_one.pre_existing_cache_files.lock().unwrap();
         let bin_calc = PubkeyBinCalculator24::new(65536);
         files.iter().for_each(|file| {
+            error!("file: {:?}", file);
             let mut accum = SavedType::default();
             cache_one.load(file, &mut accum, 0, &bin_calc).unwrap();
             accum.into_iter().flatten().for_each(|entry| {
@@ -130,6 +131,7 @@ impl CacheHashData {
         let cache_two = &datas[1];
         let files = cache_two.pre_existing_cache_files.lock().unwrap();
         files.iter().for_each(|file| {
+            error!("file2: {:?}", file);
             let mut accum = SavedType::default();
             cache_one.load(file, &mut accum, 0, &bin_calc).unwrap();
             accum.into_iter().flatten().for_each(|entry| {
@@ -142,10 +144,11 @@ impl CacheHashData {
                 }
             });
         });
+        error!("draining");
         for (k, mut v) in one.drain() {
+            v.sort();
             if let Some(mut entry) = two.remove(&k) {
                 entry.sort();
-                v.sort();
                 if v != entry {
                     error!("values different: {} {:?}, {:?}", k, v, entry);
                 }
