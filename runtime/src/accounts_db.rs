@@ -6472,6 +6472,7 @@ impl AccountsDb {
         let width = max_slot_inclusive - slot0;
         // 2 is for 2 special chunks - unaligned slots at the beginning and end
         let chunks = ancient_slot_count + 2 + (width as Slot / MAX_ITEMS_PER_CHUNK);
+        error!("chunks: {}, ancient_slot_count: {}", chunks, ancient_slot_count);
         (0..chunks)
             .into_par_iter()
             .map(|mut chunk| {
