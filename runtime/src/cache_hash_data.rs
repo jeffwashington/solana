@@ -112,7 +112,7 @@ impl CacheHashData {
             HashMap::<Pubkey, Vec<(std::string::String, CalculateHashIntermediate)>>::new();
         let cache_one = &datas[0];
         use solana_sdk::pubkey::Pubkey;
-        let files = cache_one.pre_existing_cache_files.lock().unwrap();
+        let files = cache_one.pre_existing_cache_files.lock().unwrap().clone();;
         let bin_calc = PubkeyBinCalculator24::new(65536);
         files.iter().for_each(|file| {
             error!("file: {:?}", file);
@@ -132,7 +132,7 @@ impl CacheHashData {
             });
         });
         let cache_two = &datas[1];
-        let files = cache_two.pre_existing_cache_files.lock().unwrap();
+        let files = cache_two.pre_existing_cache_files.lock().unwrap().clone();;
         files.iter().for_each(|file| {
             error!("file2: {:?}", file);
             let mut accum = SavedType::default();
@@ -240,7 +240,6 @@ impl CacheHashData {
     ) -> Result<(), std::io::Error> {
         let mut m = Measure::start("overall");
         let path = self.cache_folder.join(file_name);
-        error!("loading: {:?}", path);
         let file_len = std::fs::metadata(path.clone())?.len();
         let mut m1 = Measure::start("read_file");
         let mmap = CacheHashDataFile::load_map(&path)?;
