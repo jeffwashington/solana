@@ -112,11 +112,13 @@ impl CacheHashData {
             HashMap::<Pubkey, Vec<(std::string::String, CalculateHashIntermediate)>>::new();
         let cache_one = &datas[0];
         use solana_sdk::pubkey::Pubkey;
-        let files = cache_one.pre_existing_cache_files.lock().unwrap().clone();;
+        let files = cache_one.pre_existing_cache_files.lock().unwrap().clone();
+        let vec_size = 65536/2;
+
         let bin_calc = PubkeyBinCalculator24::new(65536);
         files.iter().for_each(|file| {
             error!("file: {:?}", file);
-            let mut accum = SavedType::default();
+            let mut accum = (0..vec_size).map(|_| Vec::default()).collect::<Vec<_>>();
             let x = cache_one.load(file, &mut accum, 0, &bin_calc);
             if x.is_err() {
                 error!("failure to load file :{:?}", x);
@@ -135,7 +137,7 @@ impl CacheHashData {
         let files = cache_two.pre_existing_cache_files.lock().unwrap().clone();
         files.iter().for_each(|file| {
             error!("file2: {:?}", file);
-            let mut accum = SavedType::default();
+            let mut accum = (0..vec_size).map(|_| Vec::default()).collect::<Vec<_>>();
             cache_one.load(file, &mut accum, 0, &bin_calc).unwrap();
             accum.into_iter().flatten().for_each(|entry| {
                 let pk = entry.pubkey;
@@ -152,8 +154,10 @@ impl CacheHashData {
             v.sort();
             if let Some(mut entry) = two.remove(&k) {
                 entry.sort();
-                if v != entry {
-                    error!("values different: {} {:?}, {:?}", k, v, entry);
+                let two = entry.last().unwrap();
+                let one = v.last().unwrap();
+                if one != two {
+                    error!("values different: {} {:?}, {:?}", k, one, two);
                 }
             } else {
                 error!("in 1, not in 2: {:?}, {:?}", k, v);
