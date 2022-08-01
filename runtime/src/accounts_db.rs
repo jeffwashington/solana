@@ -8547,7 +8547,7 @@ error!("{}{}", file!(), line!());
                         unique_pubkeys.insert(*pubkey);
                     })
                 });
-                error!("{}{}", file!(), line!());
+                error!("{}{}, unique keys: {}", file!(), line!(), unique_pubkeys.len());
                 let accounts_data_len_from_duplicates = unique_pubkeys
                     .into_iter()
                     .collect::<Vec<_>>()
