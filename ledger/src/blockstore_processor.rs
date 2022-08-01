@@ -1536,6 +1536,10 @@ fn load_frozen_forks(
                 bank.force_flush_accounts_cache();
                 let can_cached_slot_be_unflushed = true;
                 // note that this slot may not be a root
+                info!(
+                    "calculate_accounts_hash_without_index after halt: {}",
+                    on_halt_store_hash_raw_data_for_debug
+                );
                 let _ = bank.verify_bank_hash(VerifyBankHash {
                     test_hash_calculation: false,
                     can_cached_slot_be_unflushed,
