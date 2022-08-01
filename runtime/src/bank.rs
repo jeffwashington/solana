@@ -7043,7 +7043,7 @@ impl Bank {
                 "Capitalization mismatch: calculated: {} != expected: {}",
                 calculated, expected
             );
-            false
+            true
         }
     }
 
