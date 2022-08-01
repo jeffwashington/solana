@@ -8488,7 +8488,7 @@ impl AccountsDb {
                     }
                 }
             }
-
+error!("{}{}", file!(), line!());
             let storage_info_timings = storage_info_timings.into_inner().unwrap();
             let mut timings = GenerateIndexTimings {
                 index_flush_us,
@@ -8507,6 +8507,7 @@ impl AccountsDb {
                 ..GenerateIndexTimings::default()
             };
 
+            error!("{}{}", file!(), line!());
             // subtract data.len() from accounts_data_len for all old accounts that are in the index twice
             let mut accounts_data_len_dedup_timer =
                 Measure::start("handle accounts data len duplicates");
@@ -8518,6 +8519,7 @@ impl AccountsDb {
                         unique_pubkeys.insert(*pubkey);
                     })
                 });
+                error!("{}{}", file!(), line!());
                 let accounts_data_len_from_duplicates = unique_pubkeys
                     .into_iter()
                     .collect::<Vec<_>>()
@@ -8536,7 +8538,8 @@ impl AccountsDb {
                         count
                     })
                     .sum();
-                accounts_data_len.fetch_sub(accounts_data_len_from_duplicates, Ordering::Relaxed);
+                    error!("{}{}", file!(), line!());
+                    accounts_data_len.fetch_sub(accounts_data_len_from_duplicates, Ordering::Relaxed);
                 info!(
                     "accounts data len: {}",
                     accounts_data_len.load(Ordering::Relaxed)
@@ -8545,6 +8548,7 @@ impl AccountsDb {
             accounts_data_len_dedup_timer.stop();
             timings.accounts_data_len_dedup_time_us = accounts_data_len_dedup_timer.as_us();
 
+            error!("{}{}", file!(), line!());
             if pass == 0 {
                 let uncleaned_roots = uncleaned_roots.into_inner().unwrap();
                 // Need to add these last, otherwise older updates will be cleaned
@@ -8555,6 +8559,7 @@ impl AccountsDb {
                     let uncleaned_root = uncleaned_roots.contains(root);
                     self.accounts_index.add_root(*root, !uncleaned_root);
                 }
+                error!("{}{}", file!(), line!());
 
                 self.set_storage_count_and_alive_bytes(storage_info, &mut timings);
             }

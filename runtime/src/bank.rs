@@ -6882,6 +6882,7 @@ impl Bank {
         let cap = self.capitalization();
         let epoch_schedule = self.epoch_schedule();
         let rent_collector = self.rent_collector();
+        error!("verifying hash");
         if false && config.run_in_background {
             let ancestors = ancestors.clone();
             let accounts = Arc::clone(accounts);
@@ -6916,6 +6917,8 @@ impl Bank {
             });
             true // initial result is true. We haven't failed yet. If verification fails, we'll panic from bg thread.
         } else {
+            error!("verifying hash");
+
             let result = accounts.verify_bank_hash_and_lamports(
                 slot,
                 &self.ancestors,
@@ -6928,6 +6931,7 @@ impl Bank {
                 config.store_hash_raw_data_for_debug,
             );
             self.set_initial_accounts_hash_verification_completed();
+            error!("verifying hash done");
             result
         }
     }
