@@ -6897,9 +6897,10 @@ impl AccountsDb {
             }
 
             info!(
-                "calculate_accounts_hash_without_index: slot: {} {:?}",
+                "calculate_accounts_hash_without_index: slot: {} {:?}, store detailed info: {}",
                 storages.max_slot_inclusive(),
-                final_result
+                final_result,
+                config.store_detailed_debug_info_on_failure
             );
             Ok(final_result)
         };
