@@ -106,7 +106,10 @@ impl CacheHashData {
     pub fn compare_two<P: AsRef<Path> + std::fmt::Debug>(files: &[&P; 2]) {
         let datas = files.into_iter().map(|p| Self::new(p)).collect::<Vec<_>>();
         use std::collections::HashMap;
-        let mut one = HashMap::<Pubkey, Vec<(CalculateHashIntermediate, std::string::String)>>::new();
+        let mut one =
+            HashMap::<Pubkey, Vec<(std::string::String, CalculateHashIntermediate)>>::new();
+        let mut two =
+            HashMap::<Pubkey, Vec<(std::string::String, CalculateHashIntermediate)>>::new();
         let cache_one = &datas[0];
         use solana_sdk::pubkey::Pubkey;
         let files = cache_one.pre_existing_cache_files.lock().unwrap();
@@ -116,15 +119,43 @@ impl CacheHashData {
             cache_one.load(file, &mut accum, 0, &bin_calc).unwrap();
             accum.into_iter().flatten().for_each(|entry| {
                 let pk = entry.pubkey;
-                let new_one = (entry, format!("{:?}", file));
+                let new_one = (format!("{:?}", file), entry);
                 if let Some(current) = one.get_mut(&pk) {
                     current.push(new_one);
-                }
-                else {
+                } else {
                     one.insert(pk, vec![new_one]);
                 }
             });
         });
+        let cache_two = &datas[1];
+        let files = cache_two.pre_existing_cache_files.lock().unwrap();
+        files.iter().for_each(|file| {
+            let mut accum = SavedType::default();
+            cache_one.load(file, &mut accum, 0, &bin_calc).unwrap();
+            accum.into_iter().flatten().for_each(|entry| {
+                let pk = entry.pubkey;
+                let new_one = (format!("{:?}", file), entry);
+                if let Some(current) = two.get_mut(&pk) {
+                    current.push(new_one);
+                } else {
+                    two.insert(pk, vec![new_one]);
+                }
+            });
+        });
+        for (k, mut v) in one.drain() {
+            if let Some(mut entry) = two.remove(&k) {
+                entry.sort();
+                v.sort();
+                if v != entry {
+                    error!("values different: {} {:?}, {:?}", k, v, entry);
+                }
+            } else {
+                error!("in 1, not in 2: {:?}, {:?}", k, v);
+            }
+        }
+        for (k, mut v) in two.drain() {
+            error!("in 2, not in 1: {:?}, {:?}", k, v);
+        }
     }
 
     pub fn new<P: AsRef<Path> + std::fmt::Debug>(parent_folder: &P) -> CacheHashData {
