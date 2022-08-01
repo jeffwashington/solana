@@ -110,19 +110,24 @@ impl CacheHashData {
             HashMap::<Pubkey, Vec<(std::string::String, CalculateHashIntermediate)>>::new();
         let mut two =
             HashMap::<Pubkey, Vec<(std::string::String, CalculateHashIntermediate)>>::new();
-        let cache_one = &datas[0];
+            let one = Mutex::new(one);
+            let two = Mutex::new(two);
+            let cache_one = &datas[0];
         use solana_sdk::pubkey::Pubkey;
-        let files = cache_one.pre_existing_cache_files.lock().unwrap().clone();
+        let files = cache_one.pre_existing_cache_files.lock().unwrap().iter().cloned().collect::<Vec<_>>();
         let vec_size = 65536;
 
+        use rayon::iter::IntoParallelRefIterator;
+        use rayon::iter::ParallelIterator;
         let bin_calc = PubkeyBinCalculator24::new(65536);
-        files.iter().for_each(|file| {
-            error!("file: {:?}", file);
+        files.par_iter().for_each(|file| {
+            //error!("file: {:?}", file);
             let mut accum = (0..vec_size).map(|_| Vec::default()).collect::<Vec<_>>();
             let x = cache_one.load(file, &mut accum, 0, &bin_calc);
             if x.is_err() {
                 error!("failure to load file :{:?}", x);
             }
+            let mut one = one.lock().unwrap();
             accum.into_iter().flatten().for_each(|entry| {
                 let pk = entry.pubkey;
                 let new_one = (format!("{:?}", file), entry);
@@ -134,11 +139,12 @@ impl CacheHashData {
             });
         });
         let cache_two = &datas[1];
-        let files = cache_two.pre_existing_cache_files.lock().unwrap().clone();
-        files.iter().for_each(|file| {
-            error!("file2: {:?}", file);
+        let files = cache_two.pre_existing_cache_files.lock().unwrap().iter().cloned().collect::<Vec<_>>();
+        files.par_iter().for_each(|file| {
+            //error!("file2: {:?}", file);
             let mut accum = (0..vec_size).map(|_| Vec::default()).collect::<Vec<_>>();
             cache_one.load(file, &mut accum, 0, &bin_calc).unwrap();
+            let mut two = two.lock().unwrap();
             accum.into_iter().flatten().for_each(|entry| {
                 let pk = entry.pubkey;
                 let new_one = (format!("{:?}", file), entry);
@@ -149,6 +155,10 @@ impl CacheHashData {
                 }
             });
         });
+
+        let mut one = one.into_inner().unwrap();
+        let mut two = two.into_inner().unwrap();
+
         error!("draining");
         for (k, mut v) in one.drain() {
             v.sort();
