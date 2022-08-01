@@ -1533,19 +1533,19 @@ fn load_frozen_forks(
             )?;
 
             if slot >= halt_at_slot {
-                run_final_hash_calc(&bank);
+                run_final_hash_calc(&bank, on_halt_store_hash_raw_data_for_debug);
                 break;
             }
         }
     }
     else if on_halt_store_hash_raw_data_for_debug {
-        run_final_hash_calc(&bank_forks.read().unwrap().root_bank());
+        run_final_hash_calc(&bank_forks.read().unwrap().root_bank(), on_halt_store_hash_raw_data_for_debug);
     }
 
     Ok(())
 }
 
-fn run_final_hash_calc(bank: &Bank) {
+fn run_final_hash_calc(bank: &Bank, on_halt_store_hash_raw_data_for_debug: bool) {
     bank.force_flush_accounts_cache();
     let can_cached_slot_be_unflushed = true;
     // note that this slot may not be a root
