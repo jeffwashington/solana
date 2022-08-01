@@ -6442,7 +6442,7 @@ impl AccountsDb {
 
         /*
         if !config.store_detailed_debug_info_on_failure {
-            let p1 = Path::new("/mnt/nvme1n1/ledger/failed_calculate_accounts_hash_cache/calculate_accounts_hash_cache");
+            let p1 = Path::new("/mnt/nvme1n1/ledger/failed_calculate_accounts_hash_cache");
             let p2 = Path::new("/mnt/nvme1n1/hash_failures/slot.143249845");
             CacheHashData::compare_two(&[&p1, &p2]);
             panic!("compared");
