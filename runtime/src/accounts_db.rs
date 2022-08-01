@@ -8567,6 +8567,7 @@ error!("{}{}", file!(), line!());
         }
 
         self.accounts_index.log_secondary_indexes();
+        error!("{}{}", file!(), line!());
 
         IndexGenerationInfo {
             accounts_data_len: accounts_data_len.load(Ordering::Relaxed),
