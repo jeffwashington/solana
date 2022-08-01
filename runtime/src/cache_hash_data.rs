@@ -120,6 +120,8 @@ impl CacheHashData {
         use rayon::iter::IntoParallelRefIterator;
         use rayon::iter::ParallelIterator;
         let bin_calc = PubkeyBinCalculator24::new(65536);
+
+        use log::*;error!("{}{}", file!(), line!());
         files.par_iter().for_each(|file| {
             //error!("file: {:?}", file);
             let mut accum = (0..vec_size).map(|_| Vec::default()).collect::<Vec<_>>();
@@ -140,6 +142,7 @@ impl CacheHashData {
         });
         let cache_two = &datas[1];
         let files = cache_two.pre_existing_cache_files.lock().unwrap().iter().cloned().collect::<Vec<_>>();
+        use log::*;error!("{}{}", file!(), line!());
         files.par_iter().for_each(|file| {
             //error!("file2: {:?}", file);
             let mut accum = (0..vec_size).map(|_| Vec::default()).collect::<Vec<_>>();
