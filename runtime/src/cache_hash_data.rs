@@ -113,7 +113,7 @@ impl CacheHashData {
         let cache_one = &datas[0];
         use solana_sdk::pubkey::Pubkey;
         let files = cache_one.pre_existing_cache_files.lock().unwrap().clone();
-        let vec_size = 65536/2;
+        let vec_size = 65536;
 
         let bin_calc = PubkeyBinCalculator24::new(65536);
         files.iter().for_each(|file| {
