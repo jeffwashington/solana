@@ -165,7 +165,7 @@ impl CacheHashData {
         let mut one = one.into_inner().unwrap();
         let mut two = two.into_inner().unwrap();
 
-        error!("items in one: {}, two: {}, files in one, two: {}, {}", one.len(), two.len(), files.len(), file2.len());
+        error!("items in one: {}, two: {}, files in one, two: {}, {}", one.len(), two.len(), files.len(), files2.len());
 
         error!("draining");
         for (k, mut v) in one.drain() {
