@@ -141,12 +141,12 @@ impl CacheHashData {
             });
         });
         let cache_two = &datas[1];
-        let files = cache_two.pre_existing_cache_files.lock().unwrap().iter().cloned().collect::<Vec<_>>();
+        let files2 = cache_two.pre_existing_cache_files.lock().unwrap().iter().cloned().collect::<Vec<_>>();
         use log::*;error!("{}{}", file!(), line!());
-        files.par_iter().for_each(|file| {
+        files2.par_iter().for_each(|file| {
             //error!("file2: {:?}", file);
             let mut accum = (0..vec_size).map(|_| Vec::default()).collect::<Vec<_>>();
-            let x = cache_one.load(file, &mut accum, 0, &bin_calc);
+            let x = cache_two.load(file, &mut accum, 0, &bin_calc);
             if x.is_err() {
                 error!("failure to load file :{:?}, {:?}", x, file);
             }
@@ -165,7 +165,7 @@ impl CacheHashData {
         let mut one = one.into_inner().unwrap();
         let mut two = two.into_inner().unwrap();
 
-        error!("items in one: {}, two: {}", one.len(), two.len());
+        error!("items in one: {}, two: {}, files in one, two: {}, {}", one.len(), two.len(), files.len(), file2.len());
 
         error!("draining");
         for (k, mut v) in one.drain() {
