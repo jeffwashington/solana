@@ -175,7 +175,7 @@ impl CacheHashData {
                 let two = entry.last().unwrap();
                 let one = v.last().unwrap();
                 if one.1 != two.1 {
-                    error!("values different: {} {:?}, {:?}", k, one, two);
+                    error!("values different: {} {:?}, {:?}", k, v, two);
                 }
             } else {
                 error!("in 1, not in 2: {:?}, {:?}", k, v);
