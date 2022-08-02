@@ -148,7 +148,7 @@ impl CacheHashData {
             let mut accum = (0..vec_size).map(|_| Vec::default()).collect::<Vec<_>>();
             let x = cache_two.load(file, &mut accum, 0, &bin_calc);
             if x.is_err() {
-                error!("failure to load file :{:?}, {:?}", x, file);
+                error!("failure to load file2 :{:?}, {:?}", x, file);
             }
             let mut two = two.lock().unwrap();
             accum.into_iter().flatten().for_each(|entry| {
@@ -174,7 +174,7 @@ impl CacheHashData {
                 entry.sort();
                 let two = entry.last().unwrap();
                 let one = v.last().unwrap();
-                if one != two {
+                if one.1 != two.1 {
                     error!("values different: {} {:?}, {:?}", k, one, two);
                 }
             } else {
