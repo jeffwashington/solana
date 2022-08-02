@@ -8316,12 +8316,12 @@ impl AccountsDb {
         verify: bool,
         genesis_config: &GenesisConfig,
     ) -> IndexGenerationInfo {
-/*
+
         let p1 = Path::new("/mnt/nvme1n1/ledger/failed_calculate_accounts_hash_cache");
         let p2 = Path::new("/mnt/nvme1n1/hash_failures/slot.143249845");
         CacheHashData::compare_two(&[&p1, &p2]);
         use log::*;error!("{}{}", file!(), line!());
-*/
+
         let mut slots = self.storage.all_slots();
         #[allow(clippy::stable_sort_primitive)]
         slots.sort();
