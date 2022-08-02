@@ -531,6 +531,7 @@ impl BankForks {
     }
 
     pub fn set_accounts_hash_interval_slots(&mut self, accounts_interval_slots: u64) {
+        use log::*;info!("set accounts hash interval slots: {}", accounts_interval_slots);
         self.accounts_hash_interval_slots = accounts_interval_slots;
     }
 }

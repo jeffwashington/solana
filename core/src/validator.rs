@@ -1502,6 +1502,7 @@ fn load_blockstore(
     {
         let mut bank_forks = bank_forks.write().unwrap();
         bank_forks.set_snapshot_config(config.snapshot_config.clone());
+        use log::*;info!("set accounts hash interval slots: {}", config.accounts_hash_interval_slots);
         bank_forks.set_accounts_hash_interval_slots(config.accounts_hash_interval_slots);
         if let Some(ref shrink_paths) = config.account_shrink_paths {
             bank_forks

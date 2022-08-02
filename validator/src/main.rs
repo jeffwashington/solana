@@ -977,7 +977,7 @@ pub fn main() {
                 .long("accounts-hash-interval-slots")
                 .value_name("NUMBER")
                 .takes_value(true)
-                .default_value("100")
+                .default_value(default_incremental_snapshot_archive_interval_slots)
                 .help("Number of slots between generating accounts hash.")
                 .validator(|val| {
                     if val.eq("0") {
