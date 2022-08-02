@@ -102,14 +102,16 @@ impl Drop for CacheHashData {
     }
 }
 
+type hashentry = (std::string::String, CalculateHashIntermediate);
+
 impl CacheHashData {
     pub fn compare_two<P: AsRef<Path> + std::fmt::Debug>(files: &[&P; 2]) {
         let datas = files.into_iter().map(|p| Self::new(p)).collect::<Vec<_>>();
         use std::collections::HashMap;
         let mut one =
-            HashMap::<Pubkey, Vec<(std::string::String, CalculateHashIntermediate)>>::new();
+            HashMap::<Pubkey, Vec<hashentry>>::new();
         let mut two =
-            HashMap::<Pubkey, Vec<(std::string::String, CalculateHashIntermediate)>>::new();
+            HashMap::<Pubkey, Vec<hashentry>>::new();
             let one = Mutex::new(one);
             let two = Mutex::new(two);
             let cache_one = &datas[0];
@@ -169,9 +171,9 @@ impl CacheHashData {
 
         error!("draining");
         for (k, mut v) in one.drain() {
-            v.sort();
+            v.sort_by(Self::sorter);
             if let Some(mut entry) = two.remove(&k) {
-                entry.sort();
+                entry.sort_by(Self::sorter);
                 let two = entry.last().unwrap();
                 let one = v.last().unwrap();
                 if one.1 != two.1 {
@@ -185,6 +187,12 @@ impl CacheHashData {
             error!("in 2, not in 1: {:?}, {:?}", k, v);
         }
         panic!("done with compare");
+    }
+
+    fn sorter(a: &hashentry, b: &hashentry) -> std::cmp::Ordering {
+        let slota = a.0.split('.').next().unwrap();
+        let slotb = b.0.split('.').next().unwrap();
+        slota.cmp(&slotb)
     }
 
     pub fn new<P: AsRef<Path> + std::fmt::Debug>(parent_folder: &P) -> CacheHashData {
