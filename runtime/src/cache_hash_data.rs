@@ -184,6 +184,7 @@ impl CacheHashData {
         for (k, mut v) in two.drain() {
             error!("in 2, not in 1: {:?}, {:?}", k, v);
         }
+        panic!("done with compare");
     }
 
     pub fn new<P: AsRef<Path> + std::fmt::Debug>(parent_folder: &P) -> CacheHashData {
