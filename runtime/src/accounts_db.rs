@@ -6458,7 +6458,7 @@ impl AccountsDb {
         let range = snapshot_storages.range();
         let ancient_slots = snapshot_storages
             .iter_range(range.start..one_epoch_old_slot)
-            .map(|(slot, _)| slot)
+            .filter_map(|(slot, storages)| storages.map(|_| slot))
             .collect::<Vec<_>>();
         let ancient_slot_count = ancient_slots.len() as Slot;
         let slot0 = std::cmp::max(range.start, one_epoch_old_slot);
