@@ -189,6 +189,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
     fn get_only_in_mem<RT>(
         &self,
         pubkey: &K,
+        update_age: bool,
         callback: impl for<'a> FnOnce(Option<&'a AccountMapEntry<T>>) -> RT,
     ) -> RT {
         let mut found = true;
@@ -199,7 +200,9 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
             m.stop();
 
             callback(if let Some(entry) = result {
-                entry.set_age(self.storage.future_age_to_flush());
+                if update_age {
+                    entry.set_age(self.storage.future_age_to_flush(false));
+                }
                 Some(entry)
             } else {
                 drop(map);
@@ -233,9 +236,9 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         // return true if item should be added to in_mem cache
         callback: impl for<'a> FnOnce(Option<&AccountMapEntry<T>>) -> (bool, RT),
     ) -> RT {
-        self.get_only_in_mem(pubkey, |entry| {
+        self.get_only_in_mem(pubkey, true, |entry| {
             if let Some(entry) = entry {
-                entry.set_age(self.storage.future_age_to_flush());
+                entry.set_age(self.storage.future_age_to_flush(false));
                 callback(Some(entry)).1
             } else {
                 // not in cache, look on disk
@@ -358,6 +361,10 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         })
     }
 
+    fn set_age(&self, entry: &AccountMapEntry<T>, cached: bool) {
+        entry.set_age(self.storage.future_age_to_flush(cached));
+    }
+
     pub fn upsert(
         &self,
         pubkey: &Pubkey,
@@ -368,33 +375,27 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
     ) {
         let mut updated_in_mem = true;
         // try to get it just from memory first using only a read lock
-        self.get_only_in_mem(pubkey, |entry| {
+        self.get_only_in_mem(pubkey, false, |entry| {
             if let Some(entry) = entry {
-                Self::lock_and_update_slot_list(
-                    entry,
-                    new_value.into(),
-                    other_slot,
-                    reclaims,
-                    reclaim,
-                );
-                // age is incremented by caller
+                let new_value: (Slot, T) = new_value.into();
+                let upsert_cached = new_value.1.is_cached();
+                Self::lock_and_update_slot_list(entry, new_value, other_slot, reclaims, reclaim);
+                self.set_age(entry, upsert_cached);
             } else {
                 let mut m = Measure::start("entry");
                 let mut map = self.map_internal.write().unwrap();
                 let entry = map.entry(*pubkey);
                 m.stop();
-                let found = matches!(entry, Entry::Occupied(_));
-                match entry {
+                let found = match entry {
                     Entry::Occupied(mut occupied) => {
+                        let new_value: (Slot, T) = new_value.into();
+                        let upsert_cached = new_value.1.is_cached();
                         let current = occupied.get_mut();
                         Self::lock_and_update_slot_list(
-                            current,
-                            new_value.into(),
-                            other_slot,
-                            reclaims,
-                            reclaim,
+                            current, new_value, other_slot, reclaims, reclaim,
                         );
-                        current.set_age(self.storage.future_age_to_flush());
+                        self.set_age(current, upsert_cached);
+                        true // found
                     }
                     Entry::Vacant(vacant) => {
                         // not in cache, look on disk
@@ -416,14 +417,17 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                             // go to in-mem cache first
                             let disk_entry = self.load_account_entry_from_disk(vacant.key());
                             let new_value = if let Some(disk_entry) = disk_entry {
+                                let new_value: (Slot, T) = new_value.into();
+                                let upsert_cached = new_value.1.is_cached();
                                 // on disk, so merge new_value with what was on disk
                                 Self::lock_and_update_slot_list(
                                     &disk_entry,
-                                    new_value.into(),
+                                    new_value,
                                     other_slot,
                                     reclaims,
                                     reclaim,
                                 );
+                                self.set_age(&disk_entry, upsert_cached);
                                 disk_entry
                             } else {
                                 // not on disk, so insert new thing
@@ -434,8 +438,9 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                             vacant.insert(new_value);
                             self.stats().inc_mem_count(self.bin);
                         }
+                        false // not found
                     }
-                }
+                };
 
                 drop(map);
                 self.update_entry_stats(m, found);
@@ -867,7 +872,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         if let Some(disk) = self.bucket.as_ref() {
             let mut map = self.map_internal.write().unwrap();
             let items = disk.items_in_range(range); // map's lock has to be held while we are getting items from disk
-            let future_age = self.storage.future_age_to_flush();
+            let future_age = self.storage.future_age_to_flush(false);
             for item in items {
                 let entry = map.entry(item.pubkey);
                 match entry {
@@ -1224,7 +1229,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         }
 
         let stop_evictions_changes_at_start = self.get_stop_evictions_changes();
-        let next_age_on_failure = self.storage.future_age_to_flush();
+        let next_age_on_failure = self.storage.future_age_to_flush(false);
         if self.get_stop_evictions() {
             // ranges were changed
             self.move_ages_to_future(next_age_on_failure, current_age, &evictions);
