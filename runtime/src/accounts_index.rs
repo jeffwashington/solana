@@ -234,24 +234,24 @@ pub struct AccountMapEntryMeta {
 }
 
 impl AccountMapEntryMeta {
-    pub fn new_dirty<T: IndexValue>(storage: &Arc<BucketMapHolder<T>>) -> Self {
+    pub fn new_dirty<T: IndexValue>(storage: &Arc<BucketMapHolder<T>>, cached: bool) -> Self {
         AccountMapEntryMeta {
             dirty: AtomicBool::new(true),
-            age: AtomicU8::new(storage.future_age_to_flush()),
+            age: AtomicU8::new(storage.future_age_to_flush(cached)),
             lazy_disk_load: AtomicBool::new(false),
         }
     }
-    pub fn new_dirty_lazy_disk_load<T: IndexValue>(storage: &Arc<BucketMapHolder<T>>) -> Self {
+    pub fn new_dirty_lazy_disk_load<T: IndexValue>(storage: &Arc<BucketMapHolder<T>>, cached: bool) -> Self {
         AccountMapEntryMeta {
             dirty: AtomicBool::new(true),
-            age: AtomicU8::new(storage.future_age_to_flush()),
+            age: AtomicU8::new(storage.future_age_to_flush(cached)),
             lazy_disk_load: AtomicBool::new(true),
         }
     }
     pub fn new_clean<T: IndexValue>(storage: &Arc<BucketMapHolder<T>>) -> Self {
         AccountMapEntryMeta {
             dirty: AtomicBool::new(false),
-            age: AtomicU8::new(storage.future_age_to_flush()),
+            age: AtomicU8::new(storage.future_age_to_flush(false)),
             lazy_disk_load: AtomicBool::new(false),
         }
     }
@@ -434,8 +434,9 @@ impl<T: IndexValue> PreAllocatedAccountMapEntry<T> {
         account_info: T,
         storage: &Arc<BucketMapHolder<T>>,
     ) -> AccountMapEntry<T> {
-        let ref_count = if account_info.is_cached() { 0 } else { 1 };
-        let meta = AccountMapEntryMeta::new_dirty(storage);
+        let is_cached = account_info.is_cached();
+        let ref_count = if is_cached { 0 } else { 1 };
+        let meta = AccountMapEntryMeta::new_dirty(storage, is_cached);
         Arc::new(AccountMapEntryInner::new(
             vec![(slot, account_info)],
             ref_count,

@@ -31,7 +31,13 @@ pub struct BucketMapHolder<T: IndexValue> {
     pub disk: Option<BucketMap<(Slot, T)>>,
 
     pub count_buckets_flushed: AtomicUsize,
+    /// rolling 'current' age
     pub age: AtomicU8,
+    /// rolling age that is 'ages_to_stay_in_cache' + 'age'
+    pub future_age_to_flush: AtomicU8,
+    /// rolling age that is effectively 'age' - 1
+    /// these items are expected to be flushed from the cache or otherwise modified before this age occurs
+    pub future_age_to_flush_cached: AtomicU8,
     pub stats: BucketMapHolderStats,
 
     age_timer: AtomicInterval,
@@ -87,8 +93,13 @@ impl<T: IndexValue> BucketMapHolder<T> {
         self.wait_dirty_or_aged.notify_all(); // notify all because we can age scan in parallel
     }
 
-    pub fn future_age_to_flush(&self) -> Age {
-        self.current_age().wrapping_add(self.ages_to_stay_in_cache)
+    pub fn future_age_to_flush(&self, cached: bool) -> Age {
+        if cached {
+            &self.future_age_to_flush_cached
+        } else {
+            &self.future_age_to_flush
+        }
+        .load(Ordering::Acquire)
     }
 
     fn has_age_interval_elapsed(&self) -> bool {
@@ -224,6 +235,8 @@ impl<T: IndexValue> BucketMapHolder<T> {
             ages_to_stay_in_cache,
             count_buckets_flushed: AtomicUsize::default(),
             age: AtomicU8::default(),
+            future_age_to_flush: AtomicU8::new(ages_to_stay_in_cache),
+            future_age_to_flush_cached: AtomicU8::new(0_u8.wrapping_sub(1)),
             stats: BucketMapHolderStats::new(bins),
             wait_dirty_or_aged: Arc::default(),
             next_bucket_to_flush: AtomicUsize::new(0),
