@@ -394,6 +394,12 @@ impl BucketMapHolderStats {
                     i64
                 ),
                 (
+                    "disk_data_copy_us",
+                    disk.map(|disk| disk.stats.data.copy_us.swap(0, Ordering::Relaxed))
+                        .unwrap_or_default(),
+                    i64
+                ),
+                (
                     "disk_index_new_file_us",
                     disk.map(|disk| disk.stats.index.new_file_us.swap(0, Ordering::Relaxed))
                         .unwrap_or_default(),
