@@ -1416,6 +1416,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         }
 
         let mut evicted = 0;
+        let mut time = 0;
         // chunk these so we don't hold the write lock too long
         for evictions in evictions.chunks(50) {
             let mut map = self.map_internal.write().unwrap();
@@ -1449,13 +1450,17 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
 
                     // all conditions for eviction succeeded, so really evict item from in-mem cache
                     evicted += 1;
+                    let mut m_remove = Measure::start("remove");
                     occupied.remove();
+                    m_remove.stop();
+                    time += m_remove.as_us();
                 }
             }
             if map.is_empty() {
                 map.shrink_to_fit();
             }
         }
+        Self::update_stat(&self.stats().flush_evict_remove_us, time as u64);
         self.stats().sub_mem_count(self.bin, evicted);
         Self::update_stat(&self.stats().flush_entries_evicted_from_mem, evicted as u64);
         Self::update_stat(&self.stats().failed_to_evict, failed as u64);

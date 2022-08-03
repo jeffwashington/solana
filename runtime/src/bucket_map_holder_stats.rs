@@ -18,6 +18,7 @@ pub struct BucketMapHolderStats {
     pub gets_from_mem: AtomicU64,
     pub get_missing_us: AtomicU64,
     pub gets_missing: AtomicU64,
+    pub flush_evict_remove_us: AtomicU64,
     pub entry_mem_us: AtomicU64,
     pub entries_from_mem: AtomicU64,
     pub entry_missing_us: AtomicU64,
@@ -284,6 +285,11 @@ impl BucketMapHolderStats {
                 (
                     "gets_missing",
                     self.gets_missing.swap(0, Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "flush_evict_remove_us",
+                    self.flush_evict_remove_us.swap(0, Ordering::Relaxed),
                     i64
                 ),
                 (
