@@ -985,10 +985,12 @@ impl Tower {
         if let Some(vote) = vote {
             if let Some(fork_stake) = voted_stakes.get(&vote.slot) {
                 let lockout = *fork_stake as f64 / total_stake as f64;
+                if fork_stake != total_stake {
                 warn!(
                     "fork_stake slot: {}, vote slot: {}, lockout: {} fork_stake: {} total_stake: {}",
                     slot, vote.slot, lockout, fork_stake, total_stake
                 );
+            }
                 if vote.confirmation_count as usize > self.threshold_depth {
                     for old_vote in &self.vote_state.votes {
                         if old_vote.slot == vote.slot
