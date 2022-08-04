@@ -471,6 +471,9 @@ impl ExpectedRentCollection {
         find_unskipped_slot: impl Fn(Slot) -> Option<Slot>,
         filler_account_suffix: Option<&Pubkey>,
     ) -> Option<Self> {
+        use std::str::FromStr;
+        let interesting = Pubkey::from_str("HMKE74wtYtPcMnycQBh5Vffg2KeviCE1SNmDiCnhyDio").unwrap();
+use log::*;
         let mut rent_collector = rent_collector_max_epoch;
         let SlotInfoInEpochInner {
             epoch: epoch_of_max_storage_slot,
@@ -486,6 +489,9 @@ impl ExpectedRentCollection {
             first_slot_in_max_epoch + partition_from_pubkey;
         let calculated_from_index_expected_rent_collection_slot_max_epoch =
             expected_rent_collection_slot_max_epoch;
+        if pubkey == &interesting {
+            error!("jw2 {:?}", (first_slot_in_max_epoch, expected_rent_collection_slot_max_epoch, max_slot_in_storages_inclusive.slot));
+        }
         if expected_rent_collection_slot_max_epoch <= max_slot_in_storages_inclusive.slot {
             // may need to find a valid root
             if let Some(find) =
@@ -493,7 +499,10 @@ impl ExpectedRentCollection {
             {
                 // found a root that is >= expected_rent_collection_slot.
                 expected_rent_collection_slot_max_epoch = find;
-            }
+                if pubkey == &interesting {
+                    error!("jw2 updated {:?}", (find));
+                }
+                    }
         }
         let mut use_previous_epoch_rent_collector = false;
         if expected_rent_collection_slot_max_epoch > max_slot_in_storages_inclusive.slot {
@@ -502,7 +511,10 @@ impl ExpectedRentCollection {
             let slots_per_epoch_previous_epoch = epoch_schedule.get_slots_in_epoch(previous_epoch);
             expected_rent_collection_slot_max_epoch =
                 if slots_per_epoch_previous_epoch == slots_per_epoch_max_epoch {
-                    // partition index remains the same
+                    if pubkey == &interesting {
+                        error!("jw2 3:{:?}", (slots_per_epoch_previous_epoch, slots_per_epoch_max_epoch));
+                    }
+                                // partition index remains the same
                     calculated_from_index_expected_rent_collection_slot_max_epoch
                         .saturating_sub(slots_per_epoch_max_epoch)
                 } else {
@@ -511,6 +523,9 @@ impl ExpectedRentCollection {
                         pubkey,
                         slots_per_epoch_previous_epoch,
                     );
+                    if pubkey == &interesting {
+                        error!("jw2 4:{:?}", (first_slot_in_max_epoch, slots_per_epoch_previous_epoch, partition_from_pubkey));
+                    }
                     first_slot_in_max_epoch
                         .saturating_sub(slots_per_epoch_previous_epoch)
                         .saturating_add(partition_from_pubkey)
@@ -518,7 +533,10 @@ impl ExpectedRentCollection {
             // since we are looking a different root, we have to call this again
             if let Some(find) = find_unskipped_slot(expected_rent_collection_slot_max_epoch) {
                 // found a root (because we have a storage) that is >= expected_rent_collection_slot.
-                expected_rent_collection_slot_max_epoch = find;
+                if pubkey == &interesting {
+                    error!("jw2 5:{:?}", (find));
+                }
+            expected_rent_collection_slot_max_epoch = find;
             }
 
             // since we have not hit the slot in the rent collector's epoch yet, we need to collect rent according to the previous epoch's rent collector.
