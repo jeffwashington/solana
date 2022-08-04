@@ -534,7 +534,7 @@ use log::*;
             if let Some(find) = find_unskipped_slot(expected_rent_collection_slot_max_epoch) {
                 // found a root (because we have a storage) that is >= expected_rent_collection_slot.
                 if pubkey == &interesting {
-                    error!("jw2 5:{:?}", (find));
+                    error!("jw2 5:{:?}", (find, expected_rent_collection_slot_max_epoch));
                 }
             expected_rent_collection_slot_max_epoch = find;
             }
