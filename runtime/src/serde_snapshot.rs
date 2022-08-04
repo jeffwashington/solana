@@ -843,6 +843,10 @@ fn reconstruct_historical_roots(
     snapshot_historical_roots.sort_unstable();
     let mut roots_tracker = accounts_db.accounts_index.roots_tracker.write().unwrap();
     snapshot_historical_roots.into_iter().for_each(|root| {
+        if root ==      144265951 {
+            error!("jw2 initially inserting {}", root);
+        }
+
         roots_tracker.historical_roots.insert(root);
     });
 }

@@ -1814,7 +1814,13 @@ impl<T: IndexValue> AccountsIndex<T> {
             let roots_tracker = self.roots_tracker.read().unwrap();
             for root in slot..roots_tracker.historical_roots.max_exclusive() {
                 if roots_tracker.historical_roots.contains(&root) {
-                    return Some(root);
+                    if slot == 144265951 && root == 144265951 {
+                        error!("jw2 found root 144265951");
+                    }
+                    else if slot == 144265951 && root == 144265952 {
+                        error!("jw2 root missing 144265951");
+                    }
+                            return Some(root);
                 }
             }
         }
@@ -1823,7 +1829,13 @@ impl<T: IndexValue> AccountsIndex<T> {
             let min = std::cmp::max(slot, ancestors.min_slot());
             for root in min..=ancestors.max_slot() {
                 if ancestors.contains_key(&root) {
-                    return Some(root);
+                    if slot == 144265951 && root == 144265951 {
+                        error!("jw2 found root 144265951");
+                    }
+                    else if slot == 144265951 && root == 144265952 {
+                        error!("jw2 root missing 144265951");
+                    }
+                                       return Some(root);
                 }
             }
         }
@@ -1841,11 +1853,18 @@ impl<T: IndexValue> AccountsIndex<T> {
             .unwrap()
             .historical_roots
             .get_all_less_than(oldest_slot_to_keep);
-        roots.retain(|root| !keep.contains(root));
+        roots.retain(|root| {let keep = !keep.contains(root);
+            if !keep && root == &144265951 {
+                error!("jw2 removing old historical root: {}", root);
+            }
+            keep});
         if !roots.is_empty() {
             let mut w_roots_tracker = self.roots_tracker.write().unwrap();
             roots.into_iter().for_each(|root| {
-                w_roots_tracker.historical_roots.remove(&root);
+                if root == 144265951 {
+                    error!("jw2 removing old historical root2: {}", root);
+                }
+                    w_roots_tracker.historical_roots.remove(&root);
             });
         }
     }
