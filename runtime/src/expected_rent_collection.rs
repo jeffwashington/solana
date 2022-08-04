@@ -433,6 +433,17 @@ impl ExpectedRentCollection {
             expected.rent_epoch,
         );
         m.stop();
+        use std::str::FromStr;
+        let interesting = Pubkey::from_str("HMKE74wtYtPcMnycQBh5Vffg2KeviCE1SNmDiCnhyDio").unwrap();
+        if pubkey == &interesting {
+            use log::*;
+            error!("jw found: {}, {}, {:?}, new_hash: {:?}", storage_slot, pubkey,
+             (loaded_account.lamports(), loaded_hash, loaded_account.data().len(), loaded_account.rent_epoch(),
+             expected.rent_epoch
+            ), recalc_hash);
+  
+        }
+
         stats.rehash_hash_us.fetch_add(m.as_us(), Ordering::Relaxed);
         if &recalc_hash == loaded_hash {
             // unnecessary calculation occurred
