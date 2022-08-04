@@ -1815,10 +1815,10 @@ impl<T: IndexValue> AccountsIndex<T> {
             for root in slot..roots_tracker.historical_roots.max_exclusive() {
                 if roots_tracker.historical_roots.contains(&root) {
                     if slot == 144265951 && root == 144265951 {
-                        error!("jw2 found root 144265951");
+                        //error!("jw2 found root 144265951");
                     }
                     else if slot == 144265951 && root == 144265952 {
-                        error!("jw2 root missing 144265951");
+                        //error!("jw2 root missing 144265951");
                     }
                             return Some(root);
                 }
@@ -1830,10 +1830,10 @@ impl<T: IndexValue> AccountsIndex<T> {
             for root in min..=ancestors.max_slot() {
                 if ancestors.contains_key(&root) {
                     if slot == 144265951 && root == 144265951 {
-                        error!("jw2 found root 144265951");
+                        //error!("jw2 found root 144265951");
                     }
                     else if slot == 144265951 && root == 144265952 {
-                        error!("jw2 root missing 144265951");
+                        //error!("jw2 root missing 144265951");
                     }
                                        return Some(root);
                 }

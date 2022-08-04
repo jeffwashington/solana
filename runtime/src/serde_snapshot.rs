@@ -840,10 +840,11 @@ fn reconstruct_historical_roots(
             .into_iter()
             .map(|(root, _)| root),
     );
+    error!("jw2 initially inserting: {}", snapshot_historical_roots.len());
     snapshot_historical_roots.sort_unstable();
     let mut roots_tracker = accounts_db.accounts_index.roots_tracker.write().unwrap();
     snapshot_historical_roots.into_iter().for_each(|root| {
-        if root ==      144265951 {
+        if root ==      144265951 || root ==      144265952 || root ==      144265950 {
             error!("jw2 initially inserting {}", root);
         }
 
