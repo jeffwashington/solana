@@ -1840,10 +1840,10 @@ impl<'a, T: Fn(Slot) -> Option<Slot> + Sync + Send + Clone> AppendVecScan for Sc
             self.find_unskipped_slot,
             self.filler_account_suffix,
         );
-        let interesting = Pubkey::from_str("HMKE74wtYtPcMnycQBh5Vffg2KeviCE1SNmDiCnhyDio").unwrap();
-        if pubkey == &interesting {
-            error!("jw found: {}, {}, {:?}, new_hash: {:?}", self.current_slot, pubkey, (loaded_account.lamports(), loaded_account.loaded_hash(), loaded_account.data().len()), new_hash);
-        }
+//        let interesting = Pubkey::from_str("HMKE74wtYtPcMnycQBh5Vffg2KeviCE1SNmDiCnhyDio").unwrap();
+  //      if pubkey == &interesting {
+//            error!("jw found: {}, {}, {:?}, new_hash: {:?}", self.current_slot, pubkey, (loaded_account.lamports(), loaded_account.loaded_hash(), loaded_account.data().len()), new_hash);
+    //    }
 
         let loaded_hash = new_hash.unwrap_or(loaded_hash);
 

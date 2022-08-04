@@ -437,10 +437,10 @@ impl ExpectedRentCollection {
         let interesting = Pubkey::from_str("HMKE74wtYtPcMnycQBh5Vffg2KeviCE1SNmDiCnhyDio").unwrap();
         if pubkey == &interesting {
             use log::*;
-            error!("jw found: {}, {}, {:?}, new_hash: {:?}", storage_slot, pubkey,
+            error!("jw found: {}, {}, {:?}, new_hash: {:?}, slot: {}, data: {:?}", storage_slot, pubkey,
              (loaded_account.lamports(), loaded_hash, loaded_account.data().len(), loaded_account.rent_epoch(),
              expected.rent_epoch
-            ), recalc_hash);
+            ), recalc_hash,expected.expected_rent_collection_slot_max_epoch, loaded_account.data());
   
         }
 
