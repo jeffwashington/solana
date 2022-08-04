@@ -1840,6 +1840,11 @@ impl<'a, T: Fn(Slot) -> Option<Slot> + Sync + Send + Clone> AppendVecScan for Sc
             self.find_unskipped_slot,
             self.filler_account_suffix,
         );
+        let interesting = Pubkey::from_str("HMKE74wtYtPcMnycQBh5Vffg2KeviCE1SNmDiCnhyDio").unwrap();
+        if pubkey == &interesting {
+            error!("jw found: {}, {}, {:?}, new_hash: {:?}", self.current_slot, pubkey, (loaded_account.lamports(), loaded_account.loaded_hash(), loaded_account.data().len()), new_hash);
+        }
+
         let loaded_hash = new_hash.unwrap_or(loaded_hash);
 
         let source_item = CalculateHashIntermediate::new(loaded_hash, balance, *pubkey);
@@ -6448,6 +6453,7 @@ impl AccountsDb {
             panic!("compared");
         }
         */
+        let interesting = Pubkey::from_str("HMKE74wtYtPcMnycQBh5Vffg2KeviCE1SNmDiCnhyDio").unwrap();
 
         let width = snapshot_storages.range_width();
         // 2 is for 2 special chunks - unaligned slots at the beginning and end
@@ -8317,10 +8323,12 @@ impl AccountsDb {
         genesis_config: &GenesisConfig,
     ) -> IndexGenerationInfo {
 
+        if false {
         let p1 = Path::new("/mnt/nvme1n1/ledger/failed_calculate_accounts_hash_cache");
         let p2 = Path::new("/home/sol/ff/failed_calculate_accounts_hash_cache");
         CacheHashData::compare_two(&[&p1, &p2]);
         use log::*;error!("{}{}", file!(), line!());
+        }
 
         let mut slots = self.storage.all_slots();
         #[allow(clippy::stable_sort_primitive)]
