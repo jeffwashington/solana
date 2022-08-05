@@ -5566,7 +5566,7 @@ impl Bank {
             hold_range.stop();
             metrics.hold_range_us.fetch_add(hold_range.as_us(), Relaxed);
 
-            if !self.fixed_cycle_partitions() {
+            if !self.use_fixed_collection_cycle() {
             assert!(
                 partition.1 <= self.epoch_schedule().slots_per_epoch,
                 "partition_index: {:?}, slots_per_epoch: {}, slots in this epoch: {}",
