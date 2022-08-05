@@ -7021,6 +7021,7 @@ pub mod tests {
 
     #[test]
     fn test_get_vote_accounts() {
+        solana_logger::setup();
         let rpc = RpcHandler::start();
         let mut bank = rpc.working_bank();
         let RpcHandler {
