@@ -5314,6 +5314,7 @@ impl Bank {
 
         let mut measure = Measure::start("collect_rent_eagerly-ms");
         let partitions = self.rent_collection_partitions();
+        error!("collect: {:?}, epoch: {}", partitions, self.epoch);
         let count = partitions.len();
         let rent_metrics = RentMetrics::default();
         // partitions will usually be 1, but could be more if we skip slots
@@ -5867,6 +5868,8 @@ impl Bank {
         slot_count_in_two_day: SlotCount,
     ) -> Vec<Partition> {
         let parent_cycle = parent_slot / slot_count_in_two_day;
+        error!("get_partitions ecycle: {:?}", (parent_cycle, parent_slot, slot_count_in_two_day));
+
         let current_cycle = slot / slot_count_in_two_day;
         let mut parent_cycle_index = parent_slot % slot_count_in_two_day;
         let current_cycle_index = slot % slot_count_in_two_day;
@@ -5946,6 +5949,8 @@ impl Bank {
     ) -> Vec<Partition> {
         let (starting_epoch, mut starting_slot_index) =
             self.get_epoch_and_slot_index(starting_slot);
+            error!("variabl ecycle: {:?}", (starting_slot, ending_slot));
+
         let (ending_epoch, ending_slot_index) = self.get_epoch_and_slot_index(ending_slot);
 
         let mut partitions = vec![];
