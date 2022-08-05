@@ -5940,6 +5940,7 @@ dependencies = [
  "solana-faucet",
  "solana-gossip",
  "solana-ledger",
+ "solana-logger 1.11.6",
  "solana-measure",
  "solana-metrics",
  "solana-net-utils",

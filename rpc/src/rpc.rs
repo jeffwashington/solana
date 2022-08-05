@@ -4683,7 +4683,11 @@ pub mod tests {
 
     impl RpcHandler {
         fn start() -> Self {
-            let (bank_forks, mint_keypair, leader_vote_keypair) = new_bank_forks();
+            Self::start_with_slots_per_epoch(None)
+        }
+        fn start_with_slots_per_epoch(slots_per_epoch_epoch_schedule: Option<Slot>) -> Self {
+            let (bank_forks, mint_keypair, leader_vote_keypair) =
+                new_bank_forks(slots_per_epoch_epoch_schedule);
             let ledger_path = get_tmp_ledger_path!();
             let blockstore = Arc::new(Blockstore::open(&ledger_path).unwrap());
             let bank = bank_forks.read().unwrap().working_bank();
@@ -6272,7 +6276,7 @@ pub mod tests {
         let ledger_path = get_tmp_ledger_path!();
         let blockstore = Arc::new(Blockstore::open(&ledger_path).unwrap());
         let block_commitment_cache = Arc::new(RwLock::new(BlockCommitmentCache::default()));
-        let (bank_forks, mint_keypair, ..) = new_bank_forks();
+        let (bank_forks, mint_keypair, ..) = new_bank_forks(None);
         let health = RpcHealth::stub();
 
         // Freeze bank 0 to prevent a panic in `run_transaction_simulation()`
@@ -6466,7 +6470,9 @@ pub mod tests {
         );
     }
 
-    fn new_bank_forks() -> (Arc<RwLock<BankForks>>, Keypair, Arc<Keypair>) {
+    fn new_bank_forks(
+        slots_per_epoch_epoch_schedule: Option<Slot>,
+    ) -> (Arc<RwLock<BankForks>>, Keypair, Arc<Keypair>) {
         let GenesisConfigInfo {
             mut genesis_config,
             mint_keypair,
@@ -6476,8 +6482,12 @@ pub mod tests {
 
         genesis_config.rent.lamports_per_byte_year = 50;
         genesis_config.rent.exemption_threshold = 2.0;
-        genesis_config.epoch_schedule =
-            EpochSchedule::custom(TEST_SLOTS_PER_EPOCH, TEST_SLOTS_PER_EPOCH, false);
+        let slots_per_epoch_epoch_schedule = slots_per_epoch_epoch_schedule.unwrap_or(TEST_SLOTS_PER_EPOCH);
+        genesis_config.epoch_schedule = EpochSchedule::custom(
+            slots_per_epoch_epoch_schedule,
+            slots_per_epoch_epoch_schedule,
+            false,
+        );
 
         let bank = Bank::new_for_tests(&genesis_config);
         (
@@ -6530,7 +6540,7 @@ pub mod tests {
     fn test_rpc_processor_get_block_commitment() {
         let exit = Arc::new(AtomicBool::new(false));
         let validator_exit = create_validator_exit(&exit);
-        let bank_forks = new_bank_forks().0;
+        let bank_forks = new_bank_forks(None).0;
         let ledger_path = get_tmp_ledger_path!();
         let blockstore = Arc::new(Blockstore::open(&ledger_path).unwrap());
 
@@ -7023,7 +7033,7 @@ pub mod tests {
     fn test_get_vote_accounts() {
         use log::*;
         solana_logger::setup();
-        let rpc = RpcHandler::start();
+        let rpc = RpcHandler::start_with_slots_per_epoch(Some(432_000));
         let mut bank = rpc.working_bank();
         let RpcHandler {
             ref io,
