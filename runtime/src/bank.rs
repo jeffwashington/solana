@@ -5566,6 +5566,7 @@ impl Bank {
             hold_range.stop();
             metrics.hold_range_us.fetch_add(hold_range.as_us(), Relaxed);
 
+            if !self.fixed_cycle_partitions() {
             assert!(
                 partition.1 <= self.epoch_schedule().slots_per_epoch,
                 "partition_index: {:?}, slots_per_epoch: {}, slots in this epoch: {}",
@@ -5573,6 +5574,7 @@ impl Bank {
                 self.epoch_schedule().slots_per_epoch,
                 self.epoch_schedule().get_slots_in_epoch(self.epoch()),
             );
+        }
             let rent_paying_pubkeys_ = self.get_rent_paying_pubkeys(&partition);
             let rent_paying_pubkeys = rent_paying_pubkeys_.as_ref();
 
