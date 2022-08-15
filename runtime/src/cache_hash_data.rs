@@ -1,7 +1,7 @@
 //! Cached data for hashing accounts
 use {
     crate::{
-        accounts_hash::CalculateHashIntermediate, cache_hash_data_stats::CacheHashDataStats,
+        accounts_hash::{CalculateHashIntermediate, ZERO_RAW_LAMPORTS_SENTINEL}, cache_hash_data_stats::CacheHashDataStats,
         pubkey_bins::PubkeyBinCalculator24,
     },
     log::*,
@@ -181,14 +181,14 @@ impl CacheHashData {
                 }
             } else {
                 let one = v.last().unwrap();
-                if !one.1.is_zero_lamport() {
+                if one.1.lamports != ZERO_RAW_LAMPORTS_SENTINEL {
                     error!("in 1, not in 2: {:?}, {:?}", k, v);
                 }
             }
         }
         for (k, mut v) in two.drain() {
             let one = v.last().unwrap();
-            if !one.1.is_zero_lamport() {
+            if one.1.lamports != ZERO_RAW_LAMPORTS_SENTINEL () {
                 error!("in 2, not in 1: {:?}, {:?}", k, v);
             }
         }
