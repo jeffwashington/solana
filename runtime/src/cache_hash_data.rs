@@ -108,12 +108,11 @@ impl CacheHashData {
     pub fn compare_two<P: AsRef<Path> + std::fmt::Debug>(files: &[&P; 2]) {
         let datas = files.into_iter().map(|p| Self::new(p)).collect::<Vec<_>>();
         use std::collections::HashMap;
+        use dashmap::DashMap;
         let mut one =
-            HashMap::<Pubkey, Vec<hashentry>>::new();
+            DashMap::<Pubkey, Vec<hashentry>>::new();
         let mut two =
-            HashMap::<Pubkey, Vec<hashentry>>::new();
-            let one = Mutex::new(one);
-            let two = Mutex::new(two);
+            DashMap::<Pubkey, Vec<hashentry>>::new();
             let cache_one = &datas[0];
         use solana_sdk::pubkey::Pubkey;
         let files = cache_one.pre_existing_cache_files.lock().unwrap().iter().cloned().collect::<Vec<_>>();
@@ -131,11 +130,10 @@ impl CacheHashData {
             if x.is_err() {
                 error!("failure to load file :{:?}, {:?}", x, file);
             }
-            let mut one = one.lock().unwrap();
             accum.into_iter().flatten().for_each(|entry| {
                 let pk = entry.pubkey;
                 let new_one = (format!("{:?}", file), entry);
-                if let Some(current) = one.get_mut(&pk) {
+                if let Some(mut current) = one.get_mut(&pk) {
                     current.push(new_one);
                 } else {
                     one.insert(pk, vec![new_one]);
@@ -152,11 +150,10 @@ impl CacheHashData {
             if x.is_err() {
                 error!("failure to load file2 :{:?}, {:?}", x, file);
             }
-            let mut two = two.lock().unwrap();
             accum.into_iter().flatten().for_each(|entry| {
                 let pk = entry.pubkey;
                 let new_one = (format!("{:?}", file), entry);
-                if let Some(current) = two.get_mut(&pk) {
+                if let Some(mut current) = two.get_mut(&pk) {
                     current.push(new_one);
                 } else {
                     two.insert(pk, vec![new_one]);
@@ -164,15 +161,14 @@ impl CacheHashData {
             });
         });
 
-        let mut one = one.into_inner().unwrap();
-        let mut two = two.into_inner().unwrap();
-
         error!("items in one: {}, two: {}, files in one, two: {}, {}", one.len(), two.len(), files.len(), files2.len());
 
         error!("draining");
-        for (k, mut v) in one.drain() {
+        for entry in one.iter() {
+            let k = entry.key();
+            let mut v = entry.value().clone();
             v.sort_by(Self::sorter);
-            if let Some(mut entry) = two.remove(&k) {
+            if let Some((_, mut entry)) = two.remove(&k) {
                 entry.sort_by(Self::sorter);
                 let two = entry.last().unwrap();
                 let one = v.last().unwrap();
@@ -186,7 +182,9 @@ impl CacheHashData {
                 }
             }
         }
-        for (k, mut v) in two.drain() {
+        for entry in two.iter() {
+            let k = entry.key();
+            let mut v = entry.value().clone();
             v.sort_by(Self::sorter);
             let one = v.last().unwrap();
             if one.1.lamports != ZERO_RAW_LAMPORTS_SENTINEL {
