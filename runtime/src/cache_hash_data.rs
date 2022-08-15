@@ -121,6 +121,8 @@ impl CacheHashData {
         use rayon::iter::IntoParallelRefIterator;
         use rayon::iter::ParallelIterator;
         let bin_calc = PubkeyBinCalculator24::new(65536);
+        use std::str::FromStr;
+        let interesting = Pubkey::from_str("8MTrwnaQwMbVBCMPPn4BpKfPTMfTqLwhhStENtp4dtYX").unwrap();
 
         use log::*;error!("{}{}", file!(), line!());
         files.par_iter().for_each(|file| {
@@ -133,6 +135,9 @@ impl CacheHashData {
             accum.into_iter().flatten().for_each(|entry| {
                 let pk = entry.pubkey;
                 let new_one = (format!("{:?}", file), entry);
+                if interesting == pk {
+                    error!("found: {:?}", new_one);
+                }
                 if let Some(mut current) = one.get_mut(&pk) {
                     current.push(new_one);
                 } else {
@@ -153,6 +158,9 @@ impl CacheHashData {
             accum.into_iter().flatten().for_each(|entry| {
                 let pk = entry.pubkey;
                 let new_one = (format!("{:?}", file), entry);
+                if interesting == pk {
+                    error!("found: {:?}", new_one);
+                }
                 if let Some(mut current) = two.get_mut(&pk) {
                     current.push(new_one);
                 } else {
