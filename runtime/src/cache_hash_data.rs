@@ -172,6 +172,9 @@ impl CacheHashData {
 
         error!("items in one: {}, two: {}, files in one, two: {}, {}", one.len(), two.len(), files.len(), files2.len());
 
+        let mut cap1 = 0;
+        let mut cap2 = 0;
+
         error!("draining");
         for entry in one.iter() {
             let k = entry.key();
@@ -181,12 +184,19 @@ impl CacheHashData {
                 entry.sort_by(Self::sorter);
                 let two = entry.last().unwrap();
                 let one = v.last().unwrap();
+                if one.1.lamports != ZERO_RAW_LAMPORTS_SENTINEL {
+                    cap1 += one.1.lamports;
+                }
+                if two.1.lamports != ZERO_RAW_LAMPORTS_SENTINEL {
+                    cap2 += two.1.lamports;
+                }
                 if one.1 != two.1 {
                     error!("values different: {} {:?}, {:?}", k, v, entry);
                 }
             } else {
                 let one = v.last().unwrap();
                 if one.1.lamports != ZERO_RAW_LAMPORTS_SENTINEL {
+                    cap1 += one.1.lamports;
                     error!("in 1, not in 2: {:?}, {:?}", k, v);
                 }
             }
@@ -197,10 +207,11 @@ impl CacheHashData {
             v.sort_by(Self::sorter);
             let one = v.last().unwrap();
             if one.1.lamports != ZERO_RAW_LAMPORTS_SENTINEL {
+                cap2 += one.1.lamports;
                 error!("in 2, not in 1: {:?}, {:?}", k, v);
             }
         }
-        panic!("done with compare");
+        panic!("done with compare, lamports: {}, {}", cap1, cap2);
     }
 
     fn sorter(a: &hashentry, b: &hashentry) -> std::cmp::Ordering {
