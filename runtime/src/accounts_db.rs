@@ -6440,15 +6440,6 @@ impl AccountsDb {
     {
         let start_bin_index = bin_range.start;
 
-        /*
-        if !config.store_detailed_debug_info_on_failure {
-            let p1 = Path::new("/mnt/nvme1n1/ledger/failed_calculate_accounts_hash_cache");
-            let p2 = Path::new("/mnt/nvme1n1/hash_failures/slot.143249845");
-            CacheHashData::compare_two(&[&p1, &p2]);
-            panic!("compared");
-        }
-        */
-
         let width = snapshot_storages.range_width();
         // 2 is for 2 special chunks - unaligned slots at the beginning and end
         let chunks = 2 + (width as Slot / MAX_ITEMS_PER_CHUNK);
@@ -8317,12 +8308,10 @@ impl AccountsDb {
         genesis_config: &GenesisConfig,
     ) -> IndexGenerationInfo {
 
-        /*
         let p1 = Path::new("/mnt/nvme1n1/ledger/failed_calculate_accounts_hash_cache");
-        let p2 = Path::new("/mnt/nvme1n1/hash_failures/slot.143249845");
+        let p2 = Path::new("/home/sol/failed_aug15/failed_calculate_accounts_hash_cache");
         CacheHashData::compare_two(&[&p1, &p2]);
         use log::*;error!("{}{}", file!(), line!());
-        */
 
         let mut slots = self.storage.all_slots();
         #[allow(clippy::stable_sort_primitive)]
