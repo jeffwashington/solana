@@ -1,7 +1,8 @@
 //! Cached data for hashing accounts
 use {
     crate::{
-        accounts_hash::{CalculateHashIntermediate, ZERO_RAW_LAMPORTS_SENTINEL}, cache_hash_data_stats::CacheHashDataStats,
+        accounts_hash::{CalculateHashIntermediate, ZERO_RAW_LAMPORTS_SENTINEL},
+        cache_hash_data_stats::CacheHashDataStats,
         pubkey_bins::PubkeyBinCalculator24,
     },
     log::*,
@@ -107,25 +108,28 @@ type hashentry = (std::string::String, CalculateHashIntermediate);
 impl CacheHashData {
     pub fn compare_two<P: AsRef<Path> + std::fmt::Debug>(files: &[&P; 2]) {
         let datas = files.into_iter().map(|p| Self::new(p)).collect::<Vec<_>>();
-        use std::collections::HashMap;
-        use dashmap::DashMap;
-        let mut one =
-            DashMap::<Pubkey, Vec<hashentry>>::new();
-        let mut two =
-            DashMap::<Pubkey, Vec<hashentry>>::new();
-            let cache_one = &datas[0];
+        use {dashmap::DashMap, std::collections::HashMap};
+        let mut one = DashMap::<Pubkey, Vec<hashentry>>::new();
+        let mut two = DashMap::<Pubkey, Vec<hashentry>>::new();
+        let cache_one = &datas[0];
         use solana_sdk::pubkey::Pubkey;
-        let files = cache_one.pre_existing_cache_files.lock().unwrap().iter().cloned().collect::<Vec<_>>();
+        let files = cache_one
+            .pre_existing_cache_files
+            .lock()
+            .unwrap()
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>();
         let vec_size = 65536;
 
-        use rayon::iter::IntoParallelRefIterator;
-        use rayon::iter::ParallelIterator;
+        use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
         let bin_calc = PubkeyBinCalculator24::new(65536);
         use std::str::FromStr;
         let interesting = Pubkey::from_str("8MTrwnaQwMbVBCMPPn4BpKfPTMfTqLwhhStENtp4dtYX").unwrap();
         let p1 = crate::bank::Bank::partition_from_pubkey(&interesting, 432_000);
 
-        use log::*;error!("{}{}, p1: {}", file!(), line!(), p1);
+        use log::*;
+        error!("{}{}, p1: {}", file!(), line!(), p1);
         files.par_iter().for_each(|file| {
             //error!("file: {:?}", file);
             let mut accum = (0..vec_size).map(|_| Vec::default()).collect::<Vec<_>>();
@@ -147,8 +151,15 @@ impl CacheHashData {
             });
         });
         let cache_two = &datas[1];
-        let files2 = cache_two.pre_existing_cache_files.lock().unwrap().iter().cloned().collect::<Vec<_>>();
-        use log::*;error!("{}{}", file!(), line!());
+        let files2 = cache_two
+            .pre_existing_cache_files
+            .lock()
+            .unwrap()
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>();
+        use log::*;
+        error!("{}{}", file!(), line!());
         files2.par_iter().for_each(|file| {
             //error!("file2: {:?}", file);
             let mut accum = (0..vec_size).map(|_| Vec::default()).collect::<Vec<_>>();
@@ -170,33 +181,43 @@ impl CacheHashData {
             });
         });
 
-        error!("items in one: {}, two: {}, files in one, two: {}, {}", one.len(), two.len(), files.len(), files2.len());
+        error!(
+            "items in one: {}, two: {}, files in one, two: {}, {}",
+            one.len(),
+            two.len(),
+            files.len(),
+            files2.len()
+        );
 
         let mut cap1 = 0;
         let mut cap2 = 0;
+        let mut added1 = 0;
+        let mut added2 = 0;
 
         error!("draining");
         for entry in one.iter() {
             let k = entry.key();
             let mut v = entry.value().clone();
             v.sort_by(Self::sorter);
+            let one = v.last().unwrap();
+            if one.1.lamports != ZERO_RAW_LAMPORTS_SENTINEL {
+                cap1 += one.1.lamports;
+                added1 += 1;
+            }
             if let Some((_, mut entry)) = two.remove(&k) {
                 entry.sort_by(Self::sorter);
                 let two = entry.last().unwrap();
-                let one = v.last().unwrap();
-                if one.1.lamports != ZERO_RAW_LAMPORTS_SENTINEL {
-                    cap1 += one.1.lamports;
-                }
                 if two.1.lamports != ZERO_RAW_LAMPORTS_SENTINEL {
                     cap2 += two.1.lamports;
+                    added2 += 1;
                 }
                 if one.1 != two.1 {
                     error!("values different: {} {:?}, {:?}", k, v, entry);
+                } else {
+                    assert_eq!(one.1.lamports, two.1.lamports);
                 }
             } else {
-                let one = v.last().unwrap();
                 if one.1.lamports != ZERO_RAW_LAMPORTS_SENTINEL {
-                    cap1 += one.1.lamports;
                     error!("in 1, not in 2: {:?}, {:?}", k, v);
                 }
             }
@@ -205,13 +226,25 @@ impl CacheHashData {
             let k = entry.key();
             let mut v = entry.value().clone();
             v.sort_by(Self::sorter);
-            let one = v.last().unwrap();
-            if one.1.lamports != ZERO_RAW_LAMPORTS_SENTINEL {
-                cap2 += one.1.lamports;
+            let two = v.last().unwrap();
+            if two.1.lamports != ZERO_RAW_LAMPORTS_SENTINEL {
+                added2 += 1;
+                cap2 += two.1.lamports;
                 error!("in 2, not in 1: {:?}, {:?}", k, v);
             }
         }
-        panic!("done with compare, lamports: {}, {}", cap1, cap2);
+        panic!(
+            "done with compare, lamports: {}, {}, {}, added: {},{}",
+            cap1,
+            cap2,
+            if cap1 > cap2 {
+                cap1 - cap2
+            } else {
+                cap2 - cap1
+            },
+            added1,
+            added2
+        );
     }
 
     fn sorter(a: &hashentry, b: &hashentry) -> std::cmp::Ordering {
