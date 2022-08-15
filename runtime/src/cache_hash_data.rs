@@ -181,14 +181,14 @@ impl CacheHashData {
                 }
             } else {
                 let one = v.last().unwrap();
-                if !one.is_zero_lamport() {
+                if !one.1.is_zero_lamport() {
                     error!("in 1, not in 2: {:?}, {:?}", k, v);
                 }
             }
         }
         for (k, mut v) in two.drain() {
             let one = v.last().unwrap();
-            if !one.is_zero_lamport() {
+            if !one.1.is_zero_lamport() {
                 error!("in 2, not in 1: {:?}, {:?}", k, v);
             }
         }
