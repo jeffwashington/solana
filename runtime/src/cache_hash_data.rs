@@ -123,8 +123,9 @@ impl CacheHashData {
         let bin_calc = PubkeyBinCalculator24::new(65536);
         use std::str::FromStr;
         let interesting = Pubkey::from_str("8MTrwnaQwMbVBCMPPn4BpKfPTMfTqLwhhStENtp4dtYX").unwrap();
+        let p1 = crate::bank::Bank::partition_from_pubkey(&interesting, 432_000);
 
-        use log::*;error!("{}{}", file!(), line!());
+        use log::*;error!("{}{}, p1: {}", file!(), line!(), p1);
         files.par_iter().for_each(|file| {
             //error!("file: {:?}", file);
             let mut accum = (0..vec_size).map(|_| Vec::default()).collect::<Vec<_>>();
