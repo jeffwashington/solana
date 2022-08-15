@@ -180,11 +180,17 @@ impl CacheHashData {
                     error!("values different: {} {:?}, {:?}", k, v, entry);
                 }
             } else {
-                error!("in 1, not in 2: {:?}, {:?}", k, v);
+                let one = v.last().unwrap();
+                if !one.is_zero_lamport() {
+                    error!("in 1, not in 2: {:?}, {:?}", k, v);
+                }
             }
         }
         for (k, mut v) in two.drain() {
-            error!("in 2, not in 1: {:?}, {:?}", k, v);
+            let one = v.last().unwrap();
+            if !one.is_zero_lamport() {
+                error!("in 2, not in 1: {:?}, {:?}", k, v);
+            }
         }
         panic!("done with compare");
     }
