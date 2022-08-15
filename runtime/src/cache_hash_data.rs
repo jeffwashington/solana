@@ -187,6 +187,7 @@ impl CacheHashData {
             }
         }
         for (k, mut v) in two.drain() {
+            v.sort_by(Self::sorter);
             let one = v.last().unwrap();
             if one.1.lamports != ZERO_RAW_LAMPORTS_SENTINEL {
                 error!("in 2, not in 1: {:?}, {:?}", k, v);
