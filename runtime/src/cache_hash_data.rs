@@ -131,7 +131,7 @@ impl CacheHashData {
         use log::*;
         error!("{}{}, p1: {}", file!(), line!(), p1);
         files.sort();
-        files.par_iter().for_each(|file| {
+        files.iter().for_each(|file| {
             //error!("file: {:?}", file);
             let mut accum = (0..vec_size).map(|_| Vec::default()).collect::<Vec<_>>();
             let x = cache_one.load(file, &mut accum, 0, &bin_calc);
@@ -162,7 +162,7 @@ impl CacheHashData {
         files2.sort();
         use log::*;
         error!("{}{}", file!(), line!());
-        files2.par_iter().for_each(|file| {
+        files2.iter().for_each(|file| {
             //error!("file2: {:?}", file);
             let mut accum = (0..vec_size).map(|_| Vec::default()).collect::<Vec<_>>();
             let x = cache_two.load(file, &mut accum, 0, &bin_calc);
