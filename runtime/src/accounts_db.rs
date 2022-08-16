@@ -6698,7 +6698,7 @@ impl AccountsDb {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn calculate_accounts_hash_helper_with_verify(
+    pub fn calculate_accounts_hash_helper_with_verify(
         &self,
         use_index: bool,
         debug_verify: bool,

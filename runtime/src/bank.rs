@@ -7045,6 +7045,53 @@ impl Bank {
                 "Capitalization mismatch: calculated: {} != expected: {}",
                 calculated, expected
             );
+
+            self.rc.accounts
+            .accounts_db
+            .calculate_accounts_hash_helper_with_verify(
+                false,
+                false,
+                self.slot(),
+
+                crate::accounts_hash::CalcAccountsHashConfig {
+                    use_bg_thread_pool: false,
+                    check_hash: false,
+                    ancestors: None,
+                    use_write_cache: false,
+                    epoch_schedule: &self.epoch_schedule,
+                    rent_collector: &self.rent_collector,
+                    // now that we've failed, store off the failing contents that produced a bad capitalization
+                    store_detailed_debug_info_on_failure: true,
+                    full_snapshot: None,
+                },
+                None
+            );
+
+            self.rc.accounts
+            .accounts_db
+            .calculate_accounts_hash_helper_with_verify(
+                true,
+                false,
+                self.slot(),
+
+                crate::accounts_hash::CalcAccountsHashConfig {
+                    use_bg_thread_pool: false,
+                    check_hash: false,
+                    ancestors: None,
+                    use_write_cache: false,
+                    epoch_schedule: &self.epoch_schedule,
+                    rent_collector: &self.rent_collector,
+                    // now that we've failed, store off the failing contents that produced a bad capitalization
+                    store_detailed_debug_info_on_failure: false,
+                    full_snapshot: None,
+                },
+                None
+            );
+
+            loop {
+                // hang here forever
+            }
+
             false
         }
     }
