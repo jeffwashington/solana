@@ -113,7 +113,7 @@ impl CacheHashData {
         let mut two = DashMap::<Pubkey, Vec<hashentry>>::new();
         let cache_one = &datas[0];
         use solana_sdk::pubkey::Pubkey;
-        let files = cache_one
+        let mut files = cache_one
             .pre_existing_cache_files
             .lock()
             .unwrap()
@@ -130,6 +130,7 @@ impl CacheHashData {
 
         use log::*;
         error!("{}{}, p1: {}", file!(), line!(), p1);
+        files.sort();
         files.par_iter().for_each(|file| {
             //error!("file: {:?}", file);
             let mut accum = (0..vec_size).map(|_| Vec::default()).collect::<Vec<_>>();
@@ -151,13 +152,14 @@ impl CacheHashData {
             });
         });
         let cache_two = &datas[1];
-        let files2 = cache_two
+        let mut files2 = cache_two
             .pre_existing_cache_files
             .lock()
             .unwrap()
             .iter()
             .cloned()
             .collect::<Vec<_>>();
+        files2.sort();
         use log::*;
         error!("{}{}", file!(), line!());
         files2.par_iter().for_each(|file| {
@@ -198,14 +200,14 @@ impl CacheHashData {
         for entry in one.iter() {
             let k = entry.key();
             let mut v = entry.value().clone();
-            v.sort_by(Self::sorter);
+            //v.sort_by(Self::sorter);
             let one = v.last().unwrap();
             if one.1.lamports != ZERO_RAW_LAMPORTS_SENTINEL {
                 cap1 += one.1.lamports;
                 added1 += 1;
             }
             if let Some((_, mut entry)) = two.remove(&k) {
-                entry.sort_by(Self::sorter);
+                //entry.sort_by(Self::sorter);
                 let two = entry.last().unwrap();
                 if two.1.lamports != ZERO_RAW_LAMPORTS_SENTINEL {
                     cap2 += two.1.lamports;
@@ -225,7 +227,7 @@ impl CacheHashData {
         for entry in two.iter() {
             let k = entry.key();
             let mut v = entry.value().clone();
-            v.sort_by(Self::sorter);
+            //v.sort_by(Self::sorter);
             let two = v.last().unwrap();
             if two.1.lamports != ZERO_RAW_LAMPORTS_SENTINEL {
                 added2 += 1;
@@ -247,7 +249,7 @@ impl CacheHashData {
         );
     }
 
-    fn sorter(a: &hashentry, b: &hashentry) -> std::cmp::Ordering {
+    fn sorter_unused(a: &hashentry, b: &hashentry) -> std::cmp::Ordering {
         let slota = a.0.split('.').next().unwrap();
         let slotb = b.0.split('.').next().unwrap();
         slota.cmp(&slotb)
