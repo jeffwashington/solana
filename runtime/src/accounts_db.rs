@@ -6902,7 +6902,7 @@ impl AccountsDb {
 
         self.mark_old_slots_as_dirty(storages, Some(config.epoch_schedule.slots_per_epoch));
 
-        assert!(!(config.store_detailed_debug_info_on_failure && config.use_write_cache), "cannot accurately capture all data if accounts cache is being used");
+        // assert!(!(config.store_detailed_debug_info_on_failure && config.use_write_cache), "cannot accurately capture all data if accounts cache is being used");
 
         let (num_hash_scan_passes, bins_per_pass) = Self::bins_per_pass(self.num_hash_scan_passes);
         let use_bg_thread_pool = config.use_bg_thread_pool;
