@@ -8308,8 +8308,8 @@ impl AccountsDb {
         genesis_config: &GenesisConfig,
     ) -> IndexGenerationInfo {
 
-        let p1 = Path::new("/mnt/nvme1n1/ledger/failed_calculate_accounts_hash_cache");
-        let p2 = Path::new("/home/sol/failed_aug15/failed_calculate_accounts_hash_cache");
+        let p1 = Path::new("/mnt/nvme1n1/succeeded_145811791_aug17");
+        let p2 = Path::new("/mnt/nvme1n1/failed_145811791_aug17");
         CacheHashData::compare_two(&[&p1, &p2]);
         use log::*;error!("{}{}", file!(), line!());
 
