@@ -6739,6 +6739,7 @@ impl AccountsDb {
         let check_hash = false;
         error!("jwash logging on update_accounts_hash_with_index_option, slot: {}", slot);
         if can_cached_slot_be_unflushed {
+            error!("forcing flush");
             self.flush_accounts_cache(true, Some(slot));
         }
         let (hash, total_lamports) = self
