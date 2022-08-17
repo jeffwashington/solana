@@ -7046,9 +7046,11 @@ impl Bank {
                 calculated, expected
             );
 
+            error!("jwash looping at failure, slot: {}", self.slot());
+
             loop {
                 // hang here forever
-                break;
+                //break;
             }
 
             self.rc.accounts
@@ -7095,7 +7097,6 @@ impl Bank {
 
             loop {
                 // hang here forever
-                break;
             }
 
             false
