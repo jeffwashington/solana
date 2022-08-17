@@ -131,6 +131,20 @@ impl CacheHashData {
         use log::*;
         error!("{}{}, p1: {}", file!(), line!(), p1);
         files.sort();
+        let cache_two = &datas[1];
+        let mut files2 = cache_two
+            .pre_existing_cache_files
+            .lock()
+            .unwrap()
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>();
+        use log::*;
+        files2.sort();
+
+        [0, 1].par_iter().for_each(|i| {
+
+            if i == &0 {
         files.iter().for_each(|file| {
             //error!("file: {:?}", file);
             let mut accum = (0..vec_size).map(|_| Vec::default()).collect::<Vec<_>>();
@@ -151,16 +165,8 @@ impl CacheHashData {
                 }
             });
         });
-        let cache_two = &datas[1];
-        let mut files2 = cache_two
-            .pre_existing_cache_files
-            .lock()
-            .unwrap()
-            .iter()
-            .cloned()
-            .collect::<Vec<_>>();
-        files2.sort();
-        use log::*;
+    }
+    else {
         error!("{}{}", file!(), line!());
         files2.iter().for_each(|file| {
             //error!("file2: {:?}", file);
@@ -182,6 +188,7 @@ impl CacheHashData {
                 }
             });
         });
+    }});
 
         error!(
             "items in one: {}, two: {}, files in one, two: {}, {}",
