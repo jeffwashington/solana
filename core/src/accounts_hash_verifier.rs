@@ -130,6 +130,7 @@ impl AccountsHashVerifier {
         };
         timings.calc_storage_size_quartiles(&accounts_package.snapshot_storages);
 
+        error!("storing data in ahv");
         let (accounts_hash, lamports) = accounts_package
             .accounts
             .accounts_db
@@ -141,13 +142,17 @@ impl AccountsHashVerifier {
                     use_write_cache: false,
                     epoch_schedule: &accounts_package.epoch_schedule,
                     rent_collector: &accounts_package.rent_collector,
-                    store_detailed_debug_info_on_failure: false,
+                    store_detailed_debug_info_on_failure: true,
                     full_snapshot: None,
                 },
                 &sorted_storages,
                 timings,
             )
             .unwrap();
+            error!("looping after ahv");
+            loop {
+
+            }
 
         if accounts_package.expected_capitalization != lamports {
             // before we assert, run the hash calc again. This helps track down whether it could have been a failure in a race condition possibly with shrink.
