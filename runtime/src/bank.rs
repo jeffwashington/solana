@@ -7046,6 +7046,10 @@ impl Bank {
                 calculated, expected
             );
 
+            loop {
+                // hang here forever
+            }
+
             self.rc.accounts
             .accounts_db
             .calculate_accounts_hash_helper_with_verify(
@@ -7087,10 +7091,6 @@ impl Bank {
                 },
                 None
             );
-
-            loop {
-                // hang here forever
-            }
 
             false
         }
