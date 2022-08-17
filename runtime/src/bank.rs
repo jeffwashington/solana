@@ -7048,6 +7048,7 @@ impl Bank {
 
             loop {
                 // hang here forever
+                break;
             }
 
             self.rc.accounts
@@ -7091,6 +7092,11 @@ impl Bank {
                 },
                 None
             );
+
+            loop {
+                // hang here forever
+                break;
+            }
 
             false
         }

@@ -6285,6 +6285,8 @@ impl AccountsDb {
         );
         self.assert_safe_squashing_accounts_hash(max_slot, config.epoch_schedule);
 
+        error!("without_index: (but really with): {}, {}", accumulated_hash, total_lamports);
+
         Ok((accumulated_hash, total_lamports))
     }
 
