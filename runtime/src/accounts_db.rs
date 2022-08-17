@@ -6738,6 +6738,9 @@ impl AccountsDb {
     ) -> (Hash, u64) {
         let check_hash = false;
         error!("jwash logging on update_accounts_hash_with_index_option, slot: {}", slot);
+        if can_cached_slot_be_unflushed {
+            self.flush_accounts_cache(true, Some(slot));
+        }
         let (hash, total_lamports) = self
             .calculate_accounts_hash_helper_with_verify(
                 use_index,
@@ -6898,6 +6901,8 @@ impl AccountsDb {
         stats.oldest_root = storages.range().start;
 
         self.mark_old_slots_as_dirty(storages, Some(config.epoch_schedule.slots_per_epoch));
+
+        assert!(!(config.store_detailed_debug_info_on_failure && config.use_write_cache), "cannot accurately capture all data if accounts cache is being used");
 
         let (num_hash_scan_passes, bins_per_pass) = Self::bins_per_pass(self.num_hash_scan_passes);
         let use_bg_thread_pool = config.use_bg_thread_pool;
