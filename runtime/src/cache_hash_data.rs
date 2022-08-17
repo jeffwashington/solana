@@ -125,11 +125,11 @@ impl CacheHashData {
         use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
         let bin_calc = PubkeyBinCalculator24::new(65536);
         use std::str::FromStr;
-        let interesting = Pubkey::from_str("8MTrwnaQwMbVBCMPPn4BpKfPTMfTqLwhhStENtp4dtYX").unwrap();
+        let interesting = Pubkey::from_str("EgZgi8skDug7YecbFuCFxXx3SPFPhbGSVrGiNzLHErkj").unwrap();
         let p1 = crate::bank::Bank::partition_from_pubkey(&interesting, 432_000);
 
         use log::*;
-        error!("{}{}, p1: {}", file!(), line!(), p1);
+        error!("{}{}, p1: {}, {}", file!(), line!(), p1, interesting);
         files.sort();
         let cache_two = &datas[1];
         let mut files2 = cache_two
