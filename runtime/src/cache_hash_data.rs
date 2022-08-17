@@ -142,7 +142,7 @@ impl CacheHashData {
                 let pk = entry.pubkey;
                 let new_one = (format!("{:?}", file), entry);
                 if interesting == pk {
-                    error!("found: {:?}", new_one);
+                    error!("found1: {:?}", new_one);
                 }
                 if let Some(mut current) = one.get_mut(&pk) {
                     current.push(new_one);
@@ -173,7 +173,7 @@ impl CacheHashData {
                 let pk = entry.pubkey;
                 let new_one = (format!("{:?}", file), entry);
                 if interesting == pk {
-                    error!("found: {:?}", new_one);
+                    error!("found2: {:?}", new_one);
                 }
                 if let Some(mut current) = two.get_mut(&pk) {
                     current.push(new_one);
