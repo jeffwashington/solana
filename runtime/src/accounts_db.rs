@@ -2476,6 +2476,7 @@ impl AccountsDb {
                 }
             });
         });
+
         delta_insert.stop();
         timings.delta_insert_us += delta_insert.as_us();
 
@@ -2492,11 +2493,17 @@ impl AccountsDb {
             last_full_snapshot_slot.is_some() || self.zero_lamport_accounts_to_purge_after_full_snapshot.is_empty(),
             "if snapshots are disabled, then zero_lamport_accounts_to_purge_later should always be empty"
         );
+
+        let interesting = Pubkey::from_str("8MTrwnaQwMbVBCMPPn4BpKfPTMfTqLwhhStENtp4dtYX").unwrap();
+
         if let Some(last_full_snapshot_slot) = last_full_snapshot_slot {
             self.zero_lamport_accounts_to_purge_after_full_snapshot
                 .retain(|(slot, pubkey)| {
                     let is_candidate_for_clean =
                         max_slot >= *slot && last_full_snapshot_slot >= *slot;
+                    if interesting == *pubkey {
+                        error!("jw: {}, max_slot: {}, candidate: {}", pubkey, max_slot, is_candidate_for_clean);
+                    }
                     if is_candidate_for_clean {
                         pubkeys.push(*pubkey);
                     }
@@ -2553,6 +2560,7 @@ impl AccountsDb {
         let not_found_on_fork_accum = AtomicU64::new(0);
         let missing_accum = AtomicU64::new(0);
         let useful_accum = AtomicU64::new(0);
+        let interesting = Pubkey::from_str("8MTrwnaQwMbVBCMPPn4BpKfPTMfTqLwhhStENtp4dtYX").unwrap();
 
         // parallel scan the index.
         let (mut purges_zero_lamports, purges_old_accounts) = {
@@ -2575,6 +2583,10 @@ impl AccountsDb {
                                         slot_list,
                                         max_clean_root,
                                     );
+
+                                    if interesting == *pubkey {
+                                        error!("jw: clean: {}, {:?}", pubkey, index_in_slot_list);
+                                    }
 
                                     match index_in_slot_list {
                                         Some(index_in_slot_list) => {
@@ -2674,6 +2686,11 @@ impl AccountsDb {
         // Then purge if we can
         let mut store_counts: HashMap<AppendVecId, (usize, HashSet<Pubkey>)> = HashMap::new();
         for (key, (account_infos, ref_count)) in purges_zero_lamports.iter_mut() {
+            if interesting == *key {
+                error!("jw: zero lamports: {}, {:?}", key, account_infos);
+            }
+
+
             if purged_account_slots.contains_key(key) {
                 *ref_count = self.accounts_index.ref_count_from_storage(key);
             }
@@ -2995,25 +3012,34 @@ impl AccountsDb {
             "if filtering for incremental snapshots, then snapshots should be enabled",
         );
 
+        let interesting = Pubkey::from_str("8MTrwnaQwMbVBCMPPn4BpKfPTMfTqLwhhStENtp4dtYX").unwrap();
+
         purges_zero_lamports.retain(|pubkey, (slot_account_infos, _ref_count)| {
             // Only keep purges_zero_lamports where the entire history of the account in the root set
             // can be purged. All AppendVecs for those updates are dead.
             for (_slot, account_info) in slot_account_infos.iter() {
                 if store_counts.get(&account_info.store_id()).unwrap().0 != 0 {
+                    if interesting == *pubkey {
+                        error!("jw: not retain {}, {:?}, {}", pubkey, account_info, _slot);
+                    }
+        
                     return false;
                 }
             }
 
             // Exit early if not filtering more for incremental snapshots
             if !should_filter_for_incremental_snapshots {
-                return true;
+                if interesting == *pubkey {
+                    error!("jw: !should filter {}, {:?}", pubkey, slot_account_infos);
+                }
+            return true;
             }
 
             let slot_account_info_at_highest_slot = slot_account_infos
                 .iter()
                 .max_by_key(|(slot, _account_info)| slot);
 
-            slot_account_info_at_highest_slot.map_or(true, |(slot, account_info)| {
+            let r = slot_account_info_at_highest_slot.map_or(true, |(slot, account_info)| {
                 // Do *not* purge zero-lamport accounts if the slot is greater than the last full
                 // snapshot slot.  Since we're `retain`ing the accounts-to-purge, I felt creating
                 // the `cannot_purge` variable made this easier to understand.  Accounts that do
@@ -3026,7 +3052,12 @@ impl AccountsDb {
                         .insert((*slot, *pubkey));
                 }
                 !cannot_purge
-            })
+            });
+            if interesting == *pubkey {
+                error!("jw: !r: {:?} {}, {:?}", r, pubkey, slot_account_infos);
+            }
+
+            r
         });
     }
 
@@ -3174,7 +3205,7 @@ impl AccountsDb {
     where
         I: Iterator<Item = &'a Arc<AccountStorageEntry>>,
     {
-        debug!("do_shrink_slot_stores: slot: {}", slot);
+        info!("do_shrink_slot_stores: slot: {}", slot);
         let GetUniqueAccountsResult {
             stored_accounts,
             original_bytes,
