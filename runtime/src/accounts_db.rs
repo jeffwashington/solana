@@ -6365,6 +6365,7 @@ impl AccountsDb {
     fn scan_multiple_account_storages_one_slot<S>(
         storages: &[Arc<AccountStorageEntry>],
         scanner: &mut S,
+        slot: Slot,
     ) where
         S: AppendVecScan,
     {
@@ -6378,7 +6379,7 @@ impl AccountsDb {
                 if scanner.filter(&account.meta.pubkey) {
 
                     if account.meta.pubkey == interesting {
-                        error!("jw: in storage {} {:?}", account.meta.pubkey, account);
+                        error!("jw: in storage {} {:?}, slot: {}", account.meta.pubkey, (account.lamports(), account.hash), slot);
                     }
             
                     scanner.found_account(&LoadedAccount::Stored(account))
@@ -6671,7 +6672,7 @@ impl AccountsDb {
                     }
 
                     if let Some(sub_storages) = sub_storages {
-                        Self::scan_multiple_account_storages_one_slot(sub_storages, &mut scanner);
+                        Self::scan_multiple_account_storages_one_slot(sub_storages, &mut scanner, slot);
                     }
                 }
                 let r = scanner.scanning_complete();

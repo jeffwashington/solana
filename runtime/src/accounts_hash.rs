@@ -848,10 +848,12 @@ impl AccountsHash {
                 &mut first_item_to_pubkey_division,
             );
 
+            let mut found = false;
             if let Some(r) = self.reference.as_ref() {
                 if let Some(entry) = r.remove(&min_pubkey) {
                     let one = entry.1.last().unwrap();
                     if &one.1 != item {
+                        found = true;
                         error!("jw: different: {}, {:?}, {:?}", min_pubkey, entry, item);
                     }
                 }
@@ -876,7 +878,7 @@ impl AccountsHash {
                 // reverse this list because get_item can remove first_items[*i] when *i is exhausted
                 //  and that would mess up subsequent *i values
                 duplicate_pubkey_indexes.iter().rev().for_each(|i| {
-                    Self::get_item(
+                    let it = Self::get_item(
                         *i,
                         pubkey_bin,
                         &mut first_items,
@@ -884,6 +886,9 @@ impl AccountsHash {
                         &mut indexes,
                         &mut first_item_to_pubkey_division,
                     );
+                    if found {
+                        error!("jw: different, older: {}, {:?}", min_pubkey, it);
+                    }
                 });
                 duplicate_pubkey_indexes.clear();
             }
