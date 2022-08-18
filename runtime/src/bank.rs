@@ -6891,7 +6891,7 @@ impl Bank {
         let cap = self.capitalization();
         let epoch_schedule = self.epoch_schedule();
         let rent_collector = self.rent_collector();
-        if config.run_in_background {
+        if config.run_in_background && false {
             let ancestors = ancestors.clone();
             let accounts = Arc::clone(accounts);
             let epoch_schedule = *epoch_schedule;
