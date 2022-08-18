@@ -6952,6 +6952,13 @@ impl AccountsDb {
 
         stats.oldest_root = storages.range().start;
 
+        if 145811791 == storages.max_slot_inclusive() {
+            panic!("calculate hash");
+        }
+        if 145811708 == storages.max_slot_inclusive() {
+            panic!("calculate hash");
+        }
+
         self.mark_old_slots_as_dirty(storages, Some(config.epoch_schedule.slots_per_epoch));
 
         // assert!(!(config.store_detailed_debug_info_on_failure && config.use_write_cache), "cannot accurately capture all data if accounts cache is being used");
