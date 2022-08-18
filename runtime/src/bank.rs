@@ -6856,7 +6856,7 @@ impl Bank {
     /// return true if all is good
     /// Only called from startup or test code.
     #[must_use]
-    pub fn verify_bank_hash(&self, config: VerifyBankHash) -> bool {
+    pub fn verify_bank_hash(&self, config: VerifyBankHash, clean: bool) -> bool {
         let accounts = &self.rc.accounts;
         // Wait until initial hash calc is complete before starting a new hash calc.
         // This should only occur when we halt at a slot in ledger-tool.
@@ -6864,6 +6864,12 @@ impl Bank {
             .accounts_db
             .verify_accounts_hash_in_bg
             .wait_for_complete();
+
+            if clean {
+            accounts.accounts_db.flush_accounts_cache(true, Some(self.slot()));
+        accounts.accounts_db.clean_accounts(Some(self.slot()), true, None);
+        accounts.accounts_db.shrink_all_slots(true, None);
+            }
 
         if config.require_rooted_bank
             && !accounts
@@ -6873,7 +6879,7 @@ impl Bank {
         {
             if let Some(parent) = self.parent() {
                 info!("{} is not a root, so attempting to verify bank hash on parent bank at slot: {}", self.slot(), parent.slot());
-                return parent.verify_bank_hash(config);
+                return parent.verify_bank_hash(config, false);
             } else {
                 // this will result in mismatch errors
                 // accounts hash calc doesn't include unrooted slots
@@ -7223,7 +7229,7 @@ impl Bank {
                 require_rooted_bank: false,
                 run_in_background: true,
                 store_hash_raw_data_for_debug: false,
-            });
+            }, false);
             verify_time.stop();
             (verify, verify_time.as_us())
         } else {
