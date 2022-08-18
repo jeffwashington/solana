@@ -848,6 +848,20 @@ impl AccountsHash {
                 &mut first_item_to_pubkey_division,
             );
 
+            if let Some(r) = self.reference.as_ref() {
+                if let Some(entry) = r.remove(&min_pubkey) {
+                    let one = entry.1.last().unwrap();
+                    if &one.1 != item {
+                        error!("jw: different: {}, {:?}, {:?}", min_pubkey, entry, item);
+                    }
+                }
+                else {
+                    if item.lamports != ZERO_RAW_LAMPORTS_SENTINEL {
+                        error!("jw: unexpected: {:?}, {:?}", min_pubkey, item);
+                    }
+                }
+            }
+
             // add lamports, get hash as long as the lamports are > 0
             if item.lamports != ZERO_RAW_LAMPORTS_SENTINEL
                 && (!filler_accounts_enabled || !self.is_filler_account(&item.pubkey))

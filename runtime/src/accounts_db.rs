@@ -6971,6 +6971,7 @@ impl AccountsDb {
             });
             Arc::new(one)
         });
+        let reference2 = reference.as_ref().map(|r| Arc::clone(r));
 
         let (num_hash_scan_passes, bins_per_pass) = Self::bins_per_pass(self.num_hash_scan_passes);
         let use_bg_thread_pool = config.use_bg_thread_pool;
@@ -7028,6 +7029,20 @@ impl AccountsDb {
         } else {
             scan_and_hash()
         };
+
+        use crate::accounts_hash::ZERO_RAW_LAMPORTS_SENTINEL;
+        if let Some(r) = reference2 {
+            for entry in r.iter() {
+                let k = entry.key();
+                let mut v = entry.value().clone();
+                //v.sort_by(Self::sorter);
+                let two = v.last().unwrap();
+                if two.1.lamports != ZERO_RAW_LAMPORTS_SENTINEL {
+                    error!("in 2, not in 1: {:?}, {:?}", k, v);
+                }
+            }
+        }
+
         self.assert_safe_squashing_accounts_hash(
             storages.max_slot_inclusive(),
             config.epoch_schedule,
