@@ -6378,7 +6378,7 @@ impl AccountsDb {
                 if scanner.filter(&account.meta.pubkey) {
 
                     if account.meta.pubkey == interesting {
-                        error!("jw: in cache {} {:?}", account.meta.pubkey, account);
+                        error!("jw: in storage {} {:?}", account.meta.pubkey, account);
                     }
             
                     scanner.found_account(&LoadedAccount::Stored(account))
