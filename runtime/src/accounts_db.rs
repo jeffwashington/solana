@@ -2494,7 +2494,7 @@ impl AccountsDb {
             "if snapshots are disabled, then zero_lamport_accounts_to_purge_later should always be empty"
         );
 
-        let interesting = Pubkey::from_str("8MTrwnaQwMbVBCMPPn4BpKfPTMfTqLwhhStENtp4dtYX").unwrap();
+        let interesting = Pubkey::from_str("W3oQfsjMaJTC6rDcsfaVxsuVCFxxxfkAeiyxG4NE6sW").unwrap();
 
         if let Some(last_full_snapshot_slot) = last_full_snapshot_slot {
             self.zero_lamport_accounts_to_purge_after_full_snapshot
@@ -2560,7 +2560,7 @@ impl AccountsDb {
         let not_found_on_fork_accum = AtomicU64::new(0);
         let missing_accum = AtomicU64::new(0);
         let useful_accum = AtomicU64::new(0);
-        let interesting = Pubkey::from_str("8MTrwnaQwMbVBCMPPn4BpKfPTMfTqLwhhStENtp4dtYX").unwrap();
+        let interesting = Pubkey::from_str("W3oQfsjMaJTC6rDcsfaVxsuVCFxxxfkAeiyxG4NE6sW").unwrap();
 
         // parallel scan the index.
         let (mut purges_zero_lamports, purges_old_accounts) = {
@@ -3012,7 +3012,7 @@ impl AccountsDb {
             "if filtering for incremental snapshots, then snapshots should be enabled",
         );
 
-        let interesting = Pubkey::from_str("8MTrwnaQwMbVBCMPPn4BpKfPTMfTqLwhhStENtp4dtYX").unwrap();
+        let interesting = Pubkey::from_str("W3oQfsjMaJTC6rDcsfaVxsuVCFxxxfkAeiyxG4NE6sW").unwrap();
 
         purges_zero_lamports.retain(|pubkey, (slot_account_infos, _ref_count)| {
             // Only keep purges_zero_lamports where the entire history of the account in the root set
