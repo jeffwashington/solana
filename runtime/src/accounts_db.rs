@@ -6369,14 +6369,23 @@ impl AccountsDb {
         S: AppendVecScan,
     {
         let mut len = storages.len();
+
+        let interesting = Pubkey::from_str("W3oQfsjMaJTC6rDcsfaVxsuVCFxxxfkAeiyxG4NE6sW").unwrap();
+
         if len == 1 {
             // only 1 storage, so no need to interleave between multiple storages based on write_version
             storages[0].accounts.account_iter().for_each(|account| {
                 if scanner.filter(&account.meta.pubkey) {
+
+                    if account.meta.pubkey == interesting {
+                        error!("jw: in cache {} {:?}", account.meta.pubkey, account);
+                    }
+            
                     scanner.found_account(&LoadedAccount::Stored(account))
                 }
             });
         } else {
+            panic!("unexpected");
             // we have to call the scan_func in order of write_version within a slot if there are multiple storages per slot
             let mut progress = Vec::with_capacity(len);
             let mut current =
@@ -6498,6 +6507,7 @@ impl AccountsDb {
         let slot0 = std::cmp::max(range.start, one_epoch_old_slot);
         let first_boundary =
             ((slot0 + MAX_ITEMS_PER_CHUNK) / MAX_ITEMS_PER_CHUNK) * MAX_ITEMS_PER_CHUNK;
+            let interesting = Pubkey::from_str("W3oQfsjMaJTC6rDcsfaVxsuVCFxxxfkAeiyxG4NE6sW").unwrap();
 
         let width = max_slot_inclusive - slot0;
         // 2 is for 2 special chunks - unaligned slots at the beginning and end
@@ -6649,7 +6659,10 @@ impl AccountsDb {
                                                 Cow::Owned(cached_account),
                                             ));
                                             let account = accessor.get_loaded_account().unwrap();
-                                            scanner.found_account(&account);
+                                            if key == interesting {
+                                                error!("jw: in cache {} {:?}", key, (account.lamports(), account.loaded_hash(), slot));
+                                            }
+                                                scanner.found_account(&account);
                                         }
                                     }
                                 }
