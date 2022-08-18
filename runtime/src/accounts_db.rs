@@ -5788,6 +5788,7 @@ impl AccountsDb {
                 }
             }
         }
+        let interesting = Pubkey::from_str("W3oQfsjMaJTC6rDcsfaVxsuVCFxxxfkAeiyxG4NE6sW").unwrap();
 
         let (accounts, hashes): (Vec<(&Pubkey, &AccountSharedData)>, Vec<Hash>) = iter_items
             .iter()
@@ -5798,6 +5799,11 @@ impl AccountsDb {
                     .as_mut()
                     .map(|should_flush_f| should_flush_f(key, account))
                     .unwrap_or(true);
+
+                if key == &interesting {
+                    error!("jw: preparing to flush: {}, slot: {}", key, slot);
+                }
+                
                 if should_flush {
                     let hash = iter_item.value().hash();
                     total_size += (account.data().len() + STORE_META_OVERHEAD) as u64;
