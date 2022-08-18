@@ -6936,6 +6936,42 @@ impl AccountsDb {
 
         // assert!(!(config.store_detailed_debug_info_on_failure && config.use_write_cache), "cannot accurately capture all data if accounts cache is being used");
 
+        let reference = (storages.max_slot_inclusive() == 145811791).then(|| {
+            let mut one = DashMap::<Pubkey, Vec<crate::accounts_hash::hashentry>>::new();
+            let cache_one = CacheHashData::new(&Path::new("/mnt/nvme1n1/succeeded_145811791_aug17"));
+            let mut files = cache_one
+                .pre_existing_cache_files
+                .lock()
+                .unwrap()
+                .iter()
+                .cloned()
+                .collect::<Vec<_>>();
+            let vec_size = 65536;
+    
+            use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+            let bin_calc = PubkeyBinCalculator24::new(65536);
+            files.sort();
+    
+            files.iter().for_each(|file| {
+                //error!("file: {:?}", file);
+                let mut accum = (0..vec_size).map(|_| Vec::default()).collect::<Vec<_>>();
+                let x = cache_one.load(file, &mut accum, 0, &bin_calc);
+                if x.is_err() {
+                    error!("failure to load file :{:?}, {:?}", x, file);
+                }
+                accum.into_iter().flatten().for_each(|entry| {
+                    let pk = entry.pubkey;
+                    let new_one = (format!("{:?}", file), entry);
+                    if let Some(mut current) = one.get_mut(&pk) {
+                        current.push(new_one);
+                    } else {
+                        one.insert(pk, vec![new_one]);
+                    }
+                });
+            });
+            Arc::new(one)
+        });
+
         let (num_hash_scan_passes, bins_per_pass) = Self::bins_per_pass(self.num_hash_scan_passes);
         let use_bg_thread_pool = config.use_bg_thread_pool;
         let mut scan_and_hash = move || {
@@ -6956,6 +6992,7 @@ impl AccountsDb {
                     } else {
                         None
                     },
+                    reference: reference.as_ref().map(|r| Arc::clone(r)),
                 };
 
                 let result = self.scan_snapshot_stores_with_cache(

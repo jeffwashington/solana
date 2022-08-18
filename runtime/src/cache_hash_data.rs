@@ -91,7 +91,7 @@ impl CacheHashDataFile {
 pub type PreExistingCacheFiles = HashSet<String>;
 pub struct CacheHashData {
     cache_folder: PathBuf,
-    pre_existing_cache_files: Arc<Mutex<PreExistingCacheFiles>>,
+    pub pre_existing_cache_files: Arc<Mutex<PreExistingCacheFiles>>,
     pub stats: Arc<Mutex<CacheHashDataStats>>,
 }
 

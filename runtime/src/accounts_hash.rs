@@ -369,9 +369,14 @@ impl CumulativeOffsets {
     }
 }
 
+pub type hashentry = (std::string::String, CalculateHashIntermediate);
+
+use dashmap::DashMap;
+use std::sync::Arc;
 #[derive(Debug, Default)]
 pub struct AccountsHash {
     pub filler_account_suffix: Option<Pubkey>,
+    pub reference: Option<Arc<DashMap::<Pubkey, Vec<hashentry>>>>,
 }
 
 impl AccountsHash {
