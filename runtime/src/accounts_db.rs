@@ -6796,7 +6796,7 @@ impl AccountsDb {
                     use_bg_thread_pool: !is_startup,
                     check_hash,
                     ancestors: Some(ancestors),
-                    use_write_cache: false,
+                    use_write_cache: can_cached_slot_be_unflushed,
                     epoch_schedule,
                     rent_collector,
                     store_detailed_debug_info_on_failure: true,
