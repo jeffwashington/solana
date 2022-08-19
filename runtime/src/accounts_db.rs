@@ -6953,10 +6953,10 @@ impl AccountsDb {
         stats.oldest_root = storages.range().start;
 
         if 145811791 == storages.max_slot_inclusive() {
-            panic!("calculate hash");
+            //panic!("calculate hash");
         }
         if 145811708 == storages.max_slot_inclusive() {
-            panic!("calculate hash");
+            //panic!("calculate hash");
         }
 
         self.mark_old_slots_as_dirty(storages, Some(config.epoch_schedule.slots_per_epoch));
