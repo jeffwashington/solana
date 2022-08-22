@@ -2264,7 +2264,7 @@ impl AccountsDb {
                 }
             } else {
                 if pubkey == &interesting {
-                    info!("jw: calc_delete_dependencies2, {pubkey}, count: {count}, id: {store_id}, infos:{account_info:?}, {ref_count_from_storage}, len: {}", account_infos.len());
+                    info!("jw: calc_delete_dependencies2, {pubkey}, infos:{account_infos:?}, {ref_count_from_storage}, len: {}", account_infos.len());
                 }
         // a pubkey we were planning to remove is not removing all stores that contain the account
                 debug!(
