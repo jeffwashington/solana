@@ -3020,7 +3020,8 @@ impl AccountsDb {
             for (_slot, account_info) in slot_account_infos.iter() {
                 if store_counts.get(&account_info.store_id()).unwrap().0 != 0 {
                     if interesting == *pubkey {
-                        error!("jw: not retain {}, {:?}, {}", pubkey, account_info, _slot);
+                        error!("jw: filter_zero_lamport_clean_for_incremental_snapshots not retain {}, {:?}, {}, store count: {}, store_id: {}", pubkey, account_info, _slot, store_counts.get(&account_info.store_id()).unwrap().0,
+                        account_info.store_id());
                     }
         
                     return false;
