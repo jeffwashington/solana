@@ -67,6 +67,7 @@ impl ActiveStats {
             ActiveStatItem::Hash => {
                 let result = datapoint_info!("accounts_db_active", ("hash", value, i64));
                 if value > 1 {
+                    use log::*;
                     error!("too many calls: {}", value);
                 }
                 result
