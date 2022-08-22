@@ -130,7 +130,7 @@ impl AccountsHashVerifier {
         };
         timings.calc_storage_size_quartiles(&accounts_package.snapshot_storages);
 
-        error!("jw3: storing data in ahv");
+        error!("jw3: storing data in ahv: {}", accounts_package.slot);
         let (accounts_hash, lamports) = accounts_package
             .accounts
             .accounts_db
