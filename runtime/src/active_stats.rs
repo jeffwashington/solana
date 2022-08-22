@@ -65,10 +65,12 @@ impl ActiveStats {
                 datapoint_info!("accounts_db_active", ("shrink", value, i64))
             }
             ActiveStatItem::Hash => {
+                let result = datapoint_info!("accounts_db_active", ("hash", value, i64));
                 if value > 1 {
                     panic!("too many calls");
                 }
-                datapoint_info!("accounts_db_active", ("hash", value, i64))},
+                result
+            },
             ActiveStatItem::Flush => datapoint_info!("accounts_db_active", ("flush", value, i64)),
         };
     }

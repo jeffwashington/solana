@@ -6948,6 +6948,8 @@ impl AccountsDb {
         storages: &SortedStorages<'_>,
         mut stats: HashStats,
     ) -> Result<(Hash, u64), BankHashVerificationError> {
+        error!("jw3: calculate_accounts_hash_without_index");
+
         let _guard = self.active_stats.activate(ActiveStatItem::Hash);
 
         stats.oldest_root = storages.range().start;
@@ -6963,7 +6965,7 @@ impl AccountsDb {
 
         // assert!(!(config.store_detailed_debug_info_on_failure && config.use_write_cache), "cannot accurately capture all data if accounts cache is being used");
 
-        let reference = (storages.max_slot_inclusive() == 145811791).then(|| {
+        let reference = (false && storages.max_slot_inclusive() == 145811791).then(|| {
             let mut one = DashMap::<Pubkey, Vec<crate::accounts_hash::hashentry>>::new();
             let cache_one = CacheHashData::new(&Path::new("/mnt/nvme1n1/succeeded_145811791_aug17"));
             let mut files = cache_one
@@ -7057,6 +7059,7 @@ impl AccountsDb {
             scan_and_hash()
         };
 
+        error!("jw: looking for differences");
         use crate::accounts_hash::ZERO_RAW_LAMPORTS_SENTINEL;
         if let Some(r) = reference2 {
             for entry in r.iter() {
