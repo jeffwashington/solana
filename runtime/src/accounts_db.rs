@@ -6948,7 +6948,7 @@ impl AccountsDb {
         storages: &SortedStorages<'_>,
         mut stats: HashStats,
     ) -> Result<(Hash, u64), BankHashVerificationError> {
-        error!("jw3: calculate_accounts_hash_without_index");
+        error!("jw3: calculate_accounts_hash_without_index, {}", storages.max_slot_inclusive());
 
         let _guard = self.active_stats.activate(ActiveStatItem::Hash);
 
