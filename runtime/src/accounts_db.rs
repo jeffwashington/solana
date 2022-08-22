@@ -2227,6 +2227,8 @@ impl AccountsDb {
         store_counts: &mut HashMap<AppendVecId, (usize, HashSet<Pubkey>)>,
         min_store_id: Option<AppendVecId>,
     ) {
+        let interesting = Pubkey::from_str("8MTrwnaQwMbVBCMPPn4BpKfPTMfTqLwhhStENtp4dtYX").unwrap();
+
         // Another pass to check if there are some filtered accounts which
         // do not match the criteria of deleting all appendvecs which contain them
         // then increment their storage count.
@@ -2248,6 +2250,9 @@ impl AccountsDb {
                     );
                     if count != 0 {
                         // one of the pubkeys in the store has account info to a store whose store count is not going to zero
+                        if pubkey == &interesting {
+                            info!("jw: calc_delete_dependencies, {pubkey}, count: {count}, id: {store_id}, infos:{account_info:?}, slot: {_slot}");
+                        }
                         failed_store_id = Some(store_id);
                         delete = false;
                         break;
@@ -2258,7 +2263,10 @@ impl AccountsDb {
                     continue;
                 }
             } else {
-                // a pubkey we were planning to remove is not removing all stores that contain the account
+                if pubkey == &interesting {
+                    info!("jw: calc_delete_dependencies2, {pubkey}, count: {count}, id: {store_id}, infos:{account_info:?}, {ref_count_from_storage}, len: {}", account_infos.len());
+                }
+        // a pubkey we were planning to remove is not removing all stores that contain the account
                 debug!(
                     "calc_delete_dependencies(),
                     pubkey: {},
@@ -2298,6 +2306,13 @@ impl AccountsDb {
 
                 let affected_pubkeys = &store_counts.get(&id).unwrap().1;
                 for key in affected_pubkeys {
+                    if key == &interesting {
+                        if let Some(failed_store_id) = failed_store_id.take() {
+                            info!("jw: calc_delete_dependencies3, oldest store is not able to be deleted because of {pubkey} in store {failed_store_id}");
+                        } else {
+                            info!("jw: calc_delete_dependencies4, oldest store is not able to be deleted because of {pubkey}, account infos len: {}, ref count: {ref_count_from_storage}", account_infos.len());
+                        }
+                        }
                     for (_slot, account_info) in &purges.get(key).unwrap().0 {
                         if !already_counted.contains(&account_info.store_id()) {
                             pending_store_ids.insert(account_info.store_id());
