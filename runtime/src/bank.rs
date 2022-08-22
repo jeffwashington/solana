@@ -7042,6 +7042,7 @@ impl Bank {
 
     /// only called at startup vs steady-state runtime
     pub fn calculate_and_verify_capitalization(&self, debug_verify: bool) -> bool {
+        error!("jw3:calculate_and_verify_capitalization, {}", self.slot());
         let calculated = self.calculate_capitalization(debug_verify);
         let expected = self.capitalization();
         if calculated == expected {
