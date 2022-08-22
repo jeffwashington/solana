@@ -261,7 +261,7 @@ impl BankForks {
         for bank in banks.iter() {
             let bank_slot = bank.slot();
             if (bank.block_height() % self.accounts_hash_interval_slots == 0
-                && bank_slot > self.last_accounts_hash_slot || bank.slot() == 145811142) && bank.slot() <= 145811142
+                && bank_slot > self.last_accounts_hash_slot || self.root_bank().slot() == 145811142) && self.root_bank().slot() <= 145811142 && self.root_bank().slot() != 145811791
             {
                 self.last_accounts_hash_slot = bank_slot;
                 let squash_timing = bank.squash();
