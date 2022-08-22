@@ -2234,6 +2234,7 @@ impl AccountsDb {
         // then increment their storage count.
         let mut already_counted = HashSet::new();
         let mut failed_store_id = None;
+        let mut failed_slot = None;
         for (pubkey, (account_infos, ref_count_from_storage)) in purges.iter() {
             let all_stores_being_deleted =
                 account_infos.len() as RefCount == *ref_count_from_storage;
@@ -2254,6 +2255,7 @@ impl AccountsDb {
                             info!("jw: calc_delete_dependencies, {pubkey}, count: {count}, id: {store_id}, infos:{account_info:?}, slot: {_slot}");
                         }
                         failed_store_id = Some(store_id);
+                        failed_slot = Some(_slot);
                         delete = false;
                         break;
                     }
@@ -2308,7 +2310,7 @@ impl AccountsDb {
                 for key in affected_pubkeys {
                     if key == &interesting {
                         if let Some(failed_store_id) = failed_store_id.take() {
-                            info!("jw: calc_delete_dependencies3, oldest store is not able to be deleted because of {pubkey} in store {failed_store_id}");
+                            info!("jw: calc_delete_dependencies3, oldest store is not able to be deleted because of {pubkey} in store {failed_store_id}, failed slot: {failed_slot:?}");
                         } else {
                             info!("jw: calc_delete_dependencies4, oldest store is not able to be deleted because of {pubkey}, account infos len: {}, ref count: {ref_count_from_storage}", account_infos.len());
                         }
