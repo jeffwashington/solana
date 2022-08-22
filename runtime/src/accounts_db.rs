@@ -2224,13 +2224,13 @@ impl AccountsDb {
         // do not match the criteria of deleting all appendvecs which contain them
         // then increment their storage count.
         let mut already_counted = HashSet::new();
-        let mut failed_store_id = None;
+        let mut failed_slot = None;
         for (pubkey, (account_infos, ref_count_from_storage)) in purges.iter() {
             let all_stores_being_deleted =
                 account_infos.len() as RefCount == *ref_count_from_storage;
             if all_stores_being_deleted {
                 let mut delete = true;
-                for (_slot, account_info) in account_infos {
+                for (slot, account_info) in account_infos {
                     let store_id = account_info.store_id();
                     let count = store_counts.get(&store_id).unwrap().0;
                     debug!(
@@ -2241,7 +2241,7 @@ impl AccountsDb {
                     );
                     if count != 0 {
                         // one of the pubkeys in the store has account info to a store whose store count is not going to zero
-                        failed_store_id = Some(store_id);
+                        failed_slot = Some(slot);
                         delete = false;
                         break;
                     }
@@ -2275,8 +2275,8 @@ impl AccountsDb {
             while !pending_store_ids.is_empty() {
                 let id = pending_store_ids.iter().next().cloned().unwrap();
                 if Some(id) == min_store_id {
-                    if let Some(failed_store_id) = failed_store_id.take() {
-                        info!("calc_delete_dependencies, oldest store is not able to be deleted because of {pubkey} in store {failed_store_id}");
+                    if let Some(failed_slot) = failed_slot.take() {
+                        info!("calc_delete_dependencies, oldest store is not able to be deleted because of {pubkey} in store {failed_slot}");
                     } else {
                         info!("calc_delete_dependencies, oldest store is not able to be deleted because of {pubkey}, account infos len: {}, ref count: {ref_count_from_storage}", account_infos.len());
                     }
@@ -2458,6 +2458,15 @@ impl AccountsDb {
         // find the oldest append vec older than one epoch old
         // we'll add logging if that append vec cannot be marked dead
         let mut min_dirty_slot = self.get_accounts_hash_complete_one_epoch_old();
+        if min_dirty_slot == 0 {
+            min_dirty_slot = self
+                .accounts_index
+                .roots_tracker
+                .read()
+                .unwrap()
+                .min_alive_root()
+                .unwrap_or_default();
+        }
         let mut min_dirty_store_id = None;
         self.dirty_stores.retain(|(slot, store_id), store| {
             if *slot > max_slot_inclusive {
