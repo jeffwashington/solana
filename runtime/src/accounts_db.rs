@@ -6436,7 +6436,7 @@ impl AccountsDb {
                 if scanner.filter(&account.meta.pubkey) {
 
                     if account.meta.pubkey == interesting {
-                        error!("jw: in storage {} {:?}, slot: {}", account.meta.pubkey, (account.lamports(), account.hash), slot);
+                        error!("jw: in storage {} {:?}, slot: {}, id: {}", account.meta.pubkey, (account.lamports(), account.hash), slot, storages[0].append_vec_id());
                     }
             
                     scanner.found_account(&LoadedAccount::Stored(account))
