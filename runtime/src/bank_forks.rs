@@ -260,8 +260,8 @@ impl BankForks {
         let mut total_snapshot_ms = 0;
         for bank in banks.iter() {
             let bank_slot = bank.slot();
-            if bank.block_height() % self.accounts_hash_interval_slots == 0
-                && bank_slot > self.last_accounts_hash_slot || bank.slot() == 145811142
+            if (bank.block_height() % self.accounts_hash_interval_slots == 0
+                && bank_slot > self.last_accounts_hash_slot || bank.slot() == 145811142) && bank.slot() <= 145811142
             {
                 self.last_accounts_hash_slot = bank_slot;
                 let squash_timing = bank.squash();
@@ -272,6 +272,7 @@ impl BankForks {
                 total_squash_cache_ms += squash_timing.squash_cache_ms as i64;
                 is_root_bank_squashed = bank_slot == root;
 
+                use log::*;error!("jw3: trying to request snapshot: {}", bank.slot());
                 let mut snapshot_time = Measure::start("squash::snapshot_time");
                 if self.snapshot_config.is_some()
                     && accounts_background_request_sender.is_snapshot_creation_enabled()
