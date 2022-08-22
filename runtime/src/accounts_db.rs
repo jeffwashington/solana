@@ -2218,6 +2218,10 @@ impl AccountsDb {
             .fetch_add(measure.as_us(), Ordering::Relaxed);
     }
 
+    /// increment store_counts to non-zero for all stores that can not be deleted.
+    /// a store cannot be deleted if:
+    /// 1. one of the pubkeys in the store has account info to a store whose store count is not going to zero
+    /// 2. a pubkey we were planning to remove is not removing all stores that contain the account
     fn calc_delete_dependencies(
         purges: &HashMap<Pubkey, (SlotList<AccountInfo>, RefCount)>,
         store_counts: &mut HashMap<AppendVecId, (usize, HashSet<Pubkey>)>,
@@ -2259,7 +2263,7 @@ impl AccountsDb {
             };
             if no_delete {
                 let mut pending_store_ids = HashSet::new();
-                for (_bank_id, account_info) in account_infos {
+                for (_slot, account_info) in account_infos {
                     if !already_counted.contains(&account_info.store_id()) {
                         pending_store_ids.insert(account_info.store_id());
                     }
