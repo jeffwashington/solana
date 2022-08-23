@@ -8324,8 +8324,8 @@ impl AccountsDb {
     ) -> IndexGenerationInfo {
 
         if true {
-        let p1 = Path::new("/mnt/nvme1n1/ledger/failed_calculate_accounts_hash_cache");
-        let p2 = Path::new("/home/sol/ff/failed_calculate_accounts_hash_cache");
+        let p1 = Path::new("/mnt/nvme1n1/success_147269023");
+        let p2 = Path::new("/mnt/nvme1n1/failed_calculate_accounts_hash_cache/147269023");
         CacheHashData::compare_two(&[&p1, &p2]);
         use log::*;error!("{}{}", file!(), line!());
         }
