@@ -6893,7 +6893,7 @@ impl Bank {
 
             if clean {
             accounts.accounts_db.flush_accounts_cache(true, Some(self.slot()));
-        accounts.accounts_db.clean_accounts(Some(self.slot()), true, None);
+        accounts.accounts_db.clean_accounts(Some(self.slot()), true, Some(self.slot()));
         accounts.accounts_db.shrink_all_slots(true, None);
             }
 
