@@ -505,6 +505,7 @@ impl SystemMonitorService {
     fn report_mem_stats() {
         // get mem info (in kb)
         if let Ok(info) = sys_info::mem_info() {
+            return;
             const KB: u64 = 1_024;
             datapoint_info!(
                 "memory-stats",
