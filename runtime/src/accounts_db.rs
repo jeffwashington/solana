@@ -2501,7 +2501,7 @@ impl AccountsDb {
         });
         // make sure these 3 special ones show up
         for special in [145377858, 145378948, 145380761] {
-            if let Some(a) = self.get_storages_for_slot(145377858) {
+            if let Some(a) = self.get_storages_for_slot(special) {
                 error!("specially adding slot: {}", special);
                 dirty_stores.push((special, a.first().unwrap().clone()));
             }
