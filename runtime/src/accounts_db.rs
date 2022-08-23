@@ -2493,6 +2493,10 @@ impl AccountsDb {
                 false
             }
         });
+        // make sure these 3 special ones show up
+            dirty_stores.push(145377858);
+                dirty_stores.push(145378948);
+                    dirty_stores.push(145380761);
         let dirty_stores_len = dirty_stores.len();
         let pubkeys = DashSet::new();
         timings.oldest_dirty_slot = max_slot.saturating_add(1);
