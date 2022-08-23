@@ -2500,9 +2500,11 @@ impl AccountsDb {
             }
         });
         // make sure these 3 special ones show up
-        dirty_stores.push((145377858, self.get_storages_for_slot(145377858).unwrap().first().unwrap().clone()));
-        dirty_stores.push((145378948, self.get_storages_for_slot(145378948).unwrap().first().unwrap().clone()));
-        dirty_stores.push((145380761, self.get_storages_for_slot(145380761).unwrap().first().unwrap().clone()));
+        for special in [145377858, 145378948, 145380761] {
+            if let Some(a) = self.get_storages_for_slot(145377858) {
+                dirty_stores.push((special, a.first().unwrap().clone()));
+            }
+        }
         self.accounts_index.add_uncleaned_roots(vec![145377858, 145378948, 145380761]);        
         let dirty_stores_len = dirty_stores.len();
         let pubkeys = DashSet::new();
