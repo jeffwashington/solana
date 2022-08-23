@@ -186,14 +186,14 @@ impl CacheHashData {
                     error!("values different: {} {:?}, {:?}", k, v, entry);
                 }
             } else {
-                if v.last().unwrap().lamports != 0 {
+                if v.last().unwrap().1.lamports != 0 {
                     error!("in 1, not in 2: {:?}, {:?}", k, v);
                 }
             }
         }
         for (k, mut v) in two.drain() {
             v.sort_by(Self::sorter);
-            if v.last().unwrap().lamports != 0 {
+            if v.last().unwrap().1.lamports != 0 {
                 error!("in 2, not in 1: {:?}, {:?}", k, v);
             }
         }
