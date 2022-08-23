@@ -2161,6 +2161,8 @@ impl AccountsDb {
 
         let one_epoch_old = self.get_accounts_hash_complete_one_epoch_old();
 
+        let interesting = Pubkey::from_str("D9hq1KyC6YXhySGe42NBTwxADxdSkf4gVpuACVYf8vyW").unwrap();
+
         let mut clean_rooted = Measure::start("clean_old_root-ms");
         let reclaim_vecs = purges
             .par_chunks(INDEX_CLEAN_BULK_COUNT)
@@ -2169,7 +2171,10 @@ impl AccountsDb {
                 for pubkey in pubkeys {
                     self.accounts_index
                         .clean_rooted_entries(pubkey, &mut reclaims, max_clean_root);
-                }
+                        if pubkey == &interesting {
+                            error!("jw: clean_rooted_entries: {:?}, {}", reclaims.last(), pubkey);
+                        }
+                    }
                 (!reclaims.is_empty()).then(|| {
                     // figure out how many ancient accounts have been reclaimed
                     let old_reclaims = reclaims
