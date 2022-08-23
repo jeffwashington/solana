@@ -168,7 +168,7 @@ impl CacheHashData {
         let mut two = two.into_inner().unwrap();
 
         error!("items in one: {}, two: {}, files in one, two: {}, {}", one.len(), two.len(), files.len(), files2.len());
-
+        use crate::accounts_hash::ZERO_RAW_LAMPORTS_SENTINEL;
         error!("draining");
         for (k, mut v) in one.drain() {
             v.sort_by(Self::sorter);
@@ -180,11 +180,15 @@ impl CacheHashData {
                     error!("values different: {} {:?}, {:?}", k, v, entry);
                 }
             } else {
-                error!("in 1, not in 2: {:?}, {:?}", k, v);
+                if v.1.lamports != ZERO_RAW_LAMPORTS_SENTINEL {
+                    error!("in 1, not in 2: {:?}, {:?}", k, v);
+                }
             }
         }
         for (k, mut v) in two.drain() {
-            error!("in 2, not in 1: {:?}, {:?}", k, v);
+            if v.1.lamports != ZERO_RAW_LAMPORTS_SENTINEL {
+                error!("in 2, not in 1: {:?}, {:?}", k, v);
+            }
         }
         panic!("done with compare");
     }
