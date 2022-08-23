@@ -132,8 +132,11 @@ impl CacheHashData {
                 error!("failure to load file :{:?}, {:?}", x, file);
             }
             let mut one = one.lock().unwrap();
-            accum.into_iter().flatten().for_each(|entry| {
+            accum.into_iter().flatten().for_each(|mut entry| {
                 let pk = entry.pubkey;
+                if entry.lamports == ZERO_RAW_LAMPORTS_SENTINEL {
+                    entry.lamports = 0;
+                }
                 let new_one = (format!("{:?}", file), entry);
                 if let Some(current) = one.get_mut(&pk) {
                     current.push(new_one);
@@ -153,8 +156,11 @@ impl CacheHashData {
                 error!("failure to load file2 :{:?}, {:?}", x, file);
             }
             let mut two = two.lock().unwrap();
-            accum.into_iter().flatten().for_each(|entry| {
+            accum.into_iter().flatten().for_each(|mut entry| {
                 let pk = entry.pubkey;
+                if entry.lamports == ZERO_RAW_LAMPORTS_SENTINEL {
+                    entry.lamports = 0;
+                }
                 let new_one = (format!("{:?}", file), entry);
                 if let Some(current) = two.get_mut(&pk) {
                     current.push(new_one);
@@ -180,13 +186,13 @@ impl CacheHashData {
                     error!("values different: {} {:?}, {:?}", k, v, entry);
                 }
             } else {
-                if v.1.lamports != ZERO_RAW_LAMPORTS_SENTINEL {
+                if v.1.lamports != 0 {
                     error!("in 1, not in 2: {:?}, {:?}", k, v);
                 }
             }
         }
         for (k, mut v) in two.drain() {
-            if v.1.lamports != ZERO_RAW_LAMPORTS_SENTINEL {
+            if v.1.lamports != 0 {
                 error!("in 2, not in 1: {:?}, {:?}", k, v);
             }
         }
