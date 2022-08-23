@@ -3277,6 +3277,10 @@ impl AccountsDb {
     where
         I: Iterator<Item = &'a Arc<AccountStorageEntry>>,
     {
+        if slot == 146841029 {
+            error!("skipping shrink of: {}", slot);
+            return 0;
+        }
         info!("do_shrink_slot_stores: slot: {}", slot);
         let GetUniqueAccountsResult {
             stored_accounts,
