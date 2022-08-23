@@ -2237,7 +2237,7 @@ impl AccountsDb {
             let mut failed_store_id = None;
             let mut failed_slot = None;
             let all_stores_being_deleted =
-                account_infos.len() as RefCount == *ref_count_from_storage;
+                 as RefCount == *ref_count_from_storage;
             if all_stores_being_deleted {
                 let mut delete = true;
                 for (_slot, account_info) in account_infos {
@@ -2267,6 +2267,10 @@ impl AccountsDb {
             } else {
                 if pubkey == &interesting {
                     info!("jw: calc_delete_dependencies2, {pubkey}, infos:{account_infos:?}, {ref_count_from_storage}, len: {}", account_infos.len());
+                    if account_infos.len() == 1 && *ref_count_from_storage == 3 {
+                        error!("jw: should have normally sipped this delelte");
+                        continue;
+                    }
                 }
         // a pubkey we were planning to remove is not removing all stores that contain the account
                 debug!(
