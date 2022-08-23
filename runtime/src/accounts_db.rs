@@ -2257,7 +2257,7 @@ impl AccountsDb {
                     if count != 0 {
                         // one of the pubkeys in the store has account info to a store whose store count is not going to zero
                         if pubkey == &interesting {
-                            info!("jw: calc_delete_dependencies, {pubkey}, count: {count}, id: {store_id}, infos:{account_info:?}, slot: {_slot}");
+                            info!("jw: calc_delete_dependencies, {pubkey}, count: {count}, id: {store_id}, infos:{account_info:?}, slot: {_slot}, refcount: {ref_count_from_storage}");
                         }
                         failed_store_id = Some(store_id);
                         failed_slot = Some(_slot);
