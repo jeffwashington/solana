@@ -2236,7 +2236,7 @@ impl AccountsDb {
         for (pubkey, (account_infos, ref_count_from_storage)) in purges.iter() {
             let mut failed_store_id = None;
             let mut failed_slot = None;
-            let all_stores_being_deleted =
+            let all_stores_being_deleted =account_infos.len()
                  as RefCount == *ref_count_from_storage;
             if all_stores_being_deleted {
                 let mut delete = true;
