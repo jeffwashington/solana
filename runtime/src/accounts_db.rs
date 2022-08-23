@@ -2233,9 +2233,9 @@ impl AccountsDb {
         // do not match the criteria of deleting all appendvecs which contain them
         // then increment their storage count.
         let mut already_counted = HashSet::new();
-        let mut failed_store_id = None;
-        let mut failed_slot = None;
         for (pubkey, (account_infos, ref_count_from_storage)) in purges.iter() {
+            let mut failed_store_id = None;
+            let mut failed_slot = None;
             let all_stores_being_deleted =
                 account_infos.len() as RefCount == *ref_count_from_storage;
             if all_stores_being_deleted {
@@ -2310,7 +2310,9 @@ impl AccountsDb {
                 for key in affected_pubkeys {
                     if key == &interesting {
                         if let Some(failed_store_id) = failed_store_id.take() {
-                            info!("jw: calc_delete_dependencies3, oldest store is not able to be deleted because of {pubkey} in store {failed_store_id}, failed slot: {failed_slot:?}");
+                            info!("jw: calc_delete_dependencies3, oldest store is not able to be deleted because of {pubkey} in store {failed_store_id}, failed slot: {failed_slot:?}, {:?}", {
+
+                            });
                         } else {
                             info!("jw: calc_delete_dependencies4, oldest store is not able to be deleted because of {pubkey}, account infos len: {}, ref count: {ref_count_from_storage}", account_infos.len());
                         }
@@ -2497,6 +2499,7 @@ impl AccountsDb {
         dirty_stores.push((145377858, self.get_storages_for_slot(145377858).unwrap().first().unwrap().clone()));
         dirty_stores.push((145378948, self.get_storages_for_slot(145378948).unwrap().first().unwrap().clone()));
         dirty_stores.push((145380761, self.get_storages_for_slot(145380761).unwrap().first().unwrap().clone()));
+        self.accounts_index.add_uncleaned_roots(vec![145377858, 145378948, 145380761]);        
         let dirty_stores_len = dirty_stores.len();
         let pubkeys = DashSet::new();
         timings.oldest_dirty_slot = max_slot.saturating_add(1);
@@ -8219,6 +8222,9 @@ impl AccountsDb {
             .sum();
         let mut accounts_map = GenerateIndexAccountsMap::with_capacity(num_accounts);
         storage_maps.iter().for_each(|storage| {
+            if is_ancient(&storage.accounts) {
+                error!("jw3: ancient slot found: {}, {}", storage.append_vec_id(), storage.slot());
+            }
             storage.accounts.account_iter().for_each(|stored_account| {
                 let this_version = stored_account.meta.write_version;
                 let pubkey = stored_account.meta.pubkey;
