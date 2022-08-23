@@ -585,6 +585,7 @@ impl SystemMonitorService {
         // get mem info (in kb)
         if let Ok(info) = sys_info::mem_info() {
             const KB: u64 = 1_024;
+            return;
             datapoint_info!(
                 "memory-stats",
                 ("total", info.total * KB, i64),
