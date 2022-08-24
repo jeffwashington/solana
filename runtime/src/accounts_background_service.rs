@@ -540,18 +540,24 @@ info!("ha {}", line!());
 
                     if let Some(snapshot_block_height_result) = snapshot_block_height_option_result
                     {
+                        info!("ha {}", line!());
                         // Safe, see proof above
                         if let Ok(snapshot_block_height) = snapshot_block_height_result {
                             assert!(last_cleaned_block_height <= snapshot_block_height);
                             last_cleaned_block_height = snapshot_block_height;
                         } else {
+                            info!("ha {}", line!());
                             exit.store(true, Ordering::Relaxed);
                             return;
                         }
+                        info!("ha {}", line!());
                     } else {
                         if accounts_db_caching_enabled {
+                            info!("ha {}", line!());
                             bank.shrink_candidate_slots();
+                            info!("ha {}", line!());
                         } else {
+                            info!("ha {}", line!());
                             // under sustained writes, shrink can lag behind so cap to
                             // SHRUNKEN_ACCOUNT_PER_INTERVAL (which is based on INTERVAL_MS,
                             // which in turn roughly associated block time)
