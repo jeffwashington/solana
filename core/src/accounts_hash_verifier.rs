@@ -151,12 +151,12 @@ impl AccountsHashVerifier {
             .unwrap();
             error!("jw3: done storing data in ahv");
 
-            error!("looping after ahv");
+
+        if accounts_package.expected_capitalization != lamports {
+            error!("looping after ahv: {}, {}", accounts_package.expected_capitalization, lamports);
             loop {
 
             }
-
-        if accounts_package.expected_capitalization != lamports {
             // before we assert, run the hash calc again. This helps track down whether it could have been a failure in a race condition possibly with shrink.
             // We could add diagnostics to the hash calc here to produce a per bin cap or something to help narrow down how many pubkeys are different.
             let _ = accounts_package
