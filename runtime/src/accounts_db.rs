@@ -7022,7 +7022,7 @@ impl AccountsDb {
 
         // assert!(!(config.store_detailed_debug_info_on_failure && config.use_write_cache), "cannot accurately capture all data if accounts cache is being used");
 
-        let reference = (false && storages.max_slot_inclusive() == 145811791).then(|| {
+        let reference = (true && storages.max_slot_inclusive() == 145811791).then(|| {
             let mut one = DashMap::<Pubkey, Vec<crate::accounts_hash::hashentry>>::new();
             let cache_one = CacheHashData::new(&Path::new("/mnt/nvme1n1/succeeded_145811791_aug17"));
             let mut files = cache_one

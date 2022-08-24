@@ -7079,7 +7079,7 @@ impl Bank {
                 calculated, expected
             );
 
-            error!("jwash looping at failure, slot: {}", self.slot());
+            error!("jwash looping at failure, slot: {}, calculated: {}, expected: {}", self.slot(), calculated, expected);
 
             loop {
                 // hang here forever
