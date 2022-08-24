@@ -459,6 +459,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                     other_slot,
                     reclaims,
                     reclaim,
+                    pubkey,
                 );
                 // age is incremented by caller
             } else {
@@ -476,6 +477,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                             other_slot,
                             reclaims,
                             reclaim,
+                            pubkey,
                         );
                         self.set_age_to_future(current);
                     }
@@ -506,6 +508,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                                     other_slot,
                                     reclaims,
                                     reclaim,
+                                    pubkey,
                                 );
                                 disk_entry
                             } else {
@@ -550,12 +553,13 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         other_slot: Option<Slot>,
         reclaims: &mut SlotList<T>,
         reclaim: UpsertReclaim,
+        pubkey: &Pubkey,
     ) {
         let mut slot_list = current.slot_list.write().unwrap();
         let mut ignore_addref = false;
         if current.ref_count() == 0 {
             if slot_list.iter().any(|(_slot, info)| !info.is_cached()) {
-                panic!("found 0 ref count with uncached info: {slot_list:?}");
+                panic!("found 0 ref count with uncached info: {slot_list:?}, pk: {pubkey}");
             }
             if !new_value.1.is_cached() {
                 ignore_addref = true;
@@ -716,6 +720,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                     None, // should be None because we don't expect a different slot # during index generation
                     &mut Vec::default(),
                     UpsertReclaim::PopulateReclaims, // this should be ignore?
+                    &pubkey,
                 );
                 (
                     true, /* found in mem */
@@ -750,6 +755,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                             None,
                             &mut Vec::default(),
                             UpsertReclaim::PopulateReclaims,
+                            &pubkey,
                         );
                         vacant.insert(disk_entry);
                         (
