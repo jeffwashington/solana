@@ -3180,6 +3180,8 @@ impl AccountsDb {
     ) -> usize {
         let mut alive_total = 0;
 
+        let interesting = Pubkey::from_str("D9hq1KyC6YXhySGe42NBTwxADxdSkf4gVpuACVYf8vyW").unwrap();
+
         let mut alive = 0;
         let mut dead = 0;
         let mut index = 0;
@@ -3192,7 +3194,7 @@ impl AccountsDb {
                 if let Some((slot_list, _ref_count)) = slots_refs {
                     let pair = &accounts[index];
                     let stored_account = &pair.1;
-                    let is_alive = slot_list.iter().any(|(_slot, acct_info)| {
+                    let is_alive = (interesting == key) || slot_list.iter().any(|(_slot, acct_info)| {
                         acct_info.matches_storage_location(
                             stored_account.store_id,
                             stored_account.account.offset,
@@ -3276,7 +3278,7 @@ impl AccountsDb {
     {
         if slot == 146841029 {
             error!("skipping shrink of: {}", slot);
-            return 0;
+            //return 0;
         }
         info!("do_shrink_slot_stores: slot: {}", slot);
         let GetUniqueAccountsResult {
