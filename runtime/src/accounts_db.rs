@@ -3194,7 +3194,7 @@ impl AccountsDb {
                 if let Some((slot_list, _ref_count)) = slots_refs {
                     let pair = &accounts[index];
                     let stored_account = &pair.1;
-                    let is_alive = (interesting == key) || slot_list.iter().any(|(_slot, acct_info)| {
+                    let is_alive = (interesting == *pubkey) || slot_list.iter().any(|(_slot, acct_info)| {
                         acct_info.matches_storage_location(
                             stored_account.store_id,
                             stored_account.account.offset,
