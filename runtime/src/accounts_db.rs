@@ -2272,7 +2272,7 @@ impl AccountsDb {
             } else {
                 if pubkey == &interesting {
                     info!("jw: calc_delete_dependencies2, {pubkey}, infos:{account_infos:?}, {ref_count_from_storage}, len: {}", account_infos.len());
-                    if account_infos.len() == 1 && *ref_count_from_storage == 3 {
+                    if account_infos.len() == 1 && *ref_count_from_storage == 2 {
                         error!("jw: should have normally sipped this delelte");
                         continue;
                     }
