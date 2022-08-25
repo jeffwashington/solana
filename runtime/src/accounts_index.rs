@@ -277,7 +277,19 @@ impl<T: IndexValue> AccountMapEntryInner<T> {
         if add {
             assert_ne!(0, self.ref_count.fetch_add(1, Ordering::Release));
         } else {
-            assert_ne!(0, self.ref_count.fetch_sub(1, Ordering::Release));
+            let result = self.ref_count.fetch_sub(1, Ordering::Release);
+            if result == 1 {
+                if let Ok(read) = self.slot_list.try_read() {
+                    if
+                    read.iter().any(|(_slot, info)| !info.is_cached()) {
+                        panic!("ref to 0 but there are non-cached entries");
+                    }
+                }
+                else {
+                    panic!("jw: ref to 0, but can't check read lock");
+                }
+            }
+            assert_ne!(0, result);
         }
         self.set_dirty(true);
     }
