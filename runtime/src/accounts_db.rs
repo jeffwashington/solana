@@ -3818,14 +3818,17 @@ impl AccountsDb {
         if sorted_slots.is_empty() {
             return;
         }
+        info!("ha {}", line!());
         let mut guard = None;
 
         // the ancient append vec currently being written to
         let mut current_ancient = None;
         let mut dropped_roots = vec![];
 
+        info!("ha {}", line!());
         let len = sorted_slots.len();
         for slot in sorted_slots {
+            info!("ha {}, slot: {}/{}", line!(), slot, sorted_slots.len());
             let old_storages =
                 match self.get_storages_to_move_to_ancient_append_vec(slot, &mut current_ancient) {
                     Some(old_storages) => old_storages,
@@ -3863,6 +3866,7 @@ impl AccountsDb {
             self.shrink_stats
                 .accounts_loaded
                 .fetch_add(len as u64, Ordering::Relaxed);
+                info!("ha {}", line!());
 
             self.thread_pool_clean.install(|| {
                 let chunk_size = 50; // # accounts/thread
@@ -3886,6 +3890,7 @@ impl AccountsDb {
                     alive_total_collect.fetch_add(alive_total, Ordering::Relaxed);
                 });
             });
+            info!("ha {}", line!());
 
             let mut create_and_insert_store_elapsed = 0;
 
@@ -3915,6 +3920,7 @@ impl AccountsDb {
             let mut ids = vec![ancient_store.append_vec_id()];
             // if this slot is not the ancient slot we're writing to, then this root will be dropped
             let mut drop_root = slot != ancient_slot;
+            info!("ha {}", line!());
 
             let mut rewrite_elapsed = Measure::start("rewrite_elapsed");
             // write what we can to the current ancient storage
@@ -3926,6 +3932,7 @@ impl AccountsDb {
                 // we are adding accounts to an existing append vec from a different slot. We need to unref each account that exists already in 'ancient_store'.
                 slot != ancient_slot,
             );
+            info!("ha {}", line!());
 
             // handle accounts from 'slot' which did not fit into the current ancient append vec
             if to_store.has_overflow() {
@@ -3958,6 +3965,7 @@ impl AccountsDb {
                 store_accounts_timing.handle_reclaims_elapsed = timing.handle_reclaims_elapsed;
             }
             rewrite_elapsed.stop();
+            info!("ha {}", line!());
 
             let mut start = Measure::start("write_storage_elapsed");
             // Purge old, overwritten storage entries
@@ -3973,6 +3981,7 @@ impl AccountsDb {
             if drop_root {
                 dropped_roots.push(slot);
             }
+            info!("ha {}", line!());
 
             self.shrink_ancient_stats
                 .shrink_stats
