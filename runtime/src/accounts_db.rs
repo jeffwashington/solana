@@ -3828,7 +3828,7 @@ impl AccountsDb {
         info!("ha {}", line!());
         let len = sorted_slots.len();
         for slot in sorted_slots {
-            info!("ha {}, slot: {}/{}", line!(), slot, sorted_slots.len());
+            info!("ha {}, slot: {}/{}", line!(), slot, len);
             let old_storages =
                 match self.get_storages_to_move_to_ancient_append_vec(slot, &mut current_ancient) {
                     Some(old_storages) => old_storages,
