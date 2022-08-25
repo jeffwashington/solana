@@ -667,6 +667,8 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         if !found_slot && !found_other_slot {
             // if we make it here, we did not find the slot in the list
             slot_list.push((slot, account_info));
+        }else if found_slot && found_other_slot {
+            panic!("we may have hit a refcount issue?: {:?}", account_info);
         }
         addref
     }

@@ -1462,6 +1462,9 @@ struct ShrinkStats {
     dead_accounts: AtomicU64,
     alive_accounts: AtomicU64,
     accounts_loaded: AtomicU64,
+    time_get_storages: AtomicU64,
+    time_get_accounts: AtomicU64,
+    total_time_load_for_shrink: AtomicU64,
 }
 
 impl ShrinkStats {
@@ -1593,6 +1596,28 @@ impl ShrinkAncientStats {
                     "index_read_elapsed",
                     self.shrink_stats
                         .index_read_elapsed
+                        .swap(0, Ordering::Relaxed) as i64,
+                    i64
+                ),
+                
+                (
+                    "total_time_load_for_shrink",
+                    self.shrink_stats
+                        .total_time_load_for_shrink
+                        .swap(0, Ordering::Relaxed) as i64,
+                    i64
+                ),
+                (
+                    "time_get_accounts",
+                    self.shrink_stats
+                        .time_get_accounts
+                        .swap(0, Ordering::Relaxed) as i64,
+                    i64
+                ),
+                (
+                    "time_get_storages",
+                    self.shrink_stats
+                        .time_get_storages
                         .swap(0, Ordering::Relaxed) as i64,
                     i64
                 ),
@@ -3828,16 +3853,22 @@ impl AccountsDb {
         info!("ha {}", line!());
         let len = sorted_slots.len();
         for slot in sorted_slots {
-            info!("ha {}, slot: {}/{}", line!(), slot, len);
+            let mut time_get_storages = 0;
+            let mut time_get_accounts = 0;
+            let mut total_time_load_for_shrink = 0;
+                info!("ha {}, slot: {}/{}", line!(), slot, len);
+            let mut m = Measure::start("");
+            let rr = self.get_storages_to_move_to_ancient_append_vec(slot, &mut current_ancient);
+            m.stop();
+            time_get_storages += m.as_us();
             let old_storages =
-                match self.get_storages_to_move_to_ancient_append_vec(slot, &mut current_ancient) {
+                match rr {
                     Some(old_storages) => old_storages,
                     None => {
                         // nothing to squash for this slot
                         continue;
                     }
                 };
-
             if guard.is_none() {
                 // we are now doing interesting work in squashing ancient
                 guard = Some(self.active_stats.activate(ActiveStatItem::SquashAncient));
@@ -3847,12 +3878,15 @@ impl AccountsDb {
                 );
             }
 
+            let mut m = Measure::start("");
             // this code is copied from shrink. I would like to combine it into a helper function, but the borrow checker has defeated my efforts so far.
             let GetUniqueAccountsResult {
                 stored_accounts,
                 original_bytes,
                 store_ids: _,
             } = self.get_unique_accounts_from_storages(old_storages.iter());
+            m.stop();
+            time_get_accounts += m.as_us();
 
             // sort by pubkey to keep account index lookups close
             let mut stored_accounts = stored_accounts.into_iter().collect::<Vec<_>>();
@@ -3868,7 +3902,8 @@ impl AccountsDb {
                 .fetch_add(len as u64, Ordering::Relaxed);
                 info!("ha {}", line!());
 
-            self.thread_pool_clean.install(|| {
+                let mut m = Measure::start("");
+                self.thread_pool_clean.install(|| {
                 let chunk_size = 50; // # accounts/thread
                 let chunks = len / chunk_size + 1;
                 (0..chunks).into_par_iter().for_each(|chunk| {
@@ -3890,6 +3925,8 @@ impl AccountsDb {
                     alive_total_collect.fetch_add(alive_total, Ordering::Relaxed);
                 });
             });
+            m.stop();
+            total_time_load_for_shrink += m.as_us();
             info!("ha {}", line!());
 
             let mut create_and_insert_store_elapsed = 0;
@@ -3973,10 +4010,10 @@ impl AccountsDb {
             self.mark_dirty_dead_stores(slot, &mut dead_storages, |store| {
                 ids.contains(&store.append_vec_id())
             });
-            start.stop();
-            let write_storage_elapsed = start.as_us();
 
             self.drop_or_recycle_stores(dead_storages);
+            start.stop();
+            let write_storage_elapsed = start.as_us();
 
             if drop_root {
                 dropped_roots.push(slot);
@@ -4034,6 +4071,19 @@ impl AccountsDb {
                     original_bytes.saturating_sub(aligned_total),
                     Ordering::Relaxed,
                 );
+                self.shrink_ancient_stats
+                .shrink_stats
+                .time_get_storages
+                .fetch_add(time_get_storages, Ordering::Relaxed);
+                self.shrink_ancient_stats
+                .shrink_stats
+                .time_get_accounts
+                .fetch_add(time_get_accounts, Ordering::Relaxed);
+                self.shrink_ancient_stats
+                .shrink_stats
+                .total_time_load_for_shrink
+                .fetch_add(total_time_load_for_shrink, Ordering::Relaxed);
+         
             self.shrink_ancient_stats
                 .shrink_stats
                 .bytes_written
