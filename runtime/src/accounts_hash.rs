@@ -848,17 +848,18 @@ impl AccountsHash {
                 &mut first_item_to_pubkey_division,
             );
 
-            let mut found = false;
+            let mut found_different = false;
             if let Some(r) = self.reference.as_ref() {
-                if let Some(entry) = r.remove(&min_pubkey) {
+                if let Some(mut entry) = r.remove(&min_pubkey) {
+                    entry.1.sort_by(|a,b| a.0.cmp(&b.0));
                     let one = entry.1.last().unwrap();
                     if &one.1 != item {
-                        found = true;
+                        found_different = true;
                         error!("jw: different: {}, {:?}, {:?}", min_pubkey, entry, item);
                     }
                 }
                 else {
-                    if item.lamports != ZERO_RAW_LAMPORTS_SENTINEL {
+                    if item.lamports != ZERO_RAW_LAMPORTS_SENTINEL && item.lamports != 0 {
                         error!("jw: unexpected: {:?}, {:?}", min_pubkey, item);
                     }
                 }
@@ -886,7 +887,7 @@ impl AccountsHash {
                         &mut indexes,
                         &mut first_item_to_pubkey_division,
                     );
-                    if found {
+                    if found_different {
                         error!("jw: different, older: {}, {:?}", min_pubkey, it);
                     }
                 });
