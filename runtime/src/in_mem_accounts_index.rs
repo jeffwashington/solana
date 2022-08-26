@@ -435,7 +435,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
     pub fn unref(&self, pubkey: &Pubkey) {
         self.get_internal(pubkey, |entry| {
             if let Some(entry) = entry {
-                entry.add_un_ref(false)
+                entry.add_un_ref(false, pubkey)
             }
             (true, ())
         })
@@ -577,7 +577,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         );
         if addref {
             if !ignore_addref {
-                current.add_un_ref(true);
+                current.add_un_ref(true, pubkey);
             }
         }
         else if ignore_addref {

@@ -273,7 +273,7 @@ impl<T: IndexValue> AccountMapEntryInner<T> {
         self.ref_count.load(Ordering::Acquire)
     }
 
-    pub fn add_un_ref(&self, add: bool) {
+    pub fn add_un_ref(&self, add: bool, pubkey: &Pubkey) {
         if add {
             assert_ne!(0, self.ref_count.fetch_add(1, Ordering::Release));
         } else {
@@ -282,11 +282,11 @@ impl<T: IndexValue> AccountMapEntryInner<T> {
                 if let Ok(read) = self.slot_list.try_read() {
                     if
                     read.iter().any(|(_slot, info)| !info.is_cached()) {
-                        panic!("ref to 0 but there are non-cached entries");
+                        panic!("ref to 0 but there are non-cached entries: {pubkey}");
                     }
                 }
                 else {
-                    panic!("jw: ref to 0, but can't check read lock");
+                    panic!("jw: ref to 0, but can't check read lock, {pubkey}");
                 }
             }
             assert_ne!(0, result);
@@ -375,12 +375,12 @@ impl<T: IndexValue> ReadAccountMapEntry<T> {
         self.borrow_owned_entry().ref_count()
     }
 
-    pub fn unref(&self) {
-        self.borrow_owned_entry().add_un_ref(false);
+    pub fn unref(&self, pubkey: &Pubkey) {
+        self.borrow_owned_entry().add_un_ref(false, pubkey);
     }
 
     pub fn addref(&self) {
-        self.borrow_owned_entry().add_un_ref(true);
+        self.borrow_owned_entry().add_un_ref(true, &Pubkey::default());
     }
 }
 
@@ -1392,7 +1392,7 @@ impl<T: IndexValue> AccountsIndex<T> {
                         let result = callback(pubkey, Some((slot_list, locked_entry.ref_count())));
                         cache = match result {
                             AccountsIndexScanResult::Unref => {
-                                locked_entry.add_un_ref(false);
+                                locked_entry.add_un_ref(false, pubkey);
                                 true
                             }
                             AccountsIndexScanResult::KeepInMemory => true,
