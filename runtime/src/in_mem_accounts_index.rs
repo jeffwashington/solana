@@ -608,6 +608,19 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         if other_slot == Some(slot) {
             other_slot = None; // redundant info, so ignore
         }
+        else if !other_slot.is_none() {
+            if slot_list.iter().filter(|(s,i)| {
+                if *s == slot || Some(*s) == other_slot {
+                    true
+                }
+                else {
+                    false
+                }
+            }).count() >= 2 {
+                use log::*;
+                error!("{:?} {:?} {:?}", slot, other_slot, slot_list);
+            }
+        }
 
         // There may be 0..=2 dirty accounts found (one at 'slot' and one at 'other_slot')
         // that are already in the slot list.  Since the first one found will be swapped with the
@@ -668,7 +681,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
             // if we make it here, we did not find the slot in the list
             slot_list.push((slot, account_info));
         }else if found_slot && found_other_slot {
-            panic!("we may have hit a refcount issue?: {:?}", account_info);
+           // error!("we may have hit a refcount issue?: {:?}", account_info);
         }
         addref
     }
