@@ -3749,15 +3749,21 @@ impl AccountsDb {
     ) {
         // make a hashset of all keys we're about to add to this storage
         let mut accounts_to_add = accounts.iter().map(|entry| entry.0).collect::<HashSet<_>>();
+        let mut unref = vec![];
         // for each key that we're about to add that already exists in this storage, we need to unref. The account was in a different storage.
         // Now it is being put into an ancient storage, but it is already there, so maintain max of 1 ref per storage in the accounts index.
         ancient_store.accounts.account_iter().for_each(|account| {
             // remove here is so we don't unref the same key more than once in this loop if it is in the existing storage 2 times already
             let key = &account.meta.pubkey;
             if accounts_to_add.remove(key) {
-                self.accounts_index.unref_from_storage(key);
+                unref.push(*key);
             }
-        })
+        });
+
+        unref.into_par_iter().for_each(|key|{
+            self.accounts_index.unref_from_storage(&key);
+            }        );
+
     }
 
     /// helper function to cleanup call to 'store_accounts_frozen'
