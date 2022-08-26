@@ -1599,7 +1599,6 @@ impl ShrinkAncientStats {
                         .swap(0, Ordering::Relaxed) as i64,
                     i64
                 ),
-                
                 (
                     "total_time_load_for_shrink",
                     self.shrink_stats
@@ -3760,10 +3759,9 @@ impl AccountsDb {
             }
         });
 
-        unref.into_par_iter().for_each(|key|{
+        unref.into_par_iter().for_each(|key| {
             self.accounts_index.unref_from_storage(&key);
-            }        );
-
+        });
     }
 
     /// helper function to cleanup call to 'store_accounts_frozen'
@@ -3776,10 +3774,6 @@ impl AccountsDb {
         unref_if_already_exists: bool,
     ) -> StoreAccountsTiming {
         let (accounts, hashes) = accounts.get(storage_selector);
-
-        if unref_if_already_exists {
-            self.unref_accounts_already_in_storage(accounts, ancient_store);
-        }
 
         self.store_accounts_frozen(
             (ancient_slot, accounts),
@@ -3856,25 +3850,26 @@ impl AccountsDb {
         let mut current_ancient = None;
         let mut dropped_roots = vec![];
 
+        let mut ancient_pubkeys = HashSet::default();
+        let mut ancient_slot_with_pubkeys = None;
         info!("ha {}", line!());
         let len = sorted_slots.len();
         for slot in sorted_slots {
             let mut time_get_storages = 0;
             let mut time_get_accounts = 0;
             let mut total_time_load_for_shrink = 0;
-                info!("ha {}, slot: {}/{}", line!(), slot, len);
+            info!("ha {}, slot: {}/{}", line!(), slot, len);
             let mut m = Measure::start("");
             let rr = self.get_storages_to_move_to_ancient_append_vec(slot, &mut current_ancient);
             m.stop();
             time_get_storages += m.as_us();
-            let old_storages =
-                match rr {
-                    Some(old_storages) => old_storages,
-                    None => {
-                        // nothing to squash for this slot
-                        continue;
-                    }
-                };
+            let old_storages = match rr {
+                Some(old_storages) => old_storages,
+                None => {
+                    // nothing to squash for this slot
+                    continue;
+                }
+            };
             if guard.is_none() {
                 // we are now doing interesting work in squashing ancient
                 guard = Some(self.active_stats.activate(ActiveStatItem::SquashAncient));
@@ -3906,10 +3901,10 @@ impl AccountsDb {
             self.shrink_stats
                 .accounts_loaded
                 .fetch_add(len as u64, Ordering::Relaxed);
-                info!("ha {}", line!());
+            info!("ha {}", line!());
 
-                let mut m = Measure::start("");
-                self.thread_pool_clean.install(|| {
+            let mut m = Measure::start("");
+            self.thread_pool_clean.install(|| {
                 let chunk_size = 50; // # accounts/thread
                 let chunks = len / chunk_size + 1;
                 (0..chunks).into_par_iter().for_each(|chunk| {
@@ -3965,6 +3960,27 @@ impl AccountsDb {
             let mut drop_root = slot != ancient_slot;
             info!("ha {}", line!());
 
+            if slot != ancient_slot {
+                let (accounts, hashes) = to_store.get(StorageSelector::Primary);
+                if !(Some(ancient_slot) != ancient_slot_with_pubkeys) {
+                    ancient_slot_with_pubkeys = Some(ancient_slot);
+                    ancient_pubkeys = ancient_store.accounts.account_iter().map(|account| account.meta.pubkey).collect::<HashSet<_>>();
+                }
+                let mut unref = vec![];
+                // we are adding accounts to an existing append vec from a different slot. We need to unref each account that exists already in 'ancient_store'.
+                // for each key that we're about to add that already exists in this storage, we need to unref. The account was in a different storage.
+                // Now it is being put into an ancient storage, but it is already there, so maintain max of 1 ref per storage in the accounts index.
+                accounts.iter().for_each(|account| {
+                    if !ancient_pubkeys.insert(*account.0) {
+                        unref.push(*account.0);
+                    }
+                });
+
+                unref.into_par_iter().for_each(|key| {
+                    self.accounts_index.unref_from_storage(&key);
+                });
+            }
+
             let mut rewrite_elapsed = Measure::start("rewrite_elapsed");
             // write what we can to the current ancient storage
             let mut store_accounts_timing = self.store_ancient_accounts(
@@ -3972,8 +3988,7 @@ impl AccountsDb {
                 ancient_store,
                 &to_store,
                 StorageSelector::Primary,
-                // we are adding accounts to an existing append vec from a different slot. We need to unref each account that exists already in 'ancient_store'.
-                slot != ancient_slot,
+                false,
             );
             info!("ha {}", line!());
 
@@ -4077,19 +4092,18 @@ impl AccountsDb {
                     original_bytes.saturating_sub(aligned_total),
                     Ordering::Relaxed,
                 );
-                self.shrink_ancient_stats
+            self.shrink_ancient_stats
                 .shrink_stats
                 .time_get_storages
                 .fetch_add(time_get_storages, Ordering::Relaxed);
-                self.shrink_ancient_stats
+            self.shrink_ancient_stats
                 .shrink_stats
                 .time_get_accounts
                 .fetch_add(time_get_accounts, Ordering::Relaxed);
-                self.shrink_ancient_stats
+            self.shrink_ancient_stats
                 .shrink_stats
                 .total_time_load_for_shrink
                 .fetch_add(total_time_load_for_shrink, Ordering::Relaxed);
-         
             self.shrink_ancient_stats
                 .shrink_stats
                 .bytes_written
