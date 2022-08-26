@@ -3962,7 +3962,7 @@ impl AccountsDb {
 
             if slot != ancient_slot {
                 let (accounts, hashes) = to_store.get(StorageSelector::Primary);
-                if !(Some(ancient_slot) != ancient_slot_with_pubkeys) {
+                if Some(ancient_slot) != ancient_slot_with_pubkeys {
                     ancient_slot_with_pubkeys = Some(ancient_slot);
                     ancient_pubkeys = ancient_store.accounts.account_iter().map(|account| account.meta.pubkey).collect::<HashSet<_>>();
                 }
