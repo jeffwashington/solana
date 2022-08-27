@@ -282,6 +282,7 @@ impl<T: IndexValue> AccountMapEntryInner<T> {
                 if let Ok(read) = self.slot_list.try_read() {
                     if
                     read.iter().any(|(_slot, info)| !info.is_cached()) {
+                        error!("ref to 0 but there are non-cached entries: {pubkey}, {:?}", read);
                         panic!("ref to 0 but there are non-cached entries: {pubkey}, {:?}", read);
                     }
                 }
