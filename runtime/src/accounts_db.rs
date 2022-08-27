@@ -3195,6 +3195,9 @@ impl AccountsDb {
                         )
                     });
                     if !is_alive {
+                        if slot_list.len() == 1 && _ref_count == 1 && !slot_list.first().unwrap().1.is_cached() {
+                            error!("jw: marked not alive {pubkey}, 1 ref_count, {slot_list:?}, {}, {}", store_account.store_id, stored_account.account.offset);
+                        }
                         // This pubkey was found in the storage, but no longer exists in the index.
                         // It would have had a ref to the storage from the initial store, but it will
                         // not exist in the re-written slot. Unref it to keep the index consistent with
@@ -3341,7 +3344,7 @@ impl AccountsDb {
 
         let total_starting_accounts = stored_accounts.len();
         let total_accounts_after_shrink = alive_accounts.len();
-        debug!(
+        info!(
             "shrinking: slot: {}, accounts: ({} => {}) bytes: ({} ; aligned to: {}) original: {}",
             slot,
             total_starting_accounts,
