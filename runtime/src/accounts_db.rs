@@ -8357,6 +8357,7 @@ impl AccountsDb {
 
         let secondary = !self.account_indexes.is_empty();
 
+        let interesting = Pubkey::from_str("DYPbwio3YTivG4qRgvK4NA6XaSSaNwZGyca8BLtB7Ghg").unwrap();        
         let mut rent_paying_accounts_by_partition = Vec::default();
         let mut accounts_data_len = 0;
         let mut num_accounts_rent_paying = 0;
@@ -8385,10 +8386,18 @@ impl AccountsDb {
                 if let Some(amount_to_top_off_rent_this_account) =
                     Self::stats_for_rent_payers(&pubkey, &stored_account, rent_collector)
                 {
+                    if interesting == pubkey {
+                        error!("{interesting} is paying rent: {:?}", (amount_to_top_off_rent_this_account, slot, stored_account.lamports()));
+                    }
                     amount_to_top_off_rent += amount_to_top_off_rent_this_account;
                     num_accounts_rent_paying += 1;
                     // remember this rent-paying account pubkey
                     rent_paying_accounts_by_partition.push(pubkey);
+                }
+                else {
+                    if interesting == pubkey {
+                        error!("{interesting} is NOT paying rent: {:?}", (slot, stored_account.lamports()));
+                    }
                 }
 
                 (
