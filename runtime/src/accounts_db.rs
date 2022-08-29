@@ -8534,7 +8534,7 @@ impl AccountsDb {
     ) -> IndexGenerationInfo {
 
         let interesting = Pubkey::from_str("DSXeRMjynLPHGTt9zDAf4GYh7TVmG2EfXFDmB7E383oW").unwrap();
-        let pi =Bank::partition_from_pubkey(&interesting, 432_000); 
+        let pi =crate::bank::Bank::partition_from_pubkey(&interesting, 432_000); 
         error!("jw: partition for {interesting}: {pi}, last several: {:?}",         (0..5).into_iter().map(|offset| 147744000 + pi - 432_000*offset).collect::<Vec<_>>());
 
         let mut slots = self.storage.all_slots();
