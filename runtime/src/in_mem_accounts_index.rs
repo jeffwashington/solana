@@ -698,7 +698,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
 
         use log::*;
         if should_undo_addref == 1 && !found_slot {
-            panic!("this was previously not covered");
+            error!("this was previously not covered- found entry in other, was not in 1, we should not addref");
         }
         else if should_undo_addref == 2 {
             error!("jw: 2 undo addrefs - hope caller correctly unref'd");
