@@ -633,6 +633,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         // new account, if a second one is found, we cannot swap again. Instead, just remove it.
         let mut found_slot = false;
         let mut found_other_slot = false;
+        let mut should_undo_addref = 0;
         (0..slot_list.len())
             .into_iter()
             .rev() // rev since we delete from the list in some cases
@@ -677,12 +678,13 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                         if !is_cur_account_cached {
                             // current info at 'slot' is NOT cached, so we should NOT addref. This slot already has a ref count for this pubkey.
                             addref = false;
+                            should_undo_addref += 1;
                         }
                     } else {
                         found_other_slot = true;
                         if !is_cur_account_cached {
-                            panic!("this was previously not covered");
                             addref = false;
+                            should_undo_addref += 1;
                         }
                     }
                 }
@@ -693,6 +695,14 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         }else if found_slot && found_other_slot {
            // error!("we may have hit a refcount issue?: {:?}", account_info);
         }
+
+        if should_undo_addref == 1 && !found_slot {
+            panic!("this was previously not covered");
+        }
+        else if should_undo_addref == 2 {
+            error!("jw: 2 undo addrefs - hope caller correctly unref'd");
+        }
+
         addref
     }
 
