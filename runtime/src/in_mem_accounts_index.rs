@@ -585,7 +585,10 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
             panic!("unexpected");
         }
         let after_len = slot_list.len();
-        assert!(current.ref_count() as usize >= after_len, "too few refs: {}, before_len: {prev_len}, after: {after_len}, {pubkey}, {slot_list:?}", current.ref_count());
+        if (current.ref_count() as usize) < after_len {
+            let cached = slot_list.iter().filter_map(|(s,i)| i.is_cached().then(|| s)).count();
+            assert!(((current.ref_count() as usize) + cached) >= after_len, "too few refs: {}, before_len: {prev_len}, after: {after_len}, {pubkey}, {slot_list:?}, cached: {}", current.ref_count(), cached);
+        }
         current.set_dirty(true);
     }
 
