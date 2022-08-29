@@ -2111,7 +2111,7 @@ impl AccountsDb {
                             let too_new = new_len-old_len;
 
                             if ((idx.ref_count() as usize) - too_new) > entry.value().len() {
-                                error!("andrew: {} greater refcounts: {}, should be: {}, {:?}, {:?}, original: {:?}", entry.key(), idx.ref_count(), entry.value().len(), *entry.value(), list, idx.slot_list());
+                                panic!("andrew: {} greater refcounts: {}, should be: {}, {:?}, {:?}, original: {:?}, too_new: {too_new}", entry.key(), idx.ref_count(), entry.value().len(), *entry.value(), list, idx.slot_list());
                             }
                         }
                         else if (idx.ref_count() as usize) < entry.value().len() {
