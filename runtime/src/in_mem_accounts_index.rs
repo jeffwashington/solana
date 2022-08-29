@@ -701,7 +701,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
             error!("this was previously not covered- found entry in other, was not in 1, we should not addref");
         }
         else if should_undo_addref == 2 {
-            error!("jw: 2 undo addrefs - hope caller correctly unref'd");
+            panic!("jw: 2 undo addrefs - hope caller correctly unref'd");
         }
 
         addref
