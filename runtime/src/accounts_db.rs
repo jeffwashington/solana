@@ -2080,7 +2080,7 @@ impl AccountsDb {
         let _guard = self.active_stats.activate(ActiveStatItem::Clean);
 
         // exhaustively compare ALL refcounts
-        {//if let Some(slot) = max_clean_root.as_ref() {
+        if let Some(max_slot) = max_clean_root.as_ref() {
             let pks = DashMap::<Pubkey, Vec<Slot>>::default();
             let slots = self.storage.all_slots();
             slots.into_par_iter().for_each(|slot| {
@@ -2103,8 +2103,19 @@ impl AccountsDb {
             (0..128).into_par_iter().for_each(|attempt| {
                 pks.iter().skip(attempt * per_batch).take(per_batch).for_each(|entry| {
                     if let Some(idx) = self.accounts_index.get_account_read_entry(entry.key()) {
-                        if idx.ref_count() as usize != entry.value().len() {
-                            error!("andrew: {} different refcounts: {}, should be: {}, {:?}, {:?}", entry.key(), idx.ref_count(), entry.value().len(), *entry.value(), idx.slot_list());
+                        if idx.ref_count() as usize > entry.value().len() {
+                            let mut list = idx.slot_list().clone();
+                            let old_len = list.len();
+                            list.retain(|(slot, _)| slot <= max_slot);
+                            let new_len = list.len();
+                            let too_new = new_len-old_len;
+
+                            if ((idx.ref_count() as usize) - too_new) > entry.value().len() {
+                                error!("andrew: {} greater refcounts: {}, should be: {}, {:?}, {:?}, original: {:?}", entry.key(), idx.ref_count(), entry.value().len(), *entry.value(), list, idx.slot_list());
+                            }
+                        }
+                        else if (idx.ref_count() as usize) < entry.value().len() {
+                            error!("andrew: {} less refcounts: {}, should be: {}, {:?}, {:?}", entry.key(), idx.ref_count(), entry.value().len(), *entry.value(), idx.slot_list());
                         }
                     }
                 });
