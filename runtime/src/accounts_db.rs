@@ -2079,6 +2079,38 @@ impl AccountsDb {
     ) {
         let _guard = self.active_stats.activate(ActiveStatItem::Clean);
 
+        // exhaustively compare ALL refcounts
+        {//if let Some(slot) = max_clean_root.as_ref() {
+            let pks = DashMap::<Pubkey, Vec<Slot>>::default();
+            let slots = self.storage.all_slots();
+            slots.into_par_iter().for_each(|slot| {
+                for storage in self.storage.get_slot_storage_entries(slot).unwrap_or_default() {
+                    storage.all_accounts().iter().for_each(|account| {
+                        let pk = account.meta.pubkey;
+                        match pks.entry(pk) {
+                            dashmap::mapref::entry::Entry::Occupied(mut occupied_entry) => {
+                                occupied_entry.get_mut().push(slot);
+                            }
+                            dashmap::mapref::entry::Entry::Vacant(vacant_entry) => {
+                                vacant_entry.insert(vec![slot]);
+                            }
+                        }
+                    });
+                }
+            });
+            let total = pks.len();
+            let per_batch = total/127;
+            (0..128).into_par_iter().for_each(|attempt| {
+                pks.iter().skip(attempt * per_batch).take(per_batch).for_each(|entry| {
+                    if let Some(idx) = self.accounts_index.get_account_read_entry(entry.key()) {
+                        if idx.ref_count() as usize != entry.value().len() {
+                            error!("andrew: {} different refcounts: {}, should be: {}, {:?}, {:?}", entry.key(), idx.ref_count(), entry.value().len(), *entry.value(), idx.slot_list());
+                        }
+                    }
+                });
+            });
+        }
+
         let mut measure_all = Measure::start("clean_accounts");
         let max_clean_root = self.max_clean_root(max_clean_root);
 
