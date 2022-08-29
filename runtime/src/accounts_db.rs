@@ -8607,7 +8607,7 @@ impl AccountsDb {
         genesis_config: &GenesisConfig,
     ) -> IndexGenerationInfo {
 
-        let interesting = Pubkey::from_str("DSXeRMjynLPHGTt9zDAf4GYh7TVmG2EfXFDmB7E383oW").unwrap();
+        let interesting = Pubkey::from_str("DYPbwio3YTivG4qRgvK4NA6XaSSaNwZGyca8BLtB7Ghg").unwrap();
         let pi =crate::bank::Bank::partition_from_pubkey(&interesting, 432_000); 
         error!("jw: partition for {interesting}: {pi}, last several: {:?}",         (0..5).into_iter().map(|offset| 147744000 + pi - 432_000*offset).collect::<Vec<_>>());
 
