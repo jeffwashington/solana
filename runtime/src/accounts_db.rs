@@ -7806,6 +7806,7 @@ impl AccountsDb {
                 }
             }
         }
+        // get all pubkeys in all slots
         let purged_slot_pubkeys: HashSet<(Slot, Pubkey)> = {
             self.thread_pool_clean.install(|| {
                 stores
