@@ -3197,7 +3197,16 @@ impl AccountsDb {
                     });
                     if !is_alive {
                         if slot_list.len() == 1 && _ref_count == 1 && !slot_list.first().unwrap().1.is_cached() {
-                            error!("jw: marked not alive {pubkey}, 1 ref_count, {slot_list:?}, {}, {}", stored_account.store_id, stored_account.account.offset);
+                            let mut expected_slot = 0;
+                            self.storage.all_slots().into_iter().for_each(|slot| {
+                                for storage in self.get_storages_for_slot(slot).unwrap_or_default() {
+                                    if storage.append_vec_id() == stored_account.store_id {
+                                        expected_slot = storage.slot();
+                                    }
+                                }
+                            });
+
+                            error!("jw: marked not alive {pubkey}, 1 ref_count, {slot_list:?}, {}, {}, expected_slot: {expected_slot}", stored_account.store_id, stored_account.account.offset);
                         }
                         // This pubkey was found in the storage, but no longer exists in the index.
                         // It would have had a ref to the storage from the initial store, but it will
@@ -3358,10 +3367,10 @@ impl AccountsDb {
             .accounts_loaded
             .fetch_add(len as u64, Ordering::Relaxed);
 
-        self.thread_pool_clean.install(|| {
+        /*self.thread_pool_clean.install(|| */{
             let chunk_size = 50; // # accounts/thread
             let chunks = len / chunk_size + 1;
-            (0..chunks).into_par_iter().for_each(|chunk| {
+            (0..chunks).into_iter().for_each(|chunk| {
                 let skip = chunk * chunk_size;
 
                 let mut alive_accounts = Vec::with_capacity(chunk_size);
@@ -3384,7 +3393,7 @@ impl AccountsDb {
                     .append(&mut unrefed_pubkeys);
                 alive_total_collect.fetch_add(alive_total, Ordering::Relaxed);
             });
-        });
+        }//);
 
         let alive_accounts = alive_accounts_collect.into_inner().unwrap();
         let unrefed_pubkeys = unrefed_pubkeys_collect.into_inner().unwrap();
