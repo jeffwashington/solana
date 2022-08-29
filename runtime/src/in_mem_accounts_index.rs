@@ -567,7 +567,8 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
             }
         }
         let (slot, new_entry) = new_value;
-        let addref = Self::update_slot_list(
+        let prev_len = slot_list.len();
+        let addref = Self::update_slot_list2(
             &mut slot_list,
             slot,
             new_entry,
@@ -583,6 +584,8 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         else if ignore_addref {
             panic!("unexpected");
         }
+        let after_len = slot_list.len();
+        assert!(current.ref_count() as usize >= after_len, "too few refs: {}, before_len: {prev_len}, after: {after_len}, {pubkey}, {slot_list:?}", current.ref_count());
         current.set_dirty(true);
     }
 
@@ -595,7 +598,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
     /// AND
     ///   previous slot_list entry AT 'slot' did not exist (this is the first time this account was modified in this "slot"), or was previously cached (the storage is now being flushed from the cache)
     /// Note that even if entry DID exist at 'other_slot', the above conditions apply.
-    fn update_slot_list(
+    fn update_slot_list2(
         slot_list: &mut SlotList<T>,
         slot: Slot,
         account_info: T,
@@ -674,6 +677,10 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                         }
                     } else {
                         found_other_slot = true;
+                        if !is_cur_account_cached {
+                            panic!("this was previously not covered");
+                            addref = false;
+                        }
                     }
                 }
             });
@@ -821,7 +828,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                 if let Some((slot_list, mut ref_count)) = current {
                     // on disk, so merge and update disk
                     let mut slot_list = slot_list.to_vec();
-                    let addref = Self::update_slot_list(
+                    let addref = Self::update_slot_list2(
                         &mut slot_list,
                         slot,
                         account_info,
