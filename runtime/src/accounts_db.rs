@@ -4043,6 +4043,8 @@ impl AccountsDb {
                     }
                 });
 
+                error!("jw: unrefing: {:?}", unref);
+
                 unref.into_par_iter().for_each(|key| {
                     self.accounts_index.unref_from_storage(&key);
                 });
