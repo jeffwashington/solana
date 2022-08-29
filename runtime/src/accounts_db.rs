@@ -7722,16 +7722,7 @@ impl AccountsDb {
         inc_new_counter_info!("remove_dead_slots_metadata-ms", measure.as_ms() as usize);
     }
 
-    fn clean_dead_slots_from_accounts_index<'a>(
-        &'a self,
-        dead_slots_iter: impl Iterator<Item = &'a Slot> + Clone,
-        purged_slot_pubkeys: HashSet<(Slot, Pubkey)>,
-        // Should only be `Some` for non-cached slots
-        purged_stored_account_slots: Option<&mut AccountSlots>,
-    ) {
-        let mut accounts_index_root_stats = AccountsIndexRootsStats::default();
-        let mut measure = Measure::start("unref_from_storage");
-        if let Some(purged_stored_account_slots) = purged_stored_account_slots {
+    fn unref_accounts(&self, purged_slot_pubkeys: HashSet<(Slot, Pubkey)>, purged_stored_account_slots: &mut AccountSlots) {
             let len = purged_stored_account_slots.len();
             const BATCH_SIZE: usize = 10_000;
             let batches = 1 + (len / BATCH_SIZE);
@@ -7754,6 +7745,19 @@ impl AccountsDb {
                     .or_default()
                     .insert(slot);
             }
+    }
+
+    fn clean_dead_slots_from_accounts_index<'a>(
+        &'a self,
+        dead_slots_iter: impl Iterator<Item = &'a Slot> + Clone,
+        purged_slot_pubkeys: HashSet<(Slot, Pubkey)>,
+        // Should only be `Some` for non-cached slots
+        purged_stored_account_slots: Option<&mut AccountSlots>,
+    ) {
+        let mut accounts_index_root_stats = AccountsIndexRootsStats::default();
+        let mut measure = Measure::start("unref_from_storage");
+        if let Some(purged_stored_account_slots) = purged_stored_account_slots {
+            self.unref_accounts(purged_slot_pubkeys, purged_stored_account_slots);
         }
         measure.stop();
         accounts_index_root_stats.clean_unref_from_storage_us += measure.as_us();
