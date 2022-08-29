@@ -1575,6 +1575,7 @@ impl ShrinkStats {
 
 impl ShrinkAncientStats {
     fn report(&self) {
+        error!("jw: ShrinkAncientStats::report");
         if self.shrink_stats.last_report.should_update(1000) {
             datapoint_info!(
                 "shrink_ancient_stats",
