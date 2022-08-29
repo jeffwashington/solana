@@ -5254,9 +5254,10 @@ impl AccountsDb {
         bank_hash_info.snapshot_hash
     }
 
+    // why does this call index version?
     pub fn update_accounts_hash(&self, slot: Slot, ancestors: &Ancestors) -> (Hash, u64) {
         self.update_accounts_hash_with_index_option(
-            true, false, slot, ancestors, None, false, None, false,
+            true, slot, ancestors, None, false, None, false,
         )
     }
 
@@ -5566,7 +5567,6 @@ impl AccountsDb {
     fn calculate_accounts_hash_helper_with_verify(
         &self,
         use_index: bool,
-        debug_verify: bool,
         slot: Slot,
         ancestors: &Ancestors,
         expected_capitalization: Option<u64>,
@@ -5585,7 +5585,7 @@ impl AccountsDb {
             slots_per_epoch,
             is_startup,
         )?;
-        if debug_verify {
+        if false {
             // calculate the other way (store or non-store) and verify results match.
             let (hash_other, total_lamports_other) = self.calculate_accounts_hash_helper(
                 !use_index,
@@ -5608,7 +5608,6 @@ impl AccountsDb {
     pub fn update_accounts_hash_with_index_option(
         &self,
         use_index: bool,
-        debug_verify: bool,
         slot: Slot,
         ancestors: &Ancestors,
         expected_capitalization: Option<u64>,
@@ -5620,7 +5619,6 @@ impl AccountsDb {
         let (hash, total_lamports) = self
             .calculate_accounts_hash_helper_with_verify(
                 use_index,
-                debug_verify,
                 slot,
                 ancestors,
                 expected_capitalization,
@@ -5819,7 +5817,6 @@ impl AccountsDb {
         slot: Slot,
         ancestors: &Ancestors,
         total_lamports: u64,
-        test_hash_calculation: bool,
         ignore_mismatch: bool,
     ) -> Result<(), BankHashVerificationError> {
         use BankHashVerificationError::*;
@@ -5831,7 +5828,6 @@ impl AccountsDb {
         let (calculated_hash, calculated_lamports) = self
             .calculate_accounts_hash_helper_with_verify(
                 use_index,
-                test_hash_calculation,
                 slot,
                 ancestors,
                 None,

@@ -93,7 +93,6 @@ impl SnapshotRequestHandler {
     pub fn handle_snapshot_requests(
         &self,
         accounts_db_caching_enabled: bool,
-        test_hash_calculation: bool,
         use_index_hash_calculation: bool,
         non_snapshot_time_us: u128,
         last_full_snapshot_slot: &mut Option<Slot>,
@@ -102,6 +101,7 @@ impl SnapshotRequestHandler {
             .try_iter()
             .last()
             .map(|snapshot_request| {
+                let test_hash_calculation = false;
                 let mut total_time = Measure::start("snapshot_request_receiver_total_time");
                 let SnapshotRequest {
                     snapshot_root_bank,
@@ -111,7 +111,7 @@ impl SnapshotRequestHandler {
                 let previous_hash = if test_hash_calculation {
                     // We have to use the index version here.
                     // We cannot calculate the non-index way because cache has not been flushed and stores don't match reality.
-                    snapshot_root_bank.update_accounts_hash_with_index_option(true, false, false)
+                    snapshot_root_bank.update_accounts_hash_with_index_option(true, false)
                 } else {
                     Hash::default()
                 };
@@ -148,7 +148,6 @@ impl SnapshotRequestHandler {
                 let mut hash_time = Measure::start("hash_time");
                 let this_hash = snapshot_root_bank.update_accounts_hash_with_index_option(
                     use_index_hash_calculation,
-                    test_hash_calculation,
                     false,
                 );
                 let hash_for_testing = if test_hash_calculation {
@@ -319,7 +318,6 @@ impl AbsRequestHandler {
     pub fn handle_snapshot_requests(
         &self,
         accounts_db_caching_enabled: bool,
-        test_hash_calculation: bool,
         use_index_hash_calculation: bool,
         non_snapshot_time_us: u128,
         last_full_snapshot_slot: &mut Option<Slot>,
@@ -329,7 +327,6 @@ impl AbsRequestHandler {
             .and_then(|snapshot_request_handler| {
                 snapshot_request_handler.handle_snapshot_requests(
                     accounts_db_caching_enabled,
-                    test_hash_calculation,
                     use_index_hash_calculation,
                     non_snapshot_time_us,
                     last_full_snapshot_slot,
@@ -361,7 +358,6 @@ impl AccountsBackgroundService {
         exit: &Arc<AtomicBool>,
         request_handler: AbsRequestHandler,
         accounts_db_caching_enabled: bool,
-        test_hash_calculation: bool,
         use_index_hash_calculation: bool,
         mut last_full_snapshot_slot: Option<Slot>,
     ) -> Self {
@@ -420,7 +416,6 @@ impl AccountsBackgroundService {
                     let snapshot_block_height_option_result = request_handler
                         .handle_snapshot_requests(
                             accounts_db_caching_enabled,
-                            test_hash_calculation,
                             use_index_hash_calculation,
                             non_snapshot_time,
                             &mut last_full_snapshot_slot,

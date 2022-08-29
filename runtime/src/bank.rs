@@ -6022,12 +6022,11 @@ impl Bank {
     /// snapshot.
     /// Only called from startup or test code.
     #[must_use]
-    pub fn verify_bank_hash(&self, test_hash_calculation: bool, ignore_mismatch: bool) -> bool {
+    pub fn verify_bank_hash(&self, ignore_mismatch: bool) -> bool {
         self.rc.accounts.verify_bank_hash_and_lamports(
             self.slot(),
             &self.ancestors,
             self.capitalization(),
-            test_hash_calculation,
             ignore_mismatch,
         )
     }
@@ -6096,18 +6095,17 @@ impl Bank {
         Ok(sanitized_tx)
     }
 
-    pub fn calculate_capitalization(&self, debug_verify: bool) -> u64 {
+    pub fn calculate_capitalization(&self) -> u64 {
         let can_cached_slot_be_unflushed = true; // implied yes
         self.rc.accounts.calculate_capitalization(
             &self.ancestors,
             self.slot(),
             can_cached_slot_be_unflushed,
-            debug_verify,
         )
     }
 
-    pub fn calculate_and_verify_capitalization(&self, debug_verify: bool) -> bool {
-        let calculated = self.calculate_capitalization(debug_verify);
+    pub fn calculate_and_verify_capitalization(&self) -> bool {
+        let calculated = self.calculate_capitalization();
         let expected = self.capitalization();
         if calculated == expected {
             true
@@ -6122,11 +6120,10 @@ impl Bank {
 
     /// Forcibly overwrites current capitalization by actually recalculating accounts' balances.
     /// This should only be used for developing purposes.
-    pub fn set_capitalization(&self) -> u64 {
+    pub fn set_capitalization2(&self) -> u64 {
         let old = self.capitalization();
-        let debug_verify = true;
         self.capitalization
-            .store(self.calculate_capitalization(debug_verify), Relaxed);
+            .store(self.calculate_capitalization(), Relaxed);
         old
     }
 
@@ -6141,7 +6138,6 @@ impl Bank {
     pub fn update_accounts_hash_with_index_option(
         &self,
         use_index: bool,
-        mut debug_verify: bool,
         is_startup: bool,
     ) -> Hash {
         let slots_per_epoch = Some(self.epoch_schedule().get_slots_in_epoch(self.epoch));
@@ -6151,7 +6147,6 @@ impl Bank {
             .accounts_db
             .update_accounts_hash_with_index_option(
                 use_index,
-                debug_verify,
                 self.slot(),
                 &self.ancestors,
                 Some(self.capitalization()),
@@ -6167,16 +6162,14 @@ impl Bank {
                 ("capitalization", self.capitalization(), i64),
             );
 
-            if !debug_verify {
                 // cap mismatch detected. It has been logged to metrics above.
                 // Run both versions of the calculation to attempt to get more info.
-                debug_verify = true;
+                // this is the failure
                 self.rc
                     .accounts
                     .accounts_db
                     .update_accounts_hash_with_index_option(
                         use_index,
-                        debug_verify,
                         self.slot(),
                         &self.ancestors,
                         Some(self.capitalization()),
@@ -6184,7 +6177,6 @@ impl Bank {
                         slots_per_epoch,
                         is_startup,
                     );
-            }
 
             panic!(
                 "capitalization_mismatch. slot: {}, calculated_lamports: {}, capitalization: {}",
@@ -6197,14 +6189,14 @@ impl Bank {
     }
 
     pub fn update_accounts_hash(&self) -> Hash {
-        self.update_accounts_hash_with_index_option(true, false, false)
+        // why are we using index here
+        self.update_accounts_hash_with_index_option(true, false)
     }
 
     /// A snapshot bank should be purged of 0 lamport accounts which are not part of the hash
     /// calculation and could shield other real accounts.
     pub fn verify_snapshot_bank(
         &self,
-        test_hash_calculation: bool,
         accounts_db_skip_shrink: bool,
         last_full_snapshot_slot: Option<Slot>,
     ) -> bool {
@@ -6229,7 +6221,7 @@ impl Bank {
 
         info!("verify_bank_hash..");
         let mut verify_time = Measure::start("verify_bank_hash");
-        let mut verify = self.verify_bank_hash(test_hash_calculation, false);
+        let mut verify = self.verify_bank_hash(false);
         verify_time.stop();
         self.rc
             .accounts

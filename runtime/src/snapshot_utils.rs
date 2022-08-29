@@ -734,7 +734,6 @@ pub fn bank_from_snapshot_archives(
     accounts_db_caching_enabled: bool,
     limit_load_slot_count_from_snapshot: Option<usize>,
     shrink_ratio: AccountShrinkThreshold,
-    test_hash_calculation: bool,
     accounts_db_skip_shrink: bool,
     verify_index: bool,
     accounts_db_config: Option<AccountsDbConfig>,
@@ -809,7 +808,6 @@ pub fn bank_from_snapshot_archives(
 
     let mut measure_verify = Measure::start("verify");
     if !bank.verify_snapshot_bank(
-        test_hash_calculation,
         accounts_db_skip_shrink || !full_snapshot_archive_info.is_remote(),
         Some(full_snapshot_archive_info.slot()),
     ) && limit_load_slot_count_from_snapshot.is_none()
@@ -844,7 +842,6 @@ pub fn bank_from_latest_snapshot_archives(
     accounts_db_caching_enabled: bool,
     limit_load_slot_count_from_snapshot: Option<usize>,
     shrink_ratio: AccountShrinkThreshold,
-    test_hash_calculation: bool,
     accounts_db_skip_shrink: bool,
     verify_index: bool,
     accounts_db_config: Option<AccountsDbConfig>,
@@ -886,7 +883,6 @@ pub fn bank_from_latest_snapshot_archives(
         accounts_db_caching_enabled,
         limit_load_slot_count_from_snapshot,
         shrink_ratio,
-        test_hash_calculation,
         accounts_db_skip_shrink,
         verify_index,
         accounts_db_config,

@@ -784,14 +784,12 @@ impl Accounts {
         ancestors: &Ancestors,
         slot: Slot,
         can_cached_slot_be_unflushed: bool,
-        debug_verify: bool,
     ) -> u64 {
         let use_index = false;
         let is_startup = false; // there may be conditions where this is called at startup.
         self.accounts_db
             .update_accounts_hash_with_index_option(
                 use_index,
-                debug_verify,
                 slot,
                 ancestors,
                 None,
@@ -809,14 +807,12 @@ impl Accounts {
         slot: Slot,
         ancestors: &Ancestors,
         total_lamports: u64,
-        test_hash_calculation: bool,
         ignore_mismatch: bool,
     ) -> bool {
         if let Err(err) = self.accounts_db.verify_bank_hash_and_lamports(
             slot,
             ancestors,
             total_lamports,
-            test_hash_calculation,
             ignore_mismatch,
         ) {
             warn!("verify_bank_hash failed: {:?}", err);
