@@ -696,6 +696,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
            // error!("we may have hit a refcount issue?: {:?}", account_info);
         }
 
+        use log::*;
         if should_undo_addref == 1 && !found_slot {
             panic!("this was previously not covered");
         }
