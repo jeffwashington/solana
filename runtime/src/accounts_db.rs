@@ -2227,7 +2227,7 @@ impl AccountsDb {
         store_counts: &mut HashMap<AppendVecId, (usize, HashSet<Pubkey>)>,
         min_store_id: Option<AppendVecId>,
     ) {
-        let interesting = Pubkey::from_str("8MTrwnaQwMbVBCMPPn4BpKfPTMfTqLwhhStENtp4dtYX").unwrap();
+        let interesting = Pubkey::from_str("EYiu3SB5hyQQ78GM77rSXNsxB8zrymQM6E3emg8HqqzT").unwrap();
 
         // Another pass to check if there are some filtered accounts which
         // do not match the criteria of deleting all appendvecs which contain them
@@ -2546,7 +2546,7 @@ impl AccountsDb {
             "if snapshots are disabled, then zero_lamport_accounts_to_purge_later should always be empty"
         );
 
-        let interesting = Pubkey::from_str("8MTrwnaQwMbVBCMPPn4BpKfPTMfTqLwhhStENtp4dtYX").unwrap();
+        let interesting = Pubkey::from_str("EYiu3SB5hyQQ78GM77rSXNsxB8zrymQM6E3emg8HqqzT").unwrap();
 
         if let Some(last_full_snapshot_slot) = last_full_snapshot_slot {
             self.zero_lamport_accounts_to_purge_after_full_snapshot
@@ -2612,7 +2612,7 @@ impl AccountsDb {
         let not_found_on_fork_accum = AtomicU64::new(0);
         let missing_accum = AtomicU64::new(0);
         let useful_accum = AtomicU64::new(0);
-        let interesting = Pubkey::from_str("8MTrwnaQwMbVBCMPPn4BpKfPTMfTqLwhhStENtp4dtYX").unwrap();
+        let interesting = Pubkey::from_str("EYiu3SB5hyQQ78GM77rSXNsxB8zrymQM6E3emg8HqqzT").unwrap();
 
         // parallel scan the index.
         let (mut purges_zero_lamports, purges_old_accounts) = {
@@ -3068,7 +3068,7 @@ impl AccountsDb {
             "if filtering for incremental snapshots, then snapshots should be enabled",
         );
 
-        let interesting = Pubkey::from_str("8MTrwnaQwMbVBCMPPn4BpKfPTMfTqLwhhStENtp4dtYX").unwrap();
+        let interesting = Pubkey::from_str("EYiu3SB5hyQQ78GM77rSXNsxB8zrymQM6E3emg8HqqzT").unwrap();
 
         purges_zero_lamports.retain(|pubkey, (slot_account_infos, _ref_count)| {
             // Only keep purges_zero_lamports where the entire history of the account in the root set
@@ -5845,7 +5845,7 @@ impl AccountsDb {
                 }
             }
         }
-        let interesting = Pubkey::from_str("8MTrwnaQwMbVBCMPPn4BpKfPTMfTqLwhhStENtp4dtYX").unwrap();
+        let interesting = Pubkey::from_str("EYiu3SB5hyQQ78GM77rSXNsxB8zrymQM6E3emg8HqqzT").unwrap();
 
         let (accounts, hashes): (Vec<(&Pubkey, &AccountSharedData)>, Vec<Hash>) = iter_items
             .iter()
@@ -6434,7 +6434,7 @@ impl AccountsDb {
     {
         let mut len = storages.len();
 
-        let interesting = Pubkey::from_str("8MTrwnaQwMbVBCMPPn4BpKfPTMfTqLwhhStENtp4dtYX").unwrap();
+        let interesting = Pubkey::from_str("EYiu3SB5hyQQ78GM77rSXNsxB8zrymQM6E3emg8HqqzT").unwrap();
 
         if len == 1 {
             // only 1 storage, so no need to interleave between multiple storages based on write_version
@@ -6571,7 +6571,7 @@ impl AccountsDb {
         let slot0 = std::cmp::max(range.start, one_epoch_old_slot);
         let first_boundary =
             ((slot0 + MAX_ITEMS_PER_CHUNK) / MAX_ITEMS_PER_CHUNK) * MAX_ITEMS_PER_CHUNK;
-            let interesting = Pubkey::from_str("8MTrwnaQwMbVBCMPPn4BpKfPTMfTqLwhhStENtp4dtYX").unwrap();
+            let interesting = Pubkey::from_str("EYiu3SB5hyQQ78GM77rSXNsxB8zrymQM6E3emg8HqqzT").unwrap();
 
         let width = max_slot_inclusive - slot0;
         // 2 is for 2 special chunks - unaligned slots at the beginning and end
