@@ -3226,6 +3226,69 @@ impl AccountsDb {
             .fetch_add(dead, Ordering::Relaxed);
 
         alive_total
+    }    /// load the account index entry for the first `count` items in `accounts`
+    /// store a reference to all alive accounts in `alive_accounts`
+    /// unref and optionally store a reference to all pubkeys that are in the index, but dead in `unrefed_pubkeys`
+    /// return sum of account size for all alive accounts
+    fn load_accounts_index_for_shrink_ancient<'a>(
+        &'a self,
+        accounts: &'a [(Pubkey, FoundStoredAccount<'a>)],
+        count: usize,
+        alive_accounts: &mut Vec<&'a (Pubkey, FoundStoredAccount<'a>)>,
+        mut unrefed_pubkeys: Option<&mut Vec<&'a Pubkey>>,
+    ) -> usize {
+        let mut alive_total = 0;
+
+        let mut alive = 0;
+        let mut dead = 0;
+        let mut index = 0;
+        self.accounts_index.scan(
+            accounts[..std::cmp::min(accounts.len(), count)]
+                .iter()
+                .map(|(key, _)| key),
+            |pubkey, slots_refs| {
+                let mut result = AccountsIndexScanResult::None;
+                if let Some((slot_list, _ref_count)) = slots_refs {
+                    let pair = &accounts[index];
+                    let stored_account = &pair.1;
+                    let is_alive = slot_list.iter().any(|(_slot, acct_info)| {
+                        acct_info.matches_storage_location(
+                            stored_account.store_id,
+                            stored_account.account.offset,
+                        )
+                    });
+                    if !is_alive {
+                        if slot_list.len() == 1 && _ref_count == 1 && !slot_list.first().unwrap().1.is_cached() {
+                            error!("jw: marked not alive {pubkey}, 1 ref_count, {slot_list:?}, {}, {}", stored_account.store_id, stored_account.account.offset);
+                        }
+                        // This pubkey was found in the storage, but no longer exists in the index.
+                        // It would have had a ref to the storage from the initial store, but it will
+                        // not exist in the re-written slot. Unref it to keep the index consistent with
+                        // rewriting the storage entries.
+                        if let Some(unrefed_pubkeys) = &mut unrefed_pubkeys {
+                            unrefed_pubkeys.push(pubkey);
+                        }
+                        result = AccountsIndexScanResult::Unref;
+                        dead += 1;
+                    } else {
+                        alive_accounts.push(pair);
+                        alive_total += stored_account.account.stored_size;
+                        alive += 1;
+                    }
+                }
+                index += 1;
+                result
+            },
+        );
+        assert_eq!(index, std::cmp::min(accounts.len(), count));
+        self.shrink_stats
+            .alive_accounts
+            .fetch_add(alive, Ordering::Relaxed);
+        self.shrink_stats
+            .dead_accounts
+            .fetch_add(dead, Ordering::Relaxed);
+
+        alive_total
     }
 
     /// get all accounts in all the storages passed in
@@ -3914,7 +3977,7 @@ impl AccountsDb {
                     let skip = chunk * chunk_size;
 
                     let mut alive_accounts = Vec::with_capacity(chunk_size);
-                    let alive_total = self.load_accounts_index_for_shrink(
+                    let alive_total = self.load_accounts_index_for_shrink_ancient(
                         &stored_accounts[skip..],
                         chunk_size,
                         &mut alive_accounts,
