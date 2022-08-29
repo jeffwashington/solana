@@ -6007,7 +6007,6 @@ impl AccountsDb {
                 let old_slot = accounts.slot(i);
                 self.accounts_index.upsert(
                     target_slot,
-                    old_slot,
                     pubkey,
                     pubkey_account.1,
                     &self.account_indexes,

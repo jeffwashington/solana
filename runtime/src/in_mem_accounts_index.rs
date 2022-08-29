@@ -347,7 +347,6 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         &self,
         pubkey: &Pubkey,
         new_value: PreAllocatedAccountMapEntry<T>,
-        other_slot: Option<Slot>,
         reclaims: &mut SlotList<T>,
         previous_slot_entry_was_cached: bool,
     ) {
@@ -357,7 +356,6 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                 Self::lock_and_update_slot_list(
                     entry,
                     new_value.into(),
-                    other_slot,
                     reclaims,
                     previous_slot_entry_was_cached,
                 );
@@ -374,7 +372,6 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                         Self::lock_and_update_slot_list(
                             current,
                             new_value.into(),
-                            other_slot,
                             reclaims,
                             previous_slot_entry_was_cached,
                         );
@@ -394,7 +391,6 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                             let already_existed = self.upsert_on_disk(
                                 vacant,
                                 new_value,
-                                other_slot,
                                 reclaims,
                                 previous_slot_entry_was_cached,
                             );
@@ -409,7 +405,6 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                                 Self::lock_and_update_slot_list(
                                     &disk_entry,
                                     new_value.into(),
-                                    other_slot,
                                     reclaims,
                                     previous_slot_entry_was_cached,
                                 );
@@ -450,7 +445,6 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
     pub fn lock_and_update_slot_list(
         current: &AccountMapEntryInner<T>,
         new_value: (Slot, T),
-        other_slot: Option<Slot>,
         reclaims: &mut SlotList<T>,
         previous_slot_entry_was_cached: bool,
     ) {
@@ -460,7 +454,6 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
             &mut slot_list,
             slot,
             new_entry,
-            other_slot,
             reclaims,
             previous_slot_entry_was_cached,
         );
@@ -483,15 +476,12 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         slot_list: &mut SlotList<T>,
         slot: Slot,
         account_info: T,
-        mut other_slot: Option<Slot>,
         reclaims: &mut SlotList<T>,
         previous_slot_entry_was_cached: bool,
     ) -> bool {
         let mut addref = !account_info.is_cached();
 
-        if other_slot == Some(slot) {
-            other_slot = None; // redundant info, so ignore
-        }
+        let other_slot = None;
 
         // There may be 0..=2 dirty accounts found (one at 'slot' and one at 'other_slot')
         // that are already in the slot list.  Since the first one found will be swapped with the
@@ -585,7 +575,6 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                 InMemAccountsIndex::lock_and_update_slot_list(
                     occupied.get(),
                     (slot, account_info),
-                    None, // should be None because we don't expect a different slot # during index generation
                     &mut Vec::default(),
                     false,
                 );
@@ -604,7 +593,6 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                     let already_existed = self.upsert_on_disk(
                         vacant,
                         new_entry,
-                        None, // not changing slots here since it doesn't exist in the index at all
                         &mut Vec::default(),
                         false,
                     );
@@ -619,7 +607,6 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                             (slot, account_info),
                             // None because we are inserting the first element in the slot list for this pubkey.
                             // There can be no 'other' slot in the list.
-                            None,
                             &mut Vec::default(),
                             false,
                         );
@@ -661,7 +648,6 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         &self,
         vacant: VacantEntry<K, AccountMapEntry<T>>,
         new_entry: PreAllocatedAccountMapEntry<T>,
-        other_slot: Option<Slot>,
         reclaims: &mut SlotList<T>,
         previous_slot_entry_was_cached: bool,
     ) -> bool {
@@ -676,7 +662,6 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                         &mut slot_list,
                         slot,
                         account_info,
-                        other_slot,
                         reclaims,
                         previous_slot_entry_was_cached,
                     );

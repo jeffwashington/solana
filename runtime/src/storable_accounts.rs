@@ -43,31 +43,6 @@ impl<'a, T: ReadableAccount + Sync> StorableAccounts<'a, T> for (Slot, &'a [(&'a
     }
 }
 
-/// this tuple contains slot info PER account
-impl<'a, T: ReadableAccount + Sync> StorableAccounts<'a, T>
-    for (Slot, &'a [(&'a Pubkey, &'a T, Slot)])
-{
-    fn pubkey(&self, index: usize) -> &Pubkey {
-        self.1[index].0
-    }
-    fn account(&self, index: usize) -> &T {
-        self.1[index].1
-    }
-    fn slot(&self, index: usize) -> Slot {
-        // note that this could be different than 'target_slot()' PER account
-        self.1[index].2
-    }
-    fn target_slot(&self) -> Slot {
-        self.0
-    }
-    fn is_empty(&self) -> bool {
-        self.1.is_empty()
-    }
-    fn len(&self) -> usize {
-        self.1.len()
-    }
-}
-
 #[cfg(test)]
 pub mod tests {
     use {
