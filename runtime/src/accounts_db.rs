@@ -4189,6 +4189,8 @@ impl AccountsDb {
                 self.accounts_index
                     .clean_dead_slot(*slot, &mut AccountsIndexRootsStats::default());
                 self.bank_hashes.write().unwrap().remove(slot);
+                // all storages have been removed from here and recycled
+                self.storage.map.remove(slot);
             });
         }
 
