@@ -2103,6 +2103,9 @@ impl AccountsDb {
             let per_batch = total/127;
             (0..128).into_par_iter().for_each(|attempt| {
                 pks.iter().skip(attempt * per_batch).take(per_batch).for_each(|entry| {
+                    if failed.load(Ordering::Relaxed) {
+                        return;
+                    }
                     if let Some(idx) = self.accounts_index.get_account_read_entry(entry.key()) {
                         if idx.ref_count() as usize > entry.value().len() {
                             let mut list = idx.slot_list().clone();
@@ -2396,6 +2399,9 @@ impl AccountsDb {
             let per_batch = total/127;
             (0..128).into_par_iter().for_each(|attempt| {
                 pks.iter().skip(attempt * per_batch).take(per_batch).for_each(|entry| {
+                    if failed.load(Ordering::Relaxed) {
+                        return;
+                    }
                     if let Some(idx) = self.accounts_index.get_account_read_entry(entry.key()) {
                         if idx.ref_count() as usize > entry.value().len() {
                             let mut list = idx.slot_list().clone();
