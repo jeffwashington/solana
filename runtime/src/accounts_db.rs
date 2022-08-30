@@ -4036,6 +4036,8 @@ impl AccountsDb {
             let mut drop_root = slot != ancient_slot;
             info!("ha {}", line!());
 
+            assert!(self.accounts_index.account_maps.first().unwrap().storage.double_unrefs.is_empty());
+
             if slot != ancient_slot {
                 let (accounts, hashes) = to_store.get(StorageSelector::Primary);
                 if Some(ancient_slot) != ancient_slot_with_pubkeys {
@@ -4055,6 +4057,7 @@ impl AccountsDb {
                 error!("jw: unrefing: {:?}", unref);
 
                 unref.into_par_iter().for_each(|key| {
+                    self.accounts_index.account_maps.first().unwrap().storage.double_unrefs.insert(key);
                     self.accounts_index.unref_from_storage(&key);
                 });
             }
@@ -4069,6 +4072,8 @@ impl AccountsDb {
                 false,
             );
             info!("ha {}", line!());
+
+            assert!(self.accounts_index.account_maps.first().unwrap().storage.double_unrefs.is_empty());
 
             // handle accounts from 'slot' which did not fit into the current ancient append vec
             if to_store.has_overflow() {

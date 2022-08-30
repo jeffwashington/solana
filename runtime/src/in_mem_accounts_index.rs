@@ -91,7 +91,7 @@ pub struct InMemAccountsIndex<T: IndexValue> {
 
     // backing store
     map_internal: RwLock<InMemMap<T>>,
-    storage: Arc<BucketMapHolder<T>>,
+    pub storage: Arc<BucketMapHolder<T>>,
     bin: usize,
 
     bucket: Option<Arc<BucketApi<(Slot, T)>>>,
@@ -453,7 +453,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         // try to get it just from memory first using only a read lock
         self.get_only_in_mem(pubkey, |entry| {
             if let Some(entry) = entry {
-                Self::lock_and_update_slot_list(
+                self.lock_and_update_slot_list(
                     entry,
                     new_value.into(),
                     other_slot,
@@ -471,7 +471,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                 match entry {
                     Entry::Occupied(mut occupied) => {
                         let current = occupied.get_mut();
-                        Self::lock_and_update_slot_list(
+                        self.lock_and_update_slot_list(
                             current,
                             new_value.into(),
                             other_slot,
@@ -502,7 +502,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                             let disk_entry = self.load_account_entry_from_disk(vacant.key());
                             let new_value = if let Some(disk_entry) = disk_entry {
                                 // on disk, so merge new_value with what was on disk
-                                Self::lock_and_update_slot_list(
+                                self.lock_and_update_slot_list(
                                     &disk_entry,
                                     new_value.into(),
                                     other_slot,
@@ -548,6 +548,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
     /// the new item.
     /// if 'other_slot' is some, then also remove any entries in the slot list that are at 'other_slot'
     pub fn lock_and_update_slot_list(
+        &self,
         current: &AccountMapEntryInner<T>,
         new_value: (Slot, T),
         other_slot: Option<Slot>,
@@ -568,13 +569,14 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         }
         let (slot, new_entry) = new_value;
         let prev_len = slot_list.len();
-        let addref = Self::update_slot_list2(
+        let addref = self.update_slot_list2(
             &mut slot_list,
             slot,
             new_entry,
             other_slot,
             reclaims,
             reclaim,
+            pubkey,
         );
         if addref {
             if !ignore_addref {
@@ -602,12 +604,14 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
     ///   previous slot_list entry AT 'slot' did not exist (this is the first time this account was modified in this "slot"), or was previously cached (the storage is now being flushed from the cache)
     /// Note that even if entry DID exist at 'other_slot', the above conditions apply.
     fn update_slot_list2(
+        &self,
         slot_list: &mut SlotList<T>,
         slot: Slot,
         account_info: T,
         mut other_slot: Option<Slot>,
         reclaims: &mut SlotList<T>,
         reclaim: UpsertReclaim,
+        pubkey: &Pubkey,
     ) -> bool {
         let mut addref = !account_info.is_cached();
 
@@ -701,7 +705,9 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
             error!("this was previously not covered- found entry in other, was not in 1, we should not addref");
         }
         else if should_undo_addref == 2 {
-            panic!("jw: 2 undo addrefs - hope caller correctly unref'd");
+            if self.storage.double_unrefs.remove(&pubkey).is_none() {
+                panic!("jw: 2 undo addrefs - hope caller correctly unref'd: {:?}", pubkey);
+            }
         }
 
         addref
@@ -750,7 +756,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
             Entry::Occupied(occupied) => {
                 // in cache, so merge into cache
                 let (slot, account_info) = new_entry.into();
-                InMemAccountsIndex::lock_and_update_slot_list(
+                self.lock_and_update_slot_list(
                     occupied.get(),
                     (slot, account_info),
                     None, // should be None because we don't expect a different slot # during index generation
@@ -783,7 +789,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                     self.stats().inc_mem_count(self.bin);
                     if let Some(disk_entry) = disk_entry {
                         let (slot, account_info) = new_entry.into();
-                        InMemAccountsIndex::lock_and_update_slot_list(
+                        self.lock_and_update_slot_list(
                             &disk_entry,
                             (slot, account_info),
                             // None because we are inserting the first element in the slot list for this pubkey.
@@ -842,13 +848,14 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                 if let Some((slot_list, mut ref_count)) = current {
                     // on disk, so merge and update disk
                     let mut slot_list = slot_list.to_vec();
-                    let addref = Self::update_slot_list2(
+                    let addref = self.update_slot_list2(
                         &mut slot_list,
                         slot,
                         account_info,
                         other_slot,
                         reclaims,
                         reclaim,
+                        &Pubkey::default(),
                     );
                     if addref {
                         ref_count += 1

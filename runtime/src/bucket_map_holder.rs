@@ -23,6 +23,8 @@ use {
 pub type Age = u8;
 
 const AGE_MS: u64 = SLOT_MS; // match one age per slot time
+use dashmap::DashSet;
+use solana_sdk::pubkey::Pubkey;
 
 // 10 GB limit for in-mem idx. In practice, we don't get this high. This tunes how aggressively to save items we expect to use soon.
 pub const DEFAULT_DISK_INDEX: Option<usize> = Some(10_000);
@@ -34,6 +36,8 @@ pub struct BucketMapHolder<T: IndexValue> {
     /// rolling 'current' age
     pub age: AtomicU8,
     pub stats: BucketMapHolderStats,
+
+    pub double_unrefs: DashSet<Pubkey>,
 
     age_timer: AtomicInterval,
 
@@ -221,6 +225,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
         // only allocate if mem_budget_mb is Some
         let disk = mem_budget_mb.map(|_| BucketMap::new(bucket_config));
         Self {
+            double_unrefs: DashSet::default(),
             disk,
             ages_to_stay_in_cache,
             count_buckets_flushed: AtomicUsize::default(),
