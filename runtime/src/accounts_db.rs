@@ -6350,6 +6350,10 @@ impl AccountsDb {
         if purged_slot_pubkeys.contains(&(148269246, interesting)) {
             error!("clean_dead_slots contains: {interesting}, 148269246");
         }
+
+        let all = purged_slot_pubkeys.iter().collect::<Vec<_>>();
+        
+
         if let Some(purged_stored_account_slots) = purged_stored_account_slots {
             let len = purged_stored_account_slots.len();
             // we could build a higher level function in accounts_index to group by bin
@@ -6358,7 +6362,11 @@ impl AccountsDb {
             self.thread_pool_clean.install(|| {
                 (0..batches).into_par_iter().for_each(|batch| {
                     let skip = batch * BATCH_SIZE;
+                    let mut i =skip;
                     for (_slot, pubkey) in purged_slot_pubkeys.iter().skip(skip).take(BATCH_SIZE) {
+                        assert_eq!(_slot, &all[i].0);
+                        assert_eq!(pubkey, &all[i].1);
+                        i += 1;
                         if pubkey == &interesting {
                             error!("clean_dead_slots: unref: {interesting}, {_slot}");
                         }
