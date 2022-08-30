@@ -290,7 +290,7 @@ impl<T: IndexValue> AccountMapEntryInner<T> {
                     panic!("jw: ref to 0, but can't check read lock, {pubkey}");
                 }
             }
-            assert_ne!(0, result);
+            assert_ne!(0, result, "{pubkey}, {:?}", self.slot_list.try_read());
         }
         self.set_dirty(true);
     }
