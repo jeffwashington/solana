@@ -2835,10 +2835,10 @@ impl AccountsDb {
         let unrefed_pubkeys = unrefed_pubkeys_collect.into_inner().unwrap();
         let alive_total = alive_total_collect.load(Ordering::Relaxed);
 
-        if alive_accounts.contains(&interesting) {
+        if alive_accounts.iter().any(|(k,_)| k==&&interesting) {
             error!("{interesting} in slot {slot} alive_accounts");
         }
-        else if unrefed_pubkeys.contains(&interesting) {
+        else if unrefed_pubkeys.contains(&&interesting) {
             error!("{interesting} in slot {slot} unrefed_pubkeys");
 
         } else         if slot == 147837246 || slot ==  148269246{
