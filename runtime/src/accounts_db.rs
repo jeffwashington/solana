@@ -2081,6 +2081,7 @@ impl AccountsDb {
     ) {
         let _guard = self.active_stats.activate(ActiveStatItem::Clean);
 
+        if false {
         // exhaustively compare ALL refcounts
         if let Some(max_slot) = max_clean_root.or_else(|| Some(self.accounts_index.max_root_inclusive())).as_ref() {
             let pks = DashMap::<Pubkey, Vec<Slot>>::default();
@@ -2132,6 +2133,7 @@ impl AccountsDb {
                 panic!("failed");
             }
             }
+        }
 
 
         let mut measure_all = Measure::start("clean_accounts");
