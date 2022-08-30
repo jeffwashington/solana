@@ -4332,6 +4332,7 @@ impl AccountsDb {
         let reclaims = self.purge_keys_exact(pubkey_to_slot_set.iter());
         assert_eq!(reclaims.len(), num_purged_keys);
         if is_dead {
+            error!("jw {}", line!());
             self.remove_dead_slots_metadata(
                 std::iter::once(&purged_slot),
                 purged_slot_pubkeys,
@@ -6340,8 +6341,15 @@ impl AccountsDb {
         // Should only be `Some` for non-cached slots
         purged_stored_account_slots: Option<&mut AccountSlots>,
     ) {
+        use std::str::FromStr;        let interesting = Pubkey::from_str("4ihhaS2dnfjR6Wun26tZyM6KNXfRCqhxrBye4KaiydA4").unwrap();        
         let mut accounts_index_root_stats = AccountsIndexRootsStats::default();
         let mut measure = Measure::start("unref_from_storage");
+        if purged_slot_pubkeys.contains(&(147837246, interesting)) {
+            error!("clean_dead_slots contains: {interesting}, 147837246");
+        }
+        if purged_slot_pubkeys.contains(&(148269246, interesting)) {
+            error!("clean_dead_slots contains: {interesting}, 148269246");
+        }
         if let Some(purged_stored_account_slots) = purged_stored_account_slots {
             let len = purged_stored_account_slots.len();
             // we could build a higher level function in accounts_index to group by bin
@@ -6351,6 +6359,9 @@ impl AccountsDb {
                 (0..batches).into_par_iter().for_each(|batch| {
                     let skip = batch * BATCH_SIZE;
                     for (_slot, pubkey) in purged_slot_pubkeys.iter().skip(skip).take(BATCH_SIZE) {
+                        if pubkey == &interesting {
+                            error!("clean_dead_slots: unref: {interesting}, {_slot}");
+                        }
                         self.accounts_index.unref_from_storage(pubkey);
                     }
                 })
@@ -6425,11 +6436,13 @@ impl AccountsDb {
                     })
             })
         };
+        error!("jw {}", line!());
         self.remove_dead_slots_metadata(
             dead_slots.iter(),
             purged_slot_pubkeys,
             purged_account_slots,
         );
+        error!("jw {}", line!());
         measure.stop();
         inc_new_counter_info!("clean_stored_dead_slots-ms", measure.as_ms() as usize);
         self.clean_accounts_stats
