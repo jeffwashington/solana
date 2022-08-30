@@ -183,7 +183,7 @@ impl BucketMapHolderStats {
         if !self.last_time.should_update(STATS_INTERVAL_MS) {
             return;
         }
-
+        return;
         let ms_per_age = self.ms_per_age(storage, elapsed_ms);
 
         let in_mem_per_bucket_counts = self
