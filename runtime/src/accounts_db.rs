@@ -2099,6 +2099,7 @@ impl AccountsDb {
                 }
             });
             let total = pks.len();
+            let failed = AtomicBool::default();
             let per_batch = total/127;
             (0..128).into_par_iter().for_each(|attempt| {
                 pks.iter().skip(attempt * per_batch).take(per_batch).for_each(|entry| {
@@ -2111,6 +2112,7 @@ impl AccountsDb {
                             let too_new = new_len-old_len;
 
                             if ((idx.ref_count() as usize) - too_new) > entry.value().len() {
+                                failed.store(true, Ordering::Relaxed);
                                 panic!("andrew: {} greater refcounts: {}, should be: {}, {:?}, {:?}, original: {:?}, too_new: {too_new}", entry.key(), idx.ref_count(), entry.value().len(), *entry.value(), list, idx.slot_list());
                             }
                         }
@@ -2120,6 +2122,10 @@ impl AccountsDb {
                     }
                 });
             });
+        }
+
+        if failed.load(Ordering::Relaxed) {
+            panic!("failed");
         }
 
         let mut measure_all = Measure::start("clean_accounts");
