@@ -153,7 +153,7 @@ impl AccountsHashVerifier {
 
 
         if accounts_package.expected_capitalization != lamports {
-            error!("looping after ahv: {}, {}", accounts_package.expected_capitalization, lamports);
+            error!("jw: looping after ahv: {}, {}", accounts_package.expected_capitalization, lamports);
             loop {
 
             }

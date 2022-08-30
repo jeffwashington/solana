@@ -9086,7 +9086,7 @@ impl AccountsDb {
                 let sparse_by_bytes = (written_bytes as f32 / total_bytes as f32) <= 0.8;
                 let not_sparse = !sparse_by_count && !sparse_by_bytes;
                 let too_small_to_shrink = total_bytes <= PAGE_SIZE;
-                panic!("");
+                panic!("jw:");
                 if not_sparse || too_small_to_shrink {
                     return 0;
                 }
