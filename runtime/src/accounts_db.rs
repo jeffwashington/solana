@@ -2371,6 +2371,55 @@ impl AccountsDb {
         reclaims_time.stop();
         measure_all.stop();
 
+        // exhaustively compare ALL refcounts
+        if let Some(max_slot) = max_clean_root.or_else(|| Some(self.accounts_index.max_root_inclusive())).as_ref() {
+            let pks = DashMap::<Pubkey, Vec<Slot>>::default();
+            let slots = self.storage.all_slots();
+            slots.into_par_iter().for_each(|slot| {
+                for storage in self.storage.get_slot_storage_entries(slot).unwrap_or_default() {
+                    storage.all_accounts().iter().for_each(|account| {
+                        let pk = account.meta.pubkey;
+                        match pks.entry(pk) {
+                            dashmap::mapref::entry::Entry::Occupied(mut occupied_entry) => {
+                                occupied_entry.get_mut().push(slot);
+                            }
+                            dashmap::mapref::entry::Entry::Vacant(vacant_entry) => {
+                                vacant_entry.insert(vec![slot]);
+                            }
+                        }
+                    });
+                }
+            });
+            let total = pks.len();
+            let failed = AtomicBool::default();
+            let per_batch = total/127;
+            (0..128).into_par_iter().for_each(|attempt| {
+                pks.iter().skip(attempt * per_batch).take(per_batch).for_each(|entry| {
+                    if let Some(idx) = self.accounts_index.get_account_read_entry(entry.key()) {
+                        if idx.ref_count() as usize > entry.value().len() {
+                            let mut list = idx.slot_list().clone();
+                            let old_len = list.len();
+                            list.retain(|(slot, _)| slot <= max_slot);
+                            let new_len = list.len();
+                            let too_new = new_len-old_len;
+
+                            if ((idx.ref_count() as usize) - too_new) > entry.value().len() {
+                                failed.store(true, Ordering::Relaxed);
+                                panic!("andrew: {} greater refcounts: {}, should be: {}, {:?}, {:?}, original: {:?}, too_new: {too_new}", entry.key(), idx.ref_count(), entry.value().len(), *entry.value(), list, idx.slot_list());
+                            }
+                        }
+                        else if (idx.ref_count() as usize) < entry.value().len() {
+                            error!("andrew: {} less refcounts: {}, should be: {}, {:?}, {:?}", entry.key(), idx.ref_count(), entry.value().len(), *entry.value(), idx.slot_list());
+                        }
+                    }
+                });
+            });
+        }
+
+        if failed.load(Ordering::Relaxed) {
+            panic!("failed");
+        } 
+               
         self.clean_accounts_stats.report();
         datapoint_info!(
             "clean_accounts",
