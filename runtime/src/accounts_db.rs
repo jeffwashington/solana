@@ -2080,7 +2080,7 @@ impl AccountsDb {
         let _guard = self.active_stats.activate(ActiveStatItem::Clean);
 
         // exhaustively compare ALL refcounts
-        if let Some(max_slot) = max_clean_root.as_ref() {
+        if let Some(max_slot) = max_clean_root.or_else(|| Some(self.accounts_index.max_root_inclusive())).as_ref() {
             let pks = DashMap::<Pubkey, Vec<Slot>>::default();
             let slots = self.storage.all_slots();
             slots.into_par_iter().for_each(|slot| {
