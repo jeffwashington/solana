@@ -2401,7 +2401,7 @@ impl AccountsDb {
             });
             let total = pks.len();
             let failed = AtomicBool::default();
-            let per_batch = total/127;
+            let per_batch = (total/127).max(1);
             (0..128).into_par_iter().for_each(|attempt| {
                 pks.iter().skip(attempt * per_batch).take(per_batch).for_each(|entry| {
                     if failed.load(Ordering::Relaxed) {
