@@ -2388,7 +2388,7 @@ impl AccountsDb {
                     storage.all_accounts().iter().for_each(|account| {
                         let pk = account.meta.pubkey;
                         if pk != interesting {
-                            return;
+                            //return;
                         }
                         match pks.entry(pk) {
                             dashmap::mapref::entry::Entry::Occupied(mut occupied_entry) => {
