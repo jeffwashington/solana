@@ -7522,7 +7522,7 @@ impl AccountsDb {
             });
             reclaims
         };
-        if len > threshold {
+        if false {//len > threshold {
             let chunk_size = std::cmp::max(1, len / quarter_thread_count()); // # pubkeys/thread
             let batches = 1 + len / chunk_size;
             (0..batches)
