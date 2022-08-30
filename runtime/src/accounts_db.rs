@@ -2122,11 +2122,11 @@ impl AccountsDb {
                     }
                 });
             });
-        }
+            if failed.load(Ordering::Relaxed) {
+                panic!("failed");
+            }
+            }
 
-        if failed.load(Ordering::Relaxed) {
-            panic!("failed");
-        }
 
         let mut measure_all = Measure::start("clean_accounts");
         let max_clean_root = self.max_clean_root(max_clean_root);
@@ -2414,12 +2414,12 @@ impl AccountsDb {
                     }
                 });
             });
-        }
+            if failed.load(Ordering::Relaxed) {
+                panic!("failed");
+            } 
+            }
 
-        if failed.load(Ordering::Relaxed) {
-            panic!("failed");
-        } 
-               
+
         self.clean_accounts_stats.report();
         datapoint_info!(
             "clean_accounts",
@@ -2790,10 +2790,10 @@ impl AccountsDb {
             .accounts_loaded
             .fetch_add(len as u64, Ordering::Relaxed);
 
-        self.thread_pool_clean.install(|| {
+        /*self.thread_pool_clean.install(|| */{
             let chunk_size = 50; // # accounts/thread
             let chunks = len / chunk_size + 1;
-            (0..chunks).into_par_iter().for_each(|chunk| {
+            (0..chunks).into_iter().for_each(|chunk| {
                 let skip = chunk * chunk_size;
 
                 let mut alive_accounts = Vec::with_capacity(chunk_size);
@@ -2815,7 +2815,7 @@ impl AccountsDb {
                     .append(&mut unrefed_pubkeys);
                 alive_total_collect.fetch_add(alive_total, Ordering::Relaxed);
             });
-        });
+        }//);
 
         let alive_accounts = alive_accounts_collect.into_inner().unwrap();
         let unrefed_pubkeys = unrefed_pubkeys_collect.into_inner().unwrap();
@@ -2839,14 +2839,15 @@ impl AccountsDb {
 
         let total_starting_accounts = stored_accounts.len();
         let total_accounts_after_shrink = alive_accounts.len();
-        debug!(
-            "shrinking: slot: {}, accounts: ({} => {}) bytes: ({} ; aligned to: {}) original: {}",
+        info!(
+            "shrinking: slot: {}, accounts: ({} => {}) bytes: ({} ; aligned to: {}) original: {}, unref'd pubkeys: {:?}",
             slot,
             total_starting_accounts,
             total_accounts_after_shrink,
             alive_total,
             aligned_total,
             original_bytes,
+            unrefed_pubkeys,
         );
 
         let mut rewrite_elapsed = Measure::start("rewrite_elapsed");
