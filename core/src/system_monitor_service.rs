@@ -310,6 +310,7 @@ impl SystemMonitorService {
 
     fn report_mem_stats() {
         if let Ok(info) = sys_info::mem_info() {
+            return;
             // stats are returned in kb.
             const KB: u64 = 1_024;
             datapoint_info!(
