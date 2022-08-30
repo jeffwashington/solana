@@ -1298,6 +1298,11 @@ impl<T: IndexValue> AccountsIndex<T> {
         pubkey: &Pubkey,
         user: impl for<'a> FnOnce(&mut RwLockWriteGuard<'a, SlotList<T>>) -> RT,
     ) -> Option<RT> {
+        use std::str::FromStr;        let interesting = Pubkey::from_str("4ihhaS2dnfjR6Wun26tZyM6KNXfRCqhxrBye4KaiydA4").unwrap();        
+        if interesting == *pubkey {
+            error!("slot_list_mut {interesting}");
+        }
+
         let read_lock = self.account_maps[self.bin_calculator.bin_from_pubkey(pubkey)]
             .read()
             .unwrap();

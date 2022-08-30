@@ -6876,6 +6876,8 @@ impl AccountsDb {
             return SlotIndexGenerationInfo::default();
         }
 
+        let interesting = Pubkey::from_str("4ihhaS2dnfjR6Wun26tZyM6KNXfRCqhxrBye4KaiydA4").unwrap();        
+       
         let secondary = !self.account_indexes.is_empty();
 
         let mut accounts_data_len = 0;
@@ -6890,6 +6892,10 @@ impl AccountsDb {
                     stored_account,
                 },
             )| {
+                if interesting == pubkey {
+                    error!("{interesting}, slot: {slot}");
+                }
+
                 if secondary {
                     self.accounts_index.update_secondary_indexes(
                         &pubkey,
