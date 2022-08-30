@@ -7129,6 +7129,8 @@ impl AccountsDb {
                 }
             }
         }
+        error!("jw: done looking for differences");
+
 
         self.assert_safe_squashing_accounts_hash(
             storages.max_slot_inclusive(),
