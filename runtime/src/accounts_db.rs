@@ -2113,7 +2113,8 @@ impl AccountsDb {
 
                             if ((idx.ref_count() as usize) - too_new) > entry.value().len() {
                                 failed.store(true, Ordering::Relaxed);
-                                panic!("andrew: {} greater refcounts: {}, should be: {}, {:?}, {:?}, original: {:?}, too_new: {too_new}", entry.key(), idx.ref_count(), entry.value().len(), *entry.value(), list, idx.slot_list());
+                                error!("andrew2: {} greater refcounts: {}, should be: {}, {:?}, {:?}, original: {:?}, too_new: {too_new}", entry.key(), idx.ref_count(), entry.value().len(), *entry.value(), list, idx.slot_list());
+                                return;
                             }
                         }
                         else if (idx.ref_count() as usize) < entry.value().len() {
