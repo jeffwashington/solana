@@ -1762,6 +1762,7 @@ impl AccountsDb {
         const INDEX_CLEAN_BULK_COUNT: usize = 4096;
 
         let mut clean_rooted = Measure::start("clean_old_root-ms");
+        error!("jw: clean_rooted_entries {}", line!());
         let reclaim_vecs = purges
             .par_chunks(INDEX_CLEAN_BULK_COUNT)
             .map(|pubkeys: &[Pubkey]| {
@@ -1772,6 +1773,7 @@ impl AccountsDb {
                 }
                 reclaims
             });
+        error!("jw: clean_rooted_entries {}", line!());
         let reclaims: Vec<_> = reclaim_vecs.flatten().collect();
         clean_rooted.stop();
         inc_new_counter_info!("clean-old-root-par-clean-ms", clean_rooted.as_ms() as usize);
@@ -2780,6 +2782,10 @@ impl AccountsDb {
     where
         I: Iterator<Item = &'a Arc<AccountStorageEntry>>,
     {
+        use std::str::FromStr;        let interesting = Pubkey::from_str("4ihhaS2dnfjR6Wun26tZyM6KNXfRCqhxrBye4KaiydA4").unwrap();        
+        if slot == 147837246 || slot ==  148269246{
+            error!("slot: {slot}");
+        }
         debug!("do_shrink_slot_stores: slot: {}", slot);
         let (stored_accounts, num_stores, original_bytes) =
             self.get_unique_accounts_from_storages(stores);
@@ -2829,11 +2835,22 @@ impl AccountsDb {
         let unrefed_pubkeys = unrefed_pubkeys_collect.into_inner().unwrap();
         let alive_total = alive_total_collect.load(Ordering::Relaxed);
 
+        if alive_accounts.contains(&interesting) {
+            error!("{interesting} in slot {slot} alive_accounts");
+        }
+        else if unrefed_pubkeys.contains(&interesting) {
+            error!("{interesting} in slot {slot} unrefed_pubkeys");
+
+        } else         if slot == 147837246 || slot ==  148269246{
+            error!("{interesting} not found in slot {slot}");
+        }
+
         index_read_elapsed.stop();
         let aligned_total: u64 = Self::page_align(alive_total as u64);
 
         // This shouldn't happen if alive_bytes/approx_stored_count are accurate
         if Self::should_not_shrink(aligned_total, original_bytes, num_stores) {
+            panic!("undoing shrink");
             self.shrink_stats
                 .skipped_shrink
                 .fetch_add(1, Ordering::Relaxed);
