@@ -2869,7 +2869,7 @@ impl AccountsDb {
 
         let total_starting_accounts = stored_accounts.len();
         let total_accounts_after_shrink = alive_accounts.len();
-        info!(
+        debug!(
             "shrinking: slot: {}, accounts: ({} => {}) bytes: ({} ; aligned to: {}) original: {}, unref'd pubkeys: {:?}",
             slot,
             total_starting_accounts,
