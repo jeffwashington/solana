@@ -702,7 +702,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
 
         use log::*;
         if should_undo_addref == 1 && !found_slot {
-            panic!("this was previously not covered- found entry in other, was not in 1, we should not addref, {pubkey}");
+// this is correct now            panic!("this was previously not covered- found entry in other, was not in 1, we should not addref, {pubkey}");
         }
         else if should_undo_addref == 2 {
             if self.storage.double_unrefs.remove(&pubkey).is_none() {
