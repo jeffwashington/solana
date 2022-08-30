@@ -7740,7 +7740,7 @@ impl AccountsDb {
     }
 
     fn unref_accounts(&self, purged_slot_pubkeys: HashSet<(Slot, Pubkey)>, purged_stored_account_slots: &mut AccountSlots) {
-            let len = purged_stored_account_slots.len();
+            let len = purged_slot_pubkeys.len();
             const BATCH_SIZE: usize = 10_000;
             let batches = 1 + (len / BATCH_SIZE);
             self.thread_pool_clean.install(|| {
