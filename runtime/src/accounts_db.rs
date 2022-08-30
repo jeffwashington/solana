@@ -2376,7 +2376,7 @@ impl AccountsDb {
 
         reclaims_time.stop();
         measure_all.stop();
-
+        let interesting = Pubkey::from_str("4ihhaS2dnfjR6Wun26tZyM6KNXfRCqhxrBye4KaiydA4").unwrap();        
         // exhaustively compare ALL refcounts
         if let Some(max_slot) = max_clean_root.or_else(|| Some(self.accounts_index.max_root_inclusive())).as_ref() {
             let pks = DashMap::<Pubkey, Vec<Slot>>::default();
@@ -2385,6 +2385,9 @@ impl AccountsDb {
                 for storage in self.storage.get_slot_storage_entries(slot).unwrap_or_default() {
                     storage.all_accounts().iter().for_each(|account| {
                         let pk = account.meta.pubkey;
+                        if pk != interesting {
+                            return;
+                        }
                         match pks.entry(pk) {
                             dashmap::mapref::entry::Entry::Occupied(mut occupied_entry) => {
                                 occupied_entry.get_mut().push(slot);

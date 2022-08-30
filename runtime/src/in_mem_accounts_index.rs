@@ -335,7 +335,13 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
     }
 
     pub fn unref(&self, pubkey: &Pubkey) {
+        use std::str::FromStr;        let interesting = Pubkey::from_str("4ihhaS2dnfjR6Wun26tZyM6KNXfRCqhxrBye4KaiydA4").unwrap();        
+
         self.get_internal(pubkey, |entry| {
+            if pubkey == &interesting {
+                use log::*;
+                error!("unref: {pubkey}, {entry:?}, {}", entry.map(|e| e.ref_count()).unwrap_or(123456));
+            }
             if let Some(entry) = entry {
                 entry.add_un_ref(false)
             }
