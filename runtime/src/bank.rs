@@ -6845,6 +6845,8 @@ impl Bank {
             hash = hard_forked_hash;
         }
 
+        // if ledger tool
+        self.rc.accounts.accounts_db.notify_accounts_hash_calculated_complete        ( self.slot());
         info!(
             "bank frozen: {} hash: {} accounts_delta: {} signature_count: {} last_blockhash: {} capitalization: {}",
             self.slot(),
@@ -6897,7 +6899,7 @@ impl Bank {
         let cap = self.capitalization();
         let epoch_schedule = self.epoch_schedule();
         let rent_collector = self.rent_collector();
-        if config.run_in_background {
+        if config.run_in_background && false {
             let ancestors = ancestors.clone();
             let accounts = Arc::clone(accounts);
             let epoch_schedule = *epoch_schedule;
