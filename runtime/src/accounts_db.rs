@@ -2864,7 +2864,14 @@ impl AccountsDb {
         reclaims_time.stop();
         measure_all.stop();
 
-        //self.exhaustively_verify_refcounts(max_clean_root_inclusive);
+        if true {
+            for _ in 0..10 {
+                self.exhaustively_verify_refcounts(max_clean_root_inclusive);
+                // this will randomly shrink ancient append vecs
+                self.shrink_ancient_slots();
+            }
+
+        }
 
         self.clean_accounts_stats.report();
         datapoint_info!(
