@@ -2864,7 +2864,7 @@ impl AccountsDb {
         reclaims_time.stop();
         measure_all.stop();
 
-        if true {
+        if !self.accounts_index.started_from_validator {
             for _ in 0..10 {
                 self.exhaustively_verify_refcounts(max_clean_root_inclusive);
                 // this will randomly shrink ancient append vecs
@@ -7780,6 +7780,7 @@ impl AccountsDb {
 
     fn exhaustively_verify_refcounts(&self, slot: Option<Slot>) {
         // exhaustively compare ALL refcounts
+        error!("exhaustively verifying refcounts");
         if let Some(max_slot) = slot.or_else(|| Some(self.accounts_index.max_root_inclusive())).as_ref() {
             let pks = DashMap::<Pubkey, Vec<Slot>>::default();
             let slots = self.storage.all_slots();

@@ -684,6 +684,7 @@ pub enum AccountsIndexScanResult {
 
 #[derive(Debug)]
 pub struct AccountsIndex<T: IndexValue> {
+    pub started_from_validator: bool,
     pub account_maps: LockMapType<T>,
     pub bin_calculator: PubkeyBinCalculator24,
     program_id_index: SecondaryIndex<DashMapSecondaryIndexEntry>,
@@ -731,6 +732,9 @@ impl<T: IndexValue> AccountsIndex<T> {
             .as_ref()
             .and_then(|config| config.scan_results_limit_bytes);
         let (account_maps, bin_calculator, storage) = Self::allocate_accounts_index(config);
+        let started_from_validator = config
+            .as_ref()
+            .and_then(|config| config.started_from_validator).unwrap_or_default();
         Self {
             account_maps,
             bin_calculator,
@@ -753,6 +757,7 @@ impl<T: IndexValue> AccountsIndex<T> {
             active_scans: AtomicUsize::default(),
             max_distance_to_min_scan_slot: AtomicU64::default(),
             rent_paying_accounts_by_partition: OnceCell::default(),
+            started_from_validator,
         }
     }
 
