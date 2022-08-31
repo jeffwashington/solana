@@ -7778,7 +7778,9 @@ impl AccountsDb {
                         let pk = account.meta.pubkey;
                         match pks.entry(pk) {
                             dashmap::mapref::entry::Entry::Occupied(mut occupied_entry) => {
-                                if !occupied_entry.get().contains(slot) {
+                                let v: &Vec<Slot> = &(*occupied_entry.get());
+                                if !v.iter().any(|s| s==&slot) {
+                                    drop(v);
                                 occupied_entry.get_mut().push(slot);
                                 }
                                 else {
