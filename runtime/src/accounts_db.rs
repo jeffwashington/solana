@@ -7778,7 +7778,12 @@ impl AccountsDb {
                         let pk = account.meta.pubkey;
                         match pks.entry(pk) {
                             dashmap::mapref::entry::Entry::Occupied(mut occupied_entry) => {
+                                if !occupied_entry.get().contain(slot) {
                                 occupied_entry.get_mut().push(slot);
+                                }
+                                else {
+                                    error!("jw: account in same slot twice: {pk}, {slot}");
+                                }
                             }
                             dashmap::mapref::entry::Entry::Vacant(vacant_entry) => {
                                 vacant_entry.insert(vec![slot]);
@@ -8428,7 +8433,7 @@ impl AccountsDb {
 
         let secondary = !self.account_indexes.is_empty();
 
-        let interesting = Pubkey::from_str("DYPbwio3YTivG4qRgvK4NA6XaSSaNwZGyca8BLtB7Ghg").unwrap();        
+        let interesting = Pubkey::from_str("9F53pP5BzXcvGm6mvoJ9SoBE4ER5G3QBkYsJAJvcv2Gn").unwrap();        
         let mut rent_paying_accounts_by_partition = Vec::default();
         let mut accounts_data_len = 0;
         let mut num_accounts_rent_paying = 0;
@@ -8687,7 +8692,7 @@ impl AccountsDb {
         genesis_config: &GenesisConfig,
     ) -> IndexGenerationInfo {
 
-        let interesting = Pubkey::from_str("DYPbwio3YTivG4qRgvK4NA6XaSSaNwZGyca8BLtB7Ghg").unwrap();
+        let interesting = Pubkey::from_str("9F53pP5BzXcvGm6mvoJ9SoBE4ER5G3QBkYsJAJvcv2Gn").unwrap();
         let pi =crate::bank::Bank::partition_from_pubkey(&interesting, 432_000); 
         error!("jw: partition for {interesting}: {pi}, last several: {:?}",         (0..5).into_iter().map(|offset| 147744000 + pi - 432_000*offset).collect::<Vec<_>>());
 
