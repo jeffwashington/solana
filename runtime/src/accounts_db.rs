@@ -2864,6 +2864,8 @@ impl AccountsDb {
         reclaims_time.stop();
         measure_all.stop();
 
+        self.exhaustively_verify_refcounts(max_clean_root_inclusive);
+
         self.clean_accounts_stats.report();
         datapoint_info!(
             "clean_accounts",
