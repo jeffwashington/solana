@@ -280,13 +280,17 @@ impl<T: IndexValue> AccountMapEntryInner<T> {
             let result = self.ref_count.fetch_sub(1, Ordering::Release);
             if result == 1 {
                 if let Ok(read) = self.slot_list.try_read() {
-                    if
-                    read.iter().any(|(_slot, info)| !info.is_cached()) {
-                        error!("ref to 0 but there are non-cached entries: {pubkey}, {:?}", read);
-                        panic!("ref to 0 but there are non-cached entries: {pubkey}, {:?}", read);
+                    if read.iter().any(|(_slot, info)| !info.is_cached()) {
+                        error!(
+                            "ref to 0 but there are non-cached entries: {pubkey}, {:?}",
+                            read
+                        );
+                        panic!(
+                            "ref to 0 but there are non-cached entries: {pubkey}, {:?}",
+                            read
+                        );
                     }
-                }
-                else {
+                } else {
                     panic!("jw: ref to 0, but can't check read lock, {pubkey}");
                 }
             }
@@ -381,7 +385,8 @@ impl<T: IndexValue> ReadAccountMapEntry<T> {
     }
 
     pub fn addref(&self) {
-        self.borrow_owned_entry().add_un_ref(true, &Pubkey::default());
+        self.borrow_owned_entry()
+            .add_un_ref(true, &Pubkey::default());
     }
 }
 
@@ -731,10 +736,11 @@ impl<T: IndexValue> AccountsIndex<T> {
         let scan_results_limit_bytes = config
             .as_ref()
             .and_then(|config| config.scan_results_limit_bytes);
-        let (account_maps, bin_calculator, storage) = Self::allocate_accounts_index(config);
         let started_from_validator = config
             .as_ref()
-            .and_then(|config| Some(config.started_from_validator)).unwrap_or_default();
+            .and_then(|config| Some(config.started_from_validator))
+            .unwrap_or_default();
+        let (account_maps, bin_calculator, storage) = Self::allocate_accounts_index(config);
         Self {
             account_maps,
             bin_calculator,
