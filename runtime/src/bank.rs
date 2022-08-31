@@ -6846,7 +6846,7 @@ impl Bank {
         }
 
         // if ledger tool
-        self.rc.accounts.accounts_db.notify_accounts_hash_calculated_complete        ( self.slot());
+        self.rc.accounts.accounts_db.notify_accounts_hash_calculated_complete        ( self.slot(), self.epoch_schedule());
         info!(
             "bank frozen: {} hash: {} accounts_delta: {} signature_count: {} last_blockhash: {} capitalization: {}",
             self.slot(),
