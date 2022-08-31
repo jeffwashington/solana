@@ -7117,13 +7117,14 @@ impl AccountsDb {
     fn assert_safe_squashing_accounts_hash(&self, slot: Slot, epoch_schedule: &EpochSchedule) {
         let previous = self.get_accounts_hash_complete_one_epoch_old();
         let current = Self::get_slot_one_epoch_prior(slot, epoch_schedule);
+        /*
         assert!(
             previous <= current,
             "get_accounts_hash_complete_one_epoch_old: {}, get_slot_one_epoch_prior: {}, slot: {}",
             previous,
             current,
             slot
-        );
+        );*/
     }
 
     /// normal code path returns the common cache path
