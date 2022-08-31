@@ -6910,6 +6910,7 @@ impl Bank {
                         info!(
                             "running initial verification accounts hash calculation in background"
                         );
+                        error!("{}", line!());
                         let result = accounts_.verify_bank_hash_and_lamports(
                             slot,
                             &ancestors,
@@ -6921,6 +6922,7 @@ impl Bank {
                             config.ignore_mismatch,
                             config.store_hash_raw_data_for_debug,
                         );
+                        error!("{}", line!());
                         accounts_
                             .accounts_db
                             .verify_accounts_hash_in_bg
