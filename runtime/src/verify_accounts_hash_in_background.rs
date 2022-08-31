@@ -65,11 +65,12 @@ impl VerifyAccountsHashInBackground {
         if lock.is_none() {
             return; // nothing to do
         }
+        use log::*;
         error!("{}", line!());
         let result = lock.take().unwrap();
         error!("{}", line!());
         
-        result.join().unwrap();
+        let result = result.join().unwrap();
         error!("{}", line!());
         if !result {
             panic!("initial hash verification failed");
