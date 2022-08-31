@@ -72,7 +72,7 @@ impl VerifyAccountsHashInBackground {
         
         let result = result.join();
         error!("{}, result: {result:?}", line!());
-        let result = result.unwrap()
+        let result = result.unwrap();
         if !result {
             panic!("initial hash verification failed");
         }
