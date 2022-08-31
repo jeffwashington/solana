@@ -3773,6 +3773,7 @@ impl AccountsDb {
     /// squash those slots into ancient append vecs
     fn shrink_ancient_slots(&self) {
         if !self.ancient_append_vecs {
+            info!("ha {}", line!());
             return;
         }
 
@@ -3936,6 +3937,7 @@ impl AccountsDb {
     /// Combine all account data from storages in 'sorted_slots' into ancient append vecs.
     /// This keeps us from accumulating append vecs in slots older than an epoch.
     fn combine_ancient_slots(&self, sorted_slots: Vec<Slot>) {
+        info!("ha {}", line!());
         if sorted_slots.is_empty() {
             return;
         }
