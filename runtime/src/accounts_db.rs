@@ -2430,8 +2430,13 @@ impl AccountsDb {
 
     /// get the slot that is one epoch older than the highest slot that has been used for hash calculation
     fn get_accounts_hash_complete_one_epoch_old(&self) -> Slot {
-        //self.accounts_index.max_root_inclusive() - 432_000
-        *self.accounts_hash_complete_one_epoch_old.read().unwrap()
+        if self.accounts_index.started_from_validator {
+            *self.accounts_hash_complete_one_epoch_old.read().unwrap()
+
+        }
+        else {
+            self.accounts_index.max_root_inclusive() - 432_000
+        }
     }
 
     /// Collect all the uncleaned slots, up to a max slot
