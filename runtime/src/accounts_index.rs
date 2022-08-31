@@ -734,7 +734,7 @@ impl<T: IndexValue> AccountsIndex<T> {
         let (account_maps, bin_calculator, storage) = Self::allocate_accounts_index(config);
         let started_from_validator = config
             .as_ref()
-            .and_then(|config| config.started_from_validator).unwrap_or_default();
+            .and_then(|config| Some(config.started_from_validator)).unwrap_or_default();
         Self {
             account_maps,
             bin_calculator,
