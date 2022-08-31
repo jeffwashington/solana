@@ -2873,7 +2873,9 @@ impl AccountsDb {
             for _ in 0..10 {
                 self.exhaustively_verify_refcounts(max_clean_root_inclusive);
                 // this will randomly shrink ancient append vecs
-                self.shrink_ancient_slots();
+                for _ in 0..5 {
+                    self.shrink_ancient_slots();
+                }
             }
 
         }
