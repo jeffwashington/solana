@@ -6838,7 +6838,9 @@ if stores.is_some() {
                         bin_range.end.hash(&mut hasher);
                         if let Some(sub_storages) = sub_storages {
                             if sub_storages.len() > 1 {
+                                if config.store_detailed_debug_info_on_failure {
                                 error!("filename will be empty2: {:?}, substorages: {:?}", (start, end_exclusive), sub_storages);
+                                }
                                 if !config.store_detailed_debug_info_on_failure {
                                     load_from_cache = false;
                                     break;
@@ -6850,13 +6852,17 @@ if stores.is_some() {
                             // check alive_bytes, etc. here?
                             let amod = std::fs::metadata(storage_file);
                             if amod.is_err() {
-                                error!("filename will be empty3: {:?}", (start, end_exclusive));
+                                if config.store_detailed_debug_info_on_failure {
+                                    error!("filename will be empty3: {:?}", (start, end_exclusive));
+                                }
                                 load_from_cache = false;
                                 break;
                             }
                             let amod = amod.unwrap().modified();
                             if amod.is_err() {
-                                error!("filename will be empty4: {:?}", (start, end_exclusive));
+                                if config.store_detailed_debug_info_on_failure {
+                                    error!("filename will be empty4: {:?}", (start, end_exclusive));
+                                }
                                 load_from_cache = false;
                                 break;
                             }
@@ -6896,8 +6902,9 @@ if stores.is_some() {
                         // fall through and load normally - we failed to load
                     }
                 } else {
-                    error!("filename will be empty1: {:?}", (start, end_exclusive));
-
+                    if config.store_detailed_debug_info_on_failure {
+                        error!("filename will be empty1: {:?}", (start, end_exclusive));
+                    }
                     for (slot, sub_storages) in snapshot_storages.iter_range(start..end_exclusive) {
                         if bin_range.start == 0 && slot < one_epoch_old {
                             self.update_old_slot_stats(stats, sub_storages);
