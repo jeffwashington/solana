@@ -3356,7 +3356,7 @@ impl AccountsDb {
 if stores.is_some() {
     let stores = stores.unwrap();
     if stores.1.len() > 1 {
-        error!("we have > 1 stores: {}, {:?}",line!(), stores);
+        //error!("we have > 1 stores: {}, {:?}",line!(), stores);
     }
 }    
         }
@@ -3379,7 +3379,7 @@ if stores.is_some() {
 if stores.is_some() {
     let stores = stores.unwrap();
     if stores.1.len() > 1 {
-        error!("we have > 1 stores: {}, {:?}",line!(), stores);
+       // error!("we have > 1 stores: {}, {:?}",line!(), stores);
     }
 }    
         }
@@ -3478,7 +3478,7 @@ if stores.is_some() {
 if stores.is_some() {
     let stores = stores.unwrap();
     if stores.1.len() > 1 {
-        error!("we have > 1 stores: {}, {:?}",line!(), stores);
+       // error!("we have > 1 stores: {}, {:?}",line!(), stores);
     }
 }    
         }
