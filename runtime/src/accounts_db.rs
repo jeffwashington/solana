@@ -6782,9 +6782,10 @@ impl AccountsDb {
                         if let Some(sub_storages) = sub_storages {
                             if sub_storages.len() > 1 {
                                 error!("filename will be empty2: {:?}, substorages: {:?}", (start, end_exclusive), sub_storages);
-
-                                load_from_cache = false;
-                                break;
+                                if !config.store_detailed_debug_info_on_failure {
+                                    load_from_cache = false;
+                                    break;
+                                }
                             }
                             let storage_file = sub_storages.first().unwrap().accounts.get_path();
                             slot.hash(&mut hasher);
