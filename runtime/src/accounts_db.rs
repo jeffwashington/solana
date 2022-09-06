@@ -2028,6 +2028,7 @@ impl AccountsDb {
         mut accounts_db_config: Option<AccountsDbConfig>,
         accounts_update_notifier: Option<AccountsUpdateNotifier>,
     ) -> Self {
+        error!("{}, caching: {}", line!(), caching_enabled);
         let accounts_index =
             AccountsIndex::new(accounts_db_config.as_mut().and_then(|x| x.index.take()));
         let accounts_hash_cache_path = accounts_db_config
