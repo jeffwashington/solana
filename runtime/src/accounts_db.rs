@@ -8397,7 +8397,34 @@ if stores.is_some() {
             .sum();
         let mut accounts_map = GenerateIndexAccountsMap::with_capacity(num_accounts);
         if storage_maps.len() > 1 {
-            error!("stores> 1: slot: {}, stores: {}", storage_maps.first().unwrap().slot(), storage_maps.len());
+            let sizes = storage_maps.iter().map(|s| s.total_bytes()).collect::<Vec<_>>();
+            let mut ps: HashSet<Pubkey> = HashSet::default();
+            let mut counts = vec![];
+            let mut all_dups = vec![];
+            let mut all_master_dups = vec![];
+            storage_maps.iter().for_each(|storage| {
+                let mut dups = 0;
+                let mut this_one: HashSet<Pubkey> = HashSet::default();
+                let mut count=0;
+                storage.accounts.account_iter().for_each(|a| {
+                    if !this_one.insert(a.meta.pubkey) {
+                        dups += 1;
+                    }
+                    count += 1;
+                });
+                all_dups.push(dups);
+                dups = 0;
+                counts.push(count);
+                this_one.iter().for_each(|k| {
+                    if !ps.insert(*k) {
+                        dups += 1;
+                    }
+                });
+                all_master_dups.push(dups);
+            });    
+            error!("stores> 1: slot: {}, stores: {}, dups within slot: {:?}, master_dups: {:?}, counts: {:?}, sizes: {:?}", storage_maps.first().unwrap().slot(), storage_maps.len(),
+            all_dups,all_master_dups, counts, sizes,
+        );
         }
         storage_maps.iter().for_each(|storage| {
             storage.accounts.account_iter().for_each(|stored_account| {
