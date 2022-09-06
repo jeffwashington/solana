@@ -3339,14 +3339,14 @@ impl AccountsDb {
 
     fn do_shrink_slot_stores<'a, I>(&'a self, slot: Slot, stores: I) -> usize
     where
-        I: Iterator<Item = &'a Arc<AccountStorageEntry>>,
+        I: Iterator<Item = &'a Arc<AccountStorageEntry>> + Clone,
     {
         debug!("do_shrink_slot_stores: slot: {}", slot);
         let GetUniqueAccountsResult {
             stored_accounts,
             original_bytes,
             store_ids,
-        } = self.get_unique_accounts_from_storages(stores);
+        } = self.get_unique_accounts_from_storages(stores.clone());
 
         // sort by pubkey to keep account index lookups close
         let mut stored_accounts = stored_accounts.into_iter().collect::<Vec<_>>();
@@ -3471,7 +3471,7 @@ impl AccountsDb {
             if remaining_stores > 1 {
                 inc_new_counter_info!("accounts_db_shrink_extra_stores", 1);
                 info!(
-                    "after shrink, slot has extra stores: {}, {}, expected store id len: {:?}, ids: {:?}, old ids: {:?}",
+                    "after shrink, slot has extra stores: {}, {}, expected store id len: {:?}, ids: {:?}, old ids: {:?}, stores originally: {:?}",
                     slot,
                     remaining_stores,
                     store_ids.len(),
@@ -3484,7 +3484,8 @@ impl AccountsDb {
                         None
                     }
                 },
-                store_ids
+                store_ids,
+                stores.collect::<Vec<_>>(),
                 );
             }
             start.stop();
@@ -6885,7 +6886,7 @@ impl AccountsDb {
                     }
                 }
                 else {
-                    error!("filename is empty: {:?}", range);
+                    error!("filename is empty: {:?}", (start, end_exclusive));
                 }
                 r
             })
