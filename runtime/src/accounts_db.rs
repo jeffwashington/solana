@@ -3471,8 +3471,10 @@ impl AccountsDb {
             if remaining_stores > 1 {
                 inc_new_counter_info!("accounts_db_shrink_extra_stores", 1);
                 info!(
-                    "after shrink, slot has extra stores: {}, {}",
-                    slot, remaining_stores
+                    "after shrink, slot has extra stores: {}, {}, expected store id len: {:?}",
+                    slot,
+                    remaining_stores,
+                    store_ids.len(),
                 );
             }
             start.stop();
