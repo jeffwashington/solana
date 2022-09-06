@@ -209,14 +209,14 @@ impl CacheHashData {
             let mut v = entry.value().clone();
             //v.sort_by(Self::sorter);
             let one = v.last().unwrap();
-            if one.1.lamports != ZERO_RAW_LAMPORTS_SENTINEL {
+            if one.1.lamports != ZERO_RAW_LAMPORTS_SENTINEL && one.1.lamports != 0{
                 cap1 += one.1.lamports;
                 added1 += 1;
             }
             if let Some((_, mut entry)) = two.remove(&k) {
                 //entry.sort_by(Self::sorter);
                 let two = entry.last().unwrap();
-                if two.1.lamports != ZERO_RAW_LAMPORTS_SENTINEL {
+                if two.1.lamports != ZERO_RAW_LAMPORTS_SENTINEL && two.1.lamports != 0 {
                     cap2 += two.1.lamports;
                     added2 += 1;
                 }
@@ -226,7 +226,7 @@ impl CacheHashData {
                     assert_eq!(one.1.lamports, two.1.lamports);
                 }
             } else {
-                if one.1.lamports != ZERO_RAW_LAMPORTS_SENTINEL {
+                if one.1.lamports != ZERO_RAW_LAMPORTS_SENTINEL && one.1.lamports != 0 {
                     error!("in 1, not in 2: {:?}, {:?}", k, v);
                 }
             }
@@ -236,7 +236,7 @@ impl CacheHashData {
             let mut v = entry.value().clone();
             //v.sort_by(Self::sorter);
             let two = v.last().unwrap();
-            if two.1.lamports != ZERO_RAW_LAMPORTS_SENTINEL {
+            if two.1.lamports != ZERO_RAW_LAMPORTS_SENTINEL && two.1.lamports != 0 {
                 added2 += 1;
                 cap2 += two.1.lamports;
                 error!("in 2, not in 1: {:?}, {:?}", k, v);
