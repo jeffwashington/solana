@@ -6781,7 +6781,7 @@ impl AccountsDb {
                         bin_range.end.hash(&mut hasher);
                         if let Some(sub_storages) = sub_storages {
                             if sub_storages.len() > 1 {
-                                error!("filename will be empty2: {:?}", (start, end_exclusive));
+                                error!("filename will be empty2: {:?}, substorages: {:?}", (start, end_exclusive), sub_storages);
 
                                 load_from_cache = false;
                                 break;
