@@ -8400,12 +8400,14 @@ if stores.is_some() {
             .sum();
         let mut accounts_map = GenerateIndexAccountsMap::with_capacity(num_accounts);
         if storage_maps.len() > 1 {
-            let sizes = storage_maps.iter().map(|s| s.total_bytes()).collect::<Vec<_>>();
+            let mut sizes = storage_maps.iter().enumerate().map(|(i, s)| (s.total_bytes(), i)).collect::<Vec<_>>();
+            sizes.sort_by(|a,b| b.0.cmp(&a.0));
             let mut ps: HashSet<Pubkey> = HashSet::default();
             let mut counts = vec![];
             let mut all_dups = vec![];
             let mut all_master_dups = vec![];
-            storage_maps.iter().for_each(|storage| {
+            sizes.iter().for_each(|(_, i)| {
+                let storage = &storage_maps[*i];
                 let mut dups = 0;
                 let mut this_one: HashSet<Pubkey> = HashSet::default();
                 let mut count=0;
