@@ -5449,11 +5449,19 @@ impl Bank {
         }
     }
 
+    /// false if rent collection rewrites accounts whose pubkey indicates
+    /// it is time for rent collection, but the account is rent exempt
+    fn bank_hash_skips_rent_rewrites(&self) -> bool {
+        self.feature_set
+            .is_active(&feature_set::skip_rent_rewrites::id())
+    }
+
     /// If we are skipping rewrites for bank hash, then we don't want to
     ///  allow accounts hash calculation to rehash anything.
     ///  We should use whatever hash found for each account as-is.
+    /// Convenience function to make callers easier to read.
     pub fn bank_enable_rehashing_on_accounts_hash(&self) -> bool {
-        true // this will be goverened by a feature later
+        !self.bank_hash_skips_rent_rewrites()
     }
 
     /// Collect rent from `accounts`
@@ -5481,7 +5489,9 @@ impl Bank {
         let mut time_collecting_rent_us = 0;
         let mut time_hashing_skipped_rewrites_us = 0;
         let mut time_storing_accounts_us = 0;
-        let can_skip_rewrites = self.rc.accounts.accounts_db.skip_rewrites || just_rewrites;
+        let can_skip_rewrites = self.rc.accounts.accounts_db.skip_rewrites
+            || just_rewrites
+            || self.bank_hash_skips_rent_rewrites();
         let preserve_rent_epoch_for_rent_exempt_accounts =
             self.preserve_rent_epoch_for_rent_exempt_accounts();
         for (pubkey, account, loaded_slot) in accounts.iter_mut() {
@@ -5509,17 +5519,19 @@ impl Bank {
                     account,
                 )
             {
-                // this would have been rewritten previously. Now we skip it.
-                // calculate the hash that we would have gotten if we did the rewrite.
-                // This will be needed to calculate the bank's hash.
-                let (hash, measure) = measure!(crate::accounts_db::AccountsDb::hash_account(
-                    self.slot(),
-                    account,
-                    pubkey
-                ));
-                time_hashing_skipped_rewrites_us += measure.as_us();
-                rewrites_skipped.push((*pubkey, hash));
-                assert_eq!(rent_collected_info, CollectedInfo::default());
+                if !self.bank_hash_skips_rent_rewrites() {
+                    // this would have been rewritten previously. Now we skip it.
+                    // calculate the hash that we would have gotten if we did the rewrite.
+                    // This will be needed to calculate the bank's hash.
+                    let (hash, measure) = measure!(crate::accounts_db::AccountsDb::hash_account(
+                        self.slot(),
+                        account,
+                        pubkey
+                    ));
+                    time_hashing_skipped_rewrites_us += measure.as_us();
+                    rewrites_skipped.push((*pubkey, hash));
+                    assert_eq!(rent_collected_info, CollectedInfo::default());
+                }
             } else if !just_rewrites {
                 if rent_collected_info.rent_amount > 0 {
                     if let Some(rent_paying_pubkeys) = rent_paying_pubkeys {
@@ -8093,7 +8105,7 @@ pub(crate) mod tests {
             accounts_index::{AccountIndex, AccountSecondaryIndexes, ScanError, ITER_BATCH_SIZE},
             ancestors::Ancestors,
             genesis_utils::{
-                self, activate_all_features, bootstrap_validator_stake_lamports,
+                self, activate_all_features, activate_feature, bootstrap_validator_stake_lamports,
                 create_genesis_config_with_leader, create_genesis_config_with_vote_accounts,
                 genesis_sysvar_and_builtin_program_lamports, GenesisConfigInfo,
                 ValidatorVoteKeypairs,
@@ -10002,7 +10014,11 @@ pub(crate) mod tests {
         solana_logger::setup();
 
         let (mut genesis_config, _mint_keypair) = create_genesis_config(1_000_000);
-        activate_all_features(&mut genesis_config);
+        for feature_id in FeatureSet::default().inactive {
+            if feature_id != feature_set::skip_rent_rewrites::id() {
+                activate_feature(&mut genesis_config, feature_id);
+            }
+        }
 
         let zero_lamport_pubkey = solana_sdk::pubkey::new_rand();
         let rent_due_pubkey = solana_sdk::pubkey::new_rand();
