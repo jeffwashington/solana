@@ -8400,7 +8400,7 @@ if stores.is_some() {
             .sum();
         let mut accounts_map = GenerateIndexAccountsMap::with_capacity(num_accounts);
         if storage_maps.len() > 1 {
-            let mut counts = storage_maps.iter().enumerate().map(|(i, s)| (s.accounts.len(), i)).collect::<Vec<_>>();
+            let mut counts = storage_maps.iter().enumerate().map(|(i, s)| (s.accounts.account_iter().count(), i)).collect::<Vec<_>>();
             counts.sort_by(|a,b| b.0.cmp(&a.0));
             let mut sizes = vec![];
             let mut ps: HashSet<Pubkey> = HashSet::default();
