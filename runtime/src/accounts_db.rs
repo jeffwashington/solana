@@ -6725,7 +6725,8 @@ impl AccountsDb {
                     })
                 };
                 end_exclusive = std::cmp::min(end_exclusive, range.end);
-                if start == end_exclusive {
+                if start >= end_exclusive {
+                    error!("scanning complete: {:?}", range);
                     return scanner.scanning_complete();
                 }
 
@@ -6813,6 +6814,8 @@ impl AccountsDb {
                                 )
                                 .is_ok()
                         {
+                            error!("jw found: {:?}", range);
+
                             return retval;
                         }
                         scanner.set_accum(retval);
@@ -6866,7 +6869,13 @@ impl AccountsDb {
                             "FAILED_TO_SAVE: {}-{}, {}, first_boundary: {}, {:?}, error: {:?}",
                             range.start, range.end, width, first_boundary, file_name, result,
                         );
+                        if config.store_detailed_debug_info_on_failure {
+                            panic!("failed to save a file: {:?}, range: {:?}", file_name, range);
+                        }
                     }
+                }
+                else {
+                    error!("filename is empty: {:?}", range);
                 }
                 r
             })
