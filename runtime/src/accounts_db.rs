@@ -8400,13 +8400,13 @@ if stores.is_some() {
             .sum();
         let mut accounts_map = GenerateIndexAccountsMap::with_capacity(num_accounts);
         if storage_maps.len() > 1 {
-            let mut sizes = storage_maps.iter().enumerate().map(|(i, s)| (s.total_bytes(), i)).collect::<Vec<_>>();
-            sizes.sort_by(|a,b| b.0.cmp(&a.0));
+            let mut counts = storage_maps.iter().enumerate().map(|(i, s)| (s.accounts.len(), i)).collect::<Vec<_>>();
+            counts.sort_by(|a,b| b.0.cmp(&a.0));
+            let mut sizes = vec![];
             let mut ps: HashSet<Pubkey> = HashSet::default();
-            let mut counts = vec![];
             let mut all_dups = vec![];
             let mut all_master_dups = vec![];
-            sizes.iter().for_each(|(_, i)| {
+            counts.iter().for_each(|(_, i)| {
                 let storage = &storage_maps[*i];
                 let mut dups = 0;
                 let mut this_one: HashSet<Pubkey> = HashSet::default();
@@ -8417,9 +8417,9 @@ if stores.is_some() {
                     }
                     count += 1;
                 });
+                sizes.push((storage.total_bytes(), storage.alive_bytes()));
                 all_dups.push(dups);
                 dups = 0;
-                counts.push(count);
                 this_one.iter().for_each(|k| {
                     if !ps.insert(*k) {
                         dups += 1;
