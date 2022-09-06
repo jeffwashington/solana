@@ -8383,6 +8383,9 @@ if stores.is_some() {
             .map(|storage| storage.approx_stored_count())
             .sum();
         let mut accounts_map = GenerateIndexAccountsMap::with_capacity(num_accounts);
+        if storage_maps.len() > 1 {
+            error!("stores> 1: slot: {}, stores: {}", storage_maps.first().unwrap().slot(), storage_maps.len());
+        }
         storage_maps.iter().for_each(|storage| {
             storage.accounts.account_iter().for_each(|stored_account| {
                 let this_version = stored_account.meta.write_version;
