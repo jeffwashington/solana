@@ -6760,12 +6760,18 @@ if stores.is_some() {
             .collect::<Vec<_>>();
         let ancient_slot_count = ancient_slots.len() as Slot;
         let slot0 = std::cmp::max(range.start, one_epoch_old_slot);
+        let items_per_chunk = if config.store_detailed_debug_info_on_failure {
+            1
+        }
+        else {
+            MAX_ITEMS_PER_CHUNK
+        };
         let first_boundary =
-            ((slot0 + MAX_ITEMS_PER_CHUNK) / MAX_ITEMS_PER_CHUNK) * MAX_ITEMS_PER_CHUNK;
+            ((slot0 + items_per_chunk) / items_per_chunk) * items_per_chunk;
 
         let width = max_slot_inclusive - slot0;
         // 2 is for 2 special chunks - unaligned slots at the beginning and end
-        let chunks = ancient_slot_count + 2 + (width as Slot / MAX_ITEMS_PER_CHUNK);
+        let chunks = ancient_slot_count + 2 + (width as Slot / items_per_chunk);
         (0..chunks)
             .into_par_iter()
             .map(|mut chunk| {
@@ -6786,8 +6792,8 @@ if stores.is_some() {
                             (slot0, first_boundary)
                         } else {
                             // normal chunk in the middle or at the end
-                            let start = first_boundary + MAX_ITEMS_PER_CHUNK * (chunk - 1);
-                            let end_exclusive = start + MAX_ITEMS_PER_CHUNK;
+                            let start = first_boundary + items_per_chunk * (chunk - 1);
+                            let end_exclusive = start + items_per_chunk;
                             (start, end_exclusive)
                         }
                     })
@@ -6806,7 +6812,7 @@ if stores.is_some() {
                 // chunks that don't divide evenly would include some cached append vecs that are no longer part of this range and some that are, so we have to ignore caching on non-evenly dividing chunks.
                 let eligible_for_caching = !config.use_write_cache
                     && (single_cached_slot
-                        || end_exclusive.saturating_sub(start) == MAX_ITEMS_PER_CHUNK);
+                        || end_exclusive.saturating_sub(start) == items_per_chunk);
 
                 if eligible_for_caching || config.store_detailed_debug_info_on_failure {
                     let range = bin_range.end - bin_range.start;
