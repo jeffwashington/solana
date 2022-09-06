@@ -6764,7 +6764,7 @@ if stores.is_some() {
         let ancient_slot_count = ancient_slots.len() as Slot;
         let slot0 = std::cmp::max(range.start, one_epoch_old_slot);
         let items_per_chunk = if config.store_detailed_debug_info_on_failure {
-            1
+            10 // smaller, but manageable
         }
         else {
             MAX_ITEMS_PER_CHUNK
