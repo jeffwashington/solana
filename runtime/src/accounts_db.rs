@@ -5245,7 +5245,7 @@ if stores.is_some() {
         let mut write = slot_storages
         .write()
         .unwrap();
-        //assert!(write.len() < 3, "{}", write.len());
+        assert!(write.len() < 10, "{}", write.len());
         if write.len() > 10 {
             error!("inserting into: {}", write.len());
         }
