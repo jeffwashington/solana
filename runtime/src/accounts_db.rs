@@ -3466,7 +3466,7 @@ impl AccountsDb {
             // Purge old, overwritten storage entries
             let mut start = Measure::start("write_storage_elapsed");
             let remaining_stores = self.mark_dirty_dead_stores(slot, &mut dead_storages, |store| {
-                !store_ids.contains(&store.append_vec_id())
+                store_ids.contains(&store.append_vec_id())
             });
             if remaining_stores > 1 {
                 inc_new_counter_info!("accounts_db_shrink_extra_stores", 1);
