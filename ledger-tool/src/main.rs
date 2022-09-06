@@ -2871,7 +2871,7 @@ fn main() {
                     ..AccountsDbConfig::default()
                 });
 
-                match load_bank_forks(
+                match load_bank_forks( 
                     arg_matches,
                     &genesis_config,
                     &blockstore,
@@ -2879,6 +2879,7 @@ fn main() {
                         new_hard_forks,
                         halt_at_slot: Some(snapshot_slot),
                         poh_verify: false,
+                        accounts_db_caching_enabled: true,
                         accounts_db_config,
                         ..ProcessOptions::default()
                     },
