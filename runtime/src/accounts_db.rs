@@ -3342,11 +3342,47 @@ impl AccountsDb {
         I: Iterator<Item = &'a Arc<AccountStorageEntry>> + Clone,
     {
         debug!("do_shrink_slot_stores: slot: {}", slot);
+        {
+            let stores =             {
+                if let Some(slot_stores) = self.storage.get_slot_stores(slot) {
+                    let list = slot_stores.read().unwrap();
+                    Some((slot, list.clone()))
+                }
+                else {
+                    None
+                }
+
+};
+if stores.is_some() {
+    let stores = stores.unwrap();
+    if stores.1.len() > 1 {
+        error!("we have > 1 stores: {}, {:?}",line!(), stores);
+    }
+}    
+        }
         let GetUniqueAccountsResult {
             stored_accounts,
             original_bytes,
             store_ids,
         } = self.get_unique_accounts_from_storages(stores.clone());
+        {
+            let stores =             {
+                if let Some(slot_stores) = self.storage.get_slot_stores(slot) {
+                    let list = slot_stores.read().unwrap();
+                    Some((slot, list.clone()))
+                }
+                else {
+                    None
+                }
+
+};
+if stores.is_some() {
+    let stores = stores.unwrap();
+    if stores.1.len() > 1 {
+        error!("we have > 1 stores: {}, {:?}",line!(), stores);
+    }
+}    
+        }
 
         // sort by pubkey to keep account index lookups close
         let mut stored_accounts = stored_accounts.into_iter().collect::<Vec<_>>();
@@ -3428,6 +3464,25 @@ impl AccountsDb {
         let mut create_and_insert_store_elapsed = 0;
         let mut write_storage_elapsed = 0;
         let mut store_accounts_timing = StoreAccountsTiming::default();
+        {
+            let stores =             {
+                if let Some(slot_stores) = self.storage.get_slot_stores(slot) {
+                    let list = slot_stores.read().unwrap();
+                    Some((slot, list.clone()))
+                }
+                else {
+                    None
+                }
+
+};
+if stores.is_some() {
+    let stores = stores.unwrap();
+    if stores.1.len() > 1 {
+        error!("we have > 1 stores: {}, {:?}",line!(), stores);
+    }
+}    
+        }
+
         if aligned_total > 0 {
             let mut start = Measure::start("find_alive_elapsed");
             let mut accounts = Vec::with_capacity(total_accounts_after_shrink);
@@ -3478,7 +3533,7 @@ impl AccountsDb {
                     {
                     if let Some(slot_stores) = self.storage.get_slot_stores(slot) {
                         let list = slot_stores.read().unwrap();
-                        Some(list.clone())
+                        Some((slot, list.clone()))
                     }
                     else {
                         None
@@ -5187,9 +5242,11 @@ impl AccountsDb {
                 .or_insert(Arc::new(RwLock::new(HashMap::new())))
                 .clone());
 
-        assert!(slot_storages
-            .write()
-            .unwrap()
+        let mut write = slot_storages
+        .write()
+        .unwrap();
+        assert!(write.len() < 3, "{}", write.len());
+        assert!(write
             .insert(store.append_vec_id(), store)
             .is_none());
     }
