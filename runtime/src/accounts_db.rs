@@ -2677,6 +2677,9 @@ impl AccountsDb {
         if self.exhaustively_verify_refcounts {
             self.exhaustively_verify_refcounts(max_clean_root_inclusive);
         }
+        else {
+            error!("not exhaustively comparing");
+        }
 
         let _guard = self.active_stats.activate(ActiveStatItem::Clean);
 
