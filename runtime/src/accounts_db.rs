@@ -2644,17 +2644,27 @@ impl AccountsDb {
                     }
                     if let Some(idx) = self.accounts_index.get_account_read_entry(entry.key()) {
                         let list = idx.slot_list();
-                        let too_new = list.iter().filter_map(|(slot, _)| (slot > &max_slot_inclusive).then_some(())).count();
+                        let too_new = list.iter().filter_map(|(slot, info)| (slot > &max_slot_inclusive && !info.is_cached()).then_some(())).count();
                         let expected = list.iter().filter_map(|(slot, info)| (slot <= &max_slot_inclusive && !info.is_cached()).then_some(())).count();
                         let current_ref_count = idx.ref_count() as usize;
 
-                        if current_ref_count > expected {
+                        if current_ref_count - too_new > expected {
+                            if failed_too_large.load(Ordering::Relaxed) {
+                                //continue;
+                            }
+                            let mut slots = entry.value().clone();
+                            slots.sort();
                             failed_too_large.store(true, Ordering::Relaxed);
-                            error!("exhaustively_verify_refcounts: {} refcount too large: idx ref count: {}, should be: {}, slots with refcount: {:?}, index: {:?}, too_new: {too_new}", entry.key(), current_ref_count, entry.value().len(), *entry.value(), idx.slot_list());
+                            error!("exhaustively_verify_refcounts: {} refcount too large: idx ref count: {}, should be: {}, slots with refcount: {:?}, index: {:?}, too_new: {too_new}, expected: {expected}, max_slot_inclusive: {max_slot_inclusive}", entry.key(), current_ref_count, slots.len(), slots, idx.slot_list());
                         }
-                        else if current_ref_count < expected {
+                        else if current_ref_count - too_new < expected {
+                            if failed_too_small.load(Ordering::Relaxed) {
+                                //continue;
+                            }
+                            let mut slots = entry.value().clone();
+                            slots.sort();
                             failed_too_small.store(true, Ordering::Relaxed);
-                            error!("exhaustively_verify_refcounts: {} refcount too small: idx ref count: {}, should be: {}, slots with refcount: {:?}, index: {:?}, too_new: {too_new}", entry.key(), current_ref_count, entry.value().len(), *entry.value(), idx.slot_list());
+                            error!("exhaustively_verify_refcounts: {} refcount too small: idx ref count: {}, should be: {}, slots with refcount: {:?}, index: {:?}, too_new: {too_new}, expected: {expected}, max_slot_inclusive: {max_slot_inclusive}", entry.key(), current_ref_count, slots.len(), slots, idx.slot_list());
                         }
                     }
                 });
