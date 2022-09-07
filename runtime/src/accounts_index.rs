@@ -1392,7 +1392,7 @@ impl<T: IndexValue> AccountsIndex<T> {
                         cache = match result {
                             AccountsIndexScanResult::Unref => {
                                 if locked_entry.add_un_ref(false) {
-                                    info!("unref to -1: {pubkey} in scan");
+                                    panic!("unref to -1: {pubkey} in scan, list: {:?}", locked_entry.slot_list.read().unwrap());
                                 }
                                 true
                             }

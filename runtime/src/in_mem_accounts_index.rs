@@ -439,7 +439,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         self.get_internal(pubkey, |entry| {
             if let Some(entry) = entry {
                 if entry.add_un_ref(false) {
-                    info!("unref to -1: {pubkey}");
+                    panic!("unref to -1: {pubkey}, list: {:?}", entry.slot_list.read().unwrap());
                 }
             }
             (true, ())
