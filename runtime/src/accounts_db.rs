@@ -2633,35 +2633,34 @@ impl AccountsDb {
             }
         });
         let total = pubkey_refcount.len();
-        let failed = AtomicBool::default();
+        let failed_too_large = AtomicBool::default();
+        let failed_too_small = AtomicBool::default();
         let threads = quarter_thread_count();
         let per_batch = total / threads;
         (0..=threads).into_par_iter().for_each(|attempt| {
                 pubkey_refcount.iter().skip(attempt * per_batch).take(per_batch).for_each(|entry| {
-                    if failed.load(Ordering::Relaxed) {
+                    if failed_too_small.load(Ordering::Relaxed) && failed_too_large.load(Ordering::Relaxed) {
                         return;
                     }
                     if let Some(idx) = self.accounts_index.get_account_read_entry(entry.key()) {
-                        match (idx.ref_count() as usize).cmp(&entry.value().len()) {
-                            std::cmp::Ordering::Greater => {
-                            let list = idx.slot_list();
-                            let too_new = list.iter().filter_map(|(slot, _)| (slot > &max_slot_inclusive).then_some(())).count();
+                        let list = idx.slot_list();
+                        let too_new = list.iter().filter_map(|(slot, _)| (slot > &max_slot_inclusive).then_some(())).count();
+                        let expected = list.iter().filter_map(|(slot, info)| (slot <= &max_slot_inclusive && !info.is_cached()).then_some(())).count();
+                        let current_ref_count = idx.ref_count() as usize;
 
-                            if ((idx.ref_count() as usize) - too_new) > entry.value().len() {
-                                failed.store(true, Ordering::Relaxed);
-                                error!("exhaustively_verify_refcounts: {} refcount too large: {}, should be: {}, {:?}, {:?}, original: {:?}, too_new: {too_new}", entry.key(), idx.ref_count(), entry.value().len(), *entry.value(), list, idx.slot_list());
-                            }
+                        if current_ref_count > expected {
+                            failed_too_large.store(true, Ordering::Relaxed);
+                            error!("exhaustively_verify_refcounts: {} refcount too large: idx ref count: {}, should be: {}, slots with refcount: {:?}, index: {:?}, too_new: {too_new}", entry.key(), current_ref_count, entry.value().len(), *entry.value(), idx.slot_list());
                         }
-                        std::cmp::Ordering::Less => {
-                            error!("exhaustively_verify_refcounts: {} refcount too small: {}, should be: {}, {:?}, {:?}", entry.key(), idx.ref_count(), entry.value().len(), *entry.value(), idx.slot_list());
+                        else if current_ref_count < expected {
+                            failed_too_small.store(true, Ordering::Relaxed);
+                            error!("exhaustively_verify_refcounts: {} refcount too small: idx ref count: {}, should be: {}, slots with refcount: {:?}, index: {:?}, too_new: {too_new}", entry.key(), current_ref_count, entry.value().len(), *entry.value(), idx.slot_list());
                         }
-                        _ => {}
-                    }
                     }
                 });
             });
-        if failed.load(Ordering::Relaxed) {
-            panic!("exhaustively_verify_refcounts failed");
+        if failed_too_small.load(Ordering::Relaxed) || failed_too_large.load(Ordering::Relaxed) {
+            panic!("exhaustively_verify_refcounts failed, max_slot_inclusive: {max_slot_inclusive}");
         }
     }
 
