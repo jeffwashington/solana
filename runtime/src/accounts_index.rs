@@ -273,16 +273,21 @@ impl<T: IndexValue> AccountMapEntryInner<T> {
         self.ref_count.load(Ordering::Acquire)
     }
 
-    pub fn add_un_ref(&self, add: bool) {
+    /// return true if 'fail'
+    #[must_use]
+    pub fn add_un_ref(&self, add: bool) -> bool {
+        let mut fail = false;
         if add {
             self.ref_count.fetch_add(1, Ordering::Release);
         } else {
             let previous = self.ref_count.fetch_sub(1, Ordering::Release);
             if previous == 0 {
                 inc_new_counter_info!("accounts_index-deref_from_0", 1);
+                fail = true;
             }
         }
         self.set_dirty(true);
+        fail
     }
 
     pub fn dirty(&self) -> bool {
@@ -357,12 +362,12 @@ impl<T: IndexValue> ReadAccountMapEntry<T> {
         self.borrow_owned_entry().ref_count()
     }
 
-    pub fn unref(&self) {
-        self.borrow_owned_entry().add_un_ref(false);
+    pub fn unref2(&self) {
+        let _ = self.borrow_owned_entry().add_un_ref(false);
     }
 
     pub fn addref(&self) {
-        self.borrow_owned_entry().add_un_ref(true);
+        let _ = self.borrow_owned_entry().add_un_ref(true);
     }
 }
 
@@ -1386,7 +1391,9 @@ impl<T: IndexValue> AccountsIndex<T> {
                         };
                         cache = match result {
                             AccountsIndexScanResult::Unref => {
-                                locked_entry.add_un_ref(false);
+                                if locked_entry.add_un_ref(false) {
+                                    info!("unref to -1: {pubkey} in scan");
+                                }
                                 true
                             }
                             AccountsIndexScanResult::KeepInMemory => true,

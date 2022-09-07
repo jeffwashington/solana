@@ -8,6 +8,7 @@ use {
         bucket_map_holder_stats::BucketMapHolderStats,
         waitable_condvar::WaitableCondvar,
     },
+    log::*,
     rand::{thread_rng, Rng},
     solana_bucket_map::bucket_api::BucketApi,
     solana_measure::measure::Measure,
@@ -437,7 +438,9 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
     pub fn unref(&self, pubkey: &Pubkey) {
         self.get_internal(pubkey, |entry| {
             if let Some(entry) = entry {
-                entry.add_un_ref(false)
+                if entry.add_un_ref(false) {
+                    info!("unref to -1: {pubkey}");
+                }
             }
             (true, ())
         })
@@ -557,7 +560,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
             reclaim,
         );
         if addref {
-            current.add_un_ref(true);
+            let _ = current.add_un_ref(true);
         }
         current.set_dirty(true);
         slot_list.len()
