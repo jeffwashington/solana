@@ -2741,7 +2741,7 @@ impl AccountsDb {
                         let mut not_found_on_fork = 0;
                         let mut missing = 0;
                         let mut useful = 0;
-                        self.accounts_index.scan(
+                        self.accounts_index.scan2(
                             pubkeys.iter(),
                             |pubkey, slots_refs| {
                                 let mut useless = true;
@@ -3270,7 +3270,7 @@ impl AccountsDb {
         let mut alive = 0;
         let mut dead = 0;
         let mut index = 0;
-        self.accounts_index.scan(
+        self.accounts_index.scan2(
             accounts[..std::cmp::min(accounts.len(), count)]
                 .iter()
                 .map(|(key, _)| key),
@@ -7759,7 +7759,7 @@ impl AccountsDb {
         self.thread_pool_clean.install(|| {
             (0..batches).into_par_iter().for_each(|batch| {
                 let skip = batch * UNREF_ACCOUNTS_BATCH_SIZE;
-                self.accounts_index.scan(
+                self.accounts_index.scan2(
                     purged_slot_pubkeys
                         .iter()
                         .skip(skip)
@@ -8384,6 +8384,8 @@ impl AccountsDb {
             return SlotIndexGenerationInfo::default();
         }
 
+        let interesting = Pubkey::from_str("67U1EitxuzFuBtbQmYMFYtub6bhZAnXCXktmnyBYviv6").unwrap();
+
         let secondary = !self.account_indexes.is_empty();
 
         let mut rent_paying_accounts_by_partition = Vec::default();
@@ -8400,6 +8402,9 @@ impl AccountsDb {
                     stored_account,
                 },
             )| {
+                if pubkey == interesting {
+                    error!("generate_index_for_slot: {:?}, {}", interesting, slot);
+                }
                 if secondary {
                     self.accounts_index.update_secondary_indexes(
                         &pubkey,

@@ -1353,7 +1353,7 @@ impl<T: IndexValue> AccountsIndex<T> {
     /// For each pubkey, find the slot list in the accounts index
     ///   apply 'avoid_callback_result' if specified.
     ///   otherwise, call `callback`
-    pub(crate) fn scan<'a, F, I>(
+    pub(crate) fn scan2<'a, F, I>(
         &'a self,
         pubkeys: I,
         mut callback: F,
