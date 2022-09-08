@@ -454,6 +454,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         other_slot: Option<Slot>,
         reclaims: &mut SlotList<T>,
         reclaim: UpsertReclaim,
+        pubkey: &Pubkey,
     ) {
         let new_value: (Slot, T) = new_value.into();
         let mut upsert_cached = new_value.1.is_cached();
@@ -461,6 +462,12 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
             // if slot list > 1, then we are going to hold this entry in memory until it gets set back to 1
             upsert_cached = true;
         }
+        use std::str::FromStr;
+        let interesting = Pubkey::from_str("67U1EitxuzFuBtbQmYMFYtub6bhZAnXCXktmnyBYviv6").unwrap();
+        if pubkey == &interesting {
+            use log::*; error!("{pubkey}, refcount: {}, info: {:?}", entry.ref_count(), entry.slot_list.read().unwrap());
+        }
+
         self.set_age_to_future(entry, upsert_cached);
     }
 
@@ -476,7 +483,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         // try to get it just from memory first using only a read lock
         self.get_only_in_mem(pubkey, false, |entry| {
             if let Some(entry) = entry {
-                self.update_slot_list_entry(entry, new_value, other_slot, reclaims, reclaim);
+                self.update_slot_list_entry(entry, new_value, other_slot, reclaims, reclaim, pubkey);
             } else {
                 let mut m = Measure::start("entry");
                 let mut map = self.map_internal.write().unwrap();
@@ -487,7 +494,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                     Entry::Occupied(mut occupied) => {
                         let current = occupied.get_mut();
                         self.update_slot_list_entry(
-                            current, new_value, other_slot, reclaims, reclaim,
+                            current, new_value, other_slot, reclaims, reclaim,pubkey,
                         );
                     }
                     Entry::Vacant(vacant) => {
@@ -504,6 +511,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                                 other_slot,
                                 reclaims,
                                 reclaim,
+                                pubkey,
                             );
                             disk_entry
                         } else {
