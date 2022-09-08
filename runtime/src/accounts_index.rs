@@ -1132,13 +1132,13 @@ impl<T: IndexValue> AccountsIndex<T> {
             .map(ReadAccountMapEntry::from_account_map_entry)
     }
 
-    fn slot_list_mut2<RT>(
+    fn slot_list_mut<RT>(
         &self,
         pubkey: &Pubkey,
         user: impl for<'a> FnOnce(&mut RwLockWriteGuard<'a, SlotList<T>>) -> RT,
     ) -> Option<RT> {
         let read_lock = self.get_bin(pubkey);
-        read_lock.slot_list_mut2(pubkey, user)
+        read_lock.slot_list_mut(pubkey, user)
     }
 
     pub fn handle_dead_keys(
@@ -1280,7 +1280,7 @@ impl<T: IndexValue> AccountsIndex<T> {
             use log::*;error!("purge_exact: {pubkey}");
         }
 
-        self.slot_list_mut2(pubkey, |slot_list| {
+        self.slot_list_mut(pubkey, |slot_list| {
             slot_list.retain(|(slot, item)| {
                 let should_purge = slots_to_purge.contains(slot);
                 if should_purge {
@@ -1764,7 +1764,7 @@ impl<T: IndexValue> AccountsIndex<T> {
         }
 
         let mut is_slot_list_empty = false;
-        self.slot_list_mut2(pubkey, |slot_list| {
+        self.slot_list_mut(pubkey, |slot_list| {
             self.purge_older_root_entries(slot_list, reclaims, max_clean_root_inclusive);
             is_slot_list_empty = slot_list.is_empty();
         });
@@ -2007,7 +2007,7 @@ impl<T: IndexValue> AccountsIndex<T> {
     // if this account has no more entries. Note this does not update the secondary
     // indexes!
     pub fn purge_roots(&self, pubkey: &Pubkey) -> (SlotList<T>, bool) {
-        self.slot_list_mut2(pubkey, |slot_list| {
+        self.slot_list_mut(pubkey, |slot_list| {
             let reclaims = self.get_rooted_entries(slot_list, None);
             slot_list.retain(|(slot, _)| !self.is_alive_root(*slot));
             (reclaims, slot_list.is_empty())
@@ -3763,7 +3763,7 @@ pub mod tests {
 
         secondary_indexes.keys = None;
 
-        index.slot_list_mut2(&account_key, |slot_list| slot_list.clear());
+        index.slot_list_mut(&account_key, |slot_list| slot_list.clear());
 
         // Everything should be deleted
         index.handle_dead_keys(&[&account_key], &secondary_indexes);
@@ -3873,7 +3873,7 @@ pub mod tests {
         // was outdated by the update in the later slot, the primary account key is still alive,
         // so both secondary keys will still be kept alive.
         index.add_root(later_slot, false);
-        index.slot_list_mut2(&account_key, |slot_list| {
+        index.slot_list_mut(&account_key, |slot_list| {
             index.purge_older_root_entries(slot_list, &mut vec![], None)
         });
 

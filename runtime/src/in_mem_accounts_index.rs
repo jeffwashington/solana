@@ -435,7 +435,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         result
     }
 
-    pub fn slot_list_mut2<RT>(
+    pub fn slot_list_mut<RT>(
         &self,
         pubkey: &Pubkey,
         user: impl for<'a> FnOnce(&mut RwLockWriteGuard<'a, SlotList<T>>) -> RT,
@@ -463,7 +463,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                 if let Some(entry) = &entry {
                     use log::*;
                     error!(
-                        "slot_list_mut2 {pubkey}, refcount: {}, info: {:?}",
+                        "slot_list_mut {pubkey}, refcount: {}, info: {:?}",
                         entry.ref_count(),
                         entry.slot_list.read().unwrap()
                     );
