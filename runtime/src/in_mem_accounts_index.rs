@@ -376,6 +376,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                     // We have to have a write lock to the map here, which means nobody else can get
                     //  the arc, but someone may already have retrieved a clone of it.
                     // account index in_mem flushing is one such possibility
+                    assert_eq!(1, Arc::strong_count(occupied.get()));
                     self.delete_disk_key(occupied.key());
                     self.stats().dec_mem_count(self.bin);
                     occupied.remove();
@@ -434,7 +435,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         result
     }
 
-    pub fn slot_list_mut<RT>(
+    pub fn slot_list_mut2<RT>(
         &self,
         pubkey: &Pubkey,
         user: impl for<'a> FnOnce(&mut RwLockWriteGuard<'a, SlotList<T>>) -> RT,

@@ -1132,13 +1132,13 @@ impl<T: IndexValue> AccountsIndex<T> {
             .map(ReadAccountMapEntry::from_account_map_entry)
     }
 
-    fn slot_list_mut<RT>(
+    fn slot_list_mut2<RT>(
         &self,
         pubkey: &Pubkey,
         user: impl for<'a> FnOnce(&mut RwLockWriteGuard<'a, SlotList<T>>) -> RT,
     ) -> Option<RT> {
         let read_lock = self.get_bin(pubkey);
-        read_lock.slot_list_mut(pubkey, user)
+        read_lock.slot_list_mut2(pubkey, user)
     }
 
     pub fn handle_dead_keys(
@@ -1274,7 +1274,13 @@ impl<T: IndexValue> AccountsIndex<T> {
     where
         C: Contains<'a, Slot>,
     {
-        self.slot_list_mut(pubkey, |slot_list| {
+        use std::str::FromStr;
+        let interesting = Pubkey::from_str("67U1EitxuzFuBtbQmYMFYtub6bhZAnXCXktmnyBYviv6").unwrap();
+        if interesting == *pubkey {
+            use log::*;error!("purge_exact: {pubkey}");
+        }
+
+        self.slot_list_mut2(pubkey, |slot_list| {
             slot_list.retain(|(slot, item)| {
                 let should_purge = slots_to_purge.contains(slot);
                 if should_purge {
@@ -1751,8 +1757,14 @@ impl<T: IndexValue> AccountsIndex<T> {
         reclaims: &mut SlotList<T>,
         max_clean_root_inclusive: Option<Slot>,
     ) {
+        use std::str::FromStr;
+        let interesting = Pubkey::from_str("67U1EitxuzFuBtbQmYMFYtub6bhZAnXCXktmnyBYviv6").unwrap();
+        if interesting == *pubkey {
+            use log::*;error!("clean_rooted_entries: {pubkey}");
+        }
+
         let mut is_slot_list_empty = false;
-        self.slot_list_mut(pubkey, |slot_list| {
+        self.slot_list_mut2(pubkey, |slot_list| {
             self.purge_older_root_entries(slot_list, reclaims, max_clean_root_inclusive);
             is_slot_list_empty = slot_list.is_empty();
         });
