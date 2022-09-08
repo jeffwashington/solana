@@ -2297,7 +2297,7 @@ impl AccountsDb {
                 if delete {
                     // this pubkey can be deleted from all stores it is in
                     if interesting == *pubkey {
-                        error!("{pubkey}, {}", line!());
+                        error!("{pubkey}, {}, refcount: {ref_count_from_storage}, infos: {account_infos:?}", line!());
                     }
                         continue;
                 }
