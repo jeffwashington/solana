@@ -8454,7 +8454,7 @@ impl AccountsDb {
                 },
             )| {
                 if pubkey == interesting {
-                    error!("generate_index_for_slot: {:?}, {}", interesting, slot);
+                    error!("generate_index_for_slot: {:?}, {}, account: {:?}", interesting, slot, stored_account.lamports());
                 }
                 if secondary {
                     self.accounts_index.update_secondary_indexes(
