@@ -2191,6 +2191,7 @@ impl AccountsDb {
         let one_epoch_old = self.get_accounts_hash_complete_one_epoch_old();
         let interesting = Pubkey::from_str("67U1EitxuzFuBtbQmYMFYtub6bhZAnXCXktmnyBYviv6").unwrap();
 
+        error!("clean_accounts_older_than_root starting");
         let mut clean_rooted = Measure::start("clean_old_root-ms");
         let reclaim_vecs = purges
             .par_chunks(INDEX_CLEAN_BULK_COUNT)
@@ -2219,6 +2220,7 @@ impl AccountsDb {
                 })
             })
             .collect::<Vec<_>>();
+        error!("clean_accounts_older_than_root finishing");
         clean_rooted.stop();
         self.clean_accounts_stats
             .clean_old_root_us
@@ -2408,11 +2410,17 @@ impl AccountsDb {
     {
         let mut reclaims = Vec::new();
         let mut dead_keys = Vec::new();
+        let interesting = Pubkey::from_str("67U1EitxuzFuBtbQmYMFYtub6bhZAnXCXktmnyBYviv6").unwrap();
 
         for (pubkey, slots_set) in pubkey_to_slot_set {
             let is_empty = self
                 .accounts_index
                 .purge_exact(pubkey, slots_set, &mut reclaims);
+                if pubkey == &interesting {
+                    error!("{pubkey}, purge_keys_exact is done");
+                    self.sync1.store(true, Ordering::Relaxed);
+                }
+
             if is_empty {
                 dead_keys.push(pubkey);
             }
@@ -7571,6 +7579,7 @@ impl AccountsDb {
                         }
 b=false;
                     }
+                    error!("DONE waiting on lock: {pubkey}");
                 }
                 self.accounts_index.upsert(
                     target_slot,
@@ -7582,6 +7591,7 @@ b=false;
                     &mut reclaims,
                     reclaim,
                 );
+                error!("DONE waiting on lock: {pubkey} and upsert");
             });
             reclaims
         };
@@ -7818,7 +7828,10 @@ b=false;
                         .take(UNREF_ACCOUNTS_BATCH_SIZE)
                         .map(|(_slot, pubkey)| {
                             if pubkey == &interesting {
-                                error!("unref_accounts: {}, slot: {}", pubkey, _slot);
+                                error!("unref_accounts start waiting: {}, slot: {}", pubkey, _slot);
+                                while !self.sync2.load(Ordering::Relaxed){}
+                                error!("unref_accounts done waiting: {}, slot: {}", pubkey, _slot);
+
                             }
                             pubkey
                         }),
@@ -15610,6 +15623,70 @@ pub mod tests {
 
         accounts_db.clean_accounts(None, false, Some(slot3));
         assert_eq!(accounts_db.ref_count_for_pubkey(&pubkey), 0);
+    }
+
+    #[test]
+    fn test_jeff() {
+        solana_logger::setup();
+        let accounts_db = AccountsDb::new_single_for_tests_with_caching();
+        let pubkey = Pubkey::from_str("67U1EitxuzFuBtbQmYMFYtub6bhZAnXCXktmnyBYviv6").unwrap();
+        let owner = solana_sdk::pubkey::new_rand();
+        let space = 0;
+
+        let slot1: Slot = 1;
+        let account = AccountSharedData::new(0, space, &owner);
+        accounts_db.sync1.store(true, Ordering::Relaxed);
+        accounts_db.store_accounts_frozen((slot1, &[(&pubkey, &account)][..]), None::<&[Hash]>, None, None, StoreReclaims::Ignore);
+        accounts_db.sync1.store(false, Ordering::Relaxed);
+        accounts_db.get_accounts_delta_hash(slot1);
+        accounts_db.add_root(slot1);
+        let slot2: Slot = 2;
+
+        let adb = Arc::new(accounts_db);
+        let adb2 = Arc::clone(&adb);
+
+        let t = Builder::new()
+            .name("solDbStoreHashr".to_string())
+            .spawn(move || {
+                adb2.clean_accounts(Some(slot2), false, Some(slot2));
+            })
+            .unwrap();
+
+        //sleep(Duration::from_millis(1000));
+
+
+        let account2 = AccountSharedData::new(1, space, &owner);
+        error!("start store cached");
+        adb.store_cached((slot2, &[(&pubkey, &account2)][..]), None);
+        error!("store cached");
+        adb.sync2.store(true, Ordering::Relaxed);
+
+
+            t.join().unwrap();
+
+/*
+        let account = AccountSharedData::new(222, space, &owner);
+        accounts_db.store_cached((slot2, &[(&pubkey, &account)][..]), None);
+        accounts_db.get_accounts_delta_hash(slot2);
+        accounts_db.add_root(slot2);
+
+        let slot3: Slot = 3;
+        let account = AccountSharedData::new(0, space, &owner);
+        accounts_db.store_cached((slot3, &[(&pubkey, &account)][..]), None);
+        accounts_db.get_accounts_delta_hash(slot3);
+        accounts_db.add_root(slot3);
+
+        assert_eq!(accounts_db.ref_count_for_pubkey(&pubkey), 3);
+
+        accounts_db.clean_accounts(Some(slot2), false, Some(slot2));
+        assert_eq!(accounts_db.ref_count_for_pubkey(&pubkey), 2);
+
+        accounts_db.clean_accounts(None, false, Some(slot2));
+        assert_eq!(accounts_db.ref_count_for_pubkey(&pubkey), 1);
+
+        accounts_db.clean_accounts(None, false, Some(slot3));
+        assert_eq!(accounts_db.ref_count_for_pubkey(&pubkey), 0);
+        */
     }
 
     #[test]
