@@ -1136,22 +1136,27 @@ impl<T: IndexValue> AccountsIndex<T> {
         read_lock.slot_list_mut(pubkey, user)
     }
 
+    #[must_use]
     pub fn handle_dead_keys(
         &self,
         dead_keys: &[&Pubkey],
         account_indexes: &AccountSecondaryIndexes,
-    ) {
+    ) -> HashSet<Pubkey> {
+        let mut pubkeys_removed_from_accounts_index = HashSet::default();
         if !dead_keys.is_empty() {
             for key in dead_keys.iter() {
                 let w_index = self.get_bin(key);
                 if w_index.remove_if_slot_list_empty(**key) {
+                    pubkeys_removed_from_accounts_index.insert(**key);
                     // Note it's only safe to remove all the entries for this key
                     // because we have the lock for this key's entry in the AccountsIndex,
                     // so no other thread is also updating the index
                     self.purge_secondary_indexes_by_inner_key(key, account_indexes);
                 }
+                //panic!("");
             }
         }
+        pubkeys_removed_from_accounts_index
     }
 
     /// call func with every pubkey and index visible from a given set of ancestors
@@ -1737,26 +1742,29 @@ impl<T: IndexValue> AccountsIndex<T> {
         });
     }
 
+    #[must_use]
     pub fn clean_rooted_entries(
         &self,
         pubkey: &Pubkey,
         reclaims: &mut SlotList<T>,
         max_clean_root_inclusive: Option<Slot>,
-    ) {
+    ) -> bool {
         let mut is_slot_list_empty = false;
         self.slot_list_mut(pubkey, |slot_list| {
             self.purge_older_root_entries(slot_list, reclaims, max_clean_root_inclusive);
             is_slot_list_empty = slot_list.is_empty();
         });
 
+        let mut removed = false;
         // If the slot list is empty, remove the pubkey from `account_maps`. Make sure to grab the
         // lock and double check the slot list is still empty, because another writer could have
         // locked and inserted the pubkey in-between when `is_slot_list_empty=true` and the call to
         // remove() below.
         if is_slot_list_empty {
             let w_maps = self.get_bin(pubkey);
-            w_maps.remove_if_slot_list_empty(*pubkey);
+            removed = w_maps.remove_if_slot_list_empty(*pubkey);
         }
+        removed
     }
 
     /// When can an entry be purged?
@@ -3528,7 +3536,7 @@ pub mod tests {
             &mut vec![],
         );
 
-        index.handle_dead_keys(&[&account_key], secondary_indexes);
+        let _ = index.handle_dead_keys(&[&account_key], secondary_indexes);
         assert!(secondary_index.index.is_empty());
         assert!(secondary_index.reverse_index.is_empty());
     }
@@ -3746,7 +3754,7 @@ pub mod tests {
         index.slot_list_mut(&account_key, |slot_list| slot_list.clear());
 
         // Everything should be deleted
-        index.handle_dead_keys(&[&account_key], &secondary_indexes);
+        let _ = index.handle_dead_keys(&[&account_key], &secondary_indexes);
         assert!(secondary_index.index.is_empty());
         assert!(secondary_index.reverse_index.is_empty());
     }
@@ -3867,7 +3875,7 @@ pub mod tests {
         // pubkey as dead and finally remove all the secondary indexes
         let mut reclaims = vec![];
         index.purge_exact(&account_key, &later_slot, &mut reclaims);
-        index.handle_dead_keys(&[&account_key], secondary_indexes);
+        let _ = index.handle_dead_keys(&[&account_key], secondary_indexes);
         assert!(secondary_index.index.is_empty());
         assert!(secondary_index.reverse_index.is_empty());
     }
