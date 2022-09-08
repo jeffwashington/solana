@@ -1047,6 +1047,8 @@ type AccountInfoAccountsIndex = AccountsIndex<AccountInfo>;
 // This structure handles the load/store of the accounts
 #[derive(Debug)]
 pub struct AccountsDb {
+    pub sync1: AtomicBool,
+    pub sync2: AtomicBool,
     /// Keeps tracks of index into AppendVec on a per slot basis
     pub accounts_index: AccountInfoAccountsIndex,
 
@@ -1942,6 +1944,8 @@ impl AccountsDb {
         const ACCOUNTS_STACK_SIZE: usize = 8 * 1024 * 1024;
 
         AccountsDb {
+            sync1: AtomicBool::default(),
+            sync2: AtomicBool::default(),
             verify_accounts_hash_in_bg: VerifyAccountsHashInBackground::default(),
             filler_accounts_per_slot: AtomicU64::default(),
             filler_account_slots_remaining: AtomicU64::default(),
@@ -2185,6 +2189,7 @@ impl AccountsDb {
         const INDEX_CLEAN_BULK_COUNT: usize = 4096;
 
         let one_epoch_old = self.get_accounts_hash_complete_one_epoch_old();
+        let interesting = Pubkey::from_str("67U1EitxuzFuBtbQmYMFYtub6bhZAnXCXktmnyBYviv6").unwrap();
 
         let mut clean_rooted = Measure::start("clean_old_root-ms");
         let reclaim_vecs = purges
@@ -2197,7 +2202,12 @@ impl AccountsDb {
                         &mut reclaims,
                         max_clean_root_inclusive,
                     );
+                    if pubkey == &interesting {
+                        error!("{pubkey}, clean_accounts_older_than_root is done");
+                        self.sync1.store(true, Ordering::Relaxed);
+                    }
                 }
+                
                 (!reclaims.is_empty()).then(|| {
                     // figure out how many ancient accounts have been reclaimed
                     let old_reclaims = reclaims
@@ -7543,6 +7553,8 @@ impl AccountsDb {
         // so, instead we limit how many threads will be created to the same size as the bg thread pool
         let len = std::cmp::min(accounts.len(), infos.len());
         let threshold = 1;
+        let interesting = Pubkey::from_str("67U1EitxuzFuBtbQmYMFYtub6bhZAnXCXktmnyBYviv6").unwrap();
+        
         let update = |start, end| {
             let mut reclaims = Vec::with_capacity((end - start) / 2);
 
@@ -7551,6 +7563,15 @@ impl AccountsDb {
                 let pubkey_account = (accounts.pubkey(i), accounts.account(i));
                 let pubkey = pubkey_account.0;
                 let old_slot = accounts.slot(i);
+                if &interesting == pubkey {
+                    let mut b = true;
+                    while !self.sync1.load(Ordering::Relaxed) {
+                        if b {
+                            error!("waiting on lock: {pubkey}");
+                        }
+b=false;
+                    }
+                }
                 self.accounts_index.upsert(
                     target_slot,
                     old_slot,
