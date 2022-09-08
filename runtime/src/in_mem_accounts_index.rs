@@ -414,13 +414,18 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         let interesting = Pubkey::from_str("67U1EitxuzFuBtbQmYMFYtub6bhZAnXCXktmnyBYviv6").unwrap();
         if pubkey == interesting {
             if let Entry::Occupied(entry) = &entry {
-                use log::*; error!("remove_if_slot_list_empty {pubkey}, refcount: {}, info: {:?}", entry.get().ref_count(), entry.get().slot_list.read().unwrap());
-            }
-            else {
-                use log::*; error!("remove_if_slot_list_empty not found {pubkey}");
+                use log::*;
+                error!(
+                    "remove_if_slot_list_empty {pubkey}, refcount: {}, info: {:?}",
+                    entry.get().ref_count(),
+                    entry.get().slot_list.read().unwrap()
+                );
+            } else {
+                use log::*;
+                error!("remove_if_slot_list_empty not found {pubkey}");
             }
         }
-        
+
         let found = matches!(entry, Entry::Occupied(_));
         let result = self.remove_if_slot_list_empty_entry(entry);
         drop(map);
@@ -434,15 +439,36 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         pubkey: &Pubkey,
         user: impl for<'a> FnOnce(&mut RwLockWriteGuard<'a, SlotList<T>>) -> RT,
     ) -> Option<RT> {
+        use std::str::FromStr;
+        let interesting = Pubkey::from_str("67U1EitxuzFuBtbQmYMFYtub6bhZAnXCXktmnyBYviv6").unwrap();
         self.get_internal(pubkey, |entry| {
-            (
-                true,
-                entry.map(|entry| {
-                    let result = user(&mut entry.slot_list.write().unwrap());
-                    entry.set_dirty(true);
-                    result
-                }),
-            )
+            if pubkey == &interesting {
+                if let Some(entry) = &entry {
+                    use log::*;
+                    error!(
+                        "slot_list_mut {pubkey}, refcount: {}, info: {:?}",
+                        entry.ref_count(),
+                        entry.slot_list.read().unwrap()
+                    );
+                }
+            }
+            let result = entry.map(|entry| {
+                let result = user(&mut entry.slot_list.write().unwrap());
+                entry.set_dirty(true);
+                result
+            });
+
+            if pubkey == &interesting {
+                if let Some(entry) = &entry {
+                    use log::*;
+                    error!(
+                        "slot_list_mut2 {pubkey}, refcount: {}, info: {:?}",
+                        entry.ref_count(),
+                        entry.slot_list.read().unwrap()
+                    );
+                }
+            }
+            (true, result)
         })
     }
 
@@ -450,7 +476,10 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         self.get_internal(pubkey, |entry| {
             if let Some(entry) = entry {
                 if entry.add_un_ref(false) {
-                    panic!("unref to -1: {pubkey}, list: {:?}", entry.slot_list.read().unwrap());
+                    panic!(
+                        "unref to -1: {pubkey}, list: {:?}",
+                        entry.slot_list.read().unwrap()
+                    );
                 }
             }
             (true, ())
@@ -476,7 +505,12 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         use std::str::FromStr;
         let interesting = Pubkey::from_str("67U1EitxuzFuBtbQmYMFYtub6bhZAnXCXktmnyBYviv6").unwrap();
         if pubkey == &interesting {
-            use log::*; error!("{pubkey}, refcount: {}, info: {:?}", entry.ref_count(), entry.slot_list.read().unwrap());
+            use log::*;
+            error!(
+                "{pubkey}, refcount: {}, info: {:?}",
+                entry.ref_count(),
+                entry.slot_list.read().unwrap()
+            );
         }
 
         self.set_age_to_future(entry, upsert_cached);
@@ -494,7 +528,9 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         // try to get it just from memory first using only a read lock
         self.get_only_in_mem(pubkey, false, |entry| {
             if let Some(entry) = entry {
-                self.update_slot_list_entry(entry, new_value, other_slot, reclaims, reclaim, pubkey);
+                self.update_slot_list_entry(
+                    entry, new_value, other_slot, reclaims, reclaim, pubkey,
+                );
             } else {
                 let mut m = Measure::start("entry");
                 let mut map = self.map_internal.write().unwrap();
@@ -505,7 +541,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                     Entry::Occupied(mut occupied) => {
                         let current = occupied.get_mut();
                         self.update_slot_list_entry(
-                            current, new_value, other_slot, reclaims, reclaim,pubkey,
+                            current, new_value, other_slot, reclaims, reclaim, pubkey,
                         );
                     }
                     Entry::Vacant(vacant) => {
