@@ -2357,6 +2357,7 @@ impl AccountsDb {
                 }
             }
         }
+        error!("calc_delete_dependencies: {}", line!());
     }
 
     fn background_hasher(receiver: Receiver<CachedAccount>) {
@@ -2933,6 +2934,8 @@ impl AccountsDb {
         );
         calc_deps_time.stop();
 
+        error!("{}", line!());
+
         let mut purge_filter = Measure::start("purge_filter");
         self.filter_zero_lamport_clean_for_incremental_snapshots(
             max_clean_root_inclusive,
@@ -2942,6 +2945,7 @@ impl AccountsDb {
         );
         purge_filter.stop();
 
+        error!("{}", line!());
         let mut reclaims_time = Measure::start("reclaims");
         // Recalculate reclaims with new purge set
         let pubkey_to_slot_set: Vec<_> = purges_zero_lamports
@@ -2956,8 +2960,10 @@ impl AccountsDb {
                 )
             })
             .collect();
+            error!("{}", line!());
 
         let reclaims = self.purge_keys_exact(pubkey_to_slot_set.iter());
+        error!("{}", line!());
 
         // Don't reset from clean, since the pubkeys in those stores may need to be unref'ed
         // and those stores may be used for background hashing.
@@ -2969,6 +2975,7 @@ impl AccountsDb {
             Some((&self.clean_accounts_stats.purge_stats, &mut reclaim_result)),
             reset_accounts,
         );
+        error!("{}", line!());
 
         reclaims_time.stop();
         measure_all.stop();
@@ -7794,8 +7801,12 @@ impl AccountsDb {
                             }
                             pubkey
                         }),
-                    |_pubkey, _slots_refs| /* unused */AccountsIndexScanResult::Unref,
-                    Some(AccountsIndexScanResult::Unref),
+                    |_pubkey, _slots_refs| {
+                        if _pubkey == &interesting {
+                            error!("unref_accounts2: {}, refs: {_slots_refs:?}", _pubkey);
+                        }
+                    /* unused */AccountsIndexScanResult::Unref},
+                    None,//Some(AccountsIndexScanResult::Unref),
                 )
             })
         });
