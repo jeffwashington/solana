@@ -2253,6 +2253,8 @@ impl AccountsDb {
         store_counts: &mut HashMap<AppendVecId, (usize, HashSet<Pubkey>)>,
         min_store_id: Option<AppendVecId>,
     ) {
+        let interesting = Pubkey::from_str("67U1EitxuzFuBtbQmYMFYtub6bhZAnXCXktmnyBYviv6").unwrap();
+
         // Another pass to check if there are some filtered accounts which
         // do not match the criteria of deleting all appendvecs which contain them
         // then increment their storage count.
@@ -2261,6 +2263,9 @@ impl AccountsDb {
             let mut failed_store_id = None;
             let all_stores_being_deleted =
                 account_infos.len() as RefCount == *ref_count_from_storage;
+                if interesting == *pubkey {
+                    error!("{pubkey}, {}", line!());
+                }
             if all_stores_being_deleted {
                 let mut delete = true;
                 for (_slot, account_info) in account_infos {
@@ -2273,7 +2278,10 @@ impl AccountsDb {
                             store_id, count,
                         );
                         if count == 0 {
-                            // this store CAN be removed
+                            if interesting == *pubkey {
+                                error!("{pubkey}, {}", line!());
+                            }
+                                        // this store CAN be removed
                             continue;
                         }
                     }
@@ -2281,14 +2289,23 @@ impl AccountsDb {
                     // If the store cannot be found, that also means store isn't being deleted.
                     failed_store_id = Some(store_id);
                     delete = false;
-                    break;
+                    if interesting == *pubkey {
+                        error!("{pubkey}, {}", line!());
+                    }
+                        break;
                 }
                 if delete {
                     // this pubkey can be deleted from all stores it is in
-                    continue;
+                    if interesting == *pubkey {
+                        error!("{pubkey}, {}", line!());
+                    }
+                        continue;
                 }
             } else {
                 // a pubkey we were planning to remove is not removing all stores that contain the account
+                if interesting == *pubkey {
+                    error!("{pubkey}, {}", line!());
+                }
                 debug!(
                     "calc_delete_dependencies(),
                     pubkey: {},
@@ -2329,6 +2346,9 @@ impl AccountsDb {
                     let affected_pubkeys = &store_count.1;
                     for key in affected_pubkeys {
                         for (_slot, account_info) in &purges.get(key).unwrap().0 {
+                            if key == &interesting {
+                                error!("{key}, {}, slot: {_slot}", line!());
+                            }
                             if !already_counted.contains(&account_info.store_id()) {
                                 pending_store_ids.insert(account_info.store_id());
                             }
@@ -2670,7 +2690,9 @@ impl AccountsDb {
                 });
             });
         if failed_too_small.load(Ordering::Relaxed) || failed_too_large.load(Ordering::Relaxed) {
-            panic!("exhaustively_verify_refcounts failed, max_slot_inclusive: {max_slot_inclusive}");
+            panic!(
+                "exhaustively_verify_refcounts failed, max_slot_inclusive: {max_slot_inclusive}"
+            );
         }
     }
 
@@ -2686,8 +2708,7 @@ impl AccountsDb {
     ) {
         if self.exhaustively_verify_refcounts {
             self.exhaustively_verify_refcounts(max_clean_root_inclusive);
-        }
-        else {
+        } else {
             error!("not exhaustively comparing");
         }
 
@@ -3134,6 +3155,7 @@ impl AccountsDb {
                     }
                 }
 
+                error!("handle reclaims");
                 self.process_dead_slots(&dead_slots, purged_account_slots, purge_stats);
             } else {
                 assert!(dead_slots.is_empty());
@@ -7754,6 +7776,8 @@ impl AccountsDb {
         purged_slot_pubkeys: HashSet<(Slot, Pubkey)>,
         purged_stored_account_slots: &mut AccountSlots,
     ) {
+        let interesting = Pubkey::from_str("67U1EitxuzFuBtbQmYMFYtub6bhZAnXCXktmnyBYviv6").unwrap();
+
         let len = purged_slot_pubkeys.len();
         let batches = 1 + (len / UNREF_ACCOUNTS_BATCH_SIZE);
         self.thread_pool_clean.install(|| {
@@ -7764,7 +7788,12 @@ impl AccountsDb {
                         .iter()
                         .skip(skip)
                         .take(UNREF_ACCOUNTS_BATCH_SIZE)
-                        .map(|(_slot, pubkey)| pubkey),
+                        .map(|(_slot, pubkey)| {
+                            if pubkey == &interesting {
+                                error!("unref_accounts: {}, slot: {}", pubkey, _slot);
+                            }
+                            pubkey
+                        }),
                     |_pubkey, _slots_refs| /* unused */AccountsIndexScanResult::Unref,
                     Some(AccountsIndexScanResult::Unref),
                 )
@@ -7838,6 +7867,8 @@ impl AccountsDb {
                 }
             }
         }
+        let interesting = Pubkey::from_str("67U1EitxuzFuBtbQmYMFYtub6bhZAnXCXktmnyBYviv6").unwrap();
+
         // get all pubkeys in all dead slots
         let purged_slot_pubkeys: HashSet<(Slot, Pubkey)> = {
             self.thread_pool_clean.install(|| {
@@ -7848,7 +7879,16 @@ impl AccountsDb {
                         store
                             .accounts
                             .account_iter()
-                            .map(|account| (slot, account.meta.pubkey))
+                            .map(|account| {
+                                if account.meta.pubkey == interesting {
+                                    error!(
+                                        "cleaning dead slot: {}, {}",
+                                        store.slot(),
+                                        account.meta.pubkey
+                                    );
+                                }
+                                (slot, account.meta.pubkey)
+                            })
                             .collect::<Vec<(Slot, Pubkey)>>()
                     })
                     .flatten()
