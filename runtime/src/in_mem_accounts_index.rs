@@ -410,6 +410,17 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         let mut map = self.map_internal.write().unwrap();
         let entry = map.entry(pubkey);
         m.stop();
+        use std::str::FromStr;
+        let interesting = Pubkey::from_str("67U1EitxuzFuBtbQmYMFYtub6bhZAnXCXktmnyBYviv6").unwrap();
+        if pubkey == interesting {
+            if let Entry::Occupied(entry) = &entry {
+                use log::*; error!("remove_if_slot_list_empty {pubkey}, refcount: {}, info: {:?}", entry.get().ref_count(), entry.get().slot_list.read().unwrap());
+            }
+            else {
+                use log::*; error!("remove_if_slot_list_empty not found {pubkey}");
+            }
+        }
+        
         let found = matches!(entry, Entry::Occupied(_));
         let result = self.remove_if_slot_list_empty_entry(entry);
         drop(map);
