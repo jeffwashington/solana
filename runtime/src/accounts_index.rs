@@ -1393,6 +1393,7 @@ impl<T: IndexValue> AccountsIndex<T> {
                         cache = match result {
                             AccountsIndexScanResult::Unref => {
                                 locked_entry.add_un_ref(false);
+                                assert_ne!(0, locked_entry.ref_count(), "{pubkey}");
                                 true
                             }
                             AccountsIndexScanResult::KeepInMemory => true,
@@ -4092,7 +4093,7 @@ pub mod tests {
         // return true if we don't know anything about 'key_unknown'
         // the item did not exist in the accounts index at all, so index is up to date
         assert!(index.clean_rooted_entries(&key_unknown, &mut gc, None));
-        
+
         index.upsert_simple_test(&key, slot1, value);
 
         let slot2 = 2;
