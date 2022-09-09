@@ -281,6 +281,7 @@ impl<T: IndexValue> AccountMapEntryInner<T> {
             if previous == 0 {
                 inc_new_counter_info!("accounts_index-deref_from_0", 1);
             }
+            assert!(previous > 0);
         }
         self.set_dirty(true);
     }
