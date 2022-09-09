@@ -1393,6 +1393,7 @@ impl<T: IndexValue> AccountsIndex<T> {
                         cache = match result {
                             AccountsIndexScanResult::Unref => {
                                 locked_entry.add_un_ref(false);
+                                assert_ne!(0, locked_entry.ref_count(), "{pubkey}");
                                 true
                             }
                             AccountsIndexScanResult::KeepInMemory => true,
