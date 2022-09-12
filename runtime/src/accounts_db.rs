@@ -3963,7 +3963,7 @@ impl AccountsDb {
 
         // randomly shrink ancient slots
         // this exercises the ancient shrink code more often
-        let random_shrink = true;//thread_rng().gen_range(0, 100) == 0 && is_ancient(accounts);
+        let random_shrink = thread_rng().gen_range(0, 100) == 0 && is_ancient(accounts);
 
         if is_full_ancient(accounts) || (random_shrink && is_ancient(accounts)) {
             if self.is_candidate_for_shrink(storage, true) || random_shrink {
@@ -4116,6 +4116,7 @@ impl AccountsDb {
                         .map(|account| account.meta.pubkey)
                         .collect::<HashSet<_>>();
                 }
+                error!("ancient_append_vec: unrefing: {}, {}", slot, ancient_slot);
                 // accounts in 'slot' but ALSO already in the ancient append vec at a different slot need to be unref'd since 'slot' is going away
                 self.unref_accounts_already_in_storage(accounts, &mut ancient_pubkeys);
             }
