@@ -3395,7 +3395,7 @@ impl AccountsDb {
     where
         I: Iterator<Item = &'a Arc<AccountStorageEntry>>,
     {
-        error!("do_shrink_slot_stores: slot: {}", slot);
+        panic!("do_shrink_slot_stores: slot: {}", slot);
         let GetUniqueAccountsResult {
             stored_accounts,
             original_bytes,
