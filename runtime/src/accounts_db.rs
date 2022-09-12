@@ -8461,7 +8461,7 @@ impl AccountsDb {
 
         let secondary = !self.account_indexes.is_empty();
 
-        let int = Pubkey::from_str("12MBzP3dQUnsADLfwfSYYqH2PX4LuPEkJgh9hP1TXFp2").unwrap();
+        let int = Pubkey::from_str("5xrfczVyWeqWfbVMQmHhJs7cwN6w5VUV4PSAa6YYT874").unwrap();
 
         let mut rent_paying_accounts_by_partition = Vec::default();
         let mut accounts_data_len = 0;
