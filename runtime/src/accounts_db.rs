@@ -3946,7 +3946,7 @@ impl AccountsDb {
 
         // randomly shrink ancient slots
         // this exercises the ancient shrink code more often
-        let random_shrink = thread_rng().gen_range(0, 100) == 0 && is_ancient(accounts);
+        let random_shrink = true;//thread_rng().gen_range(0, 100) == 0 && is_ancient(accounts);
 
         if is_full_ancient(accounts) || random_shrink {
             if self.is_candidate_for_shrink(storage, true) || random_shrink {
