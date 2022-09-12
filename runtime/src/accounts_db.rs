@@ -3816,7 +3816,10 @@ impl AccountsDb {
             error!("no ancient append vecs enabled");
             return;
         }
-        error!("{}, one epoch old: {:?}", line!(), self.get_accounts_hash_complete_one_epoch_old());
+        error!("{}, one epoch old: {:?}, historical: {}, is_root: {}", line!(), self.get_accounts_hash_complete_one_epoch_old(),
+    {self.accounts_index.roots_tracker.read().unwrap().historical_roots.len()},
+    {self.accounts_index.roots_tracker.read().unwrap().alive_roots.contains(&149881932)},
+);
 
         // If we squash accounts in a slot that is still within an epoch of a hash calculation's max slot, then
         //  we could calculate the wrong rent_epoch and slot for an individual account and thus the wrong overall accounts hash.
