@@ -8461,7 +8461,8 @@ impl AccountsDb {
 
         let secondary = !self.account_indexes.is_empty();
 
-        let int = Pubkey::from_str("5xrfczVyWeqWfbVMQmHhJs7cwN6w5VUV4PSAa6YYT874").unwrap();
+        let int = Pubkey::from_str("Fxx9rWTYphf8RP6K3SoH7Ws6vKEY7oCDo36PbyBz9ULR").unwrap();
+        let int2 = Pubkey::from_str("6sz4qfAKeH1UVcVGnhq3ETdngZG9xftKmsfTwLJFPf8").unwrap();
 
         let mut rent_paying_accounts_by_partition = Vec::default();
         let mut accounts_data_len = 0;
@@ -8478,6 +8479,9 @@ impl AccountsDb {
                 },
             )| {
                 if int == pubkey {
+                    error!("{pubkey}, slot: {slot}");
+                }
+                if int2 == pubkey {
                     error!("{pubkey}, slot: {slot}");
                 }
                 if secondary {
