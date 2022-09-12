@@ -3395,7 +3395,7 @@ impl AccountsDb {
     where
         I: Iterator<Item = &'a Arc<AccountStorageEntry>>,
     {
-        debug!("do_shrink_slot_stores: slot: {}", slot);
+        error!("do_shrink_slot_stores: slot: {}", slot);
         let GetUniqueAccountsResult {
             stored_accounts,
             original_bytes,
@@ -3466,7 +3466,7 @@ impl AccountsDb {
 
         let total_starting_accounts = stored_accounts.len();
         let total_accounts_after_shrink = alive_accounts.len();
-        debug!(
+        error!(
             "shrinking: slot: {}, accounts: ({} => {}) bytes: ({} ; aligned to: {}) original: {}",
             slot,
             total_starting_accounts,
@@ -9247,7 +9247,7 @@ impl AccountsDb {
     // Requires all stores in the slot to be re-written otherwise the accounts_index
     // store ref count could become incorrect.
     fn do_shrink_slot_v1(&self, slot: Slot, forced: bool) -> usize {
-        trace!("shrink_stale_slot: slot: {}", slot);
+        error!("shrink_stale_slot: slot: {}", slot);
 
         if let Some(stores_lock) = self.storage.get_slot_stores(slot) {
             let stores: Vec<_> = stores_lock.read().unwrap().values().cloned().collect();
