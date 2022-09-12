@@ -3819,7 +3819,7 @@ impl AccountsDb {
     }
 
     /// create new ancient append vec
-    /// return it and the elapsed time for metrics
+/// return it and the elapsed time for metrics
     fn create_ancient_append_vec(
         &self,
         slot: Slot,
@@ -8479,11 +8479,12 @@ impl AccountsDb {
                     stored_account,
                 },
             )| {
+                let data = stored_account.lamports();
                 if int == pubkey {
-                    error!("{pubkey}, slot: {slot}");
+                    error!("{pubkey}, slot: {slot}, account: {:?}", data);
                 }
                 if int2 == pubkey {
-                    error!("{pubkey}, slot: {slot}");
+                    error!("{pubkey}, slot: {slot}, account: {:?}", data);
                 }
                 if secondary {
                     self.accounts_index.update_secondary_indexes(
