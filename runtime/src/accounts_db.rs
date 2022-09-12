@@ -3391,7 +3391,7 @@ impl AccountsDb {
         }
     }
 
-    fn do_shrink_slot_stores<'a, I>(&'a self, slot: Slot, stores: I) -> usize
+    fn do_shrink_slot_stores2<'a, I>(&'a self, slot: Slot, stores: I) -> usize
     where
         I: Iterator<Item = &'a Arc<AccountStorageEntry>>,
     {
@@ -3666,7 +3666,7 @@ impl AccountsDb {
 
     // Reads all accounts in given slot's AppendVecs and filter only to alive,
     // then create a minimum AppendVec filled with the alive.
-    fn shrink_slot_forced(&self, slot: Slot) -> usize {
+    fn shrink_slot_forced2(&self, slot: Slot) -> usize {
         debug!("shrink_slot_forced: slot: {}", slot);
 
         if let Some(stores_lock) = self.storage.get_slot_stores(slot) {
@@ -3675,7 +3675,7 @@ impl AccountsDb {
             if !Self::is_shrinking_productive(slot, stores.iter()) {
                 return 0;
             }
-            self.do_shrink_slot_stores(slot, stores.iter())
+            self.do_shrink_slot_stores2(slot, stores.iter())
         } else {
             0
         }
@@ -4243,6 +4243,7 @@ impl AccountsDb {
         {//if !shrink_candidates_slots.is_empty() {
             self.shrink_ancient_slots();
         }
+        error!("{}", line!());
 
         let (shrink_slots, shrink_slots_next_batch) = {
             if let AccountShrinkThreshold::TotalSpace { shrink_ratio } = self.shrink_ratio {
@@ -4272,7 +4273,7 @@ impl AccountsDb {
                 .into_par_iter()
                 .map(|(slot, slot_shrink_candidates)| {
                     let mut measure = Measure::start("shrink_candidate_slots-ms");
-                    self.do_shrink_slot_stores(slot, slot_shrink_candidates.values());
+                    self.do_shrink_slot_stores2(slot, slot_shrink_candidates.values());
                     measure.stop();
                     inc_new_counter_info!("shrink_candidate_slots-ms", measure.as_ms() as usize);
                     slot_shrink_candidates.len()
@@ -4300,7 +4301,8 @@ impl AccountsDb {
 
     pub fn shrink_all_slots(&self, is_startup: bool, last_full_snapshot_slot: Option<Slot>) {
         self.shrink_ancient_slots();
-        
+        error!("{}", line!());
+
         let _guard = self.active_stats.activate(ActiveStatItem::Shrink);
         const DIRTY_STORES_CLEANING_THRESHOLD: usize = 10_000;
         const OUTER_CHUNK_SIZE: usize = 2000;
@@ -4311,7 +4313,7 @@ impl AccountsDb {
             slots.chunks(OUTER_CHUNK_SIZE).for_each(|chunk| {
                 chunk.par_chunks(inner_chunk_size).for_each(|slots| {
                     for slot in slots {
-                        self.shrink_slot_forced(*slot);
+                        self.shrink_slot_forced2(*slot);
                     }
                 });
                 if self.dirty_stores.len() > DIRTY_STORES_CLEANING_THRESHOLD {
@@ -4321,7 +4323,7 @@ impl AccountsDb {
         } else {
             for slot in self.all_slots_in_storage() {
                 if self.caching_enabled {
-                    self.shrink_slot_forced(slot);
+                    self.shrink_slot_forced2(slot);
                 } else {
                     self.do_shrink_slot_forced_v1(slot);
                 }
@@ -9251,7 +9253,7 @@ impl AccountsDb {
     // Requires all stores in the slot to be re-written otherwise the accounts_index
     // store ref count could become incorrect.
     fn do_shrink_slot_v1(&self, slot: Slot, forced: bool) -> usize {
-        error!("shrink_stale_slot: slot: {}", slot);
+        panic!("shrink_stale_slot: slot: {}", slot);
 
         if let Some(stores_lock) = self.storage.get_slot_stores(slot) {
             let stores: Vec<_> = stores_lock.read().unwrap().values().cloned().collect();
@@ -9288,7 +9290,7 @@ impl AccountsDb {
                 );
             }
 
-            self.do_shrink_slot_stores(slot, stores.iter())
+            self.do_shrink_slot_stores2(slot, stores.iter())
         } else {
             0
         }
