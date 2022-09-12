@@ -4033,6 +4033,12 @@ impl AccountsDb {
                 stored_accounts
             };
 
+            if stored_accounts.is_empty() {
+                // this is not expected, but it simplifies things if we know from now on there are accounts to write
+                inc_new_counter_info!("accounts_ancient_append_vec_no_accounts", 1);
+                continue; // skipping slot with no accounts to write
+            }
+
             let mut index_read_elapsed = Measure::start("index_read_elapsed");
             let alive_total_collect = AtomicUsize::new(0);
 
@@ -4072,9 +4078,6 @@ impl AccountsDb {
             index_read_elapsed.stop();
             let aligned_total: u64 = Self::page_align(alive_total as u64);
             // could follow what shrink does more closely
-            if stored_accounts.is_empty() {
-                continue; // skipping slot with no useful accounts to write
-            }
 
             let total_starting_accounts = stored_accounts.len();
             let total_accounts_after_shrink = alive_accounts.len();
