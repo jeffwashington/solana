@@ -3896,6 +3896,7 @@ impl AccountsDb {
         });
 
         self.thread_pool_clean.install(|| {
+            info!("unreffing: {}", unref.len());
             unref.into_par_iter().for_each(|key| {
                 self.accounts_index.unref_from_storage(key);
             });
