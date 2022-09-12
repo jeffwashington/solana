@@ -3395,7 +3395,7 @@ impl AccountsDb {
     where
         I: Iterator<Item = &'a Arc<AccountStorageEntry>>,
     {
-        panic!("do_shrink_slot_stores: slot: {}", slot);
+        error!("do_shrink_slot_stores: slot: {}", slot);
         let GetUniqueAccountsResult {
             stored_accounts,
             original_bytes,
@@ -3807,6 +3807,7 @@ impl AccountsDb {
             error!("no ancient append vecs enabled");
             return;
         }
+        error!("{}, one epoch old: {:?}", line!(), self.get_accounts_hash_complete_one_epoch_old());
 
         // If we squash accounts in a slot that is still within an epoch of a hash calculation's max slot, then
         //  we could calculate the wrong rent_epoch and slot for an individual account and thus the wrong overall accounts hash.

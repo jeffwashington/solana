@@ -827,7 +827,7 @@ impl Accounts {
         ignore_mismatch: bool,
         store_detailed_debug_info: bool,
     ) -> bool {
-        if let Err(err) = self.accounts_db.verify_bank_hash_and_lamports_new(
+        let result = if let Err(err) = self.accounts_db.verify_bank_hash_and_lamports_new(
             slot,
             ancestors,
             total_lamports,
@@ -842,7 +842,10 @@ impl Accounts {
             false
         } else {
             true
-        }
+        };
+        self.accounts_db
+            .notify_accounts_hash_calculated_complete(slot, epoch_schedule);
+        result
     }
 
     fn is_loadable(lamports: u64) -> bool {
