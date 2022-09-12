@@ -175,6 +175,7 @@ impl BucketMapHolderStats {
     }
 
     pub fn report_stats<T: IndexValue>(&self, storage: &BucketMapHolder<T>) {
+        return;
         let elapsed_ms = self.last_time.elapsed_ms();
         if elapsed_ms < STATS_INTERVAL_MS {
             return;
