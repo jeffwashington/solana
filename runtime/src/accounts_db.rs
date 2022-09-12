@@ -3804,6 +3804,7 @@ impl AccountsDb {
     /// squash those slots into ancient append vecs
     fn shrink_ancient_slots(&self) {
         if !self.ancient_append_vecs {
+            error!("no ancient append vecs enabled");
             return;
         }
 
@@ -4239,7 +4240,7 @@ impl AccountsDb {
     pub fn shrink_candidate_slots(&self) -> usize {
         let shrink_candidates_slots =
             std::mem::take(&mut *self.shrink_candidate_slots.lock().unwrap());
-        if !shrink_candidates_slots.is_empty() {
+        {//if !shrink_candidates_slots.is_empty() {
             self.shrink_ancient_slots();
         }
 
