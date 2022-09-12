@@ -3987,6 +3987,7 @@ impl AccountsDb {
         let mut ancient_slot_with_pubkeys = None;
 
         let len = sorted_slots.len();
+        let slots_copy = sorted_slots.clone();
         for slot in sorted_slots {
             let old_storages =
                 match self.get_storages_to_move_to_ancient_append_vec(slot, &mut current_ancient) {
@@ -4001,8 +4002,10 @@ impl AccountsDb {
                 // we are now doing interesting work in squashing ancient
                 guard = Some(self.active_stats.activate(ActiveStatItem::SquashAncient));
                 info!(
-                    "ancient_append_vec: combine_ancient_slots first slot: {}, num_roots: {}",
-                    slot, len
+                    "ancient_append_vec: combine_ancient_slots first slot: {}, num_roots: {}, roots: {:?}",
+                    slot, len,
+                    (slots_copy.iter().take(1000).collect::<Vec<_>>(), slots_copy.iter().min(), slots_copy.iter().max(),
+                slots_copy.contains(&149881932))
                 );
             }
 
