@@ -3827,7 +3827,7 @@ impl AccountsDb {
 
     /// get a sorted list of slots older than an epoch
     /// squash those slots into ancient append vecs
-    fn shrink_ancient_slots(&self) {
+    fn shrink_ancient_slots(&self, shrink_candidate_slots: &mut ShrinkCandidates) {
         if !self.ancient_append_vecs {
             error!("no ancient append vecs enabled");
             return;
@@ -3848,7 +3848,7 @@ impl AccountsDb {
         );
                     
         old_slots.sort_unstable();
-        self.combine_ancient_slots(old_slots);
+        self.combine_ancient_slots(old_slots, shrink_candidate_slots);
     }
 
     /// create new ancient append vec
@@ -4005,7 +4005,7 @@ impl AccountsDb {
 
     /// Combine all account data from storages in 'sorted_slots' into ancient append vecs.
     /// This keeps us from accumulating append vecs in slots older than an epoch.
-    fn combine_ancient_slots(&self, sorted_slots: Vec<Slot>) {
+    fn combine_ancient_slots(&self, sorted_slots: Vec<Slot>, shrink_candidate_slots: &mut ShrinkCandidates) {
         if sorted_slots.is_empty() {
             return;
         }
@@ -4195,6 +4195,16 @@ impl AccountsDb {
 
             }
 
+            {
+                // modify the CURRENT list we're about to use for shrinking
+                if shrink_candidate_slots.contains(&slot) {
+                    error!("jw: shrinking candidate slots still contains a shrunk slot: {:?}", slot);
+                }
+                // shrink_candidate_slots.remove(&slot);
+                // make SURE we are going to try to shrink the old stores here
+                shrink_candidate_slots.entry(slot).or_default().extend(dead_storages.iter().map(|store| (store.append_vec_id(), Arc::clone(store))));
+            }
+
             self.verify_all_append_vecs_are_ancient(slot);
             if slot != ancient_slot {
                 self.verify_all_append_vecs_are_ancient(ancient_slot);
@@ -4318,10 +4328,10 @@ impl AccountsDb {
     }
 
     pub fn shrink_candidate_slots(&self) -> usize {
-        let shrink_candidates_slots =
+        let mut shrink_candidates_slots =
             std::mem::take(&mut *self.shrink_candidate_slots.lock().unwrap());
         if !shrink_candidates_slots.is_empty() {
-            self.shrink_ancient_slots();
+            self.shrink_ancient_slots(&mut shrink_candidates_slots);
         }
 
         let (shrink_slots, shrink_slots_next_batch) = {
@@ -4379,7 +4389,7 @@ impl AccountsDb {
     }
 
     pub fn shrink_all_slots(&self, is_startup: bool, last_full_snapshot_slot: Option<Slot>) {
-        self.shrink_ancient_slots();
+        //self.shrink_ancient_slots();
         error!("{}", line!());
 
         let _guard = self.active_stats.activate(ActiveStatItem::Shrink);
