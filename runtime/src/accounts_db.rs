@@ -4285,7 +4285,7 @@ impl AccountsDb {
     fn verify_all_append_vecs_are_ancient(&self, slot: Slot) {
         if let Some(slot_stores) = self.storage.get_slot_stores(slot) {
             let list = slot_stores.read().unwrap();
-            assert!(!list.iter().any(|(_, store)| is_ancient(&store.accounts)), 
+            assert!(list.iter().any(|(_, store)| !is_ancient(&store.accounts)), 
             "slot {slot} contains append vecs that are not ancient: {:?}", list.iter().map(|(s, store)|
                 (s, store.append_vec_id(), is_ancient(&store.accounts), store.accounts.capacity())
             ).collect::<Vec<_>>());
