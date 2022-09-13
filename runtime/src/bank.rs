@@ -47,6 +47,7 @@ use {
             AccountShrinkThreshold, AccountsDbConfig, SnapshotStorages,
             ACCOUNTS_DB_CONFIG_FOR_BENCHMARKS, ACCOUNTS_DB_CONFIG_FOR_TESTING,
         },
+        accounts_hash::CalcAccountsHashConfig,
         accounts_index::{AccountSecondaryIndexes, IndexKey, ScanConfig, ScanResult, ZeroLamport},
         accounts_update_notifier_interface::AccountsUpdateNotifier,
         ancestors::{Ancestors, AncestorsForSerialization},
@@ -7111,6 +7112,23 @@ impl Bank {
         if calculated == expected {
             true
         } else {
+            // save off the data used that resulted in an incorrect hash calc
+            self.force_flush_accounts_cache();
+            self.rc.accounts.accounts_db.calculate_accounts_hash_helper(
+                false,
+                self.slot(),
+                &CalcAccountsHashConfig {
+                    use_bg_thread_pool: false,
+                    check_hash: false,
+                    ancestors: None,
+                    use_write_cache: false,
+                    epoch_schedule: self.epoch_schedule(),
+                    rent_collector: self.rent_collector(),
+                    store_detailed_debug_info_on_failure: true,
+                    full_snapshot: None,
+                    enable_rehashing: true,
+                },
+            );
             warn!(
                 "Capitalization mismatch: calculated: {} != expected: {}",
                 calculated, expected

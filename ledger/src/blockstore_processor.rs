@@ -872,6 +872,8 @@ pub fn process_blockstore_from_root(
 
     bank.set_startup_accounts_hash_calculation_complete();
 
+    panic!("didn't fail");
+
     datapoint_info!(
         "process_blockstore_from_root",
         ("total_time_us", processing_time.as_micros(), i64),
