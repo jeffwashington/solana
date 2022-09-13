@@ -3364,6 +3364,19 @@ impl AccountsDb {
         let store_ids = stores
             .into_iter()
             .map(|store| {
+                if let Some(slot_stores) = self.storage.get_slot_stores(store.slot()) {
+                    let list = slot_stores.read().unwrap();
+                    assert!(list.iter().any(|(_, store2)| store.append_vec_id() == store2.append_vec_id()), 
+                    "slot {} does not contain an append vec we're shrinking: {:?}, requested: {}", store.slot(), list.iter().map(|(s, store)|
+                        (s, store.append_vec_id(), is_ancient(&store.accounts), store.accounts.capacity())
+                    ).collect::<Vec<_>>(), store.append_vec_id());
+                }
+                else {
+                    panic!("no stores found during shrink: {:?}", store.slot()
+                );
+                }
+        
+        
                 original_bytes += store.total_bytes();
                 let store_id = store.append_vec_id();
                 store.accounts.account_iter().for_each(|account| {
@@ -3396,6 +3409,7 @@ impl AccountsDb {
         I: Iterator<Item = &'a Arc<AccountStorageEntry>>,
     {
         error!("do_shrink_slot_stores: slot: {}", slot);
+
         let GetUniqueAccountsResult {
             stored_accounts,
             original_bytes,
@@ -4328,7 +4342,7 @@ impl AccountsDb {
                 .into_par_iter()
                 .map(|(slot, slot_shrink_candidates)| {
                     let mut measure = Measure::start("shrink_candidate_slots-ms");
-                    self.do_shrink_slot_stores2(slot, slot_shrink_candidates.values());
+                    // this is the one
                     measure.stop();
                     inc_new_counter_info!("shrink_candidate_slots-ms", measure.as_ms() as usize);
                     slot_shrink_candidates.len()
