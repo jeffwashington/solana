@@ -3580,6 +3580,7 @@ impl AccountsDb {
 
         self.shrink_stats.report();
 
+        if false {
         use std::str::FromStr;
         let int = Pubkey::from_str("Fxx9rWTYphf8RP6K3SoH7Ws6vKEY7oCDo36PbyBz9ULR").unwrap();
         let int2 = Pubkey::from_str("6sz4qfAKeH1UVcVGnhq3ETdngZG9xftKmsfTwLJFPf8").unwrap();
@@ -3588,6 +3589,7 @@ impl AccountsDb {
                 self.accounts_index.ref_count_from_storage(j), line!(),
             );
         }
+    }
 
         total_accounts_after_shrink
     }
@@ -4259,6 +4261,7 @@ impl AccountsDb {
             });
         }
 
+        if false {
 
         use std::str::FromStr;
         let int = Pubkey::from_str("Fxx9rWTYphf8RP6K3SoH7Ws6vKEY7oCDo36PbyBz9ULR").unwrap();
@@ -4268,6 +4271,7 @@ impl AccountsDb {
                 self.accounts_index.ref_count_from_storage(j), line!(),
             );
         }
+    }
 
         self.shrink_ancient_stats.report();
     }
