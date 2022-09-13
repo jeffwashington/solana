@@ -6868,17 +6868,20 @@ impl Bank {
             hash = hard_forked_hash;
         }
         if false {
-
-        use std::str::FromStr;
-        let int = Pubkey::from_str("Fxx9rWTYphf8RP6K3SoH7Ws6vKEY7oCDo36PbyBz9ULR").unwrap();
-        let int2 = Pubkey::from_str("6sz4qfAKeH1UVcVGnhq3ETdngZG9xftKmsfTwLJFPf8").unwrap();
-        for j in &[int, int2] {
-            error!("refcounts: {j}, {}", {
-                self.rc.accounts.accounts_db.accounts_index.ref_count_from_storage(j)
-            });
+            use std::str::FromStr;
+            let int = Pubkey::from_str("Fxx9rWTYphf8RP6K3SoH7Ws6vKEY7oCDo36PbyBz9ULR").unwrap();
+            let int2 = Pubkey::from_str("6sz4qfAKeH1UVcVGnhq3ETdngZG9xftKmsfTwLJFPf8").unwrap();
+            for j in &[int, int2] {
+                error!("refcounts: {j}, {}", {
+                    self.rc
+                        .accounts
+                        .accounts_db
+                        .accounts_index
+                        .ref_count_from_storage(j)
+                });
+            }
         }
-    }
-    
+
         info!(
             "bank frozen: {} hash: {} accounts_delta: {} signature_count: {} last_blockhash: {} capitalization: {}{}",
             self.slot(),
@@ -6951,7 +6954,8 @@ impl Bank {
         let cap = self.capitalization();
         let epoch_schedule = self.epoch_schedule();
         let rent_collector = self.rent_collector();
-        if config.run_in_background {//} && false {
+        if config.run_in_background {
+            //} && false {
             let ancestors = ancestors.clone();
             let accounts = Arc::clone(accounts);
             let epoch_schedule = *epoch_schedule;
@@ -7111,6 +7115,28 @@ impl Bank {
                 "Capitalization mismatch: calculated: {} != expected: {}",
                 calculated, expected
             );
+
+            use crate::accounts_hash::CalcAccountsHashConfig;
+            let use_index = false;
+            let check_hash = false; // this will not be supported anymore
+                                    // interesting to consider this
+            let is_startup = true;
+            let can_cached_slot_be_unflushed = false;
+            self.rc.accounts.accounts_db.calculate_accounts_hash(
+                self.slot(),
+                &CalcAccountsHashConfig {
+                    use_bg_thread_pool: !is_startup,
+                    check_hash,
+                    ancestors: Some(&self.ancestors),
+                    use_write_cache: can_cached_slot_be_unflushed,
+                    epoch_schedule: self.epoch_schedule(),
+                    rent_collector: self.rent_collector(),
+                    store_detailed_debug_info_on_failure: true,
+                    full_snapshot: None,
+                    enable_rehashing: true,
+                },
+            );
+
             false
         }
     }
