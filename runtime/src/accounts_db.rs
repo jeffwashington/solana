@@ -4142,6 +4142,14 @@ impl AccountsDb {
                 ids.contains(&store.append_vec_id())
             });
 
+            {
+                let mut shrink_candidate_slots = self.shrink_candidate_slots.lock().unwrap();
+                if shrink_candidate_slots.contains(&slot) {
+                    error!("jw: shrinking candidate slots still contains a shrunk slot: {:?}", slot);
+                }
+                shrink_candidate_slots.remove(&slot);
+            }
+
             self.verify_all_append_vecs_are_ancient(slot);
             if slot != ancient_slot {
                 self.verify_all_append_vecs_are_ancient(ancient_slot);
