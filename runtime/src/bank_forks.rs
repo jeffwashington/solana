@@ -278,7 +278,7 @@ impl BankForks {
                 {
                     let snapshot_root_bank = self.root_bank();
                     let root_slot = snapshot_root_bank.slot();
-                    if snapshot_root_bank.is_startup_verification_complete() {
+                    if snapshot_root_bank.is_startup_verification_complete() && snapshot_root_bank.get_startup_accounts_hash_calculation_complete() {
                         // Save off the status cache because these may get pruned if another
                         // `set_root()` is called before the snapshots package can be generated
                         let status_cache_slot_deltas = snapshot_root_bank

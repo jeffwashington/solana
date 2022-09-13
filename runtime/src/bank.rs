@@ -163,7 +163,7 @@ use {
         sync::{
             atomic::{
                 AtomicBool, AtomicI64, AtomicU64, AtomicUsize,
-                Ordering::{AcqRel, Acquire, Relaxed},
+                Ordering::{AcqRel, Acquire, Release, Relaxed},
             },
             Arc, LockResult, RwLock, RwLockReadGuard, RwLockWriteGuard,
         },
@@ -7229,6 +7229,14 @@ impl Bank {
         self.update_accounts_hash_with_index_option(true, false, false)
     }
 
+    pub fn set_startup_accounts_hash_calculation_complete(&self) {
+        self.rc.accounts.accounts_db.startup_accounts_hash_calculation_complete.store(true, Release);
+    }
+
+    pub fn get_startup_accounts_hash_calculation_complete(&self) -> bool {
+        self.rc.accounts.accounts_db.startup_accounts_hash_calculation_complete.load(Acquire)
+    }
+
     /// A snapshot bank should be purged of 0 lamport accounts which are not part of the hash
     /// calculation and could shield other real accounts.
     pub fn verify_snapshot_bank(
@@ -8152,7 +8160,7 @@ pub(crate) mod tests {
             },
         },
         std::{
-            result, str::FromStr, sync::atomic::Ordering::Release, thread::Builder, time::Duration,
+            result, str::FromStr, thread::Builder, time::Duration,
         },
         test_utils::goto_end_of_slot,
     };

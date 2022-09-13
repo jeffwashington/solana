@@ -1191,6 +1191,9 @@ pub struct AccountsDb {
     /// debug feature to scan every append vec and verify refcounts are equal
     exhaustively_verify_refcounts: bool,
 
+    /// true once all accounts hash calculations that may take place at startup have been requested
+    pub startup_accounts_hash_calculation_complete: AtomicBool,
+
     /// the full accounts hash calculation as of a predetermined block height 'N'
     /// to be included in the bank hash at a predetermined block height 'M'
     /// The cadence is once per epoch, all nodes calculate a full accounts hash as of a known slot calculated using 'N'
@@ -2001,6 +2004,7 @@ impl AccountsDb {
             num_hash_scan_passes,
             log_dead_slots: AtomicBool::new(true),
             exhaustively_verify_refcounts: false,
+            startup_accounts_hash_calculation_complete: AtomicBool::default(),
             epoch_accounts_hash: Mutex::new(None),
         }
     }
