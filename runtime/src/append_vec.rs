@@ -193,6 +193,8 @@ pub struct AppendVec {
 impl Drop for AppendVec {
     fn drop(&mut self) {
         if self.remove_on_drop {
+            error!("removing appendvec of size: {}", self.file_size);
+
             if let Err(_e) = remove_file(&self.path) {
                 // promote this to panic soon.
                 // disabled due to many false positive warnings while running tests.
@@ -205,10 +207,11 @@ impl Drop for AppendVec {
 }
 
 impl AppendVec {
-    pub fn new(file: &Path, create: bool, size: usize) -> Self {
+    pub fn new2(file: &Path, create: bool, size: usize) -> Self {
         let initial_len = 0;
         AppendVec::sanitize_len_and_size(initial_len, size).unwrap();
 
+        error!("creating appendvec of size: {}", size);
         if create {
             let _ignored = remove_file(file);
         }

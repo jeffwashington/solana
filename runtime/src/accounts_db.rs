@@ -737,10 +737,10 @@ pub struct AccountStorageEntry {
 }
 
 impl AccountStorageEntry {
-    pub fn new(path: &Path, slot: Slot, id: AppendVecId, file_size: u64) -> Self {
+    pub fn new2(path: &Path, slot: Slot, id: AppendVecId, file_size: u64) -> Self {
         let tail = AppendVec::file_name(slot, id);
         let path = Path::new(path).join(tail);
-        let accounts = AppendVec::new(&path, true, file_size as usize);
+        let accounts = AppendVec::new2(&path, true, file_size as usize);
 
         Self {
             id: AtomicAppendVecId::new(id),
@@ -2162,8 +2162,8 @@ impl AccountsDb {
         next_id
     }
 
-    fn new_storage_entry(&self, slot: Slot, path: &Path, size: u64) -> AccountStorageEntry {
-        AccountStorageEntry::new(path, slot, self.next_id(), size)
+    fn new_storage_entry2(&self, slot: Slot, path: &Path, size: u64) -> AccountStorageEntry {
+        AccountStorageEntry::new2(path, slot, self.next_id(), size)
     }
 
     pub fn expected_cluster_type(&self) -> ClusterType {
@@ -5214,7 +5214,7 @@ impl AccountsDb {
         paths: &[PathBuf],
     ) -> Arc<AccountStorageEntry> {
         let path_index = thread_rng().gen_range(0, paths.len());
-        let store = Arc::new(self.new_storage_entry(
+        let store = Arc::new(self.new_storage_entry2(
             slot,
             Path::new(&paths[path_index]),
             Self::page_align(size),
