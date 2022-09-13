@@ -2537,7 +2537,7 @@ impl AccountsDb {
         });
         let dirty_stores_len = dirty_stores.len();
         let pubkeys = DashSet::new();
-        let dirty_ancient_stores: AtomicUsize::default();
+        let dirty_ancient_stores= AtomicUsize::default();
         let mut dirty_store_routine = || {
             let chunk_size = 1.max(dirty_stores_len.saturating_div(rayon::current_num_threads()));
             let oldest_dirty_slots: Vec<u64> = dirty_stores
@@ -2545,7 +2545,7 @@ impl AccountsDb {
                 .map(|dirty_store_chunk| {
                     let mut oldest_dirty_slot = max_slot_inclusive.saturating_add(1);
                     dirty_store_chunk.iter().for_each(|(slot, store)| {
-                        if is_ancient(&store) {
+                        if is_ancient(&store.accounts) {
                             dirty_ancient_stores.fetch_add(1, Ordering::Relaxed);
                         }
                         oldest_dirty_slot = oldest_dirty_slot.min(*slot);
