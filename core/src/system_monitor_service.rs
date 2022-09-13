@@ -482,6 +482,7 @@ impl SystemMonitorService {
 
     #[cfg(target_os = "linux")]
     fn report_net_stats(old_stats: &NetStats, new_stats: &NetStats) {
+        return;
         datapoint_info!(
             "net-stats-validator",
             (
@@ -635,6 +636,7 @@ impl SystemMonitorService {
     }
 
     fn report_mem_stats() {
+        return;
         // get mem info (in kb)
         if let Ok(info) = sys_info::mem_info() {
             const KB: u64 = 1_024;
@@ -722,6 +724,7 @@ impl SystemMonitorService {
 
     #[cfg(target_os = "linux")]
     fn report_disk_stats(old_stats: &DiskStats, new_stats: &DiskStats) {
+        return;
         datapoint_info!(
             "disk-stats",
             (
