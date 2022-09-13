@@ -4169,6 +4169,12 @@ impl AccountsDb {
             self.mark_dirty_dead_stores(slot, &mut dead_storages, |store| {
                 ids.contains(&store.append_vec_id())
             });
+
+            self.verify_all_append_vecs_are_ancient(slot);
+            if slot != ancient_slot {
+                self.verify_all_append_vecs_are_ancient(ancient_slot);
+            }
+                
             start.stop();
             let write_storage_elapsed = start.as_us();
 
@@ -4274,6 +4280,16 @@ impl AccountsDb {
     }
 
         self.shrink_ancient_stats.report();
+    }
+
+    fn verify_all_append_vecs_are_ancient(&self, slot: Slot) {
+        if let Some(slot_stores) = self.storage.get_slot_stores(slot) {
+            let list = slot_stores.read().unwrap();
+            assert!(!list.iter().any(|(_, store)| is_ancient(&store.accounts)), 
+            "slot {slot} contains append vecs that are not ancient: {:?}", list.iter().map(|(s, store)|
+                (s, store.append_vec_id(), is_ancient(&store.accounts), store.accounts.capacity())
+            ).collect::<Vec<_>>());
+        }
     }
 
     pub fn shrink_candidate_slots(&self) -> usize {
