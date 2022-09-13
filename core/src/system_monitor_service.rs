@@ -693,6 +693,7 @@ impl SystemMonitorService {
     }
 
     fn report_cpu_stats() {
+        return;
         if let Ok(info) = Self::cpu_info() {
             datapoint_info!(
                 "cpu-stats",
