@@ -4320,10 +4320,9 @@ impl AccountsDb {
     pub fn shrink_candidate_slots(&self) -> usize {
         let shrink_candidates_slots =
             std::mem::take(&mut *self.shrink_candidate_slots.lock().unwrap());
-        {//if !shrink_candidates_slots.is_empty() {
+        if !shrink_candidates_slots.is_empty() {
             self.shrink_ancient_slots();
         }
-        error!("{}", line!());
 
         let (shrink_slots, shrink_slots_next_batch) = {
             if let AccountShrinkThreshold::TotalSpace { shrink_ratio } = self.shrink_ratio {
