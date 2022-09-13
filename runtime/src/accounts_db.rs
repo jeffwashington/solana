@@ -4189,7 +4189,10 @@ impl AccountsDb {
                 if shrink_candidate_slots.contains(&slot) {
                     error!("jw: shrinking candidate slots still contains a shrunk slot: {:?}", slot);
                 }
-                shrink_candidate_slots.remove(&slot);
+                // shrink_candidate_slots.remove(&slot);
+                // make SURE we are going to try to shrink the old stores here
+                shrink_candidate_slots.entry(slot).or_default().extend(dead_storages.iter().map(|store| (store.append_vec_id(), Arc::clone(store))));
+
             }
 
             self.verify_all_append_vecs_are_ancient(slot);
