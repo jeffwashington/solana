@@ -125,7 +125,7 @@ impl CacheHashData {
         use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
         let bin_calc = PubkeyBinCalculator24::new(65536);
         use std::str::FromStr;
-        let interesting = Pubkey::from_str("DFM12VwQFetZQrxvLuygmGmSUPexx9bgBSvbWzuwB67R").unwrap();
+        let interesting = Pubkey::from_str("6EnpckMpzS6k3fVMAjDXU8uDzg6zKbGzixAXipHiLiRA").unwrap();
         let p1 = crate::bank::Bank::partition_from_pubkey(&interesting, 432_000);
 
         use log::*;
