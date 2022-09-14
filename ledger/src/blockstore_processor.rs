@@ -872,7 +872,7 @@ pub fn process_blockstore_from_root(
 
     bank.set_startup_accounts_hash_calculation_complete();
 
-    //panic!("didn't fail");
+    panic!("didn't fail");
 
     datapoint_info!(
         "process_blockstore_from_root",
