@@ -7113,6 +7113,10 @@ impl Bank {
         if calculated == expected {
             true
         } else {
+            error!("jw: RootBankWithMismatchedCapitalization, looping infinitely");
+            loop {
+                
+            }
             // save off the data used that resulted in an incorrect hash calc
             self.force_flush_accounts_cache();
             self.rc.accounts.accounts_db.calculate_accounts_hash_helper(
@@ -7134,6 +7138,7 @@ impl Bank {
                 "Capitalization mismatch: calculated: {} != expected: {}",
                 calculated, expected
             );
+            
 
             use crate::accounts_hash::CalcAccountsHashConfig;
             let use_index = false;
