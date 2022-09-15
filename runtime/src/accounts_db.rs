@@ -879,6 +879,8 @@ impl AccountStorageEntry {
         self.accounts.accounts(0)
     }
 
+    /// remove account
+    /// returns remaining count alive
     fn remove_account(&self, num_bytes: usize, reset_accounts: bool) -> usize {
         let mut count_and_status = self.count_and_status.write().unwrap();
         let (mut count, mut status) = *count_and_status;
@@ -3625,6 +3627,9 @@ impl AccountsDb {
             let mut list = slot_stores.write().unwrap();
             list.retain(|_key, store| {
                 if !should_retain(store) {
+                    if is_ancient(&store.accounts) {
+                        panic!("mark_dirty_dead_stores ancient {slot}");
+                    }
                     self.dirty_stores
                         .insert((slot, store.append_vec_id()), store.clone());
                     dead_storages.push(store.clone());
@@ -7732,6 +7737,10 @@ impl AccountsDb {
                 let count =
                     store.remove_account(account_info.stored_size() as usize, reset_accounts);
                 if count == 0 {
+                    if is_ancient(&store.accounts) {
+                        panic!("remove_dead_accounts ancient {slot}");
+                    }
+
                     self.dirty_stores
                         .insert((*slot, store.append_vec_id()), store.clone());
                     dead_slots.insert(*slot);
@@ -8331,6 +8340,10 @@ impl AccountsDb {
         let mut store_time = Measure::start("store_add_root");
         if let Some(slot_stores) = self.storage.get_slot_stores(slot) {
             for (store_id, store) in slot_stores.read().unwrap().iter() {
+                if is_ancient(&store.accounts) {
+                    panic!("add_root ancient {slot}");
+                }
+
                 self.dirty_stores.insert((slot, *store_id), store.clone());
             }
         }
