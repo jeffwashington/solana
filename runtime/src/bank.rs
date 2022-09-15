@@ -5464,7 +5464,7 @@ impl Bank {
     pub fn bank_enable_rehashing_on_accounts_hash(&self) -> bool {
         let r = !self.bank_hash_skips_rent_rewrites();
         if !r {
-            panic!("");
+            error!("not rehashing, slot: {}", self.slot());
         }
         r
     }
