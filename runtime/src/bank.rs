@@ -2075,6 +2075,7 @@ impl Bank {
             .stats
             .submit(parent.slot());
 
+        new.bank_enable_rehashing_on_accounts_hash();
         new
     }
 
@@ -11570,7 +11571,9 @@ pub(crate) mod tests {
     }
 
     fn new_from_parent(parent: &Arc<Bank>) -> Bank {
-        Bank::new_from_parent(parent, &Pubkey::default(), parent.slot() + 1)
+        let b = Bank::new_from_parent(parent, &Pubkey::default(), parent.slot() + 1);
+        b.bank_enable_rehashing_on_accounts_hash();
+        b
     }
 
     /// Verify that the parent's vector is computed correctly
