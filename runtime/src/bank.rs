@@ -2295,6 +2295,7 @@ impl Bank {
         &'a self,
         ancestors: &'a HashMap<Slot, usize>,
     ) -> BankFieldsToSerialize<'a> {
+        self.bank_enable_rehashing_on_accounts_hash();
         BankFieldsToSerialize {
             blockhash_queue: &self.blockhash_queue,
             ancestors,
