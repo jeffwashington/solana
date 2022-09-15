@@ -8309,7 +8309,7 @@ impl AccountsDb {
     ) -> IndexGenerationInfo {
 
         let p1 = Path::new("/mnt/nvme1n1/success_150353655");
-        let p2 = Path::new("/mnt/nvme1n1/150353655");
+        let p2 = Path::new("/mnt/nvme1n1/failed2_150353655");
         CacheHashData::compare_two(&[&p1, &p2]);
         use log::*;error!("{}{}", file!(), line!());
 
