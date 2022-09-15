@@ -6134,6 +6134,8 @@ impl AccountsDb {
             }
         }
 
+        error!("jw: do_flush_slot_cache, max_clean_root: {:?}", max_clean_root);
+
         let mut filler_accounts = 0;
         if self.filler_accounts_enabled() {
             let slots_remaining = self.filler_account_slots_remaining.load(Ordering::Acquire);
@@ -6372,13 +6374,18 @@ impl AccountsDb {
         is_cached_store: bool,
         txn_signatures: Option<&'a [Option<&'a Signature>]>,
     ) -> Vec<AccountInfo> {
-        let mut calc_stored_meta_time = Measure::start("calc_stored_meta");
+        let int = Pubkey::from_str("5h2uXgGhRsXjGwvR4iLWGPNxjtKysNX6oZK3hxUuJXZS").unwrap();
+        let int2 = Pubkey::from_str("AhRfMqB2r8F1XEujM1TxbpndYkjUrBLaTA4rXthEQAjv").unwrap();
+let mut calc_stored_meta_time = Measure::start("calc_stored_meta");
         let slot = accounts.target_slot();
         let accounts_and_meta_to_store: Vec<_> = (0..accounts.len())
             .into_iter()
             .map(|index| {
                 let (pubkey, account) = (accounts.pubkey(index), accounts.account(index));
-                self.read_only_accounts_cache.remove(*pubkey, slot);
+                if *pubkey == int || *pubkey == int2 {
+                    error!("jw: store_accounts_to {} slot {}, is cached: {is_cached_store}", pubkey, accounts.target_slot());
+                }
+            self.read_only_accounts_cache.remove(*pubkey, slot);
                 // this is the source of Some(Account) or None.
                 // Some(Account) = store 'Account'
                 // None = store a default/empty account with 0 lamports
@@ -6742,15 +6749,21 @@ impl AccountsDb {
     ) where
         S: AppendVecScan,
     {
+        let int = Pubkey::from_str("5h2uXgGhRsXjGwvR4iLWGPNxjtKysNX6oZK3hxUuJXZS").unwrap();
+        let int2 = Pubkey::from_str("AhRfMqB2r8F1XEujM1TxbpndYkjUrBLaTA4rXthEQAjv").unwrap();
         let mut len = storages.len();
         if len == 1 {
             // only 1 storage, so no need to interleave between multiple storages based on write_version
             storages[0].accounts.account_iter().for_each(|account| {
                 if scanner.filter(&account.meta.pubkey) {
+                    if account.meta.pubkey == int || account.meta.pubkey == int2 {
+                        error!("jw: scanning found {} slot {}", account.meta.pubkey, storages[0].slot());
+                    }
                     scanner.found_account(&LoadedAccount::Stored(account))
                 }
             });
         } else {
+            panic!("");
             // we have to call the scan_func in order of write_version within a slot if there are multiple storages per slot
             let mut progress = Vec::with_capacity(len);
             let mut current =
@@ -6850,6 +6863,8 @@ impl AccountsDb {
         S: AppendVecScan,
     {
         let start_bin_index = bin_range.start;
+        let int = Pubkey::from_str("5h2uXgGhRsXjGwvR4iLWGPNxjtKysNX6oZK3hxUuJXZS").unwrap();
+        let int2 = Pubkey::from_str("AhRfMqB2r8F1XEujM1TxbpndYkjUrBLaTA4rXthEQAjv").unwrap();
 
         // any ancient append vecs should definitely be cached
         // We need to break the ranges into:
@@ -7022,6 +7037,12 @@ impl AccountsDb {
                                 let keys = slot_cache.get_all_pubkeys();
                                 for key in keys {
                                     if scanner.filter(&key) {
+                                        let int = Pubkey::from_str("5h2uXgGhRsXjGwvR4iLWGPNxjtKysNX6oZK3hxUuJXZS").unwrap();
+                                        let int2 = Pubkey::from_str("AhRfMqB2r8F1XEujM1TxbpndYkjUrBLaTA4rXthEQAjv").unwrap();
+                                        if key == int || key == int2 {
+                                            error!("jw: scanning found {} in cache slot {}", key, slot);
+                                        }
+                                                            
                                         if let Some(cached_account) = slot_cache.get_cloned(&key) {
                                             let mut accessor = LoadedAccountAccessor::Cached(Some(
                                                 Cow::Owned(cached_account),
@@ -7920,6 +7941,9 @@ impl AccountsDb {
         purged_stored_account_slots: &mut AccountSlots,
         pubkeys_removed_from_accounts_index: &PubkeysRemovedFromAccountsIndex,
     ) {
+        let int = Pubkey::from_str("5h2uXgGhRsXjGwvR4iLWGPNxjtKysNX6oZK3hxUuJXZS").unwrap();
+        let int2 = Pubkey::from_str("AhRfMqB2r8F1XEujM1TxbpndYkjUrBLaTA4rXthEQAjv").unwrap();
+
         let len = purged_slot_pubkeys.len();
         let batches = 1 + (len / UNREF_ACCOUNTS_BATCH_SIZE);
         self.thread_pool_clean.install(|| {
@@ -7931,6 +7955,10 @@ impl AccountsDb {
                         .skip(skip)
                         .take(UNREF_ACCOUNTS_BATCH_SIZE)
                         .filter_map(|(_slot, pubkey)| {
+                            if *pubkey == int || *pubkey == int2 {
+                                error!("jw: unref_accounts {}", pubkey);
+                            }
+            
                             // filter out pubkeys that have already been removed from the accounts index in a previous step
                             let already_removed =
                                 pubkeys_removed_from_accounts_index.contains(pubkey);
@@ -8572,8 +8600,8 @@ impl AccountsDb {
 
         let secondary = !self.account_indexes.is_empty();
 
-        let int = Pubkey::from_str("Fxx9rWTYphf8RP6K3SoH7Ws6vKEY7oCDo36PbyBz9ULR").unwrap();
-        let int2 = Pubkey::from_str("6sz4qfAKeH1UVcVGnhq3ETdngZG9xftKmsfTwLJFPf8").unwrap();
+        let int = Pubkey::from_str("5h2uXgGhRsXjGwvR4iLWGPNxjtKysNX6oZK3hxUuJXZS").unwrap();
+        let int2 = Pubkey::from_str("AhRfMqB2r8F1XEujM1TxbpndYkjUrBLaTA4rXthEQAjv").unwrap();
 
         let mut rent_paying_accounts_by_partition = Vec::default();
         let mut accounts_data_len = 0;
@@ -8591,10 +8619,10 @@ impl AccountsDb {
             )| {
                 let data = stored_account.lamports();
                 if int == pubkey {
-                    error!("{pubkey}, slot: {slot}, account: {:?}", data);
+                    error!("loading {pubkey}, slot: {slot}, account: {:?}", data);
                 }
                 if int2 == pubkey {
-                    error!("{pubkey}, slot: {slot}, account: {:?}", data);
+                    error!("loading {pubkey}, slot: {slot}, account: {:?}", data);
                 }
                 if secondary {
                     self.accounts_index.update_secondary_indexes(
