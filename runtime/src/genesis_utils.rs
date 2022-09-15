@@ -195,6 +195,7 @@ pub fn create_genesis_config_with_leader(
 }
 
 pub fn activate_all_features(genesis_config: &mut GenesisConfig) {
+    panic!("");
     // Activate all features at genesis in development mode
     for feature_id in FeatureSet::default().inactive {
         activate_feature(genesis_config, feature_id);

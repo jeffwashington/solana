@@ -5461,7 +5461,11 @@ impl Bank {
     ///  We should use whatever hash found for each account as-is.
     /// Convenience function to make callers easier to read.
     pub fn bank_enable_rehashing_on_accounts_hash(&self) -> bool {
-        !self.bank_hash_skips_rent_rewrites()
+        let r = !self.bank_hash_skips_rent_rewrites();
+        if !r {
+            panic!("");
+        }
+        r
     }
 
     /// Collect rent from `accounts`
