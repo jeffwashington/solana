@@ -1,4 +1,5 @@
 use {
+    log::*,
     solana_sdk::{
         account::{Account, AccountSharedData},
         feature::{self, Feature},
