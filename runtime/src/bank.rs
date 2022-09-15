@@ -2233,6 +2233,7 @@ impl Bank {
             additional_builtins,
             debug_do_not_add_builtins,
         );
+        bank.bank_enable_rehashing_on_accounts_hash();
 
         // Sanity assertions between bank snapshot and genesis config
         // Consider removing from serializable bank state
