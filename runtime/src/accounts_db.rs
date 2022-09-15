@@ -6134,7 +6134,7 @@ impl AccountsDb {
             }
         }
 
-        error!("jw: do_flush_slot_cache, max_clean_root: {:?}", max_clean_root);
+        error!("jw: do_flush_slot_cache, max_clean_root: {:?}, slot: {}", max_clean_root, slot);
 
         let mut filler_accounts = 0;
         if self.filler_accounts_enabled() {
