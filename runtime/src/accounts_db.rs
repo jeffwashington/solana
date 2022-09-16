@@ -7181,7 +7181,7 @@ let mut calc_stored_meta_time = Measure::start("calc_stored_meta");
         is_startup: bool,
     ) -> (Hash, u64) {
         let check_hash = false;
-        let store_detailed_debug_info_on_failure = slot == 150353655;
+        let store_detailed_debug_info_on_failure = false;//slot == 150353655;
         let (hash, total_lamports) = self
             .calculate_accounts_hash_helper_with_verify(
                 use_index,
