@@ -7122,18 +7122,23 @@ let mut calc_stored_meta_time = Measure::start("calc_stored_meta");
             collect_time.stop();
 
             if config.use_write_cache {
+                let mut last_count = 0;
                 loop {
                     let mut in_write_cache = false;
+                    let mut count = 0;
                 for e in self.accounts_cache.cache.iter() {
                     if e.key() <= &slot {
                         in_write_cache = true;
-                        error!("jw: slot {} is in write cache", e.key());
-                        sleep(Duration::from_millis(1000));
-                        break;
+                        count += 1;
                     }
                 };
-                if !in_write_cache {
+                if !in_write_cache || count < last_count {
                     break;
+                }
+                else {
+                    error!("jw: in write cache: {}", count);
+                    last_count = count;
+                    sleep(Duration::from_millis(1000));
                 }
             }
         }
