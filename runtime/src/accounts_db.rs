@@ -7107,6 +7107,24 @@ impl AccountsDb {
             let (combined_maps, slots) = self.get_snapshot_storages(slot, None, config.ancestors);
             collect_time.stop();
 
+            if config.use_write_cache {
+                loop {
+                    let mut in_write_cache = false;
+                for e in self.accounts_cache.cache.iter() {
+                    if e.key() <= &slot {
+                        in_write_cache = true;
+                        error!("jw: slot {} is in write cache", e.key());
+                        sleep(Duration::from_millis(1000));
+                        break;
+                    }
+                };
+                if !in_write_cache {
+                    break;
+                }
+            }
+        }
+        error!("jw: slot {} continuing", e.key());
+
             let mut sort_time = Measure::start("sort_storages");
             let min_root = self.accounts_index.min_alive_root();
             let storages = SortedStorages::new_with_slots(
