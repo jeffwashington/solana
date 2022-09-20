@@ -7137,7 +7137,7 @@ let mut calc_stored_meta_time = Measure::start("calc_stored_meta");
                 }
             }
         }
-        error!("jw: slot {} continuing");
+        error!("jw: slot continuing");
 
             let mut sort_time = Measure::start("sort_storages");
             let min_root = self.accounts_index.min_alive_root();
