@@ -220,7 +220,7 @@ impl CacheHashData {
                     cap2 += two.1.lamports;
                     added2 += 1;
                 }
-                if one.1 != two.1 {
+                if one.1 != two.1 && !((one.1.lamports == ZERO_RAW_LAMPORTS_SENTINEL && two.1.lamports == 0) || (one.1.lamports == 0 && two.1.lamports == ZERO_RAW_LAMPORTS_SENTINEL)) {
                     error!("values different: {} {:?}, {:?}", k, v, entry);
                 } else {
                     assert_eq!(one.1.lamports, two.1.lamports);
