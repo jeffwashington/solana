@@ -7120,7 +7120,7 @@ let mut calc_stored_meta_time = Measure::start("calc_stored_meta");
             let mut collect_time = Measure::start("collect");
             let (combined_maps, slots) = self.get_snapshot_storages(slot, None, config.ancestors);
             collect_time.stop();
-
+/*
             if config.use_write_cache {
                 let mut last_count = 0;
                 loop {
@@ -7142,7 +7142,8 @@ let mut calc_stored_meta_time = Measure::start("calc_stored_meta");
                 }
             }
         }
-        error!("jw: slot continuing");
+            */
+            error!("jw: slot continuing");
 
             let mut sort_time = Measure::start("sort_storages");
             let min_root = self.accounts_index.min_alive_root();
