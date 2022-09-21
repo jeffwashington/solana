@@ -2464,7 +2464,9 @@ impl AccountsDb {
         timings.dirty_store_processing_us += dirty_store_processing_time.as_us();
 
         let mut collect_delta_keys = Measure::start("key_create");
+        error!("jw: uncleaned_pubkeys: {}", self.uncleaned_pubkeys.iter().map(|x| x.value().len()).sum::<usize>());
         let delta_keys = self.remove_uncleaned_slots_and_collect_pubkeys_up_to_slot(max_slot);
+        error!("jw: deltakeys: {}", delta_keys.iter().flatten().count());
         collect_delta_keys.stop();
         timings.collect_delta_keys_us += collect_delta_keys.as_us();
 
@@ -8106,6 +8108,7 @@ impl AccountsDb {
         let mut num_accounts_rent_paying = 0;
         let num_accounts = accounts_map.len();
         let mut amount_to_top_off_rent = 0;
+        let mut all_are_zero = Mutex::new(true);
         let items = accounts_map.into_iter().map(
             |(
                 pubkey,
@@ -8124,6 +8127,7 @@ impl AccountsDb {
                 }
                 if !stored_account.is_zero_lamport() {
                     accounts_data_len += stored_account.data().len() as u64;
+                    *all_are_zero.lock().unwrap() = false;
                 }
 
                 if let Some(amount_to_top_off_rent_this_account) =
@@ -8145,6 +8149,10 @@ impl AccountsDb {
                 )
             },
         );
+
+        if num_accounts > 0 && *all_are_zero.lock().unwrap() {
+            error!("jw: all accounts zero: {}, # accts: {}", slot, num_accounts);
+        }
 
         let (dirty_pubkeys, insert_time_us) = self
             .accounts_index
