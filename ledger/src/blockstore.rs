@@ -4295,7 +4295,7 @@ fn adjust_ulimit_nofile(enforce_ulimit_nofile: bool) -> Result<()> {
     // AppendVecs and disk Account Index are also heavy users of mmapped files.
     // This should be kept in sync with published validator instructions.
     // https://docs.solana.com/running-validator/validator-start#increased-memory-mapped-files-limit
-    let desired_nofile = 1_000_000;
+    let desired_nofile = 700_000;
 
     fn get_nofile() -> libc::rlimit {
         let mut nofile = libc::rlimit {
