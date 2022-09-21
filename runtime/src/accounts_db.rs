@@ -2521,7 +2521,7 @@ impl AccountsDb {
     ) {
         let _guard = self.active_stats.activate(ActiveStatItem::Clean);
 
-        error!("jw: {} {}", line!());
+        error!("jw: {}", line!());
 
         let ancient_account_cleans = AtomicU64::default();
 
@@ -2557,7 +2557,7 @@ impl AccountsDb {
         let not_found_on_fork_accum = AtomicU64::new(0);
         let missing_accum = AtomicU64::new(0);
         let useful_accum = AtomicU64::new(0);
-        error!("jw: {} {}", line!());
+        error!("jw: {}", line!());
 
         error!("jw: keys: {}", pubkeys.len());
 
@@ -2660,7 +2660,7 @@ impl AccountsDb {
             }
         };
         accounts_scan.stop();
-        error!("jw: {} {}", line!());
+        error!("jw: {}", line!());
 
         let mut clean_old_rooted = Measure::start("clean_old_roots");
         let (purged_account_slots, removed_accounts) = self.clean_accounts_older_than_root(
