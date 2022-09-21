@@ -8159,13 +8159,13 @@ impl AccountsDb {
             },
         );
 
-        if num_accounts > 0 && *all_are_zero.lock().unwrap() {
-            error!("jw: all accounts zero: {}, # accts: {}", slot, num_accounts);
-        }
-
         let (dirty_pubkeys, insert_time_us) = self
             .accounts_index
             .insert_new_if_missing_into_primary_index(*slot, num_accounts, items);
+
+        if num_accounts > 0 && *all_are_zero.lock().unwrap() {
+            error!("jw: all accounts zero: {}, # accts: {}", slot, num_accounts);
+        }
 
         // dirty_pubkeys will contain a pubkey if an item has multiple rooted entries for
         // a given pubkey. If there is just a single item, there is no cleaning to
