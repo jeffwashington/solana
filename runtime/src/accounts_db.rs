@@ -2731,6 +2731,7 @@ impl AccountsDb {
             });
         }
         store_counts_time.stop();
+        error!("jw: {}", line!());
 
         let mut calc_deps_time = Measure::start("calc_deps");
         Self::calc_delete_dependencies(&purges_zero_lamports, &mut store_counts);
@@ -2744,6 +2745,7 @@ impl AccountsDb {
             &mut purges_zero_lamports,
         );
         purge_filter.stop();
+        error!("jw: {}", line!());
 
         let mut reclaims_time = Measure::start("reclaims");
         // Recalculate reclaims with new purge set
@@ -2775,6 +2777,7 @@ impl AccountsDb {
 
         reclaims_time.stop();
         measure_all.stop();
+        error!("jw: {}", line!());
 
         self.clean_accounts_stats.report();
         datapoint_info!(
