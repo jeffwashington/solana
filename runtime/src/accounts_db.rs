@@ -8164,7 +8164,7 @@ impl AccountsDb {
             .insert_new_if_missing_into_primary_index(*slot, num_accounts, items);
 
         if num_accounts > 0 && *all_are_zero.lock().unwrap() {
-            error!("jw: all accounts zero: {}, # accts: {}", slot, num_accounts);
+            //error!("jw: all accounts zero: {}, # accts: {}", slot, num_accounts);
         }
 
         // dirty_pubkeys will contain a pubkey if an item has multiple rooted entries for
