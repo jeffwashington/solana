@@ -724,7 +724,7 @@ where
             "invalid snapshot data file: {} has {} bytes, however consumed {} bytes to deserialize",
             file_path.as_ref().display(), file_size, consumed_size
         );
-        return Err(get_io_error(&error_message));
+        error!("{:?}", error_message);//return Err(get_io_error(&error_message));
     }
 
     Ok(())
