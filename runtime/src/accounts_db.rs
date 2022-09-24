@@ -6751,14 +6751,42 @@ impl AccountsDb {
         let acceptable_straggler_slot_count = 100; // do nothing special for these old stores which will likely get cleaned up shortly
         let sub = slots_per_epoch + acceptable_straggler_slot_count;
         let in_epoch_range_start = max.saturating_sub(sub);
+        let mut oldest_storage_marked = in_epoch_range_start;
         for (slot, storages) in storages.iter_range(..in_epoch_range_start) {
             if let Some(storages) = storages {
                 storages.iter().for_each(|store| {
+                    oldest_storage_marked = oldest_storage_marked.min(in_epoch_range_start);
                     self.dirty_stores
                         .insert((slot, store.append_vec_id()), store.clone());
                 });
             }
         }
+
+        let mut added = 0;
+        let mut oldest = oldest_storage_marked;
+
+        self.accounts_index
+            .roots_tracker
+            .read()
+            .unwrap()
+            .alive_roots
+            .get_all_less_than(oldest_storage_marked)
+            .into_iter()
+            .for_each(|old_root| {
+                if let Some(storages) = self.get_storages_for_slot(old_root) {
+                    oldest = oldest.min(old_root);
+                    storages.iter().for_each(|store| {
+                        if self
+                            .dirty_stores
+                            .insert((old_root, store.append_vec_id()), store.clone())
+                            .is_none()
+                        {
+                            added += 1;
+                        }
+                    });
+                }
+            });
+        error!("jw: added {added} old storages to dirty stores, oldest moved: {oldest}");
     }
 
     pub(crate) fn calculate_accounts_hash_helper(
