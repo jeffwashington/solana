@@ -6984,6 +6984,34 @@ impl AccountsDb {
         let _guard = self.active_stats.activate(ActiveStatItem::Hash);
 
         stats.oldest_root = storages.range().start;
+        // log contents of oldest appendvec, including its refcount
+        if stats
+            .oldest_root
+            .saturating_add(config.epoch_schedule.slots_per_epoch)
+            > storages.max_slot_inclusive().saturating_sub(1000)
+        {
+            storages
+                .iter_range(stats.oldest_root..=stats.oldest_root)
+                .take(1)
+                .for_each(|(slot, store)| {
+                    if let Some(store) = store {
+                        if let Some(store) = store.first() {
+                            if !is_ancient(&store.accounts) {
+                                store.accounts.account_iter().for_each(|meta| {
+                                    error!(
+                                        "{}, {}, {}, {:?}",
+                                        slot,
+                                        meta.meta.pubkey,
+                                        meta.lamports(),
+                                        self.accounts_index
+                                            .ref_count_from_storage(&meta.meta.pubkey)
+                                    );
+                                });
+                            }
+                        }
+                    }
+                });
+        }
 
         self.mark_old_slots_as_dirty(storages, config.epoch_schedule.slots_per_epoch);
 
