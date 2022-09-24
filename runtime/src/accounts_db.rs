@@ -6991,7 +6991,7 @@ impl AccountsDb {
             > storages.max_slot_inclusive().saturating_sub(1000)
         {
             storages
-                .iter_range(stats.oldest_root..=stats.oldest_root)
+                .iter_range(stats.oldest_root..=(stats.oldest_root + 1))
                 .take(1)
                 .for_each(|(slot, store)| {
                     if let Some(store) = store {
@@ -6999,7 +6999,7 @@ impl AccountsDb {
                             if !is_ancient(&store.accounts) {
                                 store.accounts.account_iter().for_each(|meta| {
                                     error!(
-                                        "{}, {}, {}, {:?}",
+                                        "jw: {}, {}, {}, {:?}",
                                         slot,
                                         meta.meta.pubkey,
                                         meta.lamports(),
@@ -7007,10 +7007,18 @@ impl AccountsDb {
                                             .ref_count_from_storage(&meta.meta.pubkey)
                                     );
                                 });
+                            } else {
+                                error!("jw: {}", line!());
                             }
+                        } else {
+                            error!("jw: {}", line!());
                         }
+                    } else {
+                        error!("jw: {}", line!());
                     }
                 });
+        } else {
+            error!("jw: {}", line!());
         }
 
         self.mark_old_slots_as_dirty(storages, config.epoch_schedule.slots_per_epoch);
