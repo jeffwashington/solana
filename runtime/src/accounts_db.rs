@@ -6774,16 +6774,21 @@ impl AccountsDb {
             .into_iter()
             .for_each(|old_root| {
                 if let Some(storages) = self.get_storages_for_slot(old_root) {
-                    oldest = oldest.min(old_root);
                     storages.iter().for_each(|store| {
-                        if self
-                            .dirty_stores
-                            .insert((old_root, store.append_vec_id()), store.clone())
-                            .is_none()
-                        {
-                            added += 1;
+                        if !is_ancient(&store.accounts) {
+                            oldest = oldest.min(old_root);
+                            if self
+                                .dirty_stores
+                                .insert((old_root, store.append_vec_id()), store.clone())
+                                .is_none()
+                            {
+                                added += 1;
+                            }
                         }
                     });
+                }
+                else {
+                    info!("jw: old root with no storage: {}", old_root);
                 }
             });
         error!("jw: added {added} old storages to dirty stores, oldest moved: {oldest}");
