@@ -6791,7 +6791,7 @@ impl AccountsDb {
                     info!("jw: old root with no storage: {}", old_root);
                 }
             });
-        error!("jw: added {added} old storages to dirty stores, oldest moved: {oldest}");
+        error!("jw: added {added} old storages to dirty stores, oldest moved: {oldest}, oldest_storage marked: {oldest_storage_marked}, in_epoch_range_start: {in_epoch_range_start}");
     }
 
     pub(crate) fn calculate_accounts_hash_helper(
