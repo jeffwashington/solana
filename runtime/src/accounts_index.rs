@@ -1745,9 +1745,18 @@ impl<T: IndexValue> AccountsIndex<T> {
         max_clean_root_inclusive: Option<Slot>,
     ) -> bool {
         let mut is_slot_list_empty = false;
+        use std::str::FromStr;
+        let interesting = Pubkey::from_str("2vWL47amZQmFgPxqkBJR8iAhZs4AuFRGYxvwryQgsGgd").unwrap();
         let missing_in_accounts_index = self
             .slot_list_mut(pubkey, |slot_list| {
+                if pubkey == &interesting {
+                    error!("jw: clean_rooted_entries: {pubkey}, {slot_list:?}");
+                }
+
                 self.purge_older_root_entries(slot_list, reclaims, max_clean_root_inclusive);
+                if pubkey == &interesting {
+                    error!("jw: clean_rooted_entries2: {pubkey}, {slot_list:?}");
+                }
                 is_slot_list_empty = slot_list.is_empty();
             })
             .is_none();

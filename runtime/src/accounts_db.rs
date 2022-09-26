@@ -2207,6 +2207,7 @@ impl AccountsDb {
         ancient_account_cleans: &AtomicU64,
     ) -> (ReclaimResult, PubkeysRemovedFromAccountsIndex) {
         let pubkeys_removed_from_accounts_index = HashSet::default();
+
         if purges.is_empty() {
             return (
                 ReclaimResult::default(),
@@ -2226,6 +2227,12 @@ impl AccountsDb {
             .filter_map(|pubkeys: &[Pubkey]| {
                 let mut reclaims = Vec::new();
                 for pubkey in pubkeys {
+                    /*
+                    let interesting = Pubkey::from_str("2vWL47amZQmFgPxqkBJR8iAhZs4AuFRGYxvwryQgsGgd").unwrap();
+                    if pubkey == &interesting {
+                        error!("jw: clean_accounts_older_than_root: {pubkey}");
+                    }
+                     */
                     let removed_from_index = self.accounts_index.clean_rooted_entries(
                         pubkey,
                         &mut reclaims,
@@ -2766,6 +2773,29 @@ impl AccountsDb {
                 }
             });
         }        
+        else if max_clean_root_inclusive.is_none() {
+            let mut oldest = self.accounts_index.roots_tracker.read().unwrap().alive_roots.max_inclusive();
+            oldest -= 432000;
+            oldest -= 1000;
+            error!("jw2: before old roots <= {oldest}");
+            let old_roots = self.accounts_index
+            .roots_tracker
+            .read()
+            .unwrap()
+            .alive_roots
+            .get_all_less_than(oldest)
+            .into_iter().collect::<Vec<_>>();
+            error!("jw2: before old roots: {}", old_roots.len());
+            old_roots.into_iter().for_each(|root| {
+                if let Some(storages) = self.get_storages_for_slot(root) {
+                    storages.iter().for_each(|store| {
+                        error!("jw: slot: {root}, id: {}", store.append_vec_id());
+                        old_ids.insert(store.append_vec_id());
+                        self.dirty_stores.insert((root, store.append_vec_id()), store.clone());
+                    });
+                }
+            });
+        }
         let ancient_account_cleans = AtomicU64::default();
 
         let mut measure_all = Measure::start("clean_accounts");
@@ -2817,6 +2847,9 @@ impl AccountsDb {
                         self.accounts_index.scan(
                             pubkeys.iter(),
                             |pubkey, slots_refs| {
+                                if pubkey == &interesting {
+                                    error!("jw: scanning for clean: {pubkey}, {slots_refs:?}");
+                                }
                                 let mut useless = true;
                                 if let Some((slot_list, ref_count)) = slots_refs {
                                     let index_in_slot_list = self.accounts_index.latest_slot(
