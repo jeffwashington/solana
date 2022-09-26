@@ -2754,8 +2754,8 @@ impl AccountsDb {
         let really_old_root = self.accounts_index.roots_tracker.read().unwrap().alive_roots.max_inclusive().saturating_sub(432_000);
 
         if let Some(mut oldest) = max_clean_root_inclusive {
-            oldest -= 432000;
-            oldest -= 1000;
+            oldest = oldest.saturating_sub(432000);
+            oldest = oldest.saturating_sub(1000);
 
             error!("jw: before old roots <= {oldest}");
             let old_roots = self.accounts_index
