@@ -8624,7 +8624,7 @@ impl AccountsDb {
                 m.stop();
                 index_flush_us = m.as_us();
                 let interesting = Pubkey::from_str("2vWL47amZQmFgPxqkBJR8iAhZs4AuFRGYxvwryQgsGgd").unwrap();
-
+                error!("checking duplicates");
                 // this has to happen before visit_duplicate_pubkeys_during_startup below
                 // get duplicate keys from acct idx. We have to wait until we've finished flushing.
                 for (slot, key) in self

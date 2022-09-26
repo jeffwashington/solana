@@ -1123,7 +1123,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
             disk.update(&k, |current| {
                 if interesting == k {
                     use log::*;
-                    error!("updating index: {k}, {slot}, {current:?}");
+                    error!("updating index: {k}, {slot}, {current:?}, bin: {}", self.bin);
                 }
                 match current {
                     Some((current_slot_list, mut ref_count)) => {
