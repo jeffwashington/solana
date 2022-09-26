@@ -2751,6 +2751,8 @@ impl AccountsDb {
         let interesting = Pubkey::from_str("2vWL47amZQmFgPxqkBJR8iAhZs4AuFRGYxvwryQgsGgd").unwrap();
         error!("jw: is_root: {}, {}", 152112203, self.accounts_index.roots_tracker.read().unwrap().alive_roots.contains(&152112203));
 
+        let really_old_root = self.accounts_index.roots_tracker.read().unwrap().alive_roots.max_inclusive().saturating_sub(432_000);
+
         if let Some(mut oldest) = max_clean_root_inclusive {
             oldest -= 432000;
             oldest -= 1000;
@@ -2878,7 +2880,15 @@ impl AccountsDb {
                                             } else {
                                                 found_not_zero += 1;
                                             }
+                                            let old_account = 
                                             if uncleaned_roots.contains(slot) {
+                                                true
+                                            }
+                                            else {
+                                                // any alive items that are more than epoch old likely need to be cleaned
+                                                slot_list.len() > 1 && slot_list.iter().any(|(slot, _)| slot <= &really_old_root)
+                                            };
+                                            if old_account {
                                                 // Assertion enforced by `accounts_index.get()`, the latest slot
                                                 // will not be greater than the given `max_clean_root`
                                                 if let Some(max_clean_root_inclusive) =
