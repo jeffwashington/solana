@@ -8701,6 +8701,9 @@ impl AccountsDb {
                     // passing 'true' to 'add_root' does NOT add 'root' to 'accounts_index.roots_tracker.uncleaned_roots'
                     // So, don't add all slots to 'uncleaned_roots' here since we know which slots contain duplicate pubkeys.
                     let uncleaned_root = uncleaned_roots.contains(root);
+                    if root == &151260261 || root == &152112203 {
+                        error!("add_root: {root}, uncleaned: {}", uncleaned_root);
+                    }
                     self.accounts_index.add_root(*root, !uncleaned_root);
                 }
 
@@ -8757,7 +8760,11 @@ impl AccountsDb {
         let mut uncleaned_slots = HashSet::<Slot>::default();
         let mut removed_rent_paying = 0;
         let mut removed_top_off = 0;
+        let interesting = Pubkey::from_str("2vWL47amZQmFgPxqkBJR8iAhZs4AuFRGYxvwryQgsGgd").unwrap();
         pubkeys.iter().for_each(|pubkey| {
+            if pubkey == &interesting {
+                error!("jw: {pubkey} in visit_duplicate_pubkeys");
+            }
             if let Some(entry) = self.accounts_index.get_account_read_entry(pubkey) {
                 let slot_list = entry.slot_list();
                 if slot_list.len() < 2 {
@@ -8771,6 +8778,9 @@ impl AccountsDb {
                 let max = slot_list.iter().map(|(slot, _)| slot).max().unwrap();
                 slot_list.iter().for_each(|(slot, account_info)| {
                     uncleaned_slots.insert(*slot);
+                    if pubkey == &interesting {
+                        error!("jw: {pubkey} uncleaned_slot: {slot}");
+                    }
                     if slot == max {
                         // the info in 'max' is the most recent, current info for this pubkey
                         return;
