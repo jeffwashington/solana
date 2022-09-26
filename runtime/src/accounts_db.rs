@@ -2741,6 +2741,9 @@ impl AccountsDb {
         let _guard = self.active_stats.activate(ActiveStatItem::Clean);
         let mut old_ids = HashSet::default();
 
+        let interesting = Pubkey::from_str("2vWL47amZQmFgPxqkBJR8iAhZs4AuFRGYxvwryQgsGgd").unwrap();
+        error!("jw: is_root: {}, {}", 152112203, self.accounts_index.roots_tracker.read().unwrap().alive_roots.contains(&152112203));
+
         if let Some(mut oldest) = max_clean_root_inclusive {
             oldest -= 432000;
             oldest -= 1000;
