@@ -4144,6 +4144,9 @@ impl AccountsDb {
         let mut remove_storage_entries_elapsed = Measure::start("remove_storage_entries_elapsed");
         for remove_slot in removed_slots {
             // Remove the storage entries and collect some metrics
+            if remove_slot == &151260261 {
+                panic!("removed!");
+            }
             if let Some((_, slot_storages_to_be_removed)) = self.storage.map.remove(remove_slot) {
                 {
                     let r_slot_removed_storages = slot_storages_to_be_removed.read().unwrap();
