@@ -8214,6 +8214,7 @@ impl AccountsDb {
         }
 
         let secondary = !self.account_indexes.is_empty();
+        let interesting = Pubkey::from_str("2vWL47amZQmFgPxqkBJR8iAhZs4AuFRGYxvwryQgsGgd").unwrap();
 
         let mut rent_paying_accounts_by_partition = Vec::default();
         let mut accounts_data_len = 0;
@@ -8229,6 +8230,9 @@ impl AccountsDb {
                     stored_account,
                 },
             )| {
+                if pubkey == interesting {
+                    error!("generate index: {slot}, {pubkey}");
+                }
                 if secondary {
                     self.accounts_index.update_secondary_indexes(
                         &pubkey,
