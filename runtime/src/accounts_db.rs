@@ -7220,7 +7220,7 @@ impl AccountsDb {
         let mut added = 0;
         let mut oldest = oldest_storage_marked;
         let mut total = 0;
-
+        let mut old_slots = Vec::default();
         self.accounts_index
             .roots_tracker
             .read()
@@ -7232,6 +7232,7 @@ impl AccountsDb {
                 if let Some(storages) = self.get_storages_for_slot(old_root) {
                     storages.iter().for_each(|store| {
                         if !is_ancient(&store.accounts) {
+                            old_slots.push(old_root);
                             total += 1;
                             oldest = oldest.min(old_root);
                             if self
@@ -7248,6 +7249,11 @@ impl AccountsDb {
                     info!("jw: old root with no storage: {}", old_root);
                 }
             });
+        if !old_slots.is_empty() {
+            let mut uncleaned_roots = self.accounts_index.roots_tracker.write().unwrap();
+            old_slots.into_iter().for_each(|root| {
+            uncleaned_roots.uncleaned_roots.insert(root);});
+        }
         error!("jw: added {added} old storages to dirty stores, oldest moved: {oldest}, oldest_storage marked: {oldest_storage_marked}, in_epoch_range_start: {in_epoch_range_start}, total: {total}");
     }
 
