@@ -3076,8 +3076,8 @@ impl AccountsDb {
 
         //pubkeys
         if let Some(mut oldest) = max_clean_root_inclusive {
-            oldest -= 432000;
-            oldest -= 1000;
+            oldest = oldest.saturating_sub(432000);
+            oldest = oldest.saturating_sub(1000);
 
             error!("jw: old roots <= {oldest}");
             let old_roots = self.accounts_index
