@@ -1159,7 +1159,14 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         // in order to return accurate and complete duplicates, we must have nothing left remaining to insert
         assert!(write.insert.is_empty());
 
-        std::mem::take(&mut write.duplicates)
+        let r = std::mem::take(&mut write.duplicates);
+        if self.bin == 914 {
+            use std::str::FromStr;
+            use log::*;
+            let interesting = Pubkey::from_str("2vWL47amZQmFgPxqkBJR8iAhZs4AuFRGYxvwryQgsGgd").unwrap();
+                error!("getting 914: {}, contains: {}", r.len(), r.iter().any(|(s, k)| k == &interesting));
+        }
+        r
     }
 
     /// synchronize the in-mem index with the disk index
