@@ -1114,10 +1114,17 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         let disk = self.bucket.as_ref().unwrap();
         let mut duplicate = vec![];
         let mut count = 0;
+        use std::str::FromStr;
+        let interesting = Pubkey::from_str("2vWL47amZQmFgPxqkBJR8iAhZs4AuFRGYxvwryQgsGgd").unwrap();
+
         insert.into_iter().for_each(|(slot, k, v)| {
             let entry = (slot, v);
             let new_ref_count = u64::from(!v.is_cached());
             disk.update(&k, |current| {
+                if interesting == k {
+                    use log::*;
+                    error!("updating index: {k}, {slot}, {current:?}");
+                }
                 match current {
                     Some((current_slot_list, mut ref_count)) => {
                         // merge this in, mark as conflict

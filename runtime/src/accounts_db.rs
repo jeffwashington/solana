@@ -8623,6 +8623,7 @@ impl AccountsDb {
                 self.accounts_index.set_startup(Startup::Normal);
                 m.stop();
                 index_flush_us = m.as_us();
+                let interesting = Pubkey::from_str("2vWL47amZQmFgPxqkBJR8iAhZs4AuFRGYxvwryQgsGgd").unwrap();
 
                 // this has to happen before visit_duplicate_pubkeys_during_startup below
                 // get duplicate keys from acct idx. We have to wait until we've finished flushing.
@@ -8632,6 +8633,9 @@ impl AccountsDb {
                     .into_iter()
                     .flatten()
                 {
+                    if key == interesting {
+                        error!("{key} is duplicate at slot: {slot}");
+                    }
                     match self.uncleaned_pubkeys.entry(slot) {
                         Occupied(mut occupied) => occupied.get_mut().push(key),
                         Vacant(vacant) => {
