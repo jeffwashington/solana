@@ -36,6 +36,7 @@ impl CacheHashDataFile {
         self.get_slice(0)
     }
 
+    #[allow(dead_code)]
     /// Populate 'accumulator' from entire contents of the cache file.
     pub(crate) fn load_all(
         &self,
@@ -201,6 +202,7 @@ impl CacheHashData {
         parent_folder.as_ref().join("calculate_accounts_hash_cache")
     }
 
+    #[allow(dead_code)]
     /// load from 'file_name' into 'accumulator'
     pub(crate) fn load<P: AsRef<Path> + std::fmt::Debug>(
         &self,

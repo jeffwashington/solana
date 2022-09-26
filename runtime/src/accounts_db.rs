@@ -43,7 +43,7 @@ use {
         },
         append_vec::{AppendVec, StoredAccountMeta, StoredMeta, StoredMetaWriteVersion},
         bank::Rewrites,
-        cache_hash_data::CacheHashData,
+        cache_hash_data::{CacheHashData, CacheHashDataFile},
         contains::Contains,
         epoch_accounts_hash::EpochAccountsHashManager,
         expected_rent_collection::{ExpectedRentCollection, SlotInfoInEpoch},
@@ -7009,7 +7009,7 @@ impl AccountsDb {
 
     /// Scan through all the account storage in parallel.
     /// Returns a Vec of cache data. At this level, the vector is ordered from older slots to newer slots.
-    ///   A single pubkey could be in multiple entries. The pubkey found int the latest entry is the one to use.
+    ///   A single pubkey could be in multiple entries. The pubkey found in the latest entry is the one to use.
     /// Each entry in the Vec contains data binned by pubkey according to the various binning parameters.
     fn scan_account_storage_no_bank<S>(
         &self,
@@ -7018,9 +7018,8 @@ impl AccountsDb {
         snapshot_storages: &SortedStorages,
         scanner: S,
         bin_range: &Range<usize>,
-        bin_calculator: &PubkeyBinCalculator24,
         stats: &HashStats,
-    ) -> Vec<BinnedHashData>
+    ) -> Vec<CacheHashDataFile>
     where
         S: AppendVecScan,
     {
@@ -7032,34 +7031,19 @@ impl AccountsDb {
             snapshot_storages,
         );
 
-        let range = snapshot_storages.range();
-        let start_bin_index = bin_range.start;
-
         (0..splitter.chunk_count)
             .into_par_iter()
             .map(|chunk| {
                 let mut scanner = scanner.clone();
 
-                let range_this_chunk = splitter.get_slot_range(chunk);
-
-                if range_this_chunk.is_none() {
-                    return scanner.scanning_complete();
-                }
-                let range_this_chunk = range_this_chunk.unwrap();
-
-                let should_cache_hash_data = CalcAccountsHashConfig::get_should_cache_hash_data()
-                    || config.store_detailed_debug_info_on_failure;
+                let range_this_chunk = splitter.get_slot_range(chunk)?;
 
                 // Single cached slots get cached and full chunks get cached.
-                // chunks that don't divide evenly would include some cached append vecs that are no longer part of this range and some that are, so we have to ignore caching on non-evenly dividing chunks.
+                // chunks that don't divide evenly would include some cached append vecs that are no longer part of this range and some that are,
+                // so we will fail to load the cached data for these and save new data instead
                 let eligible_for_caching = splitter.is_chunk_ancient(chunk)
                     || range_this_chunk.end.saturating_sub(range_this_chunk.start)
                         == MAX_ITEMS_PER_CHUNK;
-
-                if eligible_for_caching || config.store_detailed_debug_info_on_failure {
-                    let range = bin_range.end - bin_range.start;
-                    scanner.init_accum(range);
-                }
 
                 let slots_per_epoch = config
                     .rent_collector
@@ -7070,9 +7054,7 @@ impl AccountsDb {
                     .end
                     .saturating_sub(slots_per_epoch);
 
-                let file_name = if (should_cache_hash_data && eligible_for_caching)
-                    || config.store_detailed_debug_info_on_failure
-                {
+                let file_name = {
                     let mut load_from_cache = true;
                     let mut hasher = std::collections::hash_map::DefaultHasher::new();
                     bin_range.start.hash(&mut hasher);
@@ -7117,46 +7099,32 @@ impl AccountsDb {
                             amod.hash(&mut hasher);
                         }
                     }
+                    // we have a hash value for all the storages in this slot
+                    // so, build a file name:
+                    let hash = hasher.finish();
+                    let file_name = format!(
+                        "{}.{}.{}.{}.{}",
+                        range_this_chunk.start,
+                        range_this_chunk.end,
+                        bin_range.start,
+                        bin_range.end,
+                        hash
+                    );
                     if load_from_cache {
-                        // we have a hash value for all the storages in this slot
-                        // so, build a file name:
-                        let hash = hasher.finish();
-                        let file_name = format!(
-                            "{}.{}.{}.{}.{}",
-                            range_this_chunk.start,
-                            range_this_chunk.end,
-                            bin_range.start,
-                            bin_range.end,
-                            hash
-                        );
-                        let mut retval = scanner.get_accum();
-                        if eligible_for_caching
-                            && cache_hash_data
-                                .load(
-                                    &Path::new(&file_name),
-                                    &mut retval,
-                                    start_bin_index,
-                                    bin_calculator,
-                                )
-                                .is_ok()
-                        {
-                            return retval;
+                        if let Ok(mapped_file) = cache_hash_data.load_map(&Path::new(&file_name)) {
+                            return Some(mapped_file);
                         }
-                        scanner.set_accum(retval);
+                    }
 
-                        // fall through and load normally - we failed to load
-                        file_name
-                    } else {
-                        String::default()
-                    }
-                } else {
-                    for (slot, sub_storages) in snapshot_storages.iter_range(&range_this_chunk) {
-                        if bin_range.start == 0 && slot < one_epoch_old {
-                            self.update_old_slot_stats(stats, sub_storages);
-                        }
-                    }
-                    String::default()
+                    // fall through and load normally - we failed to load from a cache file
+                    file_name
                 };
+
+                // load from cache failed, so create the cache file for this chunk
+                if eligible_for_caching || config.store_detailed_debug_info_on_failure {
+                    let range = bin_range.end - bin_range.start;
+                    scanner.init_accum(range);
+                }
 
                 for (slot, sub_storages) in snapshot_storages.iter_range(&range_this_chunk) {
                     scanner.set_slot(slot);
@@ -7165,24 +7133,15 @@ impl AccountsDb {
                     }
                 }
                 let r = scanner.scanning_complete();
-                if !file_name.is_empty() {
-                    let result = cache_hash_data.save(Path::new(&file_name), &r);
-
-                    if result.is_err() {
-                        info!(
-                            "FAILED_TO_SAVE: {}-{}, {}, first_chunk_start: {}, {:?}, error: {:?}",
-                            range.start,
-                            range.end,
-                            splitter.non_ancient_slot_count,
-                            splitter.first_chunk_start,
-                            file_name,
-                            result,
-                        );
-                    }
-                }
-                r
+                assert!(!file_name.is_empty());
+                (!r.is_empty() && r.iter().any(|b| !b.is_empty())).then(|| {
+                    // error if we can't write this
+                    let file_name = Path::new(&file_name);
+                    cache_hash_data.save(Path::new(&file_name), &r).unwrap();
+                    cache_hash_data.load_map(&file_name).unwrap()
+                })
             })
-            .filter(|x| !x.is_empty())
+            .filter_map(|x| x)
             .collect()
     }
 
@@ -7334,7 +7293,7 @@ impl AccountsDb {
         bin_range: &Range<usize>,
         config: &CalcAccountsHashConfig<'_>,
         filler_account_suffix: Option<&Pubkey>,
-    ) -> Result<Vec<BinnedHashData>, BankHashVerificationError> {
+    ) -> Result<Vec<CacheHashDataFile>, BankHashVerificationError> {
         let bin_calculator = PubkeyBinCalculator24::new(bins);
         assert!(bin_range.start < bins && bin_range.end <= bins && bin_range.start < bin_range.end);
         let mut time = Measure::start("scan all accounts");
@@ -7364,13 +7323,12 @@ impl AccountsDb {
             pubkey_to_bin_index: 0,
         };
 
-        let result: Vec<BinnedHashData> = self.scan_account_storage_no_bank(
+        let result = self.scan_account_storage_no_bank(
             cache_hash_data,
             config,
             storage,
             scanner,
             bin_range,
-            &bin_calculator,
             stats,
         );
 
@@ -7488,7 +7446,18 @@ impl AccountsDb {
                     hash.filler_account_suffix.as_ref(),
                 )?;
 
-                // turn raw data into merkel tree hashes and sum of lamports
+                let slices = result
+                    .iter()
+                    .map(|d| d.get_cache_hash_data())
+                    .collect::<Vec<_>>();
+
+                let result = AccountsHash::get_binned_data(
+                    &slices,
+                    PUBKEY_BINS_FOR_CALCULATING_HASHES,
+                    &bounds,
+                );
+
+                // turn raw data into merkle tree hashes and sum of lamports
                 let (hash, lamports, for_next_pass) = hash.rest_of_hash_calculation(
                     result,
                     &mut stats,
@@ -9595,6 +9564,7 @@ pub mod tests {
                 tests::*, AccountSecondaryIndexesIncludeExclude, ReadAccountMapEntry, RefCount,
             },
             append_vec::{test_utils::TempFile, AccountMeta},
+            cache_hash_data_stats::CacheHashDataStats,
             inline_spl_token,
         },
         assert_matches::assert_matches,
@@ -9634,7 +9604,7 @@ pub mod tests {
             bins: usize,
             bin_range: &Range<usize>,
             check_hash: bool,
-        ) -> Result<Vec<BinnedHashData>, BankHashVerificationError> {
+        ) -> Result<Vec<CacheHashDataFile>, BankHashVerificationError> {
             let temp_dir = TempDir::new().unwrap();
             let accounts_hash_cache_path = temp_dir.path();
             self.scan_snapshot_stores_with_cache(
@@ -9769,9 +9739,35 @@ pub mod tests {
         SortedStorages::new(input)
     }
 
-    /// helper method. Refactoring will soon make this comparison more complicated.
-    fn assert_scan(result: Vec<BinnedHashData>, expected: Vec<BinnedHashData>) {
-        assert_eq!(result, expected);
+    /// helper to compare expected binned data with scan result in cache files
+    /// result: return from scanning
+    /// expected: binned data expected
+    /// bins: # bins total to divide pubkeys into
+    /// start_bin_index: bin # that was the minimum # we were scanning for 0<=start_bin_index<bins
+    /// bin_range: end_exclusive-start_bin_index passed to scan
+    fn assert_scan(
+        result: Vec<CacheHashDataFile>,
+        expected: Vec<BinnedHashData>,
+        bins: usize,
+        start_bin_index: usize,
+        bin_range: usize,
+    ) {
+        assert_eq!(expected.len(), result.len());
+
+        for cache_file in &result {
+            let mut result2 = (0..bin_range).map(|_| Vec::default()).collect::<Vec<_>>();
+            cache_file.load_all(
+                &mut result2,
+                start_bin_index,
+                &PubkeyBinCalculator24::new(bins),
+                &mut CacheHashDataStats::default(),
+            );
+            assert_eq!(
+                convert_to_slice(&[result2]),
+                expected,
+                "bins: {bins}, start_bin_index: {start_bin_index}"
+            );
+        }
     }
 
     #[test]
@@ -9795,7 +9791,7 @@ pub mod tests {
                 false,
             )
             .unwrap();
-        assert_scan(result, vec![vec![raw_expected.clone()]]);
+        assert_scan(result, vec![vec![raw_expected.clone()]], bins, 0, bins);
 
         let bins = 2;
         let accounts_db = AccountsDb::new_single_for_tests();
@@ -9816,7 +9812,7 @@ pub mod tests {
         expected[0].push(raw_expected[1].clone());
         expected[bins - 1].push(raw_expected[2].clone());
         expected[bins - 1].push(raw_expected[3].clone());
-        assert_scan(result, vec![expected]);
+        assert_scan(result, vec![expected], bins, 0, bins);
 
         let bins = 4;
         let accounts_db = AccountsDb::new_single_for_tests();
@@ -9837,7 +9833,7 @@ pub mod tests {
         expected[1].push(raw_expected[1].clone());
         expected[2].push(raw_expected[2].clone());
         expected[bins - 1].push(raw_expected[3].clone());
-        assert_scan(result, vec![expected]);
+        assert_scan(result, vec![expected], bins, 0, bins);
 
         let bins = 256;
         let accounts_db = AccountsDb::new_single_for_tests();
@@ -9858,7 +9854,7 @@ pub mod tests {
         expected[127].push(raw_expected[1].clone());
         expected[128].push(raw_expected[2].clone());
         expected[bins - 1].push(raw_expected.last().unwrap().clone());
-        assert_scan(result, vec![expected]);
+        assert_scan(result, vec![expected], bins, 0, bins);
     }
 
     #[test]
@@ -9886,15 +9882,13 @@ pub mod tests {
                 false,
             )
             .unwrap();
-        assert_eq!(result.len(), 2); // 2 chunks
-        assert_eq!(result[0].len(), bins);
-        assert_eq!(0, result[0].iter().map(|x| x.len()).sum::<usize>()); // nothing found in bin 0
-        assert_eq!(result[1].len(), bins);
-        assert_eq!(result[1], vec![raw_expected]);
+
+        assert_scan(result, vec![vec![raw_expected]], bins, 0, bins);
     }
 
     #[test]
     fn test_accountsdb_scan_snapshot_stores_binning() {
+        solana_logger::setup();
         let mut stats = HashStats::default();
         let (storages, raw_expected) = sample_storages_and_accounts();
 
@@ -9917,7 +9911,7 @@ pub mod tests {
         let mut expected = vec![Vec::new(); half_bins];
         expected[0].push(raw_expected[0].clone());
         expected[0].push(raw_expected[1].clone());
-        assert_scan(result, vec![expected]);
+        assert_scan(result, vec![expected], bins, 0, half_bins);
 
         // just the second bin of 2
         let accounts_db = AccountsDb::new_single_for_tests();
@@ -9938,7 +9932,7 @@ pub mod tests {
         let starting_bin_index = 0;
         expected[starting_bin_index].push(raw_expected[2].clone());
         expected[starting_bin_index].push(raw_expected[3].clone());
-        assert_scan(result, vec![expected]);
+        assert_scan(result, vec![expected], bins, 1, bins - 1);
 
         // 1 bin at a time of 4
         let bins = 4;
@@ -9959,7 +9953,7 @@ pub mod tests {
                 .unwrap();
             let mut expected = vec![Vec::new(); 1];
             expected[0].push(expected_item.clone());
-            assert_scan(result, vec![expected]);
+            assert_scan(result, vec![expected], bins, bin, 1);
         }
 
         let bins = 256;
@@ -9981,15 +9975,27 @@ pub mod tests {
                 .unwrap();
             let mut expected = vec![];
             if let Some(index) = bin_locations.iter().position(|&r| r == bin) {
-                expected = vec![vec![Vec::new(); range]];
-                expected[0][0].push(raw_expected[index].clone());
+                expected = vec![Vec::new(); range];
+                expected[0].push(raw_expected[index].clone());
             }
-            assert_eq!(result, expected);
+            let mut result2 = (0..range).map(|_| Vec::default()).collect::<Vec<_>>();
+            if let Some(m) = result.get(0) {
+                m.load_all(
+                    &mut result2,
+                    bin,
+                    &PubkeyBinCalculator24::new(bins),
+                    &mut CacheHashDataStats::default(),
+                );
+            } else {
+                result2 = vec![];
+            }
+
+            assert_eq!(result2, expected);
         }
     }
 
     #[test]
-    fn test_accountsdb_scan_snapshot_stores_binning_2nd_chunk() {
+    fn test_accountsdb_scan_snapshot_stores2_binning_2nd_chunk() {
         // enough stores to get to 2nd chunk
         // range is for only 1 bin out of 256.
         let bins = 256;
@@ -10016,13 +10022,18 @@ pub mod tests {
                 false,
             )
             .unwrap();
-        assert_eq!(result.len(), 2); // 2 chunks
-        assert_eq!(result[0].len(), range);
-        assert_eq!(0, result[0].iter().map(|x| x.len()).sum::<usize>()); // nothing found in bin 0
+        assert_eq!(result.len(), 1); // 2 chunks, but 1 is empty so not included
         let mut expected = vec![Vec::new(); range];
         expected[0].push(raw_expected[1].clone());
-        assert_eq!(result[1].len(), 1);
-        assert_eq!(result[1], expected);
+        let mut result2 = (0..range).map(|_| Vec::default()).collect::<Vec<_>>();
+        result[0].load_all(
+            &mut result2,
+            0,
+            &PubkeyBinCalculator24::new(range),
+            &mut CacheHashDataStats::default(),
+        );
+        assert_eq!(result2.len(), 1);
+        assert_eq!(result2, expected);
     }
 
     #[test]
@@ -10162,7 +10173,6 @@ pub mod tests {
             &get_storage_refs(&storages),
             test_scan,
             &Range { start: 0, end: 1 },
-            &PubkeyBinCalculator24::new(1),
             &HashStats::default(),
         );
         assert_eq!(calls.load(Ordering::Relaxed), 1);
@@ -10173,7 +10183,19 @@ pub mod tests {
                 expected,
                 pubkey,
             )]]],
+            1,
+            0,
+            1,
         );
+    }
+
+    fn convert_to_slice(
+        input: &[Vec<Vec<CalculateHashIntermediate>>],
+    ) -> Vec<Vec<&[CalculateHashIntermediate]>> {
+        input
+            .iter()
+            .map(|v| v.iter().map(|v| &v[..]).collect::<Vec<_>>())
+            .collect::<Vec<_>>()
     }
 
     #[test]
