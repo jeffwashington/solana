@@ -18,6 +18,8 @@
 //! tracks the number of commits to the entire data store. So the latest
 //! commit for each slot entry would be indexed.
 
+use crate::bank::Bank;
+
 use {
     crate::{
         account_info::{AccountInfo, Offset, StorageLocation, StoredSize},
@@ -2294,6 +2296,7 @@ impl AccountsDb {
         purges: &HashMap<Pubkey, (SlotList<AccountInfo>, RefCount)>,
         store_counts: &mut HashMap<AppendVecId, (usize, HashSet<Pubkey>)>,
         min_store_id: Option<AppendVecId>,
+        old_ids: HashSet<AppendVecId>,
     ) {
         // Another pass to check if there are some filtered accounts which
         // do not match the criteria of deleting all appendvecs which contain them
@@ -2354,10 +2357,17 @@ impl AccountsDb {
             while !pending_store_ids.is_empty() {
                 let id = pending_store_ids.iter().next().cloned().unwrap();
                 if Some(id) == min_store_id {
-                    if let Some(failed_store_id) = failed_store_id.take() {
-                        info!("calc_delete_dependencies, oldest store is not able to be deleted because of {pubkey} in store {failed_store_id}");
+                    if let Some(failed_store_id) = failed_store_id {
+                        info!("jw: calc_delete_dependencies, oldest store is not able to be deleted because of {pubkey} in store {failed_store_id}, id: {id}");
                     } else {
-                        info!("calc_delete_dependencies, oldest store is not able to be deleted because of {pubkey}, account infos len: {}, ref count: {ref_count_from_storage}", account_infos.len());
+                        info!("jw: calc_delete_dependencies2, oldest store is not able to be deleted because of {pubkey}, account infos len: {}, ref count: {ref_count_from_storage}, id: {id}", account_infos.len());
+                    }
+                }
+                else if old_ids.contains(&id) {
+                    if let Some(failed_store_id) = failed_store_id {
+                        info!("jw: calc_delete_dependencies3, oldest store is not able to be deleted because of {pubkey} in store {failed_store_id}, id: {id}");
+                    } else {
+                        info!("jw: calc_delete_dependencies4, oldest store is not able to be deleted because of {pubkey}, account infos len: {}, ref count: {ref_count_from_storage}, id: {id}", account_infos.len());
                     }
                 }
 
@@ -2729,7 +2739,30 @@ impl AccountsDb {
         }
 
         let _guard = self.active_stats.activate(ActiveStatItem::Clean);
+        let mut old_ids = HashSet::default();
 
+        if let Some(mut oldest) = max_clean_root_inclusive {
+            oldest -= 432000;
+            oldest -= 1000;
+
+            error!("jw: before old roots <= {oldest}");
+            let old_roots = self.accounts_index
+            .roots_tracker
+            .read()
+            .unwrap()
+            .alive_roots
+            .get_all_less_than(oldest)
+            .into_iter().collect::<Vec<_>>();
+            error!("jw: before old roots: {}", old_roots.len());
+            old_roots.into_iter().for_each(|root| {
+                if let Some(storages) = self.get_storages_for_slot(root) {
+                    storages.iter().for_each(|store| {
+                        error!("jw: slot: {root}, id: {}", store.append_vec_id());
+                        old_ids.insert(store.append_vec_id());
+                    });
+                }
+            });
+        }        
         let ancient_account_cleans = AtomicU64::default();
 
         let mut measure_all = Measure::start("clean_accounts");
@@ -2947,6 +2980,7 @@ impl AccountsDb {
             &purges_zero_lamports,
             &mut store_counts,
             min_dirty_store_id,
+            old_ids,
         );
         calc_deps_time.stop();
 
@@ -2993,6 +3027,41 @@ impl AccountsDb {
 
         reclaims_time.stop();
         measure_all.stop();
+
+        //pubkeys
+        if let Some(mut oldest) = max_clean_root_inclusive {
+            oldest -= 432000;
+            oldest -= 1000;
+
+            error!("jw: old roots <= {oldest}");
+            let old_roots = self.accounts_index
+            .roots_tracker
+            .read()
+            .unwrap()
+            .alive_roots
+            .get_all_less_than(oldest)
+            .into_iter().collect::<Vec<_>>();
+            error!("jw: old roots: {}", old_roots.len());
+            old_roots.into_iter().for_each(|root| {
+                if let Some(storages) = self.get_storages_for_slot(root) {
+                    if storages.len() != 1 {
+                        error!("jw: {} storages for {root}", storages.len());
+                    }
+                    if let Some(store) = storages.first() {
+                        store.accounts.account_iter().for_each(|entry| {
+                            let pubkey = &entry.meta.pubkey;
+                            let index = self.accounts_index.get_account_read_entry(pubkey);
+                            let pi = Bank::partition_from_pubkey(pubkey, 432000);
+                            let checked= pubkeys.contains(pubkey);
+                            error!("jw: {root} {pubkey}, lamports: {}, {:?}, pi: {pi}, next slots: {:?}, checked: {checked}", entry.lamports(), index, (152_064_000+pi, 152_064_000+pi+432_000, 152_064_000+pi+432_000*2));
+                        });
+                    }
+                }
+                else {
+                    error!("jw: no storages for {root}");
+                }
+            });
+        }
 
         self.clean_accounts_stats.report();
         datapoint_info!(
@@ -7114,6 +7183,7 @@ impl AccountsDb {
 
         let mut added = 0;
         let mut oldest = oldest_storage_marked;
+        let mut total = 0;
 
         self.accounts_index
             .roots_tracker
@@ -7126,6 +7196,7 @@ impl AccountsDb {
                 if let Some(storages) = self.get_storages_for_slot(old_root) {
                     storages.iter().for_each(|store| {
                         if !is_ancient(&store.accounts) {
+                            total += 1;
                             oldest = oldest.min(old_root);
                             if self
                                 .dirty_stores
@@ -7141,7 +7212,7 @@ impl AccountsDb {
                     info!("jw: old root with no storage: {}", old_root);
                 }
             });
-        error!("jw: added {added} old storages to dirty stores, oldest moved: {oldest}");
+        error!("jw: added {added} old storages to dirty stores, oldest moved: {oldest}, oldest_storage marked: {oldest_storage_marked}, in_epoch_range_start: {in_epoch_range_start}, total: {total}");
     }
 
     pub(crate) fn calculate_accounts_hash_helper(
