@@ -13621,7 +13621,7 @@ pub mod tests {
         store_counts.insert(1, (0, HashSet::from_iter(vec![key0, key1])));
         store_counts.insert(2, (0, HashSet::from_iter(vec![key1, key2])));
         store_counts.insert(3, (1, HashSet::from_iter(vec![key2])));
-        AccountsDb::calc_delete_dependencies(&purges, &mut store_counts, None);
+        AccountsDb::calc_delete_dependencies(&purges, &mut store_counts, None, HashSet::default());
         let mut stores: Vec<_> = store_counts.keys().cloned().collect();
         stores.sort_unstable();
         for store in &stores {
