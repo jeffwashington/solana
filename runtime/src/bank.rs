@@ -1589,6 +1589,7 @@ impl Bank {
             Some(ACCOUNTS_DB_CONFIG_FOR_TESTING),
             None,
             &Arc::default(),
+            LoadZeroLamports::SomeWithZeroLamportAccount, // here - unsure
         )
     }
 
@@ -1606,6 +1607,7 @@ impl Bank {
             Some(ACCOUNTS_DB_CONFIG_FOR_BENCHMARKS),
             None,
             &Arc::default(),
+            LoadZeroLamports::SomeWithZeroLamportAccount, // here - unsure
         )
     }
 
@@ -1623,6 +1625,7 @@ impl Bank {
         accounts_db_config: Option<AccountsDbConfig>,
         accounts_update_notifier: Option<AccountsUpdateNotifier>,
         exit: &Arc<AtomicBool>,
+        load_zero_lamports: LoadZeroLamports,
     ) -> Self {
         let accounts = Accounts::new_with_config(
             paths,
@@ -1662,18 +1665,20 @@ impl Bank {
         bank.update_rent();
         bank.update_epoch_schedule();
         bank.update_recent_blockhashes();
-        bank.fill_missing_sysvar_cache_entries();
+        bank.fill_missing_sysvar_cache_entries(load_zero_lamports); // here - passed in
         bank
     }
 
     /// Create a new bank that points to an immutable checkpoint of another bank.
     pub fn new_from_parent(parent: &Arc<Bank>, collector_id: &Pubkey, slot: Slot) -> Self {
+        let load_zero_lamports = LoadZeroLamports::SomeWithZeroLamportAccount; // here - unsure - this is public?
         Self::_new_from_parent(
             parent,
             collector_id,
             slot,
             null_tracer(),
             NewBankOptions::default(),
+            load_zero_lamports,
         )
     }
 
@@ -1683,7 +1688,15 @@ impl Bank {
         slot: Slot,
         new_bank_options: NewBankOptions,
     ) -> Self {
-        Self::_new_from_parent(parent, collector_id, slot, null_tracer(), new_bank_options)
+        let load_zero_lamports = LoadZeroLamports::SomeWithZeroLamportAccount; // here - unsure - this is public?
+        Self::_new_from_parent(
+            parent,
+            collector_id,
+            slot,
+            null_tracer(),
+            new_bank_options,
+            load_zero_lamports,
+        )
     }
 
     pub fn new_from_parent_with_tracer(
@@ -1692,12 +1705,14 @@ impl Bank {
         slot: Slot,
         reward_calc_tracer: impl Fn(&RewardCalculationEvent) + Send + Sync,
     ) -> Self {
+        let load_zero_lamports = LoadZeroLamports::SomeWithZeroLamportAccount; // here - unsure - this is public?
         Self::_new_from_parent(
             parent,
             collector_id,
             slot,
             Some(reward_calc_tracer),
             NewBankOptions::default(),
+            load_zero_lamports,
         )
     }
 
@@ -1711,6 +1726,7 @@ impl Bank {
         slot: Slot,
         reward_calc_tracer: Option<impl Fn(&RewardCalculationEvent) + Send + Sync>,
         new_bank_options: NewBankOptions,
+        load_zero_lamports: LoadZeroLamports,
     ) -> Self {
         let mut time = Measure::start("bank::new_from_parent");
         let NewBankOptions { vote_only_bank } = new_bank_options;
@@ -2027,8 +2043,10 @@ impl Bank {
             "update_sysvars",
         );
 
-        let (_, fill_sysvar_cache_time) =
-            measure!(new.fill_missing_sysvar_cache_entries(), "fill_sysvar_cache");
+        let (_, fill_sysvar_cache_time) = measure!(
+            new.fill_missing_sysvar_cache_entries(load_zero_lamports),
+            "fill_sysvar_cache"
+        );
 
         time.stop();
 
@@ -2121,13 +2139,18 @@ impl Bank {
         let mut clock = new.clock();
         clock.epoch_start_timestamp = parent_timestamp;
         clock.unix_timestamp = parent_timestamp;
-        new.update_sysvar_account(&sysvar::clock::id(), |account| {
-            create_account(
-                &clock,
-                new.inherit_specially_retained_account_fields(account),
-            )
-        });
-        new.fill_missing_sysvar_cache_entries();
+        let load_zero_lamports = LoadZeroLamports::None; // here - unsure
+        new.update_sysvar_account(
+            &sysvar::clock::id(),
+            |account| {
+                create_account(
+                    &clock,
+                    new.inherit_specially_retained_account_fields(account),
+                )
+            },
+            load_zero_lamports,
+        );
+        new.fill_missing_sysvar_cache_entries(load_zero_lamports);
         new.freeze();
         new
     }
@@ -2393,11 +2416,15 @@ impl Bank {
         self.genesis_creation_time + ((self.slot as u128 * self.ns_per_slot) / 1_000_000_000) as i64
     }
 
-    fn update_sysvar_account<F>(&self, pubkey: &Pubkey, updater: F)
-    where
+    fn update_sysvar_account<F>(
+        &self,
+        pubkey: &Pubkey,
+        updater: F,
+        load_zero_lamports: LoadZeroLamports,
+    ) where
         F: Fn(&Option<AccountSharedData>) -> AccountSharedData,
     {
-        let old_account = self.get_account_with_fixed_root(pubkey);
+        let old_account = self.get_account_with_fixed_root(pubkey, load_zero_lamports);
         let mut new_account = updater(&old_account);
 
         // When new sysvar comes into existence (with RENT_UNADJUSTED_INITIAL_BALANCE lamports),
@@ -2428,8 +2455,16 @@ impl Bank {
     }
 
     pub fn clock(&self) -> sysvar::clock::Clock {
-        from_account(&self.get_account(&sysvar::clock::id()).unwrap_or_default())
-            .unwrap_or_default()
+        // here - fine either way due to default - maybe make a function for this
+        from_account(
+            &self
+                .get_account(
+                    &sysvar::clock::id(),
+                    LoadZeroLamports::SomeWithZeroLamportAccount,
+                )
+                .unwrap_or_default(),
+        )
+        .unwrap_or_default()
     }
 
     fn update_clock(&self, parent_epoch: Option<Epoch>) {
@@ -2483,60 +2518,81 @@ impl Bank {
             leader_schedule_epoch: self.epoch_schedule().get_leader_schedule_epoch(self.slot),
             unix_timestamp,
         };
-        self.update_sysvar_account(&sysvar::clock::id(), |account| {
-            create_account(
-                &clock,
-                self.inherit_specially_retained_account_fields(account),
-            )
-        });
+        self.update_sysvar_account(
+            &sysvar::clock::id(),
+            |account| {
+                create_account(
+                    &clock,
+                    self.inherit_specially_retained_account_fields(account),
+                )
+            },
+            LoadZeroLamports::SomeWithZeroLamportAccount,
+        ); // here - unsure
     }
 
     pub fn set_sysvar_for_tests<T>(&self, sysvar: &T)
     where
         T: Sysvar + SysvarId,
     {
-        self.update_sysvar_account(&T::id(), |account| {
-            create_account(
-                sysvar,
-                self.inherit_specially_retained_account_fields(account),
-            )
-        });
-        // Simply force fill sysvar cache rather than checking which sysvar was
-        // actually updated since tests don't need to be optimized for performance.
+        self.update_sysvar_account(
+            &T::id(),
+            |account| {
+                create_account(
+                    sysvar,
+                    self.inherit_specially_retained_account_fields(account),
+                )
+            },
+            LoadZeroLamports::None,
+        ); // here - tests only
+           // Simply force fill sysvar cache rather than checking which sysvar was
+           // actually updated since tests don't need to be optimized for performance.
         self.reset_sysvar_cache();
-        self.fill_missing_sysvar_cache_entries();
+        self.fill_missing_sysvar_cache_entries(LoadZeroLamports::None); // here - unsure
     }
 
     fn update_slot_history(&self) {
-        self.update_sysvar_account(&sysvar::slot_history::id(), |account| {
-            let mut slot_history = account
-                .as_ref()
-                .map(|account| from_account::<SlotHistory, _>(account).unwrap())
-                .unwrap_or_default();
-            slot_history.add(self.slot());
-            create_account(
-                &slot_history,
-                self.inherit_specially_retained_account_fields(account),
-            )
-        });
+        self.update_sysvar_account(
+            &sysvar::slot_history::id(),
+            |account| {
+                let mut slot_history = account
+                    .as_ref()
+                    .map(|account| from_account::<SlotHistory, _>(account).unwrap())
+                    .unwrap_or_default();
+                slot_history.add(self.slot());
+                create_account(
+                    &slot_history,
+                    self.inherit_specially_retained_account_fields(account),
+                )
+            },
+            LoadZeroLamports::None,
+        ); // here - unsure
     }
 
     fn update_slot_hashes(&self) {
-        self.update_sysvar_account(&sysvar::slot_hashes::id(), |account| {
-            let mut slot_hashes = account
-                .as_ref()
-                .map(|account| from_account::<SlotHashes, _>(account).unwrap())
-                .unwrap_or_default();
-            slot_hashes.add(self.parent_slot, self.parent_hash);
-            create_account(
-                &slot_hashes,
-                self.inherit_specially_retained_account_fields(account),
-            )
-        });
+        self.update_sysvar_account(
+            &sysvar::slot_hashes::id(),
+            |account| {
+                let mut slot_hashes = account
+                    .as_ref()
+                    .map(|account| from_account::<SlotHashes, _>(account).unwrap())
+                    .unwrap_or_default();
+                slot_hashes.add(self.parent_slot, self.parent_hash);
+                create_account(
+                    &slot_hashes,
+                    self.inherit_specially_retained_account_fields(account),
+                )
+            },
+            LoadZeroLamports::None,
+        ); // here - unsure
     }
 
     pub fn get_slot_history(&self) -> SlotHistory {
-        from_account(&self.get_account(&sysvar::slot_history::id()).unwrap()).unwrap()
+        from_account(
+            &self
+                .get_account(&sysvar::slot_history::id(), LoadZeroLamports::None)
+                .unwrap(),
+        )
+        .unwrap() // here - unsure
     }
 
     fn update_epoch_stakes(&mut self, leader_schedule_epoch: Epoch) {
@@ -2576,31 +2632,43 @@ impl Bank {
             .feature_set
             .is_active(&feature_set::disable_fees_sysvar::id())
         {
-            self.update_sysvar_account(&sysvar::fees::id(), |account| {
-                create_account(
-                    &sysvar::fees::Fees::new(&self.fee_rate_governor.create_fee_calculator()),
-                    self.inherit_specially_retained_account_fields(account),
-                )
-            });
+            self.update_sysvar_account(
+                &sysvar::fees::id(),
+                |account| {
+                    create_account(
+                        &sysvar::fees::Fees::new(&self.fee_rate_governor.create_fee_calculator()),
+                        self.inherit_specially_retained_account_fields(account),
+                    )
+                },
+                LoadZeroLamports::None,
+            ); // here - unsure
         }
     }
 
     fn update_rent(&self) {
-        self.update_sysvar_account(&sysvar::rent::id(), |account| {
-            create_account(
-                &self.rent_collector.rent,
-                self.inherit_specially_retained_account_fields(account),
-            )
-        });
+        self.update_sysvar_account(
+            &sysvar::rent::id(),
+            |account| {
+                create_account(
+                    &self.rent_collector.rent,
+                    self.inherit_specially_retained_account_fields(account),
+                )
+            },
+            LoadZeroLamports::None,
+        ); // here - unsure
     }
 
     fn update_epoch_schedule(&self) {
-        self.update_sysvar_account(&sysvar::epoch_schedule::id(), |account| {
-            create_account(
-                self.epoch_schedule(),
-                self.inherit_specially_retained_account_fields(account),
-            )
-        });
+        self.update_sysvar_account(
+            &sysvar::epoch_schedule::id(),
+            |account| {
+                create_account(
+                    self.epoch_schedule(),
+                    self.inherit_specially_retained_account_fields(account),
+                )
+            },
+            LoadZeroLamports::None,
+        ); // here - unsure
     }
 
     fn update_stake_history(&self, epoch: Option<Epoch>) {
@@ -2608,12 +2676,16 @@ impl Bank {
             return;
         }
         // if I'm the first Bank in an epoch, ensure stake_history is updated
-        self.update_sysvar_account(&sysvar::stake_history::id(), |account| {
-            create_account::<sysvar::stake_history::StakeHistory>(
-                self.stakes_cache.stakes().history(),
-                self.inherit_specially_retained_account_fields(account),
-            )
-        });
+        self.update_sysvar_account(
+            &sysvar::stake_history::id(),
+            |account| {
+                create_account::<sysvar::stake_history::StakeHistory>(
+                    self.stakes_cache.stakes().history(),
+                    self.inherit_specially_retained_account_fields(account),
+                )
+            },
+            LoadZeroLamports::None,
+        ); // here - unsure
     }
 
     pub fn epoch_duration_in_years(&self, prev_epoch: Epoch) -> f64 {
@@ -2789,6 +2861,7 @@ impl Bank {
         &self,
         thread_pool: &ThreadPool,
         reward_calc_tracer: Option<impl Fn(&RewardCalculationEvent) + Send + Sync>,
+        load_zero_lamports: LoadZeroLamports,
     ) -> LoadVoteAndStakeAccountsResult {
         let stakes = self.stakes_cache.stakes();
         let cached_vote_accounts = stakes.vote_accounts();
@@ -2809,15 +2882,16 @@ impl Bank {
                     if invalid_vote_keys.contains_key(vote_pubkey) {
                         return;
                     }
-                    let stake_account = match self.get_account_with_fixed_root(stake_pubkey) {
-                        Some(stake_account) => stake_account,
-                        None => {
-                            invalid_stake_keys
-                                .insert(*stake_pubkey, InvalidCacheEntryReason::Missing);
-                            invalid_cached_stake_accounts.fetch_add(1, Relaxed);
-                            return;
-                        }
-                    };
+                    let stake_account =
+                        match self.get_account_with_fixed_root(stake_pubkey, load_zero_lamports) {
+                            Some(stake_account) => stake_account,
+                            None => {
+                                invalid_stake_keys
+                                    .insert(*stake_pubkey, InvalidCacheEntryReason::Missing);
+                                invalid_cached_stake_accounts.fetch_add(1, Relaxed);
+                                return;
+                            }
+                        };
                     if cached_stake_account.account() != &stake_account {
                         invalid_cached_stake_accounts.fetch_add(1, Relaxed);
                         let cached_stake_account = cached_stake_account.account();
@@ -2863,7 +2937,9 @@ impl Bank {
                         vote_delegations
                     } else {
                         let cached_vote_account = cached_vote_accounts.get(vote_pubkey);
-                        let vote_account = match self.get_account_with_fixed_root(vote_pubkey) {
+                        let vote_account = match self
+                            .get_account_with_fixed_root(vote_pubkey, load_zero_lamports)
+                        {
                             Some(vote_account) => {
                                 if vote_account.owner() != &solana_vote_program::id() {
                                     invalid_vote_keys
@@ -2982,7 +3058,8 @@ impl Bank {
             // already have been cached in cached_vote_accounts; so the code
             // below is only for sanity check, and can be removed once
             // vote_accounts_cache_miss_count is shown to be always zero.
-            let account = self.get_account_with_fixed_root(vote_pubkey)?;
+            // here - this checks owner so will be ok either way
+            let account = self.get_account_with_fixed_root(vote_pubkey, LoadZeroLamports::None)?;
             if account.owner() == &solana_vote_program
                 && VoteState::deserialize(account.data()).is_ok()
             {
@@ -3087,6 +3164,7 @@ impl Bank {
                 self.load_vote_and_stake_accounts_with_thread_pool(
                     thread_pool,
                     reward_calc_tracer.as_ref(),
+                    LoadZeroLamports::None, // here - unsure
                 )
             };
             m.stop();
@@ -3293,13 +3371,17 @@ impl Bank {
 
     fn update_recent_blockhashes_locked(&self, locked_blockhash_queue: &BlockhashQueue) {
         #[allow(deprecated)]
-        self.update_sysvar_account(&sysvar::recent_blockhashes::id(), |account| {
-            let recent_blockhash_iter = locked_blockhash_queue.get_recent_blockhashes();
-            recent_blockhashes_account::create_account_with_data_and_fields(
-                recent_blockhash_iter,
-                self.inherit_specially_retained_account_fields(account),
-            )
-        });
+        self.update_sysvar_account(
+            &sysvar::recent_blockhashes::id(),
+            |account| {
+                let recent_blockhash_iter = locked_blockhash_queue.get_recent_blockhashes();
+                recent_blockhashes_account::create_account_with_data_and_fields(
+                    recent_blockhash_iter,
+                    self.inherit_specially_retained_account_fields(account),
+                )
+            },
+            LoadZeroLamports::None,
+        ); // here - this one is wrong otherwise
     }
 
     pub fn update_recent_blockhashes(&self) {
@@ -3513,7 +3595,7 @@ impl Bank {
 
         for (pubkey, account) in genesis_config.accounts.iter() {
             assert!(
-                self.get_account(pubkey).is_none(),
+                self.get_account(pubkey, LoadZeroLamports::None).is_none(), // here - unsure
                 "{} repeated in genesis config",
                 pubkey
             );
@@ -3527,7 +3609,7 @@ impl Bank {
 
         for (pubkey, account) in genesis_config.rewards_pools.iter() {
             assert!(
-                self.get_account(pubkey).is_none(),
+                self.get_account(pubkey, LoadZeroLamports::None).is_none(), // here - unsure?
                 "{} repeated in genesis config",
                 pubkey
             );
@@ -3585,20 +3667,20 @@ impl Bank {
     // NOTE: must hold idempotent for the same set of arguments
     /// Add a builtin program account
     pub fn add_builtin_account(&self, name: &str, program_id: &Pubkey, must_replace: bool) {
-        let existing_genuine_program =
-            self.get_account_with_fixed_root(program_id)
-                .and_then(|account| {
-                    // it's very unlikely to be squatted at program_id as non-system account because of burden to
-                    // find victim's pubkey/hash. So, when account.owner is indeed native_loader's, it's
-                    // safe to assume it's a genuine program.
-                    if native_loader::check_id(account.owner()) {
-                        Some(account)
-                    } else {
-                        // malicious account is pre-occupying at program_id
-                        self.burn_and_purge_account(program_id, account);
-                        None
-                    }
-                });
+        let existing_genuine_program = self
+            .get_account_with_fixed_root(program_id, LoadZeroLamports::None) // here - unsure
+            .and_then(|account| {
+                // it's very unlikely to be squatted at program_id as non-system account because of burden to
+                // find victim's pubkey/hash. So, when account.owner is indeed native_loader's, it's
+                // safe to assume it's a genuine program.
+                if native_loader::check_id(account.owner()) {
+                    Some(account)
+                } else {
+                    // malicious account is pre-occupying at program_id
+                    self.burn_and_purge_account(program_id, account);
+                    None
+                }
+            });
 
         if must_replace {
             // updating builtin program
@@ -3645,7 +3727,9 @@ impl Bank {
 
     // Used by tests to simulate clusters with precompiles that aren't owned by the native loader
     fn add_precompiled_account_with_owner(&self, program_id: &Pubkey, owner: Pubkey) {
-        if let Some(account) = self.get_account_with_fixed_root(program_id) {
+        if let Some(account) = self.get_account_with_fixed_root(program_id, LoadZeroLamports::None)
+        {
+            // here - probably fine either way
             if account.executable() {
                 // The account is already executable, that's all we need
                 return;
@@ -4102,16 +4186,19 @@ impl Bank {
         let mut account_overrides = AccountOverrides::default();
         let slot_history_id = sysvar::slot_history::id();
         if account_keys.iter().any(|pubkey| *pubkey == slot_history_id) {
-            let current_account = self.get_account_with_fixed_root(&slot_history_id);
+            let current_account =
+                self.get_account_with_fixed_root(&slot_history_id, LoadZeroLamports::None); // here - this is probably right
             let slot_history = current_account
                 .as_ref()
                 .map(|account| from_account::<SlotHistory, _>(account).unwrap())
                 .unwrap_or_default();
             if slot_history.check(self.slot()) == Check::Found {
                 let ancestors = Ancestors::from(self.proper_ancestors().collect::<Vec<_>>());
-                if let Some((account, _)) =
-                    self.load_slow_with_fixed_root(&ancestors, &slot_history_id)
-                {
+                if let Some((account, _)) = self.load_slow_with_fixed_root(
+                    &ancestors,
+                    &slot_history_id,
+                    self.return_none_for_zero_lamport_accounts(),
+                ) {
                     account_overrides.set_slot_history(Some(account));
                 }
             }
@@ -4215,7 +4302,8 @@ impl Bank {
 
     fn check_message_for_nonce(&self, message: &SanitizedMessage) -> Option<TransactionAccount> {
         let nonce_address = message.get_durable_nonce()?;
-        let nonce_account = self.get_account_with_fixed_root(nonce_address)?;
+        let nonce_account =
+            self.get_account_with_fixed_root(nonce_address, LoadZeroLamports::None)?; // here probably either is correct
         let nonce_data =
             nonce_account::verify_nonce_account(&nonce_account, message.recent_blockhash())?;
 
@@ -4984,7 +5072,8 @@ impl Bank {
                 // post-load, fee deducted, pre-execute account state
                 // stored
                 if execution_status.is_err() && !is_nonce {
-                    self.withdraw(tx.message().fee_payer(), fee)?;
+                    self.withdraw(tx.message().fee_payer(), fee, LoadZeroLamports::None)?;
+                    // here - unsure
                 }
 
                 fees += fee;
@@ -5219,7 +5308,7 @@ impl Bank {
                 };
                 if !enforce_fix || rent_to_be_paid > 0 {
                     let mut account = self
-                        .get_account_with_fixed_root(&pubkey)
+                        .get_account_with_fixed_root(&pubkey, LoadZeroLamports::None) // here
                         .unwrap_or_default();
                     if account.checked_add_lamports(rent_to_be_paid).is_err() {
                         // overflow adding lamports
@@ -5305,8 +5394,11 @@ impl Bank {
     }
 
     fn run_incinerator(&self) {
-        if let Some((account, _)) =
-            self.get_account_modified_since_parent_with_fixed_root(&incinerator::id())
+        if let Some((account, _)) = self.get_account_modified_since_parent_with_fixed_root(
+            &incinerator::id(),
+            LoadZeroLamports::None,
+        )
+        // here
         {
             self.capitalization.fetch_sub(account.lamports(), Relaxed);
             self.store_account(&incinerator::id(), &AccountSharedData::default());
@@ -6403,7 +6495,7 @@ impl Bank {
     /// Each program would need to be able to introspect its own state
     /// this is hard-coded to the Budget language
     pub fn get_balance(&self, pubkey: &Pubkey) -> u64 {
-        self.get_account(pubkey)
+        self.get_account(pubkey, LoadZeroLamports::None) // here this unwraps
             .map(|x| Self::read_balance(&x))
             .unwrap_or(0)
     }
@@ -6487,40 +6579,42 @@ impl Bank {
         pubkey: &Pubkey,
         new_account: &AccountSharedData,
     ) {
-        let old_account_data_size =
-            if let Some(old_account) = self.get_account_with_fixed_root(pubkey) {
-                match new_account.lamports().cmp(&old_account.lamports()) {
-                    std::cmp::Ordering::Greater => {
-                        let increased = new_account.lamports() - old_account.lamports();
-                        trace!(
-                            "store_account_and_update_capitalization: increased: {} {}",
-                            pubkey,
-                            increased
-                        );
-                        self.capitalization.fetch_add(increased, Relaxed);
-                    }
-                    std::cmp::Ordering::Less => {
-                        let decreased = old_account.lamports() - new_account.lamports();
-                        trace!(
-                            "store_account_and_update_capitalization: decreased: {} {}",
-                            pubkey,
-                            decreased
-                        );
-                        self.capitalization.fetch_sub(decreased, Relaxed);
-                    }
-                    std::cmp::Ordering::Equal => {}
+        let load_zero_lamports = LoadZeroLamports::None; // here - unknown
+        let old_account_data_size = if let Some(old_account) =
+            self.get_account_with_fixed_root(pubkey, load_zero_lamports)
+        {
+            match new_account.lamports().cmp(&old_account.lamports()) {
+                std::cmp::Ordering::Greater => {
+                    let increased = new_account.lamports() - old_account.lamports();
+                    trace!(
+                        "store_account_and_update_capitalization: increased: {} {}",
+                        pubkey,
+                        increased
+                    );
+                    self.capitalization.fetch_add(increased, Relaxed);
                 }
-                old_account.data().len()
-            } else {
-                trace!(
-                    "store_account_and_update_capitalization: created: {} {}",
-                    pubkey,
-                    new_account.lamports()
-                );
-                self.capitalization
-                    .fetch_add(new_account.lamports(), Relaxed);
-                0
-            };
+                std::cmp::Ordering::Less => {
+                    let decreased = old_account.lamports() - new_account.lamports();
+                    trace!(
+                        "store_account_and_update_capitalization: decreased: {} {}",
+                        pubkey,
+                        decreased
+                    );
+                    self.capitalization.fetch_sub(decreased, Relaxed);
+                }
+                std::cmp::Ordering::Equal => {}
+            }
+            old_account.data().len()
+        } else {
+            trace!(
+                "store_account_and_update_capitalization: created: {} {}",
+                pubkey,
+                new_account.lamports()
+            );
+            self.capitalization
+                .fetch_add(new_account.lamports(), Relaxed);
+            0
+        };
 
         self.store_account(pubkey, new_account);
         self.calculate_and_update_accounts_data_size_delta_off_chain(
@@ -6529,8 +6623,13 @@ impl Bank {
         );
     }
 
-    fn withdraw(&self, pubkey: &Pubkey, lamports: u64) -> Result<()> {
-        match self.get_account_with_fixed_root(pubkey) {
+    fn withdraw(
+        &self,
+        pubkey: &Pubkey,
+        lamports: u64,
+        load_zero_lamports: LoadZeroLamports,
+    ) -> Result<()> {
+        match self.get_account_with_fixed_root(pubkey, load_zero_lamports) {
             Some(mut account) => {
                 let min_balance = match get_system_account_kind(&account) {
                     Some(SystemAccountKind::Nonce) => self
@@ -6562,7 +6661,9 @@ impl Bank {
     ) -> std::result::Result<u64, LamportsError> {
         // This doesn't collect rents intentionally.
         // Rents should only be applied to actual TXes
-        let mut account = self.get_account_with_fixed_root(pubkey).unwrap_or_default();
+        let mut account = self
+            .get_account_with_fixed_root(pubkey, LoadZeroLamports::None)
+            .unwrap_or_default(); // here
         account.checked_add_lamports(lamports)?;
         self.store_account(pubkey, &account);
         Ok(account.lamports())
@@ -6633,8 +6734,12 @@ impl Bank {
     // Hi! leaky abstraction here....
     // try to use get_account_with_fixed_root() if it's called ONLY from on-chain runtime account
     // processing. That alternative fn provides more safety.
-    pub fn get_account(&self, pubkey: &Pubkey) -> Option<AccountSharedData> {
-        self.get_account_modified_slot(pubkey)
+    pub fn get_account(
+        &self,
+        pubkey: &Pubkey,
+        load_zero_lamports: LoadZeroLamports,
+    ) -> Option<AccountSharedData> {
+        self.get_account_modified_slot(pubkey, load_zero_lamports)
             .map(|(acc, _slot)| acc)
     }
 
@@ -6644,13 +6749,21 @@ impl Bank {
     // running).
     // pro: safer assertion can be enabled inside AccountsDb
     // con: panics!() if called from off-chain processing
-    pub fn get_account_with_fixed_root(&self, pubkey: &Pubkey) -> Option<AccountSharedData> {
-        self.load_slow_with_fixed_root(&self.ancestors, pubkey)
+    pub fn get_account_with_fixed_root(
+        &self,
+        pubkey: &Pubkey,
+        load_zero_lamports: LoadZeroLamports,
+    ) -> Option<AccountSharedData> {
+        self.load_slow_with_fixed_root(&self.ancestors, pubkey, load_zero_lamports)
             .map(|(acc, _slot)| acc)
     }
 
-    pub fn get_account_modified_slot(&self, pubkey: &Pubkey) -> Option<(AccountSharedData, Slot)> {
-        self.load_slow(&self.ancestors, pubkey)
+    pub fn get_account_modified_slot(
+        &self,
+        pubkey: &Pubkey,
+        load_zero_lamports: LoadZeroLamports,
+    ) -> Option<(AccountSharedData, Slot)> {
+        self.load_slow(&self.ancestors, pubkey, load_zero_lamports)
     }
 
     fn load_slow(
@@ -6772,9 +6885,12 @@ impl Bank {
     fn get_account_modified_since_parent_with_fixed_root(
         &self,
         pubkey: &Pubkey,
+        load_zero_lamports: LoadZeroLamports,
     ) -> Option<(AccountSharedData, Slot)> {
         let just_self: Ancestors = Ancestors::from(vec![self.slot()]);
-        if let Some((account, slot)) = self.load_slow_with_fixed_root(&just_self, pubkey) {
+        if let Some((account, slot)) =
+            self.load_slow_with_fixed_root(&just_self, pubkey, load_zero_lamports)
+        {
             if slot == self.slot() {
                 return Some((account, slot));
             }
@@ -7701,6 +7817,7 @@ impl Bank {
         caller: ApplyFeatureActivationsCaller,
         debug_do_not_add_builtins: bool,
     ) {
+        let load_zero_lamports = LoadZeroLamports::None; // here
         use ApplyFeatureActivationsCaller::*;
         let allow_new_activations = match caller {
             FinishInit => false,
@@ -7744,7 +7861,7 @@ impl Bank {
                 allow_new_activations,
                 &new_feature_activations,
             );
-            self.reconfigure_token2_native_mint();
+            self.reconfigure_token2_native_mint(load_zero_lamports);
         }
 
         if new_feature_activations.contains(&feature_set::cap_accounts_data_len::id()) {
@@ -7762,6 +7879,7 @@ impl Bank {
 
     // Compute the active feature set based on the current bank state, and return the set of newly activated features
     fn compute_active_feature_set(&mut self, allow_new_activations: bool) -> HashSet<Pubkey> {
+        let load_zero_lamports = LoadZeroLamports::None; // here
         let mut active = self.feature_set.active.clone();
         let mut inactive = HashSet::new();
         let mut newly_activated = HashSet::new();
@@ -7769,7 +7887,9 @@ impl Bank {
 
         for feature_id in &self.feature_set.inactive {
             let mut activated = None;
-            if let Some(mut account) = self.get_account_with_fixed_root(feature_id) {
+            if let Some(mut account) =
+                self.get_account_with_fixed_root(feature_id, load_zero_lamports)
+            {
                 if let Some(mut feature) = feature::from_account(&account) {
                     match feature.activated_at {
                         None => {
@@ -7850,8 +7970,12 @@ impl Bank {
         new_address: &Pubkey,
         datapoint_name: &'static str,
     ) {
-        if let Some(old_account) = self.get_account_with_fixed_root(old_address) {
-            if let Some(new_account) = self.get_account_with_fixed_root(new_address) {
+        let load_zero_lamports = LoadZeroLamports::None; // here
+        if let Some(old_account) = self.get_account_with_fixed_root(old_address, load_zero_lamports)
+        {
+            if let Some(new_account) =
+                self.get_account_with_fixed_root(new_address, load_zero_lamports)
+            {
                 datapoint_info!(datapoint_name, ("slot", self.slot, i64));
 
                 // Burn lamports in the old account
@@ -7874,7 +7998,7 @@ impl Bank {
         }
     }
 
-    fn reconfigure_token2_native_mint(&mut self) {
+    fn reconfigure_token2_native_mint(&mut self, load_zero_lamports: LoadZeroLamports) {
         let reconfigure_token2_native_mint = match self.cluster_type() {
             ClusterType::Development => true,
             ClusterType::Devnet => true,
@@ -7895,9 +8019,11 @@ impl Bank {
             // https://github.com/solana-labs/solana-program-library/issues/374, ensure that the
             // spl-token 2 native mint account is owned by the spl-token 2 program.
             let old_account_data_size;
-            let store = if let Some(existing_native_mint_account) =
-                self.get_account_with_fixed_root(&inline_spl_token::native_mint::id())
-            {
+            let store = if let Some(existing_native_mint_account) = self
+                .get_account_with_fixed_root(
+                    &inline_spl_token::native_mint::id(),
+                    load_zero_lamports,
+                ) {
                 old_account_data_size = existing_native_mint_account.data().len();
                 if existing_native_mint_account.owner() == &solana_sdk::system_program::id() {
                     native_mint_account.set_lamports(existing_native_mint_account.lamports());

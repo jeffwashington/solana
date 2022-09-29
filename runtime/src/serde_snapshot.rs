@@ -568,6 +568,7 @@ where
         additional_builtins,
         debug_do_not_add_builtins,
         reconstructed_accounts_db_info.accounts_data_len,
+        crate::accounts_db::LoadZeroLamports::None, // here
     );
 
     info!("rent_collector: {:?}", bank.rent_collector());

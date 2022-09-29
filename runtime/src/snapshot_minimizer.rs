@@ -185,7 +185,10 @@ impl<'a> SnapshotMinimizer<'a> {
         let owner_accounts: HashSet<_> = self
             .minimized_account_set
             .par_iter()
-            .filter_map(|pubkey| self.bank.get_account(&pubkey))
+            .filter_map(|pubkey| {
+                self.bank
+                    .get_account(&pubkey, crate::accounts_db::LoadZeroLamports::None)
+            }) // here
             .map(|account| *account.owner())
             .collect();
         owner_accounts.into_par_iter().for_each(|pubkey| {
@@ -199,7 +202,10 @@ impl<'a> SnapshotMinimizer<'a> {
         let programdata_accounts: HashSet<_> = self
             .minimized_account_set
             .par_iter()
-            .filter_map(|pubkey| self.bank.get_account(&pubkey))
+            .filter_map(|pubkey| {
+                self.bank
+                    .get_account(&pubkey, crate::accounts_db::LoadZeroLamports::None)
+            }) // here
             .filter(|account| account.executable())
             .filter(|account| bpf_loader_upgradeable::check_id(account.owner()))
             .filter_map(|account| {

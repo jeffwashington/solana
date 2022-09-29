@@ -145,6 +145,9 @@ pub enum StoreReclaims {
     Ignore,
 }
 
+pub const LOAD_ZERO_LAMPORTS_UNSURE = LoadZeroLamports::SomeWithZeroLamportAccount;
+pub const LOAD_ZERO_LAMPORTS_FINE_EITHER_WAY = LoadZeroLamports::Zero;
+
 /// specifies how to return zero lamport accounts
 /// This will only be useful until a feature activation occurs.
 #[derive(Clone, Copy)]
@@ -4705,7 +4708,7 @@ impl AccountsDb {
             ancestors,
             pubkey,
             LoadHint::FixedMaxRoot,
-                    load_zero_lamports,
+            load_zero_lamports,
         )
     }
 
