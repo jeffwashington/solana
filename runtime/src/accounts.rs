@@ -671,8 +671,11 @@ impl Accounts {
         ancestors: &Ancestors,
         pubkey: &Pubkey,
         load_hint: LoadHint,
+        load_zero_lamports: LoadZeroLamports,
     ) -> Option<(AccountSharedData, Slot)> {
-        let (account, slot) = self.accounts_db.load(ancestors, pubkey, load_hint)?;
+        let (account, slot) =
+            self.accounts_db
+                .load(ancestors, pubkey, load_hint, load_zero_lamports)?;
         Self::filter_zero_lamport_account(account, slot)
     }
 
@@ -680,16 +683,23 @@ impl Accounts {
         &self,
         ancestors: &Ancestors,
         pubkey: &Pubkey,
+        load_zero_lamports: LoadZeroLamports,
     ) -> Option<(AccountSharedData, Slot)> {
-        self.load_slow(ancestors, pubkey, LoadHint::FixedMaxRoot)
+        self.load_slow(
+            ancestors,
+            pubkey,
+            LoadHint::FixedMaxRoot,
+            load_zero_lamports,
+        )
     }
 
     pub fn load_without_fixed_root(
         &self,
         ancestors: &Ancestors,
         pubkey: &Pubkey,
+        load_zero_lamports: LoadZeroLamports,
     ) -> Option<(AccountSharedData, Slot)> {
-        self.load_slow(ancestors, pubkey, LoadHint::Unspecified)
+        self.load_slow(ancestors, pubkey, LoadHint::Unspecified, load_zero_lamports)
     }
 
     /// scans underlying accounts_db for this delta (slot) with a map function

@@ -4674,12 +4674,25 @@ impl AccountsDb {
         ancestors: &Ancestors,
         pubkey: &Pubkey,
         load_hint: LoadHint,
+        load_zero_lamports: LoadZeroLamports,
     ) -> Option<(AccountSharedData, Slot)> {
-        self.do_load(ancestors, pubkey, None, load_hint)
+        self.do_load(ancestors, pubkey, None, load_hint, load_zero_lamports)
     }
 
-    pub fn load_account_into_read_cache(&self, ancestors: &Ancestors, pubkey: &Pubkey) {
-        self.do_load_with_populate_read_cache(ancestors, pubkey, None, LoadHint::Unspecified, true);
+    pub fn load_account_into_read_cache(
+        &self,
+        ancestors: &Ancestors,
+        pubkey: &Pubkey,
+        load_zero_lamports: LoadZeroLamports,
+    ) {
+        self.do_load_with_populate_read_cache(
+            ancestors,
+            pubkey,
+            None,
+            LoadHint::Unspecified,
+            true,
+            load_zero_lamports,
+        );
     }
 
     pub fn load_with_fixed_root(
@@ -4688,21 +4701,21 @@ impl AccountsDb {
         pubkey: &Pubkey,
         load_zero_lamports: LoadZeroLamports,
     ) -> Option<(AccountSharedData, Slot)> {
-        self.load(ancestors, pubkey, LoadHint::FixedMaxRoot)
-            .filter(|(account, _)| {
-                matches!(
+        self.load(
+            ancestors,
+            pubkey,
+            LoadHint::FixedMaxRoot,
                     load_zero_lamports,
-                    LoadZeroLamports::SomeWithZeroLamportAccount
-                ) || !account.is_zero_lamport()
-            })
+        )
     }
 
     pub fn load_without_fixed_root(
         &self,
         ancestors: &Ancestors,
         pubkey: &Pubkey,
+        load_zero_lamports: LoadZeroLamports,
     ) -> Option<(AccountSharedData, Slot)> {
-        self.load(ancestors, pubkey, LoadHint::Unspecified)
+        self.load(ancestors, pubkey, LoadHint::Unspecified, load_zero_lamports)
     }
 
     fn read_index_for_accessor_or_load_slow<'a>(
@@ -5021,8 +5034,16 @@ impl AccountsDb {
         pubkey: &Pubkey,
         max_root: Option<Slot>,
         load_hint: LoadHint,
+        load_zero_lamports: LoadZeroLamports,
     ) -> Option<(AccountSharedData, Slot)> {
-        self.do_load_with_populate_read_cache(ancestors, pubkey, max_root, load_hint, false)
+        self.do_load_with_populate_read_cache(
+            ancestors,
+            pubkey,
+            max_root,
+            load_hint,
+            false,
+            load_zero_lamports,
+        )
     }
 
     /// if 'load_into_read_cache_only', then return value is meaningless.
@@ -5034,6 +5055,7 @@ impl AccountsDb {
         max_root: Option<Slot>,
         load_hint: LoadHint,
         load_into_read_cache_only: bool,
+        load_zero_lamports: LoadZeroLamports,
     ) -> Option<(AccountSharedData, Slot)> {
         #[cfg(not(test))]
         assert!(max_root.is_none());
@@ -5048,6 +5070,11 @@ impl AccountsDb {
                 if !in_write_cache {
                     let result = self.read_only_accounts_cache.load(*pubkey, slot);
                     if let Some(account) = result {
+                        if matches!(load_zero_lamports, LoadZeroLamports::None)
+                            && account.is_zero_lamport()
+                        {
+                            return None;
+                        }
                         return Some((account, slot));
                     }
                 }
@@ -5075,6 +5102,9 @@ impl AccountsDb {
         let loaded_account = account_accessor.check_and_get_loaded_account();
         let is_cached = loaded_account.is_cached();
         let account = loaded_account.take_account();
+        if matches!(load_zero_lamports, LoadZeroLamports::None) && account.is_zero_lamport() {
+            return None;
+        }
 
         if self.caching_enabled && !is_cached {
             /*
