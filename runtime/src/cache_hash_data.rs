@@ -149,9 +149,10 @@ impl MappedCacheFile {
             let mut pubkey_to_bin_index = bin_calculator.bin_from_pubkey(&d.pubkey);
             assert!(
                 pubkey_to_bin_index >= start_bin_index,
-                "{}, {}",
+                "{}, {}, {}",
                 pubkey_to_bin_index,
-                start_bin_index
+                start_bin_index,
+                d.pubkey
             ); // this would indicate we put a pubkey in too high of a bin
             pubkey_to_bin_index -= start_bin_index;
             accumulator[pubkey_to_bin_index].push(d.clone()); // may want to avoid clone here
