@@ -7085,6 +7085,7 @@ impl AccountsDb {
         epoch_schedule: &EpochSchedule,
         rent_collector: &RentCollector,
         can_cached_slot_be_unflushed: bool,
+        use_bg_thread_pool: bool,
     ) -> Result<(), BankHashVerificationError> {
         self.verify_bank_hash_and_lamports_new(
             slot,
@@ -7096,6 +7097,7 @@ impl AccountsDb {
             can_cached_slot_be_unflushed,
             false,
             false,
+            use_bg_thread_pool,
         )
     }
 
@@ -7112,20 +7114,19 @@ impl AccountsDb {
         can_cached_slot_be_unflushed: bool,
         ignore_mismatch: bool,
         store_hash_raw_data_for_debug: bool,
+        use_bg_thread_pool: bool,
     ) -> Result<(), BankHashVerificationError> {
         use BankHashVerificationError::*;
 
         let use_index = false;
         let check_hash = false; // this will not be supported anymore
-                                // interesting to consider this
-        let is_startup = true;
         let (calculated_hash, calculated_lamports) = self
             .calculate_accounts_hash_helper_with_verify(
                 use_index,
                 test_hash_calculation,
                 slot,
                 CalcAccountsHashConfig {
-                    use_bg_thread_pool: !is_startup,
+                    use_bg_thread_pool,
                     check_hash,
                     ancestors: Some(ancestors),
                     use_write_cache: can_cached_slot_be_unflushed,
@@ -11430,6 +11431,7 @@ pub mod tests {
                 &EpochSchedule::default(),
                 &RentCollector::default(),
                 false,
+                false,
             )
             .unwrap();
     }
@@ -11834,6 +11836,7 @@ pub mod tests {
                 &EpochSchedule::default(),
                 &RentCollector::default(),
                 false,
+                false,
             ),
             Ok(_)
         );
@@ -11847,6 +11850,7 @@ pub mod tests {
                 true,
                 &EpochSchedule::default(),
                 &RentCollector::default(),
+                false,
                 false,
             ),
             Err(MissingBankHash)
@@ -11870,6 +11874,7 @@ pub mod tests {
                 true,
                 &EpochSchedule::default(),
                 &RentCollector::default(),
+                false,
                 false,
             ),
             Err(MismatchedBankHash)
@@ -11899,7 +11904,8 @@ pub mod tests {
                 true,
                 &EpochSchedule::default(),
                 &RentCollector::default(),
-                false
+                false,
+                false,
             ),
             Ok(_)
         );
@@ -11921,13 +11927,14 @@ pub mod tests {
                 true,
                 &EpochSchedule::default(),
                 &RentCollector::default(),
-                false
+                false,
+                false,
             ),
             Ok(_)
         );
 
         assert_matches!(
-            db.verify_bank_hash_and_lamports(some_slot, &ancestors, 10, true, &EpochSchedule::default(), &RentCollector::default(), false),
+            db.verify_bank_hash_and_lamports(some_slot, &ancestors, 10, true, &EpochSchedule::default(), &RentCollector::default(), false, false),
             Err(MismatchedTotalLamports(expected, actual)) if expected == 2 && actual == 10
         );
     }
@@ -11954,7 +11961,8 @@ pub mod tests {
                 true,
                 &EpochSchedule::default(),
                 &RentCollector::default(),
-                false
+                false,
+                false,
             ),
             Ok(_)
         );
@@ -11998,7 +12006,8 @@ pub mod tests {
                 true,
                 &EpochSchedule::default(),
                 &RentCollector::default(),
-                false
+                false,
+                false,
             ),
             Err(MismatchedBankHash)
         );
@@ -12618,6 +12627,7 @@ pub mod tests {
                     &EpochSchedule::default(),
                     &RentCollector::default(),
                     false,
+                    false,
                 )
                 .unwrap();
 
@@ -12630,6 +12640,7 @@ pub mod tests {
                     true,
                     &EpochSchedule::default(),
                     &RentCollector::default(),
+                    false,
                     false,
                 )
                 .unwrap();
