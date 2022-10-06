@@ -4527,7 +4527,7 @@ impl AccountsDb {
         loop {
 
             if pubkey == &interesting {
-                error!("trying: {:?}", pubkey);
+                error!("trying: {:?}, slot: {slot}, storage: {storage_location:?}", pubkey);
             }
             let account_accessor = self.get_account_accessor(slot, pubkey, &storage_location);
             match account_accessor {
