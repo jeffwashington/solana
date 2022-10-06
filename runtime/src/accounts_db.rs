@@ -4656,13 +4656,14 @@ impl AccountsDb {
                 inc_new_counter_info!("retry_to_get_account_accessor-panic", 1);
                 
                 let message = format!(
-                    "Bad index entry detected ({}, {}, {:?}, {:?}, {:?}, {:?})",
+                    "Bad index entry detected ({}, {}, {:?}, {:?}, {:?}, {:?}, write cache has slot: {})",
                     pubkey,
                     slot,
                     storage_location,
                     load_hint,
                     new_storage_location,
-                    self.accounts_index.get_account_read_entry(pubkey)
+                    self.accounts_index.get_account_read_entry(pubkey),
+                    self.accounts_cache.cache.contains_key(&slot),
                 );
                 // Considering that we've failed to get accessor above and further that
                 // the index still returned the same (slot, store_id) tuple, offset must be same
