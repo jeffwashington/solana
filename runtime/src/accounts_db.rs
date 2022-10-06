@@ -4520,9 +4520,15 @@ impl AccountsDb {
             sleep(Duration::from_millis(self.load_delay));
         }
 
+        let interesting = Pubkey::from_str("Diman2GphWLwECE3swjrAEAJniezpYLxK1edUydiDZau").unwrap();
+
         // Failsafe for potential race conditions with other subsystems
         let mut num_acceptable_failed_iterations = 0;
         loop {
+
+            if pubkey == &interesting {
+                error!("trying: {:?}", pubkey);
+            }
             let account_accessor = self.get_account_accessor(slot, pubkey, &storage_location);
             match account_accessor {
                 LoadedAccountAccessor::Cached(Some(_)) | LoadedAccountAccessor::Stored(Some(_)) => {
