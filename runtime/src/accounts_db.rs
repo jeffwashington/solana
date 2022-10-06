@@ -4614,6 +4614,10 @@ impl AccountsDb {
                 // The latest version of the account existed in the index, but could not be
                 // fetched from storage. This means a race occurred between this function and clean
                 // accounts/purge_slots
+                if pubkey == &interesting {
+                    error!("fallback: {:?}, slot: {slot}, storage: {storage_location:?}", pubkey);
+                }
+    
                 let message = format!(
                     "do_load() failed to get key: {} from storage, latest attempt was for \
                      slot: {}, storage_location: {:?}, load_hint: {:?}",
@@ -4634,6 +4638,19 @@ impl AccountsDb {
                     fallback_to_slow_path,
                 )?;
             // Notice the subtle `?` at previous line, we bail out pretty early if missing.
+
+            if pubkey == &interesting {
+                let message = format!(
+                    "Bad index entry detected ({}, {}, {:?}, {:?}, {:?}, {:?})",
+                    pubkey,
+                    slot,
+                    storage_location,
+                    load_hint,
+                    new_storage_location,
+                    self.accounts_index.get_account_read_entry(pubkey)
+                );
+                error!("checking: {:?}, slot: {slot}, storage: {storage_location:?}, {message}", pubkey);
+            }
 
             if new_slot == slot && new_storage_location.is_store_id_equal(&storage_location) {
                 inc_new_counter_info!("retry_to_get_account_accessor-panic", 1);
@@ -4677,12 +4694,20 @@ impl AccountsDb {
                 // which is referring back here.
                 panic!("{message}");
             } else if fallback_to_slow_path {
+                if pubkey == &interesting {
+                    error!("return some: {:?}, slot: {slot}, storage: {storage_location:?}", pubkey);
+                }
+
                 // the above bad-index-entry check must had been checked first to retain the same
                 // behavior
                 return Some((
                     maybe_account_accessor.expect("must be some if clone_in_lock=true"),
                     new_slot,
                 ));
+            }
+
+            if pubkey == &interesting {
+                error!("retry: {:?}, slot: {slot}, storage: {storage_location:?}", pubkey);
             }
 
             slot = new_slot;
