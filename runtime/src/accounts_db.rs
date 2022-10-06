@@ -5392,6 +5392,7 @@ impl AccountsDb {
     }
 
     pub fn remove_unrooted_slots(&self, remove_slots: &[(Slot, BankId)]) {
+        error!("remove_unrooted_slots: {:?}", remove_slots);
         let rooted_slots = self
             .accounts_index
             .get_rooted_from_list(remove_slots.iter().map(|(slot, _)| slot));
@@ -5988,6 +5989,8 @@ impl AccountsDb {
     ) -> Option<FlushStats> {
         assert_eq!(1, slots.len());
         let slot = slots[0];
+        error!("flush_slot_cache_with_clean: {:?}", slots);
+
         if self
             .remove_unrooted_slots_synchronization
             .slots_under_contention
