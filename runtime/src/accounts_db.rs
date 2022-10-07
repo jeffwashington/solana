@@ -1051,6 +1051,7 @@ type AccountInfoAccountsIndex = AccountsIndex<AccountInfo>;
 // This structure handles the load/store of the accounts
 #[derive(Debug)]
 pub struct AccountsDb {
+    pub duplicates: DashSet<Slot>,
     /// Keeps tracks of index into AppendVec on a per slot basis
     pub accounts_index: AccountInfoAccountsIndex,
 
@@ -1938,6 +1939,7 @@ impl AccountsDb {
         const ACCOUNTS_STACK_SIZE: usize = 8 * 1024 * 1024;
 
         AccountsDb {
+            duplicates: DashSet::default(),
             verify_accounts_hash_in_bg: VerifyAccountsHashInBackground::default(),
             filler_accounts_per_slot: AtomicU64::default(),
             filler_account_slots_remaining: AtomicU64::default(),
@@ -4316,6 +4318,7 @@ impl AccountsDb {
                 "set_hash: already exists; multiple forks with shared slot {} as child (parent: {})!?",
                 slot, parent_slot,
             );
+            self.duplicates.insert(slot);
             return;
         }
 
@@ -4523,10 +4526,6 @@ impl AccountsDb {
         // Failsafe for potential race conditions with other subsystems
         let mut num_acceptable_failed_iterations = 0;
         loop {
-
-            if pubkey == &interesting {
-                error!("trying: {:?}, slot: {slot}, storage: {storage_location:?}", pubkey);
-            }
             let account_accessor = self.get_account_accessor(slot, pubkey, &storage_location);
             match account_accessor {
                 LoadedAccountAccessor::Cached(Some(_)) | LoadedAccountAccessor::Stored(Some(_)) => {
@@ -4612,10 +4611,6 @@ impl AccountsDb {
                 // The latest version of the account existed in the index, but could not be
                 // fetched from storage. This means a race occurred between this function and clean
                 // accounts/purge_slots
-                if pubkey == &interesting {
-                    error!("fallback: {:?}, slot: {slot}, storage: {storage_location:?}", pubkey);
-                }
-    
                 let message = format!(
                     "do_load() failed to get key: {} from storage, latest attempt was for \
                      slot: {}, storage_location: {:?}, load_hint: {:?}",
@@ -4636,19 +4631,6 @@ impl AccountsDb {
                     fallback_to_slow_path,
                 )?;
             // Notice the subtle `?` at previous line, we bail out pretty early if missing.
-
-            if pubkey == &interesting {
-                let message = format!(
-                    "Bad index entry detected ({}, {}, {:?}, {:?}, {:?}, {:?})",
-                    pubkey,
-                    slot,
-                    storage_location,
-                    load_hint,
-                    new_storage_location,
-                    self.accounts_index.get_account_read_entry(pubkey)
-                );
-                error!("checking: {:?}, slot: {slot}, storage: {storage_location:?}, {message}", pubkey);
-            }
 
             if new_slot == slot && new_storage_location.is_store_id_equal(&storage_location) {
                 inc_new_counter_info!("retry_to_get_account_accessor-panic", 1);
@@ -4693,20 +4675,12 @@ impl AccountsDb {
                 // which is referring back here.
                 panic!("{message}");
             } else if fallback_to_slow_path {
-                if pubkey == &interesting {
-                    error!("return some: {:?}, slot: {slot}, storage: {storage_location:?}", pubkey);
-                }
-
                 // the above bad-index-entry check must had been checked first to retain the same
                 // behavior
                 return Some((
                     maybe_account_accessor.expect("must be some if clone_in_lock=true"),
                     new_slot,
                 ));
-            }
-
-            if pubkey == &interesting {
-                error!("retry: {:?}, slot: {slot}, storage: {storage_location:?}", pubkey);
             }
 
             slot = new_slot;
@@ -7679,7 +7653,7 @@ impl AccountsDb {
         accounts_index_root_stats.clean_dead_slot_us += measure.as_us();
         if self.log_dead_slots.load(Ordering::Relaxed) {
             info!(
-                "remove_dead_slots_metadata: {} dead slots",
+                "remove_dead_slots_metadata: {} dead slots, dead_slots: {dead_slots:?}",
                 dead_slots.len()
             );
             trace!("remove_dead_slots_metadata: dead_slots: {:?}", dead_slots);
