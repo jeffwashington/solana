@@ -1491,7 +1491,12 @@ fn load_frozen_forks(
                 // Filter out all non descendants of the new root
                 pending_slots
                     .retain(|(_, pending_bank, _)| pending_bank.ancestors.contains_key(&root));
-                all_banks.retain(|_, bank| bank.ancestors.contains_key(&root));
+                all_banks.retain(|_, bank| {
+                    let result = bank.ancestors.contains_key(&root);
+                    if !result {
+                        error!("dropping bank: {} because root made at: {}, ancestors: {:?}", bank.slot(), new_root_bank.slot(), bank.ancestors);
+                    }
+                result});
             }
 
             slots_elapsed += 1;
