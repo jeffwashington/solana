@@ -1520,10 +1520,12 @@ fn load_frozen_forks(
             error!("jw: {}", line!());
 
             if slot >= halt_at_slot {
+                error!("jw: {}", line!());
                 run_final_hash_calc(&bank, on_halt_store_hash_raw_data_for_debug);
                 break;
             }
         }
+        error!("jw: {}, pending slots empty", line!());
     } else if on_halt_store_hash_raw_data_for_debug {
         run_final_hash_calc(
             &bank_forks.read().unwrap().root_bank(),

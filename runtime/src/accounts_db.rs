@@ -7587,7 +7587,7 @@ impl AccountsDb {
             for slot in dead_slots_iter {
                 if self.duplicates.contains(slot) {
                     inc_new_counter_info!("retry_to_get_account_accessor-panic", 1);
-                    panic!("cleaning slot that was duplicate: {slot}");
+                    error!("cleaning slot that was duplicate: {slot}");
                 }
                 bank_hashes.remove(slot);
             }
