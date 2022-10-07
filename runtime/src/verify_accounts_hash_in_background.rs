@@ -55,7 +55,10 @@ impl VerifyAccountsHashInBackground {
     /// This can occur because it completed in the background
     /// or if the verification was run in the foreground.
     pub(crate) fn verification_complete(&self) {
-        assert!(!self.verified.swap(true, Ordering::Release));
+        let old = !self.verified.swap(true, Ordering::Release);
+        if old {
+            error!("reentrant verification complete");
+        }
     }
 
     /// block until bg process is complete
