@@ -7585,6 +7585,23 @@ impl AccountsDb {
         {
             let mut bank_hashes = self.bank_hashes.write().unwrap();
             for slot in dead_slots_iter {
+                /*
+                 [2022-10-07T20:12:56.778311788Z ERROR solana_runtime::accounts_background_service] abs remove_dead_slots
+[2022-10-07T20:12:56.778345483Z INFO  solana_metrics::metrics] datapoint: external_purge_slots_stats safety_checks_elapsed=0i remove_cache_elapsed=46931i remove_storage_entries_elapsed=0i drop_storage_entries_elapsed=0i num_cached_slots_removed=11i num_stored_slots_removed=0i total_removed_storage_entries=0i total_removed_cached_bytes=241334930i total_removed_stored_bytes=0i recycle_stores_write_elapsed=0i scan_storages_elapsed=0i purge_accounts_index_elapsed=0i handle_reclaims_elapsed=0i
+[2022-10-07T20:12:56.778393865Z INFO  solana_runtime::accounts_db] remove_dead_slots_metadata: 1 dead slots, dead_slots: [154185568]
+thread 'solBgAccounts' panicked at 'cleaning slot that was duplicate: 154185568', runtime/src/accounts_db.rs:7590:21
+stack backtrace:
+[2022-10-07T20:12:56.798757132Z INFO  solana_metrics::metrics] datapoint: Gossip streamer-send-sample_duration_ms=393i streamer-send-host_count=1164i streamer-send-bytes_total=2180067i streamer-send-pkt_count_total=2060i streamer-send-host_bytes_min=1050i streamer-send-host_bytes_max=9536i streamer-send-host_bytes_mean=1875i streamer-send-host_bytes_90pct=3179i streamer-send-host_bytes_50pct=1060i streamer-send-host_bytes_10pct=1060i
+[2022-10-07T20:12:56.798764606Z INFO  solana_streamer::streamer] streamer send Gossip hosts: count:1164 [(69.197.13.5, SendStats { bytes: 9531, count: 9 }), (65.109.52.186, SendStats { bytes: 9531, count: 9 }), (65.108.127.108, SendStats { bytes: 8472, count: 8 }), (66.23.234.14, SendStats { bytes: 7413, count: 7 }), (65.108.226.27, SendStats { bytes: 7413, count: 7 })]
+   0: rust_begin_unwind
+             at ./rustc/7737e0b5c4103216d6fd8cf941b7ab9bdbaace7c/library/std/src/panicking.rs:584:5
+   1: core::panicking::panic_fmt
+             at ./rustc/7737e0b5c4103216d6fd8cf941b7ab9bdbaace7c/library/core/src/panicking.rs:143:14
+   2: solana_runtime::accounts_db::AccountsDb::purge_slot_cache_pubkeys
+   3: solana_runtime::accounts_db::AccountsDb::purge_slot_cache
+   4: solana_runtime::accounts_db::AccountsDb::purge_slot
+
+   */
                 if self.duplicates.contains(slot) {
                     inc_new_counter_info!("retry_to_get_account_accessor-panic", 1);
                     error!("cleaning slot that was duplicate: {slot}");
