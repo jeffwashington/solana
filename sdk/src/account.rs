@@ -94,10 +94,14 @@ impl Serialize for AccountSharedData {
     }
 }
 
+lazy_static!(
+    default_emptydata = Arc::new(Vec::default());
+)
+
 /// An Account with data that is stored on chain
 /// This will be the in-memory representation of the 'Account' struct data.
 /// The existing 'Account' structure cannot easily change due to downstream projects.
-#[derive(PartialEq, Eq, Clone, Default, AbiExample, Deserialize)]
+#[derive(PartialEq, Eq, Clone, AbiExample, Deserialize)]
 #[serde(from = "Account")]
 pub struct AccountSharedData {
     /// lamports in the account
@@ -111,6 +115,11 @@ pub struct AccountSharedData {
     /// the epoch at which this account will next owe rent
     rent_epoch: Epoch,
 }
+
+impl Default for AccountSharedData {
+    use default_emptydata here
+}
+
 
 /// Compares two ReadableAccounts
 ///
@@ -194,6 +203,7 @@ pub trait ReadableAccount: Sized {
     fn executable(&self) -> bool;
     fn rent_epoch(&self) -> Epoch;
     fn to_account_shared_data(&self) -> AccountSharedData {
+        if data.len() = 0, use default
         AccountSharedData::create(
             self.lamports(),
             self.data().to_vec(),
@@ -544,6 +554,7 @@ impl AccountSharedData {
             Some(data) => data,
             // If the buffer is shared, the cheapest thing to do is to clone the
             // incoming slice and replace the buffer.
+            do we call this with zero len data ever?
             None => return self.set_data(new_data.to_vec()),
         };
 
