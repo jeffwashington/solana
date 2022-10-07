@@ -4520,8 +4520,6 @@ impl AccountsDb {
             sleep(Duration::from_millis(self.load_delay));
         }
 
-        let interesting = Pubkey::from_str("Diman2GphWLwECE3swjrAEAJniezpYLxK1edUydiDZau").unwrap();
-
         // Failsafe for potential race conditions with other subsystems
         let mut num_acceptable_failed_iterations = 0;
         loop {
