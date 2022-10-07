@@ -448,19 +448,11 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         reclaims: &mut SlotList<T>,
         reclaim: UpsertReclaim,
     ) {
-        use log::*;
-        use std::str::FromStr;
-        let interesting = Pubkey::from_str("Diman2GphWLwECE3swjrAEAJniezpYLxK1edUydiDZau").unwrap();
-
         let mut updated_in_mem = true;
         // try to get it just from memory first using only a read lock
         self.get_only_in_mem(pubkey, |entry| {
             if let Some(entry) = entry {
                 let i = new_value.into();
-                if pubkey == &interesting {
-                    error!("upsert: {pubkey}, new_value: {i:?}");
-                }
-        
                 Self::lock_and_update_slot_list(
                     entry,
                     i,
@@ -479,9 +471,6 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                     Entry::Occupied(mut occupied) => {
                         let current = occupied.get_mut();
                         let i = new_value.into();
-                        if pubkey == &interesting {
-                            error!("upsert: {pubkey}, new_value: {i:?}");
-                        }
                                 Self::lock_and_update_slot_list(
                             current,
                             i,
@@ -513,9 +502,6 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                             let new_value = if let Some(disk_entry) = disk_entry {
                                 // on disk, so merge new_value with what was on disk
                                 let i = new_value.into();
-                                if pubkey == &interesting {
-                                    error!("upsert: {pubkey}, new_value: {i:?}");
-                                }
                                 Self::lock_and_update_slot_list(
                                     &disk_entry,
                                     i,
@@ -527,12 +513,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                             } else {
                                 // not on disk, so insert new thing
                                 self.stats().inc_insert();
-                                let i = new_value.into_account_map_entry(&self.storage);
-                                if pubkey == &interesting {
-                                    error!("upsert: {pubkey}, new_value: {i:?}");
-                                }
-                                i
-                
+                                new_value.into_account_map_entry(&self.storage)
                             };
                             assert!(new_value.dirty());
                             vacant.insert(new_value);
