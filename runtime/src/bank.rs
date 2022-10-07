@@ -8007,6 +8007,7 @@ pub struct TotalAccountsStats {
 
 impl Drop for Bank {
     fn drop(&mut self) {
+        error!("bank drop: {}", self.slot());
         panic!("bank drop: {}", self.slot());
         if self.rc.accounts.accounts_db.duplicates.contains(&self.slot()) {
             panic!("bank drop: {}", self.slot());
