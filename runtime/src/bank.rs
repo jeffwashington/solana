@@ -1658,8 +1658,8 @@ impl Bank {
     }
 
     /// Create a new bank that points to an immutable checkpoint of another bank.
-    pub fn new_from_parent(parent: &Arc<Bank>, collector_id: &Pubkey, slot: Slot) -> Self {
-        Self::_new_from_parent(
+    pub fn new_from_parent2(parent: &Arc<Bank>, collector_id: &Pubkey, slot: Slot) -> Self {
+        Self::_new_from_parent2(
             parent,
             collector_id,
             slot,
@@ -1668,22 +1668,22 @@ impl Bank {
         )
     }
 
-    pub fn new_from_parent_with_options(
+    pub fn new_from_parent_with_options2(
         parent: &Arc<Bank>,
         collector_id: &Pubkey,
         slot: Slot,
         new_bank_options: NewBankOptions,
     ) -> Self {
-        Self::_new_from_parent(parent, collector_id, slot, null_tracer(), new_bank_options)
+        Self::_new_from_parent2(parent, collector_id, slot, null_tracer(), new_bank_options)
     }
 
-    pub fn new_from_parent_with_tracer(
+    pub fn new_from_parent_with_tracer2(
         parent: &Arc<Bank>,
         collector_id: &Pubkey,
         slot: Slot,
         reward_calc_tracer: impl Fn(&RewardCalculationEvent) + Send + Sync,
     ) -> Self {
-        Self::_new_from_parent(
+        Self::_new_from_parent2(
             parent,
             collector_id,
             slot,
@@ -1696,7 +1696,7 @@ impl Bank {
         rent_collector.clone_with_epoch(epoch)
     }
 
-    fn _new_from_parent(
+    fn _new_from_parent2(
         parent: &Arc<Bank>,
         collector_id: &Pubkey,
         slot: Slot,
@@ -1714,7 +1714,7 @@ impl Bank {
 
         let (rc, bank_rc_time) = measure!(
             BankRc {
-                accounts: Arc::new(Accounts::new_from_parent(
+                accounts: Arc::new(Accounts::new_from_parent2(
                     &parent.rc.accounts,
                     slot,
                     parent.slot(),
@@ -2103,8 +2103,9 @@ impl Bank {
     /// * Adjusts the new bank's tick height to avoid having to run PoH for millions of slots
     /// * Freezes the new bank, assuming that the user will `Bank::new_from_parent` from this bank
     pub fn warp_from_parent(parent: &Arc<Bank>, collector_id: &Pubkey, slot: Slot) -> Self {
+        error!("warp_from_aprent: {slot}");
         let parent_timestamp = parent.clock().unix_timestamp;
-        let mut new = Bank::new_from_parent(parent, collector_id, slot);
+        let mut new = Bank::new_from_parent2(parent, collector_id, slot);
         new.apply_feature_activations(ApplyFeatureActivationsCaller::WarpFromParent, false);
         new.update_epoch_stakes(new.epoch_schedule().get_epoch(slot));
         new.tick_height.store(new.max_tick_height(), Relaxed);

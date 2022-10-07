@@ -6877,6 +6877,7 @@ impl AccountsDb {
     /// update hash for this slot in the 'bank_hashes' map
     pub(crate) fn set_accounts_hash(&self, slot: Slot, hash: Hash) {
         let mut bank_hashes = self.bank_hashes.write().unwrap();
+        error!("set_accounts_hash: {slot}");
         let mut bank_hash_info = bank_hashes.get_mut(&slot).unwrap();
         bank_hash_info.snapshot_hash = hash;
     }
@@ -7584,6 +7585,10 @@ impl AccountsDb {
         {
             let mut bank_hashes = self.bank_hashes.write().unwrap();
             for slot in dead_slots_iter {
+                if self.duplicates.contains(slot) {
+                    inc_new_counter_info!("retry_to_get_account_accessor-panic", 1);
+                    panic!("cleaning slot that was duplicate: {slot}");
+                }
                 bank_hashes.remove(slot);
             }
         }

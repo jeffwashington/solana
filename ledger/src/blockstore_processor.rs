@@ -1304,6 +1304,7 @@ fn process_next_slots(
         return Ok(());
     }
 
+    error!("process_ndex_slots: {:?}", meta.next_slots);
     // This is a fork point if there are multiple children, create a new child bank for each fork
     for next_slot in &meta.next_slots {
         let next_meta = blockstore
@@ -1317,7 +1318,7 @@ fn process_next_slots(
         // Only process full slots in blockstore_processor, replay_stage
         // handles any partials
         if next_meta.is_full() {
-            let next_bank = Bank::new_from_parent(
+            let next_bank = Bank::new_from_parent2(
                 bank,
                 &leader_schedule_cache
                     .slot_leader_at(*next_slot, Some(bank))

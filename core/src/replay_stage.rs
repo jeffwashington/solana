@@ -486,6 +486,8 @@ impl ReplayStage {
                         break;
                     }
 
+                    error!("ReplayStage: {}", line!());
+
                     let mut generate_new_bank_forks_time =
                         Measure::start("generate_new_bank_forks_time");
                     Self::generate_new_bank_forks(
@@ -3373,6 +3375,7 @@ impl ReplayStage {
         progress: &mut ProgressMap,
         replay_timing: &mut ReplayTiming,
     ) {
+        error!("generate_new_bank_forks: {}", line!());
         // Find the next slot that chains to the old slot
         let mut generate_new_bank_forks_read_lock =
             Measure::start("generate_new_bank_forks_read_lock");
@@ -3474,8 +3477,9 @@ impl ReplayStage {
         rpc_subscriptions: &Arc<RpcSubscriptions>,
         new_bank_options: NewBankOptions,
     ) -> Bank {
+        error!("new_bank_from_parent_with_notify: {slot}, {}", parent.slot());
         rpc_subscriptions.notify_slot(slot, parent.slot(), root_slot);
-        Bank::new_from_parent_with_options(parent, leader, slot, new_bank_options)
+        Bank::new_from_parent_with_options2(parent, leader, slot, new_bank_options)
     }
 
     fn record_rewards(bank: &Bank, rewards_recorder_sender: &Option<RewardsRecorderSender>) {

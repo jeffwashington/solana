@@ -829,7 +829,7 @@ impl ProgramTest {
         let bank = {
             let bank = Arc::new(bank);
             bank.fill_bank_with_ticks_for_tests();
-            let bank = Bank::new_from_parent(&bank, bank.collector_id(), bank.slot() + 1);
+            let bank = Bank::new_from_parent2(&bank, bank.collector_id(), bank.slot() + 1);
             debug!("Bank slot: {}", bank.slot());
             bank
         };
@@ -1131,7 +1131,7 @@ impl ProgramTestContext {
         );
 
         // warp_bank is frozen so go forward to get unfrozen bank at warp_slot
-        bank_forks.insert(Bank::new_from_parent(
+        bank_forks.insert(Bank::new_from_parent2(
             &warp_bank,
             &Pubkey::default(),
             warp_slot,
