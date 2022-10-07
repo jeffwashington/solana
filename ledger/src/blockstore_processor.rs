@@ -1494,7 +1494,7 @@ fn load_frozen_forks(
                 all_banks.retain(|_, bank| {
                     let result = bank.ancestors.contains_key(&root);
                     if !result {
-                        error!("dropping bank: {} because root made at: {}, ancestors: {:?}", bank.slot(), new_root_bank.slot(), bank.ancestors);
+                        error!("dropping bank: {} because root made at: {}, ancestors: {:?}", bank.slot(), root, bank.ancestors);
                     }
                 result});
             }
