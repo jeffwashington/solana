@@ -2763,7 +2763,7 @@ fn main() {
 
                         if child_bank_required {
                             let mut child_bank =
-                                Bank::new_from_parent(&bank, bank.collector_id(), bank.slot() + 1);
+                                Bank::new_from_parent2(&bank, bank.collector_id(), bank.slot() + 1);
 
                             if let Ok(rent_burn_percentage) = rent_burn_percentage {
                                 child_bank.set_rent_burn_percentage(rent_burn_percentage);
@@ -3373,7 +3373,7 @@ fn main() {
                                 }
                                 }
                             };
-                            let warped_bank = Bank::new_from_parent_with_tracer(
+                            let warped_bank = Bank::new_from_parent_with_tracer2(
                                 &base_bank,
                                 base_bank.collector_id(),
                                 next_epoch,
