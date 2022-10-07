@@ -55,7 +55,7 @@ impl VerifyAccountsHashInBackground {
     /// This can occur because it completed in the background
     /// or if the verification was run in the foreground.
     pub(crate) fn verification_complete(&self) {
-        self.verified.store(true, Ordering::Release);
+        assert!(!self.verified.swap(true, Ordering::Release));
     }
 
     /// block until bg process is complete

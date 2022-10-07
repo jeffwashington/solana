@@ -1477,7 +1477,7 @@ fn load_frozen_forks(
                     None
                 }
             };
-
+            error!("jw: {}", line!());
             if let Some(new_root_bank) = new_root_bank {
                 root = new_root_bank.slot();
 
@@ -1487,6 +1487,7 @@ fn load_frozen_forks(
                     accounts_background_request_sender,
                     None,
                 );
+                error!("jw: {}", line!());
 
                 // Filter out all non descendants of the new root
                 pending_slots
@@ -1498,6 +1499,7 @@ fn load_frozen_forks(
                     }
                 result});
             }
+            error!("jw: {}", line!());
 
             slots_elapsed += 1;
 
@@ -1506,6 +1508,7 @@ fn load_frozen_forks(
                 if root == slot { "root " } else { "" },
                 slot,
             );
+            error!("jw: {}", line!());
 
             process_next_slots(
                 &bank,
@@ -1514,6 +1517,7 @@ fn load_frozen_forks(
                 leader_schedule_cache,
                 &mut pending_slots,
             )?;
+            error!("jw: {}", line!());
 
             if slot >= halt_at_slot {
                 run_final_hash_calc(&bank, on_halt_store_hash_raw_data_for_debug);
@@ -1531,17 +1535,22 @@ fn load_frozen_forks(
 }
 
 fn run_final_hash_calc(bank: &Bank, on_halt_store_hash_raw_data_for_debug: bool) {
-    bank.force_flush_accounts_cache();
-    let can_cached_slot_be_unflushed = true;
-    // note that this slot may not be a root
-    let _ = bank.verify_bank_hash(VerifyBankHash {
-        test_hash_calculation: false,
-        can_cached_slot_be_unflushed,
-        ignore_mismatch: true,
-        require_rooted_bank: false,
-        run_in_background: false,
-        store_hash_raw_data_for_debug: on_halt_store_hash_raw_data_for_debug,
-    });
+    if true { //false {
+        error!("jw: {}", line!());
+        bank.force_flush_accounts_cache();
+        error!("jw: {}", line!());
+        let can_cached_slot_be_unflushed = true;
+        // note that this slot may not be a root
+        let _ = bank.verify_bank_hash(VerifyBankHash {
+            test_hash_calculation: false,
+            can_cached_slot_be_unflushed,
+            ignore_mismatch: true,
+            require_rooted_bank: false,
+            run_in_background: false,
+            store_hash_raw_data_for_debug: on_halt_store_hash_raw_data_for_debug,
+        });
+        error!("jw: {}", line!());
+    }
 }
 
 // `roots` is sorted largest to smallest by root slot

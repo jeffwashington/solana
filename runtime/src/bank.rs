@@ -6878,10 +6878,12 @@ impl Bank {
         let accounts = &self.rc.accounts;
         // Wait until initial hash calc is complete before starting a new hash calc.
         // This should only occur when we halt at a slot in ledger-tool.
+        error!("jw: {}", line!());
         accounts
             .accounts_db
             .verify_accounts_hash_in_bg
             .wait_for_complete();
+        error!("jw: {}", line!());
 
         if config.require_rooted_bank
             && !accounts
@@ -6904,6 +6906,7 @@ impl Bank {
         let epoch_schedule = self.epoch_schedule();
         let rent_collector = self.rent_collector();
         if config.run_in_background {
+            error!("jw: {}", line!());
             let ancestors = ancestors.clone();
             let accounts = Arc::clone(accounts);
             let epoch_schedule = *epoch_schedule;
@@ -6937,6 +6940,7 @@ impl Bank {
             });
             true // initial result is true. We haven't failed yet. If verification fails, we'll panic from bg thread.
         } else {
+            error!("jw: {}", line!());
             let result = accounts.verify_bank_hash_and_lamports(
                 slot,
                 &self.ancestors,
@@ -6948,6 +6952,7 @@ impl Bank {
                 config.ignore_mismatch,
                 config.store_hash_raw_data_for_debug,
             );
+            error!("jw: {}", line!());
             self.set_initial_accounts_hash_verification_completed();
             result
         }
