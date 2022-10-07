@@ -7785,7 +7785,7 @@ stack backtrace:
             // we need to drop bank_hashes to prevent deadlocks
             let mut bank_hashes = self.bank_hashes.write().unwrap();
             if !bank_hashes.contains(&accounts.target_slot()) {
-                panic!("bank hashes missing: {}", accounts.target_slot());
+                error!("jw: bank hashes missing: {}", accounts.target_slot());
             }
             let slot_info = bank_hashes
                 .entry(accounts.target_slot())
