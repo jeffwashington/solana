@@ -57,6 +57,7 @@ impl VerifyAccountsHashInBackground {
     pub(crate) fn verification_complete(&self) {
         let old = !self.verified.swap(true, Ordering::Release);
         if old {
+            use log::*;
             error!("reentrant verification complete");
         }
     }
