@@ -8007,6 +8007,9 @@ pub struct TotalAccountsStats {
 
 impl Drop for Bank {
     fn drop(&mut self) {
+        if self.rc.accounts.accounts_db.duplicates.contains(&self.slot()) {
+            panic!("bank drop: {}", self.slot());
+        }
         if let Some(drop_callback) = self.drop_callback.read().unwrap().0.as_ref() {
             drop_callback.callback(self);
         } else {
