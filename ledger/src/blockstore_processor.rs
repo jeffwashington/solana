@@ -1537,7 +1537,7 @@ fn load_frozen_forks(
 }
 
 fn run_final_hash_calc(bank: &Bank, on_halt_store_hash_raw_data_for_debug: bool) {
-    if true { //false {
+    if false {
         error!("jw: {}", line!());
         bank.force_flush_accounts_cache();
         error!("jw: {}", line!());
