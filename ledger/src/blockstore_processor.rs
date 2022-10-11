@@ -1723,7 +1723,7 @@ fn process_single_slot(
     })?;
 
     bank.freeze(); // all banks handled by this routine are created from complete slots
-    bank.write_contents_to_file_for_debugging();
+    bank.write_stored_accounts_to_file_for_debugging();
     if blockstore.is_primary_access() {
         blockstore.insert_bank_hash(bank.slot(), bank.hash(), false);
     }
