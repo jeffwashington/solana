@@ -275,6 +275,7 @@ impl ExpectedRentCollection {
         pubkey: &Pubkey,
         rewrites_skipped_this_slot: &Rewrites,
     ) {
+        return;
         let result = Self::get_corrected_rent_epoch_on_load(
             account,
             storage_slot,
@@ -403,6 +404,7 @@ impl ExpectedRentCollection {
         find_unskipped_slot: impl Fn(Slot) -> Option<Slot>,
         filler_account_suffix: Option<&Pubkey>,
     ) -> Option<Hash> {
+        return None;
         use solana_measure::measure::Measure;
         let mut m = Measure::start("rehash_calc_us");
         let expected = ExpectedRentCollection::new(

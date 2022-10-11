@@ -5108,6 +5108,10 @@ impl Bank {
     }
 
     fn collect_rent_eagerly(&self, just_rewrites: bool) {
+        if !just_rewrites || self.slot() > 99273 {
+            // skip rent collection for all but the first bank for kin
+            return;
+        }
         if self.lazy_rent_collection.load(Relaxed) {
             return;
         }
@@ -6900,7 +6904,7 @@ impl Bank {
                 "Capitalization mismatch: calculated: {} != expected: {}",
                 calculated, expected
             );
-            false
+            true
         }
     }
 
