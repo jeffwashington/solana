@@ -1259,11 +1259,12 @@ impl ReplayStage {
             return;
         }
 
-        let accounts = bank
+        let mut accounts = bank
             .rc
             .accounts
             .accounts_db
             .get_stored_accounts_for_slot(bank.slot());
+        accounts.sort();
 
         use std::fs;
         error!(
