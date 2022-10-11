@@ -1252,7 +1252,7 @@ impl ReplayStage {
     }
 
     fn write_contents_to_file_for_debugging(bank: &Bank) {
-        let file_name = format!("{}.{}", bank.slot(), bank.hash());
+        let file_name = format!("/home/sol/{}.{}", bank.slot(), bank.hash());
         use std::path::Path;
         let path = Path::new(&file_name);
         if path.exists() {
@@ -1273,7 +1273,10 @@ impl ReplayStage {
             path.display(),
             accounts.len()
         );
-        _ = fs::write(path, accounts.join("\n"));
+        let f = fs::write(path, accounts.join("\n"));
+        if f.is_err() {
+            error!("error writing file: {:?}", f);
+        }
     }
 
     fn purge_unconfirmed_duplicate_slot(
