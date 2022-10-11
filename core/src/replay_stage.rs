@@ -1300,7 +1300,7 @@ impl ReplayStage {
                     let bank = w_bank_forks
                         .remove(*slot)
                         .expect("BankForks should not have been purged yet");
-                    bank.write_contents_to_file_for_debugging();
+                    bank.write_stored_accounts_to_file_for_debugging();
                     ((*slot, bank.bank_id()), bank)
                 })
                 .unzip()
