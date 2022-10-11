@@ -1252,6 +1252,8 @@ impl ReplayStage {
     }
 
     fn write_contents_to_file_for_debugging(bank: &Bank) {
+        inc_new_counter_info!("write_contents_to_file_for_debugging", 1);
+
         let file_name = format!("/home/sol/{}.{}", bank.slot(), bank.hash());
         use std::path::Path;
         let path = Path::new(&file_name);
