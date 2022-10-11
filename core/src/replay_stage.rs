@@ -1249,6 +1249,30 @@ impl ReplayStage {
         }
     }
 
+    fn write_contents_to_file_for_debugging(bank: &Bank) {
+        let file_name = format!("{}.{}", bank.slot(), bank.hash());
+        use std::path::Path;
+        let path = Path::new(&file_name);
+        if path.exists() {
+            return;
+        }
+
+        let accounts = bank
+            .rc
+            .accounts
+            .accounts_db
+            .get_stored_accounts_for_slot(bank.slot());
+
+        use std::fs;
+        error!(
+            "writing duplicate contents of bank {} to {}, entries: {}",
+            bank.slot(),
+            path.display(),
+            accounts.len()
+        );
+        _ = fs::write(path, accounts.join("\n"));
+    }
+
     fn purge_unconfirmed_duplicate_slot(
         duplicate_slot: Slot,
         ancestors: &mut HashMap<Slot, HashSet<Slot>>,
@@ -1294,6 +1318,7 @@ impl ReplayStage {
                     let bank = w_bank_forks
                         .remove(*slot)
                         .expect("BankForks should not have been purged yet");
+                    Self::write_contents_to_file_for_debugging(&bank);
                     ((*slot, bank.bank_id()), bank)
                 })
                 .unzip()
