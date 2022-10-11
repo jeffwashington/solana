@@ -7691,6 +7691,67 @@ impl AccountsDb {
         (hashes, scan.as_us(), accumulate)
     }
 
+    /// Return a list of strings representing account state for the given `slot`
+    pub fn get_stored_accounts_for_slot(&self, slot: Slot) -> Vec<String> {
+        let scan_result: ScanStorageResult<String, DashMap<Pubkey, (u64, String)>> = self
+            .scan_account_storage(
+                slot,
+                |loaded_account: LoadedAccount| {
+                    // Cache only has one version per key, don't need to worry about versioning
+                    Some(format!(
+                        "{:?}",
+                        (
+                            loaded_account.pubkey(),
+                            loaded_account.lamports(),
+                            loaded_account.data().len(),
+                            loaded_account.rent_epoch(),
+                            loaded_account.executable(),
+                            loaded_account.loaded_hash()
+                        )
+                    ))
+                },
+                |accum: &DashMap<Pubkey, (u64, String)>, loaded_account: LoadedAccount| {
+                    let loaded_write_version = loaded_account.write_version();
+                    let desc = format!(
+                        "{:?}",
+                        (
+                            loaded_account.pubkey(),
+                            loaded_account.lamports(),
+                            loaded_account.data().len(),
+                            loaded_account.rent_epoch(),
+                            loaded_account.executable(),
+                            loaded_account.loaded_hash()
+                        )
+                    );
+                    // keep the latest write version for each pubkey
+                    match accum.entry(*loaded_account.pubkey()) {
+                        Occupied(mut occupied_entry) => {
+                            if loaded_write_version > occupied_entry.get().0 {
+                                occupied_entry.insert((loaded_write_version, desc));
+                            }
+                        }
+
+                        Vacant(vacant_entry) => {
+                            vacant_entry.insert((loaded_write_version, desc));
+                        }
+                    }
+                },
+            );
+
+        match scan_result {
+            ScanStorageResult::Cached(cached_result) => cached_result,
+            ScanStorageResult::Stored(stored_result) => stored_result
+                .into_iter()
+                .map(|(_pubkey, (_latest_write_version, desc))| desc)
+                .collect(),
+        }
+    }
+
+    /// Returns the path used for miscellaneous AccountsDb directories
+    pub fn get_accounts_hash_cache_path(&self) -> PathBuf {
+        self.accounts_hash_cache_path.clone()
+    }
+
     pub fn get_accounts_delta_hash_with_rewrites(
         &self,
         slot: Slot,

@@ -7693,6 +7693,44 @@ impl Bank {
             .epoch_accounts_hash_manager
             .try_get_epoch_accounts_hash()
     }
+
+    /// Write details about this Bank's stored accounts to a file
+    pub fn write_stored_accounts_to_file_for_debugging(&self) {
+        assert!(
+            self.is_frozen(),
+            "Bank must be frozen to print stored accounts"
+        );
+        let slot = self.slot();
+
+        let file_name = format!("{}.{}.{}", slot, self.last_blockhash(), self.hash());
+        let path = self
+            .rc
+            .accounts
+            .accounts_db
+            .get_accounts_hash_cache_path()
+            .join(&file_name);
+        if path.exists() {
+            return;
+        }
+
+        let mut accounts_strings = self
+            .rc
+            .accounts
+            .accounts_db
+            .get_stored_accounts_for_slot(slot);
+        // Account pubkeys are the first item in the summary, so we can
+        // just sort based on the entire string for easy diffing
+        accounts_strings.sort();
+
+        use std::fs;
+        error!(
+            "writing duplicate contents of bank {} to {}, entries: {}",
+            slot,
+            path.display(),
+            accounts_strings.len()
+        );
+        _ = fs::write(path, accounts_strings.join("\n"));
+    }
 }
 
 /// Compute how much an account has changed size.  This function is useful when the data size delta
