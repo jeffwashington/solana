@@ -4705,7 +4705,7 @@ impl Bank {
                 }
                 Err(err) => {
                     if *err_count == 0 {
-                        debug!("tx error: {:?} {:?}", err, tx);
+                        info!("tx error: {:?} {:?}, slot: {}", err, tx, self.slot());
                     }
                     *err_count += 1;
                 }
