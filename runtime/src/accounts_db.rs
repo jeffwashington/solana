@@ -4314,6 +4314,8 @@ impl AccountsDb {
     pub fn set_hash(&self, slot: Slot, parent_slot: Slot) {
         let mut bank_hashes = self.bank_hashes.write().unwrap();
         if bank_hashes.get(&slot).is_some() {
+            inc_new_counter_info!("set_hash_duplicate", 1);
+            
             error!(
                 "set_hash: already exists; multiple forks with shared slot {} as child (parent: {})!?",
                 slot, parent_slot,
