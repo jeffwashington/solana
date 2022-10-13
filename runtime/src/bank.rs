@@ -4705,7 +4705,10 @@ impl Bank {
                 }
                 Err(err) => {
                     if *err_count == 0 {
-                        info!("tx error: {:?} {:?}, slot: {}", err, tx, self.slot());
+                        use rand::thread_rng;
+                        if thread_rng().gen_range(0, 100) == 0 {
+                            info!("tx error: {:?} {:?}, slot: {}", err, tx, self.slot());
+                        }
                     }
                     *err_count += 1;
                 }
