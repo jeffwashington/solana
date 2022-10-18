@@ -3515,12 +3515,12 @@ impl AccountsDb {
     /// store a reference to all alive accounts in `alive_accounts`
     /// unref and optionally store a reference to all pubkeys that are in the index, but dead in `unrefed_pubkeys`
     /// return sum of account size for all alive accounts
-    fn load_accounts_index_for_shrink<'a>(
+    fn load_accounts_index_for_shrink<'a: 'b, 'b>(
         &'a self,
         accounts: &'a [(Pubkey, FoundStoredAccount<'a>)],
         count: usize,
-        alive_accounts: &mut Vec<&'a (Pubkey, FoundStoredAccount<'a>)>,
-        mut unrefed_pubkeys: Option<&mut Vec<&'a Pubkey>>,
+        alive_accounts: &'b mut Vec<&'a (Pubkey, FoundStoredAccount<'a>)>,
+        mut unrefed_pubkeys: Option<&'b mut Vec<&'a Pubkey>>,
     ) -> usize {
         let mut alive_total = 0;
 
