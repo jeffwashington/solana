@@ -7234,10 +7234,18 @@ impl AccountsDb {
             .scan_account_storage(
                 slot,
                 |loaded_account: LoadedAccount| {
+                    if slot == 156384102 {
+                        use log::*;
+                        error!("{}, {:?}", loaded_account.pubkey(), (loaded_account.lamports(), loaded_account.data().len(), loaded_account.owner()));
+                    }
                     // Cache only has one version per key, don't need to worry about versioning
                     Some((*loaded_account.pubkey(), loaded_account.loaded_hash()))
                 },
                 |accum: &DashMap<Pubkey, (u64, Hash)>, loaded_account: LoadedAccount| {
+                    if slot == 156384102 {
+                        use log::*;
+                        error!("2 {}, {:?}", loaded_account.pubkey(), (loaded_account.lamports(), loaded_account.data().len(), loaded_account.owner()));
+                    }
                     let loaded_write_version = loaded_account.write_version();
                     let loaded_hash = loaded_account.loaded_hash();
                     // keep the latest write version for each pubkey
