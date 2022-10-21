@@ -131,7 +131,11 @@ impl RentCollector {
         use std::str::FromStr;
         let interesting = Pubkey::from_str("1EWZm7aZYxfZHbyiELXtTgN1yT2vU1HF9d8DWswX2Tp").unwrap();
                     if interesting == *address {
-            error!("collect_from_existing_account2 {address}, {}", account.rent_epoch());
+            error!("collect_from_existing_account2 {address}, {}, epoch: {}, can_skip: {:?}, rent_due: {:?}", account.rent_epoch(), self.epoch, 
+            self.can_skip_rent_collection(address, account, filler_account_suffix)
+            ,self.get_rent_due(account)
+
+        );
         }
 match self.calculate_rent_result(
             address,
@@ -139,13 +143,21 @@ match self.calculate_rent_result(
             filler_account_suffix,
             preserve_rent_epoch_for_rent_exempt_accounts,
         ) {
-            RentResult::LeaveAloneNoRent => CollectedInfo::default(),
+            RentResult::LeaveAloneNoRent => {
+                if interesting == *address {
+                    error!("leave alone: {address}");
+                }
+                CollectedInfo::default()
+            }
             RentResult::CollectRent {
                 new_rent_epoch,
                 rent_due,
             } => match account.lamports().checked_sub(rent_due) {
                 None | Some(0) => {
-                    let account = std::mem::take(account);
+                    if interesting == *address {
+                        error!("collect rent 0: {address}");
+                    }
+                        let account = std::mem::take(account);
                     CollectedInfo {
                         rent_amount: account.lamports(),
                         account_data_len_reclaimed: account.data().len() as u64,
