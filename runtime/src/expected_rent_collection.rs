@@ -374,6 +374,14 @@ impl ExpectedRentCollection {
 
             // if an account was written >= its rent collection slot within the last epoch worth of slots, then we don't want to update it here
             if possibly_update && rent_epoch < current_epoch {
+                use std::str::FromStr;
+                let interesting = Pubkey::from_str("1EWZm7aZYxfZHbyiELXtTgN1yT2vU1HF9d8DWswX2Tp").unwrap();
+                if interesting == *pubkey {
+                    use log::*;
+                    error!("maybe_update_rent_epoch_on_load2 {pubkey}, {:?}", (rent_epoch, current_epoch, partition_from_pubkey, partition_from_current_slot, 
+                    rewrites_skipped_this_pubkey_this_slot()));
+                }
+        
                 let new_rent_epoch = if partition_from_pubkey < partition_from_current_slot
                     || (partition_from_pubkey == partition_from_current_slot
                         && rewrites_skipped_this_pubkey_this_slot())

@@ -3129,12 +3129,24 @@ impl Bank {
         let mut hash = self.hash.write().unwrap();
         if *hash == Hash::default() {
             // finish up any deferred changes to account state
+            if self.slot() == 156384102 {
+error!("{}", line!());
+            }
             self.collect_rent_eagerly(false);
-            self.collect_fees();
+            if self.slot() == 156384102 {
+                error!("{}", line!());
+                            }
+                            self.collect_fees();
             self.distribute_rent();
-            self.update_slot_history();
+            if self.slot() == 156384102 {
+                error!("{}", line!());
+                            }
+                            self.update_slot_history();
             self.run_incinerator();
-
+            if self.slot() == 156384102 {
+                error!("{}", line!());
+                            }
+                
             // freeze is a one-way trip, idempotent
             self.freeze_started.store(true, Relaxed);
             *hash = self.hash_internal_state();
