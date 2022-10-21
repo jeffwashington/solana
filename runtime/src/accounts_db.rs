@@ -6058,11 +6058,18 @@ impl AccountsDb {
     ) -> Vec<AccountInfo> {
         let mut calc_stored_meta_time = Measure::start("calc_stored_meta");
         let slot = accounts.target_slot();
+        use log::*;
+        use std::str::FromStr;
+        let interesting = Pubkey::from_str("1EWZm7aZYxfZHbyiELXtTgN1yT2vU1HF9d8DWswX2Tp").unwrap();
+
         let accounts_and_meta_to_store: Vec<_> = (0..accounts.len())
             .into_iter()
             .map(|index| {
-                let (pubkey, account) = (accounts.pubkey(index), accounts.account(index));
-                self.read_only_accounts_cache.remove(*pubkey, slot);
+                        let (pubkey, account) = (accounts.pubkey(index), accounts.account(index));
+                        if interesting == *pubkey {
+                            error!("store_accounts_to {pubkey}, {}", account.rent_epoch());
+                        }
+                        self.read_only_accounts_cache.remove(*pubkey, slot);
                 // this is the source of Some(Account) or None.
                 // Some(Account) = store 'Account'
                 // None = store a default/empty account with 0 lamports

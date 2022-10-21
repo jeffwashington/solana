@@ -275,6 +275,12 @@ impl ExpectedRentCollection {
         pubkey: &Pubkey,
         rewrites_skipped_this_slot: &Rewrites,
     ) {
+        use log::*;
+        use std::str::FromStr;
+        let interesting = Pubkey::from_str("1EWZm7aZYxfZHbyiELXtTgN1yT2vU1HF9d8DWswX2Tp").unwrap();
+        if interesting == *pubkey {
+            error!("maybe_update_rent_epoch_on_load {pubkey}, {}", account.rent_epoch());
+        }
         let result = Self::get_corrected_rent_epoch_on_load(
             account,
             storage_slot,
@@ -285,6 +291,9 @@ impl ExpectedRentCollection {
             rewrites_skipped_this_slot,
         );
         if let Some(rent_epoch) = result {
+            if interesting == *pubkey {
+                error!("maybe_update_rent_epoch_on_load set {pubkey}, {}", rent_epoch);
+            }
             account.set_rent_epoch(rent_epoch);
         }
     }
