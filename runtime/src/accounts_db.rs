@@ -6067,7 +6067,7 @@ impl AccountsDb {
             .map(|index| {
                         let (pubkey, account) = (accounts.pubkey(index), accounts.account(index));
                         if interesting == *pubkey {
-                            error!("store_accounts_to {pubkey}, {}", account.rent_epoch());
+                            error!("store_accounts_to {pubkey}, {}, {}", account.rent_epoch(), slot);
                         }
                         self.read_only_accounts_cache.remove(*pubkey, slot);
                 // this is the source of Some(Account) or None.

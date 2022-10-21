@@ -127,7 +127,13 @@ impl RentCollector {
         filler_account_suffix: Option<&Pubkey>,
         preserve_rent_epoch_for_rent_exempt_accounts: bool,
     ) -> CollectedInfo {
-        match self.calculate_rent_result(
+        use log::*;
+        use std::str::FromStr;
+        let interesting = Pubkey::from_str("1EWZm7aZYxfZHbyiELXtTgN1yT2vU1HF9d8DWswX2Tp").unwrap();
+                    if interesting == *address {
+            error!("collect_from_existing_account2 {address}, {}", account.rent_epoch());
+        }
+match self.calculate_rent_result(
             address,
             account,
             filler_account_suffix,
@@ -146,6 +152,12 @@ impl RentCollector {
                     }
                 }
                 Some(lamports) => {
+                    use log::*;
+                    use std::str::FromStr;
+                                if interesting == *address {
+                        error!("collect_from_existing_account {address}, {}, {}", account.rent_epoch(), new_rent_epoch);
+                    }
+
                     account.set_lamports(lamports);
                     account.set_rent_epoch(new_rent_epoch);
                     CollectedInfo {
