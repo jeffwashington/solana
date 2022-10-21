@@ -191,15 +191,25 @@ match self.calculate_rent_result(
         preserve_rent_epoch_for_rent_exempt_accounts: bool,
     ) -> RentResult {
         assert!(!preserve_rent_epoch_for_rent_exempt_accounts);
+        use log::*;
+        use std::str::FromStr;
+        let interesting = Pubkey::from_str("1EWZm7aZYxfZHbyiELXtTgN1yT2vU1HF9d8DWswX2Tp").unwrap();
+        
         if self.can_skip_rent_collection(address, account, filler_account_suffix) {
-            return RentResult::LeaveAloneNoRent;
+            if interesting == *address {
+                error!("leave alone: {address}");
+            }
+                return RentResult::LeaveAloneNoRent;
         }
         match self.get_rent_due(account) {
             // Rent isn't collected for the next epoch.
             // Make sure to check exempt status again later in current epoch.
             RentDue::Exempt => {
                 if preserve_rent_epoch_for_rent_exempt_accounts {
-                    RentResult::LeaveAloneNoRent
+                    if interesting == *address {
+                        error!("leave alone2: {address}");
+                    }
+                            RentResult::LeaveAloneNoRent
                 } else {
                     RentResult::CollectRent {
                         new_rent_epoch: self.epoch,
@@ -208,7 +218,13 @@ match self.calculate_rent_result(
                 }
             }
             // Maybe collect rent later, leave account alone.
-            RentDue::Paying(0) => RentResult::LeaveAloneNoRent,
+            RentDue::Paying(0) => {
+                if interesting == *address {
+                    error!("leave alone3: {address}");
+                }
+    
+                RentResult::LeaveAloneNoRent
+            }
             // Rent is collected for next epoch.
             RentDue::Paying(rent_due) => RentResult::CollectRent {
                 new_rent_epoch: self.epoch + 1,
