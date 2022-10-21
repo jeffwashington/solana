@@ -190,6 +190,7 @@ match self.calculate_rent_result(
         filler_account_suffix: Option<&Pubkey>,
         preserve_rent_epoch_for_rent_exempt_accounts: bool,
     ) -> RentResult {
+        assert!(!preserve_rent_epoch_for_rent_exempt_accounts);
         if self.can_skip_rent_collection(address, account, filler_account_suffix) {
             return RentResult::LeaveAloneNoRent;
         }
