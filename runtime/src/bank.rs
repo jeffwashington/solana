@@ -5107,6 +5107,7 @@ error!("{}", line!());
 
         let mut measure = Measure::start("collect_rent_eagerly-ms");
         let partitions = self.rent_collection_partitions();
+        let partitions2= partitions.clone();
         let count = partitions.len();
         let rent_metrics = RentMetrics::default();
         // partitions will usually be 1, but could be more if we skip slots
@@ -5172,6 +5173,7 @@ error!("{}", line!());
             ("hash_us", rent_metrics.hash_us.load(Relaxed), i64),
             ("store_us", rent_metrics.store_us.load(Relaxed), i64),
         );
+        error!("collect_rent_eagerly, partitions: {:?}", partitions2);
     }
 
     #[cfg(test)]

@@ -6067,7 +6067,7 @@ impl AccountsDb {
             .map(|index| {
                         let (pubkey, account) = (accounts.pubkey(index), accounts.account(index));
                         if interesting == *pubkey {
-                            error!("store_accounts_to {pubkey}, {}, {}", account.rent_epoch(), slot);
+                            error!("store_accounts_to {pubkey}, {}, {}, {}, pi: {}", account.rent_epoch(), slot, account.lamports(), crate::bank::Bank::partition_from_pubkey(pubkey, 432_000));
                         }
                         self.read_only_accounts_cache.remove(*pubkey, slot);
                 // this is the source of Some(Account) or None.
