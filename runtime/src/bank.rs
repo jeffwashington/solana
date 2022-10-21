@@ -6419,16 +6419,17 @@ error!("{}", line!());
     ) -> Option<(AccountSharedData, Slot)> {
         match self.rc.accounts.load_with_fixed_root(ancestors, pubkey) {
             Some((mut account, storage_slot)) => {
-                ExpectedRentCollection::maybe_update_rent_epoch_on_load(
-                    &mut account,
-                    &SlotInfoInEpoch::new_small(storage_slot),
-                    &SlotInfoInEpoch::new_small(self.slot()),
-                    self.epoch_schedule(),
-                    self.rent_collector(),
-                    pubkey,
-                    &self.rewrites_skipped_this_slot,
-                );
-
+                if !self.preserve_rent_epoch_for_rent_exempt_accounts() {
+                    ExpectedRentCollection::maybe_update_rent_epoch_on_load(
+                        &mut account,
+                        &SlotInfoInEpoch::new_small(storage_slot),
+                        &SlotInfoInEpoch::new_small(self.slot()),
+                        self.epoch_schedule(),
+                        self.rent_collector(),
+                        pubkey,
+                        &self.rewrites_skipped_this_slot,
+                    );
+                }
                 Some((account, storage_slot))
             }
             None => None,
