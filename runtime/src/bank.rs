@@ -6282,7 +6282,9 @@ error!("{}", line!());
     ) -> std::result::Result<u64, LamportsError> {
         // This doesn't collect rents intentionally.
         // Rents should only be applied to actual TXes
+        error!("deposit: {}", pubkey);
         let mut account = self.get_account_with_fixed_root(pubkey).unwrap_or_default();
+        error!("~deposit: {}", pubkey);
         account.checked_add_lamports(lamports)?;
         self.store_account(pubkey, &account);
         Ok(account.lamports())
