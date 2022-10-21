@@ -190,7 +190,7 @@ match self.calculate_rent_result(
         filler_account_suffix: Option<&Pubkey>,
         preserve_rent_epoch_for_rent_exempt_accounts: bool,
     ) -> RentResult {
-        assert!(!preserve_rent_epoch_for_rent_exempt_accounts);
+        //assert!(!preserve_rent_epoch_for_rent_exempt_accounts);
         use log::*;
         use std::str::FromStr;
         let interesting = Pubkey::from_str("1EWZm7aZYxfZHbyiELXtTgN1yT2vU1HF9d8DWswX2Tp").unwrap();
