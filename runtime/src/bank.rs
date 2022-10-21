@@ -5366,7 +5366,7 @@ error!("{}", line!());
             // divide the range into num_threads smaller ranges and process in parallel
             // Note that 'pubkey_range_from_partition' cannot easily be re-used here to break the range smaller.
             // It has special handling of 0..0 and partition_count changes affect all ranges unevenly.
-            let num_threads = crate::accounts_db::quarter_thread_count() as u64;
+            let num_threads = 1;//crate::accounts_db::quarter_thread_count() as u64;
             let sz = std::mem::size_of::<u64>();
             let start_prefix = Self::prefix_from_pubkey(subrange_full.start());
             let end_prefix_inclusive = Self::prefix_from_pubkey(subrange_full.end());
@@ -5383,6 +5383,9 @@ error!("{}", line!());
                         bound
                     };
                     let start = merge_prefix(start, *subrange_full.start());
+                    if partition.1 == 100 {
+                        error!("jw: (1EWZm7aZYxfZHbyiELXtTgN1yT2vU1HF9d8DWswX2Tp), chunk: {chunk} ");
+                    }
                     let (accounts, measure_load_accounts) = measure!(if last {
                         let end = *subrange_full.end();
                         let subrange = start..=end; // IN-clusive
@@ -5396,6 +5399,9 @@ error!("{}", line!());
                             .accounts
                             .load_to_collect_rent_eagerly(&self.ancestors, subrange)
                     });
+                    if partition.1 == 100 {
+                        error!("~jw: (1EWZm7aZYxfZHbyiELXtTgN1yT2vU1HF9d8DWswX2Tp), chunk: {chunk} ");
+                    }
                     CollectRentInPartitionInfo::new(
                         self.collect_rent_from_accounts(
                             accounts,
