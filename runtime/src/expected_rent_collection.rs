@@ -292,6 +292,9 @@ impl ExpectedRentCollection {
         );
         if let Some(rent_epoch) = result {
             if interesting == *pubkey {
+                if rent_epoch == 362 {
+                    panic!("updating rent epoch");
+                }
                 error!("maybe_update_rent_epoch_on_load set {pubkey}, {}", rent_epoch);
             }
             account.set_rent_epoch(rent_epoch);
