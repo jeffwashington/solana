@@ -3137,7 +3137,10 @@ error!("{}", line!());
                 error!("{}", line!());
                             }
                             self.collect_fees();
-            self.distribute_rent();
+                            if self.slot() == 156384102 {
+                                error!("{}", line!());
+                                            }
+                            self.distribute_rent();
             if self.slot() == 156384102 {
                 error!("{}", line!());
                             }
@@ -4934,6 +4937,11 @@ error!("{}", line!());
         // holder
         let mut leftover_lamports = rent_to_be_distributed - rent_distributed_in_initial_round;
 
+
+        use log::*;
+        use std::str::FromStr;
+        let interesting = Pubkey::from_str("1EWZm7aZYxfZHbyiELXtTgN1yT2vU1HF9d8DWswX2Tp").unwrap();
+        
         let mut rewards = vec![];
         validator_rent_shares
             .into_iter()
@@ -4945,10 +4953,16 @@ error!("{}", line!());
                     rent_share
                 };
                 if !enforce_fix || rent_to_be_paid > 0 {
+                    if interesting == pubkey {
+                        error!("distribute rent: {}", pubkey);
+                    }
                     let mut account = self
                         .get_account_with_fixed_root(&pubkey)
                         .unwrap_or_default();
-                    if account.checked_add_lamports(rent_to_be_paid).is_err() {
+                        if interesting == pubkey {
+                            error!("~distribute rent: {}", pubkey);
+                        }
+                        if account.checked_add_lamports(rent_to_be_paid).is_err() {
                         // overflow adding lamports
                         self.capitalization.fetch_sub(rent_to_be_paid, Relaxed);
                         error!(
