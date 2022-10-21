@@ -5383,8 +5383,8 @@ error!("{}", line!());
                         bound
                     };
                     let start = merge_prefix(start, *subrange_full.start());
-                    if partition.1 == 100 {
-                        error!("jw: (1EWZm7aZYxfZHbyiELXtTgN1yT2vU1HF9d8DWswX2Tp), chunk: {chunk} ");
+                    if partition.1 == 100 || partition.1 == 101 {
+                        error!("jw: (1EWZm7aZYxfZHbyiELXtTgN1yT2vU1HF9d8DWswX2Tp), chunk: {chunk} {partition:?}");
                     }
                     let (accounts, measure_load_accounts) = measure!(if last {
                         let end = *subrange_full.end();
@@ -5399,8 +5399,8 @@ error!("{}", line!());
                             .accounts
                             .load_to_collect_rent_eagerly(&self.ancestors, subrange)
                     });
-                    if partition.1 == 100 {
-                        error!("~jw: (1EWZm7aZYxfZHbyiELXtTgN1yT2vU1HF9d8DWswX2Tp), chunk: {chunk} ");
+                    if partition.1 == 100 || partition.1 == 101 {
+                        error!("~jw: (1EWZm7aZYxfZHbyiELXtTgN1yT2vU1HF9d8DWswX2Tp), chunk: {chunk}  {partition:?}");
                     }
                     CollectRentInPartitionInfo::new(
                         self.collect_rent_from_accounts(
