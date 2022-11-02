@@ -1839,6 +1839,9 @@ impl CleanAccountsStats {
 struct ShrinkAncientStats {
     shrink_stats: ShrinkStats,
     ancient_append_vecs_shrunk: AtomicU64,
+    total_us: AtomicU64,
+    random_shrink: AtomicU64,
+    slots_considered: AtomicU64,
 }
 
 #[derive(Debug, Default)]
@@ -2045,6 +2048,7 @@ impl ShrinkAncientStats {
                     i64
                 ),
                 (
+                    // current not written
                     "drop_storage_entries_elapsed",
                     self.shrink_stats
                         .drop_storage_entries_elapsed
@@ -2052,6 +2056,7 @@ impl ShrinkAncientStats {
                     i64
                 ),
                 (
+                    // this is not written to
                     "recycle_stores_write_time",
                     self.shrink_stats
                         .recycle_stores_write_elapsed
@@ -2076,6 +2081,7 @@ impl ShrinkAncientStats {
                     i64
                 ),
                 (
+                    // not written
                     "skipped_shrink",
                     self.shrink_stats.skipped_shrink.swap(0, Ordering::Relaxed) as i64,
                     i64
@@ -2098,6 +2104,21 @@ impl ShrinkAncientStats {
                 (
                     "ancient_append_vecs_shrunk",
                     self.ancient_append_vecs_shrunk.swap(0, Ordering::Relaxed) as i64,
+                    i64
+                ),
+                (
+                    "random",
+                    self.random_shrink.swap(0, Ordering::Relaxed) as i64,
+                    i64
+                ),
+                (
+                    "slots_considered",
+                    self.slots_considered.swap(0, Ordering::Relaxed) as i64,
+                    i64
+                ),
+                (
+                    "total_us",
+                    self.total_us.swap(0, Ordering::Relaxed) as i64,
                     i64
                 ),
             );
@@ -3676,6 +3697,7 @@ impl AccountsDb {
     fn load_accounts_index_for_shrink<'a>(
         &'a self,
         accounts: &'a [FoundStoredAccount<'a>],
+        stats: &ShrinkStats,
     ) -> LoadAccountsIndexForShrink<'a> {
         let count = accounts.len();
         let mut alive_accounts = Vec::with_capacity(count);
@@ -3720,12 +3742,8 @@ impl AccountsDb {
             None,
         );
         assert_eq!(index, std::cmp::min(accounts.len(), count));
-        self.shrink_stats
-            .alive_accounts
-            .fetch_add(alive, Ordering::Relaxed);
-        self.shrink_stats
-            .dead_accounts
-            .fetch_add(dead, Ordering::Relaxed);
+        stats.alive_accounts.fetch_add(alive, Ordering::Relaxed);
+        stats.dead_accounts.fetch_add(dead, Ordering::Relaxed);
 
         LoadAccountsIndexForShrink {
             alive_total,
@@ -3822,7 +3840,7 @@ impl AccountsDb {
                         mut alive_accounts,
                         mut unrefed_pubkeys,
                         all_are_zero_lamports,
-                    } = self.load_accounts_index_for_shrink(stored_accounts);
+                    } = self.load_accounts_index_for_shrink(stored_accounts, stats);
 
                     // collect
                     alive_accounts_collect
@@ -4396,20 +4414,29 @@ impl AccountsDb {
         let storage = all_storages.first().unwrap();
         let accounts = &storage.accounts;
 
+        self.shrink_ancient_stats
+        .slots_considered
+        .fetch_add(1, Ordering::Relaxed);
+
         if is_ancient(accounts) {
             // randomly shrink ancient slots
             // this exercises the ancient shrink code more often
-            if self.is_candidate_for_shrink(storage, true)
+            let is_candidate = self.is_candidate_for_shrink(storage, true);
+            if is_candidate
                 || (can_randomly_shrink
-                    && thread_rng().gen_range(0, 100) == 0
-                    && is_ancient(accounts))
+                    && thread_rng().gen_range(0, 100) == 0)
             {
                 // we are a candidate for shrink, so either append us to the previous append vec
                 // or recreate us as a new append vec and eliminate the dead accounts
                 info!("ancient_append_vec: shrinking full ancient: {}", slot);
+                if !is_candidate {
+                    self.shrink_ancient_stats
+                        .random_shrink
+                        .fetch_add(1, Ordering::Relaxed);
+                }
                 self.shrink_ancient_stats
-                    .ancient_append_vecs_shrunk
-                    .fetch_add(1, Ordering::Relaxed);
+                .ancient_append_vecs_shrunk
+                .fetch_add(1, Ordering::Relaxed);
                 return true;
             }
             // this slot is ancient and can become the 'current' ancient for other slots to be squashed into
@@ -4424,6 +4451,7 @@ impl AccountsDb {
     /// Combine all account data from storages in 'sorted_slots' into ancient append vecs.
     /// This keeps us from accumulating append vecs for each slot older than an epoch.
     fn combine_ancient_slots(&self, sorted_slots: Vec<Slot>, can_randomly_shrink: bool) {
+        let mut total = Measure::start("combine_ancient_slots");
         if sorted_slots.is_empty() {
             return;
         }
@@ -4536,6 +4564,11 @@ impl AccountsDb {
         }
 
         self.handle_dropped_roots_for_ancient(dropped_roots);
+
+        total.stop();
+        self.shrink_ancient_stats
+            .total_us
+            .fetch_add(total.as_us(), Ordering::Relaxed);
 
         self.shrink_ancient_stats.report();
     }
@@ -7923,7 +7956,18 @@ impl AccountsDb {
         };
         match self.shrink_ratio {
             AccountShrinkThreshold::TotalSpace { shrink_ratio: _ } => {
-                Self::page_align(store.alive_bytes() as u64) < total_bytes
+                let result = Self::page_align(store.alive_bytes() as u64) < total_bytes;
+                if allow_shrink_ancient {
+                    error!(
+                        "shrink ancient: alive: {}, written: {}, total: {}, slot: {}, alive%: {}",
+                        store.alive_bytes(),
+                        store.written_bytes(),
+                        store.total_bytes(),
+                        store.slot(),
+                        (store.alive_bytes() as u64) * 100 / store.written_bytes()
+                    );
+                }
+                result
             }
             AccountShrinkThreshold::IndividualStore { shrink_ratio } => {
                 (Self::page_align(store.alive_bytes() as u64) as f64 / total_bytes as f64)
