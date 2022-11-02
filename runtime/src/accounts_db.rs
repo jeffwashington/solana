@@ -1842,6 +1842,7 @@ struct ShrinkAncientStats {
     total_us: AtomicU64,
     random_shrink: AtomicU64,
     slots_considered: AtomicU64,
+    ancient_scanned: AtomicU64,
 }
 
 #[derive(Debug, Default)]
@@ -2114,6 +2115,11 @@ impl ShrinkAncientStats {
                 (
                     "slots_considered",
                     self.slots_considered.swap(0, Ordering::Relaxed) as i64,
+                    i64
+                ),
+                (
+                    "ancient_scanned",
+                    self.ancient_scanned.swap(0, Ordering::Relaxed) as i64,
                     i64
                 ),
                 (
@@ -4419,6 +4425,10 @@ impl AccountsDb {
         .fetch_add(1, Ordering::Relaxed);
 
         if is_ancient(accounts) {
+            self.shrink_ancient_stats
+            .ancient_scanned
+            .fetch_add(1, Ordering::Relaxed);
+    
             // randomly shrink ancient slots
             // this exercises the ancient shrink code more often
             let is_candidate = self.is_candidate_for_shrink(storage, true);
