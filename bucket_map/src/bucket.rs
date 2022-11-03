@@ -296,7 +296,10 @@ impl<T: Clone + Copy> Bucket<T> {
             let slice: &mut [T] = current_bucket.get_mut_cell_slice(elem_loc, data.len() as u64);
             assert_eq!(current_bucket.uid(elem_loc), Some(elem_uid));
             elem.num_slots = num_slots;
+            let mut m = Measure::start("copy_from_slice");
             slice.copy_from_slice(data);
+            m.stop();
+            self.stats.data.copy_us.fetch_add(m.as_us(), Ordering::Relaxed);
             Ok(())
         } else {
             // need to move the allocation to a best fit spot
@@ -321,7 +324,10 @@ impl<T: Clone + Copy> Bucket<T> {
                         let best_bucket = &mut self.data[best_fit_bucket as usize];
                         best_bucket.allocate(ix, elem_uid, false).unwrap();
                         let slice = best_bucket.get_mut_cell_slice(ix, num_slots);
+                        let mut m = Measure::start("copy_from_slice");
                         slice.copy_from_slice(data);
+                        m.stop();
+                        self.stats.data.copy_us.fetch_add(m.as_us(), Ordering::Relaxed);
                     }
                     return Ok(());
                 }
