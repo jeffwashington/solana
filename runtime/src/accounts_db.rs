@@ -2035,6 +2035,9 @@ impl AccountsDb {
             .map(|config| config.ancient_append_vecs)
             .unwrap_or_default();
 
+        let skip_rewrites = true;
+        let ancient_append_vecs = true;
+    
         let filler_account_suffix = if filler_accounts_config.count > 0 {
             Some(solana_sdk::pubkey::new_rand())
         } else {

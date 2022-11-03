@@ -33,7 +33,7 @@ use {
     },
 };
 
-const INTERVAL_MS: u64 = 100;
+const INTERVAL_MS: u64 = 1000;
 const SHRUNKEN_ACCOUNT_PER_SEC: usize = 250;
 const SHRUNKEN_ACCOUNT_PER_INTERVAL: usize =
     SHRUNKEN_ACCOUNT_PER_SEC / (1000 / INTERVAL_MS as usize);
@@ -490,7 +490,7 @@ impl AccountsBackgroundService {
                         })
                         .unwrap_or_default();
 
-                    // Check to see if there were any requests for snapshotting banks
+                        // Check to see if there were any requests for snapshotting banks
                     // < the current root bank `bank` above.
 
                     // Claim: Any snapshot request for slot `N` found here implies that the last cleanup
