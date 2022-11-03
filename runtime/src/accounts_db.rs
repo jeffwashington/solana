@@ -4433,6 +4433,15 @@ impl AccountsDb {
             // this exercises the ancient shrink code more often
             let is_candidate = {
                 let alive_ratio = (storage.alive_bytes() as u64) * 100 / storage.written_bytes();
+                error!(
+                    "shrink ancient: alive: {}, written: {}, total: {}, slot: {}, alive%: {}, slot: {}",
+                    storage.alive_bytes(),
+                    storage.written_bytes(),
+                    storage.total_bytes(),
+                    storage.slot(),
+                    (storage.alive_bytes() as u64) * 100 / storage.written_bytes(),
+                    slot
+                );
                 alive_ratio < 90
             };
             if is_candidate || (can_randomly_shrink && thread_rng().gen_range(0, 100) == 0) {
