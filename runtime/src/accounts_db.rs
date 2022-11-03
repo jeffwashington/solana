@@ -4434,7 +4434,7 @@ impl AccountsDb {
             let is_candidate = {
                 let alive_ratio = (storage.alive_bytes() as u64) * 100 / storage.written_bytes();
                 error!(
-                    "shrink ancient: alive: {}, written: {}, total: {}, slot: {}, alive%: {}, slot: {}",
+                    "shrink ancient2: alive: {}, written: {}, total: {}, slot: {}, alive%: {}, slot: {}",
                     storage.alive_bytes(),
                     storage.written_bytes(),
                     storage.total_bytes(),
