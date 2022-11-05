@@ -2439,7 +2439,7 @@ impl AccountsDb {
             .as_ref()
             .map(|config| config.filler_accounts_config)
             .unwrap_or_default();
-        let skip_rewrites = accounts_db_config
+        let _skip_rewrites = accounts_db_config
             .as_ref()
             .map(|config| config.skip_rewrites)
             .unwrap_or_default();
@@ -2448,7 +2448,7 @@ impl AccountsDb {
             .map(|config| config.skip_initial_hash_calc)
             .unwrap_or_default();
 
-        let ancient_append_vec_offset = accounts_db_config
+        let _ancient_append_vec_offset = accounts_db_config
             .as_ref()
             .map(|config| config.ancient_append_vec_offset)
             .unwrap_or_default();
@@ -2459,8 +2459,8 @@ impl AccountsDb {
             .unwrap_or_default();
 
         let skip_rewrites = true;
-        let ancient_append_vecs = true;
-    
+        let ancient_append_vec_offset = Some(0);
+
         let filler_account_suffix = if filler_accounts_config.count > 0 {
             Some(solana_sdk::pubkey::new_rand())
         } else {
