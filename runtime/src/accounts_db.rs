@@ -4447,7 +4447,7 @@ impl AccountsDb {
                 );
                 alive_ratio < 90
             };
-            if is_candidate || (can_randomly_shrink && thread_rng().gen_range(0, 100) == 0) {
+            if is_candidate || (can_randomly_shrink && thread_rng().gen_range(0, 1000) == 0) {
                 // we are a candidate for shrink, so either append us to the previous append vec
                 // or recreate us as a new append vec and eliminate the dead accounts
                 info!("ancient_append_vec: shrinking full ancient: {}", slot);
