@@ -2082,12 +2082,6 @@ impl ShrinkAncientStats {
                     i64
                 ),
                 (
-                    // not written
-                    "skipped_shrink",
-                    self.shrink_stats.skipped_shrink.swap(0, Ordering::Relaxed) as i64,
-                    i64
-                ),
-                (
                     "alive_accounts",
                     self.shrink_stats.alive_accounts.swap(0, Ordering::Relaxed) as i64,
                     i64
