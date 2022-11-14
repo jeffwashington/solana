@@ -25,7 +25,7 @@ pub const DEFAULT_TPU_USE_QUIC: bool = false;
 /// Default TPU connection pool size per remote address
 pub const DEFAULT_TPU_CONNECTION_POOL_SIZE: usize = 4;
 
-pub const DEFAULT_TPU_ENABLE_UDP: bool = false;
+pub const DEFAULT_TPU_ENABLE_UDP: bool = true;
 
 pub struct TpuConnectionCache<P: ConnectionPool> {
     pub map: RwLock<IndexMap<SocketAddr, P>>,
