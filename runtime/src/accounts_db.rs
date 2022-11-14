@@ -17762,6 +17762,58 @@ pub mod tests {
     }
 
     #[test]
+    fn test_profile_scan_ancient_append_vec() {
+        solana_logger::setup();
+        for _ in 0..10 {
+            let db = AccountsDb::new_single_for_tests();
+            let slot0 = 0;
+            let slot1 = 1;
+            let available_bytes = 1_000_000;
+            let mut current_ancient = CurrentAncientAppendVec::default();
+
+            // setup 'to_store'
+            let pubkey = Pubkey::new(&[1; 32]);
+            let store_id = AppendVecId::default();
+            let account_size = 3;
+
+            let account = AccountSharedData::default();
+
+            let account_meta = AccountMeta {
+                lamports: 1,
+                owner: Pubkey::new(&[2; 32]),
+                executable: false,
+                rent_epoch: 0,
+            };
+            let offset = 3;
+            let hash = Hash::new(&[2; 32]);
+            let stored_meta = StoredMeta {
+                /// global write version
+                write_version: 0,
+                /// key for the account
+                pubkey,
+                data_len: 43,
+            };
+            current_ancient.create_ancient_append_vec(slot0, &db);
+
+            for k in 0..500000 {
+                let lamports = 1;
+                let space = 1;
+                let mut account =
+                    AccountSharedData::new(lamports, space, AccountSharedData::default().owner());
+                let pubkey = Pubkey::default();
+                db.store_uncached(slot0, &[(&pubkey, &account)]);
+            }
+
+            let av = current_ancient.append_vec();
+            let mut j = 0;
+            let mut m = Measure::start("");
+            av.accounts.account_iter().for_each(|e| j += 1);
+            m.stop();
+            error!("{}, {}", m.as_us(), j);
+        }
+    }
+
+    #[test]
     fn test_handle_dropped_roots_for_ancient() {
         solana_logger::setup();
         let db = AccountsDb::new_single_for_tests();
