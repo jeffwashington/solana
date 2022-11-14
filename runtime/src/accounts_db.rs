@@ -3709,7 +3709,7 @@ impl AccountsDb {
                     let is_alive = slot_list.iter().any(|(_slot, acct_info)| {
                         acct_info.matches_storage_location(
                             stored_account.store_id,
-                            stored_account.account.offset,
+                            0,//stored_account.account.offset,
                         )
                     });
                     if !is_alive {
@@ -3723,7 +3723,6 @@ impl AccountsDb {
                     } else {
                         all_are_zero_lamports &= stored_account.account.lamports() == 0;
                         alive_accounts.push(stored_account);
-                        alive_total += stored_account.account.stored_size;
                         alive += 1;
                     }
                 }
@@ -4329,7 +4328,7 @@ impl AccountsDb {
                         storage
                             .accounts
                             .account_iter()
-                            .map(|account| account.stored_size)
+                            .map(|account| 0)//account.stored_size)
                     })
                     .flatten()
                     .collect::<Vec<_>>()
@@ -8856,8 +8855,8 @@ impl AccountsDb {
                 (
                     pubkey,
                     AccountInfo::new(
-                        StorageLocation::AppendVec(store_id, stored_account.offset), // will never be cached
-                        stored_account.stored_size as StoredSize, // stored_size should never exceed StoredSize::MAX because of max data len const
+                        StorageLocation::AppendVec(store_id, 0),//stored_account.offset), // will never be cached
+                        0,//stored_account.stored_size as StoredSize, // stored_size should never exceed StoredSize::MAX because of max data len const
                         stored_account.account_meta.lamports,
                     ),
                 )
@@ -9183,9 +9182,9 @@ impl AccountsDb {
                                         let ai = AccountInfo::new(
                                             StorageLocation::AppendVec(
                                                 account_info.store_id,
-                                                account_info.stored_account.offset,
+                                                0//account_info.stored_account.offset,
                                             ), // will never be cached
-                                            account_info.stored_account.stored_size as StoredSize, // stored_size should never exceed StoredSize::MAX because of max data len const
+                                            0,//account_info.stored_account.stored_size as StoredSize, // stored_size should never exceed StoredSize::MAX because of max data len const
                                             account_info.stored_account.account_meta.lamports,
                                         );
                                         assert_eq!(&ai, account_info2);
@@ -9420,7 +9419,6 @@ impl AccountsDb {
             let mut info = storage_info_local
                 .entry(v.store_id)
                 .or_insert_with(StorageSizeAndCount::default);
-            info.stored_size += v.stored_account.stored_size;
             info.count += 1;
         }
         storage_size_accounts_map_time.stop();
@@ -9940,8 +9938,6 @@ pub mod tests {
             /// account data
             account_meta: &account_meta,
             data: account.data(),
-            offset,
-            stored_size: account_size,
             hash: &hash,
         };
         let found = FoundStoredAccount { account, store_id };
@@ -10029,32 +10025,24 @@ pub mod tests {
             meta: &meta,
             account_meta: &account_meta,
             data: &data,
-            offset,
-            stored_size,
             hash: &hash,
         };
         let stored_account2 = StoredAccountMeta {
             meta: &meta2,
             account_meta: &account_meta,
             data: &data,
-            offset,
-            stored_size,
             hash: &hash,
         };
         let stored_account3 = StoredAccountMeta {
             meta: &meta3,
             account_meta: &account_meta,
             data: &data,
-            offset,
-            stored_size,
             hash: &hash,
         };
         let stored_account4 = StoredAccountMeta {
             meta: &meta4,
             account_meta: &account_meta,
             data: &data,
-            offset,
-            stored_size,
             hash: &hash,
         };
         let slot0 = 0;
@@ -12616,8 +12604,6 @@ pub mod tests {
             meta: &meta,
             account_meta: &account_meta,
             data: &data,
-            offset,
-            stored_size,
             hash: &hash,
         };
         assert!(accounts_equal(&account, &stored_account));
@@ -12656,8 +12642,6 @@ pub mod tests {
             meta: &meta,
             account_meta: &account_meta,
             data: &data,
-            offset,
-            stored_size: CACHE_VIRTUAL_STORED_SIZE as usize,
             hash: &hash,
         };
         let account = stored_account.clone_account();
@@ -14957,12 +14941,10 @@ pub mod tests {
             let removed_data_size = account_info.1.stored_size();
             // Fetching the account from storage should return the same
             // stored size as in the index.
-            assert_eq!(removed_data_size, account.stored_size as StoredSize);
             assert_eq!(account_info.0, slot);
             let reclaims = vec![account_info];
             accounts_db.remove_dead_accounts(reclaims.iter(), None, None, true);
             let after_size = storage0.alive_bytes.load(Ordering::Acquire);
-            assert_eq!(before_size, after_size + account.stored_size);
         }
     }
 

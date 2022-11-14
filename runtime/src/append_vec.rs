@@ -97,8 +97,6 @@ pub struct StoredAccountMeta<'a> {
     /// account data
     pub account_meta: &'a AccountMeta,
     pub data: &'a [u8],
-    pub offset: usize,
-    pub stored_size: usize,
     pub hash: &'a Hash,
 }
 
@@ -206,6 +204,12 @@ impl Drop for AppendVec {
             }
         }
     }
+}
+
+struct Serialized {
+    meta: StoredMeta,
+    account_meta: AccountMeta,
+    hash: Hash,
 }
 
 impl AppendVec {
@@ -396,6 +400,7 @@ impl AppendVec {
     /// doesn't overrun the internal buffer. Otherwise return None.
     /// Also return the offset of the first byte after the requested data that
     /// falls on a 64-byte boundary.
+    //#[inline]
     fn get_slice(&self, offset: usize, size: usize) -> Option<(&[u8], usize)> {
         let (next, overflow) = offset.overflowing_add(size);
         if overflow || next > self.len() {
@@ -453,6 +458,7 @@ impl AppendVec {
     /// Return a reference to the type at `offset` if its data doesn't overrun the internal buffer.
     /// Otherwise return None. Also return the offset of the first byte after the requested data
     /// that falls on a 64-byte boundary.
+    //#[inline]
     fn get_type<'a, T>(&self, offset: usize) -> Option<(&'a T, usize)> {
         let (data, next) = self.get_slice(offset, mem::size_of::<T>())?;
         let ptr: *const T = data.as_ptr() as *const T;
@@ -465,6 +471,16 @@ impl AppendVec {
     /// the internal buffer. Otherwise return None. Also return the offset of the first byte
     /// after the requested data that falls on a 64-byte boundary.
     pub fn get_account<'a>(&'a self, offset: usize) -> Option<(StoredAccountMeta<'a>, usize)> {
+        /*
+        let (
+            Serialized {
+                meta,
+                account_meta,
+                hash,
+            },
+            next,
+        ): (&'a Serialized, _) = self.get_type(offset)?;
+        */
         let (meta, next): (&'a StoredMeta, _) = self.get_type(offset)?;
         let (account_meta, next): (&'a AccountMeta, _) = self.get_type(next)?;
         let (hash, next): (&'a Hash, _) = self.get_type(next)?;
@@ -475,8 +491,6 @@ impl AppendVec {
                 meta,
                 account_meta,
                 data,
-                offset,
-                stored_size,
                 hash,
             },
             next,

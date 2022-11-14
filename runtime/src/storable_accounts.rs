@@ -224,8 +224,6 @@ pub mod tests {
             meta: &meta,
             account_meta: &account_meta,
             data: &data,
-            offset,
-            stored_size,
             hash: &hash,
         };
 
@@ -287,8 +285,6 @@ pub mod tests {
                             meta: &raw[entry as usize].3,
                             account_meta: &raw[entry as usize].4,
                             data: &data,
-                            offset,
-                            stored_size,
                             hash: &hash,
                         });
                     }

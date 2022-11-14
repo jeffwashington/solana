@@ -321,7 +321,7 @@ impl<'a> SnapshotMinimizer<'a> {
             let mut purge_pubkeys = Vec::with_capacity(CHUNK_SIZE);
             chunk.iter().for_each(|account| {
                 if self.minimized_account_set.contains(account.pubkey()) {
-                    chunk_bytes += account.account.stored_size;
+                    //chunk_bytes += account.account.stored_size;
                     keep_accounts.push(account);
                 } else if self
                     .accounts_db()

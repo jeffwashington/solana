@@ -46,7 +46,7 @@ impl<'a> AccountsToStore<'a> {
         // index of the first account that doesn't fit in the current append vec
         let mut index_first_item_overflow = num_accounts; // assume all fit
         stored_accounts.iter().for_each(|account| {
-            let account_size = account.account.stored_size as u64;
+            let account_size = 0;//account.account.stored_size as u64;
             if available_bytes >= account_size {
                 available_bytes = available_bytes.saturating_sub(account_size);
             } else if index_first_item_overflow == num_accounts {
@@ -153,8 +153,6 @@ pub mod tests {
             /// account data
             account_meta: &account_meta,
             data: account.data(),
-            offset,
-            stored_size: account_size,
             hash: &hash,
         };
         let found = FoundStoredAccount { account, store_id };
