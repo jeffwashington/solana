@@ -471,7 +471,7 @@ impl AppendVec {
     /// the internal buffer. Otherwise return None. Also return the offset of the first byte
     /// after the requested data that falls on a 64-byte boundary.
     pub fn get_account<'a>(&'a self, offset: usize) -> Option<(StoredAccountMeta<'a>, usize)> {
-        /*
+        
         let (
             Serialized {
                 meta,
@@ -480,10 +480,11 @@ impl AppendVec {
             },
             next,
         ): (&'a Serialized, _) = self.get_type(offset)?;
-        */
+        /*
         let (meta, next): (&'a StoredMeta, _) = self.get_type(offset)?;
         let (account_meta, next): (&'a AccountMeta, _) = self.get_type(next)?;
         let (hash, next): (&'a Hash, _) = self.get_type(next)?;
+        */
         let (data, next) = self.get_slice(next, meta.data_len as usize)?;
         let stored_size = next - offset;
         Some((
