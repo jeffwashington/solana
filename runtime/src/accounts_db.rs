@@ -3792,7 +3792,10 @@ impl AccountsDb {
             .into_iter()
             .map(|(_k, v)| v)
             .collect::<Vec<_>>();
-        stored_accounts.sort_unstable_by(|a, b| a.pubkey().cmp(b.pubkey()));
+        let (_, sort) = measure!(stored_accounts.sort_unstable_by(|a, b| a.pubkey().cmp(b.pubkey())));
+        if sort.as_ms() > 1 {
+            error!("sorting took: {}, entries: {}", sort.as_us(), stored_accounts.len());
+        }
 
         GetUniqueAccountsResult {
             stored_accounts,
