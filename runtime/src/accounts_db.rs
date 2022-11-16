@@ -217,6 +217,10 @@ impl CurrentAncientAppendVec {
         self.slot_and_append_vec.as_ref().unwrap().0
     }
 
+    fn try_slot(&self) -> Option<Slot> {
+        self.slot_and_append_vec.as_ref().map(|current| current.0)
+    }
+
     /// note this requires that 'slot_and_append_vec' is Some
     fn append_vec(&self) -> &Arc<AccountStorageEntry> {
         &self.slot_and_append_vec.as_ref().unwrap().1
@@ -4460,8 +4464,8 @@ impl AccountsDb {
                 // we are a candidate for shrink, so either append us to the previous append vec
                 // or recreate us as a new append vec and eliminate the dead accounts
                 info!(
-                    "ancient_append_vec: shrinking ancient: {}, random: {}, alive_ratio: {}",
-                    slot, !is_candidate, alive_ratio
+                    "ancient_append_vec: shrinking ancient: {}, random: {}, alive_ratio: {}, current_ancient.slot: {:?}",
+                    slot, !is_candidate, alive_ratio, current_ancient.try_slot(),
                 );
                 if !is_candidate {
                     self.shrink_ancient_stats
@@ -4533,6 +4537,8 @@ impl AccountsDb {
                 continue; // skipping slot with no useful accounts to write
             }
 
+            let current_ancient_slot = current_ancient.try_slot();
+
             let (_, time) = measure!(current_ancient.create_if_necessary(slot, self));
             let mut create_and_insert_store_elapsed_us = time.as_us();
             let available_bytes = current_ancient.append_vec().accounts.remaining_bytes();
@@ -4562,7 +4568,7 @@ impl AccountsDb {
                 // We need a new ancient append vec at this slot.
                 // Assert: it cannot be the case that we already had an ancient append vec at this slot and
                 // yet that ancient append vec does not have room for the accounts stored at this slot currently
-                assert_ne!(slot, current_ancient.slot(), "available_bytes: {available_bytes}, alive_bytes: {}, alive accounts: {}, overflow accounts: {}", shrink_collect.alive_total, shrink_collect.alive_accounts.len(), to_store.get(StorageSelector::Overflow).0.len());
+                assert_ne!(slot, current_ancient.slot(), "available_bytes: {available_bytes}, alive_bytes: {}, alive accounts: {}, overflow accounts: {}, previous current ancient slot: {:?}, capacity of ancient: {}", shrink_collect.alive_total, shrink_collect.alive_accounts.len(), to_store.get(StorageSelector::Overflow).0.len(), current_ancient_slot, current_ancient.append_vec().accounts.capacity());
                 let (_, time) = measure!(current_ancient.create_ancient_append_vec(slot, self));
                 create_and_insert_store_elapsed_us += time.as_us();
 
