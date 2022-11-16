@@ -373,6 +373,7 @@ pub struct GetUniqueAccountsResult<'a> {
     pub stored_accounts: Vec<FoundStoredAccount<'a>>,
     pub original_bytes: u64,
     store_ids: Vec<AppendVecId>,
+    expected_alive_bytes: usize,
 }
 
 pub struct AccountsAddRootTiming {
@@ -3759,10 +3760,12 @@ impl AccountsDb {
     {
         let mut stored_accounts: HashMap<Pubkey, FoundStoredAccount> = HashMap::new();
         let mut original_bytes = 0;
+        let mut expected_alive_bytes = 0;
         let store_ids = stores
             .into_iter()
             .map(|store| {
                 original_bytes += store.total_bytes();
+                expected_alive_bytes += store.alive_bytes();
                 let store_id = store.append_vec_id();
                 store.accounts.account_iter().for_each(|account| {
                     let new_entry = FoundStoredAccount { account, store_id };
@@ -3795,6 +3798,7 @@ impl AccountsDb {
             stored_accounts,
             original_bytes,
             store_ids,
+            expected_alive_bytes,
         }
     }
 
@@ -3814,6 +3818,7 @@ impl AccountsDb {
                 stored_accounts: stored_accounts_temp,
                 original_bytes,
                 store_ids,
+                expected_alive_bytes,
             },
             storage_read_elapsed,
         ) = measure!(self.get_unique_accounts_from_storages(stores));
@@ -3862,6 +3867,13 @@ impl AccountsDb {
         let alive_accounts = alive_accounts_collect.into_inner().unwrap();
         let unrefed_pubkeys = unrefed_pubkeys_collect.into_inner().unwrap();
         let alive_total = alive_total_collect.load(Ordering::Relaxed);
+
+        error!(
+            "shrink_collect: diff: {}, alive_total: {}, expected_alive_bytes: {}",
+            alive_total.wrapping_sub(expected_alive_bytes),
+            alive_total,
+            expected_alive_bytes
+        );
 
         index_read_elapsed.stop();
         stats
