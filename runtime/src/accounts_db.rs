@@ -3805,11 +3805,17 @@ impl AccountsDb {
     where
         I: Iterator<Item = &'a Arc<AccountStorageEntry>>,
     {
-        let GetUniqueAccountsResult {
-            stored_accounts: stored_accounts_temp,
-            original_bytes,
-            store_ids,
-        } = self.get_unique_accounts_from_storages(stores);
+        let (
+            GetUniqueAccountsResult {
+                stored_accounts: stored_accounts_temp,
+                original_bytes,
+                store_ids,
+            },
+            measure,
+        ) = measure!(self.get_unique_accounts_from_storages(stores));
+        stats
+            .storage_read_elapsed
+            .fetch_add(measure.as_us(), Ordering::Relaxed);
         *stored_accounts = stored_accounts_temp;
 
         let mut index_read_elapsed = Measure::start("index_read_elapsed");
