@@ -3833,10 +3833,11 @@ impl AccountsDb {
         {
             let (_, measure2) = measure!(self.get_unique_accounts_from_storages(stores));
             error!(
-                "1st time: {}, 2nd: {}, diff: {}",
+                "1st time: {}, 2nd: {}, diff: {}, len: {}",
                 measure.as_us(),
                 measure2.as_us(),
-                measure.as_us().wrapping_sub(measure2.as_us())
+                measure.as_us().wrapping_sub(measure2.as_us()),
+                stored_accounts.len(),
             );
         }
 
