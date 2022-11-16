@@ -90,7 +90,7 @@ pub fn get_ancient_append_vec_capacity() -> u64 {
     // smaller than max by a bit just in case
     // some functions add slop on allocation
     // temporarily smaller to force ancient append vec operations to occur more often to flush out any bugs
-    MAXIMUM_APPEND_VEC_FILE_SIZE / 10 - 2048
+    MAXIMUM_APPEND_VEC_FILE_SIZE - 2048
 }
 
 /// is this a max-size append vec designed to be used as an ancient append vec?
