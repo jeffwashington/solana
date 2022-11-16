@@ -4460,7 +4460,7 @@ impl AccountsDb {
                 // we are a candidate for shrink, so either append us to the previous append vec
                 // or recreate us as a new append vec and eliminate the dead accounts
                 info!(
-                    "ancient_append_vec: shrinking full ancient: {}, random: {}, alive_ratio: {}",
+                    "ancient_append_vec: shrinking ancient: {}, random: {}, alive_ratio: {}",
                     slot, !is_candidate, alive_ratio
                 );
                 if !is_candidate {
@@ -4562,7 +4562,7 @@ impl AccountsDb {
                 // We need a new ancient append vec at this slot.
                 // Assert: it cannot be the case that we already had an ancient append vec at this slot and
                 // yet that ancient append vec does not have room for the accounts stored at this slot currently
-                assert_ne!(slot, current_ancient.slot());
+                assert_ne!(slot, current_ancient.slot(), "available_bytes: {available_bytes}, alive_bytes: {}, alive accounts: {}, overflow accounts: {}", shrink_collect.alive_total, shrink_collect.alive_accounts.len(), to_store.get(StorageSelector::Overflow).0.len());
                 let (_, time) = measure!(current_ancient.create_ancient_append_vec(slot, self));
                 create_and_insert_store_elapsed_us += time.as_us();
 
