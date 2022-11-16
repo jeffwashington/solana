@@ -3811,7 +3811,7 @@ impl AccountsDb {
     fn shrink_collect<'a: 'b, 'b, I>(
         &'a self,
         stores: I,
-        stored_accounts: &'b mut Vec<FoundStoredAccount<'b>>,
+        stored_accounts: &'b mut Vec<FoundStoredAccount<'b>> ,
         stats: &ShrinkStats,
     ) -> ShrinkCollect<'b>
     where
@@ -3825,7 +3825,7 @@ impl AccountsDb {
                 expected_alive_bytes,
             },
             storage_read_elapsed,
-        ) = measure!(self.get_unique_accounts_from_storages(stores));
+        ) = measure!(self.get_unique_accounts_from_storages(stores.clone()));
         stats
             .storage_read_elapsed
             .fetch_add(storage_read_elapsed.as_us(), Ordering::Relaxed);
@@ -3834,9 +3834,9 @@ impl AccountsDb {
             let (_, measure2) = measure!(self.get_unique_accounts_from_storages(stores));
             error!(
                 "1st time: {}, 2nd: {}, diff: {}, len: {}",
-                measure.as_us(),
+                storage_read_elapsed.as_us(),
                 measure2.as_us(),
-                measure.as_us().wrapping_sub(measure2.as_us()),
+                storage_read_elapsed.as_us().wrapping_sub(measure2.as_us()),
                 stored_accounts.len(),
             );
         }
@@ -17917,6 +17917,7 @@ pub mod tests {
             stored_accounts: after_stored_accounts,
             original_bytes: after_original_bytes,
             store_ids: after_store_ids,
+            ..
         } = db.get_unique_accounts_from_storages(after_stores.iter());
         assert_ne!(created_accounts.original_bytes, after_original_bytes);
         assert_eq!(created_accounts.stored_accounts.len(), 1);
