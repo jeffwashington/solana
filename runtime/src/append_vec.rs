@@ -5,6 +5,7 @@
 //! <https://docs.solana.com/implemented-proposals/persistent-account-storage>
 
 use {
+    crate::storable_accounts::StorableAccounts,
     log::*,
     memmap2::MmapMut,
     serde::{Deserialize, Serialize},
@@ -19,6 +20,7 @@ use {
         convert::TryFrom,
         fs::{remove_file, OpenOptions},
         io::{self, Seek, SeekFrom, Write},
+        marker::PhantomData,
         mem,
         path::{Path, PathBuf},
         sync::{
@@ -42,6 +44,60 @@ macro_rules! u64_align {
 pub const MAXIMUM_APPEND_VEC_FILE_SIZE: u64 = 16 * 1024 * 1024 * 1024; // 16 GiB
 
 pub type StoredMetaWriteVersion = u64;
+
+pub struct StorableAccountsWithHashesAndWriteVersions<
+    'a: 'b,
+    'b,
+    T: ReadableAccount + Sync + 'b,
+    U: StorableAccounts<'a, T>,
+    V: Borrow<Hash>,
+> {
+    pub accounts: &'b U,
+    hashes_and_write_versions: Option<(Vec<V>, Vec<StoredMetaWriteVersion>)>,
+    _phantom: PhantomData<&'a T>,
+}
+
+impl<'a: 'b, 'b, T: ReadableAccount + Sync + 'b, U: StorableAccounts<'a, T>, V: Borrow<Hash>>
+    StorableAccountsWithHashesAndWriteVersions<'a, 'b, T, U, V>
+{
+    pub fn new(accounts: &'b U) -> Self {
+        assert!(accounts.has_hash_and_write_version());
+        Self {
+            accounts,
+            hashes_and_write_versions: None,
+            _phantom: PhantomData::default(),
+        }
+    }
+    pub fn new_with_hashes_and_write_versions(
+        accounts: &'b U,
+        hashes: Vec<V>,
+        write_versions: Vec<StoredMetaWriteVersion>,
+    ) -> Self {
+        assert!(!accounts.has_hash_and_write_version());
+        assert_eq!(accounts.len(), hashes.len());
+        assert_eq!(write_versions.len(), hashes.len());
+        Self {
+            accounts,
+            hashes_and_write_versions: Some((hashes, write_versions)),
+            _phantom: PhantomData::default(),
+        }
+    }
+
+    pub fn hash(&self, index: usize) -> &Hash {
+        if self.accounts.has_hash_and_write_version() {
+            self.accounts.hash(index)
+        } else {
+            self.hashes_and_write_versions.as_ref().unwrap().0[index].borrow()
+        }
+    }
+    pub fn write_version(&self, index: usize) -> u64 {
+        if self.accounts.has_hash_and_write_version() {
+            self.accounts.write_version(index)
+        } else {
+            self.hashes_and_write_versions.as_ref().unwrap().1[index]
+        }
+    }
+}
 
 /// Meta contains enough context to recover the index from storage itself
 /// This struct will be backed by mmaped and snapshotted data files.
@@ -516,24 +572,40 @@ impl AppendVec {
     /// So, return.len() is 1 + (number of accounts written)
     /// After each account is appended, the internal `current_len` is updated
     /// and will be available to other threads.
-    pub fn append_accounts(
+    pub fn append_accounts<
+        'a,
+        'b,
+        T: ReadableAccount + Sync,
+        U: StorableAccounts<'a, T>,
+        V: Borrow<Hash>,
+    >(
         &self,
-        accounts: &[(StoredMeta, Option<&impl ReadableAccount>)],
-        hashes: &[impl Borrow<Hash>],
+        accounts: &StorableAccountsWithHashesAndWriteVersions<'a, 'b, T, U, V>,
+        skip: usize,
     ) -> Option<Vec<usize>> {
         let _lock = self.append_lock.lock().unwrap();
         let mut offset = self.len();
-        let mut rv = Vec::with_capacity(accounts.len());
-        for ((stored_meta, account), hash) in accounts.iter().zip(hashes) {
-            let meta_ptr = stored_meta as *const StoredMeta;
-            let account_meta = AccountMeta::from(*account);
+
+        let mut rv = Vec::with_capacity(accounts.accounts.len());
+        let len = accounts.accounts.len();
+        for i in skip..len {
+            let account = accounts.accounts.account(i);
+            let stored_meta = StoredMeta {
+                pubkey: *accounts.accounts.pubkey(i),
+                data_len: account.data().len() as u64,
+                write_version: accounts.write_version(i),
+            };
+            let meta_ptr = &stored_meta as *const StoredMeta;
+            let account_meta = AccountMeta {
+                lamports: account.lamports(),
+                owner: *account.owner(),
+                rent_epoch: account.rent_epoch(),
+                executable: account.executable(),
+            };
             let account_meta_ptr = &account_meta as *const AccountMeta;
             let data_len = stored_meta.data_len as usize;
-            let data_ptr = account
-                .map(|account| account.data())
-                .unwrap_or_default()
-                .as_ptr();
-            let hash_ptr = hash.borrow().as_ref().as_ptr();
+            let data_ptr = account.data().as_ptr();
+            let hash_ptr = accounts.hash(i).as_ref().as_ptr();
             let ptrs = [
                 (meta_ptr as *const u8, mem::size_of::<StoredMeta>()),
                 (account_meta_ptr as *const u8, mem::size_of::<AccountMeta>()),
@@ -561,14 +633,16 @@ impl AppendVec {
     /// Copy the account metadata, account and hash to the internal buffer.
     /// Return the starting offset of the account metadata.
     /// After the account is appended, the internal `current_len` is updated.
-    pub fn append_account(
+    pub fn append_account2(
         &self,
-        storage_meta: StoredMeta,
-        account: &AccountSharedData,
-        hash: Hash,
+        _storage_meta: StoredMeta,
+        _account: &AccountSharedData,
+        _hash: Hash,
     ) -> Option<usize> {
-        let res = self.append_accounts(&[(storage_meta, Some(account))], &[&hash]);
-        res.and_then(|res| res.first().cloned())
+        //todo
+        //let res = self.append_accounts(&[(storage_meta, Some(account))], &[&hash]);
+        //res.and_then(|res| res.first().cloned())
+        None
     }
 }
 

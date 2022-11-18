@@ -8,7 +8,7 @@ use {
         accounts_db::FoundStoredAccount,
         append_vec::{AppendVec, StoredAccountMeta},
     },
-    solana_sdk::{clock::Slot, hash::Hash},
+    solana_sdk::clock::Slot,
 };
 
 /// a set of accounts need to be stored.
@@ -25,7 +25,6 @@ pub enum StorageSelector {
 /// We need 1-2 of these slices constructed based on available bytes and individual account sizes.
 /// The slice arithmetic accross both hashes and account data gets messy. So, this struct abstracts that.
 pub struct AccountsToStore<'a> {
-    hashes: Vec<&'a Hash>,
     accounts: Vec<(&'a StoredAccountMeta<'a>, Slot)>,
     /// if 'accounts' contains more items than can be contained in the primary storage, then we have to split these accounts.
     /// 'index_first_item_overflow' specifies the index of the first item in 'accounts' that will go into the overflow storage
@@ -41,7 +40,6 @@ impl<'a> AccountsToStore<'a> {
         slot: Slot,
     ) -> Self {
         let num_accounts = stored_accounts.len();
-        let mut hashes = Vec::with_capacity(num_accounts);
         let mut accounts = Vec::with_capacity(num_accounts);
         // index of the first account that doesn't fit in the current append vec
         let mut index_first_item_overflow = num_accounts; // assume all fit
@@ -52,15 +50,13 @@ impl<'a> AccountsToStore<'a> {
             } else if index_first_item_overflow == num_accounts {
                 available_bytes = 0;
                 // the # of accounts we have so far seen is the most that will fit in the current ancient append vec
-                index_first_item_overflow = hashes.len();
+                index_first_item_overflow = accounts.len();
             }
-            hashes.push(account.account.hash);
             // we have to specify 'slot' here because we are writing to an ancient append vec and squashing slots,
             // so we need to update the previous accounts index entry for this account from 'slot' to 'ancient_slot'
             accounts.push((&account.account, slot));
         });
         Self {
-            hashes,
             accounts,
             index_first_item_overflow,
         }
@@ -72,15 +68,12 @@ impl<'a> AccountsToStore<'a> {
     }
 
     /// get the accounts and hashes to store in the given 'storage'
-    pub fn get(
-        &self,
-        storage: StorageSelector,
-    ) -> (&[(&'a StoredAccountMeta<'a>, Slot)], &[&'a Hash]) {
+    pub fn get(&self, storage: StorageSelector) -> &[(&'a StoredAccountMeta<'a>, Slot)] {
         let range = match storage {
             StorageSelector::Primary => 0..self.index_first_item_overflow,
             StorageSelector::Overflow => self.index_first_item_overflow..self.accounts.len(),
         };
-        (&self.accounts[range.clone()], &self.hashes[range])
+        &self.accounts[range.clone()]
     }
 }
 

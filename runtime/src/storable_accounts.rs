@@ -1,8 +1,21 @@
 //! trait for abstracting underlying storage of pubkey and account pairs to be written
 use {
     crate::{accounts_db::IncludeSlotInHash, append_vec::StoredAccountMeta},
-    solana_sdk::{account::ReadableAccount, clock::Slot, pubkey::Pubkey},
+    solana_sdk::{account::ReadableAccount, clock::Slot, hash::Hash, pubkey::Pubkey},
 };
+/*
+pub trait StorableAccountsWithHash<'a, T: ReadableAccount + Sync>: StorableAccounts<'a, T> {
+    fn hash(&self, index: usize) -> &Hash;
+    fn write_version(&self, index: usize) -> u64;
+    // write_version_producer.next().unwrap()
+    fn next_write_version(&self) -> u64;
+}
+
+*/
+
+lazy_static! {
+    static ref EMPTY_HASH: Hash = Hash::default();
+}
 
 /// abstract access to pubkey, account, slot, target_slot of either:
 /// a. (slot, &[&Pubkey, &ReadableAccount])
@@ -12,6 +25,10 @@ use {
 pub trait StorableAccounts<'a, T: ReadableAccount + Sync>: Sync {
     /// pubkey at 'index'
     fn pubkey(&self, index: usize) -> &Pubkey;
+    fn account_default_if_zero_lamport(&self, index: usize) -> Option<&T> {
+        let account = self.account(index);
+        (account.lamports() != 0).then_some(account)
+    }
     /// account at 'index'
     fn account(&self, index: usize) -> &T;
     // current slot for account at 'index'
@@ -29,6 +46,16 @@ pub trait StorableAccounts<'a, T: ReadableAccount + Sync>: Sync {
     fn contains_multiple_slots(&self) -> bool;
     /// true iff hashing these accounts should include the slot
     fn include_slot_in_hash(&self) -> IncludeSlotInHash;
+
+    fn has_hash_and_write_version(&self) -> bool {
+        false
+    }
+    fn hash(&self, _index: usize) -> &Hash {
+        &EMPTY_HASH
+    }
+    fn write_version(&self, _index: usize) -> u64 {
+        0
+    }
 }
 
 /// accounts that are moving from 'old_slot' to 'target_slot'
@@ -164,6 +191,15 @@ impl<'a> StorableAccounts<'a, StoredAccountMeta<'a>>
     }
     fn include_slot_in_hash(&self) -> IncludeSlotInHash {
         self.2
+    }
+    fn has_hash_and_write_version(&self) -> bool {
+        true
+    }
+    fn hash(&self, index: usize) -> &Hash {
+        self.1[index].0.hash
+    }
+    fn write_version(&self, index: usize) -> u64 {
+        self.1[index].0.meta.write_version
     }
 }
 #[cfg(test)]

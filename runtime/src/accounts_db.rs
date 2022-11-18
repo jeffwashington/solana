@@ -40,7 +40,10 @@ use {
         ancient_append_vecs::{
             get_ancient_append_vec_capacity, is_ancient, AccountsToStore, StorageSelector,
         },
-        append_vec::{AppendVec, StoredAccountMeta, StoredMeta, StoredMetaWriteVersion},
+        append_vec::{
+            AppendVec, StorableAccountsWithHashesAndWriteVersions, StoredAccountMeta, StoredMeta,
+            StoredMetaWriteVersion,
+        },
         bank::Rewrites,
         cache_hash_data::{CacheHashData, CacheHashDataFile},
         contains::Contains,
@@ -233,7 +236,7 @@ impl CurrentAncientAppendVec {
         accounts: &AccountsToStore,
         storage_selector: StorageSelector,
     ) -> StoreAccountsTiming {
-        let (accounts, hashes) = accounts.get(storage_selector);
+        let accounts = accounts.get(storage_selector);
 
         db.store_accounts_frozen(
             (
@@ -241,7 +244,7 @@ impl CurrentAncientAppendVec {
                 accounts,
                 INCLUDE_SLOT_IN_HASH_IRRELEVANT_APPEND_VEC_OPERATION,
             ),
-            Some(hashes),
+            None::<Vec<Hash>>,
             Some(self.append_vec()),
             None,
             StoreReclaims::Ignore,
@@ -292,7 +295,7 @@ impl AncientSlotPubkeys {
             // we are taking accounts from 'slot' and putting them into 'current_ancient.slot()'
             // StorageSelector::Primary here because only the accounts that are moving from 'slot' to 'current_ancient.slot()'
             // Any overflow accounts will get written into a new append vec AT 'slot', so they don't need to be unrefed
-            let (accounts, _hashes) = to_store.get(StorageSelector::Primary);
+            let accounts = to_store.get(StorageSelector::Primary);
             if Some(current_ancient.slot()) != self.inner.as_ref().map(|ap| ap.slot) {
                 let pubkeys = current_ancient
                     .append_vec()
@@ -3811,7 +3814,7 @@ impl AccountsDb {
     fn shrink_collect<'a: 'b, 'b, I>(
         &'a self,
         stores: I,
-        stored_accounts: &'b mut Vec<FoundStoredAccount<'b>> ,
+        stored_accounts: &'b mut Vec<FoundStoredAccount<'b>>,
         stats: &ShrinkStats,
     ) -> ShrinkCollect<'b>
     where
@@ -4014,7 +4017,7 @@ impl AccountsDb {
                     &accounts[..],
                     INCLUDE_SLOT_IN_HASH_IRRELEVANT_APPEND_VEC_OPERATION,
                 ),
-                Some(&hashes),
+                Some(hashes),
                 Some(&shrunken_store),
                 Some(Box::new(write_versions.into_iter())),
                 StoreReclaims::Ignore,
@@ -4578,7 +4581,7 @@ impl AccountsDb {
     fn combine_one_store_into_ancient(
         &self,
         slot: Slot,
-        old_storages: &Vec<Arc<AccountStorageEntry>>,
+        old_storages: &[Arc<AccountStorageEntry>],
         current_ancient: &mut CurrentAncientAppendVec,
         ancient_slot_pubkeys: &mut AncientSlotPubkeys,
         dropped_roots: &mut Vec<Slot>,
@@ -4612,7 +4615,7 @@ impl AccountsDb {
         ancient_slot_pubkeys.maybe_unref_accounts_already_in_ancient(
             slot,
             self,
-            &current_ancient,
+            current_ancient,
             &to_store,
         );
 
@@ -4628,7 +4631,7 @@ impl AccountsDb {
                 // We need a new ancient append vec at this slot.
                 // Assert: it cannot be the case that we already had an ancient append vec at this slot and
                 // yet that ancient append vec does not have room for the accounts stored at this slot currently
-                assert_ne!(slot, current_ancient.slot(), "available_bytes: {available_bytes}, alive_bytes: {}, alive accounts: {}, overflow accounts: {}, previous current ancient slot: {:?}, capacity of ancient: {}", shrink_collect.alive_total, shrink_collect.alive_accounts.len(), to_store.get(StorageSelector::Overflow).0.len(), current_ancient_slot, current_ancient.append_vec().accounts.capacity());
+                assert_ne!(slot, current_ancient.slot(), "available_bytes: {available_bytes}, alive_bytes: {}, alive accounts: {}, overflow accounts: {}, previous current ancient slot: {:?}, capacity of ancient: {}", shrink_collect.alive_total, shrink_collect.alive_accounts.len(), to_store.get(StorageSelector::Overflow).len(), current_ancient_slot, current_ancient.append_vec().accounts.capacity());
                 let (_, time) = measure!(current_ancient.create_ancient_append_vec(slot, self));
                 create_and_insert_store_elapsed_us += time.as_us();
 
@@ -6240,31 +6243,37 @@ impl AccountsDb {
             .fetch_add(count as StoredMetaWriteVersion, Ordering::AcqRel)
     }
 
-    fn write_accounts_to_storage<F: FnMut(Slot, usize) -> Arc<AccountStorageEntry>>(
+    fn write_accounts_to_storage<
+        'a,
+        'b,
+        F: FnMut(Slot, usize) -> Arc<AccountStorageEntry>,
+        T: ReadableAccount + Sync,
+        U: StorableAccounts<'a, T>,
+        V: Borrow<Hash>,
+    >(
         &self,
         slot: Slot,
-        hashes: &[impl Borrow<Hash>],
         mut storage_finder: F,
-        accounts_and_meta_to_store: &[(StoredMeta, Option<&impl ReadableAccount>)],
+        accounts_and_meta_to_store: &StorableAccountsWithHashesAndWriteVersions<'a, 'b, T, U, V>,
     ) -> Vec<AccountInfo> {
-        assert_eq!(hashes.len(), accounts_and_meta_to_store.len());
-        let mut infos: Vec<AccountInfo> = Vec::with_capacity(accounts_and_meta_to_store.len());
+        let mut infos: Vec<AccountInfo> =
+            Vec::with_capacity(accounts_and_meta_to_store.accounts.len());
         let mut total_append_accounts_us = 0;
         let mut total_storage_find_us = 0;
-        while infos.len() < accounts_and_meta_to_store.len() {
+        while infos.len() < accounts_and_meta_to_store.accounts.len() {
             let mut storage_find = Measure::start("storage_finder");
-            let data_len = accounts_and_meta_to_store[infos.len()]
-                .1
-                .map(|account| account.data().len())
-                .unwrap_or_default();
+            let data_len = accounts_and_meta_to_store
+                .accounts
+                .account(infos.len())
+                .data()
+                .len();
             let storage = storage_finder(slot, data_len + STORE_META_OVERHEAD);
             storage_find.stop();
             total_storage_find_us += storage_find.as_us();
             let mut append_accounts = Measure::start("append_accounts");
-            let rvs = storage.accounts.append_accounts(
-                &accounts_and_meta_to_store[infos.len()..],
-                &hashes[infos.len()..],
-            );
+            let rvs = storage
+                .accounts
+                .append_accounts(accounts_and_meta_to_store, infos.len());
             append_accounts.stop();
             total_append_accounts_us += append_accounts.as_us();
             if rvs.is_none() {
@@ -6284,20 +6293,14 @@ impl AccountsDb {
                 continue;
             }
 
-            for (offsets, (_, account)) in rvs
-                .unwrap()
-                .windows(2)
-                .zip(&accounts_and_meta_to_store[infos.len()..])
-            {
+            for (i, offsets) in rvs.unwrap().windows(2).enumerate() {
                 let stored_size = offsets[1] - offsets[0];
                 storage.add_account(stored_size);
 
                 infos.push(AccountInfo::new(
                     StorageLocation::AppendVec(storage.append_vec_id(), offsets[0]),
                     stored_size as StoredSize, // stored_size should never exceed StoredSize::MAX because of max data len const
-                    account
-                        .map(|account| account.lamports())
-                        .unwrap_or_default(),
+                    accounts_and_meta_to_store.accounts.account(i).lamports(),
                 ));
             }
             // restore the state to available
@@ -6608,7 +6611,7 @@ impl AccountsDb {
             let include_slot_in_hash = IncludeSlotInHash::IrrelevantAssertOnUse;
             self.store_accounts_frozen(
                 (slot, &accounts[..], include_slot_in_hash),
-                Some(&hashes),
+                Some(hashes),
                 Some(&flushed_store),
                 None,
                 StoreReclaims::Default,
@@ -6626,7 +6629,7 @@ impl AccountsDb {
                 });
                 self.store_accounts_frozen(
                     (slot, &accounts[..], include_slot_in_hash),
-                    Some(&hashes),
+                    Some(hashes),
                     Some(&flushed_store),
                     None,
                     StoreReclaims::Ignore,
@@ -6719,43 +6722,38 @@ impl AccountsDb {
         }
     }
 
-    fn write_accounts_to_cache<'a>(
+    fn write_accounts_to_cache<'a, 'b, T: ReadableAccount + Sync>(
         &self,
         slot: Slot,
-        hashes: Option<&[impl Borrow<Hash>]>,
-        accounts_and_meta_to_store: &[(StoredMeta, Option<&impl ReadableAccount>)],
+        accounts_and_meta_to_store: &impl StorableAccounts<'b, T>,
         txn_signatures_iter: Box<dyn std::iter::Iterator<Item = &Option<&Signature>> + 'a>,
         include_slot_in_hash: IncludeSlotInHash,
     ) -> Vec<AccountInfo> {
-        let len = accounts_and_meta_to_store.len();
-        let hashes = hashes.map(|hashes| {
-            assert_eq!(hashes.len(), len);
-            hashes
-        });
-
-        accounts_and_meta_to_store
-            .iter()
-            .zip(txn_signatures_iter)
+        txn_signatures_iter
             .enumerate()
-            .map(|(i, ((meta, account), signature))| {
-                let hash = hashes.map(|hashes| hashes[i].borrow());
-
-                let account = account
-                    .map(|account| account.to_account_shared_data())
-                    .unwrap_or_default();
+            .map(|(i, signature)| {
+                let account = accounts_and_meta_to_store
+                    .account(i)
+                    .to_account_shared_data();
                 let account_info = AccountInfo::new(
                     StorageLocation::Cached,
                     CACHE_VIRTUAL_STORED_SIZE,
                     account.lamports(),
                 );
 
-                self.notify_account_at_accounts_update(slot, meta, &account, signature);
+                let meta = StoredMeta {
+                    pubkey: *accounts_and_meta_to_store.pubkey(i),
+                    data_len: account.data().len() as u64,
+                    write_version: 0,
+                };
+
+                self.notify_account_at_accounts_update(slot, &meta, &account, signature);
 
                 let cached_account = self.accounts_cache.store(
                     slot,
-                    &meta.pubkey,
+                    accounts_and_meta_to_store.pubkey(i),
                     account,
-                    hash,
+                    None::<&Hash>,
                     include_slot_in_hash,
                 );
                 // hash this account in the bg
@@ -6771,42 +6769,27 @@ impl AccountsDb {
     }
 
     fn store_accounts_to<
-        'a,
+        'a: 'c,
+        'b,
+        'c,
         F: FnMut(Slot, usize) -> Arc<AccountStorageEntry>,
         P: Iterator<Item = u64>,
-        T: ReadableAccount + Sync + ZeroLamport,
+        T: ReadableAccount + Sync + ZeroLamport + 'b,
     >(
         &self,
-        accounts: &impl StorableAccounts<'a, T>,
-        hashes: Option<&[impl Borrow<Hash>]>,
+        accounts: &'c impl StorableAccounts<'b, T>,
+        hashes: Option<Vec<impl Borrow<Hash>>>,
         storage_finder: F,
         mut write_version_producer: P,
         is_cached_store: bool,
-        txn_signatures: Option<&'a [Option<&'a Signature>]>,
+        txn_signatures: Option<&[Option<&'a Signature>]>,
     ) -> Vec<AccountInfo> {
         let mut calc_stored_meta_time = Measure::start("calc_stored_meta");
         let slot = accounts.target_slot();
-        let accounts_and_meta_to_store: Vec<_> = (0..accounts.len())
-            .into_iter()
-            .map(|index| {
-                let (pubkey, account) = (accounts.pubkey(index), accounts.account(index));
-                self.read_only_accounts_cache.remove(*pubkey, slot);
-                // this is the source of Some(Account) or None.
-                // Some(Account) = store 'Account'
-                // None = store a default/empty account with 0 lamports
-                let (account, data_len) = if account.is_zero_lamport() {
-                    (None, 0)
-                } else {
-                    (Some(account), account.data().len() as u64)
-                };
-                let meta = StoredMeta {
-                    write_version: write_version_producer.next().unwrap(),
-                    pubkey: *pubkey,
-                    data_len,
-                };
-                (meta, account)
-            })
-            .collect();
+        (0..accounts.len()).into_iter().for_each(|index| {
+            let pubkey = accounts.pubkey(index);
+            self.read_only_accounts_cache.remove(*pubkey, slot);
+        });
         calc_stored_meta_time.stop();
         self.stats
             .calc_stored_meta
@@ -6816,33 +6799,42 @@ impl AccountsDb {
             let signature_iter: Box<dyn std::iter::Iterator<Item = &Option<&Signature>>> =
                 match txn_signatures {
                     Some(txn_signatures) => {
-                        assert_eq!(txn_signatures.len(), accounts_and_meta_to_store.len());
+                        assert_eq!(txn_signatures.len(), accounts.len());
                         Box::new(txn_signatures.iter())
                     }
-                    None => {
-                        Box::new(std::iter::repeat(&None).take(accounts_and_meta_to_store.len()))
-                    }
+                    None => Box::new(std::iter::repeat(&None).take(accounts.len())),
                 };
 
             self.write_accounts_to_cache(
                 slot,
-                hashes,
-                &accounts_and_meta_to_store,
+                accounts,
                 signature_iter,
                 accounts.include_slot_in_hash(),
             )
+        } else if accounts.has_hash_and_write_version() {
+            self.write_accounts_to_storage(
+                slot,
+                storage_finder,
+                &StorableAccountsWithHashesAndWriteVersions::<'_, '_, _, _, &Hash>::new(accounts),
+            )
         } else {
+            let write_versions = (0..accounts.len())
+                .map(|_| write_version_producer.next().unwrap())
+                .collect::<Vec<_>>();
             match hashes {
                 Some(hashes) => self.write_accounts_to_storage(
                     slot,
-                    hashes,
                     storage_finder,
-                    &accounts_and_meta_to_store,
+                    &StorableAccountsWithHashesAndWriteVersions::new_with_hashes_and_write_versions(
+                        accounts,
+                        hashes,
+                        write_versions,
+                    ),
                 ),
                 None => {
                     // hash any accounts where we were lazy in calculating the hash
                     let mut hash_time = Measure::start("hash_accounts");
-                    let len = accounts_and_meta_to_store.len();
+                    let len = accounts.len();
                     let mut hashes = Vec::with_capacity(len);
                     for index in 0..accounts.len() {
                         let (pubkey, account) = (accounts.pubkey(index), accounts.account(index));
@@ -6860,11 +6852,10 @@ impl AccountsDb {
                         .fetch_add(hash_time.as_us(), Ordering::Relaxed);
 
                     self.write_accounts_to_storage(
-                        slot,
-                        &hashes,
-                        storage_finder,
-                        &accounts_and_meta_to_store,
-                    )
+                            slot,
+                            storage_finder,
+                            &StorableAccountsWithHashesAndWriteVersions::new_with_hashes_and_write_versions(accounts, hashes, write_versions),
+                        )
                 }
             }
         }
@@ -7976,7 +7967,7 @@ impl AccountsDb {
     fn update_index<'a, T: ReadableAccount + Sync>(
         &self,
         infos: Vec<AccountInfo>,
-        accounts: impl StorableAccounts<'a, T>,
+        accounts: &impl StorableAccounts<'a, T>,
         reclaim: UpsertReclaim,
     ) -> SlotList<AccountInfo> {
         let target_slot = accounts.target_slot();
@@ -8381,7 +8372,7 @@ impl AccountsDb {
             .fetch_add(measure.as_us(), Ordering::Relaxed);
     }
 
-    pub fn store_cached<'a, T: ReadableAccount + Sync + ZeroLamport>(
+    pub fn store_cached<'a, T: ReadableAccount + Sync + ZeroLamport + 'a>(
         &self,
         accounts: impl StorableAccounts<'a, T>,
         txn_signatures: Option<&'a [Option<&'a Signature>]>,
@@ -8405,7 +8396,7 @@ impl AccountsDb {
         );
     }
 
-    fn store<'a, T: ReadableAccount + Sync + ZeroLamport>(
+    fn store<'a, T: ReadableAccount + Sync + ZeroLamport + 'a>(
         &self,
         accounts: impl StorableAccounts<'a, T>,
         is_cached_store: bool,
@@ -8567,10 +8558,10 @@ impl AccountsDb {
         }
     }
 
-    fn store_accounts_unfrozen<'a, T: ReadableAccount + Sync + ZeroLamport>(
+    fn store_accounts_unfrozen<'a, T: ReadableAccount + Sync + ZeroLamport + 'a>(
         &self,
         accounts: impl StorableAccounts<'a, T>,
-        hashes: Option<&[&Hash]>,
+        hashes: Option<Vec<&'a Hash>>,
         is_cached_store: bool,
         txn_signatures: Option<&'a [Option<&'a Signature>]>,
         reclaim: StoreReclaims,
@@ -8595,10 +8586,10 @@ impl AccountsDb {
         );
     }
 
-    pub(crate) fn store_accounts_frozen<'a, T: ReadableAccount + Sync + ZeroLamport>(
+    pub(crate) fn store_accounts_frozen<'a, T: ReadableAccount + Sync + ZeroLamport + 'a>(
         &'a self,
         accounts: impl StorableAccounts<'a, T>,
-        hashes: Option<&[impl Borrow<Hash>]>,
+        hashes: Option<Vec<impl Borrow<Hash>>>,
         storage: Option<&'a Arc<AccountStorageEntry>>,
         write_version_producer: Option<Box<dyn Iterator<Item = StoredMetaWriteVersion>>>,
         reclaim: StoreReclaims,
@@ -8620,15 +8611,15 @@ impl AccountsDb {
         )
     }
 
-    fn store_accounts_custom<'a, 'b, T: ReadableAccount + Sync + ZeroLamport>(
-        &'a self,
-        accounts: impl StorableAccounts<'b, T>,
-        hashes: Option<&[impl Borrow<Hash>]>,
+    fn store_accounts_custom<'a, T: ReadableAccount + Sync + ZeroLamport + 'a>(
+        &self,
+        accounts: impl StorableAccounts<'a, T>,
+        hashes: Option<Vec<impl Borrow<Hash>>>,
         storage: Option<&'a Arc<AccountStorageEntry>>,
         write_version_producer: Option<Box<dyn Iterator<Item = u64>>>,
         is_cached_store: bool,
         reset_accounts: bool,
-        txn_signatures: Option<&'b [Option<&'b Signature>]>,
+        txn_signatures: Option<&[Option<&Signature>]>,
         reclaim: StoreReclaims,
     ) -> StoreAccountsTiming {
         let storage_finder = Box::new(move |slot, size| {
@@ -8681,7 +8672,7 @@ impl AccountsDb {
         // after the account are stored by the above `store_accounts_to`
         // call and all the accounts are stored, all reads after this point
         // will know to not check the cache anymore
-        let mut reclaims = self.update_index(infos, accounts, reclaim);
+        let mut reclaims = self.update_index(infos, &accounts, reclaim);
 
         // For each updated account, `reclaims` should only have at most one
         // item (if the account was previously updated in this slot).
@@ -9139,7 +9130,7 @@ impl AccountsDb {
                 let include_slot_in_hash = INCLUDE_SLOT_IN_HASH_TESTS;
                 self.store_accounts_frozen(
                     (*slot, &add[..], include_slot_in_hash),
-                    Some(&hashes[..]),
+                    Some(hashes),
                     None,
                     None,
                     StoreReclaims::Ignore,
