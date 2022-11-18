@@ -3985,7 +3985,7 @@ impl AccountsDb {
                     &accounts[..],
                     INCLUDE_SLOT_IN_HASH_IRRELEVANT_APPEND_VEC_OPERATION,
                 ),
-                Some(&hashes),
+                Some(hashes),
                 Some(&shrunken_store),
                 Some(Box::new(write_versions.into_iter())),
                 StoreReclaims::Ignore,
@@ -6206,7 +6206,7 @@ impl AccountsDb {
     fn write_accounts_to_storage<F: FnMut(Slot, usize) -> Arc<AccountStorageEntry>>(
         &self,
         slot: Slot,
-        hashes: &[impl Borrow<Hash>],
+        hashes: Vec<impl Borrow<Hash>>,
         mut storage_finder: F,
         accounts_and_meta_to_store: &[(StoredMeta, Option<&impl ReadableAccount>)],
     ) -> Vec<AccountInfo> {
@@ -6571,7 +6571,7 @@ impl AccountsDb {
             let include_slot_in_hash = IncludeSlotInHash::IrrelevantAssertOnUse;
             self.store_accounts_frozen(
                 (slot, &accounts[..], include_slot_in_hash),
-                Some(&hashes),
+                Some(hashes),
                 Some(&flushed_store),
                 None,
                 StoreReclaims::Default,
@@ -6589,7 +6589,7 @@ impl AccountsDb {
                 });
                 self.store_accounts_frozen(
                     (slot, &accounts[..], include_slot_in_hash),
-                    Some(&hashes),
+                    Some(hashes),
                     Some(&flushed_store),
                     None,
                     StoreReclaims::Ignore,
@@ -6685,7 +6685,7 @@ impl AccountsDb {
     fn write_accounts_to_cache<'a>(
         &self,
         slot: Slot,
-        hashes: Option<&[impl Borrow<Hash>]>,
+        hashes: Option<Vec<impl Borrow<Hash>>>,
         accounts_and_meta_to_store: &[(StoredMeta, Option<&impl ReadableAccount>)],
         txn_signatures_iter: Box<dyn std::iter::Iterator<Item = &Option<&Signature>> + 'a>,
         include_slot_in_hash: IncludeSlotInHash,
@@ -6701,7 +6701,7 @@ impl AccountsDb {
             .zip(txn_signatures_iter)
             .enumerate()
             .map(|(i, ((meta, account), signature))| {
-                let hash = hashes.map(|hashes| hashes[i].borrow());
+                let hash = hashes.as_ref().map(|hashes| hashes[i].borrow());
 
                 let account = account
                     .map(|account| account.to_account_shared_data())
@@ -6741,7 +6741,7 @@ impl AccountsDb {
     >(
         &self,
         accounts: &impl StorableAccounts<'a, T>,
-        hashes: Option<&[impl Borrow<Hash>]>,
+        hashes: Option<Vec<impl Borrow<Hash>>>,
         storage_finder: F,
         mut write_version_producer: P,
         is_cached_store: bool,
@@ -6824,7 +6824,7 @@ impl AccountsDb {
 
                     self.write_accounts_to_storage(
                         slot,
-                        &hashes,
+                        hashes,
                         storage_finder,
                         &accounts_and_meta_to_store,
                     )
@@ -8533,7 +8533,7 @@ impl AccountsDb {
     fn store_accounts_unfrozen<'a, T: ReadableAccount + Sync + ZeroLamport>(
         &self,
         accounts: impl StorableAccounts<'a, T>,
-        hashes: Option<&[&Hash]>,
+        hashes: Option<Vec<&Hash>>,
         is_cached_store: bool,
         txn_signatures: Option<&'a [Option<&'a Signature>]>,
         reclaim: StoreReclaims,
@@ -8561,7 +8561,7 @@ impl AccountsDb {
     pub(crate) fn store_accounts_frozen<'a, T: ReadableAccount + Sync + ZeroLamport>(
         &'a self,
         accounts: impl StorableAccounts<'a, T>,
-        hashes: Option<&[impl Borrow<Hash>]>,
+        hashes: Option<Vec<impl Borrow<Hash>>>,
         storage: Option<&'a Arc<AccountStorageEntry>>,
         write_version_producer: Option<Box<dyn Iterator<Item = StoredMetaWriteVersion>>>,
         reclaim: StoreReclaims,
@@ -8586,7 +8586,7 @@ impl AccountsDb {
     fn store_accounts_custom<'a, 'b, T: ReadableAccount + Sync + ZeroLamport>(
         &'a self,
         accounts: impl StorableAccounts<'b, T>,
-        hashes: Option<&[impl Borrow<Hash>]>,
+        hashes: Option<Vec<impl Borrow<Hash>>>,
         storage: Option<&'a Arc<AccountStorageEntry>>,
         write_version_producer: Option<Box<dyn Iterator<Item = u64>>>,
         is_cached_store: bool,
@@ -9102,7 +9102,7 @@ impl AccountsDb {
                 let include_slot_in_hash = INCLUDE_SLOT_IN_HASH_TESTS;
                 self.store_accounts_frozen(
                     (*slot, &add[..], include_slot_in_hash),
-                    Some(&hashes[..]),
+                    Some(hashes),
                     None,
                     None,
                     StoreReclaims::Ignore,
@@ -12781,7 +12781,7 @@ pub mod tests {
         // put wrong hash value in store so we get a mismatch
         db.store_accounts_unfrozen(
             (some_slot, &[(&key, &account)][..]),
-            Some(&[&Hash::default()]),
+            Some(vec![&Hash::default()]),
             false,
             None,
             StoreReclaims::Default,
@@ -13044,7 +13044,7 @@ pub mod tests {
         let some_hash = Hash::new(&[0xca; HASH_BYTES]);
         db.store_accounts_unfrozen(
             (some_slot, accounts),
-            Some(&[&some_hash]),
+            Some(vec![&some_hash]),
             false,
             None,
             StoreReclaims::Default,

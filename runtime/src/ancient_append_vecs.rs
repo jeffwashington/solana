@@ -74,12 +74,14 @@ impl<'a> AccountsToStore<'a> {
     }
 
     /// get the accounts and hashes to store in the given 'storage'
-    pub fn get(&self, storage: StorageSelector) -> (&[&'a StoredAccountMeta<'a>], &[&'a Hash]) {
+    pub fn get(&self, storage: StorageSelector) -> (&[&'a StoredAccountMeta<'a>], Vec<&'a Hash>) {
         let range = match storage {
             StorageSelector::Primary => 0..self.index_first_item_overflow,
             StorageSelector::Overflow => self.index_first_item_overflow..self.accounts.len(),
         };
-        (&self.accounts[range.clone()], &self.hashes[range])
+        // 'to_vec() here is inefficient. This will go away completely in an upcoming refactoring. This is all behind
+        // the optional cli arg for ancient append vecs.
+        (&self.accounts[range.clone()], self.hashes[range].to_vec())
     }
 }
 
