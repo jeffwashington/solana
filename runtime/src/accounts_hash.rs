@@ -138,6 +138,7 @@ pub type StorageSizeQuartileStats = [usize; 6];
 
 #[derive(Debug, Default)]
 pub struct HashStats {
+    pub initialize_vec_us: AtomicU64,
     pub mark_time_us: u64,
     pub scan_time_total_us: u64,
     pub zeros_time_total_us: u64,
@@ -213,6 +214,11 @@ impl HashStats {
             + self.storage_sort_us;
         datapoint_info!(
             "calculate_accounts_hash_from_storages",
+            (
+                "initialize_vec_us",
+                self.initialize_vec_us.load(Ordering::Relaxed),
+                i64
+            ),
             ("mark_time_us", self.mark_time_us, i64),
             ("accounts_scan_us", self.scan_time_total_us, i64),
             ("eliminate_zeros_us", self.zeros_time_total_us, i64),

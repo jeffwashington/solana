@@ -7296,7 +7296,8 @@ impl AccountsDb {
                         }
                         if init_accum {
                             let range = bin_range.end - bin_range.start;
-                            scanner.init_accum(range);
+                            let (_, measure) = measure!(scanner.init_accum(range));
+                            stats.initialize_vec_us.fetch_add(measure.as_us(), Ordering::Relaxed);
                             init_accum = false;
                         }
                         scanner.set_slot(slot);
