@@ -518,7 +518,7 @@ pub fn app<'a>(version: &'a str, default_args: &'a DefaultArgs) -> App<'a, 'a> {
                 .long("accounts-hash-interval-slots")
                 .value_name("NUMBER")
                 .takes_value(true)
-                .default_value(&default_args.accounts_hash_interval_slots)
+                .default_value(&default_args.incremental_snapshot_archive_interval_slots)
                 .help("Number of slots between generating accounts hash.")
                 .validator(|val| {
                     if val.eq("0") {
