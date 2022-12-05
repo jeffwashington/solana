@@ -2410,19 +2410,13 @@ impl AccountsDb {
             .as_ref()
             .map(|config| config.filler_accounts_config)
             .unwrap_or_default();
-        let skip_rewrites = accounts_db_config
-            .as_ref()
-            .map(|config| config.skip_rewrites)
-            .unwrap_or(true);
+        let skip_rewrites = true;
         let skip_initial_hash_calc = accounts_db_config
             .as_ref()
             .map(|config| config.skip_initial_hash_calc)
             .unwrap_or_default();
 
-        let ancient_append_vec_offset = accounts_db_config
-            .as_ref()
-            .map(|config| config.ancient_append_vec_offset)
-            .unwrap_or(Some(0));
+        let ancient_append_vec_offset = Some(0);
 
         let exhaustively_verify_refcounts = accounts_db_config
             .as_ref()
