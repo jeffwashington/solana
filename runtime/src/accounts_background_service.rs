@@ -560,13 +560,16 @@ impl AccountsBackgroundService {
                 let mut stats = StatsManager::new();
                 let mut last_snapshot_end_time = None;
                 loop {
+                    error!("{}", line!());
                     if exit.load(Ordering::Relaxed) {
+                        error!("{}", line!());
                         break;
                     }
                     let start_time = Instant::now();
 
                     // Grab the current root bank
                     let bank = bank_forks.read().unwrap().root_bank().clone();
+                    error!("{}", line!());
 
                     // Purge accounts of any dead slots
                     request_handlers
@@ -576,8 +579,10 @@ impl AccountsBackgroundService {
                             &mut removed_slots_count,
                             &mut total_remove_slots_time,
                         );
+                        error!("{}", line!());
 
                     Self::expire_old_recycle_stores(&bank, &mut last_expiration_check_time);
+                    error!("{}", line!());
 
                     let non_snapshot_time = last_snapshot_end_time
                         .map(|last_snapshot_end_time: Instant| {
@@ -621,6 +626,7 @@ impl AccountsBackgroundService {
                     if snapshot_block_height_option_result.is_some() {
                         last_snapshot_end_time = Some(Instant::now());
                     }
+                    error!("{}", line!());
 
                     if accounts_db_caching_enabled {
                         // Note that the flush will do an internal clean of the
@@ -629,6 +635,7 @@ impl AccountsBackgroundService {
                         // slots >= bank.slot()
                         bank.flush_accounts_cache_if_needed();
                     }
+                    error!("{}", line!());
 
                     if let Some(snapshot_block_height_result) = snapshot_block_height_option_result
                     {
@@ -654,9 +661,11 @@ impl AccountsBackgroundService {
                                 )
                                 .min(SHRUNKEN_ACCOUNT_PER_INTERVAL);
                         }
+                        error!("{}", line!());
                         if bank.block_height() - last_cleaned_block_height
                             > (CLEAN_INTERVAL_BLOCKS + thread_rng().gen_range(0, 10))
                         {
+                            error!("{}", line!());
                             if accounts_db_caching_enabled {
                                 // Note that the flush will do an internal clean of the
                                 // cache up to bank.slot(), so should be safe as long
@@ -664,12 +673,16 @@ impl AccountsBackgroundService {
                                 // slots >= bank.slot()
                                 bank.force_flush_accounts_cache();
                             }
+                            error!("{}", line!());
                             bank.clean_accounts(last_full_snapshot_slot);
+                            error!("{}", line!());
                             last_cleaned_block_height = bank.block_height();
                         }
                     }
+                    error!("{}", line!());
                     stats.record_and_maybe_submit(start_time.elapsed());
                     sleep(Duration::from_millis(INTERVAL_MS));
+                    error!("{}", line!());
                 }
             })
             .unwrap();
