@@ -3056,6 +3056,7 @@ impl AccountsDb {
         is_startup: bool,
         last_full_snapshot_slot: Option<Slot>,
     ) {
+        error!("{}", line!());
         if self.exhaustively_verify_refcounts {
             self.exhaustively_verify_refcounts(max_clean_root_inclusive);
         }
@@ -3066,7 +3067,7 @@ impl AccountsDb {
 
         let mut measure_all = Measure::start("clean_accounts");
         let max_clean_root_inclusive = self.max_clean_root(max_clean_root_inclusive);
-
+        error!("{}", line!());
         // hold a lock to prevent slot shrinking from running because it might modify some rooted
         // slot storages which can not happen as long as we're cleaning accounts because we're also
         // modifying the rooted slot storages!
@@ -3080,6 +3081,7 @@ impl AccountsDb {
             last_full_snapshot_slot,
             &mut key_timings,
         );
+        error!("{}", line!());
 
         let mut sort = Measure::start("sort");
         if is_startup {
@@ -3089,6 +3091,7 @@ impl AccountsDb {
                 .install(|| pubkeys.par_sort_unstable());
         }
         sort.stop();
+        error!("{}", line!());
 
         let total_keys_count = pubkeys.len();
         let mut accounts_scan = Measure::start("accounts_scan");
@@ -3097,6 +3100,7 @@ impl AccountsDb {
         let not_found_on_fork_accum = AtomicU64::new(0);
         let missing_accum = AtomicU64::new(0);
         let useful_accum = AtomicU64::new(0);
+        error!("{}", line!());
 
         // parallel scan the index.
         let (mut purges_zero_lamports, purges_old_accounts) = {
@@ -3202,6 +3206,7 @@ impl AccountsDb {
             }
         };
         accounts_scan.stop();
+        error!("{}", line!());
 
         let mut clean_old_rooted = Measure::start("clean_old_roots");
         let ((purged_account_slots, removed_accounts), mut pubkeys_removed_from_accounts_index) =
@@ -3210,15 +3215,18 @@ impl AccountsDb {
                 max_clean_root_inclusive,
                 &ancient_account_cleans,
             );
+            error!("{}", line!());
 
         if self.caching_enabled {
             self.do_reset_uncleaned_roots(max_clean_root_inclusive);
         } else {
             self.do_reset_uncleaned_roots_v1(&mut candidates_v1, max_clean_root_inclusive);
         }
+        error!("{}", line!());
         clean_old_rooted.stop();
 
         let mut store_counts_time = Measure::start("store_counts");
+        error!("{}", line!());
 
         // Calculate store counts as if everything was purged
         // Then purge if we can
@@ -3273,6 +3281,7 @@ impl AccountsDb {
             });
         }
         store_counts_time.stop();
+        error!("{}", line!());
 
         let mut calc_deps_time = Measure::start("calc_deps");
         Self::calc_delete_dependencies(
@@ -3281,6 +3290,7 @@ impl AccountsDb {
             min_dirty_store_id,
         );
         calc_deps_time.stop();
+        error!("{}", line!());
 
         let mut purge_filter = Measure::start("purge_filter");
         self.filter_zero_lamport_clean_for_incremental_snapshots(
@@ -3290,6 +3300,7 @@ impl AccountsDb {
             &mut purges_zero_lamports,
         );
         purge_filter.stop();
+        error!("{}", line!());
 
         let mut reclaims_time = Measure::start("reclaims");
         // Recalculate reclaims with new purge set
@@ -3305,6 +3316,7 @@ impl AccountsDb {
                 )
             })
             .collect();
+            error!("{}", line!());
 
         let (reclaims, pubkeys_removed_from_accounts_index2) =
             self.purge_keys_exact(pubkey_to_slot_set.iter());
@@ -3322,9 +3334,11 @@ impl AccountsDb {
             reset_accounts,
             &pubkeys_removed_from_accounts_index,
         );
+        error!("{}", line!());
 
         reclaims_time.stop();
         measure_all.stop();
+        error!("{}", line!());
 
         self.clean_accounts_stats.report();
         datapoint_info!(
