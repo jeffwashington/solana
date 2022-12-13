@@ -3261,7 +3261,7 @@ impl AccountsDb {
                 } else {
                     let mut key_set = HashSet::new();
                     key_set.insert(*key);
-                    if !account_info.is_cached() {
+                    if account_info.is_cached() {
                         error!("The Accounts Cache must be flushed first for this account info. pubkey: {}, slot: {}, last full snapshot: {:?}, max_clean_root_inclusive: {:?}, infos: {:?}, ref_count: {}",
                         *key,
                         *slot,
