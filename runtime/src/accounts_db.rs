@@ -3226,7 +3226,7 @@ impl AccountsDb {
         clean_old_rooted.stop();
 
         let mut store_counts_time = Measure::start("store_counts");
-        error!("{}", line!());
+        error!("jw: {}, pubkeys: {}", line!(), purges_zero_lamports.len());
 
         // Calculate store counts as if everything was purged
         // Then purge if we can
@@ -3260,6 +3260,11 @@ impl AccountsDb {
                 } else {
                     let mut key_set = HashSet::new();
                     key_set.insert(*key);
+                    if !account_info.is_cached() {
+                        error!("The Accounts Cache must be flushed first for this account info. pubkey: {}, slot: {}",
+                        *key,
+                        *slot);
+                    }
                     assert!(
                         !account_info.is_cached(),
                         "The Accounts Cache must be flushed first for this account info. pubkey: {}, slot: {}",
@@ -3276,6 +3281,9 @@ impl AccountsDb {
                         slot, account_info.store_id(), count
                     );
                     store_counts.insert(account_info.store_id(), (count, key_set));
+                    if store_counts.len() % 10_000 == 0 {
+                        error!("jw: store_counts: {}", store_counts.len());
+                    }
                 }
                 true
             });
