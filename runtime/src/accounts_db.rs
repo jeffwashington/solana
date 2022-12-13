@@ -3235,6 +3235,7 @@ impl AccountsDb {
             if purged_account_slots.contains_key(key) {
                 *ref_count = self.accounts_index.ref_count_from_storage(key);
             }
+            let infos = account_infos.clone();
             account_infos.retain(|(slot, account_info)| {
                 let was_slot_purged = purged_account_slots
                     .get(key)
@@ -3261,9 +3262,13 @@ impl AccountsDb {
                     let mut key_set = HashSet::new();
                     key_set.insert(*key);
                     if !account_info.is_cached() {
-                        error!("The Accounts Cache must be flushed first for this account info. pubkey: {}, slot: {}",
+                        error!("The Accounts Cache must be flushed first for this account info. pubkey: {}, slot: {}, last full snapshot: {:?}, max_clean_root_inclusive: {:?}, infos: {:?}, ref_count: {}",
                         *key,
-                        *slot);
+                        *slot,
+                        last_full_snapshot_slot,
+                        max_clean_root_inclusive,
+                        infos,
+                    ref_count, );
                     }
                     assert!(
                         !account_info.is_cached(),
