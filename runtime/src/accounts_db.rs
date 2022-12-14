@@ -3280,6 +3280,11 @@ impl AccountsDb {
                         *key,
                         *slot
                     );
+                    if self
+                    .storage
+                    .slot_store_count(*slot, account_info.store_id()).is_none() {
+                        error!("none for slot store count for slot: {slot}, account_info.store_id: {}, pubkey: {}", account_info.store_id(), key);
+                    }
                     let count = self
                         .storage
                         .slot_store_count(*slot, account_info.store_id())
