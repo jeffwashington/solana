@@ -3365,6 +3365,15 @@ fn main() {
                     exit(1);
                 });
 
+                let exit_signal = Arc::new(AtomicBool::new(false));
+                let system_monitor_service = SystemMonitorService::new(
+                    Arc::clone(&exit_signal),
+                    true,
+                    false,
+                    false,
+                    false,
+                );
+
                 let bank = bank_forks.read().unwrap().working_bank();
                 let mut serializer = serde_json::Serializer::new(stdout());
                 let (summarize, mut json_serializer) =
@@ -3424,6 +3433,8 @@ fn main() {
                 if summarize {
                     println!("\n{total_accounts_stats:#?}");
                 }
+                exit_signal.store(true, Ordering::Relaxed);
+                system_monitor_service.join().unwrap();
             }
             ("capitalization", Some(arg_matches)) => {
                 let halt_at_slot = value_t!(arg_matches, "halt_at_slot", Slot).ok();
