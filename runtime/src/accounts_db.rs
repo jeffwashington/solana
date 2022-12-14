@@ -2871,8 +2871,10 @@ impl AccountsDb {
         let mut dirty_stores = Vec::with_capacity(self.dirty_stores.len());
         // find the oldest append vec older than one epoch old
         // we'll add logging if that append vec cannot be marked dead
+        error!("{}", line!());
         let mut min_dirty_slot = self.get_accounts_hash_complete_one_epoch_old();
         let mut min_dirty_store_id = None;
+        error!("{}", line!());
         self.dirty_stores.retain(|(slot, store_id), store| {
             if *slot > max_slot_inclusive {
                 true
@@ -2885,6 +2887,7 @@ impl AccountsDb {
                 false
             }
         });
+        error!("{}", line!());
         let dirty_stores_len = dirty_stores.len();
         let pubkeys = DashSet::new();
         let dirty_ancient_stores = AtomicUsize::default();
@@ -2911,6 +2914,7 @@ impl AccountsDb {
                 .min()
                 .unwrap_or(&max_slot_inclusive.saturating_add(1));
         };
+        error!("{}", line!());
 
         if is_startup {
             // Free to consume all the cores during startup
@@ -2925,6 +2929,7 @@ impl AccountsDb {
             dirty_stores_len,
             pubkeys.len()
         );
+        error!("{}", line!());
         timings.dirty_pubkeys_count = pubkeys.len() as u64;
         dirty_store_processing_time.stop();
         timings.dirty_store_processing_us += dirty_store_processing_time.as_us();
@@ -2935,6 +2940,7 @@ impl AccountsDb {
             self.remove_uncleaned_slots_and_collect_pubkeys_up_to_slot(max_slot_inclusive);
         collect_delta_keys.stop();
         timings.collect_delta_keys_us += collect_delta_keys.as_us();
+        error!("{}", line!());
 
         let mut delta_insert = Measure::start("delta_insert");
         self.thread_pool_clean.install(|| {
@@ -2956,10 +2962,20 @@ impl AccountsDb {
 
         // Check if we should purge any of the zero_lamport_accounts_to_purge_later, based on the
         // last_full_snapshot_slot.
+        error!("{}", line!());
+        if !last_full_snapshot_slot.is_some() && !self.zero_lamport_accounts_to_purge_after_full_snapshot.is_empty() {
+            error!("if snapshots are disabled, then zero_lamport_accounts_to_purge_later should always be empty, {}, {}",
+            last_full_snapshot_slot.is_some(),
+            self.zero_lamport_accounts_to_purge_after_full_snapshot.is_empty(),
+        );
+
+        }
+        error!("{}", line!());
         assert!(
             last_full_snapshot_slot.is_some() || self.zero_lamport_accounts_to_purge_after_full_snapshot.is_empty(),
             "if snapshots are disabled, then zero_lamport_accounts_to_purge_later should always be empty"
         );
+        error!("{}", line!());
         if let Some(last_full_snapshot_slot) = last_full_snapshot_slot {
             self.zero_lamport_accounts_to_purge_after_full_snapshot
                 .retain(|(slot, pubkey)| {
@@ -2971,6 +2987,7 @@ impl AccountsDb {
                     !is_candidate_for_clean
                 });
         }
+        error!("{}", line!());
 
         (pubkeys, min_dirty_store_id)
     }
