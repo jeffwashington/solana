@@ -3259,6 +3259,10 @@ impl AccountsDb {
                     store_count.0 -= 1;
                     store_count.1.insert(*key);
                 } else {
+                    if account_info.is_cached() {
+                        error!("The Accounts Cache must be flushed first for this account info.");
+                    }
+
                     let mut key_set = HashSet::new();
                     key_set.insert(*key);
                     if account_info.is_cached() {
@@ -3286,7 +3290,7 @@ impl AccountsDb {
                         slot, account_info.store_id(), count
                     );
                     store_counts.insert(account_info.store_id(), (count, key_set));
-                    if store_counts.len() % 10_000 == 0 {
+                    if store_counts.len() % 100 == 0 {
                         error!("jw: store_counts: {}", store_counts.len());
                     }
                 }
