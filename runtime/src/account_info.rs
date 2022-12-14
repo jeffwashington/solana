@@ -131,6 +131,7 @@ impl AccountInfo {
 
     pub fn store_id(&self) -> AppendVecId {
         if self.is_cached() {
+            use log::*;
             error!("{} is cached!", line!());
             // if the account is in a cached store, the store_id is meaningless
             assert!(!self.is_cached());
