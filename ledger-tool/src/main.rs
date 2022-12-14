@@ -3352,6 +3352,16 @@ fn main() {
                     &shred_storage_type,
                     force_update_to_open,
                 );
+
+                let exit_signal = Arc::new(AtomicBool::new(false));
+                let system_monitor_service = SystemMonitorService::new(
+                    Arc::clone(&exit_signal),
+                    true,
+                    false,
+                    false,
+                    false,
+                );
+
                 let (bank_forks, ..) = load_bank_forks(
                     arg_matches,
                     &genesis_config,
@@ -3364,15 +3374,6 @@ fn main() {
                     eprintln!("Failed to load ledger: {err:?}");
                     exit(1);
                 });
-
-                let exit_signal = Arc::new(AtomicBool::new(false));
-                let system_monitor_service = SystemMonitorService::new(
-                    Arc::clone(&exit_signal),
-                    true,
-                    false,
-                    false,
-                    false,
-                );
 
                 let bank = bank_forks.read().unwrap().working_bank();
                 let mut serializer = serde_json::Serializer::new(stdout());
