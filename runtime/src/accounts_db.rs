@@ -3273,6 +3273,9 @@ impl AccountsDb {
                     return false;
                 }
                 if let Some(store_count) = store_counts.get_mut(&account_info.store_id()) {
+                    if store_count.0 == 0 {
+                        error!("{} error", line!());
+                    }
                     store_count.0 -= 1;
                     store_count.1.insert(*key);
                 } else {
@@ -3301,6 +3304,11 @@ impl AccountsDb {
                     .storage
                     .slot_store_count(*slot, account_info.store_id()).is_none() {
                         error!("none for slot store count for slot: {slot}, account_info.store_id: {}, pubkey: {}", account_info.store_id(), key);
+                    }
+                    if self
+                    .storage
+                    .slot_store_count(*slot, account_info.store_id()).unwrap() == 0 {
+                        error!("none for slot store count for slot is 0: {slot}, account_info.store_id: {}, pubkey: {}, {}", account_info.store_id(), key, line!());
                     }
                     let count = self
                         .storage
