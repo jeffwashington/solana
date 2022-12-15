@@ -3374,6 +3374,7 @@ fn main() {
                     eprintln!("Failed to load ledger: {err:?}");
                     exit(1);
                 });
+                error!("{}", line!());
 
                 let bank = bank_forks.read().unwrap().working_bank();
                 let mut serializer = serde_json::Serializer::new(stdout());
@@ -3393,6 +3394,7 @@ fn main() {
                     data_encoding,
                     ..CliAccountNewConfig::default()
                 };
+                error!("{}", line!());
                 let scan_func = |some_account_tuple: Option<(&Pubkey, AccountSharedData, Slot)>| {
                     if let Some((pubkey, account, slot)) = some_account_tuple
                         .filter(|(_, account, _)| Accounts::is_loadable(account.lamports()))
@@ -3423,6 +3425,7 @@ fn main() {
                         }
                     }
                 };
+                error!("{}", line!());
                 let mut measure = Measure::start("scanning accounts");
                 bank.scan_all_accounts_with_modified_slots(scan_func)
                     .unwrap();
@@ -3434,6 +3437,7 @@ fn main() {
                 if summarize {
                     println!("\n{total_accounts_stats:#?}");
                 }
+                error!("{}", line!());
                 exit_signal.store(true, Ordering::Relaxed);
                 system_monitor_service.join().unwrap();
             }

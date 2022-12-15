@@ -3249,10 +3249,12 @@ impl AccountsDb {
         // Then purge if we can
         let mut store_counts: HashMap<AppendVecId, (usize, HashSet<Pubkey>)> = HashMap::new();
         for (key, (account_infos, ref_count)) in purges_zero_lamports.iter_mut() {
+            error!("{}", line!());
             if purged_account_slots.contains_key(key) {
                 *ref_count = self.accounts_index.ref_count_from_storage(key);
             }
             let infos = account_infos.clone();
+            error!("{}", line!());
             account_infos.retain(|(slot, account_info)| {
                 let was_slot_purged = purged_account_slots
                     .get(key)
@@ -3269,9 +3271,11 @@ impl AccountsDb {
                     .get(&account_info.store_id())
                     .map(|store_removed| store_removed.contains(&account_info.offset()))
                     .unwrap_or(false);
+                error!("{}", line!());
                 if was_reclaimed {
                     return false;
                 }
+                error!("{}", line!());
                 if let Some(store_count) = store_counts.get_mut(&account_info.store_id()) {
                     if store_count.0 == 0 {
                         error!("{} error", line!());
@@ -3282,6 +3286,7 @@ impl AccountsDb {
                     if account_info.is_cached() {
                         error!("The Accounts Cache must be flushed first for this account info.");
                     }
+                    error!("{}", line!());
 
                     let mut key_set = HashSet::new();
                     key_set.insert(*key);
@@ -3300,6 +3305,7 @@ impl AccountsDb {
                         *key,
                         *slot
                     );
+                    error!("{}", line!());
                     if self
                     .storage
                     .slot_store_count(*slot, account_info.store_id()).is_none() {
