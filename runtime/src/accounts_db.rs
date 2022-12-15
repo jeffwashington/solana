@@ -3306,19 +3306,16 @@ impl AccountsDb {
                         *slot
                     );
                     error!("{}", line!());
-                    if self
+                    let count = self
                     .storage
-                    .slot_store_count(*slot, account_info.store_id()).is_none() {
+                    .slot_store_count(*slot, account_info.store_id());
+                    if count.is_none() {
                         error!("none for slot store count for slot: {slot}, account_info.store_id: {}, pubkey: {}", account_info.store_id(), key);
                     }
-                    if self
-                    .storage
-                    .slot_store_count(*slot, account_info.store_id()).unwrap() == 0 {
+                    if count == Some(0) {
                         error!("none for slot store count for slot is 0: {slot}, account_info.store_id: {}, pubkey: {}, {}", account_info.store_id(), key, line!());
                     }
-                    let count = self
-                        .storage
-                        .slot_store_count(*slot, account_info.store_id())
+                    let count = count
                         .unwrap()
                         - 1;
                     debug!(
