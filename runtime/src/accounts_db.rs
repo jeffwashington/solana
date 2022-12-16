@@ -3265,6 +3265,9 @@ impl AccountsDb {
                     // slot was purged
                     return false;
                 }
+                if account_info.is_cached() {
+                    error!("{} is cached", line!());
+                }
                 // Check if this update in `slot` to the account with `key` was reclaimed earlier by
                 // `clean_accounts_older_than_root()`
                 let was_reclaimed = removed_accounts
