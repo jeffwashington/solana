@@ -3266,7 +3266,7 @@ impl AccountsDb {
                     return false;
                 }
                 if account_info.is_cached() {
-                    error!("{} is cached", line!());
+                    error!("{} is cached, slot: {}, last full snapshot: {:?}, max_clean_root_inclusive: {:?}, slots in cache: {:?}, all slots: {:?}", line!(), slot, last_full_snapshot_slot, max_clean_root_inclusive, self.accounts_cache.num_slots(), self.accounts_cache.all_slots());
                 }
                 // Check if this update in `slot` to the account with `key` was reclaimed earlier by
                 // `clean_accounts_older_than_root()`

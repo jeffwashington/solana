@@ -324,6 +324,10 @@ impl AccountsCache {
         self.cache.len()
     }
 
+    pub fn all_slots(&self) -> Vec<Slot> {
+        self.cache.iter().map(|entry| *entry.key()).collect()
+    }
+
     pub fn fetch_max_flush_root(&self) -> Slot {
         self.max_flushed_root.load(Ordering::Relaxed)
     }
