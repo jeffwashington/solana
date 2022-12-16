@@ -3309,20 +3309,26 @@ impl AccountsDb {
                     let count = self
                     .storage
                     .slot_store_count(*slot, account_info.store_id());
+                    error!("{}", line!());
                     if count.is_none() {
                         error!("none for slot store count for slot: {slot}, account_info.store_id: {}, pubkey: {}", account_info.store_id(), key);
                     }
+                    error!("{}", line!());
                     if count == Some(0) {
                         error!("none for slot store count for slot is 0: {slot}, account_info.store_id: {}, pubkey: {}, {}", account_info.store_id(), key, line!());
                     }
+                    error!("{}", line!());
                     let count = count
                         .unwrap()
                         - 1;
-                    debug!(
+                        error!("{}", line!());
+                        debug!(
                         "store_counts, inserting slot: {}, store id: {}, count: {}",
                         slot, account_info.store_id(), count
                     );
+                    error!("{}", line!());
                     store_counts.insert(account_info.store_id(), (count, key_set));
+                    error!("{}", line!());
                     if store_counts.len() % 100 == 0 {
                         error!("jw: store_counts: {}", store_counts.len());
                     }
