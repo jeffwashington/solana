@@ -1035,6 +1035,8 @@ fn load_bank_forks(
             "snapshot.ledger-tool"
         });
 
+        error!("load_bank_forks: {}", line!());
+
     let mut starting_slot = 0; // default start check with genesis
     let snapshot_config = if arg_matches.is_present("no_snapshot") {
         None
@@ -1062,11 +1064,13 @@ fn load_bank_forks(
             ..SnapshotConfig::new_load_only()
         })
     };
+    error!("load_bank_forks: {}", line!());
 
     if let Some(halt_slot) = process_options.halt_at_slot {
         // Check if we have the slot data necessary to replay from starting_slot to >= halt_slot.
         //  - This will not catch the case when loading from genesis without a full slot 0.
         if !blockstore.slot_range_connected(starting_slot, halt_slot) {
+            error!("load_bank_forks: {}", line!());
             eprintln!("Unable to load bank forks at slot {halt_slot} due to disconnected blocks.",);
             exit(1);
         }
@@ -1076,6 +1080,7 @@ fn load_bank_forks(
         if !blockstore.is_primary_access() {
             // Be defensive, when default account dir is explicitly specified, it's still possible
             // to wipe the dir possibly shared by the running validator!
+            error!("load_bank_forks: {}", line!());
             eprintln!("Error: custom accounts path is not supported under secondary access");
             exit(1);
         }
@@ -1084,6 +1089,7 @@ fn load_bank_forks(
         vec![blockstore.ledger_path().join("accounts")]
     } else {
         let non_primary_accounts_path = blockstore.ledger_path().join("accounts.ledger-tool");
+        error!("load_bank_forks: {}", line!());
         info!(
             "Default accounts path is switched aligning with Blockstore's secondary access: {:?}",
             non_primary_accounts_path
@@ -1099,6 +1105,7 @@ fn load_bank_forks(
 
         vec![non_primary_accounts_path]
     };
+    error!("load_bank_forks: {}", line!());
 
     let mut accounts_update_notifier = Option::<AccountsUpdateNotifier>::default();
     if arg_matches.is_present("geyser_plugin_config") {
@@ -1118,6 +1125,7 @@ fn load_bank_forks(
             );
         accounts_update_notifier = geyser_service.get_accounts_update_notifier();
     }
+    error!("load_bank_forks: {}", line!());
 
     let (bank_forks, leader_schedule_cache, starting_snapshot_hashes, ..) =
         bank_forks_utils::load_bank_forks(
@@ -1131,6 +1139,7 @@ fn load_bank_forks(
             accounts_update_notifier,
             &Arc::default(),
         );
+        error!("load_bank_forks: {}", line!());
 
     let (snapshot_request_sender, snapshot_request_receiver) = crossbeam_channel::unbounded();
     let (accounts_package_sender, _accounts_package_receiver) = crossbeam_channel::unbounded();
@@ -1141,6 +1150,7 @@ fn load_bank_forks(
         snapshot_request_receiver,
         accounts_package_sender,
     };
+    error!("load_bank_forks: {}", line!());
     let pruned_banks_receiver =
         AccountsBackgroundService::setup_bank_drop_callback(bank_forks.clone());
     let pruned_banks_request_handler = PrunedBanksRequestHandler {
@@ -1150,6 +1160,7 @@ fn load_bank_forks(
         snapshot_request_handler,
         pruned_banks_request_handler,
     };
+    error!("load_bank_forks: {}", line!());
     let exit = Arc::new(AtomicBool::new(false));
     let accounts_background_service = AccountsBackgroundService::new(
         bank_forks.clone(),
@@ -1159,6 +1170,7 @@ fn load_bank_forks(
         process_options.accounts_db_test_hash_calculation,
         None,
     );
+    error!("load_bank_forks: {}", line!());
 
     let result = blockstore_processor::process_blockstore_from_root(
         blockstore,
@@ -1170,9 +1182,12 @@ fn load_bank_forks(
         &accounts_background_request_sender,
     )
     .map(|_| (bank_forks, starting_snapshot_hashes));
+    error!("load_bank_forks: {}", line!());
 
     exit.store(true, Ordering::Relaxed);
+    error!("load_bank_forks: {}", line!());
     accounts_background_service.join().unwrap();
+    error!("load_bank_forks: {}", line!());
 
     result
 }
@@ -3344,6 +3359,7 @@ fn main() {
                     accounts_db_caching_enabled: true,
                     ..ProcessOptions::default()
                 };
+                error!("ledger_tool: {}", line!());
                 let genesis_config = open_genesis_config_by(&ledger_path, arg_matches);
                 let include_sysvars = arg_matches.is_present("include_sysvars");
                 let blockstore = open_blockstore(
@@ -3363,6 +3379,8 @@ fn main() {
                     false,
                 );
 
+                error!("ledger_tool: {}", line!());
+
                 let (bank_forks, ..) = load_bank_forks(
                     arg_matches,
                     &genesis_config,
@@ -3375,7 +3393,7 @@ fn main() {
                     eprintln!("Failed to load ledger: {err:?}");
                     exit(1);
                 });
-                error!("{}", line!());
+                error!("ledger_tool: {}", line!());
 
                 let bank = bank_forks.read().unwrap().working_bank();
                 let mut serializer = serde_json::Serializer::new(stdout());
@@ -3395,7 +3413,7 @@ fn main() {
                     data_encoding,
                     ..CliAccountNewConfig::default()
                 };
-                error!("{}", line!());
+                error!("ledger_tool: {}", line!());
                 let scan_func = |some_account_tuple: Option<(&Pubkey, AccountSharedData, Slot)>| {
                     if let Some((pubkey, account, slot)) = some_account_tuple
                         .filter(|(_, account, _)| Accounts::is_loadable(account.lamports()))
@@ -3426,19 +3444,19 @@ fn main() {
                         }
                     }
                 };
-                error!("{}", line!());
+                error!("ledger_tool: {}", line!());
                 let mut measure = Measure::start("scanning accounts");
                 bank.scan_all_accounts_with_modified_slots(scan_func)
                     .unwrap();
                 measure.stop();
-                info!("{}", measure);
+                error!("{}", measure);
                 if let Some(json_serializer) = json_serializer {
                     json_serializer.end().unwrap();
                 }
                 if summarize {
                     println!("\n{total_accounts_stats:#?}");
                 }
-                error!("{}", line!());
+                error!("ledger_tool: {}", line!());
                 exit_signal.store(true, Ordering::Relaxed);
                 system_monitor_service.join().unwrap();
             }
