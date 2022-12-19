@@ -3341,6 +3341,7 @@ fn main() {
                     new_hard_forks: hardforks_of(arg_matches, "hard_forks"),
                     halt_at_slot,
                     poh_verify: false,
+                    accounts_db_caching_enabled: true,
                     ..ProcessOptions::default()
                 };
                 let genesis_config = open_genesis_config_by(&ledger_path, arg_matches);
