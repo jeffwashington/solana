@@ -626,7 +626,7 @@ impl AccountsBackgroundService {
                     if snapshot_block_height_option_result.is_some() {
                         last_snapshot_end_time = Some(Instant::now());
                     }
-                    error!("{}", line!());
+                    error!("{}, caching: {}, bank slot: {}", line!(), accounts_db_caching_enabled, bank.slot());
 
                     if accounts_db_caching_enabled {
                         // Note that the flush will do an internal clean of the
