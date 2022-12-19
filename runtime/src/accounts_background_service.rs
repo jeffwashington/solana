@@ -547,6 +547,8 @@ impl AccountsBackgroundService {
         test_hash_calculation: bool,
         mut last_full_snapshot_slot: Option<Slot>,
     ) -> Self {
+        error!("AccountsBackgroundService: caching enabled: {}", accounts_db_caching_enabled);
+
         info!("AccountsBackgroundService active");
         let exit = exit.clone();
         let mut consumed_budget = 0;

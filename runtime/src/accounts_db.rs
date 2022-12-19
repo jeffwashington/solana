@@ -2398,6 +2398,7 @@ impl AccountsDb {
         accounts_update_notifier: Option<AccountsUpdateNotifier>,
         exit: &Arc<AtomicBool>,
     ) -> Self {
+        error!("new_with_config: caching enabled: {}", caching_enabled);
         let accounts_index = AccountsIndex::new(
             accounts_db_config.as_mut().and_then(|x| x.index.take()),
             exit,
