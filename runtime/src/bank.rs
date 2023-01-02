@@ -5331,11 +5331,10 @@ impl Bank {
     ) -> CollectRentFromAccountsInfo {
         let mut rent_debits = RentDebits::default();
         let mut total_rent_collected_info = CollectedInfo::default();
-        let mut rewrites_skipped = Vec::with_capacity(accounts.len());
         let mut accounts_to_store =
             Vec::<(&Pubkey, &AccountSharedData)>::with_capacity(accounts.len());
         let mut time_collecting_rent_us = 0;
-        let mut time_hashing_skipped_rewrites_us = 0;
+        let time_hashing_skipped_rewrites_us = 0;
         let mut time_storing_accounts_us = 0;
         let can_skip_rewrites = self.rc.accounts.accounts_db.skip_rewrites;
         let set_exempt_rent_epoch_max: bool = self
@@ -5356,20 +5355,7 @@ impl Bank {
             // Also, there's another subtle side-effect from rewrites: this
             // ensures we verify the whole on-chain state (= all accounts)
             // via the bank delta hash slowly once per an epoch.
-            if can_skip_rewrites && Self::skip_rewrite(rent_collected_info.rent_amount, account) {
-                // this would have been rewritten previously. Now we skip it.
-                // calculate the hash that we would have gotten if we did the rewrite.
-                // This will be needed to calculate the bank's hash.
-                let (hash, measure) = measure!(crate::accounts_db::AccountsDb::hash_account(
-                    self.slot(),
-                    account,
-                    pubkey,
-                    self.include_slot_in_hash(),
-                ));
-                time_hashing_skipped_rewrites_us += measure.as_us();
-                rewrites_skipped.push((*pubkey, hash));
-                assert_eq!(rent_collected_info, CollectedInfo::default());
-            } else {
+            if !can_skip_rewrites || !Self::skip_rewrite(rent_collected_info.rent_amount, account) {
                 if rent_collected_info.rent_amount > 0 {
                     if let Some(rent_paying_pubkeys) = rent_paying_pubkeys {
                         if !rent_paying_pubkeys.contains(pubkey) {
