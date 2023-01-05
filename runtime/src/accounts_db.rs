@@ -2584,7 +2584,7 @@ impl AccountsDb {
 
     /// returns us required to load this many random accounts
     #[must_use]
-    pub(crate) fn test_load_random_accounts(&self, count: usize) -> u64 {
+    pub(crate) fn test_load_random_accounts(&self, count: usize) -> (u64, u64) {
         let config = CalcAccountsHashConfig {
             use_bg_thread_pool: false,
             check_hash: false,
@@ -2602,7 +2602,12 @@ impl AccountsDb {
             _ = self.load_with_fixed_root(&Ancestors::default(), &pubkey);
         });
         m.stop();
-        m.as_us()
+        let mut m2 = Measure::start("loading_accounts");
+        random_pubkeys.into_par_iter().for_each(|pubkey| {
+            _ = self.load_with_fixed_root(&Ancestors::default(), &pubkey);
+        });
+        m2.stop();
+        (m.as_us(), m2.as_us())
     }
 
     /// increment store_counts to non-zero for all stores that can not be deleted.

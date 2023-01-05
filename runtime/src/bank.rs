@@ -6804,7 +6804,7 @@ impl Bank {
             while accounts > 0 {
                 error!("loading random accounts {accounts}");
                 let us = self.rc.accounts.accounts_db.test_load_random_accounts(accounts);
-                error!("{}, {} us", accounts, us);
+                error!("{}, {}, {}", accounts, us.0, us.1);
                 accounts = accounts / 10;
             }
             panic!("done");

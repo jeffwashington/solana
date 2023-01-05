@@ -1633,7 +1633,7 @@ fn run_final_hash_calc(bank: &Bank, on_halt_store_hash_raw_data_for_debug: bool)
         require_rooted_bank: false,
         run_in_background: false,
         store_hash_raw_data_for_debug: on_halt_store_hash_raw_data_for_debug,
-        test_load_random_accounts: Some(100_000_000),
+        test_load_random_accounts: Some(10_000_000),
     });
 }
 
