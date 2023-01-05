@@ -2598,7 +2598,7 @@ impl AccountsDb {
         let cache_hash_data = self.get_cache_hash_data(&config, 0 /* ignored */);
         let random_pubkeys = cache_hash_data.get_random_pubkeys(count);
         let mut m = Measure::start("loading_accounts");
-        random_pubkeys.into_par_iter().for_each(|pubkey| {
+        random_pubkeys.clone().into_par_iter().for_each(|pubkey| {
             _ = self.load_with_fixed_root(&Ancestors::default(), &pubkey);
         });
         m.stop();
