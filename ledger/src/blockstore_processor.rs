@@ -1619,6 +1619,8 @@ fn load_frozen_forks(
         );
     }
 
+    run_final_hash_calc(&bank_forks.read().unwrap().root_bank(), false);
+
     Ok(total_slots_elapsed)
 }
 
