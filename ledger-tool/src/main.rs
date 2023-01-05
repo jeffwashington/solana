@@ -1075,7 +1075,7 @@ fn load_bank_forks(
             // Be defensive, when default account dir is explicitly specified, it's still possible
             // to wipe the dir possibly shared by the running validator!
             eprintln!("Error: custom accounts path is not supported under secondary access");
-            exit(1);
+            // exit(1);
         }
         account_paths.split(',').map(PathBuf::from).collect()
     } else if blockstore.is_primary_access() {
