@@ -6802,6 +6802,7 @@ impl Bank {
 
         if let Some(mut accounts) = config.test_load_random_accounts {
             while accounts > 0 {
+                error!("loading random accounts {accounts}");
                 let us = self.rc.accounts.accounts_db.test_load_random_accounts(accounts);
                 error!("{}, {} us", accounts, us);
                 accounts = accounts / 10;
