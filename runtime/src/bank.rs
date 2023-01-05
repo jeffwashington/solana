@@ -186,6 +186,7 @@ pub struct VerifyBankHash {
     pub require_rooted_bank: bool,
     pub run_in_background: bool,
     pub store_hash_raw_data_for_debug: bool,
+    pub test_load_random_accounts: Option<usize>,
 }
 
 #[derive(Debug, Default)]
@@ -6799,6 +6800,14 @@ impl Bank {
             .verify_accounts_hash_in_bg
             .wait_for_complete();
 
+        if let Some(mut accounts) = config.test_load_random_accounts {
+            while accounts > 0 {
+                let us = self.rc.accounts.accounts_db.test_load_random_accounts(accounts);
+                error!("{}, {} us", accounts, us);
+                accounts = accounts / 10;
+            }
+        }
+
         if config.require_rooted_bank
             && !accounts
                 .accounts_db
@@ -7118,6 +7127,7 @@ impl Bank {
                 require_rooted_bank: false,
                 run_in_background: true,
                 store_hash_raw_data_for_debug: false,
+                test_load_random_accounts: None,
             });
             verify_time.stop();
             (verify, verify_time.as_us())

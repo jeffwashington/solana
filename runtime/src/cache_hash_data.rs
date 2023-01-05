@@ -195,6 +195,23 @@ impl CacheHashData {
         }
     }
 
+    pub fn get_random_pubkeys(&self, count: usize) -> Vec<solana_sdk::pubkey::Pubkey> {
+        
+        let files = self.pre_existing_cache_files.lock().unwrap();
+        let num_files = files.len();
+        let files = files.iter().map(|file| self.load_map(file).unwrap()).collect::<Vec<_>>();
+        (0..count).map(|_| {
+            use rand::Rng;
+            let mut rng = rand::thread_rng();
+            let file_index = rng.gen::<usize>() % num_files;
+            let file: &CacheHashDataFile = &files[file_index];
+            let data: &[CalculateHashIntermediate] = file.get_cache_hash_data();
+            let index = rng.gen::<usize>() % data.len();
+            let data: &CalculateHashIntermediate = &data[index];
+            data.pubkey
+        }).collect()
+    }
+
     fn get_cache_root_path(parent_folder: impl AsRef<Path>) -> PathBuf {
         parent_folder.as_ref().join("calculate_accounts_hash_cache")
     }

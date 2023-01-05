@@ -2582,6 +2582,29 @@ impl AccountsDb {
             .fetch_add(measure.as_us(), Ordering::Relaxed);
     }
 
+    /// returns us required to load this many random accounts
+    #[must_use]
+    pub(crate) fn test_load_random_accounts(&self, count: usize) -> u64 {
+        let config = CalcAccountsHashConfig {
+            use_bg_thread_pool: false,
+            check_hash: false,
+            ancestors: None,
+            epoch_schedule: &EpochSchedule::default(),
+            rent_collector: &RentCollector::default(),
+            store_detailed_debug_info_on_failure: false,
+            full_snapshot: None,
+        };
+
+        let cache_hash_data = self.get_cache_hash_data(&config, 0 /* ignored */);
+        let random_pubkeys = cache_hash_data.get_random_pubkeys(count);
+        let mut m = Measure::start("loading_accounts");
+        random_pubkeys.into_par_iter().for_each(|pubkey| {
+            _ = self.load_with_fixed_root(&Ancestors::default(), &pubkey);
+        });
+        m.stop();
+        m.as_us()
+    }
+
     /// increment store_counts to non-zero for all stores that can not be deleted.
     /// a store cannot be deleted if:
     /// 1. one of the pubkeys in the store has account info to a store whose store count is not going to zero
