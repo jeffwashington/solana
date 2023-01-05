@@ -6807,6 +6807,7 @@ impl Bank {
                 error!("{}, {} us", accounts, us);
                 accounts = accounts / 10;
             }
+            panic!("done");
         }
 
         if config.require_rooted_bank
