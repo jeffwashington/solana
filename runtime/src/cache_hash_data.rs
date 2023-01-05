@@ -196,7 +196,7 @@ impl CacheHashData {
     }
 
     pub fn get_random_pubkeys(&self, count: usize) -> Vec<solana_sdk::pubkey::Pubkey> {
-        
+        use log::*;
         error!("{}", line!());
         let files = self.pre_existing_cache_files.lock().unwrap().clone();
         error!("{}", line!());
