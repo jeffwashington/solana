@@ -197,9 +197,14 @@ impl CacheHashData {
 
     pub fn get_random_pubkeys(&self, count: usize) -> Vec<solana_sdk::pubkey::Pubkey> {
         
-        let files = self.pre_existing_cache_files.lock().unwrap();
+        error!("{}", line!());
+        let files = self.pre_existing_cache_files.lock().unwrap().clone();
+        error!("{}", line!());
         let num_files = files.len();
+        error!("{}", line!());
         let files = files.iter().map(|file| self.load_map(file).unwrap()).collect::<Vec<_>>();
+        error!("{}, # files: {}", line!(), num_files);
+        self.pre_existing_cache_files.lock().unwrap().clear(); // don't delete these
         (0..count).map(|_| {
             use rand::Rng;
             let mut rng = rand::thread_rng();
