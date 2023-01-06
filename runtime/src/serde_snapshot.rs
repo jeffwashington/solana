@@ -768,7 +768,6 @@ where
 
     accounts_db.maybe_add_filler_accounts(
         &genesis_config.epoch_schedule,
-        &genesis_config.rent,
         snapshot_slot,
     );
 
