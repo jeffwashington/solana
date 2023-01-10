@@ -8483,8 +8483,14 @@ impl AccountsDb {
     ) -> GenerateIndexAccountsMap<'a> {
         let num_accounts = storage.approx_stored_count();
         let mut accounts_map = GenerateIndexAccountsMap::with_capacity(num_accounts);
+        let mut previous_write_version = None;
         storage.accounts.account_iter().for_each(|stored_account| {
             let this_version = stored_account.meta.write_version_obsolete;
+            if let Some(previous_write_version) = previous_write_version {
+                assert!(previous_write_version < this_version);
+            }
+            previous_write_version = Some(this_version);
+
             let pubkey = stored_account.pubkey();
             assert!(!self.is_filler_account(pubkey));
             match accounts_map.entry(*pubkey) {
