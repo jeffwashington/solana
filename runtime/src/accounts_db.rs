@@ -8489,7 +8489,7 @@ impl AccountsDb {
             i += 1;
             let this_version = stored_account.meta.write_version_obsolete;
             if let Some(previous_write_version) = previous_write_version {
-                assert!(previous_write_version < this_version, "prev: {}, this: {}, i: {}, slot: {}", previous_write_version, this_version, i, storage.get_slot());
+                assert!(previous_write_version < this_version, "prev: {}, this: {}, i: {}, slot: {}", previous_write_version, this_version, i, storage.slot());
             }
             previous_write_version = Some(this_version);
 
