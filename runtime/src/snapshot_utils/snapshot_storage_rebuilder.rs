@@ -292,6 +292,8 @@ impl SnapshotStorageRebuilder {
         let slot_storage_paths = self.storage_paths.get(&slot).unwrap();
         let lock = slot_storage_paths.lock().unwrap();
 
+        error!("storages per slot: {}", slot);
+
         let mut slot_stores = lock
             .iter()
             .map(|path| {
@@ -303,6 +305,7 @@ impl SnapshotStorageRebuilder {
                     .unwrap()
                     .get(&old_append_vec_id)
                     .unwrap();
+                error!("storage len: {:?}, id: {}, len: {}", filename, old_append_vec_id, current_len);
 
                 let storage_entry = remap_and_reconstruct_single_storage(
                     slot,
