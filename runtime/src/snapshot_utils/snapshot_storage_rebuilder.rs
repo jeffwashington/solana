@@ -293,10 +293,28 @@ impl SnapshotStorageRebuilder {
         let lock = slot_storage_paths.lock().unwrap();
 
         let fail = lock.len() > 1;
+        let mut lens = 0;
         if lock.len() > 1 {
             error!("storages per slot: {}, len: {}", slot, lock.len());
+
+            let mut slot_stores = lock
+            .iter()
+            .for_each(|path| {
+                let filename = path.file_name().unwrap().to_str().unwrap();
+                let (_, old_append_vec_id) = get_slot_and_append_vec_id(filename);
+                let current_len = *self
+                    .snapshot_storage_lengths
+                    .get(&slot)
+                    .unwrap()
+                    .get(&old_append_vec_id)
+                    .unwrap();
+                lens += current_len;
+            });
         }
 
+        let mut first = true;
+        let mut id = 0;
+        let first_path = lock.iter().next().unwrap().clone();
         let mut slot_stores = lock
             .iter()
             .map(|path| {
@@ -312,6 +330,8 @@ impl SnapshotStorageRebuilder {
                     error!("storage len: {:?}, id: {}, len: {}", filename, old_append_vec_id, current_len);
                 }
 
+                
+
                 let storage_entry = remap_and_reconstruct_single_storage(
                     slot,
                     old_append_vec_id,
@@ -320,18 +340,50 @@ impl SnapshotStorageRebuilder {
                     &self.next_append_vec_id,
                     &self.num_collisions,
                 )?;
+                if first {
+                id = storage_entry.append_vec_id();
+                }
+                first = false;
 
                 Ok((storage_entry.append_vec_id(), storage_entry))
             })
             .collect::<Result<HashMap<AppendVecId, Arc<AccountStorageEntry>>, std::io::Error>>()?;
 
+            use solana_sdk::account::ReadableAccount;
+        use crate::append_vec::StorableAccountsWithHashesAndWriteVersions;
         if slot_stores.len() != 1 {
-            //assert_eq!(slot_stores.len(), 1);
-            error!("len != 1");
+            let mut accounts = Vec::default();
+            let mut hashes = Vec::default();
+            let mut wv = Vec::default();
+            slot_stores.iter().for_each(|entry| entry.1.accounts.account_iter().for_each(|account| {
+                let pk = *account.pubkey();
+                hashes.push(*account.hash);
+                wv.push(account.meta.write_version_obsolete);
+                let account2 = account.to_account_shared_data();
+                accounts.push((pk, account2));
+            }));
+            
+            slot_stores.clear();
+
+            let store =         Arc::new(crate::accounts_db::AccountStorageEntry::new(&first_path, slot, id, lens as u64));
+            accounts    .into_iter().for_each(|(key, account)| {
+                let accts = [(&key, &account)];
+                let accts2 = (1, &accts[..], crate::accounts_db::IncludeSlotInHash::IncludeSlot);
+                let storable_accounts =
+                StorableAccountsWithHashesAndWriteVersions::new_with_hashes_and_write_versions(
+                    &accts2,
+                    vec![hashes.remove(0)],
+                    vec![wv.remove(0)],
+                );                
+                store.accounts.append_accounts(&storable_accounts, 0);
+            });
+            slot_stores.insert(store.append_vec_id(), store);
         }
-        let (id, storage) = slot_stores.drain().next().unwrap();
-        self.storage
-            .insert(slot, AccountStorageReference { id, storage });
+        else {
+            let (id, storage) = slot_stores.drain().next().unwrap();
+            self.storage
+                .insert(slot, AccountStorageReference { id, storage });
+        }
         Ok(())
     }
 
