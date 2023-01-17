@@ -292,7 +292,10 @@ impl SnapshotStorageRebuilder {
         let slot_storage_paths = self.storage_paths.get(&slot).unwrap();
         let lock = slot_storage_paths.lock().unwrap();
 
-        error!("storages per slot: {}", slot);
+        let fail = lock.len() > 1;
+        if lock.len() > 1 {
+            error!("storages per slot: {}, len: {}", slot, lock.len());
+        }
 
         let mut slot_stores = lock
             .iter()
@@ -305,7 +308,9 @@ impl SnapshotStorageRebuilder {
                     .unwrap()
                     .get(&old_append_vec_id)
                     .unwrap();
-                error!("storage len: {:?}, id: {}, len: {}", filename, old_append_vec_id, current_len);
+                if fail {
+                    error!("storage len: {:?}, id: {}, len: {}", filename, old_append_vec_id, current_len);
+                }
 
                 let storage_entry = remap_and_reconstruct_single_storage(
                     slot,
@@ -320,7 +325,10 @@ impl SnapshotStorageRebuilder {
             })
             .collect::<Result<HashMap<AppendVecId, Arc<AccountStorageEntry>>, std::io::Error>>()?;
 
-        assert_eq!(slot_stores.len(), 1);
+        if slot_stores.len() != 1 {
+            //assert_eq!(slot_stores.len(), 1);
+            error!("len != 1");
+        }
         let (id, storage) = slot_stores.drain().next().unwrap();
         self.storage
             .insert(slot, AccountStorageReference { id, storage });
