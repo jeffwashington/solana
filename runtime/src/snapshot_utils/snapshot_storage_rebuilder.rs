@@ -353,27 +353,43 @@ impl SnapshotStorageRebuilder {
         use crate::append_vec::StorableAccountsWithHashesAndWriteVersions;
         if slot_stores.len() != 1 {
             let mut accounts = Vec::default();
-            let mut hashes = Vec::default();
-            let mut wv = Vec::default();
             slot_stores.iter().for_each(|entry| entry.1.accounts.account_iter().for_each(|account| {
                 let pk = *account.pubkey();
-                hashes.push(*account.hash);
-                wv.push(account.meta.write_version_obsolete);
+                let h = *account.hash;
+                let wv = account.meta.write_version_obsolete;
                 let account2 = account.to_account_shared_data();
-                accounts.push((pk, account2));
+                let mut add = true;
+
+                let mut i = 0;
+                while i < accounts.len() {
+                    let (pk2, _, wv2, _) = accounts[i];
+                    i += 1;
+                    if pk2 != pk {
+                        continue;
+                    }
+                    if wv < wv2 {
+                        add = false;
+                        continue;
+                    }
+                    if wv > wv2 {
+                        i -= 1;
+                        accounts.remove(i);
+                    }
+                }
+                accounts.push((pk, account2, wv, h));
             }));
             
             slot_stores.clear();
 
             let store =         Arc::new(crate::accounts_db::AccountStorageEntry::new(&first_path.parent().unwrap(), slot, id, lens as u64));
-            accounts    .into_iter().for_each(|(key, account)| {
+            accounts    .into_iter().for_each(|(key, account, wv, h)| {
                 let accts = [(&key, &account)];
                 let accts2 = (1, &accts[..], crate::accounts_db::IncludeSlotInHash::IncludeSlot);
                 let storable_accounts =
                 StorableAccountsWithHashesAndWriteVersions::new_with_hashes_and_write_versions(
                     &accts2,
-                    vec![hashes.remove(0)],
-                    vec![wv.remove(0)],
+                    vec![h],
+                    vec![wv],
                 );                
                 store.accounts.append_accounts(&storable_accounts, 0);
             });
