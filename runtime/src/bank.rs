@@ -5350,7 +5350,7 @@ impl Bank {
     fn include_slot_in_hash(&self) -> IncludeSlotInHash {
         if self
             .feature_set
-            .is_active(&feature_set::account_hash_ignore_slot::id())
+            .is_active(&feature_set::account_hash_ignore_slot::id()) || self.slot() > 99273
         {
             IncludeSlotInHash::RemoveSlot
         } else {
