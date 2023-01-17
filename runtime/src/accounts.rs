@@ -246,6 +246,7 @@ impl Accounts {
         rent_collector: &RentCollector,
         feature_set: &FeatureSet,
         account_overrides: Option<&AccountOverrides>,
+        set_exempt_rent_epoch_max: bool,
     ) -> Result<LoadedTransaction> {
         // NOTE: this check will never fail because `tx` is sanitized
         if tx.signatures().is_empty() && fee != 0 {
@@ -261,7 +262,7 @@ impl Accounts {
         let mut account_deps = Vec::with_capacity(account_keys.len());
         let mut rent_debits = RentDebits::default();
 
-        let set_exempt_rent_epoch_max =
+        let _set_exempt_rent_epoch_max =
             feature_set.is_active(&solana_sdk::feature_set::set_exempt_rent_epoch_max::id());
         let mut accounts = account_keys
             .iter()
@@ -543,6 +544,7 @@ impl Accounts {
         feature_set: &FeatureSet,
         fee_structure: &FeeStructure,
         account_overrides: Option<&AccountOverrides>,
+        set_exempt_rent_epoch_max: bool,
     ) -> Vec<TransactionLoadResult> {
         txs.iter()
             .zip(lock_results)
@@ -574,6 +576,7 @@ impl Accounts {
                         rent_collector,
                         feature_set,
                         account_overrides,
+                        set_exempt_rent_epoch_max,
                     ) {
                         Ok(loaded_transaction) => loaded_transaction,
                         Err(e) => return (Err(e), None),
