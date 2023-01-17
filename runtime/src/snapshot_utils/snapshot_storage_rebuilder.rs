@@ -365,7 +365,7 @@ impl SnapshotStorageRebuilder {
             
             slot_stores.clear();
 
-            let store =         Arc::new(crate::accounts_db::AccountStorageEntry::new(&first_path, slot, id, lens as u64));
+            let store =         Arc::new(crate::accounts_db::AccountStorageEntry::new(&first_path.parent().unwrap(), slot, id, lens as u64));
             accounts    .into_iter().for_each(|(key, account)| {
                 let accts = [(&key, &account)];
                 let accts2 = (1, &accts[..], crate::accounts_db::IncludeSlotInHash::IncludeSlot);
