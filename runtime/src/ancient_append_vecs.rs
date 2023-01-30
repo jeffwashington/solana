@@ -3,9 +3,7 @@
 //! 1. a slot that is older than an epoch old
 //! 2. multiple 'slots' squashed into a single older (ie. ancient) slot for convenience and performance
 //! Otherwise, an ancient append vec is the same as any other append vec
-use {
-    crate::append_vec::{AppendVec},
-};
+use crate::append_vec::AppendVec;
 
 /// capacity of an ancient append vec
 pub fn get_ancient_append_vec_capacity() -> u64 {

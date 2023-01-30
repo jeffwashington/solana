@@ -187,15 +187,15 @@ impl<'a> StorableAccounts<'a, StoredAccountMeta<'a>>
     )
 {
     fn pubkey(&self, index: usize) -> &Pubkey {
-        let indexes = find_internal_index(&self.1, index);
+        let indexes = find_internal_index(self.1, index);
         self.1[indexes.0].1[indexes.1].pubkey()
     }
     fn account(&self, index: usize) -> &StoredAccountMeta<'a> {
-        let indexes = find_internal_index(&self.1, index);
+        let indexes = find_internal_index(self.1, index);
         self.1[indexes.0].1[indexes.1]
     }
     fn slot(&self, index: usize) -> Slot {
-        let indexes = find_internal_index(&self.1, index);
+        let indexes = find_internal_index(self.1, index);
         self.1[indexes.0].0
     }
     fn target_slot(&self) -> Slot {
@@ -218,11 +218,11 @@ impl<'a> StorableAccounts<'a, StoredAccountMeta<'a>>
         true
     }
     fn hash(&self, index: usize) -> &Hash {
-        let indexes = find_internal_index(&self.1, index);
+        let indexes = find_internal_index(self.1, index);
         self.1[indexes.0].1[indexes.1].hash
     }
     fn write_version(&self, index: usize) -> u64 {
-        let indexes = find_internal_index(&self.1, index);
+        let indexes = find_internal_index(self.1, index);
         self.1[indexes.0].1[indexes.1].meta.write_version_obsolete
     }
 }
