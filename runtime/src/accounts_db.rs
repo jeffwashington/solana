@@ -150,13 +150,17 @@ pub enum IncludeSlotInHash {
 }
 
 /// info about a storage elibigle to be combined into an ancient append vec.
+/// Useful to help sort vecs of storages.
 struct CombineAncientInfo {
     storage: Arc<AccountStorageEntry>,
+    /// slot of storage
     slot: Slot,
-    /// total capacity of the append vec
+    /// total capacity of storage
     capacity: u64,
-    /// # bytes that will be saved if this append vec is shrunk
-    bytes_to_shrink: u64,
+    /// # alive bytes in storage
+    alive_bytes: u64,
+    /// true if this should be shrunk due to ratio
+    do_ratio_shrink: bool,
 }
 
 #[derive(Default)]
@@ -167,23 +171,87 @@ struct AliveAccounts<'a> {
     bytes: usize,
 }
 
-/// info for all ancient slots and accounts eligible to be shrunk
-struct AncientSlot {
-    /// slots and info that should be shrunk but must remain in the same slot
-    should_shrink_slots: Vec<CombineAncientInfo>,
-    /// slots and alive account info that should be combined into ancient and can move slots
-    alive: Vec<CombineAncientInfo>,
+/// info for all storages in ancient slots
+/// together, 'shrink_ratio_slots' and 'alive_slots' contain all slots and storages that are ancient
+/// and 'shrink_ratio_slots' and 'alive_slots' are mutually exclusive.
+#[derive(Default)]
+struct AncientSlotInfos {
+    /// storages whose alive ratio is high but need to be combined
+    all_infos: Vec<CombineAncientInfo>,
+    /// indexes to 'all_info' for storages in ancient slots that should be shrunk because alive ratio is too low
+    shrink_ratio_slots: Vec<usize>,
+    /// total alive bytes across contents of 'shrink_ratio_slots'
+    total_alive_bytes_shrink_ratio: u64,
     /// total alive bytes across all slots
     total_alive_bytes: u64,
+    /// total # of ancient slots
+    num_slots: usize,
 }
 
-/// hold all alive account data to be shrunk and/or combined
+impl AncientSlotInfos {
+    fn clear_do_ratio_shrink_after_threshold    (&mut self, ratio: u64) {
+        let mut all_infos = Vec::default();
+        // swap all_infos out to avoid mutable reference problems
+        std::mem::swap(&mut all_infos, &mut self.all_infos);
+
+        // sort the shrink_ratio_slots by most bytes saved to fewest
+        // most bytes saved is more valuable to shrink
+        self.shrink_ratio_slots.sort_by(|l, r| {
+            // so sort by most bytes saved, highest to lowest
+            let l = &self.all_infos[*l];
+            let r = &self.all_infos[*r];
+            let r_bytes_to_shrink = r.capacity - r.alive_bytes;
+            let l_bytes_to_shrink = l.capacity - l.alive_bytes;
+            r_bytes_to_shrink.cmp(&l_bytes_to_shrink)
+        });
+
+        let mut bytes_to_shrink_due_to_ratio = 0;
+        // shrink enough slots to save 'ratio'% of the data we can save
+        let threhold_bytes = self.total_alive_bytes_shrink_ratio * ratio / 100;
+        for info_index in &self.shrink_ratio_slots {
+            let info = &mut all_infos[*info_index];
+            if bytes_to_shrink_due_to_ratio >= threhold_bytes {
+                // we exceeded the amount to shrink due to alive ratio, so don't shrink this one just due to ratio
+                // It MAY be shrunk based on total capacity still.
+                // Mark it as false for 'ratio_shrink' so it gets evaluated solely based on # of files.
+                info.do_ratio_shrink = false;
+            }
+            else {
+                bytes_to_shrink_due_to_ratio = bytes_to_shrink_due_to_ratio.saturating_add(info.alive_bytes);
+            }
+        }
+
+        std::mem::swap(&mut all_infos, &mut self.all_infos);
+    }
+
+    fn filter_by_smallest_capacity(&mut self, count: usize) {
+        // sort the mostly alive append vecs by capacity smallest to largest to keep the total # of ancient append vecs <= 'count'
+        self
+            .all_infos
+            .sort_by(|l, r| l.do_ratio_shrink.cmp(&r.do_ratio_shrink).reverse().then_with(|| l.capacity.cmp(&r.capacity)));
+        
+        self.all_infos.truncate(count);
+    }
+}
+
+/// hold all alive accounts to be shrunk and/or combined
 struct ShrinkCollectAll<'a> {
-    /// all alive account data that can move slots and should be combined
-    shrink_collect_all: Vec<ShrinkCollect<'a, ShrinkCollectAliveSeparatedByRefs<'a>>>,
     /// slots and alive accounts that must remain in the slot they are currently in
-    keep_slots_accounts: HashMap<u64, (AliveAccounts<'a>, &'a CombineAncientInfo)>,
-    /// slots that contain alive accounts that can move into ANY anicent slot
+    /// because the account exists in more than 1 slot in accounts db
+    /// This hashmap contains an entry for each slot that contains at least one account with ref_count > 1.
+    /// The value of the entry is all alive accounts in that slot whose ref_count > 1.
+    /// Any OTHER accounts in that slot whose ref_count = 1 are in 'accounts_to_combine' because they can be moved
+    /// to any slot.
+    /// We want to keep the ref_count > 1 accounts by themselves, expecting the multiple ref_counts will be resolved
+    /// soon and we can clean the duplicates up (which maybe THIS one).
+    accounts_keep_slots: HashMap<Slot, (AliveAccounts<'a>, &'a CombineAncientInfo)>,
+    /// all the rest of alive accounts that can move slots and should be combined
+    /// This includes all accounts with ref_count = 1 from the slots in 'accounts_keep_slots'
+    accounts_to_combine: Vec<ShrinkCollect<'a, ShrinkCollectAliveSeparatedByRefs<'a>>>,
+    /// slots that contain alive accounts that can move into ANY other ancient slot
+    /// these slots will NOT be in 'accounts_keep_slots'
+    /// Some of these slots will have ancient append vecs created at them to contain everything in 'accounts_to_combine'
+    /// The rest will become dead slots with no accounts in them.
     movable_slots: Vec<Slot>,
 }
 
@@ -4145,82 +4213,97 @@ impl AccountsDb {
             .unwrap_or_default()
     }
 
-    fn examine_ancient_slots(
+    /// go through all slots and get, per slot
+    /// 'AncientSlots'
+    /// todo 
+    /// should we shrink
+    /// how many bytes are alive
+    /// 
+    fn calc_ancient_slot_info(
         &self,
-        sorted_slots: Vec<Slot>,
+        slots: Vec<Slot>,
         can_randomly_shrink: bool,
-    ) -> AncientSlot {
-        let len = sorted_slots.len();
+    ) -> AncientSlotInfos {
+        let len = slots.len();
         let mut total_alive_bytes = 0;
-        let mut alive = Vec::with_capacity(len);
-        let mut should_shrink_slots = Vec::with_capacity(len);
+        let mut total_alive_bytes_shrink_ratio = 0u64;
+        let mut all_infos = Vec::with_capacity(len);
+        let mut shrink_ratio_slots = Vec::with_capacity(len);
+        let mut num_slots = 0;
 
-        for slot in &sorted_slots {
+        for slot in &slots {
             if let Some(storage) = self.storage.get_slot_storage_entry(*slot) {
                 let alive_bytes = storage.alive_bytes() as u64;
                 if alive_bytes > 0 {
                     let capacity = storage.accounts.capacity();
-                    let written_bytes = storage.written_bytes();
-                    // if nothing is written, then alive ratio is high - slot should not be shrunk. Perhaps it should be dropped, but that is not the responsibilty of this code.
-                    let mut bytes_to_shrink = 0;
-                    let should_shrink = if written_bytes > 0 {
-                        bytes_to_shrink = capacity - alive_bytes;
-                        let alive_ratio = alive_bytes * 100 / written_bytes;
+                    let do_ratio_shrink = if capacity > 0 {
+                        let alive_ratio = alive_bytes * 100 / capacity;
                         (alive_ratio < 90)
                             || (can_randomly_shrink && thread_rng().gen_range(0, 10000) == 0)
                     } else {
                         false
                     };
-                    if should_shrink {
-                        &mut should_shrink_slots
-                    } else {
-                        &mut alive
+                    // two criteria we're shrinking by later:
+                    // 1. alive ratio so that we don't consume too much disk space with dead accounts
+                    // 2. # of active ancient roots, so that we don't consume too many open file handles
+
+                    if do_ratio_shrink {
+                        // alive ratio is too low, so prioritize combining this slot with others
+                        // to reduce disk space used
+                        total_alive_bytes_shrink_ratio = total_alive_bytes_shrink_ratio.saturating_add(alive_bytes);
+                        shrink_ratio_slots.push(all_infos.len());
                     }
-                    .push(CombineAncientInfo {
+                    all_infos.push(CombineAncientInfo {
                         slot: *slot,
                         capacity,
                         storage,
-                        bytes_to_shrink,
+                        alive_bytes,
+                        do_ratio_shrink,
                     });
                     total_alive_bytes += alive_bytes;
+                    num_slots += 1;
                 }
             }
         }
 
-        AncientSlot {
-            should_shrink_slots,
-            alive,
+        AncientSlotInfos {
+            shrink_ratio_slots,
+            all_infos,
             total_alive_bytes,
+            total_alive_bytes_shrink_ratio,
+    num_slots
+,
         }
     }
 
-    fn gather_alive_accounts<'a>(
+    /// todo doc
+    fn get_unique_accounts_from_storage_for_combining_ancient_slots<'a>(
         &self,
-        ancient_slots: &'a AncientSlot,
-    ) -> Vec<(&'a CombineAncientInfo, GetUniqueAccountsResult<'a>)> {
-        let mut stored_accounts_all = Vec::default(); //(0..slots).map(|_| Vec::default()).collect::<Vec<_>>();
+        ancient_slots: &'a [CombineAncientInfo],
+        accounts_to_combine: &mut Vec<(&'a CombineAncientInfo, GetUniqueAccountsResult<'a>)>,
+    ) {
         for info in ancient_slots
-            .should_shrink_slots
-            .iter()
-            .chain(ancient_slots.alive.iter())
         {
             let unique_accounts = self.get_unique_accounts_from_storage_for_shrink(
                 &info.storage,
                 &self.shrink_ancient_stats.shrink_stats,
             );
-            stored_accounts_all.push((info, unique_accounts));
+            accounts_to_combine.push((info, unique_accounts));
         }
-        stored_accounts_all
     }
 
-    fn shrink_collect_all<'a>(
+    /// given all accounts per ancient slot, in slots that we want to combine together:
+    /// look up each pubkey in the index, separate, by slot, into:
+    /// 1. pubkeys with refcount = 1. This means this pubkey exists NOWHERE else in accounts db.
+    /// 2. pubkeys with refcount > 1
+    fn calc_accounts_to_combine<'a>(
         &self,
         stored_accounts_all: &'a Vec<(&'a CombineAncientInfo, GetUniqueAccountsResult<'a>)>,
     ) -> ShrinkCollectAll<'a> {
-        let mut keep_slots_accounts = HashMap::default(); //<Slot, (&ShrinkCollect<ShrinkCollectAliveSeparatedByRefs>, &CombineAncientInfo)>::default();
+        let mut accounts_keep_slots = HashMap::default(); //<Slot, (&ShrinkCollect<ShrinkCollectAliveSeparatedByRefs>, &CombineAncientInfo)>::default();
         let mut movable_slots = Vec::default();
 
-        let mut shrink_collect_all = Vec::default();
+        let mut accounts_to_combine = Vec::default();
         for (info, unique_accounts) in stored_accounts_all {
             let mut shrink_collect = self.shrink_collect::<ShrinkCollectAliveSeparatedByRefs<'_>>(
                 &info.storage,
@@ -4232,21 +4315,24 @@ impl AccountsDb {
                 // there are accounts with ref_count > 1. This means this account must remain IN this slot.
                 // The same account could exist in a newer or older slot. Moving this account across slots could result
                 // in this alive version of the account now being in a slot OLDER than the non-alive instances.
-                keep_slots_accounts.insert(info.slot, (std::mem::take(many_refs), *info));
+                accounts_keep_slots.insert(info.slot, (std::mem::take(many_refs), *info));
             } else {
                 // No alive accounts in this slot have a ref_count > 1. So, ALL alive accounts in this slot can be written to any other slot
                 // we find convenient. There is NO other instance of this account to conflict with.
                 movable_slots.push(info.slot);
             }
-            shrink_collect_all.push(shrink_collect);
+            accounts_to_combine.push(shrink_collect);
         }
         ShrinkCollectAll {
-            shrink_collect_all,
-            keep_slots_accounts,
+            accounts_to_combine,
+            accounts_keep_slots,
             movable_slots,
         }
     }
 
+    /// create append vec of size 'bytes'
+    /// write 'accounts_to_write' into it
+    /// return some metrics and shrink_in_progress
     fn write_ancient_accounts<'a, 'b: 'a, T: ReadableAccount + Sync + ZeroLamport + 'a>(
         &'b self,
         bytes: u64,
@@ -4269,12 +4355,19 @@ impl AccountsDb {
         }
     }
 
+    /// 'accounts_to_combine'.'accounts_keep_slots' contains the slot and alive accounts with ref_count > 1.
+    /// these accounts need to be rewritten in their same slot, with no other accounts in the slot, where other accounts
+    /// would have ref_count = 1. ref_count = 1 accounts would be combined together into other slots into larger append vecs.
+    /// for each slot in 'accounts_to_combine'.'accounts_keep_slots':
+    /// create a new append vec, write only the accounts with ref_count > 1
     fn write_ancient_accounts_multiple_refs<'a, 'b: 'a>(
         &'b self,
-        shrink_collect_all: &'a ShrinkCollectAll<'a>,
+        accounts_to_combine: &'a ShrinkCollectAll<'a>,
     ) -> WriteAncientAccounts<'b> {
+        // todo: if we're just rewriting the same append vec contents as are already there, skip this
+        // but only if there are no ref_count == 1 accounts in the existing append vec
         let mut write_ancient_accounts = WriteAncientAccounts::default();
-        for (target_slot, alive_accounts) in &shrink_collect_all.keep_slots_accounts {
+        for (target_slot, alive_accounts) in &accounts_to_combine.accounts_keep_slots {
             let accounts_to_write = (
                 *target_slot,
                 &alive_accounts.0.accounts[..],
@@ -4287,22 +4380,29 @@ impl AccountsDb {
         write_ancient_accounts
     }
 
+    /// 'accounts_to_combine'.'accounts_to_combine' contains alive accounts with ref_count = 1.
+    /// these accounts can be combined in any order in any slot, with accounts from any other slot.
+    /// for each slot in 'accounts_to_combine'.'movable_slots':
+    /// create a new append vec, write as many accounts as we ideally fit into the new append vec until we have
+    /// run out of accounts to write
     fn write_ancient_accounts_one_ref<'a, 'b: 'a>(
         &'b self,
         stored_accounts_all: &Vec<(&'a CombineAncientInfo, GetUniqueAccountsResult<'a>)>,
-        shrink_collect_all: &'a ShrinkCollectAll<'a>,
+        accounts_to_combine: &'a ShrinkCollectAll<'a>,
     ) -> WriteAncientAccountsOneRef<'b> {
         let mut write_ancient_accounts = WriteAncientAccounts::default();
         let mut dropped_roots = Vec::default();
         let mut info_index = 0;
         let ideal_size = get_ancient_append_vec_capacity();
-        for target_slot in shrink_collect_all.movable_slots.iter().rev() {
+        // rev is to try to pick the highest slot # we can since it doesn't matter where we put these movable accounts
+        // this keeps the range of alive roots as small as possible, which helps the alive_roots.is_root implementation.
+        for target_slot in accounts_to_combine.movable_slots.iter().rev() {
             // fill up a new append vec at 'slot'
             let mut bytes_total = 0usize;
             let mut accounts_to_write = Vec::default();
             while info_index < stored_accounts_all.len() {
                 let info = &stored_accounts_all[info_index];
-                let shrink_collect = &shrink_collect_all.shrink_collect_all[info_index];
+                let shrink_collect = &accounts_to_combine.accounts_to_combine[info_index];
                 let bytes_this_slot = shrink_collect.alive_accounts.one_ref.bytes;
                 if bytes_this_slot >= ideal_size as usize && accounts_to_write.is_empty() {
                     // We encountered an append vec larger than our ideal size
@@ -4348,8 +4448,44 @@ impl AccountsDb {
         }
     }
 
+    /// modify 'ancient_slot_infos' to contain only the slot infos for the slots that should be shrunk and combined
+    fn sort_and_filter_ancient_slots(&self, ancient_slot_infos: &mut AncientSlotInfos) {
+        // figure out which slots to combine
+        /*
+        do_ratio_shrink: largest bytes saved above some cutoff of ratio
+        smallest files so we get the largest number of files to compact
+        - certainly ones with ALL accounts with 1 refcount
+        later storages with widest range of pubkeys
+        */
+
+        // these 2 constants determins the algorithm tuning
+        // shrink enough of these ancient append vecs to realize 50% of the total alive data that needs to be shrunk
+        // Doing too much burns too much time and disk i/o.
+        // Doing too little could cause us to never catch up and have old data accumulate.
+        let ratio_of_shrunk_data = 50;
+        // eliminate enough files to get us to 10k of files whose slots are considered ancient
+        let max_ancient_slots = 10_000;
+
+        let min_bytes_to_shrink = get_ancient_append_vec_capacity();
+        let min_slots_to_combine = ancient_slot_infos.num_slots.saturating_sub(max_ancient_slots);
+
+        if ancient_slot_infos.total_alive_bytes < min_bytes_to_shrink {
+            if min_slots_to_combine == 0 {
+                // too few bytes to combine, and not too many files
+                *ancient_slot_infos = AncientSlotInfos::default();
+                return;
+            }
+        }
+
+        ancient_slot_infos.clear_do_ratio_shrink_after_threshold(ratio_of_shrunk_data);
+        ancient_slot_infos.filter_by_smallest_capacity(max_ancient_slots);
+    }
+
     /// Combine all account data from storages in 'sorted_slots' into ancient append vecs.
     /// This keeps us from accumulating append vecs for each slot older than an epoch.
+    /// Ater this function the number of alive roots is <= # alive roots when it was called.
+    /// In practice, the # of alive roots will be significantly less than # alive roots when called.
+    /// Trying to reduce # roots and append vecs (one per root) required to store all the data in ancient slots
     fn combine_ancient_slots(&self, sorted_slots: Vec<Slot>, can_randomly_shrink: bool) {
         let mut total = Measure::start("combine_ancient_slots");
         if sorted_slots.is_empty() {
@@ -4357,54 +4493,30 @@ impl AccountsDb {
         }
         let _guard = self.active_stats.activate(ActiveStatItem::SquashAncient);
 
-        let mut ancient_slots = self.examine_ancient_slots(sorted_slots, can_randomly_shrink);
-
-        let mut dropped_roots = vec![];
-        // we wait to write an append vec until there is enough data to fill one up
-        let min_bytes = get_ancient_append_vec_capacity();
+        let mut ancient_slot_infos = self.calc_ancient_slot_info(sorted_slots, can_randomly_shrink);
 
         let mut remove_old_stores_shrink_us = 0;
         let mut create_and_insert_store_elapsed_us = 0;
         let mut store_accounts_timing_all = StoreAccountsTiming::default();
         let mut rewrite_elapsed_us = 0;
-        if ancient_slots.total_alive_bytes >= min_bytes {
-            // figure out which slots to combine
-            /*
-            should_shrink: largest bytes saved above some cutoff of ratio
-            smallest files so we get the largest number of files to compact
-            - certainly ones with ALL accounts with 1 refcount
-            storages with widest range of pubkeys
-            */
 
-            // if we have fewer than this many append vecs after handling the ones we should shrink, then don't bother combining into ancient.
-            // todo let mut budget_remaining = 100_000 + ancient_slots.should_shrink_slots.len();
+        self.sort_and_filter_ancient_slots(&mut ancient_slot_infos);
 
-            ancient_slots.should_shrink_slots.sort_by(|l, r| {
-                // so sort by most bytes saved, highest to lowest
-                r.bytes_to_shrink.cmp(&l.bytes_to_shrink)
-            });
+        if !ancient_slot_infos.all_infos.is_empty() {
+            let mut dropped_roots = vec![];
+            let mut storage_accounts_to_combine = Vec::with_capacity(ancient_slot_infos.all_infos.len());
+            self.get_unique_accounts_from_storage_for_combining_ancient_slots(&ancient_slot_infos.all_infos[..], &mut storage_accounts_to_combine);
 
-            // sort by capacity smallest to largest to get rid of the most # of append vecs
-            ancient_slots
-                .alive
-                .sort_by(|l, r| l.capacity.cmp(&r.capacity));
-
-            //let mut accounts_that_can_move_slots= Vec::with_capacity(total_account_count);
-            //let mut shrink_collects = Vec::default();//with_capacity()
-            let stored_accounts_all = self.gather_alive_accounts(&ancient_slots);
-
-            let mut shrink_collect_all = self.shrink_collect_all(&stored_accounts_all);
-
-            // todo? let mut dropped_roots = Vec::default();
+            let mut accounts_to_combine = self.calc_accounts_to_combine(&storage_accounts_to_combine);
 
             // write accounts which have ref count > 1. These must be written IN their same slot.
             let mut write_ancient_accounts =
-                self.write_ancient_accounts_multiple_refs(&shrink_collect_all);
+                self.write_ancient_accounts_multiple_refs(&accounts_to_combine);
 
-            // divide all accounts into append vecs
-            shrink_collect_all.movable_slots.sort();
+            // combine accounts that can move (ie. ref_count=1) into as few ideally sized larger append vecs as possible
+            accounts_to_combine.movable_slots.sort();
             let mut shrink_in_progress_all_one_ref =
-                self.write_ancient_accounts_one_ref(&stored_accounts_all, &shrink_collect_all);
+                self.write_ancient_accounts_one_ref(&storage_accounts_to_combine, &accounts_to_combine);
 
             // these can be be dropped after all accounts have been moved and the index has been updated
             drop(std::mem::take(
@@ -4423,10 +4535,10 @@ impl AccountsDb {
 
             dropped_roots = std::mem::take(&mut shrink_in_progress_all_one_ref.dropped_roots);
 
-            for (shrink_collect, (info, _)) in shrink_collect_all
-                .shrink_collect_all
+            for (shrink_collect, (info, _)) in accounts_to_combine
+                .accounts_to_combine
                 .iter()
-                .zip(stored_accounts_all.iter())
+                .zip(storage_accounts_to_combine.iter())
             {
                 let (_remaining_stores, remove_old_stores_shrink) = measure!(self
                     .remove_old_stores_shrink(
@@ -4437,8 +4549,8 @@ impl AccountsDb {
                     ));
                 remove_old_stores_shrink_us += remove_old_stores_shrink.as_us();
             }
+            self.handle_dropped_roots_for_ancient(dropped_roots);
         }
-        self.handle_dropped_roots_for_ancient(dropped_roots);
 
         let find_alive_elapsed = Measure::start("");
         Self::update_shrink_stats(
@@ -4461,106 +4573,6 @@ impl AccountsDb {
         }
     }
 
-    /*
-        /// put entire alive contents of 'old_storage' into the current ancient append vec or a newly created ancient append vec
-        fn combine_one_store_into_ancient(
-            &self,
-            slot: Slot,
-            old_storage: &Arc<AccountStorageEntry>,
-            current_ancient: &mut CurrentAncientAppendVec,
-            ancient_slot_pubkeys: &mut AncientSlotPubkeys,
-            dropped_roots: &mut Vec<Slot>,
-        ) {
-            let mut stored_accounts = Vec::default();
-            let shrink_collect = self.shrink_collect::<AliveAccounts<'_>>(
-                old_storage,
-                &mut stored_accounts,
-                &self.shrink_ancient_stats.shrink_stats,
-            );
-
-            // could follow what shrink does more closely
-            if shrink_collect.total_starting_accounts == 0 || shrink_collect.alive_total_bytes == 0 {
-                return; // skipping slot with no useful accounts to write
-            }
-
-            let (mut shrink_in_progress, time) =
-                measure!(current_ancient.create_if_necessary(slot, self));
-            let mut create_and_insert_store_elapsed_us = time.as_us();
-            let available_bytes = current_ancient.append_vec().accounts.remaining_bytes();
-            // split accounts in 'slot' into:
-            // 'Primary', which can fit in 'current_ancient'
-            // 'Overflow', which will have to go into a new ancient append vec at 'slot'
-            let (to_store, find_alive_elapsed) = measure!(AccountsToStore::new(
-                available_bytes,
-                shrink_collect.alive_accounts.alive_accounts(),
-                shrink_collect.alive_total_bytes,
-                slot
-            ));
-
-            ancient_slot_pubkeys.maybe_unref_accounts_already_in_ancient(
-                slot,
-                self,
-                current_ancient,
-                &to_store,
-            );
-
-        let mut rewrite_elapsed = Measure::start("rewrite_elapsed");
-        // write what we can to the current ancient storage
-        let mut store_accounts_timing =
-            current_ancient.store_ancient_accounts(self, &to_store, StorageSelector::Primary);
-
-            // handle accounts from 'slot' which did not fit into the current ancient append vec
-            if to_store.has_overflow() {
-                // We need a new ancient append vec at this slot.
-                // Assert: it cannot be the case that we already had an ancient append vec at this slot and
-                // yet that ancient append vec does not have room for the accounts stored at this slot currently
-                assert_ne!(slot, current_ancient.slot());
-                let (shrink_in_progress_overflow, time) =
-                    measure!(current_ancient.create_ancient_append_vec(slot, self));
-                create_and_insert_store_elapsed_us += time.as_us();
-                // We cannot possibly be shrinking the original slot that created an ancient append vec
-                // AND not have enough room in the ancient append vec at that slot
-                // to hold all the contents of that slot.
-                // We need this new 'shrink_in_progress' to be used in 'remove_old_stores_shrink' below.
-                // All non-overflow accounts were put in a prior slot's ancient append vec. All overflow accounts
-                // are essentially being shrunk into a new ancient append vec in 'slot'.
-                assert!(shrink_in_progress.is_none());
-                shrink_in_progress = Some(shrink_in_progress_overflow);
-
-                // write the overflow accounts to the next ancient storage
-                let timing =
-                    current_ancient.store_ancient_accounts(self, &to_store, StorageSelector::Overflow);
-                store_accounts_timing.accumulate(&timing);
-            }
-            rewrite_elapsed.stop();
-
-            if slot != current_ancient.slot() {
-                // all append vecs in this slot have been combined into an ancient append vec
-                dropped_roots.push(slot);
-            }
-
-            let (_remaining_stores, remove_old_stores_shrink) = measure!(self
-                .remove_old_stores_shrink(
-                    &shrink_collect,
-                    slot,
-                    &self.shrink_ancient_stats.shrink_stats,
-                    shrink_in_progress,
-                ));
-
-            // we should not try to shrink any of the stores from this slot anymore. All shrinking for this slot is now handled by ancient append vec code.
-            self.shrink_candidate_slots.lock().unwrap().remove(&slot);
-
-            Self::update_shrink_stats(
-                &self.shrink_ancient_stats.shrink_stats,
-                find_alive_elapsed,
-                create_and_insert_store_elapsed_us,
-                store_accounts_timing,
-                rewrite_elapsed,
-                remove_old_stores_shrink_us
-                remove_old_stores_shrink.as_us(),
-            );
-        }
-    */
     /// each slot in 'dropped_roots' has been combined into an ancient append vec.
     /// We are done with the slot now forever.
     fn handle_dropped_roots_for_ancient(&self, dropped_roots: Vec<Slot>) {
@@ -9406,96 +9418,6 @@ pub mod tests {
         fn include_slot_in_hash(&self) -> IncludeSlotInHash {
             INCLUDE_SLOT_IN_HASH_TESTS
         }
-    }
-
-    impl CurrentAncientAppendVec {
-        /// note this requires that 'slot_and_append_vec' is Some
-        fn append_vec_id(&self) -> AppendVecId {
-            self.append_vec().append_vec_id()
-        }
-    }
-
-    #[test]
-    fn test_maybe_unref_accounts_already_in_ancient() {
-        let db = AccountsDb::new_single_for_tests();
-        let slot0 = 0;
-        let slot1 = 1;
-        let available_bytes = 1_000_000;
-        let mut current_ancient = CurrentAncientAppendVec::default();
-
-        // setup 'to_store'
-        let pubkey = Pubkey::from([1; 32]);
-        let account_size = 3;
-
-        let account = AccountSharedData::default();
-
-        let account_meta = AccountMeta {
-            lamports: 1,
-            owner: Pubkey::from([2; 32]),
-            executable: false,
-            rent_epoch: 0,
-        };
-        let offset = 3;
-        let hash = Hash::new(&[2; 32]);
-        let stored_meta = StoredMeta {
-            /// global write version
-            write_version_obsolete: 0,
-            /// key for the account
-            pubkey,
-            data_len: 43,
-        };
-        let account = StoredAccountMeta {
-            meta: &stored_meta,
-            /// account data
-            account_meta: &account_meta,
-            data: account.data(),
-            offset,
-            stored_size: account_size,
-            hash: &hash,
-        };
-        let map = vec![&account];
-        let alive_total_bytes = account.stored_size;
-        let to_store = AccountsToStore::new(available_bytes, &map, alive_total_bytes, slot0);
-        // Done: setup 'to_store'
-
-        // there has to be an existing append vec at this slot for a new current ancient at the slot to make sense
-        let _existing_append_vec = db.create_and_insert_store(slot0, 1000, "test");
-        {
-            let _shrink_in_progress = current_ancient.create_ancient_append_vec(slot0, &db);
-        }
-        let mut ancient_slot_pubkeys = AncientSlotPubkeys::default();
-        assert!(ancient_slot_pubkeys.inner.is_none());
-        // same slot as current_ancient, so no-op
-        ancient_slot_pubkeys.maybe_unref_accounts_already_in_ancient(
-            slot0,
-            &db,
-            &current_ancient,
-            &to_store,
-        );
-        assert!(ancient_slot_pubkeys.inner.is_none());
-        // different slot than current_ancient, so update 'ancient_slot_pubkeys'
-        // there has to be an existing append vec at this slot for a new current ancient at the slot to make sense
-        let _existing_append_vec = db.create_and_insert_store(slot1, 1000, "test");
-        let _shrink_in_progress = current_ancient.create_ancient_append_vec(slot1, &db);
-        let slot2 = 2;
-        ancient_slot_pubkeys.maybe_unref_accounts_already_in_ancient(
-            slot2,
-            &db,
-            &current_ancient,
-            &to_store,
-        );
-        assert!(ancient_slot_pubkeys.inner.is_some());
-        assert_eq!(ancient_slot_pubkeys.inner.as_ref().unwrap().slot, slot1);
-        assert!(ancient_slot_pubkeys
-            .inner
-            .as_ref()
-            .unwrap()
-            .pubkeys
-            .contains(&pubkey));
-        assert_eq!(
-            ancient_slot_pubkeys.inner.as_ref().unwrap().pubkeys.len(),
-            1
-        );
     }
 
     #[test]
@@ -16644,20 +16566,6 @@ pub mod tests {
         db.notify_accounts_hash_calculated_complete(completed_slot, &epoch_schedule);
         let earliest = AccountsDb::get_slot_one_epoch_prior(completed_slot, &epoch_schedule);
         assert_eq!(db.get_accounts_hash_complete_one_epoch_old(), earliest);
-    }
-
-    #[test]
-    #[should_panic(expected = "called `Option::unwrap()` on a `None` value")]
-    fn test_current_ancient_slot_assert() {
-        let current_ancient = CurrentAncientAppendVec::default();
-        _ = current_ancient.slot();
-    }
-
-    #[test]
-    #[should_panic(expected = "called `Option::unwrap()` on a `None` value")]
-    fn test_current_ancient_append_vec_assert() {
-        let current_ancient = CurrentAncientAppendVec::default();
-        _ = current_ancient.append_vec();
     }
 
     #[test]
