@@ -340,7 +340,7 @@ impl CurrentAncientAppendVec {
                 accounts_to_store.slot,
             ),
             None::<Vec<Hash>>,
-            Some(self.append_vec()),
+            self.append_vec(),
             None,
             StoreReclaims::Ignore,
         )
@@ -3939,7 +3939,7 @@ impl AccountsDb {
                     INCLUDE_SLOT_IN_HASH_IRRELEVANT_APPEND_VEC_OPERATION,
                 ),
                 None::<Vec<&Hash>>,
-                Some(shrink_in_progress.new_storage()),
+                shrink_in_progress.new_storage(),
                 None,
                 StoreReclaims::Ignore,
             );
@@ -6034,8 +6034,8 @@ impl AccountsDb {
     >(
         &self,
         slot: Slot,
-        mut storage_finder: F,
         accounts_and_meta_to_store: &StorableAccountsWithHashesAndWriteVersions<'a, 'b, T, U, V>,
+        mut storage_finder: F,
     ) -> Vec<AccountInfo> {
         let mut infos: Vec<AccountInfo> = Vec::with_capacity(accounts_and_meta_to_store.len());
         let mut total_append_accounts_us = 0;
@@ -6395,7 +6395,7 @@ impl AccountsDb {
             self.store_accounts_frozen(
                 (slot, &accounts[..], include_slot_in_hash),
                 Some(hashes),
-                Some(&flushed_store),
+                &flushed_store,
                 None,
                 StoreReclaims::Default,
             );
@@ -6413,7 +6413,7 @@ impl AccountsDb {
                 self.store_accounts_frozen(
                     (slot, &accounts[..], include_slot_in_hash),
                     Some(hashes),
-                    Some(&flushed_store),
+                    &flushed_store,
                     None,
                     StoreReclaims::Ignore,
                 );
@@ -6559,8 +6559,8 @@ impl AccountsDb {
         &self,
         accounts: &'c impl StorableAccounts<'b, T>,
         hashes: Option<Vec<impl Borrow<Hash>>>,
-        storage_finder: F,
         mut write_version_producer: P,
+        storage_finder: F,
         is_cached_store: bool,
         txn_signatures: Option<&[Option<&'a Signature>]>,
     ) -> Vec<AccountInfo> {
@@ -6595,8 +6595,8 @@ impl AccountsDb {
         } else if accounts.has_hash_and_write_version() {
             self.write_accounts_to_storage(
                 slot,
-                storage_finder,
                 &StorableAccountsWithHashesAndWriteVersions::<'_, '_, _, _, &Hash>::new(accounts),
+                storage_finder,
             )
         } else {
             let write_versions = (0..accounts.len())
@@ -6605,12 +6605,12 @@ impl AccountsDb {
             match hashes {
                 Some(hashes) => self.write_accounts_to_storage(
                     slot,
-                    storage_finder,
                     &StorableAccountsWithHashesAndWriteVersions::new_with_hashes_and_write_versions(
                         accounts,
                         hashes,
                         write_versions,
                     ),
+                    storage_finder,
                 ),
                 None => {
                     // hash any accounts where we were lazy in calculating the hash
@@ -6634,8 +6634,8 @@ impl AccountsDb {
 
                     self.write_accounts_to_storage(
                             slot,
-                            storage_finder,
                             &StorableAccountsWithHashesAndWriteVersions::new_with_hashes_and_write_versions(accounts, hashes, write_versions),
+                            storage_finder,
                         )
                 }
             }
@@ -8032,17 +8032,19 @@ impl AccountsDb {
         accounts: impl StorableAccounts<'a, T>,
         txn_signatures: Option<&'a [Option<&'a Signature>]>,
     ) {
-        self.store(accounts, true, txn_signatures, StoreReclaims::Default);
+        self.store(accounts, true, txn_signatures, StoreReclaims::Default, None);
     }
 
     /// Store the account update.
     /// only called by tests
     pub fn store_uncached(&self, slot: Slot, accounts: &[(&Pubkey, &AccountSharedData)]) {
+        let storage = self.find_storage_candidate(slot, aligned_stored_size(accounts.first().map(|(_, account)| account.data().len()).unwrap_or_default()));
         self.store(
             (slot, accounts, INCLUDE_SLOT_IN_HASH_TESTS),
             false,
             None,
             StoreReclaims::Default,
+            Some(&storage),
         );
     }
 
@@ -8052,6 +8054,7 @@ impl AccountsDb {
         is_cached_store: bool,
         txn_signatures: Option<&'a [Option<&'a Signature>]>,
         reclaim: StoreReclaims,
+        storage: Option<&Arc<AccountStorageEntry>>,
     ) {
         // If all transactions in a batch are errored,
         // it's possible to get a store with no accounts.
@@ -8087,6 +8090,7 @@ impl AccountsDb {
             is_cached_store,
             txn_signatures,
             reclaim,
+            storage,
         );
         self.report_store_timings();
     }
@@ -8221,6 +8225,7 @@ impl AccountsDb {
         is_cached_store: bool,
         txn_signatures: Option<&'a [Option<&'a Signature>]>,
         reclaim: StoreReclaims,
+        storage: Option<&Arc<AccountStorageEntry>>,
     ) {
         // This path comes from a store to a non-frozen slot.
         // If a store is dead here, then a newer update for
@@ -8229,11 +8234,10 @@ impl AccountsDb {
         // re-use it for a future store op. The pubkey ref counts should still
         // hold just 1 ref from this slot.
         let reset_accounts = true;
-
         self.store_accounts_custom(
             accounts,
             hashes,
-            None,
+            storage,
             None::<Box<dyn Iterator<Item = u64>>>,
             is_cached_store,
             reset_accounts,
@@ -8246,7 +8250,7 @@ impl AccountsDb {
         &self,
         accounts: impl StorableAccounts<'a, T>,
         hashes: Option<Vec<impl Borrow<Hash>>>,
-        storage: Option<&Arc<AccountStorageEntry>>,
+        storage: &Arc<AccountStorageEntry>,
         write_version_producer: Option<Box<dyn Iterator<Item = StoredMetaWriteVersion>>>,
         reclaim: StoreReclaims,
     ) -> StoreAccountsTiming {
@@ -8258,7 +8262,7 @@ impl AccountsDb {
         self.store_accounts_custom(
             accounts,
             hashes,
-            storage,
+            Some(storage),
             write_version_producer,
             is_cached_store,
             reset_accounts,
@@ -8279,9 +8283,8 @@ impl AccountsDb {
         reclaim: StoreReclaims,
     ) -> StoreAccountsTiming {
         let storage_finder = Box::new(move |slot, size| {
-            storage
-                .cloned()
-                .unwrap_or_else(|| self.find_storage_candidate(slot, size))
+            storage.unwrap()
+                .clone()
         });
 
         let write_version_producer: Box<dyn Iterator<Item = u64>> = write_version_producer
@@ -8301,8 +8304,8 @@ impl AccountsDb {
         let infos = self.store_accounts_to(
             &accounts,
             hashes,
-            storage_finder,
             write_version_producer,
+            storage_finder,
             is_cached_store,
             txn_signatures,
         );
@@ -12238,6 +12241,7 @@ pub mod tests {
             false,
             None,
             StoreReclaims::Default,
+            None,
         );
         db.add_root(some_slot);
         let check_hash = true;
@@ -12514,11 +12518,13 @@ pub mod tests {
         db.store_accounts_unfrozen(
             (some_slot, accounts),
             Some(vec![&some_hash]),
-            false,
+            true,
             None,
             StoreReclaims::Default,
+            None,
         );
         db.add_root(some_slot);
+        db.add_root_and_flush_write_cache(some_slot);
         assert_matches!(
             db.verify_bank_hash_and_lamports(
                 some_slot,
@@ -13670,9 +13676,11 @@ pub mod tests {
                 i + 20,
                 &Pubkey::default(),
             );
-            accounts.store_uncached(2, &[(key, &account)]);
+            accounts.store_cached((2, &[(key, &account)][..], INCLUDE_SLOT_IN_HASH_TESTS), None);
             account_refs.push(account);
         }
+        accounts.add_root(1);
+        accounts.flush_accounts_cache(true, None);
         assert!(accounts.recycle_stores.read().unwrap().entry_count() < num_stores);
 
         accounts.print_accounts_stats("post-store");
@@ -15938,6 +15946,7 @@ pub mod tests {
                 true,
                 None,
                 StoreReclaims::Default,
+                None,
             );
         }
 
