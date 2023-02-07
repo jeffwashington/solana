@@ -242,6 +242,43 @@ impl AccountsDb {
             );
             accounts_to_combine.push((info, unique_accounts));
         }
+    /// given all accounts per ancient slot, in slots that we want to combine together:
+    /// look up each pubkey in the index, separate, by slot, into:
+    /// 1. pubkeys with refcount = 1. This means this pubkey exists NOWHERE else in accounts db.
+    /// 2. pubkeys with refcount > 1
+    fn calc_accounts_to_combine<'a>(
+        &self,
+        stored_accounts_all: &'a Vec<(&'a SlotInfo, GetUniqueAccountsResult<'a>)>,
+    ) -> AccountsToCombine<'a> {
+        let mut accounts_keep_slots = HashMap::default(); //<Slot, (&ShrinkCollect<ShrinkCollectAliveSeparatedByRefs>, &SlotInfo)>::default();
+        let mut target_slots = Vec::default();
+
+        let mut accounts_to_combine = Vec::default();
+        for (info, unique_accounts) in stored_accounts_all {
+            let mut shrink_collect = self.shrink_collect::<ShrinkCollectAliveSeparatedByRefs<'_>>(
+                &info.storage,
+                unique_accounts,
+                &self.shrink_ancient_stats.shrink_stats,
+            );
+            let many_refs = &mut shrink_collect.alive_accounts.many_refs;
+            if !many_refs.accounts.is_empty() {
+                // there are accounts with ref_count > 1. This means this account must remain IN this slot.
+                // The same account could exist in a newer or older slot. Moving this account across slots could result
+                // in this alive version of the account now being in a slot OLDER than the non-alive instances.
+                accounts_keep_slots.insert(info.slot, (std::mem::take(many_refs), *info));
+            } else {
+                // No alive accounts in this slot have a ref_count > 1. So, ALL alive accounts in this slot can be written to any other slot
+                // we find convenient. There is NO other instance of this account to conflict with.
+                target_slots.push(info.slot);
+            }
+            accounts_to_combine.push(shrink_collect);
+        }
+        AccountsToCombine {
+            accounts_to_combine,
+            accounts_keep_slots,
+            target_slots,
+        }
+    }
 
         accounts_to_combine
     }
