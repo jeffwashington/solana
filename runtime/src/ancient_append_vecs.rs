@@ -359,6 +359,32 @@ impl AccountsDb {
         }
     }
 
+    /// 'accounts_to_combine'.'accounts_keep_slots' contains the slot and alive accounts with ref_count > 1.
+    /// these accounts need to be rewritten in their same slot, with no other accounts in the slot, where other accounts
+    /// would have ref_count = 1. ref_count = 1 accounts would be combined together into other slots into larger append vecs.
+    /// for each slot in 'accounts_to_combine'.'accounts_keep_slots':
+    /// create a new append vec, write only the accounts with ref_count > 1
+    #[allow(dead_code)]
+    fn write_ancient_accounts_multiple_refs<'a, 'b: 'a>(
+        &'b self,
+        accounts_to_combine: &'a AccountsToCombine<'a>,
+    ) -> WriteAncientAccounts<'b> {
+        // todo: if we're just rewriting the same append vec contents as are already there, skip this
+        // but only if there are no ref_count == 1 accounts in the existing append vec
+        let mut write_ancient_accounts = WriteAncientAccounts::default();
+        for (target_slot, alive_accounts) in &accounts_to_combine.accounts_keep_slots {
+            let accounts_to_write = (
+                *target_slot,
+                &alive_accounts.0.accounts[..],
+                INCLUDE_SLOT_IN_HASH_IRRELEVANT_APPEND_VEC_OPERATION,
+            );
+            write_ancient_accounts.accumulate(
+                self.write_ancient_accounts(alive_accounts.0.bytes as u64, accounts_to_write),
+            );
+        }
+        write_ancient_accounts
+    }
+
     /// create packed storage and write contents of 'packed' to it.
     /// accumulate results in 'write_ancient_accounts'
     #[allow(dead_code)]
