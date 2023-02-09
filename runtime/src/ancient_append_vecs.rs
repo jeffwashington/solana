@@ -386,6 +386,34 @@ impl AccountsDb {
         write_ancient_accounts
     }
 
+    #[allow(dead_code)]
+    fn pack_accounts_with_one_ref<'a>(
+        &'a self,
+        accounts_to_combine: &'a AccountsToCombine<'a>,
+        ideal_size: NonZeroU64,
+    ) -> Vec<PackedAncientStorage<'a>> {
+        PackedAncientStorage::pack(
+            accounts_to_combine
+                .accounts_to_combine
+                .iter()
+                .map(|shrink_collect| &shrink_collect.alive_accounts.one_ref),
+            ideal_size,
+        )
+    }
+
+    /// create and fill packed storages described in 'packed'
+    /// accumulate results in 'write_ancient_accounts'
+    #[allow(dead_code)]
+    fn write_packed_ancient_storages<'a, 'b: 'a>(
+        &'b self,
+        packed: impl Iterator<Item = (Slot, &'a PackedAncientStorage<'a>)>,
+        write_ancient_accounts: &mut WriteAncientAccounts<'b>,
+    ) {
+        for (target_slot, packed) in packed {
+                self.write_one_packed_storage(&packed, target_slot, write_ancient_accounts);
+        }
+    }
+
     /// create packed storage and write contents of 'packed' to it.
     /// accumulate results in 'write_ancient_accounts'
     #[allow(dead_code)]
@@ -528,6 +556,13 @@ struct AccountsToCombine<'a> {
     /// Some of these slots will have ancient append vecs created at them to contain everything in 'accounts_to_combine'
     /// The rest will become dead slots with no accounts in them.
     target_slots: Vec<Slot>,
+}
+
+/// result of writing ancient accounts with a single refcount
+#[allow(dead_code)]
+struct WriteAncientAccountsOneRef<'a> {
+    write_ancient_accounts: WriteAncientAccounts<'a>,
+    dropped_roots: Vec<Slot>,
 }
 
 /// a set of accounts need to be stored.
