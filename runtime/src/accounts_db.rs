@@ -4288,7 +4288,7 @@ impl AccountsDb {
 
         self.combine_ancient_slots_new(
             self.get_sorted_potential_ancient_slots(),
-            can_randomly_shrink,
+            true,
         );
     }
 
