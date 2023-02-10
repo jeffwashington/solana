@@ -532,7 +532,7 @@ impl Default for FillerAccountsConfig {
     }
 }
 
-const ANCIENT_APPEND_VEC_DEFAULT_OFFSET: Option<i64> = Some(-10_000);
+const ANCIENT_APPEND_VEC_DEFAULT_OFFSET: Option<i64> = Some(100_000);
 
 #[derive(Debug, Default, Clone)]
 pub struct AccountsDbConfig {
@@ -4308,18 +4308,10 @@ impl AccountsDb {
             return;
         }
 
-        let can_randomly_shrink = true;
-        if self.create_ancient_storage == CreateAncientStorage::Append {
-            self.combine_ancient_slots(
-                self.get_sorted_potential_ancient_slots(),
-                can_randomly_shrink,
-            );
-        } else {
-            self.combine_ancient_slots_packed(
-                self.get_sorted_potential_ancient_slots(),
-                can_randomly_shrink,
-            );
-        }
+        self.combine_ancient_slots_new(
+            self.get_sorted_potential_ancient_slots(),
+            true,
+        );
     }
 
     #[cfg(test)]
