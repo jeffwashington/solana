@@ -4024,7 +4024,6 @@ impl AccountsDb {
         self.shrink_stats.report();
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn update_shrink_stats(shrink_stats: &ShrinkStats, stats_sub: ShrinkStatsSub) {
         shrink_stats
             .num_slots_shrunk
@@ -17253,7 +17252,7 @@ pub mod tests {
         }
     }
 
-    const CAN_RANDOMLY_SHRINK_FALSE: bool = false;
+    pub(crate) const CAN_RANDOMLY_SHRINK_FALSE: bool = false;
 
     #[test]
     fn test_combine_ancient_slots_empty() {
