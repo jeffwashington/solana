@@ -241,6 +241,8 @@ impl AccountsDb {
         sorted_slots: Vec<Slot>,
         can_randomly_shrink: bool,
     ) {
+        use log::*;error!("jw shrink_ancient_stats: {}", line!());
+
         let tuning = PackedAncientStorageTuning {
             // only allow 10k slots old enough to be ancient
             max_ancient_slots: 10_000,
@@ -271,6 +273,7 @@ impl AccountsDb {
         {
             self.shrink_ancient_stats.report();
         }
+        use log::*;error!("jw shrink_ancient_stats: {}", line!());
     }
 
     #[allow(dead_code)]
