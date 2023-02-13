@@ -4291,12 +4291,10 @@ impl AccountsDb {
             return;
         }
 
-        use log::*;error!("jw shrink_ancient_stats: {}", line!());
         self.combine_ancient_slots_new(
             self.get_sorted_potential_ancient_slots(),
             true,
         );
-        use log::*;error!("jw shrink_ancient_stats: {}", line!());
     }
 
     #[cfg(test)]

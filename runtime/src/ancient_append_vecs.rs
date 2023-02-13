@@ -137,6 +137,7 @@ impl AncientSlotInfos {
         // from slots that exceeded the shrink threshold.
         // The goal is to limit overall i/o in this pass while making progress.
         let threhold_bytes = self.total_alive_bytes_shrink * percent_of_alive_shrunk_data / 100;
+        let mut count = 0;
         for info_index in &self.shrink_indexes {
             let info = &mut self.all_infos[*info_index];
             if bytes_to_shrink_due_to_ratio >= threhold_bytes {
@@ -145,9 +146,11 @@ impl AncientSlotInfos {
                 // Mark it as false for 'should_shrink' so it gets evaluated solely based on # of files.
                 info.should_shrink = false;
             } else {
+                count += 1;
                 saturating_add_assign!(bytes_to_shrink_due_to_ratio, info.alive_bytes);
             }
         }
+        use log::*;error!("jw shrinking storages: {}, threhold_bytes: {threhold_bytes}, ratio: {}, total alive: {}, slots should shrink: {}", count, bytes_to_shrink_due_to_ratio, self.total_alive_bytes_shrink, self.shrink_indexes.len());
     }
 
     /// after this function, only slots that were chosen to shrink are marked with
@@ -181,6 +184,8 @@ impl AncientSlotInfos {
             // we've gone too far, so get rid of this entry and all after it.
             // Every storage after this one is larger.
             if storages_remaining + ancient_storages_required < max_storages {
+                use log::*;error!("jw truncate to: {}, getting rid of: {}", i, self.all_infos.len() - i);
+
                 self.all_infos.truncate(i);
                 break;
             }
@@ -198,6 +203,8 @@ impl AncientSlotInfos {
     fn filter_by_smallest_capacity(&mut self, max_storages: usize, ideal_storage_size: NonZeroU64) {
         let total_storages = self.all_infos.len();
         if total_storages <= max_storages {
+            use log::*;error!("jw too few storages: {}, max: {}", total_storages, max_storages);
+
             // currently fewer storages than max, so nothing to shrink
             self.shrink_indexes.clear();
             self.all_infos.clear();
@@ -235,8 +242,6 @@ impl AccountsDb {
         sorted_slots: Vec<Slot>,
         can_randomly_shrink: bool,
     ) {
-        use log::*;error!("jw shrink_ancient_stats: {}", line!());
-
         let tuning = PackedAncientStorageTuning {
             // only allow 10k slots old enough to be ancient
             max_ancient_slots: 10_000,
@@ -264,7 +269,6 @@ impl AccountsDb {
         {
             self.shrink_ancient_stats.report();
         }
-        use log::*;error!("jw shrink_ancient_stats: {}", line!());
     }
 
     /// Combine account data from storages in 'sorted_slots' into packed storages.
