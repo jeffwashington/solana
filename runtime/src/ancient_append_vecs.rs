@@ -305,7 +305,10 @@ impl AccountsDb {
             return; // not enough slots to contain the storages we are trying to pack
         }
 
+        use log::*;
+        error!("jw write_packed_storages: pack: {}, target slots: {}, slots: {}", pack.len(), accounts_to_combine.target_slots_sorted.len(), sorted_slots.len());
         let write_ancient_accounts = self.write_packed_storages(&accounts_to_combine, pack);
+        use log::*;
 
         self.finish_combine_ancient_slots_packed(
             accounts_to_combine,
