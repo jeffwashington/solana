@@ -267,7 +267,8 @@ impl AccountsDb {
 
         // only log when we've spent 1s total
         // results will continue to accumulate otherwise
-        if self.shrink_ancient_stats.total_us.load(Ordering::Relaxed) > 1_000_000 {
+        // if self.shrink_ancient_stats.total_us.load(Ordering::Relaxed) > 1_000_000 
+        {
             self.shrink_ancient_stats.report();
         }
     }
@@ -282,6 +283,8 @@ impl AccountsDb {
         let ancient_slot_infos = self.collect_sort_filter_ancient_slots(sorted_slots, &tuning);
 
         if ancient_slot_infos.all_infos.is_empty() {
+            use log::*;
+            error!("jw shrink_ancient_stats: nothing collected, slots: {}", sorted_slots.len());
             return; // nothing to do
         }
         let accounts_per_storage = self
@@ -301,6 +304,8 @@ impl AccountsDb {
         );
 
         if pack.len() > accounts_to_combine.target_slots_sorted.len() {
+            use log::*;
+            error!("jw shrink_ancient_stats: pack: {}, target slots: {}, slots: {}", pack.len(), accounts_to_combine.target_slots_sorted.len(), sorted_slots.len());
             return; // not enough slots to contain the storages we are trying to pack
         }
 
