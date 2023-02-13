@@ -182,6 +182,8 @@ impl AncientSlotInfos {
             // we've gone too far, so get rid of this entry and all after it.
             // Every storage after this one is larger.
             if storages_remaining + ancient_storages_required < max_storages {
+                use log::*;error!("jw truncate to: {}, getting rid of: {}, cumulative bytes: {}, ancient_storages_required: {}", i, self.all_infos.len() - i, cumulative_bytes, ancient_storages_required);
+
                 self.all_infos.truncate(i);
                 break;
             }
