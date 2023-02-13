@@ -2493,6 +2493,10 @@ impl AccountsDb {
             .map(|config| config.ancient_append_vec_offset)
             .unwrap_or(ANCIENT_APPEND_VEC_DEFAULT_OFFSET);
 
+            error!("jw shrink_ancient_stats: {:?}, {:?}", ancient_append_vec_offset, ANCIENT_APPEND_VEC_DEFAULT_OFFSET);
+        let ancient_append_vec_offset = ANCIENT_APPEND_VEC_DEFAULT_OFFSET;
+
+
         let exhaustively_verify_refcounts = accounts_db_config
             .as_ref()
             .map(|config| config.exhaustively_verify_refcounts)
@@ -4639,11 +4643,6 @@ impl AccountsDb {
         if !self.shrink_candidate_slots.lock().unwrap().is_empty() {
             // this can affect 'shrink_candidate_slots', so don't 'take' it until after this completes
             self.shrink_ancient_slots();
-        }
-        else {
-            use log::*;error!("jw shrink_ancient_stats: {}", line!());
-            self.shrink_ancient_slots();
-            use log::*;error!("jw shrink_ancient_stats: {}", line!());
         }
 
         let shrink_candidates_slots =
