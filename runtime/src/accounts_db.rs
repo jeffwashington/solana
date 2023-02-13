@@ -4283,13 +4283,16 @@ impl AccountsDb {
     /// squash those slots into ancient append vecs
     fn shrink_ancient_slots(&self) {
         if self.ancient_append_vec_offset.is_none() {
+            use log::*;error!("jw shrink_ancient_stats: {}", line!());
             return;
         }
 
+        use log::*;error!("jw shrink_ancient_stats: {}", line!());
         self.combine_ancient_slots_new(
             self.get_sorted_potential_ancient_slots(),
             true,
         );
+        use log::*;error!("jw shrink_ancient_stats: {}", line!());
     }
 
     #[cfg(test)]
@@ -4636,6 +4639,11 @@ impl AccountsDb {
         if !self.shrink_candidate_slots.lock().unwrap().is_empty() {
             // this can affect 'shrink_candidate_slots', so don't 'take' it until after this completes
             self.shrink_ancient_slots();
+        }
+        else {
+            use log::*;error!("jw shrink_ancient_stats: {}", line!());
+            self.shrink_ancient_slots();
+            use log::*;error!("jw shrink_ancient_stats: {}", line!());
         }
 
         let shrink_candidates_slots =
