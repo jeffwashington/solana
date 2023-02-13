@@ -280,7 +280,7 @@ impl AccountsDb {
         tuning: PackedAncientStorageTuning,
         metrics: &mut ShrinkStatsSub,
     ) {
-        let ancient_slot_infos = self.collect_sort_filter_ancient_slots(sorted_slots, &tuning);
+        let ancient_slot_infos = self.collect_sort_filter_ancient_slots(sorted_slots.clone(), &tuning);
 
         if ancient_slot_infos.all_infos.is_empty() {
             use log::*;
