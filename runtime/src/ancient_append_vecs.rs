@@ -173,6 +173,7 @@ impl AncientSlotInfos {
     #[allow(dead_code)]
     fn truncate_to_max_storages(&mut self, max_storages: usize, ideal_storage_size: NonZeroU64) {
         // these indexes into 'all_infos' are useless once we truncate 'all_infos', so make sure they're cleared out to avoid any issues
+        let shrink_to_threshold = max_storages * 80 / 100;
         self.shrink_indexes.clear();
         let total_storages = self.all_infos.len();
         let mut cumulative_bytes = 0u64;
@@ -184,7 +185,7 @@ impl AncientSlotInfos {
             // combined ancient storages is less than the threshold, then
             // we've gone too far, so get rid of this entry and all after it.
             // Every storage after this one is larger.
-            if storages_remaining + ancient_storages_required < max_storages {
+            if storages_remaining + ancient_storages_required < shrink_to_threshold {
                 use log::*;
                 error!("jw truncate to: {}, getting rid of: {}, cumulative bytes: {}, ancient_storages_required: {}", i, self.all_infos.len() - i, cumulative_bytes, ancient_storages_required);
 
