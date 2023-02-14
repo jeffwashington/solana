@@ -4303,7 +4303,7 @@ impl AccountsDb {
         }
 
         use log::*;error!("jw shrink_ancient_stats: {}", line!());
-        self.combine_ancient_slots_new(
+        self.combine_ancient_slots_packed(
             self.get_sorted_potential_ancient_slots(),
             true,
         );
