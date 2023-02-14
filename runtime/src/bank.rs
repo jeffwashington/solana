@@ -3204,13 +3204,18 @@ impl Bank {
             self.rc.accounts.accounts_db.mark_slot_frozen(self.slot());
         }
 
-        assert!(!self.bank_freeze_or_destruction_decremented
-            .swap(true, Release));
-        self.rc
-            .accounts
-            .accounts_db
-            .bank_freeze_or_destruction_count
-            .fetch_add(1, Release);
+        if !self.bank_freeze_or_destruction_decremented
+            .swap(true, Release) {
+                error!("bank freeze: {}", self.slot());
+            self.rc
+                .accounts
+                .accounts_db
+                .bank_freeze_or_destruction_count
+                .fetch_add(1, Release);
+            }
+            else {
+                error!("bank freeze already frozen: {}", self.slot());
+            }
     }
 
     // dangerous; don't use this; this is only needed for ledger-tool's special command
@@ -7990,14 +7995,17 @@ impl TotalAccountsStats {
 
 impl Drop for Bank {
     fn drop(&mut self) {
-        if !self.bank_freeze_or_destruction_decremented.load(Acquire) {
-            self.bank_freeze_or_destruction_decremented
-                .store(true, Release);
+        if !self.bank_freeze_or_destruction_decremented.swap(true, Acquire) {
+            error!("bank freeze on drop: {}", self.slot());
+
             self.rc
                 .accounts
                 .accounts_db
                 .bank_freeze_or_destruction_count
                 .fetch_add(1, Release);
+        }
+        else {
+            error!("bank freeze in drop already frozen: {}", self.slot());
         }
         if let Some(drop_callback) = self.drop_callback.read().unwrap().0.as_ref() {
             drop_callback.callback(self);
