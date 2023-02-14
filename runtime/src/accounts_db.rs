@@ -1646,9 +1646,7 @@ impl SplitAncientStorages {
         snapshot_storages: &SortedStorages,
     ) -> Vec<Slot> {
         let range = snapshot_storages.range();
-        let mut ancient_slots = Vec::default();
-        snapshot_storages.iter_range(&(range.start..one_epoch_old_slot)).map(|(slot, _storage)| slot).collect()
-        ancient_slots
+        snapshot_storages.iter_range(&(range.start..=one_epoch_old_slot)).map(|(slot, _storage)| slot).collect()
     }
 
     /// create once ancient slots have been identified
