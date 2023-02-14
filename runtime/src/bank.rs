@@ -1950,6 +1950,13 @@ impl Bank {
             fee_structure: FeeStructure::default(),
             loaded_programs_cache: Arc::<RwLock<LoadedPrograms>>::default(),
         };
+        bank
+        .rc
+        .accounts
+        .accounts_db
+        .bank_creation_count
+        .fetch_add(1, Release);
+
         bank.finish_init(
             genesis_config,
             additional_builtins,
@@ -3197,8 +3204,8 @@ impl Bank {
             self.rc.accounts.accounts_db.mark_slot_frozen(self.slot());
         }
 
-        self.bank_freeze_or_destruction_decremented
-            .store(true, Release);
+        assert!(!self.bank_freeze_or_destruction_decremented
+            .swap(true, Release));
         self.rc
             .accounts
             .accounts_db
