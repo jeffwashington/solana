@@ -1175,6 +1175,9 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
             self.write_startup_info_to_disk();
         }
 
+        let threshold = 1_000_000; // only write to disk when we are holding this many items in the in-mem index
+        let write_to_disk = self.stats().count_in_mem.load(Ordering::Relaxed) > threshold;
+
         // write to disk outside in-mem map read lock
         {
             let mut evictions_age = Vec::with_capacity(evictions_age_possible.len());
@@ -1193,6 +1196,10 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                 ] {
                     for (k, v) in check_for_eviction_and_dirty.drain(..) {
                         let mut slot_list = None;
+                        if !write_to_disk && v.dirty() {
+                            // to throttle writes to disk, we don't write antyhing dirty until we've exceeded a threshold
+                            continue;
+                        }
                         if !is_random {
                             let mut mse = Measure::start("flush_should_evict");
                             let (evict_for_age, slot_list_temp) = self.should_evict_from_mem(
