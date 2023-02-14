@@ -150,7 +150,8 @@ impl AncientSlotInfos {
                 saturating_add_assign!(bytes_to_shrink_due_to_ratio, info.alive_bytes);
             }
         }
-        use log::*;error!("jw shrinking storages: {}, threhold_bytes: {threhold_bytes}, ratio: {}, total alive: {}, slots should shrink: {}", count, bytes_to_shrink_due_to_ratio, self.total_alive_bytes_shrink, self.shrink_indexes.len());
+        use log::*;
+        error!("jw shrinking storages: {}, threhold_bytes: {threhold_bytes}, ratio: {}, total alive: {}, slots should shrink: {}", count, bytes_to_shrink_due_to_ratio, self.total_alive_bytes_shrink, self.shrink_indexes.len());
     }
 
     /// after this function, only slots that were chosen to shrink are marked with
@@ -184,7 +185,8 @@ impl AncientSlotInfos {
             // we've gone too far, so get rid of this entry and all after it.
             // Every storage after this one is larger.
             if storages_remaining + ancient_storages_required < max_storages {
-                use log::*;error!("jw truncate to: {}, getting rid of: {}, cumulative bytes: {}, ancient_storages_required: {}", i, self.all_infos.len() - i, cumulative_bytes, ancient_storages_required);
+                use log::*;
+                error!("jw truncate to: {}, getting rid of: {}, cumulative bytes: {}, ancient_storages_required: {}", i, self.all_infos.len() - i, cumulative_bytes, ancient_storages_required);
 
                 self.all_infos.truncate(i);
                 break;
@@ -203,7 +205,11 @@ impl AncientSlotInfos {
     fn filter_by_smallest_capacity(&mut self, max_storages: usize, ideal_storage_size: NonZeroU64) {
         let total_storages = self.all_infos.len();
         if total_storages <= max_storages {
-            use log::*;error!("jw too few storages: {}, max: {}", total_storages, max_storages);
+            use log::*;
+            error!(
+                "jw too few storages: {}, max: {}",
+                total_storages, max_storages
+            );
 
             // currently fewer storages than max, so nothing to shrink
             self.shrink_indexes.clear();
@@ -265,7 +271,7 @@ impl AccountsDb {
 
         // only log when we've spent 1s total
         // results will continue to accumulate otherwise
-        // if self.shrink_ancient_stats.total_us.load(Ordering::Relaxed) > 1_000_000 
+        // if self.shrink_ancient_stats.total_us.load(Ordering::Relaxed) > 1_000_000
         {
             self.shrink_ancient_stats.report();
         }
@@ -283,11 +289,15 @@ impl AccountsDb {
         tuning: PackedAncientStorageTuning,
         metrics: &mut ShrinkStatsSub,
     ) {
-        let ancient_slot_infos = self.collect_sort_filter_ancient_slots(sorted_slots.clone(), &tuning);
+        let ancient_slot_infos =
+            self.collect_sort_filter_ancient_slots(sorted_slots.clone(), &tuning);
 
         if ancient_slot_infos.all_infos.is_empty() {
             use log::*;
-            error!("jw shrink_ancient_stats: nothing collected, slots: {}", sorted_slots.len());
+            error!(
+                "jw shrink_ancient_stats: nothing collected, slots: {}",
+                sorted_slots.len()
+            );
             return; // nothing to do
         }
         let accounts_per_storage = self
@@ -308,12 +318,22 @@ impl AccountsDb {
 
         if pack.len() > accounts_to_combine.target_slots_sorted.len() {
             use log::*;
-            error!("jw shrink_ancient_stats: pack: {}, target slots: {}, slots: {}", pack.len(), accounts_to_combine.target_slots_sorted.len(), sorted_slots.len());
+            error!(
+                "jw shrink_ancient_stats: pack: {}, target slots: {}, slots: {}",
+                pack.len(),
+                accounts_to_combine.target_slots_sorted.len(),
+                sorted_slots.len()
+            );
             return; // not enough slots to contain the storages we are trying to pack
         }
 
         use log::*;
-        error!("jw write_packed_storages: pack: {}, target slots: {}, slots: {}", pack.len(), accounts_to_combine.target_slots_sorted.len(), sorted_slots.len());
+        error!(
+            "jw write_packed_storages: pack: {}, target slots: {}, slots: {}",
+            pack.len(),
+            accounts_to_combine.target_slots_sorted.len(),
+            sorted_slots.len()
+        );
         let write_ancient_accounts = self.write_packed_storages(&accounts_to_combine, pack);
         use log::*;
 

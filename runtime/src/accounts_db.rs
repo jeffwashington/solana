@@ -1325,6 +1325,8 @@ type AccountInfoAccountsIndex = AccountsIndex<AccountInfo>;
 // This structure handles the load/store of the accounts
 #[derive(Debug)]
 pub struct AccountsDb {
+    pub bank_creation_count: AtomicU32,
+    pub bank_freeze_or_destruction_count: AtomicU32,
     /// Keeps tracks of index into AppendVec on a per slot basis
     pub accounts_index: AccountInfoAccountsIndex,
 
@@ -2050,7 +2052,8 @@ impl ShrinkStats {
 
 impl ShrinkAncientStats {
     pub(crate) fn report(&self) {
-        {//if self.shrink_stats.last_report.should_update(1000) {
+        {
+            //if self.shrink_stats.last_report.should_update(1000) {
             datapoint_info!(
                 "shrink_ancient_stats",
                 (
@@ -2376,6 +2379,8 @@ impl AccountsDb {
         const ACCOUNTS_STACK_SIZE: usize = 8 * 1024 * 1024;
 
         AccountsDb {
+            bank_freeze_or_destruction_count: AtomicU32::default(),
+            bank_creation_count: AtomicU32::default(),
             assert_stakes_cache_consistency: false,
             create_ancient_storage: CreateAncientStorage::Append,
             verify_accounts_hash_in_bg: VerifyAccountsHashInBackground::default(),
@@ -2493,9 +2498,11 @@ impl AccountsDb {
             .map(|config| config.ancient_append_vec_offset)
             .unwrap_or(ANCIENT_APPEND_VEC_DEFAULT_OFFSET);
 
-            error!("jw shrink_ancient_stats: {:?}, {:?}", ancient_append_vec_offset, ANCIENT_APPEND_VEC_DEFAULT_OFFSET);
+        error!(
+            "jw shrink_ancient_stats: {:?}, {:?}",
+            ancient_append_vec_offset, ANCIENT_APPEND_VEC_DEFAULT_OFFSET
+        );
         let ancient_append_vec_offset = ANCIENT_APPEND_VEC_DEFAULT_OFFSET;
-
 
         let exhaustively_verify_refcounts = accounts_db_config
             .as_ref()
@@ -4287,14 +4294,12 @@ impl AccountsDb {
     /// squash those slots into ancient append vecs
     fn shrink_ancient_slots(&self) {
         if self.ancient_append_vec_offset.is_none() {
-            use log::*;error!("jw shrink_ancient_stats: {}", line!());
+            use log::*;
+            error!("jw shrink_ancient_stats: {}", line!());
             return;
         }
 
-        self.combine_ancient_slots_new(
-            self.get_sorted_potential_ancient_slots(),
-            true,
-        );
+        self.combine_ancient_slots_new(self.get_sorted_potential_ancient_slots(), true);
     }
 
     #[cfg(test)]

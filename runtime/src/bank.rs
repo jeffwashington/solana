@@ -174,7 +174,7 @@ use {
         sync::{
             atomic::{
                 AtomicBool, AtomicI64, AtomicU64, AtomicUsize,
-                Ordering::{AcqRel, Acquire, Relaxed},
+                Ordering::{AcqRel, Acquire, Relaxed, Release},
             },
             Arc, LockResult, RwLock, RwLockReadGuard, RwLockWriteGuard,
         },
@@ -803,6 +803,7 @@ impl PartialEq for Bank {
             return true;
         }
         let Self {
+            bank_freeze_or_destruction_decremented,
             rc: _,
             status_cache: _,
             blockhash_queue,
@@ -950,6 +951,7 @@ impl AbiExample for BuiltinPrograms {
 /// are implemented elsewhere for versioning
 #[derive(AbiExample, Debug)]
 pub struct Bank {
+    bank_freeze_or_destruction_decremented: AtomicBool,
     /// References to accounts, parent and signature status
     pub rc: BankRc,
 
@@ -1272,6 +1274,7 @@ impl Bank {
 
     fn default_with_accounts(accounts: Accounts) -> Self {
         let mut bank = Self {
+            bank_freeze_or_destruction_decremented: AtomicBool::default(),
             incremental_snapshot_persistence: None,
             rc: BankRc::new(accounts, Slot::default()),
             status_cache: Arc::<RwLock<BankStatusCache>>::default(),
@@ -1546,7 +1549,29 @@ impl Bank {
         let (feature_set, feature_set_time_us) = measure_us!(parent.feature_set.clone());
 
         let accounts_data_size_initial = parent.load_accounts_data_size();
+        parent
+            .rc
+            .accounts
+            .accounts_db
+            .bank_creation_count
+            .fetch_add(1, Release);
+        error!(
+            "jw bank new from parent: {}, {}",
+            parent
+                .rc
+                .accounts
+                .accounts_db
+                .bank_creation_count
+                .load(Acquire),
+            parent
+                .rc
+                .accounts
+                .accounts_db
+                .bank_freeze_or_destruction_count
+                .load(Acquire),
+        );
         let mut new = Bank {
+            bank_freeze_or_destruction_decremented: AtomicBool::default(),
             incremental_snapshot_persistence: None,
             rc,
             status_cache,
@@ -1862,6 +1887,7 @@ impl Bank {
         }
         let feature_set = new();
         let mut bank = Self {
+            bank_freeze_or_destruction_decremented: AtomicBool::default(),
             incremental_snapshot_persistence: fields.incremental_snapshot_persistence,
             rc: bank_rc,
             status_cache: new(),
@@ -3170,6 +3196,14 @@ impl Bank {
             *hash = self.hash_internal_state();
             self.rc.accounts.accounts_db.mark_slot_frozen(self.slot());
         }
+
+        self.bank_freeze_or_destruction_decremented
+            .store(true, Release);
+        self.rc
+            .accounts
+            .accounts_db
+            .bank_freeze_or_destruction_count
+            .fetch_add(1, Release);
     }
 
     // dangerous; don't use this; this is only needed for ledger-tool's special command
@@ -7949,6 +7983,15 @@ impl TotalAccountsStats {
 
 impl Drop for Bank {
     fn drop(&mut self) {
+        if !self.bank_freeze_or_destruction_decremented.load(Acquire) {
+            self.bank_freeze_or_destruction_decremented
+                .store(true, Release);
+            self.rc
+                .accounts
+                .accounts_db
+                .bank_freeze_or_destruction_count
+                .fetch_add(1, Release);
+        }
         if let Some(drop_callback) = self.drop_callback.read().unwrap().0.as_ref() {
             drop_callback.callback(self);
         } else {
