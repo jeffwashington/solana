@@ -7119,7 +7119,7 @@ impl AccountsDb {
                     );
                     if load_from_cache {
                         if let Ok(mapped_file) = cache_hash_data.load_map(&file_name) {
-                            // return Some(mapped_file);
+                            return Some(mapped_file);
                         }
                     }
 
