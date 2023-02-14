@@ -1175,7 +1175,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
             self.write_startup_info_to_disk();
         }
 
-        let threshold = 1_000_000; // only write to disk when we are holding this many items in the in-mem index
+        let threshold = 10_000_000; // only write to disk when we are holding this many items in the in-mem index
         let write_to_disk = self.stats().count_in_mem.load(Ordering::Relaxed) > threshold;
 
         // write to disk outside in-mem map read lock
