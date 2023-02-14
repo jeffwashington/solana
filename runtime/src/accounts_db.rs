@@ -1647,16 +1647,7 @@ impl SplitAncientStorages {
     ) -> Vec<Slot> {
         let range = snapshot_storages.range();
         let mut ancient_slots = Vec::default();
-        for (slot, storage) in snapshot_storages.iter_range(&(range.start..one_epoch_old_slot)) {
-            if let Some(storage) = storage {
-                if is_ancient(&storage.accounts) {
-                    ancient_slots.push(slot);
-                    continue; // was ancient, keep looking
-                }
-                // we found a slot with a non-ancient append vec
-                break;
-            }
-        }
+        snapshot_storages.iter_range(&(range.start..one_epoch_old_slot)).map(|(slot, _storage)| slot).collect()
         ancient_slots
     }
 
