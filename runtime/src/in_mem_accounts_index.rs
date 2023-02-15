@@ -1180,7 +1180,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
             return;
         }
 
-        let threshold = 10_000_000; // only write to disk when we are holding this many items in the in-mem index
+        let threshold = 100_000_000; // only write to disk when we are holding this many items in the in-mem index
         let write_to_disk = self.stats().count_in_mem.load(Ordering::Relaxed) > threshold;
 
         // scan in-mem map for items that we may evict
