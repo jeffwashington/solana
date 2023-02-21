@@ -5,7 +5,7 @@ use {
         in_mem_accounts_index::InMemAccountsIndex,
         waitable_condvar::WaitableCondvar,
     },
-    solana_bucket_map::bucket_map::{BucketMap, BucketMapConfig},
+    solana_bucket_map::bucket_map::{BucketMapConfig, BucketMapSingle},
     solana_measure::measure::Measure,
     solana_sdk::{
         clock::{Slot, DEFAULT_MS_PER_SLOT},
@@ -28,7 +28,7 @@ const AGE_MS: u64 = DEFAULT_MS_PER_SLOT; // match one age per slot time
 pub const DEFAULT_DISK_INDEX: Option<usize> = Some(10_000);
 
 pub struct BucketMapHolder<T: IndexValue> {
-    pub disk: Option<BucketMap<(Slot, T)>>,
+    pub disk: Option<BucketMapSingle<(Slot, T)>>,
 
     pub count_buckets_flushed: AtomicUsize,
 
@@ -237,7 +237,7 @@ impl<T: IndexValue> BucketMapHolder<T> {
         };
 
         // only allocate if mem_budget_mb is Some
-        let disk = mem_budget_mb.map(|_| BucketMap::new(bucket_config));
+        let disk = mem_budget_mb.map(|_| BucketMapSingle::new(bucket_config));
         Self {
             disk,
             ages_to_stay_in_cache,

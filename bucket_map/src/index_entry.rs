@@ -2,7 +2,7 @@
 
 use {
     crate::{
-        bucket::Bucket,
+        bucket::Bucket2,
         bucket_storage::{BucketStorage, Uid},
         RefCount,
     },
@@ -14,6 +14,15 @@ use {
         hash::{Hash, Hasher},
     },
 };
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+// one instance of this per item in the index
+// stored in the index bucket
+pub struct IndexEntrySingle<T> {
+    pub key: Pubkey, // can this be smaller if we have reduced the keys into buckets already?
+    pub info: T,
+}
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -34,6 +43,13 @@ pub struct IndexEntry {
 struct PackedStorage {
     capacity_when_created_pow2: B8,
     offset: B56,
+}
+
+impl<T> IndexEntrySingle<T> {
+    pub fn init(&mut self, pubkey: &Pubkey, info: T) {
+        self.key = *pubkey;
+        self.info = info;
+    }
 }
 
 impl IndexEntry {
@@ -94,7 +110,7 @@ impl IndexEntry {
         self.storage_offset() << (storage.capacity_pow2 - self.storage_capacity_when_created_pow2())
     }
 
-    pub fn read_value<'a, T>(&self, bucket: &'a Bucket<T>) -> Option<(&'a [T], RefCount)> {
+    pub fn read_value<'a, T>(&self, bucket: &'a Bucket2<T>) -> Option<(&'a [T], RefCount)> {
         let data_bucket_ix = self.data_bucket_ix();
         let data_bucket = &bucket.data[data_bucket_ix as usize];
         let slice = if self.num_slots > 0 {

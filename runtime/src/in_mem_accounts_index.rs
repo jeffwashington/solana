@@ -9,7 +9,7 @@ use {
         waitable_condvar::WaitableCondvar,
     },
     rand::{thread_rng, Rng},
-    solana_bucket_map::bucket_api::BucketApi,
+    solana_bucket_map::bucket_api::BucketApiSingle,
     solana_measure::measure::Measure,
     solana_sdk::{clock::Slot, pubkey::Pubkey},
     std::{
@@ -91,7 +91,7 @@ pub struct InMemAccountsIndex<T: IndexValue> {
     storage: Arc<BucketMapHolder<T>>,
     bin: usize,
 
-    bucket: Option<Arc<BucketApi<(Slot, T)>>>,
+    bucket: Option<Arc<BucketApiSingle<(Slot, T)>>>,
 
     // pubkey ranges that this bin must hold in the cache while the range is present in this vec
     pub(crate) cache_ranges_held: CacheRangesHeld,
@@ -941,15 +941,16 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         entry: &'a AccountMapEntry<T>,
         startup: bool,
         update_stats: bool,
-        exceeds_budget: bool,
+        _exceeds_budget: bool,
     ) -> (bool, Option<std::sync::RwLockReadGuard<'a, SlotList<T>>>) {
+        let exceeds_budget = false;
         // this could be tunable dynamically based on memory pressure
         // we could look at more ages or we could throw out more items we are choosing to keep in the cache
         if Self::should_evict_based_on_age(current_age, entry, startup) {
             if exceeds_budget {
                 // if we are already holding too many items in-mem, then we need to be more aggressive at kicking things out
                 (true, None)
-            } else if entry.ref_count() > 1 {
+            } else if entry.ref_count() != 1 {
                 Self::update_stat(&self.stats().held_in_mem_ref_count, 1);
                 (false, None)
             } else {
@@ -1043,24 +1044,18 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         let mut count = 0;
         insert.into_iter().for_each(|(slot, k, v)| {
             let entry = (slot, v);
-            let new_ref_count = u64::from(!v.is_cached());
             disk.update(&k, |current| {
                 match current {
-                    Some((current_slot_list, mut ref_count)) => {
+                    Some(_existing) => {
                         // merge this in, mark as conflict
-                        let mut slot_list = Vec::with_capacity(current_slot_list.len() + 1);
-                        slot_list.extend_from_slice(current_slot_list);
-                        slot_list.push(entry); // will never be from the same slot that already exists in the list
-                        ref_count += new_ref_count;
                         duplicates.push((slot, k));
-                        Some((slot_list, ref_count))
                     }
                     None => {
                         count += 1;
                         // not on disk, insert it
-                        Some((vec![entry], new_ref_count))
                     }
                 }
+                Some(entry)
             });
         });
         self.stats().inc_insert_count(count);
