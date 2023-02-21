@@ -10,7 +10,7 @@ use {
     },
     rand::{thread_rng, Rng},
     solana_bucket_map::bucket_api::BucketApi,
-    solana_measure::measure::Measure,
+    solana_measure::{measure::Measure, measure_us},
     solana_sdk::{clock::Slot, pubkey::Pubkey},
     std::{
         collections::{hash_map::Entry, HashMap},
@@ -1119,23 +1119,21 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                     for (k, v) in check_for_eviction_and_dirty.drain(..) {
                         let mut slot_list = None;
                         if !is_random {
-                            let mut mse = Measure::start("flush_should_evict");
-                            let (evict_for_age, slot_list_temp) = self.should_evict_from_mem(
-                                current_age,
-                                &v,
-                                startup,
-                                true,
-                                exceeds_budget,
-                            );
-                            slot_list = slot_list_temp;
-                            mse.stop();
-                            flush_should_evict_us += mse.as_us();
-                            if evict_for_age {
-                                evictions_age.push(k);
-                            } else {
+                            let ((evict_for_age, slot_list_temp), us) = measure_us!(self
+                                .should_evict_from_mem(
+                                    current_age,
+                                    &v,
+                                    startup,
+                                    true,
+                                    exceeds_budget,
+                                ));
+                            flush_should_evict_us += us;
+                            if !evict_for_age {
                                 // not evicting, so don't write, even if dirty
                                 continue;
                             }
+                            slot_list = slot_list_temp;
+                            evictions_age.push(k);
                         }
                         // if we are evicting it, then we need to update disk if we're dirty
                         if v.clear_dirty() {
