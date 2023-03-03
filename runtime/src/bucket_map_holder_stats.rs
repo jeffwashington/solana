@@ -57,6 +57,8 @@ pub struct BucketMapHolderStats {
     bins: u64,
     pub estimate_mem: AtomicU64,
     pub flush_should_evict_us: AtomicU64,
+    pub buckets_written_to_disk: AtomicU64,
+    pub buckets_not_written_to_disk: AtomicU64,
 }
 
 impl BucketMapHolderStats {
@@ -229,6 +231,16 @@ impl BucketMapHolderStats {
                 (
                     "estimate_mem_bytes",
                     self.estimate_mem.load(Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "buckets_written_to_disk",
+                    self.buckets_written_to_disk.swap(0, Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "buckets_not_written_to_disk",
+                    self.buckets_not_written_to_disk.swap(0, Ordering::Relaxed),
                     i64
                 ),
                 (
