@@ -986,14 +986,25 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
         current_age: Age,
         startup: bool,
         _flush_guard: &FlushGuard,
+        mut can_write: bool,
     ) -> FlushScanResult<T> {
+        if startup {
+            can_write = true;
+        }
         let mut possible_evictions = self.possible_evictions.write().unwrap();
-        if let Some(result) = possible_evictions.get_possible_evictions() {
-            // we have previously calculated the possible evictions for this age
-            return result;
+        if !can_write {
+            // if we cannot write, then use what we scanned previously
+            if let Some(result) = possible_evictions.get_possible_evictions() {
+                // we have previously calculated the possible evictions for this age
+                return result;
+            }
         }
         // otherwise, we need to scan some number of ages into the future now
-        let ages_to_scan = self.ages_to_scan_ahead(current_age);
+        let ages_to_scan = if can_write {
+            1
+        } else {
+            self.ages_to_scan_ahead(current_age)
+        };
         possible_evictions.reset(ages_to_scan);
 
         let m;
@@ -1007,12 +1018,17 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
                 } else if startup {
                     0
                 } else {
-                    let ages_in_future = v.age().wrapping_sub(current_age);
-                    if ages_in_future >= ages_to_scan {
-                        // not planning to evict this item from memory within the next few ages
-                        continue;
+                    if can_write && v.dirty() {
+                        // flush all dirty entries now
+                        0
+                    } else {
+                        let ages_in_future = v.age().wrapping_sub(current_age);
+                        if ages_in_future >= ages_to_scan {
+                            // not planning to evict this item from memory within the next few ages
+                            continue;
+                        }
+                        ages_in_future
                     }
-                    ages_in_future
                 };
 
                 possible_evictions.insert(age_offset, *k, Arc::clone(v), random);
@@ -1097,11 +1113,22 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
             return;
         }
 
+        let threshold = 100_000_000; // only write to disk when we are holding this many items in the in-mem index
+        let write_to_disk = self.stats().count_in_mem.load(Ordering::Relaxed) > threshold;
+        Self::update_stat(
+            if write_to_disk {
+                &self.stats().buckets_written_to_disk
+            } else {
+                &self.stats().buckets_not_written_to_disk
+            },
+            1,
+        );
+
         // scan in-mem map for items that we may evict
         let FlushScanResult {
             mut evictions_age_possible,
             mut evictions_random,
-        } = self.flush_scan(current_age, startup, flush_guard);
+        } = self.flush_scan(current_age, startup, flush_guard, write_to_disk);
 
         if startup {
             self.write_startup_info_to_disk();
@@ -1125,6 +1152,11 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
                 ] {
                     for (k, v) in check_for_eviction_and_dirty.drain(..) {
                         let mut slot_list = None;
+
+                        if !write_to_disk && v.dirty() {
+                            // to throttle writes to disk, we don't write antyhing dirty until we've exceeded a threshold
+                            continue;
+                        }
                         if !is_random {
                             let mut mse = Measure::start("flush_should_evict");
                             let (evict_for_age, slot_list_temp) = self.should_evict_from_mem(
