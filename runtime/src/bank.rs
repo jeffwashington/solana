@@ -3241,7 +3241,7 @@ impl Bank {
         }
         squash_accounts_time.stop();
 
-        *self.rc.parent.write().unwrap() = None;
+        // skipping dropping parent bank *self.rc.parent.write().unwrap() = None;
 
         let mut squash_cache_time = Measure::start("squash_cache_time");
         roots
