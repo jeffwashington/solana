@@ -181,6 +181,13 @@ use {
     },
 };
 
+lazy_static! {
+    static ref HELD_BANKS: RwLock<Vec<Option<Arc<Bank>>>> = RwLock::default();
+}
+lazy_static! {
+    static ref NUM_HELD_BANKS: AtomicUsize = AtomicUsize::default();
+}
+
 /// params to `verify_bank_hash`
 pub struct VerifyBankHash {
     pub test_hash_calculation: bool,
@@ -3241,7 +3248,18 @@ impl Bank {
         }
         squash_accounts_time.stop();
 
-        // skipping dropping parent bank *self.rc.parent.write().unwrap() = None;
+        // skipping dropping parent bank
+        {
+            let bank = self.rc.parent.write().unwrap().take();
+            if let Some(bank) = bank {
+                let len = bank.parents().len();
+                datapoint_info!(
+                    "holding_forked_banks",
+                    ("count", len + NUM_HELD_BANKS.fetch_add(len, Relaxed), i64)
+                );
+                HELD_BANKS.write().unwrap().push(Some(bank));
+            }
+        }
 
         let mut squash_cache_time = Measure::start("squash_cache_time");
         roots
