@@ -3225,6 +3225,25 @@ impl Bank {
         &self.epoch_schedule
     }
 
+    fn hold(&self) {
+        let bank = self.rc.parent.write().unwrap().take();
+        if let Some(mut bank) = bank {
+            bank.hold();
+            datapoint_info!(
+                "holding_forked_banks",
+                ("count", 1 + NUM_HELD_BANKS.fetch_add(1, Relaxed), i64),
+            );
+            {
+                let bank_guts = Arc::get_mut(&mut bank).unwrap();
+                *bank_guts.status_cache.write().unwrap() = BankStatusCache::default();
+                *bank_guts.blockhash_queue.write().unwrap() = BlockhashQueue::default();
+            }
+
+            HELD_BANKS.write().unwrap().push(Some(bank));
+
+        }
+    }
+
     /// squash the parent's state up into this Bank,
     ///   this Bank becomes a root
     pub fn squash(&self) -> SquashTiming {
@@ -3250,15 +3269,7 @@ impl Bank {
 
         // skipping dropping parent bank
         {
-            let bank = self.rc.parent.write().unwrap().take();
-            if let Some(bank) = bank {
-                let len = bank.parents().len();
-                datapoint_info!(
-                    "holding_forked_banks",
-                    ("count", len + NUM_HELD_BANKS.fetch_add(len, Relaxed), i64)
-                );
-                HELD_BANKS.write().unwrap().push(Some(bank));
-            }
+            self.hold();
         }
 
         let mut squash_cache_time = Measure::start("squash_cache_time");
