@@ -8212,6 +8212,7 @@ impl AccountsDb {
                 {
                     amount_to_top_off_rent += amount_to_top_off_rent_this_account;
                     num_accounts_rent_paying += 1;
+                    error!("rent_paying_jw: {} {} {}", pubkey, amount_to_top_off_rent_this_account, stored_account.lamports());
                     // remember this rent-paying account pubkey
                     rent_paying_accounts_by_partition.push(pubkey);
                 }
