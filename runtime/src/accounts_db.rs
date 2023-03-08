@@ -8954,6 +8954,8 @@ impl AccountsDb {
                     if let Some(lamports_to_top_off) =
                         Self::stats_for_rent_payers(pubkey, &loaded_account, rent_collector)
                     {
+                        error!("rent_paying_jw: {} {} {} removed", pubkey, lamports_to_top_off, loaded_account.lamports());
+
                         removed_rent_paying += 1;
                         removed_top_off += lamports_to_top_off;
                     }
