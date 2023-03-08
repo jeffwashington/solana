@@ -3227,16 +3227,19 @@ impl Bank {
 
     fn hold(&self) {
         let bank = self.rc.parent.write().unwrap().take();
-        if let Some(mut bank) = bank {
+        if let Some(bank) = bank {
             bank.hold();
             datapoint_info!(
                 "holding_forked_banks",
                 ("count", 1 + NUM_HELD_BANKS.fetch_add(1, Relaxed), i64),
             );
-            {
+            {/*
                 let bank_guts = Arc::get_mut(&mut bank).unwrap();
                 *bank_guts.status_cache.write().unwrap() = BankStatusCache::default();
                 *bank_guts.blockhash_queue.write().unwrap() = BlockhashQueue::default();
+                */
+                *bank.status_cache.write().unwrap() = BankStatusCache::default();
+                *bank.blockhash_queue.write().unwrap() = BlockhashQueue::default();
             }
 
             HELD_BANKS.write().unwrap().push(Some(bank));
