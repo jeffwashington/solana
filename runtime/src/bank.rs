@@ -3238,8 +3238,14 @@ impl Bank {
                 *bank_guts.status_cache.write().unwrap() = BankStatusCache::default();
                 *bank_guts.blockhash_queue.write().unwrap() = BlockhashQueue::default();
                 */
-                *bank.status_cache.write().unwrap() = BankStatusCache::default();
+                //*bank.status_cache.write().unwrap() = BankStatusCache::default();
                 *bank.blockhash_queue.write().unwrap() = BlockhashQueue::default();
+                *bank.drop_callback.write().unwrap() = OptionalDropCallback::default();
+            
+                *bank.cost_tracker.write().unwrap() = CostTracker::default();
+            
+                *bank.sysvar_cache.write().unwrap() = SysvarCache::default();
+            
             }
 
             HELD_BANKS.write().unwrap().push(Some(bank));
