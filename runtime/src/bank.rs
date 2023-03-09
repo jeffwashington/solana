@@ -3239,7 +3239,7 @@ impl Bank {
                 *bank_guts.blockhash_queue.write().unwrap() = BlockhashQueue::default();
                 */
                 //*bank.status_cache.write().unwrap() = BankStatusCache::default();
-                *bank.blockhash_queue.write().unwrap() = BlockhashQueue::default();
+                //*bank.blockhash_queue.write().unwrap() = BlockhashQueue::default();
                 *bank.drop_callback.write().unwrap() = OptionalDropCallback::default();
             
                 *bank.cost_tracker.write().unwrap() = CostTracker::default();
