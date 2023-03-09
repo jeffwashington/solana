@@ -8473,6 +8473,7 @@ impl AccountsDb {
             return SlotIndexGenerationInfo::default();
         }
 
+let pk1 = Pubkey::from_str("o1nodeMCRLoSgCL1LTgTTJU56AhYuBNC9Y2ttafDL3n").unwrap();
         let secondary = !self.account_indexes.is_empty();
 
         let mut rent_paying_accounts_by_partition = Vec::default();
@@ -8499,7 +8500,9 @@ impl AccountsDb {
                 if !stored_account.is_zero_lamport() {
                     accounts_data_len += stored_account.data().len() as u64;
                 }
-
+                if pk1 == pubkey {
+                    error!("jw2: {}, {:?}, {}", pubkey, stored_account.to_account_shared_data(), slot);
+                }
                 if let Some(amount_to_top_off_rent_this_account) =
                     Self::stats_for_rent_payers(&pubkey, &stored_account, rent_collector)
                 {
