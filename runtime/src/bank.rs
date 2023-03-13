@@ -3385,6 +3385,7 @@ impl Bank {
         {
             //self.hold();
         }
+        *self.rc.parent.write().unwrap() = None;        
 
         let mut squash_cache_time = Measure::start("squash_cache_time");
         roots
