@@ -1787,7 +1787,10 @@ impl Bank {
                 self.epoch,
             ))
         });
-        executor_cache.write().unwrap().executors.clear();
+        //executor_cache.write().unwrap().executors.clear();
+
+        let mut blockhash_queue = RwLock::default();
+        std::mem::swap(&mut *blockhash_queue.write().unwrap(), &mut *self.blockhash_queue.write().unwrap());
 
         let mut bank = Self {
             parent_hash: self.parent_hash,
@@ -1795,11 +1798,11 @@ impl Bank {
             bank_freeze_or_destruction_incremented: AtomicBool::default(),
             incremental_snapshot_persistence: None,
             rc,
-            status_cache: Arc::default(),
+            status_cache: self.status_cache.clone(),//Arc::default(),
             slot: self.slot(),
             bank_id: self.bank_id,
             epoch: self.epoch,
-            blockhash_queue: RwLock::default(),
+            blockhash_queue,//: self.blockhash_queue.write().unwrap().take().unwrap(),// RwLock::default(),
 
             // TODO: clean this up, so much special-case copying...
             hashes_per_tick: self.hashes_per_tick,
@@ -1836,8 +1839,8 @@ impl Bank {
             signature_count: AtomicU64::new(0),
             builtin_programs: BuiltinPrograms::default(),
             runtime_config: self.runtime_config.clone(),
-            builtin_feature_transitions: Arc::default(),//self.builtin_feature_transitions.clone(),
-            hard_forks: Arc::default(),//self.hard_forks.clone(),
+            builtin_feature_transitions: self.builtin_feature_transitions.clone(),
+            hard_forks: self.hard_forks.clone(),
             rewards: RwLock::new(vec![]),
             cluster_type: self.cluster_type,
             lazy_rent_collection: AtomicBool::new(self.lazy_rent_collection.load(Relaxed)),
