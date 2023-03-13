@@ -8180,7 +8180,7 @@ impl AccountsDb {
             return SlotIndexGenerationInfo::default();
         }
 
-let pk1 = Pubkey::from_str("o1nodeMCRLoSgCL1LTgTTJU56AhYuBNC9Y2ttafDL3n").unwrap();
+let pk1 = Pubkey::from_str("14azuHWbRyrX51Nvnx8pN6V8qC8byx8vLPRKgMPWHUzo").unwrap();
         let secondary = !self.account_indexes.is_empty();
 
         let mut rent_paying_accounts_by_partition = Vec::default();
