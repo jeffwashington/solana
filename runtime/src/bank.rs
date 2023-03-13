@@ -1767,6 +1767,118 @@ impl Bank {
         new
     }
 
+    fn hold2(&self) {
+        let (rc, bank_rc_creation_time_us) = measure_us!({
+            let accounts_db = Arc::clone(&self.rc.accounts.accounts_db);
+            BankRc {
+                accounts: Arc::new(Accounts::new(accounts_db)),
+                parent: RwLock::new(None),
+                slot: self.slot,
+                bank_id_generator: Arc::clone(&self.rc.bank_id_generator),
+            }
+        });
+
+        let accounts_data_size_initial = self.load_accounts_data_size();
+
+        let (executor_cache, executor_cache_time_us) = measure_us!({
+            let parent_bank_executors = self.executor_cache.read().unwrap();
+            RwLock::new(BankExecutorCache::new_from_parent_bank_executors(
+                &parent_bank_executors,
+                self.epoch,
+            ))
+        });
+
+        let mut bank = Self {
+            parent_hash: self.parent_hash,
+            parent_slot: self.parent_slot,
+            bank_freeze_or_destruction_incremented: AtomicBool::default(),
+            incremental_snapshot_persistence: None,
+            rc,
+            status_cache: Arc::default(),
+            slot: self.slot(),
+            bank_id: self.bank_id,
+            epoch: self.epoch,
+            blockhash_queue: RwLock::default(),
+
+            // TODO: clean this up, so much special-case copying...
+            hashes_per_tick: self.hashes_per_tick,
+            ticks_per_slot: self.ticks_per_slot,
+            ns_per_slot: self.ns_per_slot,
+            genesis_creation_time: self.genesis_creation_time,
+            slots_per_year: self.slots_per_year,
+            epoch_schedule: self.epoch_schedule.clone(),
+            collected_rent: AtomicU64::new(0),
+            rent_collector: Self::get_rent_collector_from(&self.rent_collector, self.epoch),
+            max_tick_height: (self.slot + 1) * self.ticks_per_slot,
+            block_height: self.block_height + 1,
+            fee_calculator: FeeCalculator::default(),
+            fee_rate_governor: FeeRateGovernor::default(),
+            capitalization: AtomicU64::new(self.capitalization()),
+            vote_only_bank: self.vote_only_bank,
+            inflation: self.inflation.clone(),
+            transaction_count: AtomicU64::new(self.transaction_count()),
+            non_vote_transaction_count_since_restart: AtomicU64::new(
+                self.non_vote_transaction_count_since_restart(),
+            ),
+            transaction_error_count: AtomicU64::new(0),
+            transaction_entries_count: AtomicU64::new(0),
+            transactions_per_entry_max: AtomicU64::new(0),
+            // we will .clone_with_epoch() this soon after stake data update; so just .clone() for now
+            stakes_cache: StakesCache::default(),
+            epoch_stakes: self.epoch_stakes.clone(),
+            collector_id: self.collector_id,
+            collector_fees: AtomicU64::new(0),
+            ancestors: Ancestors::default(),
+            hash: RwLock::new(Hash::default()),
+            is_delta: AtomicBool::new(false),
+            tick_height: AtomicU64::new(self.tick_height.load(Relaxed)),
+            signature_count: AtomicU64::new(0),
+            builtin_programs: BuiltinPrograms::default(),
+            runtime_config: self.runtime_config.clone(),
+            builtin_feature_transitions: Arc::default(),//self.builtin_feature_transitions.clone(),
+            hard_forks: self.hard_forks.clone(),
+            rewards: RwLock::new(vec![]),
+            cluster_type: self.cluster_type,
+            lazy_rent_collection: AtomicBool::new(self.lazy_rent_collection.load(Relaxed)),
+            rewards_pool_pubkeys: Arc::default(),
+            executor_cache,
+            transaction_debug_keys: self.transaction_debug_keys.clone(),
+            transaction_log_collector_config: Arc::default(),
+            transaction_log_collector: Arc::new(RwLock::new(TransactionLogCollector::default())),
+            feature_set: self.feature_set.clone(),
+            drop_callback: RwLock::new(OptionalDropCallback(
+                self
+                    .drop_callback
+                    .read()
+                    .unwrap()
+                    .0
+                    .as_ref()
+                    .map(|drop_callback| drop_callback.clone_box()),
+            )),
+            freeze_started: AtomicBool::new(false),
+            cost_tracker: RwLock::new(CostTracker::new_with_account_data_size_limit(
+                self.feature_set
+                    .is_active(&feature_set::cap_accounts_data_len::id())
+                    .then(|| {
+                        self
+                            .accounts_data_size_limit()
+                            .saturating_sub(accounts_data_size_initial)
+                    }),
+            )),
+            sysvar_cache: RwLock::new(SysvarCache::default()),
+            accounts_data_size_initial,
+            accounts_data_size_delta_on_chain: AtomicI64::new(0),
+            accounts_data_size_delta_off_chain: AtomicI64::new(0),
+            fee_structure: self.fee_structure.clone(),
+            loaded_programs_cache: self.loaded_programs_cache.clone(),
+        };        
+        datapoint_info!(
+            "holding_forked_banks",
+            ("count", 1 + NUM_HELD_BANKS.fetch_add(1, Relaxed), i64),
+        );
+        HELD_BANKS.write().unwrap().push(Some(Arc::new(bank)));
+    }
+
     pub fn byte_limit_for_scans(&self) -> Option<usize> {
         self.rc
             .accounts
@@ -3278,7 +3390,7 @@ impl Bank {
 
         // skipping dropping parent bank
         {
-            self.hold();
+            //self.hold();
         }
 
         let mut squash_cache_time = Measure::start("squash_cache_time");
@@ -8181,6 +8293,7 @@ impl Drop for Bank {
         self.bank_frozen_or_destroyed();
         if let Some(drop_callback) = self.drop_callback.read().unwrap().0.as_ref() {
             drop_callback.callback(self);
+            self.hold2();
         } else {
             // Default case for tests
             self.rc
