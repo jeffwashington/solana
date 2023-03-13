@@ -7170,7 +7170,7 @@ impl AccountsDb {
     ///
     /// This function is called in Bank::drop() when the bank is _not_ frozen, so that its pubkeys
     /// are considered for cleanup.
-    pub fn scan_slot_and_insert_dirty_pubkeys_into_uncleaned_pubkeys(&self, slot: Slot) {
+    pub fn scan_slot_and_insert_dirty_pubkeys_into_uncleaned_pubkeys2(&self, slot: Slot) {
         let dirty_pubkeys = self.scan_slot_for_dirty_pubkeys(slot);
         self.uncleaned_pubkeys.insert(slot, dirty_pubkeys);
     }
@@ -8584,6 +8584,8 @@ let pk1 = Pubkey::from_str("14azuHWbRyrX51Nvnx8pN6V8qC8byx8vLPRKgMPWHUzo").unwra
                 .sum();
 
             let mut index_flush_us = 0;
+            let pk1 = Pubkey::from_str("14azuHWbRyrX51Nvnx8pN6V8qC8byx8vLPRKgMPWHUzo").unwrap();
+
             if pass == 0 {
                 // tell accounts index we are done adding the initial accounts at startup
                 let mut m = Measure::start("accounts_index_idle_us");
@@ -8593,12 +8595,17 @@ let pk1 = Pubkey::from_str("14azuHWbRyrX51Nvnx8pN6V8qC8byx8vLPRKgMPWHUzo").unwra
 
                 // this has to happen before visit_duplicate_pubkeys_during_startup below
                 // get duplicate keys from acct idx. We have to wait until we've finished flushing.
+                let mut ii = 0;
                 for (slot, key) in self
                     .accounts_index
                     .retrieve_duplicate_keys_from_startup()
                     .into_iter()
                     .flatten()
                 {
+                    ii += 1;
+                    if key == pk1 {
+                        error!("jw10: {}, slot: {slot}", key);
+                    }
                     match self.uncleaned_pubkeys.entry(slot) {
                         Occupied(mut occupied) => occupied.get_mut().push(key),
                         Vacant(vacant) => {
@@ -8606,6 +8613,7 @@ let pk1 = Pubkey::from_str("14azuHWbRyrX51Nvnx8pN6V8qC8byx8vLPRKgMPWHUzo").unwra
                         }
                     }
                 }
+                error!("total dups: {}", ii);
             }
 
             let storage_info_timings = storage_info_timings.into_inner().unwrap();
@@ -8632,6 +8640,7 @@ let pk1 = Pubkey::from_str("14azuHWbRyrX51Nvnx8pN6V8qC8byx8vLPRKgMPWHUzo").unwra
             let uncleaned_roots = Mutex::new(HashSet::<Slot>::default());
             if pass == 0 {
                 let mut unique_pubkeys = HashSet::<Pubkey>::default();
+                error!("jw6: uncleaned pubkeys: {}", self.uncleaned_pubkeys.len());
                 self.uncleaned_pubkeys.iter().for_each(|entry| {
                     entry.value().iter().for_each(|pubkey| {
                         unique_pubkeys.insert(*pubkey);
@@ -8728,9 +8737,17 @@ let pk1 = Pubkey::from_str("14azuHWbRyrX51Nvnx8pN6V8qC8byx8vLPRKgMPWHUzo").unwra
         let mut uncleaned_slots = HashSet::<Slot>::default();
         let mut removed_rent_paying = 0;
         let mut removed_top_off = 0;
+        error!("jw3: pubkeys: {}", pubkeys.len());
+        let pk1 = Pubkey::from_str("14azuHWbRyrX51Nvnx8pN6V8qC8byx8vLPRKgMPWHUzo").unwrap();
+
         pubkeys.iter().for_each(|pubkey| {
             if let Some(entry) = self.accounts_index.get_account_read_entry(pubkey) {
                 let slot_list = entry.slot_list();
+
+                if &pk1 == pubkey {
+                    error!("jw4: {}, slot list: {:?}", pubkey, slot_list);
+                }
+    
                 if slot_list.len() < 2 {
                     return;
                 }
@@ -8763,6 +8780,11 @@ let pk1 = Pubkey::from_str("14azuHWbRyrX51Nvnx8pN6V8qC8byx8vLPRKgMPWHUzo").unwra
                         removed_top_off += lamports_to_top_off;
                     }
                 });
+            }
+            else {
+                if &pk1 == pubkey {
+                    error!("jw5: {}", pubkey);
+                }
             }
         });
         timings

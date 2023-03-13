@@ -1113,9 +1113,14 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         // merge all items into the disk index now
         let disk = self.bucket.as_ref().unwrap();
         let mut count = 0;
+        
+        use std::str::FromStr;
+        let pk1 = Pubkey::from_str("14azuHWbRyrX51Nvnx8pN6V8qC8byx8vLPRKgMPWHUzo").unwrap();
+
         insert.into_iter().for_each(|(slot, k, v)| {
             let entry = (slot, v);
             let new_ref_count = u64::from(!v.is_cached());
+            use log::*;
             disk.update(&k, |current| {
                 match current {
                     Some((current_slot_list, mut ref_count)) => {
@@ -1125,9 +1130,15 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
                         slot_list.push(entry); // will never be from the same slot that already exists in the list
                         ref_count += new_ref_count;
                         duplicates.push((slot, k));
+                        if k == pk1 {
+                            error!("jw7: {k}, {:?}, dup", slot_list);
+                        }
                         Some((slot_list, ref_count))
                     }
                     None => {
+                        if k == pk1 {
+                            error!("jw7: {k} unique");
+                        }
                         count += 1;
                         // not on disk, insert it
                         Some((vec![entry], new_ref_count))
