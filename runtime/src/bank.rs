@@ -1787,6 +1787,7 @@ impl Bank {
                 self.epoch,
             ))
         });
+        executor_cache.write().unwrap().executors.clear();
 
         let mut bank = Self {
             parent_hash: self.parent_hash,
@@ -1836,7 +1837,7 @@ impl Bank {
             builtin_programs: BuiltinPrograms::default(),
             runtime_config: self.runtime_config.clone(),
             builtin_feature_transitions: Arc::default(),//self.builtin_feature_transitions.clone(),
-            hard_forks: self.hard_forks.clone(),
+            hard_forks: Arc::default(),//self.hard_forks.clone(),
             rewards: RwLock::new(vec![]),
             cluster_type: self.cluster_type,
             lazy_rent_collection: AtomicBool::new(self.lazy_rent_collection.load(Relaxed)),
@@ -1846,15 +1847,7 @@ impl Bank {
             transaction_log_collector_config: Arc::default(),
             transaction_log_collector: Arc::new(RwLock::new(TransactionLogCollector::default())),
             feature_set: self.feature_set.clone(),
-            drop_callback: RwLock::new(OptionalDropCallback(
-                self
-                    .drop_callback
-                    .read()
-                    .unwrap()
-                    .0
-                    .as_ref()
-                    .map(|drop_callback| drop_callback.clone_box()),
-            )),
+            drop_callback: RwLock::default(),
             freeze_started: AtomicBool::new(false),
             cost_tracker: RwLock::new(CostTracker::new_with_account_data_size_limit(
                 self.feature_set
