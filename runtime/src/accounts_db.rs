@@ -8848,11 +8848,13 @@ let pk1 = Pubkey::from_str("14azuHWbRyrX51Nvnx8pN6V8qC8byx8vLPRKgMPWHUzo").unwra
                         unique_pubkeys.insert(*pubkey);
                     })
                 });
+                let ct = AtomicUsize::default();
                 let accounts_data_len_from_duplicates = unique_pubkeys
                     .into_iter()
                     .collect::<Vec<_>>()
                     .par_chunks(4096)
                     .map(|pubkeys| {
+                        ct.fetch_add(pubkeys.len(), Ordering::Relaxed);
                         let (count, uncleaned_roots_this_group) = self
                             .visit_duplicate_pubkeys_during_startup(
                                 pubkeys,
@@ -8866,6 +8868,7 @@ let pk1 = Pubkey::from_str("14azuHWbRyrX51Nvnx8pN6V8qC8byx8vLPRKgMPWHUzo").unwra
                         count
                     })
                     .sum();
+                error!("jw3: pubkeys: {}", ct.load(Ordering::Relaxed));
                 accounts_data_len.fetch_sub(accounts_data_len_from_duplicates, Ordering::Relaxed);
                 info!(
                     "accounts data len: {}",
@@ -8937,7 +8940,6 @@ let pk1 = Pubkey::from_str("14azuHWbRyrX51Nvnx8pN6V8qC8byx8vLPRKgMPWHUzo").unwra
         let mut uncleaned_slots = HashSet::<Slot>::default();
         let mut removed_rent_paying = 0;
         let mut removed_top_off = 0;
-        error!("jw3: pubkeys: {}", pubkeys.len());
         let pk1 = Pubkey::from_str("14azuHWbRyrX51Nvnx8pN6V8qC8byx8vLPRKgMPWHUzo").unwrap();
 
         pubkeys.iter().for_each(|pubkey| {
