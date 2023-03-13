@@ -2442,6 +2442,7 @@ fn main() {
                 {
                     IndexLimitMb::Limit(limit)
                 } else if matches.is_present("enable_accounts_disk_index") {
+                    error!("disk_index enabled");
                     IndexLimitMb::Unspecified
                 } else {
                     if matches.is_present("disable_accounts_disk_index") {

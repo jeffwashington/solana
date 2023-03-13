@@ -216,6 +216,8 @@ impl<T: IndexValue> BucketMapHolder<T> {
                 }
             }
         };
+        use log::*;
+        error!("disk_index mem budget: {:?}", mem_budget_mb);
 
         // only allocate if mem_budget_mb is Some
         let disk = mem_budget_mb.map(|_| BucketMap::new(bucket_config));
