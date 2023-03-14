@@ -1787,10 +1787,10 @@ impl Bank {
                 self.epoch,
             ))
         });
-        //executor_cache.write().unwrap().executors.clear();
+        executor_cache.write().unwrap().executors.clear();
 
         let mut blockhash_queue = RwLock::default();
-        std::mem::swap(&mut *blockhash_queue.write().unwrap(), &mut *self.blockhash_queue.write().unwrap());
+        //std::mem::swap(&mut *blockhash_queue.write().unwrap(), &mut *self.blockhash_queue.write().unwrap());
 
         let mut bank = Self {
             parent_hash: self.parent_hash,
