@@ -1768,12 +1768,12 @@ impl Bank {
     }
 
     fn hold2(&self) {
+
+        return;
         datapoint_info!(
             "holding_forked_banks",
             ("count", 1 + NUM_HELD_BANKS.fetch_add(1, Relaxed), i64),
         );
-
-        return;
         let (rc, bank_rc_creation_time_us) = measure_us!({
             let accounts_db = Arc::clone(&self.rc.accounts.accounts_db);
             BankRc {
@@ -3387,9 +3387,7 @@ impl Bank {
         squash_accounts_time.stop();
 
         // skipping dropping parent bank
-        {
-            //self.hold();
-        }
+        self.hold();
         *self.rc.parent.write().unwrap() = None;        
 
         let mut squash_cache_time = Measure::start("squash_cache_time");
