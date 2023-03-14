@@ -153,6 +153,7 @@ impl Tvu {
         let fetch_sockets: Vec<Arc<UdpSocket>> = fetch_sockets.into_iter().map(Arc::new).collect();
         let forward_sockets: Vec<Arc<UdpSocket>> =
             tvu_forward_sockets.into_iter().map(Arc::new).collect();
+        panic!("starting shred fetch");
         let fetch_stage = ShredFetchStage::new(
             fetch_sockets,
             forward_sockets,
