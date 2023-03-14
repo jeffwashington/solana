@@ -5800,7 +5800,7 @@ impl AccountsDb {
                 // Nobody else shoud have removed the slot cache entry yet
                 assert!(self.accounts_cache.remove_slot(*remove_slot).is_some());
             } else {
-                self.purge_slot_storage(*remove_slot, purge_stats);
+                // temporary self.purge_slot_storage(*remove_slot, purge_stats);
             }
             // It should not be possible that a slot is neither in the cache or storage. Even in
             // a slot with all ticks, `Bank::new_from_parent()` immediately stores some sysvars

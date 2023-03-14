@@ -1768,6 +1768,12 @@ impl Bank {
     }
 
     fn hold2(&self) {
+        datapoint_info!(
+            "holding_forked_banks",
+            ("count", 1 + NUM_HELD_BANKS.fetch_add(1, Relaxed), i64),
+        );
+
+        return;
         let (rc, bank_rc_creation_time_us) = measure_us!({
             let accounts_db = Arc::clone(&self.rc.accounts.accounts_db);
             BankRc {
@@ -1868,10 +1874,6 @@ impl Bank {
             fee_structure: self.fee_structure.clone(),
             loaded_programs_cache: self.loaded_programs_cache.clone(),
         };        
-        datapoint_info!(
-            "holding_forked_banks",
-            ("count", 1 + NUM_HELD_BANKS.fetch_add(1, Relaxed), i64),
-        );
         HELD_BANKS.write().unwrap().push(Some(Arc::new(bank)));
     }
 
