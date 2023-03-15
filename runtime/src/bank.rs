@@ -1798,8 +1798,12 @@ impl Bank {
         let mut blockhash_queue = RwLock::default();
         std::mem::swap(&mut *blockhash_queue.write().unwrap(), &mut *self.blockhash_queue.write().unwrap());
 
-        let (stakes_cache, stakes_cache_time_us) =
-            measure_us!(StakesCache::new(self.stakes_cache.stakes().clone()));
+        let mut stakes = self.stakes_cache.stakes().clone();
+
+        stakes.vote_accounts.vote_accounts = Arc::default();
+
+        let mut stakes_cache =
+            StakesCache::new(stakes);
 
 
 

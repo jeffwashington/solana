@@ -168,10 +168,10 @@ impl StakesCache {
 #[derive(Default, Clone, PartialEq, Debug, Deserialize, Serialize, AbiExample)]
 pub struct Stakes<T: Clone> {
     /// vote accounts
-    vote_accounts: VoteAccounts,
+    pub vote_accounts: VoteAccounts,
 
     /// stake_delegations
-    stake_delegations: ImHashMap<Pubkey, T>,
+    pub stake_delegations: ImHashMap<Pubkey, T>,
 
     /// unused
     unused: u64,
@@ -180,7 +180,7 @@ pub struct Stakes<T: Clone> {
     epoch: Epoch,
 
     /// history of staking levels
-    stake_history: StakeHistory,
+    pub stake_history: StakeHistory,
 }
 
 // For backward compatibility, we can only serialize and deserialize
