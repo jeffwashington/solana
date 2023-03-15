@@ -83,6 +83,7 @@ impl<T: Clone + Copy> BucketApi<T> {
     }
 
     fn get_write_bucket(&self) -> RwLockWriteGuard<Option<Bucket<T>>> {
+        let use_bit_field = true;
         let mut bucket = self.bucket.write().unwrap();
         if bucket.is_none() {
             *bucket = Some(Bucket::new(
@@ -90,6 +91,7 @@ impl<T: Clone + Copy> BucketApi<T> {
                 self.max_search,
                 Arc::clone(&self.stats),
                 Arc::clone(&self.count),
+                use_bit_field,
             ));
         } else {
             let write = bucket.as_mut().unwrap();

@@ -99,7 +99,7 @@ impl IndexEntry {
             let data_bucket_ix = self.data_bucket_ix();
             let data_bucket = &bucket.data[data_bucket_ix as usize];
             let loc = self.data_loc(data_bucket);
-            let uid = Self::key_uid(&self.key);
+            let uid = Self::key_uid2(&self.key);
             assert_eq!(Some(uid), data_bucket.uid(loc));
             data_bucket.get_cell_slice(loc, self.num_slots)
         } else {
@@ -109,7 +109,14 @@ impl IndexEntry {
         Some((slice, self.ref_count))
     }
 
-    pub fn key_uid(key: &Pubkey) -> Uid {
+    /// uid in maps is 1 or 0, where 0 is empty, 1 is in-use
+    pub fn key_uid2(key: &Pubkey) -> Uid {
+        1/*
+        let mut s = DefaultHasher::new();
+        key.hash(&mut s);
+        s.finish().max(1u64)*/
+    }
+    pub fn full_key_uid(key: &Pubkey) -> Uid {
         let mut s = DefaultHasher::new();
         key.hash(&mut s);
         s.finish().max(1u64)
