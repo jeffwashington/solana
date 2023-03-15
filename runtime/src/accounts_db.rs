@@ -622,6 +622,7 @@ struct GenerateIndexTimings {
     pub amount_to_top_off_rent: AtomicU64,
     pub total_duplicates: u64,
     pub accounts_data_len_dedup_time_us: u64,
+    pub duplicate_key_count: u64,
 }
 
 #[derive(Default, Debug, PartialEq, Eq)]
@@ -678,6 +679,7 @@ impl GenerateIndexTimings {
                 self.accounts_data_len_dedup_time_us as i64,
                 i64
             ),
+            ("duplicate_key_count", self.duplicate_key_count as i64, i64),
         );
     }
 }
@@ -9077,6 +9079,7 @@ impl AccountsDb {
                 .sum();
 
             let mut index_flush_us = 0;
+            let mut duplicate_key_count = 0;
             if pass == 0 {
                 // tell accounts index we are done adding the initial accounts at startup
                 let mut m = Measure::start("accounts_index_idle_us");
@@ -9092,6 +9095,7 @@ impl AccountsDb {
                     .into_iter()
                     .flatten()
                 {
+                    duplicate_key_count += 1;
                     match self.uncleaned_pubkeys.entry(slot) {
                         Occupied(mut occupied) => occupied.get_mut().push(key),
                         Vacant(vacant) => {
@@ -9112,6 +9116,7 @@ impl AccountsDb {
                 total_items,
                 rent_paying,
                 amount_to_top_off_rent,
+                duplicate_key_count,
                 total_duplicates: total_duplicates.load(Ordering::Relaxed),
                 storage_size_accounts_map_us: storage_info_timings.storage_size_accounts_map_us,
                 storage_size_accounts_map_flatten_us: storage_info_timings
