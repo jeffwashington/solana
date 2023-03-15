@@ -1798,6 +1798,11 @@ impl Bank {
         let mut blockhash_queue = RwLock::default();
         std::mem::swap(&mut *blockhash_queue.write().unwrap(), &mut *self.blockhash_queue.write().unwrap());
 
+        let (stakes_cache, stakes_cache_time_us) =
+            measure_us!(StakesCache::new(self.stakes_cache.stakes().clone()));
+
+
+
         let mut bank = Self {
             parent_hash: self.parent_hash,
             parent_slot: self.parent_slot,
@@ -1834,7 +1839,7 @@ impl Bank {
             transaction_entries_count: AtomicU64::new(0),
             transactions_per_entry_max: AtomicU64::new(0),
             // we will .clone_with_epoch() this soon after stake data update; so just .clone() for now
-            stakes_cache: StakesCache::default(),
+            stakes_cache,
             epoch_stakes: self.epoch_stakes.clone(),
             collector_id: self.collector_id,
             collector_fees: AtomicU64::new(0),
