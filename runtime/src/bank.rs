@@ -1559,7 +1559,7 @@ impl Bank {
 
         let accounts_data_size_initial = parent.load_accounts_data_size();
         parent.bank_created(slot);
-        error!("creating bank: {}, parent: {}", slot, parent.slot());
+        //error!("creating bank: {}, parent: {}", slot, parent.slot());
         let mut new = Self {
             bank_freeze_or_destruction_incremented: AtomicBool::default(),
             incremental_snapshot_persistence: None,
