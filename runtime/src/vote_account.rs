@@ -14,6 +14,7 @@ use {
         iter::FromIterator,
         sync::Arc,
     },
+    log::*,
     thiserror::Error,
 };
 
