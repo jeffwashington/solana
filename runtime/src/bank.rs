@@ -1769,7 +1769,7 @@ impl Bank {
 
     fn hold2(&self) {
 
-        return;
+        //return;
         datapoint_info!(
             "holding_forked_banks",
             ("count", 1 + NUM_HELD_BANKS.fetch_add(1, Relaxed), i64),
@@ -1808,7 +1808,7 @@ impl Bank {
             slot: self.slot(),
             bank_id: self.bank_id,
             epoch: self.epoch,
-            blockhash_queue,//: self.blockhash_queue.write().unwrap().take().unwrap(),// RwLock::default(),
+            blockhash_queue,
 
             // TODO: clean this up, so much special-case copying...
             hashes_per_tick: self.hashes_per_tick,
@@ -3387,7 +3387,7 @@ impl Bank {
         squash_accounts_time.stop();
 
         // skipping dropping parent bank
-        self.hold();
+        //self.hold();
         *self.rc.parent.write().unwrap() = None;        
 
         let mut squash_cache_time = Measure::start("squash_cache_time");
