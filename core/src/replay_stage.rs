@@ -2832,7 +2832,7 @@ impl ReplayStage {
                 if !is_computed {
                     // Check if our tower is behind, if so (and the feature migration flag is in use)
                     // overwrite with the newer bank.
-                    error!("{}, {}", line!(), bank.slot());
+                    error!("{}, {}, {my_vote_pubkey}", line!(), bank.slot());
                     if let (true, Some(vote_account)) = (
                         Tower::is_direct_vote_state_update_enabled(bank),
                         bank.get_vote_account(my_vote_pubkey),
