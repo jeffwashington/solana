@@ -138,6 +138,7 @@ impl VoteAccounts {
     }
 
     pub(crate) fn insert(&mut self, pubkey: Pubkey, (stake, vote_account): (u64, VoteAccount)) {
+        error!("insert: {pubkey}");
         self.add_node_stake(stake, &vote_account);
         let vote_accounts = Arc::make_mut(&mut self.vote_accounts);
         if let Some((stake, vote_account)) = vote_accounts.insert(pubkey, (stake, vote_account)) {
@@ -146,6 +147,7 @@ impl VoteAccounts {
     }
 
     pub(crate) fn remove(&mut self, pubkey: &Pubkey) -> Option<(u64, VoteAccount)> {
+        error!("remove: {pubkey}");
         let vote_accounts = Arc::make_mut(&mut self.vote_accounts);
         let entry = vote_accounts.remove(pubkey);
         if let Some((stake, ref vote_account)) = entry {
@@ -155,6 +157,7 @@ impl VoteAccounts {
     }
 
     pub(crate) fn add_stake(&mut self, pubkey: &Pubkey, delta: u64) {
+        error!("add_stake: {pubkey}");
         let vote_accounts = Arc::make_mut(&mut self.vote_accounts);
         if let Some((stake, vote_account)) = vote_accounts.get_mut(pubkey) {
             *stake += delta;
@@ -164,6 +167,7 @@ impl VoteAccounts {
     }
 
     pub(crate) fn sub_stake(&mut self, pubkey: &Pubkey, delta: u64) {
+        error!("sub_stake: {pubkey}");
         let vote_accounts = Arc::make_mut(&mut self.vote_accounts);
         if let Some((stake, vote_account)) = vote_accounts.get_mut(pubkey) {
             *stake = stake
