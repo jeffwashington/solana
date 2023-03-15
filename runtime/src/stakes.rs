@@ -374,7 +374,10 @@ impl Stakes<StakeAccount> {
         // delegated vote pubkey)
         let stake = match self.vote_accounts.remove(vote_pubkey) {
             None => self.calculate_stake(vote_pubkey, self.epoch, &self.stake_history),
-            Some((stake, _)) => stake,
+            Some((stake, vote_account_old)) => {
+                error!("update: {}, {}, {}, {:?}, {:?}", vote_pubkey, vote_account_old.account().lamports(), vote_account.account().lamports(), vote_account_old.account().data(), vote_account.account().data());
+                stake
+            }
         };
         let entry = (stake, vote_account);
         self.vote_accounts.insert(*vote_pubkey, entry);
