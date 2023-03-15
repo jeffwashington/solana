@@ -1800,6 +1800,8 @@ impl Bank {
 
         let mut stakes = self.stakes_cache.stakes().clone();
 
+        error!("jw: arc count on votes: {}, # votes: {}", Arc::strong_count(&stakes.vote_accounts.vote_accounts), stakes.vote_accounts.vote_accounts.len());
+
         stakes.vote_accounts.vote_accounts = Arc::default();
 
         let mut stakes_cache =
