@@ -365,7 +365,7 @@ impl Stakes<StakeAccount> {
     }
 
     fn upsert_vote_account(&mut self, vote_pubkey: &Pubkey, vote_account: VoteAccount) {
-        error!("upsert_vote_account: {vote_pubkey}");
+        error!("upsert_vote_account: {vote_pubkey}, len: {}", vote_account.account().data().len());
         
         debug_assert_ne!(vote_account.lamports(), 0u64);
         debug_assert!(vote_account.is_deserialized());
