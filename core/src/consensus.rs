@@ -448,6 +448,7 @@ impl Tower {
     }
 
     pub fn last_voted_slot_in_bank(bank: &Bank, vote_account_pubkey: &Pubkey) -> Option<Slot> {
+        error!("{}, {}", line!(), bank.slot());
         let vote_account = bank.get_vote_account(vote_account_pubkey)?;
         let vote_state = vote_account.vote_state();
         vote_state.as_ref().ok()?.last_voted_slot()
@@ -1258,6 +1259,7 @@ impl Tower {
         root: Slot,
         bank: &Bank,
     ) {
+        error!("{}, {}", line!(), root);
         if let Some(vote_account) = bank.get_vote_account(vote_account_pubkey) {
             self.vote_state = vote_account
                 .vote_state()

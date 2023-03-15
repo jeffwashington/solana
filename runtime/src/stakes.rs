@@ -230,6 +230,7 @@ impl Stakes<StakeAccount> {
             }
         });
         // Assert that cached vote accounts are consistent with accounts-db.
+        error!("{}", line!());
         for (pubkey, vote_account) in stakes.vote_accounts.iter() {
             let account = match get_account(pubkey) {
                 None => return Err(Error::VoteAccountNotFound(*pubkey)),
@@ -313,6 +314,7 @@ impl Stakes<StakeAccount> {
                 })
                 .reduce(HashMap::default, merge)
         });
+        error!("{}", line!());
         self.vote_accounts = self
             .vote_accounts
             .iter()
@@ -365,7 +367,7 @@ impl Stakes<StakeAccount> {
     }
 
     fn upsert_vote_account(&mut self, vote_pubkey: &Pubkey, vote_account: VoteAccount) {
-        error!("upsert_vote_account: {vote_pubkey}, len: {}", vote_account.account().data().len());
+        //error!("upsert_vote_account: {vote_pubkey}, len: {}", vote_account.account().data().len());
         
         debug_assert_ne!(vote_account.lamports(), 0u64);
         debug_assert!(vote_account.is_deserialized());
@@ -375,7 +377,7 @@ impl Stakes<StakeAccount> {
         let stake = match self.vote_accounts.remove(vote_pubkey) {
             None => self.calculate_stake(vote_pubkey, self.epoch, &self.stake_history),
             Some((stake, vote_account_old)) => {
-                error!("update: {}, {}, {}, {:?}, {:?}", vote_pubkey, vote_account_old.account().lamports(), vote_account.account().lamports(), vote_account_old.account().data(), vote_account.account().data());
+                //error!("update: {}, {}, {}, {:?}, {:?}", vote_pubkey, vote_account_old.account().lamports(), vote_account.account().lamports(), vote_account_old.account().data(), vote_account.account().data());
                 stake
             }
         };

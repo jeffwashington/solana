@@ -102,8 +102,9 @@ impl VoteSimulator {
                     new_bank.process_transaction(&vote_tx).unwrap();
 
                     // Check the vote landed
+                    error!("{}, {}", line!(), new_bank.slot());
                     let vote_account = new_bank
-                        .get_vote_account(&keypairs.vote_keypair.pubkey())
+                    .get_vote_account(&keypairs.vote_keypair.pubkey())
                         .unwrap();
                     let state = vote_account.vote_state();
                     assert!(state

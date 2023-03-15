@@ -2061,6 +2061,7 @@ impl ReplayStage {
                 return None;
             }
         }
+        error!("{}, {}", line!(), bank.slot());
         let vote_account = match bank.get_vote_account(vote_account_pubkey) {
             None => {
                 warn!(
@@ -2831,6 +2832,7 @@ impl ReplayStage {
                 if !is_computed {
                     // Check if our tower is behind, if so (and the feature migration flag is in use)
                     // overwrite with the newer bank.
+                    error!("{}, {}", line!(), bank.slot());
                     if let (true, Some(vote_account)) = (
                         Tower::is_direct_vote_state_update_enabled(bank),
                         bank.get_vote_account(my_vote_pubkey),
