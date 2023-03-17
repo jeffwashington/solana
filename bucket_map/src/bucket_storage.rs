@@ -296,6 +296,9 @@ impl BucketStorage {
         data.seek(SeekFrom::Start(capacity * cell_size as u64 - 1))
             .unwrap();
         data.write_all(&[0]).unwrap();
+        if prefix == "index" && (capacity * cell_size as u64 ) < 7_000_000 {
+            use log::*;error!("new_map, capacity * cell_size: {}, cap: {}, cell_size: {}", capacity * cell_size as u64, capacity_pow2, cell_size);
+        }
         data.rewind().unwrap();
         measure_new_file.stop();
         let mut measure_flush = Measure::start("measure_flush");
