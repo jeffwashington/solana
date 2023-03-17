@@ -91,7 +91,7 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
             Arc::clone(&stats.index),
             count,
             "index_new",
-            18,
+            5,
         );
         stats.index.resize_grow(0, index.capacity_bytes());
 
@@ -414,6 +414,9 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
                     items.index = Some((random, index));
                     self.reallocated.add_reallocation();
                     break;
+                }
+                else {
+                    use log::*; error!("failed to reallocate: {}", self.index.capacity_pow2 + i);
                 }
             }
             m.stop();
