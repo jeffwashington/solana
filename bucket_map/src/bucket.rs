@@ -91,7 +91,7 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
             Arc::clone(&stats.index),
             count,
             "index_new",
-            14,
+            18,
         );
         stats.index.resize_grow(0, index.capacity_bytes());
 
