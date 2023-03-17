@@ -32,7 +32,7 @@ use {
 23  8,388,608
 24  16,777,216
 */
-pub const DEFAULT_CAPACITY_POW2: u8 = 14;
+pub const DEFAULT_CAPACITY_POW2: u8 = 5;
 
 /// A Header UID of 0 indicates that the header is unlocked
 const UID_UNLOCKED: Uid = 0;
@@ -131,12 +131,13 @@ impl BucketStorage {
         stats: Arc<BucketStats>,
         count: Arc<AtomicU64>,
         prefix: &str,
+        cap: u8,
     ) -> Self {
         Self::new_with_capacity(
             drives,
             num_elems,
             elem_size,
-            DEFAULT_CAPACITY_POW2,
+            cap,
             max_search,
             stats,
             count,
