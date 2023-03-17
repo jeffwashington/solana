@@ -90,6 +90,7 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
             max_search,
             Arc::clone(&stats.index),
             count,
+            "index",
         );
         stats.index.resize_grow(0, index.capacity_bytes());
 
@@ -380,6 +381,7 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
                     self.index.max_search,
                     Arc::clone(&self.stats.index),
                     Arc::clone(&self.index.count),
+                    "index",
                 );
                 let random = thread_rng().gen();
                 let mut valid = true;
@@ -452,6 +454,7 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
                     self.index.max_search,
                     Arc::clone(&self.stats.data),
                     Arc::default(),
+                    "data",
                 ));
             }
             self.add_data_bucket(bucket);

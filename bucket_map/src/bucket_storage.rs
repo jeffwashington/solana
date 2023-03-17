@@ -104,9 +104,10 @@ impl BucketStorage {
         max_search: MaxSearch,
         stats: Arc<BucketStats>,
         count: Arc<AtomicU64>,
+        prefix: &str,
     ) -> Self {
         let cell_size = elem_size * num_elems + std::mem::size_of::<Header>() as u64;
-        let (mmap, path) = Self::new_map(&drives, cell_size as usize, capacity_pow2, &stats);
+        let (mmap, path) = Self::new_map(&drives, cell_size as usize, capacity_pow2, &stats, prefix);
         Self {
             path,
             mmap,
@@ -129,6 +130,7 @@ impl BucketStorage {
         max_search: MaxSearch,
         stats: Arc<BucketStats>,
         count: Arc<AtomicU64>,
+        prefix: &str,
     ) -> Self {
         Self::new_with_capacity(
             drives,
@@ -138,6 +140,7 @@ impl BucketStorage {
             max_search,
             stats,
             count,
+            prefix,
         )
     }
 
@@ -262,12 +265,13 @@ impl BucketStorage {
         cell_size: usize,
         capacity_pow2: u8,
         stats: &BucketStats,
+        prefix: &str,
     ) -> (MmapMut, PathBuf) {
         let mut measure_new_file = Measure::start("measure_new_file");
         let capacity = 1u64 << capacity_pow2;
         let r = thread_rng().gen_range(0, drives.len());
         let drive = &drives[r];
-        let pos = format!("{}", thread_rng().gen_range(0, u128::MAX),);
+        let pos = format!("{}{}", prefix, thread_rng().gen_range(0, u128::MAX),);
         let file = drive.join(pos);
         let mut data = OpenOptions::new()
             .read(true)
@@ -361,6 +365,7 @@ impl BucketStorage {
             bucket
                 .map(|bucket| Arc::clone(&bucket.count))
                 .unwrap_or_default(),
+                "data",
         );
         if let Some(bucket) = bucket {
             new_bucket.copy_contents(bucket);
