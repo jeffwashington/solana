@@ -458,8 +458,8 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
                     self.index.max_search,
                     Arc::clone(&self.stats.data),
                     Arc::default(),
-                    "data",
-                    5,
+                    "data_placeholder",
+                    14,
                 ));
             }
             self.add_data_bucket(bucket);

@@ -369,7 +369,7 @@ impl BucketStorage {
             bucket
                 .map(|bucket| Arc::clone(&bucket.count))
                 .unwrap_or_default(),
-                "data",
+                "data_resize",
         );
         if let Some(bucket) = bucket {
             new_bucket.copy_contents(bucket);
