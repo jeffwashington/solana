@@ -479,7 +479,7 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
             &self.drives,
             self.index.max_search,
             self.data.get(data_index as usize),
-            std::cmp::max(current_capacity_pow2 + 1, 20),
+            std::cmp::max(current_capacity_pow2 + 1, DEFAULT_CAPACITY_POW2),
             1 << data_index,
             Self::elem_size(),
             &self.stats.data,
