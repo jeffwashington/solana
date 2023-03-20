@@ -200,9 +200,21 @@ impl<O: BucketOccupied> BucketStorage<O> {
     }
 
     pub(crate) fn get_mut_from_parts<T: Sized>(item_slice: &mut [u8]) -> &mut T {
-        assert!(std::mem::size_of::<T>() <= item_slice.len());
+        assert!(
+            std::mem::size_of::<T>() <= item_slice.len(),
+            "{}, {}",
+            std::mem::size_of::<T>(),
+            item_slice.len()
+        );
         let item = item_slice.as_mut_ptr() as *mut T;
         unsafe { &mut *item }
+    }
+
+    pub(crate) fn get_from_parts<T: Sized>(item_slice: &[u8]) -> &T {
+        unsafe {
+            let item = item_slice.as_ptr() as *const T;
+            &*item
+        }
     }
 
     pub fn get_mut<T: Sized>(&mut self, ix: u64) -> &mut T {
@@ -371,10 +383,10 @@ mod test {
         let paths: Vec<PathBuf> = vec![tmpdir.path().to_path_buf()];
         assert!(!paths.is_empty());
 
-        let mut storage = BucketStorage::<IndexBucket>::new(
+        let mut storage = BucketStorage::<IndexBucket<u64>>::new(
             Arc::new(paths),
             1,
-            1,
+            std::mem::size_of::<crate::index_entry::IndexEntry<u64>>() as u64,
             1,
             Arc::default(),
             Arc::default(),
