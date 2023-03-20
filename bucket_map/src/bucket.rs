@@ -459,7 +459,7 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
                     Arc::clone(&self.stats.data),
                     Arc::default(),
                     "data_placeholder",
-                    14,
+                    5,
                 ));
             }
             self.add_data_bucket(bucket);
