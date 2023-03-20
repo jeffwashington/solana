@@ -25,7 +25,7 @@ impl BucketMapConfig {
     }
 }
 
-pub struct BucketMap<T: Clone + Copy + Debug + Default + 'static> {
+pub struct BucketMap<T: Clone + Copy + Debug + 'static> {
     buckets: Vec<Arc<BucketApi<T>>>,
     drives: Arc<Vec<PathBuf>>,
     max_buckets_pow2: u8,
@@ -33,7 +33,7 @@ pub struct BucketMap<T: Clone + Copy + Debug + Default + 'static> {
     pub temp_dir: Option<TempDir>,
 }
 
-impl<T: Clone + Copy + Debug + Default> Drop for BucketMap<T> {
+impl<T: Clone + Copy + Debug + 'static> Drop for BucketMap<T> {
     fn drop(&mut self) {
         if self.temp_dir.is_none() {
             BucketMap::<T>::erase_previous_drives(&self.drives);
@@ -41,7 +41,7 @@ impl<T: Clone + Copy + Debug + Default> Drop for BucketMap<T> {
     }
 }
 
-impl<T: Clone + Copy + Debug + Default> std::fmt::Debug for BucketMap<T> {
+impl<T: Clone + Copy + Debug + 'static> std::fmt::Debug for BucketMap<T> {
     fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Ok(())
     }
@@ -55,7 +55,7 @@ pub enum BucketMapError {
     IndexNoSpace(u8),
 }
 
-impl<T: Clone + Copy + Debug + Default> BucketMap<T> {
+impl<T: Clone + Copy + Debug> BucketMap<T> {
     pub fn new(config: BucketMapConfig) -> Self {
         assert_ne!(
             config.max_buckets, 0,
@@ -261,7 +261,7 @@ mod tests {
                 let result = index.try_insert(&key, (value, 0));
                 assert!(result.is_ok());
             }
-            assert_eq!(index.read_value(&key), Some((value.to_vec(), 0)));
+            assert_eq!(index.read_value(&key), Some((value.to_vec(), 0)), "pass: {pass}");
         }
     }
 
@@ -420,7 +420,7 @@ mod tests {
             let v = (0..count)
                 .map(|x| (x as usize, x as usize /*thread_rng().gen::<usize>()*/))
                 .collect::<Vec<_>>();
-            let rc = thread_rng().gen::<RefCount>();
+            let rc = thread_rng().gen_range(0, RefCount::MAX >> 2);
             (v, rc)
         };
 

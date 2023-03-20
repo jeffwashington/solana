@@ -4,7 +4,7 @@ use {
         bucket_map::BucketMapError,
         bucket_stats::BucketMapStats,
         bucket_storage::{BucketStorage, Uid, DEFAULT_CAPACITY_POW2},
-        index_entry::IndexEntry,
+        index_entry::{IndexEntry, MultipleSlots, SlotCountEnum},
         MaxSearch, RefCount,
     },
     rand::{thread_rng, Rng},
@@ -32,6 +32,12 @@ pub struct ReallocatedItems {
     // Some for a data bucket reallocation
     // u64 is data bucket index
     pub data: Option<(u64, BucketStorage)>,
+}
+
+/// when updating the index, this keeps track of the previous data entry which will need to be freed
+struct DataFileEntryToFree {
+    bucket_ix: usize,
+    location: u64,
 }
 
 #[derive(Default)]
@@ -77,7 +83,7 @@ pub struct Bucket<T> {
     pub reallocated: Reallocated,
 }
 
-impl<'b, T: Clone + Copy + Debug + Default + 'static> Bucket<T> {
+impl<'b, T: Clone + Copy + Debug + 'static> Bucket<T> {
     pub fn new(
         drives: Arc<Vec<PathBuf>>,
         max_search: MaxSearch,
@@ -241,8 +247,9 @@ impl<'b, T: Clone + Copy + Debug + Default + 'static> Bucket<T> {
     pub fn addref(&mut self, key: &Pubkey) -> Option<RefCount> {
         if let Ok((found, elem, _)) = self.find_entry_mut(key) {
             if found {
-                elem.ref_count += 1;
-                return Some(elem.ref_count);
+                let result = elem.ref_count() + 1;
+                elem.set_ref_count(result);
+                return Some(result);
             }
         }
         None
@@ -251,8 +258,9 @@ impl<'b, T: Clone + Copy + Debug + Default + 'static> Bucket<T> {
     pub fn unref(&mut self, key: &Pubkey) -> Option<RefCount> {
         if let Ok((found, elem, _)) = self.find_entry_mut(key) {
             if found {
-                elem.ref_count -= 1;
-                return Some(elem.ref_count);
+                let result = elem.ref_count() - 1;
+                elem.set_ref_count(result);
+                return Some(result);
             }
         }
         None
@@ -292,35 +300,61 @@ impl<'b, T: Clone + Copy + Debug + Default + 'static> Bucket<T> {
             // Since this part of the mmapped file could have previously been used by someone else, there can be garbage here.
             elem.init(key);
         }
-        elem.ref_count = ref_count;
-        let old_slots = elem.num_slots;
+        elem.set_ref_count(ref_count);
         let elem_uid = self.index.uid_unchecked(elem_ix);
         let num_slots = data_len as u64;
-        let bucket_ix = elem.data_bucket_ix();
 
         if !use_data_storage {
             // new data stored should be stored in elem.`first_element`
             // new data len is 0 or 1
-            elem.num_slots = num_slots;
-            elem.first_element = data.next().copied().unwrap_or_default();
-            if old_slots > 1 {
+            let mut free_info = None;
+            if let SlotCountEnum::MultipleSlots(multiple_slots) = elem.get_slot_count_enum() {
                 // free old data location
-                let elem_loc = elem.data_loc(&self.data[bucket_ix as usize]);
-                self.data[bucket_ix as usize].free(elem_loc, elem_uid);
+                let bucket_ix =
+                    IndexEntry::<T>::data_bucket_from_num_slots(multiple_slots.num_slots);
+                free_info = Some((
+                    bucket_ix as usize,
+                    IndexEntry::<T>::data_loc(&self.data[bucket_ix as usize], multiple_slots),
+                ));
             }
-        } else if best_fit_bucket == bucket_ix {
-            // in place update in same data file
-            let current_bucket = &self.data[bucket_ix as usize];
-            let elem_loc = elem.data_loc(current_bucket);
-
-            let slice: &mut [T] = current_bucket.get_mut_cell_slice(elem_loc, data_len as u64);
-            assert_eq!(current_bucket.uid(elem_loc), Some(elem_uid));
-            elem.num_slots = num_slots;
-
-            slice.iter_mut().zip(data).for_each(|(dest, src)| {
-                *dest = *src;
+            elem.set_slot_count_enum_value(if let Some(single_element) = data.next() {
+                SlotCountEnum::OneSlotInIndex(single_element)
+            } else {
+                SlotCountEnum::ZeroSlots
             });
+            if let Some((bucket_ix, elem_loc)) = free_info {
+                // free the entry in the data bucket the data was previously stored in
+                self.data[bucket_ix].free(elem_loc, elem_uid);
+            }
         } else {
+            // has to be multiple slots
+
+            let mut old_data_entry_to_free = None;
+            // see if old elements were in a data file
+            if let Some(multiple_slots) = elem.get_multiple_slots_mut() {
+                let bucket_ix =
+                IndexEntry::<T>::data_bucket_from_num_slots(multiple_slots.num_slots) as usize;
+                let current_bucket = &self.data[bucket_ix];
+                let elem_loc = IndexEntry::<T>::data_loc(current_bucket, multiple_slots);
+                old_data_entry_to_free = Some(DataFileEntryToFree {
+                    bucket_ix,
+                    location: elem_loc,
+                });
+    
+                if best_fit_bucket == bucket_ix as u64 {
+                    // in place update in same data file
+                    let slice: &mut [T] =
+                        current_bucket.get_mut_cell_slice(elem_loc, data_len as u64);
+                    assert_eq!(current_bucket.uid(elem_loc), Some(elem_uid));
+                    multiple_slots.num_slots = num_slots;
+
+                    slice.iter_mut().zip(data).for_each(|(dest, src)| {
+                        *dest = *src;
+                    });
+                    return Ok(());
+                }
+            }
+
             // need to move the allocation to a best fit spot
             // previous data could have been len=0, len=1, or in a different data file
             let best_bucket = &self.data[best_fit_bucket as usize];
@@ -339,28 +373,12 @@ impl<'b, T: Clone + Copy + Debug + Default + 'static> Bucket<T> {
             for i in pos..pos + (self.index.max_search() * 10).min(cap) {
                 let ix = i % cap;
                 if best_bucket.is_free(ix) {
-                    let mut elem_loc = 0;
-                    if old_slots >= 2 {
-                        elem_loc = elem.data_loc(&self.data[bucket_ix as usize]);
-                    }
-                    elem.set_storage_offset(ix);
-                    elem.set_storage_capacity_when_created_pow2(best_bucket.capacity_pow2);
-                    elem.num_slots = num_slots;
-                    match old_slots {
-                        2.. => {
-                            // free the entry in the data bucket the data was previously stored in
-                            self.data[bucket_ix as usize].free(elem_loc, elem_uid);
-                        }
-                        1 => {
-                            // nothing to free in a data bucket
-                            // set `first_element` to default to avoid confusion
-                            assert!(num_slots > 1);
-                            elem.first_element = T::default();
-                        }
-                        0 => {
-                            // nothing to free
-                        }
-                    }
+                    let mut multiple_slots = MultipleSlots::default();
+                    multiple_slots.set_storage_offset(ix);
+                    multiple_slots
+                        .set_storage_capacity_when_created_pow2(best_bucket.capacity_pow2);
+                    multiple_slots.num_slots = num_slots;
+                    elem.set_slot_count_enum_value(SlotCountEnum::MultipleSlots(&multiple_slots));
                     //debug!(                        "DATA ALLOC {:?} {} {} {}",                        key, elem.data_location, best_bucket.capacity, elem_uid                    );
                     if num_slots > 0 {
                         assert!(num_slots > 1);
@@ -370,6 +388,10 @@ impl<'b, T: Clone + Copy + Debug + Default + 'static> Bucket<T> {
                         slice.iter_mut().zip(data).for_each(|(dest, src)| {
                             *dest = *src;
                         });
+                    }
+                    if let Some(DataFileEntryToFree {bucket_ix, location}) = old_data_entry_to_free {
+                        // free the entry in the data bucket the data was previously stored in
+                        self.data[bucket_ix].free(location, elem_uid);
                     }
                     return Ok(());
                 }
@@ -382,10 +404,11 @@ impl<'b, T: Clone + Copy + Debug + Default + 'static> Bucket<T> {
     pub fn delete_key(&mut self, key: &Pubkey) {
         if let Some((elem, elem_ix)) = self.find_entry(key) {
             let elem_uid = self.index.uid_unchecked(elem_ix);
-            if elem.num_slots > 1 {
-                let ix = elem.data_bucket_ix() as usize;
+            if let SlotCountEnum::MultipleSlots(multiple_slots) = elem.get_slot_count_enum() {
+                let ix =
+                    IndexEntry::<T>::data_bucket_from_num_slots(multiple_slots.num_slots) as usize;
                 let data_bucket = &self.data[ix];
-                let loc = elem.data_loc(data_bucket);
+                let loc = IndexEntry::<T>::data_loc(data_bucket, multiple_slots);
                 let data_bucket = &mut self.data[ix];
                 //debug!(                    "DATA FREE {:?} {} {} {}",                    key, elem.data_location, data_bucket.capacity, elem_uid                );
                 data_bucket.free(loc, elem_uid);
