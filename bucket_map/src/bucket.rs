@@ -3,7 +3,7 @@ use {
         bucket_item::BucketItem,
         bucket_map::BucketMapError,
         bucket_stats::BucketMapStats,
-        bucket_storage::{BucketStorage, Uid, DEFAULT_CAPACITY_POW2},
+        bucket_storage::{BucketStorage, Uid, DEFAULT_CAPACITY_POW2, KEY_UID_EXISTS},
         index_entry::IndexEntry,
         MaxSearch, RefCount,
     },
@@ -191,6 +191,7 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
         let ix = Self::bucket_index_ix(index, key, random);
         for i in ix..ix + index.max_search() {
             let ii = i % index.capacity();
+            assert!(ii < index.capacity(), "{}, {}", ii, index.capacity());
             if index.is_free(ii) {
                 continue;
             }
@@ -238,8 +239,9 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
     }
 
     pub fn addref(&mut self, key: &Pubkey) -> Option<RefCount> {
-        if let Ok((found, elem, _)) = self.find_entry_mut(key) {
+        if let Ok((found, elem_ix)) = self.find_entry_mut(key) {
             if found {
+                let elem: &mut IndexEntry = self.index.get_mut(elem_ix);
                 elem.ref_count += 1;
                 return Some(elem.ref_count);
             }
@@ -248,8 +250,9 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
     }
 
     pub fn unref(&mut self, key: &Pubkey) -> Option<RefCount> {
-        if let Ok((found, elem, _)) = self.find_entry_mut(key) {
+        if let Ok((found, elem_ix)) = self.find_entry_mut(key) {
             if found {
+                let elem: &mut IndexEntry = self.index.get_mut(elem_ix);
                 elem.ref_count -= 1;
                 return Some(elem.ref_count);
             }
@@ -279,14 +282,19 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
             // fail early if the data bucket we need doesn't exist - we don't want the index entry partially allocated
             return Err(BucketMapError::DataNoSpace((best_fit_bucket, 0)));
         }
-        let (found, elem, elem_ix) = self.find_entry_mut(key)?;
+        let (found, elem_ix) = self.find_entry_mut(key)?;
+        let elem: &mut IndexEntry;
         if !found {
             let is_resizing = false;
-            let elem_uid = IndexEntry::key_uid(key);
-            self.index.allocate(elem_ix, elem_uid, is_resizing).unwrap();
+            self.index
+                .allocate(elem_ix, KEY_UID_EXISTS, is_resizing)
+                .unwrap();
+            elem = self.index.get_mut(elem_ix);
             // These fields will be overwritten after allocation by callers.
             // Since this part of the mmapped file could have previously been used by someone else, there can be garbage here.
             elem.init(key);
+        } else {
+            elem = self.index.get_mut(elem_ix);
         }
         elem.ref_count = ref_count;
         let elem_uid = self.index.uid_unchecked(elem_ix);
@@ -482,7 +490,7 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
     }
 
     fn bucket_index_ix(index: &BucketStorage, key: &Pubkey, random: u64) -> u64 {
-        let uid = IndexEntry::key_uid(key);
+        let uid = IndexEntry::full_key_uid(key);
         let mut s = DefaultHasher::new();
         uid.hash(&mut s);
         //the locally generated random will make it hard for an attacker

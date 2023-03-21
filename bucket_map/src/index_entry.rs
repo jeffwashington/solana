@@ -3,7 +3,7 @@
 use {
     crate::{
         bucket::Bucket,
-        bucket_storage::{BucketStorage, Uid},
+        bucket_storage::{BucketStorage, Uid, KEY_UID_EXISTS},
         RefCount,
     },
     modular_bitfield::prelude::*,
@@ -99,8 +99,7 @@ impl IndexEntry {
             let data_bucket_ix = self.data_bucket_ix();
             let data_bucket = &bucket.data[data_bucket_ix as usize];
             let loc = self.data_loc(data_bucket);
-            let uid = Self::key_uid(&self.key);
-            assert_eq!(Some(uid), data_bucket.uid(loc));
+            assert_eq!(Some(KEY_UID_EXISTS), data_bucket.uid(loc));
             data_bucket.get_cell_slice(loc, self.num_slots)
         } else {
             // num_slots is 0. This means we don't have an actual allocation.
@@ -109,7 +108,7 @@ impl IndexEntry {
         Some((slice, self.ref_count))
     }
 
-    pub fn key_uid(key: &Pubkey) -> Uid {
+    pub fn full_key_uid(key: &Pubkey) -> Uid {
         let mut s = DefaultHasher::new();
         key.hash(&mut s);
         s.finish().max(1u64)

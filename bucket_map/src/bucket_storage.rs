@@ -34,8 +34,14 @@ use {
 */
 pub const DEFAULT_CAPACITY_POW2: u8 = 5;
 
+/// true if the 'allocated' flag per entry should be represented in a memory bitvec instead of a u64 header per entry
+pub(crate) const ALLOCATED_BIT_IN_HEADER: bool = false;
+
 /// A Header UID of 0 indicates that the header is unlocked
 const UID_UNLOCKED: Uid = 0;
+
+/// uid in maps is 1 or 0, where 0 is empty, 1 is in-use
+pub(crate) const KEY_UID_EXISTS: Uid = 1;
 
 pub(crate) type Uid = u64;
 
@@ -105,7 +111,13 @@ impl BucketStorage {
         stats: Arc<BucketStats>,
         count: Arc<AtomicU64>,
     ) -> Self {
-        let cell_size = elem_size * num_elems + std::mem::size_of::<Header>() as u64;
+        let use_bit_field = !ALLOCATED_BIT_IN_HEADER;
+        let cell_size = elem_size * num_elems
+            + if use_bit_field {
+                0
+            } else {
+                std::mem::size_of::<Header>() as u64
+            };
         let (mmap, path) = Self::new_map(&drives, cell_size as usize, capacity_pow2, &stats);
         Self {
             path,
@@ -139,10 +151,27 @@ impl BucketStorage {
             stats,
             count,
         )
-    }
+    } /*
+      fn calculate_header_offset(&self, ix: u64) -> HeaderOffsets {
+          // the header bits are always before the entries they correspond to
+          let size_header = std::mem::size_of::<Header>();
+          let items_per_header = u64::BITS as u64;
+          let earlier_headers = ix / items_per_header;
+          let offset_in_header = ix % items_per_header;
+          let all_entries_with_earlier_header = earlier_headers * items_per_header;
+          let size_of_previous_headers = earlier_headers * size_header;
+          let size_of_previous_entries = all_entries_with_earlier_header * self.cell_size; // cell size should be a constant todo
+          let offset_of_this_header = size_of_previous_headers.saturating_add(size_of_previous_entries);
+          let offset_of_this_cell = offset_of_this_header + size_header + offset_in_header  * self.cell_size;
+          HeaderOffsets {
+              offset_of_this_header,
+              offset_of_this_cell,
+          }
+      }*/
 
     /// return ref to header of item 'ix' in mmapped file
     fn header_ptr(&self, ix: u64) -> &Header {
+        assert!(ALLOCATED_BIT_IN_HEADER);
         let ix = (ix * self.cell_size) as usize;
         let hdr_slice: &[u8] = &self.mmap[ix..ix + std::mem::size_of::<Header>()];
         unsafe {
@@ -154,6 +183,7 @@ impl BucketStorage {
     /// return ref to header of item 'ix' in mmapped file
     #[allow(clippy::mut_from_ref)]
     fn header_mut_ptr(&self, ix: u64) -> &mut Header {
+        assert!(ALLOCATED_BIT_IN_HEADER);
         let ix = (ix * self.cell_size) as usize;
         let hdr_slice: &[u8] = &self.mmap[ix..ix + std::mem::size_of::<Header>()];
         unsafe {
@@ -165,14 +195,40 @@ impl BucketStorage {
     /// return uid allocated at index 'ix' or None if vacant
     pub fn uid(&self, ix: u64) -> Option<Uid> {
         assert!(ix < self.capacity(), "bad index size");
-        self.header_ptr(ix).uid()
+        if ALLOCATED_BIT_IN_HEADER {
+            self.header_ptr(ix).uid()
+        } else {
+            (!self.is_free(ix)).then_some(KEY_UID_EXISTS)
+        }
     }
 
     /// true if the entry at index 'ix' is free (as opposed to being allocated)
     pub fn is_free(&self, ix: u64) -> bool {
         // note that the terminology in the implementation is locked or unlocked.
         // but our api is allocate/free
-        self.header_ptr(ix).is_unlocked()
+        if ALLOCATED_BIT_IN_HEADER {
+            self.header_ptr(ix).is_unlocked()
+        }
+        else {
+            self.bit_field
+            .as_ref()
+            .map(|bit_field| !bit_field.get(ix))
+            .unwrap()
+        }
+    }
+
+    fn try_lock(&mut self, ix: u64, uid: Uid) -> bool {
+        if ALLOCATED_BIT_IN_HEADER {
+            self.header_mut_ptr(ix).try_lock(uid)
+        }
+        else {
+            if let Some(bit_field) = self.bit_field.as_mut() {
+                let in_use = bit_field.get(ix);
+                if !in_use {
+                    bit_field.set(ix, true);
+                }
+                !in_use
+        }
     }
 
     /// caller knows id is not empty
@@ -182,12 +238,17 @@ impl BucketStorage {
 
     /// 'is_resizing' true if caller is resizing the index (so don't increment count)
     /// 'is_resizing' false if caller is adding an item to the index (so increment count)
-    pub fn allocate(&self, ix: u64, uid: Uid, is_resizing: bool) -> Result<(), BucketStorageError> {
+    pub fn allocate(
+        &mut self,
+        ix: u64,
+        uid: Uid,
+        is_resizing: bool,
+    ) -> Result<(), BucketStorageError> {
         assert!(ix < self.capacity(), "allocate: bad index size");
-        assert!(UID_UNLOCKED != uid, "allocate: bad uid");
+        assert!(UID_UNLOCKED != uid, "allocate: bad uid {uid}");
         let mut e = Err(BucketStorageError::AlreadyAllocated);
         //debug!("ALLOC {} {}", ix, uid);
-        if self.header_mut_ptr(ix).try_lock(uid) {
+        if self.try_lock(ix, uid) {
             e = Ok(());
             if !is_resizing {
                 self.count.fetch_add(1, Ordering::Relaxed);
@@ -196,16 +257,32 @@ impl BucketStorage {
         e
     }
 
+    fn unlock(&mut self, ix: u64, uid: Uid) {
+        if ALLOCATED_BIT_IN_HEADER {
+            self.header_mut_ptr(ix).unlock(uid);
+        } else {
+            // todo
+            let Some(bit_field) = self.bit_field.as_mut() {
+            assert!(bit_field.get(ix));
+            bit_field.set(ix, false);
+        }
+    }
+
     pub fn free(&mut self, ix: u64, uid: Uid) {
         assert!(ix < self.capacity(), "bad index size");
         assert!(UID_UNLOCKED != uid, "free: bad uid");
-        self.header_mut_ptr(ix).unlock(uid);
+        self.unlock(ix, uid);
         self.count.fetch_sub(1, Ordering::Relaxed);
     }
 
     pub fn get<T: Sized>(&self, ix: u64) -> &T {
         assert!(ix < self.capacity(), "bad index size");
-        let start = (ix * self.cell_size) as usize + std::mem::size_of::<Header>();
+        let start = (ix * self.cell_size) as usize
+            + if ALLOCATED_BIT_IN_HEADER {
+                std::mem::size_of::<Header>()
+            } else {
+                0
+            };
         let end = start + std::mem::size_of::<T>();
         let item_slice: &[u8] = &self.mmap[start..end];
         unsafe {
@@ -221,7 +298,12 @@ impl BucketStorage {
     pub fn get_cell_slice<T: Sized>(&self, ix: u64, len: u64) -> &[T] {
         assert!(ix < self.capacity(), "bad index size");
         let ix = self.cell_size * ix;
-        let start = ix as usize + std::mem::size_of::<Header>();
+        let start = ix as usize
+            + if ALLOCATED_BIT_IN_HEADER {
+                std::mem::size_of::<Header>()
+            } else {
+                0
+            };
         let end = start + std::mem::size_of::<T>() * len as usize;
         //debug!("GET slice {} {}", start, end);
         let item_slice: &[u8] = &self.mmap[start..end];
@@ -234,7 +316,12 @@ impl BucketStorage {
     #[allow(clippy::mut_from_ref)]
     pub fn get_mut<T: Sized>(&self, ix: u64) -> &mut T {
         assert!(ix < self.capacity(), "bad index size");
-        let start = (ix * self.cell_size) as usize + std::mem::size_of::<Header>();
+        let start = (ix * self.cell_size) as usize
+            + if ALLOCATED_BIT_IN_HEADER {
+                std::mem::size_of::<Header>()
+            } else {
+                0
+            };
         let end = start + std::mem::size_of::<T>();
         let item_slice: &[u8] = &self.mmap[start..end];
         unsafe {
@@ -247,7 +334,12 @@ impl BucketStorage {
     pub fn get_mut_cell_slice<T: Sized>(&self, ix: u64, len: u64) -> &mut [T] {
         assert!(ix < self.capacity(), "bad index size");
         let ix = self.cell_size * ix;
-        let start = ix as usize + std::mem::size_of::<Header>();
+        let start = ix as usize
+            + if ALLOCATED_BIT_IN_HEADER {
+                std::mem::size_of::<Header>()
+            } else {
+                0
+            };
         let end = start + std::mem::size_of::<T>() * len as usize;
         //debug!("GET mut slice {} {}", start, end);
         let item_slice: &[u8] = &self.mmap[start..end];
@@ -312,6 +404,7 @@ impl BucketStorage {
     }
 
     /// copy contents from 'old_bucket' to 'self'
+    /// This is used by data buckets
     fn copy_contents(&mut self, old_bucket: &Self) {
         let mut m = Measure::start("grow");
         let old_cap = old_bucket.capacity();
@@ -320,16 +413,22 @@ impl BucketStorage {
         let increment = self.capacity_pow2 - old_bucket.capacity_pow2;
         let index_grow = 1 << increment;
         (0..old_cap as usize).for_each(|i| {
-            let old_ix = i * old_bucket.cell_size as usize;
-            let new_ix = old_ix * index_grow;
-            let dst_slice: &[u8] = &self.mmap[new_ix..new_ix + old_bucket.cell_size as usize];
-            let src_slice: &[u8] = &old_map[old_ix..old_ix + old_bucket.cell_size as usize];
+            if !old_bucket.is_free(i as u64) {
+                if !ALLOCATED_BIT_IN_HEADER {
+                    // mark the entry as allocated in the new bucket
+                    self.try_lock((i * index_grow) as u64, KEY_UID_EXISTS);
+                }
+                let old_ix = i * old_bucket.cell_size as usize;
+                let new_ix = old_ix * index_grow;
+                let dst_slice: &[u8] = &self.mmap[new_ix..new_ix + old_bucket.cell_size as usize];
+                let src_slice: &[u8] = &old_map[old_ix..old_ix + old_bucket.cell_size as usize];
 
-            unsafe {
-                let dst = dst_slice.as_ptr() as *mut u8;
-                let src = src_slice.as_ptr() as *const u8;
-                std::ptr::copy_nonoverlapping(src, dst, old_bucket.cell_size as usize);
-            };
+                unsafe {
+                    let dst = dst_slice.as_ptr() as *mut u8;
+                    let src = src_slice.as_ptr() as *const u8;
+                    std::ptr::copy_nonoverlapping(src, dst, old_bucket.cell_size as usize);
+                };
+            }
         });
         m.stop();
         // resized so update total file size
@@ -393,7 +492,7 @@ mod test {
         let mut storage =
             BucketStorage::new(Arc::new(paths), 1, 1, 1, Arc::default(), Arc::default());
         let ix = 0;
-        let uid = Uid::MAX;
+        let uid = 1; //Uid::MAX;
         assert!(storage.is_free(ix));
         assert!(storage.allocate(ix, uid, false).is_ok());
         assert!(storage.allocate(ix, uid, false).is_err());
