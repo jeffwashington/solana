@@ -12,6 +12,7 @@ pub struct BucketStats {
     pub flush_file_us: AtomicU64,
     pub mmap_us: AtomicU64,
     pub find_entry_mut_us: AtomicU64,
+    pub copy_us: AtomicU64,
     pub file_count: AtomicU64,
     pub total_file_size: AtomicU64,
 }

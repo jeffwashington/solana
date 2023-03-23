@@ -299,9 +299,12 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
             assert!(!current_bucket.is_free(elem_loc));
             elem.num_slots = num_slots;
 
+            let mut m = Measure::start("copy_from_slice");
             slice.iter_mut().zip(data).for_each(|(dest, src)| {
                 *dest = *src;
             });
+            m.stop();
+            self.stats.data.copy_us.fetch_add(m.as_us(), Ordering::Relaxed);
             Ok(())
         } else {
             // need to move the allocation to a best fit spot
@@ -334,10 +337,13 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
                         let best_bucket = &mut self.data[best_fit_bucket as usize];
                         best_bucket.allocate(ix, false).unwrap();
                         let slice = best_bucket.get_mut_cell_slice(ix, num_slots);
+                        let mut m = Measure::start("copy_from_slice");
                         slice.iter_mut().zip(data).for_each(|(dest, src)| {
                             *dest = *src;
                         });
-                    }
+                        m.stop();
+                        self.stats.data.copy_us.fetch_add(m.as_us(), Ordering::Relaxed);
+                                }
                     return Ok(());
                 }
             }
