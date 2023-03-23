@@ -27,7 +27,7 @@ type CacheRangesHeld = RwLock<Vec<RangeInclusive<Pubkey>>>;
 
 type InMemMap<T> = HashMap<Pubkey, AccountMapEntry<T>>;
 
-const NUM_AGES_TO_DISTRIBUTE_FLUSHES: Age = 255;
+const NUM_AGES_TO_DISTRIBUTE_FLUSHES: Age = 100;
 
 #[derive(Debug)]
 pub struct PossibleEvictions<T: IndexValue> {
