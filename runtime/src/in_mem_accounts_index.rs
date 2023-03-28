@@ -27,6 +27,29 @@ type CacheRangesHeld = RwLock<Vec<RangeInclusive<Pubkey>>>;
 
 type InMemMap<T> = HashMap<Pubkey, AccountMapEntry<T>>;
 
+pub type WriteLocksForInitialIndexGeneration<T> =
+Arc<Vec<WriteLockForInitialIndexGeneration<T>>>;
+
+pub struct WriteLocksForInitialIndexGenerationOuter<'a, T: IndexValue> {
+    pub(crate) locks: Vec<WriteLockForInitialIndexGenerationInternal<'a, T>>,
+    pub(crate) maps: WriteLocksForInitialIndexGeneration<T>,
+}
+
+impl<'a, T: IndexValue> Drop for WriteLocksForInitialIndexGenerationOuter<'a, T> {
+    fn drop(&mut self) {
+        self.locks.iter_mut().zip(Arc::try_unwrap(std::mem::take(&mut self.maps)).unwrap().drain(..)).for_each(|(lock, map)| {
+            **lock = map.into_inner().unwrap();
+        });
+    }
+}
+
+pub type WriteLockForInitialIndexGeneration<T> =
+RwLock<std::collections::HashMap<Pubkey, Arc<AccountMapEntryInner<T>>>>;
+
+pub type WriteLockForInitialIndexGenerationInternal<'a, T> =
+    RwLockWriteGuard<'a, std::collections::HashMap<Pubkey, Arc<AccountMapEntryInner<T>>>>;
+
+
 #[derive(Debug)]
 pub struct PossibleEvictions<T: IndexValue> {
     /// vec per age in the future, up to size 'ages_to_stay_in_cache'
@@ -86,10 +109,14 @@ impl<T: IndexValue> PossibleEvictions<T> {
 pub struct InMemAccountsIndex<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> {
     last_age_flushed: AtomicU8,
 
+    //held_write_lock: Mutex<WriteLockForInitialIndexGeneration<'a, T>>,
+
     // backing store
     map_internal: RwLock<InMemMap<T>>,
     storage: Arc<BucketMapHolder<T, U>>,
     bin: usize,
+
+    //startup_write_lock: RwLock<RwLockWriteGuard<'_, T>>,
 
     bucket: Option<Arc<BucketApi<(Slot, U)>>>,
 
@@ -137,7 +164,7 @@ struct StartupInfo<T: IndexValue> {
 
 #[derive(Default, Debug)]
 /// result from scanning in-mem index during flush
-struct FlushScanResult<T> {
+struct FlushScanResult<T: IndexValue> {
     /// pubkeys whose age indicates they may be evicted now, pending further checks.
     evictions_age_possible: Vec<(Pubkey, AccountMapEntry<T>)>,
     /// pubkeys chosen to evict based on random eviction
@@ -661,9 +688,13 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
         self.stats().count_in_bucket(self.bin)
     }
 
+    pub(crate) fn get_startup_write_lock<'a>(&'a self) -> RwLockWriteGuard<'a, InMemMap<T>> {
+        self.map_internal.write().unwrap()
+    }
+
     /// Queue up these insertions for when the flush thread is dealing with this bin.
     /// This is very fast and requires no lookups or disk access.
-    pub fn startup_insert_only(&self, slot: Slot, items: impl Iterator<Item = (Pubkey, T)>) {
+    pub fn startup_insert_only<'a>(&self, slot: Slot, items: impl Iterator<Item = (Pubkey, T)>, _write_lock: &WriteLocksForInitialIndexGeneration<T>) {
         assert!(self.storage.get_startup());
         assert!(self.bucket.is_some());
 
@@ -677,9 +708,10 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
         &self,
         pubkey: Pubkey,
         new_entry: PreAllocatedAccountMapEntry<T>,
+        map: &WriteLockForInitialIndexGeneration<T>,
     ) -> InsertNewEntryResults {
         let mut m = Measure::start("entry");
-        let mut map = self.map_internal.write().unwrap();
+        let mut map = map.write().unwrap();
         let entry = map.entry(pubkey);
         m.stop();
         let new_entry_zero_lamports = new_entry.is_zero_lamport();
@@ -911,9 +943,9 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
         self.stop_evictions_changes.load(Ordering::Acquire)
     }
 
-    pub(crate) fn flush(&self, can_advance_age: bool) {
+    pub(crate) fn flush(&self, can_advance_age: bool, write_locks:  Option<&WriteLocksForInitialIndexGeneration<T>>,) {
         if let Some(flush_guard) = FlushGuard::lock(&self.flushing_active) {
-            self.flush_internal(&flush_guard, can_advance_age)
+            self.flush_internal(&flush_guard, can_advance_age, write_locks);
         }
     }
 
@@ -1033,6 +1065,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
             return;
         }
 
+/*
         // during startup, nothing should be in the in-mem map
         let map_internal = self.map_internal.read().unwrap();
         assert!(
@@ -1042,7 +1075,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
             map_internal.iter().take(1).collect::<Vec<_>>()
         );
         drop(map_internal);
-
+*/
         // this fn should only be called from a single thread, so holding the lock is fine
         let mut startup_info = self.startup_info.lock().unwrap();
 
@@ -1080,7 +1113,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
     /// duplicate pubkeys have a slot list with len > 1
     /// These were collected for this bin when we did batch inserts in the bg flush threads.
     /// Insert these into the in-mem index, then return the duplicate (Slot, Pubkey)
-    pub(crate) fn populate_and_retrieve_duplicate_keys_from_startup(&self) -> Vec<(Slot, Pubkey)> {
+    pub(crate) fn populate_and_retrieve_duplicate_keys_from_startup<'a>(&self, write_lock: &WriteLockForInitialIndexGeneration<T>) -> Vec<(Slot, Pubkey)> {
         let mut write = self.startup_info.lock().unwrap();
         // in order to return accurate and complete duplicates, we must have nothing left remaining to insert
         assert!(write.insert.is_empty());
@@ -1092,14 +1125,14 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
             .into_iter()
             .chain(duplicates.into_iter().map(|(slot, key, info)| {
                 let entry = PreAllocatedAccountMapEntry::new(slot, info, &self.storage, true);
-                self.insert_new_entry_if_missing_with_lock(key, entry);
+                self.insert_new_entry_if_missing_with_lock(key, entry, write_lock);
                 (slot, key)
             }))
             .collect()
     }
 
     /// synchronize the in-mem index with the disk index
-    fn flush_internal(&self, flush_guard: &FlushGuard, can_advance_age: bool) {
+    fn flush_internal(&self, flush_guard: &FlushGuard, can_advance_age: bool, write_locks:  Option<&WriteLocksForInitialIndexGeneration<T>>,) {
         let current_age = self.storage.current_age();
         let iterate_for_age = self.get_should_age(current_age);
         let startup = self.storage.get_startup();
@@ -1109,16 +1142,25 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
             return;
         }
 
+        if startup {
+            self.write_startup_info_to_disk();
+        }
+
+        if write_locks.is_some() {
+            if iterate_for_age {
+                // completed iteration of the buckets at the current age
+                assert_eq!(current_age, self.storage.current_age());
+                self.set_has_aged(current_age, can_advance_age);
+            }
+            return;
+        }
+
         Self::update_stat(&self.stats().buckets_scanned, 1);
         // scan in-mem map for items that we may evict
         let FlushScanResult {
             mut evictions_age_possible,
             mut evictions_random,
         } = self.flush_scan(current_age, startup, flush_guard);
-
-        if startup {
-            self.write_startup_info_to_disk();
-        }
 
         // write to disk outside in-mem map read lock
         {

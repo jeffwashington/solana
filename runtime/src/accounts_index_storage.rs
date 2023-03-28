@@ -2,7 +2,7 @@ use {
     crate::{
         accounts_index::{AccountsIndexConfig, DiskIndexValue, IndexValue},
         bucket_map_holder::BucketMapHolder,
-        in_mem_accounts_index::InMemAccountsIndex,
+        in_mem_accounts_index::{InMemAccountsIndex, WriteLocksForInitialIndexGeneration},
         waitable_condvar::WaitableCondvar,
     },
     std::{
@@ -17,7 +17,9 @@ use {
 
 /// Manages the lifetime of the background processing threads.
 pub struct AccountsIndexStorage<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> {
-    _bg_threads: BgThreads,
+    _bg_threads: Mutex<Option<BgThreads>>,
+
+    threads: usize,
 
     pub storage: Arc<BucketMapHolder<T, U>>,
     pub in_mem: Vec<Arc<InMemAccountsIndex<T, U>>>,
@@ -59,12 +61,14 @@ impl BgThreads {
         threads: usize,
         can_advance_age: bool,
         exit: &Arc<AtomicBool>,
+        write_locks: Option<&WriteLocksForInitialIndexGeneration<T>>,
     ) -> Self {
         // stop signal used for THIS batch of bg threads
         let local_exit = Arc::new(AtomicBool::default());
         let handles = Some(
             (0..threads)
                 .map(|idx| {
+                    let write_locks = write_locks.cloned();
                     // the first thread we start is special
                     let can_advance_age = can_advance_age && idx == 0;
                     let storage_ = Arc::clone(storage);
@@ -80,6 +84,7 @@ impl BgThreads {
                                 vec![local_exit_, system_exit_],
                                 in_mem_,
                                 can_advance_age,
+                                write_locks,
                             );
                         })
                         .unwrap()
@@ -114,25 +119,36 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndexStorage<
     ///      in mem to act in a way that flushes to disk asap
     ///      also creates some additional bg threads to facilitate flushing to disk asap
     /// startup=false is 'normal' operation
-    pub fn set_startup(&self, startup: Startup) {
+    pub fn set_startup(
+        &self,
+        startup: Startup,
+        write_locks: Option<&WriteLocksForInitialIndexGeneration<T>>,
+    ) {
+
         let value = !matches!(startup, Startup::Normal);
+        use log::*;error!("set startup: {:?}", value);
+        self.storage.set_startup(value);
         if matches!(startup, Startup::StartupWithExtraThreads) {
+            assert!(self._bg_threads.lock().unwrap().is_none());
             // create some additional bg threads to help get things to the disk index asap
             *self.startup_worker_threads.lock().unwrap() = Some(BgThreads::new(
                 &self.storage,
                 &self.in_mem,
-                Self::num_threads(),
-                false, // cannot advance age from any of these threads
+                Self::num_threads() * 2,
+                true,
                 &self.exit,
+                write_locks,
             ));
         }
-        self.storage.set_startup(value);
         if !value {
             // transitioning from startup to !startup (ie. steady state)
             // shutdown the bg threads
             *self.startup_worker_threads.lock().unwrap() = None;
             // maybe shrink hashmaps
-            self.shrink_to_fit();
+            // todo - can't do this self.shrink_to_fit();
+            // start the non-startup bg threads
+            *self._bg_threads.lock().unwrap() =
+                Some(BgThreads::new(&self.storage, &self.in_mem, self.threads, true, &self.exit, None));
         }
     }
 
@@ -167,11 +183,12 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndexStorage<
             .collect::<Vec<_>>();
 
         Self {
-            _bg_threads: BgThreads::new(&storage, &in_mem, threads, true, exit),
+            _bg_threads: Mutex::default(),
             storage,
             in_mem,
             startup_worker_threads: Mutex::default(),
             exit: Arc::clone(exit),
+            threads,
         }
     }
 }

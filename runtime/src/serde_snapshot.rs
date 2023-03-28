@@ -560,7 +560,7 @@ where
             .map(|bank_fields| bank_fields.capitalization),
     );
     let bank_fields = bank_fields.collapse_into();
-    let (accounts_db, reconstructed_accounts_db_info) = reconstruct_accountsdb_from_fields(
+    let accounts_db = reconstruct_accountsdb_from_fields(
         snapshot_accounts_db_fields,
         account_paths,
         storage_and_next_append_vec_id,
@@ -577,7 +577,7 @@ where
         bank_fields.incremental_snapshot_persistence.as_ref(),
     )?;
 
-    let bank_rc = BankRc::new(Accounts::new_empty(accounts_db), bank_fields.slot);
+    let bank_rc = BankRc::new(Accounts::new(accounts_db), bank_fields.slot);
     let runtime_config = Arc::new(runtime_config.clone());
 
     // if limit_load_slot_count_from_snapshot is set, then we need to side-step some correctness checks beneath this call
@@ -590,7 +590,7 @@ where
         debug_keys,
         additional_builtins,
         debug_do_not_add_builtins,
-        reconstructed_accounts_db_info.accounts_data_len,
+        0,
     );
 
     info!("rent_collector: {:?}", bank.rent_collector());
@@ -675,13 +675,13 @@ pub(crate) fn remap_and_reconstruct_single_storage(
     )?;
     Ok(storage)
 }
-
+/*
 /// This struct contains side-info while reconstructing the accounts DB from fields.
 #[derive(Debug, Default, Copy, Clone)]
 struct ReconstructedAccountsDbInfo {
-    accounts_data_len: u64,
+    accounts_data_len2: u64,
 }
-
+*/
 #[allow(clippy::too_many_arguments)]
 fn reconstruct_accountsdb_from_fields<E>(
     snapshot_accounts_db_fields: SnapshotAccountsDbFields<E>,
@@ -698,7 +698,7 @@ fn reconstruct_accountsdb_from_fields<E>(
     epoch_accounts_hash: Option<Hash>,
     capitalizations: (u64, Option<u64>),
     incremental_snapshot_persistence: Option<&BankIncrementalSnapshotPersistence>,
-) -> Result<(AccountsDb, ReconstructedAccountsDbInfo), Error>
+) -> Result<Arc<AccountsDb>, Error>
 where
     E: SerializableStorage + std::marker::Sync,
 {
@@ -854,42 +854,63 @@ where
     let mut measure_notify = Measure::start("accounts_notify");
 
     let accounts_db = Arc::new(accounts_db);
+
+    let rent_collector = RentCollector::new(
+        genesis_config.epoch_schedule.get_epoch(snapshot_slot),
+        genesis_config.epoch_schedule,
+        genesis_config.slots_per_year(),
+        genesis_config.rent,
+    );
+
+    let locks_held = Arc::new(AtomicBool::default());
+    let locks_held_clone = locks_held.clone();
+
     let accounts_db_clone = accounts_db.clone();
-    let handle = Builder::new()
-        .name("solNfyAccRestor".to_string())
+    let _handle_bg_index_generation = Builder::new()
+        .name("solGenIndex".to_string())
         .spawn(move || {
-            accounts_db_clone.notify_account_restore_from_snapshot();
+            let _hold_index_generation_lock =
+                accounts_db_clone.index_generation_complete.write().unwrap();
+            let accounts_db_clone2 = accounts_db_clone.clone();
+            let handle = Builder::new()
+                .name("solNfyAccRestor".to_string())
+                .spawn(move || {
+                    accounts_db_clone2.notify_account_restore_from_snapshot();
+                })
+                .unwrap();
+
+            let epoch_schedule = rent_collector.epoch_schedule;
+
+            let IndexGenerationInfo {
+                accounts_data_len: _,
+                rent_paying_accounts_by_partition,
+            } = accounts_db_clone.generate_index(
+                limit_load_slot_count_from_snapshot,
+                verify_index,
+                rent_collector,
+                locks_held_clone,
+            );
+            accounts_db_clone
+                .accounts_index
+                .rent_paying_accounts_by_partition
+                .set(rent_paying_accounts_by_partition)
+                .unwrap();
+
+            accounts_db_clone.maybe_add_filler_accounts(&epoch_schedule, snapshot_slot);
+
+            handle.join().unwrap();
+            measure_notify.stop();
+
+            datapoint_info!(
+                "reconstruct_accountsdb_from_fields()",
+                ("accountsdb-notify-at-start-us", measure_notify.as_us(), i64),
+            );
         })
         .unwrap();
 
-    let IndexGenerationInfo {
-        accounts_data_len,
-        rent_paying_accounts_by_partition,
-    } = accounts_db.generate_index(
-        limit_load_slot_count_from_snapshot,
-        verify_index,
-        genesis_config,
-    );
-    accounts_db
-        .accounts_index
-        .rent_paying_accounts_by_partition
-        .set(rent_paying_accounts_by_partition)
-        .unwrap();
+    while !locks_held.load(Ordering::Acquire) {}
 
-    accounts_db.maybe_add_filler_accounts(&genesis_config.epoch_schedule, snapshot_slot);
-
-    handle.join().unwrap();
-    measure_notify.stop();
-
-    datapoint_info!(
-        "reconstruct_accountsdb_from_fields()",
-        ("accountsdb-notify-at-start-us", measure_notify.as_us(), i64),
-    );
-
-    Ok((
-        Arc::try_unwrap(accounts_db).unwrap(),
-        ReconstructedAccountsDbInfo { accounts_data_len },
-    ))
+    Ok(accounts_db)
 }
 
 /// populate 'historical_roots' from 'snapshot_historical_roots' and 'snapshot_historical_roots_with_hash'

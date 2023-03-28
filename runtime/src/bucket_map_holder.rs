@@ -2,7 +2,7 @@ use {
     crate::{
         accounts_index::{AccountsIndexConfig, DiskIndexValue, IndexLimitMb, IndexValue},
         bucket_map_holder_stats::BucketMapHolderStats,
-        in_mem_accounts_index::InMemAccountsIndex,
+        in_mem_accounts_index::{WriteLocksForInitialIndexGeneration,InMemAccountsIndex},
         waitable_condvar::WaitableCondvar,
     },
     solana_bucket_map::bucket_map::{BucketMap, BucketMapConfig},
@@ -134,6 +134,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> BucketMapHolder<T, U>
 
     /// return when the bg threads have reached an 'idle' state
     pub(crate) fn wait_for_idle(&self) {
+        use log::*;error!("wait for idle");
         assert!(self.get_startup());
         if self.disk.is_none() {
             return;
@@ -143,12 +144,14 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> BucketMapHolder<T, U>
         //  so we are then 'idle'
         let end_age = self.current_age().wrapping_add(2);
         loop {
+            use log::*;error!("wait for idle loop");
             self.wait_dirty_or_aged
                 .wait_timeout(Duration::from_millis(self.age_interval_ms()));
             if end_age == self.current_age() {
                 break;
             }
         }
+        use log::*;error!("wait for idle done");
     }
 
     pub fn current_age(&self) -> Age {
@@ -333,6 +336,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> BucketMapHolder<T, U>
         exit: Vec<Arc<AtomicBool>>,
         in_mem: Vec<Arc<InMemAccountsIndex<T, U>>>,
         can_advance_age: bool,
+        write_locks:  Option<WriteLocksForInitialIndexGeneration<T>>,
     ) {
         let bins = in_mem.len();
         let flush = self.disk.is_some();
@@ -381,7 +385,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> BucketMapHolder<T, U>
             for _ in 0..bins {
                 if flush {
                     let index = self.next_bucket_to_flush();
-                    in_mem[index].flush(can_advance_age);
+                    in_mem[index].flush(can_advance_age, write_locks.as_ref());
                 }
                 self.stats.report_stats(self);
                 if self.all_buckets_flushed_at_current_age() {

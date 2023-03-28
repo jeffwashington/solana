@@ -43,6 +43,7 @@ use {
             UpsertReclaim, ZeroLamport, ACCOUNTS_INDEX_CONFIG_FOR_BENCHMARKS,
             ACCOUNTS_INDEX_CONFIG_FOR_TESTING,
         },
+        in_mem_accounts_index::WriteLocksForInitialIndexGeneration,
         accounts_index_storage::Startup,
         accounts_update_notifier_interface::AccountsUpdateNotifier,
         active_stats::{ActiveStatItem, ActiveStats},
@@ -84,7 +85,7 @@ use {
         account::{Account, AccountSharedData, ReadableAccount, WritableAccount},
         clock::{BankId, Epoch, Slot},
         epoch_schedule::EpochSchedule,
-        genesis_config::{ClusterType, GenesisConfig},
+        genesis_config::ClusterType,
         hash::Hash,
         pubkey::Pubkey,
         rent::Rent,
@@ -1364,6 +1365,9 @@ type AccountInfoAccountsIndex = AccountsIndex<AccountInfo, AccountInfo>;
 // This structure handles the load/store of the accounts
 #[derive(Debug)]
 pub struct AccountsDb {
+    /// a write lock to this is held open while initial index generation is taking place
+    /// read locks are available once initial index generation is complete
+    pub index_generation_complete: RwLock<()>,
     /// Keeps tracks of index into AppendVec on a per slot basis
     pub accounts_index: AccountInfoAccountsIndex,
 
@@ -2401,6 +2405,7 @@ impl AccountsDb {
         const ACCOUNTS_STACK_SIZE: usize = 8 * 1024 * 1024;
 
         AccountsDb {
+            index_generation_complete: RwLock::default(),
             assert_stakes_cache_consistency: false,
             bank_progress: BankCreationFreezingProgress::default(),
             create_ancient_storage: CreateAncientStorage::Append,
@@ -3157,6 +3162,9 @@ impl AccountsDb {
         is_startup: bool,
         last_full_snapshot_slot: Option<Slot>,
     ) {
+        // possibly wait for initial index generation
+        drop(self.index_generation_complete.read().unwrap());
+
         if self.exhaustively_verify_refcounts {
             self.exhaustively_verify_refcounts(max_clean_root_inclusive);
         }
@@ -8783,11 +8791,12 @@ impl AccountsDb {
         })
     }
 
-    fn generate_index_for_slot(
+    fn generate_index_for_slot<'a>(
         &self,
         accounts_map: GenerateIndexAccountsMap<'_>,
         slot: &Slot,
         rent_collector: &RentCollector,
+        startup_write_locks: &WriteLocksForInitialIndexGeneration<AccountInfo>,
     ) -> SlotIndexGenerationInfo {
         if accounts_map.is_empty() {
             return SlotIndexGenerationInfo::default();
@@ -8841,7 +8850,7 @@ impl AccountsDb {
 
         let (dirty_pubkeys, insert_time_us) = self
             .accounts_index
-            .insert_new_if_missing_into_primary_index(*slot, num_accounts, items);
+            .insert_new_if_missing_into_primary_index(*slot, num_accounts, items, startup_write_locks);
 
         // dirty_pubkeys will contain a pubkey if an item has multiple rooted entries for
         // a given pubkey. If there is just a single item, there is no cleaning to
@@ -8949,7 +8958,8 @@ impl AccountsDb {
         &self,
         limit_load_slot_count_from_snapshot: Option<usize>,
         verify: bool,
-        genesis_config: &GenesisConfig,
+        rent_collector: RentCollector,
+        locks_held: Arc<AtomicBool>,
     ) -> IndexGenerationInfo {
         let mut slots = self.storage.all_slots();
         #[allow(clippy::stable_sort_primitive)]
@@ -8957,18 +8967,15 @@ impl AccountsDb {
         if let Some(limit) = limit_load_slot_count_from_snapshot {
             slots.truncate(limit); // get rid of the newer slots and keep just the older
         }
-        let max_slot = slots.last().cloned().unwrap_or_default();
-        let schedule = genesis_config.epoch_schedule;
-        let rent_collector = RentCollector::new(
-            schedule.get_epoch(max_slot),
-            schedule,
-            genesis_config.slots_per_year(),
-            genesis_config.rent,
-        );
         let accounts_data_len = AtomicU64::new(0);
 
-        let rent_paying_accounts_by_partition =
-            Mutex::new(RentPayingAccountsByPartition::new(&schedule));
+        let rent_paying_accounts_by_partition = Mutex::new(RentPayingAccountsByPartition::new(
+            &rent_collector.epoch_schedule,
+        ));
+
+        let write_locks = self.accounts_index.get_startup_write_locks();
+        locks_held.store(true, Ordering::Release);
+        error!("locks held");
 
         // pass == 0 always runs and generates the index
         // pass == 1 only runs if verify == true.
@@ -8977,7 +8984,7 @@ impl AccountsDb {
         for pass in 0..passes {
             if pass == 0 {
                 self.accounts_index
-                    .set_startup(Startup::StartupWithExtraThreads);
+                    .set_startup(Startup::StartupWithExtraThreads, Some(&write_locks.maps));
             }
             let storage_info = StorageSizeAndCountMap::default();
             let total_processed_slots_across_all_threads = AtomicU64::new(0);
@@ -9033,7 +9040,7 @@ impl AccountsDb {
                                 amount_to_top_off_rent: amount_to_top_off_rent_this_slot,
                                 rent_paying_accounts_by_partition:
                                     rent_paying_accounts_by_partition_this_slot,
-                            } = self.generate_index_for_slot(accounts_map, slot, &rent_collector);
+                            } = self.generate_index_for_slot(accounts_map, slot, &rent_collector, &write_locks.maps);
                             rent_paying.fetch_add(rent_paying_this_slot, Ordering::Relaxed);
                             amount_to_top_off_rent
                                 .fetch_add(amount_to_top_off_rent_this_slot, Ordering::Relaxed);
@@ -9106,16 +9113,17 @@ impl AccountsDb {
             if pass == 0 {
                 // tell accounts index we are done adding the initial accounts at startup
                 let mut m = Measure::start("accounts_index_idle_us");
-                self.accounts_index.set_startup(Startup::Normal);
+                self.accounts_index.set_startup(Startup::Normal, None);
                 m.stop();
                 index_flush_us = m.as_us();
 
+error!("populate_and_retrieve_duplicate_keys_from_startup");
                 populate_duplicate_keys_us = measure_us!({
                     // this has to happen before visit_duplicate_pubkeys_during_startup below
                     // get duplicate keys from acct idx. We have to wait until we've finished flushing.
                     for (slot, key) in self
                         .accounts_index
-                        .populate_and_retrieve_duplicate_keys_from_startup()
+                        .populate_and_retrieve_duplicate_keys_from_startup(&write_locks.maps)
                         .into_iter()
                         .flatten()
                     {
@@ -9129,7 +9137,7 @@ impl AccountsDb {
                     }
                 })
                 .1;
-            }
+            error!("populate_and_retrieve_duplicate_keys_from_startup");            }
 
             let storage_info_timings = storage_info_timings.into_inner().unwrap();
             let mut timings = GenerateIndexTimings {
@@ -9162,11 +9170,14 @@ impl AccountsDb {
                         unique_pubkeys.insert(*pubkey);
                     })
                 });
+                error!("skipping visit_duplicate_pubkeys_during_startup");
                 let accounts_data_len_from_duplicates = unique_pubkeys
                     .into_iter()
                     .collect::<Vec<_>>()
                     .par_chunks(4096)
                     .map(|pubkeys| {
+                        /*
+                        todo
                         let (count, uncleaned_roots_this_group) = self
                             .visit_duplicate_pubkeys_during_startup(
                                 pubkeys,
@@ -9177,7 +9188,8 @@ impl AccountsDb {
                         uncleaned_roots_this_group.into_iter().for_each(|slot| {
                             uncleaned_roots.insert(slot);
                         });
-                        count
+                        count*/
+                        0
                     })
                     .sum();
                 accounts_data_len.fetch_sub(accounts_data_len_from_duplicates, Ordering::Relaxed);
@@ -9188,7 +9200,7 @@ impl AccountsDb {
             }
             accounts_data_len_dedup_timer.stop();
             timings.accounts_data_len_dedup_time_us = accounts_data_len_dedup_timer.as_us();
-
+error!("{}", line!());
             if pass == 0 {
                 let uncleaned_roots = uncleaned_roots.into_inner().unwrap();
                 // Need to add these last, otherwise older updates will be cleaned
@@ -9200,8 +9212,10 @@ impl AccountsDb {
 
                 self.set_storage_count_and_alive_bytes(storage_info, &mut timings);
             }
+            error!("{}", line!());
             timings.report();
         }
+        error!("{}", line!());
 
         self.accounts_index.log_secondary_indexes();
 

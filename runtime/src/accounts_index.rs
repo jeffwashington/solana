@@ -4,7 +4,7 @@ use {
         ancestors::Ancestors,
         bucket_map_holder::{Age, BucketMapHolder},
         contains::Contains,
-        in_mem_accounts_index::{InMemAccountsIndex, InsertNewEntryResults},
+        in_mem_accounts_index::{InMemAccountsIndex, InsertNewEntryResults, WriteLocksForInitialIndexGeneration, WriteLocksForInitialIndexGenerationOuter},
         inline_spl_token::{self, GenericTokenAccount},
         inline_spl_token_2022,
         pubkey_bins::PubkeyBinCalculator24,
@@ -133,7 +133,7 @@ pub trait IsCached {
     fn is_cached(&self) -> bool;
 }
 
-pub trait IndexValue: 'static + IsCached + ZeroLamport + DiskIndexValue {}
+pub trait IndexValue: 'static + IsCached + ZeroLamport + DiskIndexValue + Sync + Send {}
 
 pub trait DiskIndexValue:
     'static + Clone + Debug + PartialEq + Copy + Default + Sync + Send
@@ -256,7 +256,7 @@ impl AccountMapEntryMeta {
 #[derive(Debug, Default)]
 /// one entry in the in-mem accounts index
 /// Represents the value for an account key in the in-memory accounts index
-pub struct AccountMapEntryInner<T> {
+pub struct AccountMapEntryInner<T: IndexValue> {
     /// number of alive slots that contain >= 1 instances of account data for this pubkey
     /// where alive represents a slot that has not yet been removed by clean via AccountsDB::clean_stored_dead_slots() for containing no up to date account information
     ref_count: AtomicU64,
@@ -1345,8 +1345,8 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
         iter.hold_range_in_memory(range, start_holding, thread_pool);
     }
 
-    pub fn set_startup(&self, value: Startup) {
-        self.storage.set_startup(value);
+    pub fn set_startup(&self, value: Startup, write_locks: Option<&WriteLocksForInitialIndexGeneration<T>>) {
+        self.storage.set_startup(value, write_locks);
     }
 
     pub fn get_startup_remaining_items_to_flush_estimate(&self) -> usize {
@@ -1605,6 +1605,21 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
         self.account_maps.len()
     }
 
+    pub(crate) fn get_startup_write_locks<'a>(&'a self) -> WriteLocksForInitialIndexGenerationOuter<'a, T> {
+        let mut maps = Vec::default();
+        let locks =         self.account_maps.iter().map(|bin| {
+ let mut lock =            bin.get_startup_write_lock();
+ let mut map = std::collections::HashMap::default();
+ std::mem::swap(&mut map, &mut*lock);
+ maps.push(RwLock::new(map));
+ lock
+        }).collect();
+        WriteLocksForInitialIndexGenerationOuter {
+            locks,
+            maps: Arc::new(maps),
+        }
+    }
+
     // Same functionally to upsert, but:
     // 1. operates on a batch of items
     // 2. holds the write lock for the duration of adding the items
@@ -1612,11 +1627,12 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
     // But, does NOT update secondary index
     // This is designed to be called at startup time.
     #[allow(clippy::needless_collect)]
-    pub(crate) fn insert_new_if_missing_into_primary_index(
+    pub(crate) fn insert_new_if_missing_into_primary_index<'a>(
         &self,
         slot: Slot,
         item_len: usize,
         items: impl Iterator<Item = (Pubkey, T)>,
+        write_locks: &WriteLocksForInitialIndexGeneration<T>,
     ) -> (Vec<Pubkey>, u64) {
         // big enough so not likely to re-allocate, small enough to not over-allocate by too much
         // this assumes the largest bin contains twice the expected amount of the average size per bin
@@ -1657,7 +1673,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
             let r_account_maps = &self.account_maps[pubkey_bin];
             let mut insert_time = Measure::start("insert_into_primary_index");
             if use_disk {
-                r_account_maps.startup_insert_only(slot, items.into_iter());
+                r_account_maps.startup_insert_only(slot, items.into_iter(), write_locks);
             } else {
                 // not using disk buckets, so just write to in-mem
                 // this is no longer the default case
@@ -1668,7 +1684,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
                         &self.storage.storage,
                         use_disk,
                     );
-                    match r_account_maps.insert_new_entry_if_missing_with_lock(pubkey, new_entry) {
+                    match r_account_maps.insert_new_entry_if_missing_with_lock(pubkey, new_entry, &write_locks[pubkey_bin]) {
                         InsertNewEntryResults::DidNotExist => {}
                         InsertNewEntryResults::ExistedNewEntryZeroLamports => {}
                         InsertNewEntryResults::ExistedNewEntryNonZeroLamports => {
@@ -1685,14 +1701,15 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
     }
 
     /// return Vec<Vec<>> because the internal vecs are already allocated per bin
-    pub(crate) fn populate_and_retrieve_duplicate_keys_from_startup(
+    pub(crate) fn populate_and_retrieve_duplicate_keys_from_startup<'a>(
         &self,
+        write_locks: &WriteLocksForInitialIndexGeneration<T>,
     ) -> Vec<Vec<(Slot, Pubkey)>> {
         (0..self.bins())
             .into_par_iter()
             .map(|pubkey_bin| {
                 let r_account_maps = &self.account_maps[pubkey_bin];
-                r_account_maps.populate_and_retrieve_duplicate_keys_from_startup()
+                r_account_maps.populate_and_retrieve_duplicate_keys_from_startup(&write_locks[pubkey_bin])
             })
             .collect()
     }
