@@ -37,6 +37,8 @@ pub struct WriteLocksForInitialIndexGenerationOuter<'a, T: IndexValue> {
 
 impl<'a, T: IndexValue> Drop for WriteLocksForInitialIndexGenerationOuter<'a, T> {
     fn drop(&mut self) {
+        use log::*;error!("dropping WriteLocksForInitialIndexGenerationOuter {}", line!());
+
         self.locks.iter_mut().zip(Arc::try_unwrap(std::mem::take(&mut self.maps)).unwrap().drain(..)).for_each(|(lock, map)| {
             **lock = map.into_inner().unwrap();
         });
@@ -302,7 +304,9 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
         let mut found = true;
         let mut m = Measure::start("get");
         let result = {
+            use log::*;error!("{}, bin: {}", self.bin, line!());
             let map = self.map_internal.read().unwrap();
+            error!("{}", line!());
             let result = map.get(pubkey);
             m.stop();
 

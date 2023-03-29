@@ -1965,7 +1965,9 @@ impl Bank {
             fee_structure: FeeStructure::default(),
             loaded_programs_cache: Arc::<RwLock<LoadedPrograms>>::default(),
         };
-        bank.bank_created();
+        error!("{}", line!());
+                bank.bank_created();
+        error!("{}", line!());        
 
         bank.finish_init(
             genesis_config,
@@ -1973,6 +1975,7 @@ impl Bank {
             debug_do_not_add_builtins,
         );
         bank.fill_missing_sysvar_cache_entries();
+        error!("{}", line!());
 
         // Sanity assertions between bank snapshot and genesis config
         // Consider removing from serializable bank state
@@ -2008,6 +2011,7 @@ impl Bank {
                 bank.fee_calculator
             );
         }
+        error!("{}", line!());
 
         datapoint_info!(
             "bank-new-from-fields",
@@ -2027,6 +2031,7 @@ impl Bank {
                 i64
             ),
         );
+        error!("{}", line!());
         bank
     }
 
@@ -3352,6 +3357,7 @@ impl Bank {
         );
 
         // Add additional builtin programs specified in the genesis config
+        error!("{}", line!());
         for (name, program_id) in &genesis_config.native_instruction_processors {
             self.add_builtin_account(name, program_id, false);
         }
@@ -3371,22 +3377,26 @@ impl Bank {
     // NOTE: must hold idempotent for the same set of arguments
     /// Add a builtin program account
     pub fn add_builtin_account(&self, name: &str, program_id: &Pubkey, must_replace: bool) {
-        let existing_genuine_program =
+        error!("{}", line!());
+                let existing_genuine_program =
             self.get_account_with_fixed_root(program_id)
                 .and_then(|account| {
                     // it's very unlikely to be squatted at program_id as non-system account because of burden to
                     // find victim's pubkey/hash. So, when account.owner is indeed native_loader's, it's
                     // safe to assume it's a genuine program.
                     if native_loader::check_id(account.owner()) {
+                        error!("{}", line!());
                         Some(account)
                     } else {
                         // malicious account is pre-occupying at program_id
+                        error!("{}", line!());
                         self.burn_and_purge_account(program_id, account);
                         None
                     }
                 });
 
-        if must_replace {
+                error!("{}", line!());
+                if must_replace {
             // updating builtin program
             match &existing_genuine_program {
                 None => panic!(
@@ -3406,6 +3416,7 @@ impl Bank {
                 return;
             }
         }
+        error!("{}", line!());
 
         assert!(
             !self.freeze_started(),
@@ -6620,6 +6631,7 @@ impl Bank {
         additional_builtins: Option<&Builtins>,
         debug_do_not_add_builtins: bool,
     ) {
+        error!("{}", line!());
         self.rewards_pool_pubkeys =
             Arc::new(genesis_config.rewards_pools.keys().cloned().collect());
 
@@ -6632,7 +6644,9 @@ impl Bank {
                 .feature_transitions
                 .extend_from_slice(&additional_builtins.feature_transitions);
         }
+        error!("{}, debug_do_not_add_builtins: {debug_do_not_add_builtins}", line!());
         if !debug_do_not_add_builtins {
+            error!("{}", line!());
             for builtin in builtins.genesis_builtins {
                 self.add_builtin(
                     &builtin.name,
@@ -6646,12 +6660,15 @@ impl Bank {
                 }
             }
         }
+        error!("{}", line!());
         self.builtin_feature_transitions = Arc::new(builtins.feature_transitions);
 
+        error!("{}", line!());
         self.apply_feature_activations(
             ApplyFeatureActivationsCaller::FinishInit,
             debug_do_not_add_builtins,
         );
+        error!("{}", line!());
 
         if self
             .feature_set
@@ -7657,6 +7674,7 @@ impl Bank {
         program_id: &Pubkey,
         process_instruction: ProcessInstructionWithContext,
     ) {
+        error!("{}", line!());
         debug!("Adding program {} under {:?}", name, program_id);
         self.add_builtin_account(name, program_id, false);
         if let Some(entry) = self
@@ -7806,13 +7824,16 @@ impl Bank {
             NewFromParent => true,
             WarpFromParent => false,
         };
+        error!("{}", line!());
         let new_feature_activations = self.compute_active_feature_set(allow_new_activations);
+        error!("{}", line!());
 
         if new_feature_activations.contains(&feature_set::pico_inflation::id()) {
             *self.inflation.write().unwrap() = Inflation::pico();
             self.fee_rate_governor.burn_percent = 50; // 50% fee burn
             self.rent_collector.rent.burn_percent = 50; // 50% rent burn
         }
+        error!("{}", line!());
 
         if !new_feature_activations.is_disjoint(&self.feature_set.full_inflation_features_enabled())
         {
@@ -7820,6 +7841,7 @@ impl Bank {
             self.fee_rate_governor.burn_percent = 50; // 50% fee burn
             self.rent_collector.rent.burn_percent = 50; // 50% rent burn
         }
+        error!("{}", line!());
 
         if new_feature_activations.contains(&feature_set::spl_token_v3_4_0::id()) {
             self.replace_program_account(
@@ -7828,6 +7850,7 @@ impl Bank {
                 "bank-apply_spl_token_v3_4_0",
             );
         }
+        error!("{}", line!());
 
         if new_feature_activations.contains(&feature_set::spl_associated_token_account_v1_1_0::id())
         {
@@ -7837,6 +7860,7 @@ impl Bank {
                 "bank-apply_spl_associated_token_account_v1_1_0",
             );
         }
+        error!("{}", line!());
 
         if !debug_do_not_add_builtins {
             self.apply_builtin_program_feature_transitions(
@@ -7845,15 +7869,18 @@ impl Bank {
             );
             self.reconfigure_token2_native_mint();
         }
+        error!("{}", line!());
 
         if new_feature_activations.contains(&feature_set::cap_accounts_data_len::id()) {
             const ACCOUNTS_DATA_LEN: u64 = 50_000_000_000;
             self.accounts_data_size_initial = ACCOUNTS_DATA_LEN;
         }
+        error!("{}", line!());
 
         if new_feature_activations.contains(&feature_set::update_hashes_per_tick::id()) {
             self.apply_updated_hashes_per_tick(DEFAULT_HASHES_PER_TICK);
         }
+        error!("{}", line!());
     }
 
     fn apply_updated_hashes_per_tick(&mut self, hashes_per_tick: u64) {
@@ -7921,6 +7948,7 @@ impl Bank {
         only_apply_transitions_for_new_features: bool,
         new_feature_activations: &HashSet<Pubkey>,
     ) {
+        error!("{}", line!());
         let feature_set = self.feature_set.clone();
         let should_apply_action_for_feature_transition = |feature_id: &Pubkey| -> bool {
             if only_apply_transitions_for_new_features {

@@ -2550,7 +2550,7 @@ fn rebuild_bank_from_unarchived_snapshots(
             }?,
         )
     })?;
-
+    error!("{}", line!());
     // The status cache is rebuilt from the latest snapshot.  So, if there's an incremental
     // snapshot, use that.  Otherwise use the full snapshot.
     let status_cache_path = incremental_snapshot_unpacked_snapshots_dir_and_version
@@ -2625,7 +2625,7 @@ fn rebuild_bank_from_snapshot(
             stakes,
         )?)
     })?;
-
+    error!("{}", line!());
     let status_cache_path = bank_snapshot
         .snapshot_dir
         .join(SNAPSHOT_STATUS_CACHE_FILENAME);

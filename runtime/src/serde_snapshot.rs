@@ -582,9 +582,9 @@ where
 
     let bank_rc = BankRc::new(Accounts::new(accounts_db), bank_fields.slot);
     let runtime_config = Arc::new(runtime_config.clone());
-
+    error!("{}", line!());
     // if limit_load_slot_count_from_snapshot is set, then we need to side-step some correctness checks beneath this call
-    let debug_do_not_add_builtins = limit_load_slot_count_from_snapshot.is_some();
+    let debug_do_not_add_builtins = limit_load_slot_count_from_snapshot.is_some() || true;
     let bank = Bank::new_from_fields(
         bank_rc,
         genesis_config,
@@ -596,7 +596,7 @@ where
         0,
         stakes,
     );
-
+    error!("{}", line!());
     info!("rent_collector: {:?}", bank.rent_collector());
 
     Ok(bank)
@@ -913,7 +913,7 @@ where
         .unwrap();
 
     while !locks_held.load(Ordering::Acquire) {}
-
+    error!("{}, generate in index started in bg", line!());
     Ok(accounts_db)
 }
 

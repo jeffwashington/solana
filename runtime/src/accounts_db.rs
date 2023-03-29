@@ -5053,9 +5053,11 @@ impl AccountsDb {
             AccountIndexGetResult::Found(lock, index) => (lock, index),
             // we bail out pretty early for missing.
             AccountIndexGetResult::NotFound => {
+                error!("{}", line!());
                 return None;
             }
         };
+        error!("{}", line!());
 
         let slot_list = lock.slot_list();
         let (slot, info) = slot_list[index];
