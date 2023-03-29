@@ -838,7 +838,7 @@ impl PartialEq for Bank {
             rent_collector,
             epoch_schedule,
             inflation,
-            stakes_cache,
+            stakes_cache2,
             epoch_stakes,
             is_delta,
             // TODO: Confirm if all these fields are intentionally ignored!
@@ -896,7 +896,7 @@ impl PartialEq for Bank {
             && rent_collector == &other.rent_collector
             && epoch_schedule == &other.epoch_schedule
             && *inflation.read().unwrap() == *other.inflation.read().unwrap()
-            && *stakes_cache.stakes() == *other.stakes_cache.stakes()
+            && *stakes_cache2.stakes() == *other.stakes_cache2.stakes()
             && epoch_stakes == &other.epoch_stakes
             && is_delta.load(Relaxed) == other.is_delta.load(Relaxed)
     }
@@ -1056,7 +1056,7 @@ pub struct Bank {
     inflation: Arc<RwLock<Inflation>>,
 
     /// cache of vote_account and stake_account state for this fork
-    stakes_cache: StakesCache,
+    pub stakes_cache2: StakesCache,
 
     /// staked nodes on epoch boundaries, saved off when a bank.slot() is at
     ///   a leader schedule calculation boundary
@@ -1315,7 +1315,7 @@ impl Bank {
             rent_collector: RentCollector::default(),
             epoch_schedule: EpochSchedule::default(),
             inflation: Arc::<RwLock<Inflation>>::default(),
-            stakes_cache: StakesCache::default(),
+            stakes_cache2: StakesCache::default(),
             epoch_stakes: HashMap::<Epoch, EpochStakes>::default(),
             is_delta: AtomicBool::default(),
             builtin_programs: BuiltinPrograms::default(),
@@ -1427,7 +1427,9 @@ impl Bank {
         // genesis needs stakes for all epochs up to the epoch implied by
         //  slot = 0 and genesis configuration
         {
-            let stakes = bank.stakes_cache.stakes().clone();
+            use log::*;
+            error!("{}", line!());
+            let stakes = bank.stakes_cache2.stakes().clone();
             let stakes = Arc::new(StakesEnum::from(stakes));
             for epoch in 0..=bank.get_leader_schedule_epoch(bank.slot) {
                 bank.epoch_stakes
@@ -1527,8 +1529,9 @@ impl Bank {
         let (blockhash_queue, blockhash_queue_time_us) =
             measure_us!(RwLock::new(parent.blockhash_queue.read().unwrap().clone()));
 
-        let (stakes_cache, stakes_cache_time_us) =
-            measure_us!(StakesCache::new(parent.stakes_cache.stakes().clone()));
+        use log::*;error!("{}", line!());
+        let (stakes_cache2, stakes_cache_time_us) =
+            measure_us!(StakesCache::new(parent.stakes_cache2.stakes().clone()));
 
         let (epoch_stakes, epoch_stakes_time_us) = measure_us!(parent.epoch_stakes.clone());
 
@@ -1590,7 +1593,7 @@ impl Bank {
             transaction_entries_count: AtomicU64::new(0),
             transactions_per_entry_max: AtomicU64::new(0),
             // we will .clone_with_epoch() this soon after stake data update; so just .clone() for now
-            stakes_cache,
+            stakes_cache2,
             epoch_stakes,
             parent_hash: parent.hash(),
             parent_slot: parent.slot(),
@@ -1670,8 +1673,9 @@ impl Bank {
                 // Add new entry to stakes.stake_history, set appropriate epoch and
                 // update vote accounts with warmed up stakes before saving a
                 // snapshot of stakes in epoch stakes
+                use log::*;error!("{}", line!());
                 let (_, activate_epoch_time) = measure!(
-                    new.stakes_cache.activate_epoch(epoch, &thread_pool),
+                    new.stakes_cache2.activate_epoch(epoch, &thread_pool),
                     "activate_epoch",
                 );
 
@@ -1871,6 +1875,7 @@ impl Bank {
         additional_builtins: Option<&Builtins>,
         debug_do_not_add_builtins: bool,
         accounts_data_size_initial: u64,
+        stakes: crate::stakes::StakesCache,
     ) -> Self {
         let now = Instant::now();
         let ancestors = Ancestors::from(&fields.ancestors);
@@ -1880,6 +1885,7 @@ impl Bank {
         // from Stakes<Delegation> by reading the full account state from
         // accounts-db. Note that it is crucial that these accounts are loaded
         // at the right slot and match precisely with serialized Delegations.
+        /*
         let stakes = Stakes::new(&fields.stakes, |pubkey| {
             let r  = bank_rc.accounts.load_with_fixed_root(&ancestors, pubkey);
             let (account, _slot) = r?;
@@ -1889,6 +1895,7 @@ impl Bank {
             "Stakes cache is inconsistent with accounts-db. This can indicate \
             a corrupted snapshot or bugs in cached accounts or accounts-db.",
         );
+        */
         let stakes_accounts_load_duration = now.elapsed();
         fn new<T: Default>() -> T {
             T::default()
@@ -1932,7 +1939,7 @@ impl Bank {
             rent_collector: Self::get_rent_collector_from(&fields.rent_collector, fields.epoch),
             epoch_schedule: fields.epoch_schedule,
             inflation: Arc::new(RwLock::new(fields.inflation)),
-            stakes_cache: StakesCache::new(stakes),
+            stakes_cache2: stakes,
             epoch_stakes: fields.epoch_stakes,
             is_delta: AtomicBool::new(fields.is_delta),
             builtin_programs: new(),
@@ -2056,7 +2063,7 @@ impl Bank {
             rent_collector: self.rent_collector.clone(),
             epoch_schedule: self.epoch_schedule,
             inflation: *self.inflation.read().unwrap(),
-            stakes: &self.stakes_cache,
+            stakes: &self.stakes_cache2,
             epoch_stakes: &self.epoch_stakes,
             is_delta: self.is_delta.load(Relaxed),
             accounts_data_len: self.load_accounts_data_size(),
@@ -2277,7 +2284,8 @@ impl Bank {
             self.epoch_stakes.retain(|&epoch, _| {
                 epoch >= leader_schedule_epoch.saturating_sub(MAX_LEADER_SCHEDULE_STAKES)
             });
-            let stakes = self.stakes_cache.stakes().clone();
+            use log::*;error!("{}", line!());
+            let stakes = self.stakes_cache2.stakes().clone();
             let stakes = Arc::new(StakesEnum::from(stakes));
             let new_epoch_stakes = EpochStakes::new(stakes, leader_schedule_epoch);
             info!(
@@ -2289,8 +2297,9 @@ impl Bank {
             // It is expensive to log the details of epoch stakes. Only log them at "trace"
             // level for debugging purpose.
             if log::log_enabled!(log::Level::Trace) {
+                use log::*;error!("{}", line!());
                 let vote_stakes: HashMap<_, _> = self
-                    .stakes_cache
+                    .stakes_cache2
                     .stakes()
                     .vote_accounts()
                     .delegated_stakes()
@@ -2341,9 +2350,10 @@ impl Bank {
             return;
         }
         // if I'm the first Bank in an epoch, ensure stake_history is updated
+        use log::*;error!("{}", line!());
         self.update_sysvar_account(&sysvar::stake_history::id(), |account| {
             create_account::<sysvar::stake_history::StakeHistory>(
-                self.stakes_cache.stakes().history(),
+                self.stakes_cache2.stakes().history(),
                 self.inherit_specially_retained_account_fields(account),
             )
         });
@@ -2437,7 +2447,8 @@ impl Bank {
             foundation_rate,
         } = self.calculate_previous_epoch_inflation_rewards(capitalization, prev_epoch);
 
-        let old_vote_balance_and_staked = self.stakes_cache.stakes().vote_balance_and_staked();
+        use log::*;error!("{}", line!());
+        let old_vote_balance_and_staked = self.stakes_cache2.stakes().vote_balance_and_staked();
         let update_rewards_from_cached_accounts = self
             .feature_set
             .is_active(&feature_set::update_rewards_from_cached_accounts::id());
@@ -2452,7 +2463,8 @@ impl Bank {
             update_rewards_from_cached_accounts,
         );
 
-        let new_vote_balance_and_staked = self.stakes_cache.stakes().vote_balance_and_staked();
+        use log::*;error!("{}", line!());
+        let new_vote_balance_and_staked = self.stakes_cache2.stakes().vote_balance_and_staked();
         let validator_rewards_paid = new_vote_balance_and_staked - old_vote_balance_and_staked;
         assert_eq!(
             validator_rewards_paid,
@@ -2479,8 +2491,9 @@ impl Bank {
             "distributed inflation: {} (rounded from: {})",
             validator_rewards_paid, validator_rewards
         );
+        use log::*;error!("{}", line!());
         let (num_stake_accounts, num_vote_accounts) = {
-            let stakes = self.stakes_cache.stakes();
+            let stakes = self.stakes_cache2.stakes();
             (
                 stakes.stake_delegations().len(),
                 stakes.vote_accounts().len(),
@@ -2489,8 +2502,9 @@ impl Bank {
         self.capitalization
             .fetch_add(validator_rewards_paid, Relaxed);
 
+        use log::*;error!("{}", line!());
         let active_stake = if let Some(stake_history_entry) =
-            self.stakes_cache.stakes().history().get(prev_epoch)
+            self.stakes_cache2.stakes().history().get(prev_epoch)
         {
             stake_history_entry.effective
         } else {
@@ -2523,7 +2537,8 @@ impl Bank {
         thread_pool: &ThreadPool,
         reward_calc_tracer: Option<impl Fn(&RewardCalculationEvent) + Send + Sync>,
     ) -> LoadVoteAndStakeAccountsResult {
-        let stakes = self.stakes_cache.stakes();
+        use log::*;error!("{}", line!());
+        let stakes = self.stakes_cache2.stakes();
         let cached_vote_accounts = stakes.vote_accounts();
         let vote_with_stake_delegations_map = DashMap::with_capacity(cached_vote_accounts.len());
         let invalid_stake_keys: DashMap<Pubkey, InvalidCacheEntryReason> = DashMap::new();
@@ -2718,7 +2733,8 @@ impl Bank {
     where
         F: Fn(&RewardCalculationEvent) + Send + Sync,
     {
-        let stakes = self.stakes_cache.stakes();
+        use log::*;error!("{}", line!());
+        let stakes = self.stakes_cache2.stakes();
         let stake_delegations = self.filter_stake_delegations(&stakes);
 
         // Obtain all unique voter pubkeys from stake delegations.
@@ -2842,7 +2858,8 @@ impl Bank {
         metrics: &mut RewardsMetrics,
         update_rewards_from_cached_accounts: bool,
     ) {
-        let stake_history = self.stakes_cache.stakes().history().clone();
+        use log::*;error!("{}", line!());
+        let stake_history = self.stakes_cache2.stakes().history().clone();
         let vote_with_stake_delegations_map = {
             let mut m = Measure::start("load_vote_and_stake_accounts_us");
             let LoadVoteAndStakeAccountsResult {
@@ -2870,7 +2887,8 @@ impl Bank {
             metrics.invalid_cached_stake_accounts_rent_epoch +=
                 invalid_cached_stake_accounts_rent_epoch;
             metrics.vote_accounts_cache_miss_count += vote_accounts_cache_miss_count;
-            self.stakes_cache.handle_invalid_keys(
+            use log::*;error!("{}", line!());
+            self.stakes_cache2.handle_invalid_keys(
                 invalid_stake_keys,
                 invalid_vote_keys,
                 self.slot(),
@@ -3303,8 +3321,9 @@ impl Bank {
         }
 
         // highest staked node is the first collector
+        use log::*;error!("{}", line!());
         self.collector_id = self
-            .stakes_cache
+            .stakes_cache2
             .stakes()
             .highest_staked_node()
             .unwrap_or_default();
@@ -5389,7 +5408,8 @@ impl Bank {
 
     /// Get stake and stake node accounts
     pub(crate) fn get_stake_accounts(&self, minimized_account_set: &DashSet<Pubkey>) {
-        self.stakes_cache
+        use log::*;error!("{}", line!());
+        self.stakes_cache2
             .stakes()
             .stake_delegations()
             .iter()
@@ -5397,7 +5417,7 @@ impl Bank {
                 minimized_account_set.insert(*pubkey);
             });
 
-        self.stakes_cache
+        self.stakes_cache2
             .stakes()
             .staked_nodes()
             .par_iter()
@@ -6462,7 +6482,8 @@ impl Bank {
         assert!(!self.freeze_started());
         let mut m = Measure::start("stakes_cache.check_and_store");
         (0..accounts.len()).for_each(|i| {
-            self.stakes_cache
+            use log::*;error!("{}", line!());
+            self.stakes_cache2
                 .check_and_store(accounts.pubkey(i), accounts.account(i))
         });
         self.rc.accounts.store_accounts_cached(accounts);
@@ -7514,26 +7535,30 @@ impl Bank {
                 for (_i, (pubkey, account)) in
                     (0..message.account_keys().len()).zip(loaded_transaction.accounts.iter())
                 {
-                    self.stakes_cache.check_and_store(pubkey, account);
+                    use log::*;error!("{}", line!());
+                    self.stakes_cache2.check_and_store(pubkey, account);
                 }
             }
         }
     }
 
     pub fn staked_nodes(&self) -> Arc<HashMap<Pubkey, u64>> {
-        self.stakes_cache.stakes().staked_nodes()
+        use log::*;error!("{}", line!());
+        self.stakes_cache2.stakes().staked_nodes()
     }
 
     /// current vote accounts for this bank along with the stake
     ///   attributed to each account
     pub fn vote_accounts(&self) -> Arc<VoteAccountsHashMap> {
-        let stakes = self.stakes_cache.stakes();
+        use log::*;error!("{}", line!());
+        let stakes = self.stakes_cache2.stakes();
         Arc::from(stakes.vote_accounts())
     }
 
     /// Vote account for the given vote account pubkey.
     pub fn get_vote_account(&self, vote_account: &Pubkey) -> Option<VoteAccount> {
-        let stakes = self.stakes_cache.stakes();
+        use log::*;error!("{}", line!());
+        let stakes = self.stakes_cache2.stakes();
         let vote_account = stakes.vote_accounts().get(vote_account)?;
         Some(vote_account.clone())
     }

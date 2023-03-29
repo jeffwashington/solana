@@ -53,7 +53,7 @@ pub enum InvalidCacheEntryReason {
 type StakeAccount = stake_account::StakeAccount<Delegation>;
 
 #[derive(Default, Debug, AbiExample)]
-pub(crate) struct StakesCache(RwLock<Stakes<StakeAccount>>);
+pub struct StakesCache(pub RwLock<Stakes<StakeAccount>>);
 
 impl StakesCache {
     pub(crate) fn new(stakes: Stakes<StakeAccount>) -> Self {

@@ -339,6 +339,7 @@ pub(crate) fn bank_from_streams<R>(
     accounts_db_config: Option<AccountsDbConfig>,
     accounts_update_notifier: Option<AccountsUpdateNotifier>,
     exit: &Arc<AtomicBool>,
+    stakes: crate::stakes::StakesCache,
 ) -> std::result::Result<Bank, Error>
 where
     R: Read,
@@ -360,6 +361,7 @@ where
         accounts_db_config,
         accounts_update_notifier,
         exit,
+        stakes,
     )
 }
 
@@ -548,6 +550,7 @@ fn reconstruct_bank_from_fields<E>(
     accounts_db_config: Option<AccountsDbConfig>,
     accounts_update_notifier: Option<AccountsUpdateNotifier>,
     exit: &Arc<AtomicBool>,
+    stakes: crate::stakes::StakesCache,
 ) -> Result<Bank, Error>
 where
     E: SerializableStorage + std::marker::Sync,
@@ -591,6 +594,7 @@ where
         additional_builtins,
         debug_do_not_add_builtins,
         0,
+        stakes,
     );
 
     info!("rent_collector: {:?}", bank.rent_collector());

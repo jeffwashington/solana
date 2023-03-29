@@ -637,6 +637,11 @@ impl Validator {
             Some(poh_timing_point_sender.clone()),
         )?;
 
+        use log::*;error!("locking stakes cache");
+        let forks = bank_forks.read().unwrap();
+        let root_bank = forks.root_bank();
+        let mut locked_stakes_cache = root_bank.stakes_cache2.0.write().unwrap();
+
         node.info.set_wallclock(timestamp());
         node.info.set_shred_version(compute_shred_version(
             &genesis_config.hash(),
@@ -1164,6 +1169,11 @@ impl Validator {
             ("id", id.to_string(), String),
             ("version", solana_version::version!(), String)
         );
+
+        use log::*;error!("dropping locked stakes cache");
+        drop(locked_stakes_cache);
+        drop(root_bank);
+        drop(forks);
 
         *start_progress.write().unwrap() = ValidatorStartProgress::Running;
         Ok(Self {

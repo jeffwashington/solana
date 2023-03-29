@@ -119,6 +119,8 @@ pub fn load_bank_forks(
         false
     };
 
+    let stakes = solana_runtime::stakes::StakesCache::default();
+
     let (bank_forks, starting_snapshot_hashes) = if snapshot_present {
         bank_forks_from_snapshot(
             genesis_config,
@@ -128,6 +130,7 @@ pub fn load_bank_forks(
             process_options,
             accounts_update_notifier,
             exit,
+            stakes,
         )
     } else {
         let maybe_filler_accounts = process_options
@@ -192,6 +195,7 @@ fn bank_forks_from_snapshot(
     process_options: &ProcessOptions,
     accounts_update_notifier: Option<AccountsUpdateNotifier>,
     exit: &Arc<AtomicBool>,
+    stakes: solana_runtime::stakes::StakesCache,
 ) -> (Arc<RwLock<BankForks>>, Option<StartingSnapshotHashes>) {
     // Fail hard here if snapshot fails to load, don't silently continue
     if account_paths.is_empty() {
@@ -220,6 +224,7 @@ fn bank_forks_from_snapshot(
             process_options.accounts_db_config.clone(),
             accounts_update_notifier,
             exit,
+            stakes,
         )
         .expect("Load from snapshot failed");
 

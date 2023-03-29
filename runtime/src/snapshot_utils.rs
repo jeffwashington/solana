@@ -1439,6 +1439,7 @@ pub fn bank_from_snapshot_archives(
     accounts_db_config: Option<AccountsDbConfig>,
     accounts_update_notifier: Option<AccountsUpdateNotifier>,
     exit: &Arc<AtomicBool>,
+    stakes: crate::stakes::StakesCache,
 ) -> Result<(Bank, BankFromArchiveTimings)> {
     let (unarchived_full_snapshot, mut unarchived_incremental_snapshot, next_append_vec_id) =
         verify_and_unarchive_snapshots(
@@ -1481,6 +1482,7 @@ pub fn bank_from_snapshot_archives(
         accounts_db_config,
         accounts_update_notifier,
         exit,
+        stakes,
     )?;
     measure_rebuild.stop();
     info!("{}", measure_rebuild);
@@ -1558,6 +1560,7 @@ pub fn bank_from_latest_snapshot_archives(
     accounts_db_config: Option<AccountsDbConfig>,
     accounts_update_notifier: Option<AccountsUpdateNotifier>,
     exit: &Arc<AtomicBool>,
+    stakes: crate::stakes::StakesCache,
 ) -> Result<(
     Bank,
     FullSnapshotArchiveInfo,
@@ -1602,6 +1605,7 @@ pub fn bank_from_latest_snapshot_archives(
         accounts_db_config,
         accounts_update_notifier,
         exit,
+        stakes,
     )?;
 
     datapoint_info!(
@@ -1651,6 +1655,7 @@ pub fn bank_from_snapshot_dir(
     accounts_db_config: Option<AccountsDbConfig>,
     accounts_update_notifier: Option<AccountsUpdateNotifier>,
     exit: &Arc<AtomicBool>,
+    stakes: crate::stakes::StakesCache,
 ) -> Result<(Bank, BankFromArchiveTimings)> {
     let next_append_vec_id = Arc::new(AtomicAppendVecId::new(0));
 
@@ -1682,6 +1687,7 @@ pub fn bank_from_snapshot_dir(
         accounts_db_config,
         accounts_update_notifier,
         exit,
+        stakes,
     )?;
     measure_rebuild.stop();
     info!("{}", measure_rebuild);
@@ -2489,6 +2495,7 @@ fn rebuild_bank_from_unarchived_snapshots(
     accounts_db_config: Option<AccountsDbConfig>,
     accounts_update_notifier: Option<AccountsUpdateNotifier>,
     exit: &Arc<AtomicBool>,
+    stakes: crate::stakes::StakesCache,
 ) -> Result<Bank> {
     let (full_snapshot_version, full_snapshot_root_paths) =
         verify_unpacked_snapshots_dir_and_version(
@@ -2538,6 +2545,7 @@ fn rebuild_bank_from_unarchived_snapshots(
                     accounts_db_config,
                     accounts_update_notifier,
                     exit,
+                    stakes,
                 ),
             }?,
         )
@@ -2585,6 +2593,7 @@ fn rebuild_bank_from_snapshot(
     accounts_db_config: Option<AccountsDbConfig>,
     accounts_update_notifier: Option<AccountsUpdateNotifier>,
     exit: &Arc<AtomicBool>,
+    stakes: crate::stakes::StakesCache,
 ) -> Result<Bank> {
     info!(
         "Rebuilding bank from snapshot {}",
@@ -2613,6 +2622,7 @@ fn rebuild_bank_from_snapshot(
             accounts_db_config,
             accounts_update_notifier,
             exit,
+            stakes,
         )?)
     })?;
 
