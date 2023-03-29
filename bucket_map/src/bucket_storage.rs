@@ -51,11 +51,19 @@ pub trait BucketOccupied {
     /// initialize this struct
     /// `num_elements` is the number of elements allocated in the bucket
     fn new(num_elements: usize) -> Self;
+    fn growing_index_element(
+        &mut self,
+        element_new: &mut [u8],
+        ix_new: usize,
+        other: &Self,
+        element_old: &[u8],
+        ix_old: usize,
+    );
 }
 
 pub struct BucketStorage<O: BucketOccupied> {
     path: PathBuf,
-    mmap: MmapMut,
+    pub(crate) mmap: MmapMut,
     pub cell_size: u64,
     pub capacity_pow2: u8,
     pub count: Arc<AtomicU64>,
@@ -225,7 +233,7 @@ impl<O: BucketOccupied> BucketStorage<O> {
     }
 
     #[allow(clippy::mut_from_ref)]
-    pub fn get_mut_cell_slice<T: Sized>(&self, ix: u64, len: u64) -> &mut [T] {
+    pub fn get_mut_cell_slice<T: Sized>(&mut self, ix: u64, len: u64) -> &mut [T] {
         let start = self.get_start_offset_no_header(ix);
         let end = start + std::mem::size_of::<T>() * len as usize;
         //debug!("GET mut slice {} {}", start, end);
@@ -305,8 +313,14 @@ impl<O: BucketOccupied> BucketStorage<O> {
                     // copying from old to new. If 'occupied' bit is stored outside the data, then
                     // occupied has to be set on the new entry in the new bucket.
                     let start = self.get_start_offset_with_header((i * index_grow) as u64);
-                    self.contents
-                        .occupy(&mut self.mmap[start..], i * index_grow);
+                    let start_old = old_bucket.get_start_offset_with_header(i as u64);
+                    self.contents.growing_index_element(
+                        &mut self.mmap[start..],
+                        i * index_grow,
+                        &old_bucket.contents,
+                        &old_bucket.mmap[start_old..],
+                        i,
+                    );
                 }
                 let old_ix = i * old_bucket.cell_size as usize;
                 let new_ix = old_ix * index_grow;
@@ -425,6 +439,16 @@ mod test {
         /// initialize this struct
         fn new(_num_elements: usize) -> Self {
             Self {}
+        }
+        fn growing_index_element(
+            &mut self,
+            _element_new: &mut [u8],
+            _ix_new: usize,
+            _other: &Self,
+            _element_old: &[u8],
+            _ix_old: usize,
+        ) {
+            unimplemented!();
         }
     }
 

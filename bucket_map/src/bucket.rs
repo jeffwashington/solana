@@ -157,7 +157,7 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
                 let val = ix.read_value(&self.index, &self.data);
                 result.push(BucketItem {
                     pubkey: *key,
-                    ref_count: ix.ref_count(&self.index),
+                    ref_count: ix.ref_count(&self.index, &self.data),
                     slot_list: val.map(|(v, _ref_count)| v.to_vec()).unwrap_or_default(),
                 });
             }
@@ -295,9 +295,8 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
             elem_allocate.init(&mut self.index, key);
             elem_allocate
         };
-        elem.set_ref_count(&mut self.index, ref_count);
         let num_slots = data_len as u64;
-        let use_data_storage = num_slots > 1;
+        let use_data_storage = num_slots > 1 || ref_count != 1;
 
         if !use_data_storage {
             // new data stored should be stored in elem.`first_element`
@@ -338,7 +337,7 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
         if let Some(multiple_slots) = elem.get_multiple_slots_mut(&mut self.index) {
             let bucket_ix =
                 IndexEntry::<T>::data_bucket_from_num_slots(multiple_slots.num_slots) as usize;
-            let current_bucket = &self.data[bucket_ix];
+            let current_bucket = &mut self.data[bucket_ix];
             let elem_loc = IndexEntryPlaceInBucket::<T>::data_loc(current_bucket, multiple_slots);
             old_data_entry_to_free = Some(DataFileEntryToFree {
                 bucket_ix,
@@ -347,8 +346,16 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
 
             if best_fit_bucket == bucket_ix as u64 {
                 // in place update in same data file
-                let slice: &mut [T] = current_bucket.get_mut_cell_slice(elem_loc, data_len as u64);
+                // write ref_count
+                let start = current_bucket.get_start_offset_with_header(elem_loc);
+                let header = BucketStorage::<DataBucket>::get_mut_from_parts::<
+                    crate::index_entry::OccupiedHeader,
+                >(&mut current_bucket.mmap[start..]);
+                header.packed_ref_count.set_ref_count(ref_count);
+
+                // write data
                 assert!(!current_bucket.is_free(elem_loc));
+                let slice: &mut [T] = current_bucket.get_mut_cell_slice(elem_loc, data_len as u64);
                 multiple_slots.num_slots = num_slots;
 
                 slice.iter_mut().zip(data).for_each(|(dest, src)| {
@@ -359,7 +366,7 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
         }
 
         // need to move the allocation to a best fit spot
-        let best_bucket = &self.data[best_fit_bucket as usize];
+        let best_bucket = &mut self.data[best_fit_bucket as usize];
         let cap_power = best_bucket.capacity_pow2;
         let cap = best_bucket.capacity();
         let pos = thread_rng().gen_range(0, cap);
@@ -378,12 +385,20 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
                 multiple_slots.set_storage_offset(ix);
                 multiple_slots.set_storage_capacity_when_created_pow2(best_bucket.capacity_pow2);
                 multiple_slots.num_slots = num_slots;
+
+                // write ref_count
+                let start = best_bucket.get_start_offset_with_header(ix);
+                let header = BucketStorage::<DataBucket>::get_mut_from_parts::<
+                    crate::index_entry::OccupiedHeader,
+                >(&mut best_bucket.mmap[start..]);
+                header.packed_ref_count.set_ref_count(ref_count);
+
                 elem.set_slot_count_enum_value(
                     &mut self.index,
                     SlotCountEnum::MultipleSlots(&multiple_slots),
                 );
                 //debug!(                        "DATA ALLOC {:?} {} {} {}",                        key, elem.data_location, best_bucket.capacity, elem_uid                    );
-                if num_slots > 0 {
+                if num_slots > 0 || ref_count != 1 {
                     let best_bucket = &mut self.data[best_fit_bucket as usize];
                     best_bucket.occupy(ix, false).unwrap();
                     let slice = best_bucket.get_mut_cell_slice(ix, num_slots);
@@ -455,6 +470,15 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
                         let new_ix = new_ix.unwrap();
                         let new_elem: &mut IndexEntry<T> = index.get_mut(new_ix);
                         *new_elem = *elem;
+                        let start = index.get_start_offset_with_header(new_ix);
+                        let start_old = self.index.get_start_offset_with_header(ix);
+                        index.contents.growing_index_element(
+                            &mut index.mmap[start..],
+                            new_ix as usize,
+                            &self.index.contents,
+                            &self.index.mmap[start_old..],
+                            ix as usize,
+                        );
                         /*
                         let dbg_elem: IndexEntry = *new_elem;
                         assert_eq!(
