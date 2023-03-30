@@ -205,6 +205,13 @@ impl<O: BucketOccupied> BucketStorage<O> {
         unsafe { &mut *item }
     }
 
+    pub(crate) fn get_from_parts<T: Sized>(item_slice: &[u8]) -> &T {
+        unsafe {
+            let item = item_slice.as_ptr() as *const T;
+            &*item
+        }
+    }
+
     pub fn get_mut<T: Sized>(&mut self, ix: u64) -> &mut T {
         let start = self.get_start_offset_no_header(ix);
         let item_slice = &mut self.mmap[start..];
@@ -212,8 +219,7 @@ impl<O: BucketOccupied> BucketStorage<O> {
         Self::get_mut_from_parts(item_slice)
     }
 
-    #[allow(clippy::mut_from_ref)]
-    pub fn get_mut_cell_slice<T: Sized>(&self, ix: u64, len: u64) -> &mut [T] {
+    pub fn get_mut_cell_slice<T: Sized>(&mut self, ix: u64, len: u64) -> &mut [T] {
         let start = self.get_start_offset_no_header(ix);
         let end = start + std::mem::size_of::<T>() * len as usize;
         //debug!("GET mut slice {} {}", start, end);
@@ -374,7 +380,7 @@ mod test {
         let mut storage = BucketStorage::<IndexBucket<u64>>::new(
             Arc::new(paths),
             1,
-            1,
+            std::mem::size_of::<crate::index_entry::IndexEntry<u64>>() as u64,
             1,
             Arc::default(),
             Arc::default(),
