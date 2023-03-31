@@ -1218,6 +1218,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
                             //  The dirty will be picked up and the item will be prevented from being evicted.
 
                             // may have to loop if disk has to grow and we have to retry the write
+                            panic!("inserting");
                             loop {
                                 let disk_resize = {
                                     let slot_list = slot_list
