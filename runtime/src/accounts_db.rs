@@ -8996,6 +8996,7 @@ impl AccountsDb {
             let amount_to_top_off_rent = AtomicU64::new(0);
             let total_including_duplicates = AtomicU64::new(0);
             let storage_info_timings = Mutex::new(GenerateIndexTimings::default());
+            error!("{}", line!());
             let scan_time: u64 = slots
                 .par_chunks(chunk_size)
                 .map(|slots| {
@@ -9084,6 +9085,7 @@ impl AccountsDb {
                 })
                 .sum();
             index_time.stop();
+            error!("{}", line!());
 
             info!("rent_collector: {:?}", rent_collector);
             let mut min_bin_size = usize::MAX;
@@ -9100,15 +9102,20 @@ impl AccountsDb {
                 })
                 .sum();
 
+            error!("{}", line!());
             let mut index_flush_us = 0;
             let mut total_duplicate_slot_keys = 0;
             let mut populate_duplicate_keys_us = 0;
             if pass == 0 {
+                error!("{}", line!());
                 // tell accounts index we are done adding the initial accounts at startup
                 let mut m = Measure::start("accounts_index_idle_us");
                 self.accounts_index.set_startup(Startup::Normal);
                 m.stop();
                 index_flush_us = m.as_us();
+                error!("{}", line!());
+
+                error!("{}", line!());
 
                 populate_duplicate_keys_us = measure_us!({
                     // this has to happen before visit_duplicate_pubkeys_during_startup below
@@ -9129,6 +9136,7 @@ impl AccountsDb {
                     }
                 })
                 .1;
+            error!("{}", line!());
             }
 
             let storage_info_timings = storage_info_timings.into_inner().unwrap();
@@ -9150,6 +9158,7 @@ impl AccountsDb {
                     .storage_size_accounts_map_flatten_us,
                 ..GenerateIndexTimings::default()
             };
+            error!("{}", line!());
 
             // subtract data.len() from accounts_data_len for all old accounts that are in the index twice
             let mut accounts_data_len_dedup_timer =
@@ -9186,8 +9195,10 @@ impl AccountsDb {
                     accounts_data_len.load(Ordering::Relaxed)
                 );
             }
+            error!("{}", line!());
             accounts_data_len_dedup_timer.stop();
             timings.accounts_data_len_dedup_time_us = accounts_data_len_dedup_timer.as_us();
+            error!("{}", line!());
 
             if pass == 0 {
                 let uncleaned_roots = uncleaned_roots.into_inner().unwrap();
@@ -9200,6 +9211,7 @@ impl AccountsDb {
 
                 self.set_storage_count_and_alive_bytes(storage_info, &mut timings);
             }
+            error!("{}", line!());
             timings.report();
         }
 
