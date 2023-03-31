@@ -90,6 +90,8 @@ pub struct Bucket<T: 'static> {
     stats: Arc<BucketMapStats>,
 
     pub reallocated: Reallocated<IndexBucket<T>, DataBucket>,
+
+    pub specifics: Option<Vec<AtomicUsize>>,
 }
 
 impl<'b, T: Clone + Copy + 'static> Bucket<T> {
@@ -116,6 +118,7 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
             data: vec![],
             stats,
             reallocated: Reallocated::default(),
+            specifics: Some((0..max_search).map(|_| AtomicUsize::default()).collect()),
         }
     }
 
@@ -277,6 +280,15 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
         let elem = if let Some(elem) = elem {
             elem
         } else {
+            if let Some(specifics) = self.specifics.as_ref() {
+                let ix = Self::bucket_index_ix(&self.index, key, self.random);
+                let distance = if elem_ix < ix {
+                    elem_ix + self.index.capacity() - ix
+                } else {
+                    elem_ix - ix
+                };
+                specifics[distance as usize].fetch_add(1, Ordering::Relaxed);
+            }
             let is_resizing = false;
             self.index.occupy(elem_ix, is_resizing).unwrap();
             let elem_allocate = IndexEntryPlaceInBucket::new(elem_ix);
@@ -364,10 +376,30 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
         }
     }
 
-    pub fn grow_index(&self, current_capacity_pow2: u8) {
-        if self.index.capacity_pow2 == current_capacity_pow2 {
+    pub fn dump_index_usage(&self) {
+        use log::*;
+        error!(
+            "{}, {:?}",
+            self.index.capacity(),
+            self.specifics
+                .as_ref()
+                .unwrap()
+                .iter()
+                .map(|search| search.load(Ordering::Relaxed))
+                .collect::<Vec<_>>()
+        );
+    }
+
+    pub fn grow_index(&self, current_capacity: u64) {
             let mut m = Measure::start("grow_index");
             //debug!("GROW_INDEX: {}", current_capacity_pow2);
+            if let Some(specifics) = self.specifics.as_ref() {
+                // reset all specifics since we are re-indexing
+                specifics
+                    .iter()
+                    .for_each(|count| count.store(0, Ordering::Relaxed));
+            }
+
             let increment = 1;
             for i in increment.. {
                 //increasing the capacity by ^4 reduces the
