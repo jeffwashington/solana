@@ -83,13 +83,16 @@ impl<I: BucketOccupied, D: BucketOccupied> Reallocated<I, D> {
 // >= 2 instances of BucketStorage per 'bucket' in the bucket map. 1 for index, >= 1 for data
 pub struct Bucket<T: 'static> {
     drives: Arc<Vec<PathBuf>>,
-    //index
+    /// index
     pub index: BucketStorage<IndexBucket<T>>,
-    //random offset for the index
+    /// random offset for the index
     random: u64,
-    //storage buckets to store SlotSlice up to a power of 2 in len
+    /// storage buckets to store SlotSlice up to a power of 2 in len
     pub data: Vec<BucketStorage<DataBucket>>,
     stats: Arc<BucketMapStats>,
+
+    /// size caller expects the map to need to contain next time we need to grow
+    anticipated_size: AtomicU64,
 
     pub reallocated: Reallocated<IndexBucket<T>, DataBucket>,
 }
@@ -118,6 +121,7 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
             data: vec![],
             stats,
             reallocated: Reallocated::default(),
+            anticipated_size: AtomicU64::default(),
         }
     }
 
@@ -371,9 +375,19 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
 
     pub fn grow_index(&self, mut current_capacity: u64) {
         if self.index.capacity.capacity() == current_capacity {
+            let anticipated_size = self.anticipated_size.swap(0, Ordering::AcqRel);
+            // make sure to grow to at least % more than the anticpated size
+            let anticipated_size = (anticipated_size > 0).then_some(anticipated_size * 110 / 100);
             let mut m = Measure::start("grow_index");
             //debug!("GROW_INDEX: {}", current_capacity_pow2);
             loop {
+                let mut new_capacity = current_capacity + (1024).min(current_capacity * 2);
+                if let Some(anticipated_size) = anticipated_size.as_ref() {
+                    if *anticipated_size > new_capacity {
+                        use log::*;error!("growing to {} instead of {}", anticipated_size, new_capacity);
+                        new_capacity = new_capacity.max(*anticipated_size);
+                    }
+                }
                 //increasing the capacity by ^4 reduces the
                 //likelihood of a re-index collision of 2^(max_search)^2
                 //1 in 2^32
@@ -381,7 +395,8 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
                     Arc::clone(&self.drives),
                     1,
                     std::mem::size_of::<IndexEntry<T>>() as u64,
-                    Capacity::Random(current_capacity + (1024).min(current_capacity * 2)),
+                    // grow by 1024 entries or 
+                    Capacity::Random((current_capacity + (1024).min(current_capacity * 2)).max(anticipated_size.unwrap_or_default())),
                     self.index.max_search,
                     Arc::clone(&self.stats.index),
                     Arc::clone(&self.index.count),
@@ -515,6 +530,10 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
                 self.grow_index(current_capacity);
             }
         }
+    }
+
+    pub(crate) fn set_anticipated_count(&self, count :u64) {
+        self.anticipated_size.store(count, Ordering::Release);
     }
 
     /// if a bucket was resized previously with a read lock, then apply that resize now

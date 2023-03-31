@@ -1061,6 +1061,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
         // merge all items into the disk index now
         let disk = self.bucket.as_ref().unwrap();
         let mut count = 0;
+        disk.set_anticipated_count((insert.len() as u64).saturating_add(disk.bucket_len()) as u64);
         insert.into_iter().for_each(|(slot, k, v)| {
             let entry = (slot, v);
             let new_ref_count = u64::from(!v.is_cached());

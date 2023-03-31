@@ -111,6 +111,12 @@ impl<T: Clone + Copy> BucketApi<T> {
         }
     }
 
+    pub fn set_anticipated_count(&self, count: u64) {
+        if let Some(bucket) = self.bucket.read().unwrap().as_ref() {
+            bucket.set_anticipated_count(count);
+        }        
+    }
+
     pub fn update<F>(&self, key: &Pubkey, updatefn: F)
     where
         F: FnMut(Option<(&[T], RefCount)>) -> Option<(Vec<T>, RefCount)>,
