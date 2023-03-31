@@ -383,7 +383,12 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
             let anticipated_size = (anticipated_size > 0).then_some(anticipated_size * 110 / 100);
             let mut m = Measure::start("grow_index");
             //debug!("GROW_INDEX: {}", current_capacity_pow2);
+            let mut loops = 0;
             loop {
+                loops += 1;
+                if loops > 4 {
+                    panic!("too many loops: {}, {}", current_capacity, self.index.capacity.capacity());
+                }
                 let mut new_capacity = current_capacity + (1024).min(current_capacity * 2);
                 if let Some(anticipated_size) = anticipated_size.as_ref() {
                     if *anticipated_size > new_capacity {
