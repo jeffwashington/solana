@@ -1064,7 +1064,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
         let current_len = disk.bucket_len();
         let anticipated = insert.len();
         disk.set_anticipated_count((anticipated as u64).saturating_add(current_len) as u64);
-        if self.bin < 40 {
+        if self.bin < 400 {
             use log::*;error!("setting anticipated size: {}, current: {}", anticipated, current_len);
         }
         insert.into_iter().for_each(|(slot, k, v)| {
