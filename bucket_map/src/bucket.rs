@@ -377,14 +377,14 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
         if self.index.capacity.capacity() == current_capacity {
             let anticipated_size = self.anticipated_size.swap(0, Ordering::AcqRel);
             // make sure to grow to at least % more than the anticpated size
-            let anticipated_size = (anticipated_size > 0).then_some(anticipated_size * 110 / 100);
+            let anticipated_size = (anticipated_size > 0).then_some(anticipated_size * 150 / 100);
             let mut m = Measure::start("grow_index");
             //debug!("GROW_INDEX: {}", current_capacity_pow2);
             let mut loops = 0;
             loop {
                 loops += 1;
                 if loops > 2 {
-                    panic!("too many loops: {}, {}", current_capacity, self.index.capacity.capacity());
+                    panic!("too many loops: {}, {}, anticipated: {:?}", current_capacity, self.index.capacity.capacity(), anticipated_size);
                 }
                 let mut new_capacity = current_capacity + (1024).min(current_capacity * 2);
                 if let Some(anticipated_size) = anticipated_size.as_ref() {
