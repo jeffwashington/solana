@@ -11,6 +11,7 @@ use {
         clock::{Slot, DEFAULT_MS_PER_SLOT},
         timing::AtomicInterval,
     },
+    log::*,
     std::{
         fmt::Debug,
         marker::PhantomData,
@@ -127,8 +128,11 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> BucketMapHolder<T, U>
     /// startup=false is 'normal' operation
     pub fn set_startup(&self, value: bool) {
         if !value {
+            error!("{}", line!());
             self.wait_for_idle();
+            error!("{}", line!());
         }
+        error!("{}", line!());
         self.startup.store(value, Ordering::Relaxed)
     }
 
@@ -149,6 +153,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> BucketMapHolder<T, U>
                 break;
             }
         }
+        error!("{}", line!());
     }
 
     pub fn current_age(&self) -> Age {
@@ -187,6 +192,8 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> BucketMapHolder<T, U>
     fn maybe_advance_age_internal(&self, all_buckets_flushed_at_current_age: bool) -> bool {
         // call has_age_interval_elapsed last since calling it modifies state on success
         if all_buckets_flushed_at_current_age && self.has_age_interval_elapsed() {
+            error!("{} advance age", line!());
+
             self.increment_age();
             true
         } else {

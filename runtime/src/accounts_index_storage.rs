@@ -5,7 +5,9 @@ use {
         in_mem_accounts_index::InMemAccountsIndex,
         waitable_condvar::WaitableCondvar,
     },
+    log::*,
     std::{
+   
         fmt::Debug,
         sync::{
             atomic::{AtomicBool, Ordering},
@@ -126,7 +128,9 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndexStorage<
                 &self.exit,
             ));
         }
+        error!("{}", line!());
         self.storage.set_startup(value);
+        error!("{}", line!());
         if !value {
             // transitioning from startup to !startup (ie. steady state)
             // shutdown the bg threads
