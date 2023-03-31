@@ -376,7 +376,7 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
     pub fn grow_index(&self, mut current_capacity: u64) {
         let mut history = Vec::default();
         if self.index.capacity.capacity() == current_capacity {
-            let anticipated_size = self.anticipated_size.swap(0, Ordering::AcqRel);
+            let anticipated_size = self.anticipated_size.load(Ordering::Acquire);
             // make sure to grow to at least % more than the anticpated size
             let anticipated_size = (anticipated_size > 0).then_some(anticipated_size * 200 / 100);
             let mut m = Measure::start("grow_index");
