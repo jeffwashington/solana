@@ -1,9 +1,11 @@
+use crate::bucket_storage::Capacity;
+
 use {
     crate::{
         bucket_item::BucketItem,
         bucket_map::BucketMapError,
         bucket_stats::BucketMapStats,
-        bucket_storage::{BucketOccupied, BucketStorage, DEFAULT_CAPACITY_POW2},
+        bucket_storage::{BucketCapacity, BucketOccupied, BucketStorage, DEFAULT_CAPACITY_POW2},
         index_entry::{
             DataBucket, IndexBucket, IndexEntry, IndexEntryPlaceInBucket, MultipleSlots,
         },
@@ -198,7 +200,7 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
             .fetch_add(m.as_us(), Ordering::Relaxed);
         match first_free {
             Some(ii) => Ok((None, ii)),
-            None => Err(BucketMapError::IndexNoSpace(index.capacity_pow2)),
+            None => Err(BucketMapError::IndexNoSpace(index.capacity.capacity())),
         }
     }
 
@@ -251,7 +253,7 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
             .stats
             .find_index_entry_mut_us
             .fetch_add(m.as_us(), Ordering::Relaxed);
-        Err(BucketMapError::IndexNoSpace(index.capacity_pow2))
+        Err(BucketMapError::IndexNoSpace(index.capacity.capacity()))
     }
 
     pub fn read_value(&self, key: &Pubkey) -> Option<(&[T], RefCount)> {
@@ -307,7 +309,6 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
             // need to move the allocation to a best fit spot
             let best_bucket = &self.data[best_fit_bucket as usize];
             let current_bucket = &self.data[bucket_ix as usize];
-            let cap_power = best_bucket.capacity_pow2;
             let cap = best_bucket.capacity();
             let pos = thread_rng().gen_range(0, cap);
             // max search is increased here by a lot for this search. The idea is that we just have to find an empty bucket somewhere.
@@ -325,8 +326,9 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
                     let old_slots = current_multiple_slots.num_slots();
                     let multiple_slots = elem.get_multiple_slots_mut(&mut self.index);
                     multiple_slots.set_storage_offset(ix);
-                    multiple_slots
-                        .set_storage_capacity_when_created_pow2(best_bucket.capacity_pow2);
+                    multiple_slots.set_storage_capacity_when_created_pow2(
+                        best_bucket.contents.capacity_pow2(),
+                    );
                     multiple_slots.set_num_slots(num_slots);
                     if old_slots > 0 {
                         let current_bucket = &mut self.data[bucket_ix as usize];
@@ -344,7 +346,10 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
                     return Ok(());
                 }
             }
-            Err(BucketMapError::DataNoSpace((best_fit_bucket, cap_power)))
+            Err(BucketMapError::DataNoSpace((
+                best_fit_bucket,
+                best_bucket.capacity.capacity_pow2(),
+            )))
         }
     }
 
@@ -364,12 +369,11 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
         }
     }
 
-    pub fn grow_index(&self, current_capacity_pow2: u8) {
-        if self.index.capacity_pow2 == current_capacity_pow2 {
+    pub fn grow_index(&self, mut current_capacity: u64) {
+        if self.index.capacity.capacity() == current_capacity {
             let mut m = Measure::start("grow_index");
             //debug!("GROW_INDEX: {}", current_capacity_pow2);
-            let increment = 1;
-            for i in increment.. {
+            loop {
                 //increasing the capacity by ^4 reduces the
                 //likelihood of a re-index collision of 2^(max_search)^2
                 //1 in 2^32
@@ -377,12 +381,14 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
                     Arc::clone(&self.drives),
                     1,
                     std::mem::size_of::<IndexEntry<T>>() as u64,
-                    // *2 causes rapid growth of index buckets
-                    self.index.capacity_pow2 + i, // * 2,
+                    Capacity::Random(current_capacity + (1024).min(current_capacity * 2)),
                     self.index.max_search,
                     Arc::clone(&self.stats.index),
                     Arc::clone(&self.index.count),
                 );
+                // index may have allocated something larger than we asked for,
+                // so, in case we fail to reindex into this larger size, grow from this size next iteration.
+                current_capacity = index.capacity();
                 let random = thread_rng().gen();
                 let mut valid = true;
                 for ix in 0..self.index.capacity() {
@@ -471,7 +477,10 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
             &self.drives,
             self.index.max_search,
             self.data.get(data_index as usize),
-            std::cmp::max(current_capacity_pow2 + 1, DEFAULT_CAPACITY_POW2),
+            Capacity::Pow2(std::cmp::max(
+                current_capacity_pow2 + 1,
+                DEFAULT_CAPACITY_POW2,
+            )),
             1 << data_index,
             Self::elem_size(),
             &self.stats.data,
@@ -495,15 +504,15 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
 
     /// grow the appropriate piece. Note this takes an immutable ref.
     /// The actual grow is set into self.reallocated and applied later on a write lock
-    pub fn grow(&self, err: BucketMapError) {
+    pub(crate) fn grow(&self, err: BucketMapError) {
         match err {
             BucketMapError::DataNoSpace((data_index, current_capacity_pow2)) => {
                 //debug!("GROWING SPACE {:?}", (data_index, current_capacity_pow2));
                 self.grow_data(data_index, current_capacity_pow2);
             }
-            BucketMapError::IndexNoSpace(current_capacity_pow2) => {
+            BucketMapError::IndexNoSpace(current_capacity) => {
                 //debug!("GROWING INDEX {}", sz);
-                self.grow_index(current_capacity_pow2);
+                self.grow_index(current_capacity);
             }
         }
     }

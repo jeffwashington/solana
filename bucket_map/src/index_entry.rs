@@ -2,7 +2,7 @@
 
 use {
     crate::{
-        bucket_storage::{BucketOccupied, BucketStorage},
+        bucket_storage::{BucketCapacity, BucketOccupied, BucketStorage, Capacity},
         RefCount,
     },
     bv::BitVec,
@@ -13,8 +13,18 @@ use {
 
 /// allocated in `contents` in a BucketStorage
 pub struct BucketWithBitVec<T: 'static> {
-    pub occupied: BitVec,
+    occupied: BitVec,
+    capacity_pow2: Capacity,
     _phantom: PhantomData<&'static T>,
+}
+
+impl<T> BucketCapacity for BucketWithBitVec<T> {
+    fn capacity(&self) -> u64 {
+        self.capacity_pow2.capacity()
+    }
+    fn capacity_pow2(&self) -> u8 {
+        self.capacity_pow2.capacity_pow2()
+    }
 }
 
 impl<T> BucketOccupied for BucketWithBitVec<T> {
@@ -33,16 +43,57 @@ impl<T> BucketOccupied for BucketWithBitVec<T> {
         // no header, nothing stored in data stream
         0
     }
-    fn new(num_elements: usize) -> Self {
+    fn new(capacity: Capacity) -> Self {
+        assert!(matches!(capacity, Capacity::Pow2(_)));
         Self {
-            occupied: BitVec::new_fill(false, num_elements as u64),
+            occupied: BitVec::new_fill(false, capacity.capacity()),
+            capacity_pow2: capacity,
             _phantom: PhantomData,
         }
     }
 }
 
+/// allocated in `contents` in a BucketStorage
+pub struct IndexBucketWithBitVec<T: 'static> {
+    occupied: BitVec,
+    /// number of elements allocated
+    capacity: u64,
+    _phantom: PhantomData<&'static T>,
+}
+
+impl<T> BucketOccupied for IndexBucketWithBitVec<T> {
+    fn occupy(&mut self, element: &mut [u8], ix: usize) {
+        assert!(self.is_free(element, ix));
+        self.occupied.set(ix as u64, true);
+    }
+    fn free(&mut self, element: &mut [u8], ix: usize) {
+        assert!(!self.is_free(element, ix));
+        self.occupied.set(ix as u64, false);
+    }
+    fn is_free(&self, _element: &[u8], ix: usize) -> bool {
+        !self.occupied.get(ix as u64)
+    }
+    fn offset_to_first_data() -> usize {
+        // no header, nothing stored in data stream
+        0
+    }
+    fn new(capacity: Capacity) -> Self {
+        Self {
+            occupied: BitVec::new_fill(false, capacity.capacity()),
+            capacity: capacity.capacity(),
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<T> BucketCapacity for IndexBucketWithBitVec<T> {
+    fn capacity(&self) -> u64 {
+        self.capacity
+    }
+}
+
 pub type DataBucket = BucketWithBitVec<()>;
-pub type IndexBucket<T> = BucketWithBitVec<T>;
+pub type IndexBucket<T> = IndexBucketWithBitVec<T>;
 
 /// contains the index of an entry in the index bucket.
 /// This type allows us to call methods to interact with the index entry on this type.
@@ -135,7 +186,8 @@ impl MultipleSlots {
     /// This function maps the original data location into an index in the current bucket storage.
     /// This is coupled with how we resize bucket storages.
     pub(crate) fn data_loc(&self, storage: &BucketStorage<DataBucket>) -> u64 {
-        self.storage_offset() << (storage.capacity_pow2 - self.storage_capacity_when_created_pow2())
+        self.storage_offset()
+            << (storage.contents.capacity_pow2() - self.storage_capacity_when_created_pow2())
     }
 }
 
