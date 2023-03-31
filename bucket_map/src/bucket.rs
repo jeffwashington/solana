@@ -374,6 +374,7 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
     }
 
     pub fn grow_index(&self, mut current_capacity: u64) {
+        let mut history = Vec::default();
         if self.index.capacity.capacity() == current_capacity {
             let anticipated_size = self.anticipated_size.swap(0, Ordering::AcqRel);
             // make sure to grow to at least % more than the anticpated size
@@ -384,7 +385,7 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
             loop {
                 loops += 1;
                 if loops > 2 {
-                    panic!("too many loops: {}, {}, anticipated: {:?}", current_capacity, self.index.capacity.capacity(), anticipated_size);
+                    panic!("too many loops: {}, {}, anticipated: {:?}, history: {:?}", current_capacity, self.index.capacity.capacity(), anticipated_size, history);
                 }
                 let mut new_capacity = current_capacity + (1024).min(current_capacity * 2);
                 if let Some(anticipated_size) = anticipated_size.as_ref() {
@@ -393,6 +394,7 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
                         new_capacity = new_capacity.max(*anticipated_size);
                     }
                 }
+                let calc_cap = (current_capacity + (1024).min(current_capacity * 2)).max(anticipated_size.unwrap_or_default());
                 //increasing the capacity by ^4 reduces the
                 //likelihood of a re-index collision of 2^(max_search)^2
                 //1 in 2^32
@@ -401,7 +403,7 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
                     1,
                     std::mem::size_of::<IndexEntry<T>>() as u64,
                     // grow by 1024 entries or 
-                    Capacity::Random((current_capacity + (1024).min(current_capacity * 2)).max(anticipated_size.unwrap_or_default())),
+                    Capacity::Random(calc_cap),
                     self.index.max_search,
                     Arc::clone(&self.stats.index),
                     Arc::clone(&self.index.count),
@@ -438,6 +440,7 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
                     self.reallocated.add_reallocation();
                     break;
                 }
+                history.push(calc_cap);
             }
             m.stop();
             self.stats.index.resizes.fetch_add(1, Ordering::Relaxed);
