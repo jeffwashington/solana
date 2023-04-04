@@ -13,6 +13,7 @@ use {
         },
         MaxSearch, RefCount,
     },
+    bv::BitVec,
     rand::{thread_rng, Rng},
     solana_measure::measure::Measure,
     solana_sdk::pubkey::Pubkey,
@@ -435,6 +436,7 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
 
     pub fn grow_index(&self, mut current_capacity: u64) {
         if self.index.contents.capacity() == current_capacity {
+            let mut resize_verify_us = 0;
             // make sure to grow to at least % more than the anticipated size
             // The indexing algorithm expects to require some over-allocation.
             let anticipated_size = self.anticipated_size * 110 / 100;
@@ -444,7 +446,37 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
             loop {
                 count += 1;
                 // grow relative to the current capacity
+                // todo: this needs to be page aligned if we do that below so cap is exactly the same
                 let new_capacity = (current_capacity * 110 / 100).max(anticipated_size);
+                let random = thread_rng().gen();
+
+                let mut verify_us = Measure::start("resize_verify_us");
+                let mut occupied = BitVec::<u64>::new_fill(false, new_capacity);
+                let mut valid = true;
+                for ix in 0..self.index.capacity() {
+                    if !self.index.is_free(ix) {
+                        let elem: &IndexEntry<T> = self.index.get(ix);
+                        let ix_new = Self::bucket_index_ix(&self.index, &elem.key, random);
+                        valid = false;
+                        for look in 0..(self.index.max_search as u64) {
+                            let look = (ix_new + look) % new_capacity;
+                            if !occupied.get(look) {
+                                occupied.set(look, true);
+                                valid = true;
+                                break;
+                            }
+                        }
+                        if !valid {
+                            break;
+                        }
+                    }
+                }
+                verify_us.stop();
+                resize_verify_us += verify_us.as_us();
+                if !valid {
+                    continue;
+                }
+
                 let mut index = BucketStorage::new_with_capacity(
                     Arc::clone(&self.drives),
                     1,
@@ -457,8 +489,6 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
                 // index may have allocated something larger than we asked for,
                 // so, in case we fail to reindex into this larger size, grow from this size next iteration.
                 current_capacity = index.capacity();
-                let random = thread_rng().gen();
-                let mut valid = true;
                 for ix in 0..self.index.capacity() {
                     if !self.index.is_free(ix) {
                         let elem: &IndexEntry<T> = self.index.get(ix);
@@ -500,6 +530,10 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
                 .index
                 .resize_us
                 .fetch_add(m.as_us(), Ordering::Relaxed);
+            self.stats
+                .index
+                .resize_verify_us
+                .fetch_add(resize_verify_us, Ordering::Relaxed);
         }
     }
 
