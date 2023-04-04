@@ -21,6 +21,8 @@ const MAX_CONNECTIONS: usize = 1024;
 /// Default connection pool size per remote address
 pub const DEFAULT_CONNECTION_POOL_SIZE: usize = 4;
 
+// we used to disable quic here for kin sim
+
 pub trait ConnectionManager {
     type ConnectionPool: ConnectionPool;
     type NewConnectionConfig: NewConnectionConfig;

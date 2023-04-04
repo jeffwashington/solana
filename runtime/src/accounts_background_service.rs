@@ -32,7 +32,7 @@ use {
     },
 };
 
-const INTERVAL_MS: u64 = 100;
+const INTERVAL_MS: u64 = 1000;
 const CLEAN_INTERVAL_BLOCKS: u64 = 100;
 
 // This value is chosen to spread the dropping cost over 3 expiration checks
@@ -570,7 +570,7 @@ impl AccountsBackgroundService {
                         })
                         .unwrap_or_default();
 
-                    // Check to see if there were any requests for snapshotting banks
+                        // Check to see if there were any requests for snapshotting banks
                     // < the current root bank `bank` above.
 
                     // Claim: Any snapshot request for slot `N` found here implies that the last cleanup

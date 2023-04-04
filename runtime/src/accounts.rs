@@ -338,6 +338,7 @@ impl Accounts {
         account_overrides: Option<&AccountOverrides>,
         program_accounts: &HashMap<Pubkey, &Pubkey>,
         loaded_programs: &HashMap<Pubkey, Arc<LoadedProgram>>,
+        set_exempt_rent_epoch_max: bool,
     ) -> Result<LoadedTransaction> {
         // NOTE: this check will never fail because `tx` is sanitized
         if tx.signatures().is_empty() && fee != 0 {
@@ -354,7 +355,7 @@ impl Accounts {
         let mut account_deps = Vec::with_capacity(account_keys.len());
         let mut rent_debits = RentDebits::default();
 
-        let set_exempt_rent_epoch_max =
+        let _set_exempt_rent_epoch_max =
             feature_set.is_active(&solana_sdk::feature_set::set_exempt_rent_epoch_max::id());
 
         let requested_loaded_accounts_data_size_limit =
@@ -679,6 +680,7 @@ impl Accounts {
         account_overrides: Option<&AccountOverrides>,
         program_accounts: &HashMap<Pubkey, &Pubkey>,
         loaded_programs: &HashMap<Pubkey, Arc<LoadedProgram>>,
+        set_exempt_rent_epoch_max: bool,
     ) -> Vec<TransactionLoadResult> {
         txs.iter()
             .zip(lock_results)
@@ -716,6 +718,7 @@ impl Accounts {
                         account_overrides,
                         program_accounts,
                         loaded_programs,
+                        set_exempt_rent_epoch_max,
                     ) {
                         Ok(loaded_transaction) => loaded_transaction,
                         Err(e) => return (Err(e), None),
