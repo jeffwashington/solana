@@ -440,7 +440,7 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
         if self.index.contents.capacity() == current_capacity {
             // make sure to grow to at least % more than the anticipated size
             // The indexing algorithm expects to require some over-allocation.
-            let anticipated_size = self.anticipated_size * 140 / 100;
+            let anticipated_size = self.anticipated_size * 120 / 100;
             let mut m = Measure::start("grow_index");
             //debug!("GROW_INDEX: {}", current_capacity_pow2);
             let mut count = 0;
