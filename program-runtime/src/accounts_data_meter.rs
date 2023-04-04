@@ -7,7 +7,7 @@
 /// [Validator Requirements](https://docs.solana.com/running-validator/validator-reqs), and
 /// validators often put the ledger on a RAM disk (i.e. tmpfs).
 // pub const MAX_ACCOUNTS_DATA_LEN: u64 = 128_000_000_000;
-pub const MAX_ACCOUNTS_DATA_LEN: u64 = u64::Max; 
+pub const MAX_ACCOUNTS_DATA_LEN: u64 = u64::MAX; 
 
 /// Meter and track the amount of available accounts data space
 #[derive(Debug, Default, Clone, Copy, Eq, PartialEq)]
