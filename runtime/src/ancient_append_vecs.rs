@@ -138,17 +138,20 @@ impl AncientSlotInfos {
         // from slots that exceeded the shrink threshold.
         // The goal is to limit overall i/o in this pass while making progress.
         let threshold_bytes = self.total_alive_bytes_shrink * percent_of_alive_shrunk_data / 100;
+        let mut skip = 0;
         for info_index in &self.shrink_indexes {
             let info = &mut self.all_infos[*info_index];
             if bytes_to_shrink_due_to_ratio >= threshold_bytes {
+                skip += 1;
                 // we exceeded the amount to shrink due to alive ratio, so don't shrink this one just due to 'should_shrink'
                 // It MAY be shrunk based on total capacity still.
                 // Mark it as false for 'should_shrink' so it gets evaluated solely based on # of files.
-                info.should_shrink = false;
+                // info.should_shrink = false;
             } else {
                 saturating_add_assign!(bytes_to_shrink_due_to_ratio, info.alive_bytes);
             }
         }
+        use log::*;error!("normally woul dhave stopped: {skip}");
     }
 
     /// after this function, only slots that were chosen to shrink are marked with
@@ -173,6 +176,7 @@ impl AncientSlotInfos {
         self.shrink_indexes.clear();
         let total_storages = self.all_infos.len();
         let mut cumulative_bytes = 0u64;
+        let mut trunc = 0;
         for (i, info) in self.all_infos.iter().enumerate() {
             saturating_add_assign!(cumulative_bytes, info.alive_bytes);
             let ancient_storages_required = (cumulative_bytes / ideal_storage_size + 1) as usize;
@@ -182,10 +186,12 @@ impl AncientSlotInfos {
             // we've gone too far, so get rid of this entry and all after it.
             // Every storage after this one is larger.
             if storages_remaining + ancient_storages_required < max_storages {
-                self.all_infos.truncate(i);
+                trunc += 1;
+                // self.all_infos.truncate(i);
                 break;
             }
         }
+        use log::*; error!("normally would have truncated: {}", trunc);
     }
 
     /// remove entries from 'all_infos' such that combining
@@ -241,9 +247,11 @@ impl AccountsDb {
         sorted_slots: Vec<Slot>,
         can_randomly_shrink: bool,
     ) {
+        use log::*;error!("shrink_ancient_slots: {}, slots: {}", line!(), sorted_slots.len());
+
         let tuning = PackedAncientStorageTuning {
             // only allow 10k slots old enough to be ancient
-            max_ancient_slots: 10_000,
+            max_ancient_slots: 100,
             // re-combine/shrink 55% of the data savings this pass
             percent_of_alive_shrunk_data: 55,
             ideal_storage_size: NonZeroU64::new(get_ancient_append_vec_capacity()).unwrap(),
@@ -267,7 +275,7 @@ impl AccountsDb {
 
         // only log when we've spent 1s total
         // results will continue to accumulate otherwise
-        if self.shrink_ancient_stats.total_us.load(Ordering::Relaxed) > 1_000_000 {
+        {//if self.shrink_ancient_stats.total_us.load(Ordering::Relaxed) > 1_000_000 {
             self.shrink_ancient_stats.report();
         }
     }
@@ -284,12 +292,20 @@ impl AccountsDb {
         if ancient_slot_infos.all_infos.is_empty() {
             return; // nothing to do
         }
+        use log::*;
         let accounts_per_storage = self
             .get_unique_accounts_from_storage_for_combining_ancient_slots(
                 &ancient_slot_infos.all_infos[..],
             );
+        let mut sum = 0;
+        let mut ss = 0;
+        accounts_per_storage.iter().for_each(|(info, accts)| {
+            ss += 1;
+            sum += accts.stored_accounts.len();
+        });
 
         let accounts_to_combine = self.calc_accounts_to_combine(&accounts_per_storage);
+        error!("shrink_ancient_slots: {}, sum: {sum}, slots: {ss}, ancient infos: {}, accounts_keep_slots: {}", line!(), ancient_slot_infos.all_infos.len(), accounts_to_combine.accounts_keep_slots.len());
 
         // pack the accounts with 1 ref
         let pack = PackedAncientStorage::pack(
@@ -300,10 +316,13 @@ impl AccountsDb {
             tuning.ideal_storage_size,
         );
 
+        error!("shrink_ancient_slots: {}, pack: {}, target_slots: {}", line!(), pack.len(), accounts_to_combine.target_slots_sorted.len());
         if pack.len() > accounts_to_combine.target_slots_sorted.len() {
+            error!("shrink_ancient_slots: {}, pack: {}, target_slots: {}", line!(), pack.len(), accounts_to_combine.target_slots_sorted.len());
             return; // not enough slots to contain the storages we are trying to pack
         }
 
+        error!("shrink_ancient_slots: {}", line!());
         let write_ancient_accounts = self.write_packed_storages(&accounts_to_combine, pack);
 
         self.finish_combine_ancient_slots_packed_internal(
@@ -311,6 +330,7 @@ impl AccountsDb {
             write_ancient_accounts,
             metrics,
         );
+        error!("shrink_ancient_slots: {}", line!());
     }
 
     /// calculate all storage info for the storages in slots

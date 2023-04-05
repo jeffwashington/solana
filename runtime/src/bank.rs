@@ -7358,6 +7358,7 @@ impl Bank {
         last_full_snapshot_slot: Slot,
         base: Option<(Slot, /*capitalization*/ u64)>,
     ) -> bool {
+        let accounts_db_skip_shrink = false;
         let (_, clean_time_us) = measure_us!({
             let should_clean = !accounts_db_skip_shrink && self.slot() > 0;
             if should_clean {

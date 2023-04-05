@@ -1588,6 +1588,19 @@ fn run_final_hash_calc(bank: &Bank, on_halt_store_hash_raw_data_for_debug: bool)
             store_hash_raw_data_for_debug: on_halt_store_hash_raw_data_for_debug,
         },
     );
+    bank.rc.accounts.accounts_db.notify_accounts_hash_calculated_complete(bank.slot(), bank.epoch_schedule());
+    bank.rc.accounts.accounts_db.shrink_ancient_slots();
+    // note that this slot may not be a root
+    let _ = bank.verify_accounts_hash(
+        None,
+        VerifyAccountsHashConfig {
+            test_hash_calculation: false,
+            ignore_mismatch: true,
+            require_rooted_bank: false,
+            run_in_background: false,
+            store_hash_raw_data_for_debug: on_halt_store_hash_raw_data_for_debug,
+        },
+    );
 }
 
 // `roots` is sorted largest to smallest by root slot

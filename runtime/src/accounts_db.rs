@@ -538,7 +538,7 @@ impl Default for FillerAccountsConfig {
     }
 }
 
-const ANCIENT_APPEND_VEC_DEFAULT_OFFSET: Option<i64> = Some(-10_000);
+const ANCIENT_APPEND_VEC_DEFAULT_OFFSET: Option<i64> = Some(100_000);
 
 #[derive(Debug, Default, Clone)]
 pub struct AccountsDbConfig {
@@ -2093,7 +2093,7 @@ impl ShrinkStats {
 
 impl ShrinkAncientStats {
     pub(crate) fn report(&self) {
-        if self.shrink_stats.last_report.should_update(1000) {
+        {//if self.shrink_stats.last_report.should_update(1000) {
             datapoint_info!(
                 "shrink_ancient_stats",
                 (
@@ -2517,8 +2517,9 @@ impl AccountsDb {
 
         let ancient_append_vec_offset = accounts_db_config
             .as_ref()
-            .map(|config| config.ancient_append_vec_offset)
-            .unwrap_or(ANCIENT_APPEND_VEC_DEFAULT_OFFSET);
+            .and_then(|config| config.ancient_append_vec_offset)
+            .or(ANCIENT_APPEND_VEC_DEFAULT_OFFSET);
+        let ancient_append_vec_offset = ANCIENT_APPEND_VEC_DEFAULT_OFFSET;
 
         let exhaustively_verify_refcounts = accounts_db_config
             .as_ref()
@@ -3157,6 +3158,7 @@ impl AccountsDb {
         is_startup: bool,
         last_full_snapshot_slot: Option<Slot>,
     ) {
+        return;
         if self.exhaustively_verify_refcounts {
             self.exhaustively_verify_refcounts(max_clean_root_inclusive);
         }
@@ -3356,7 +3358,7 @@ impl AccountsDb {
                         .storage
                         .get_account_storage_entry(*slot, account_info.store_id())
                         .map(|store| store.count())
-                        .unwrap()
+                        .expect(&format!("{}", *slot))
                         - 1;
                     debug!(
                         "store_counts, inserting slot: {}, store id: {}, count: {}",
@@ -4315,23 +4317,27 @@ impl AccountsDb {
 
     /// get a sorted list of slots older than an epoch
     /// squash those slots into ancient append vecs
-    fn shrink_ancient_slots(&self) {
+    pub fn shrink_ancient_slots(&self) {
+        error!("shrink_ancient_slots: {}", line!());
         if self.ancient_append_vec_offset.is_none() {
+            error!("shrink_ancient_slots: {}", line!());
             return;
         }
 
-        return;
         let can_randomly_shrink = true;
-        if self.create_ancient_storage == CreateAncientStorage::Append {
+        if false && self.create_ancient_storage == CreateAncientStorage::Append {
+            error!("shrink_ancient_slots: {}", line!());
             self.combine_ancient_slots(
                 self.get_sorted_potential_ancient_slots(),
                 can_randomly_shrink,
             );
         } else {
+            error!("shrink_ancient_slots: {}", line!());
             self.combine_ancient_slots_packed(
                 self.get_sorted_potential_ancient_slots(),
                 can_randomly_shrink,
             );
+            error!("shrink_ancient_slots: {}, slots: {}, newest ancient: {}", line!(), self.get_sorted_potential_ancient_slots().len(), self.get_newest_ancient_slot());
         }
     }
 
@@ -4678,7 +4684,7 @@ impl AccountsDb {
     pub fn shrink_candidate_slots(&self) -> usize {
         if !self.shrink_candidate_slots.lock().unwrap().is_empty() {
             // this can affect 'shrink_candidate_slots', so don't 'take' it until after this completes
-            self.shrink_ancient_slots();
+            //self.shrink_ancient_slots();
         }
 
         let shrink_candidates_slots =
