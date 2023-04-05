@@ -2517,8 +2517,8 @@ impl AccountsDb {
 
         let ancient_append_vec_offset = accounts_db_config
             .as_ref()
-            .map(|config| config.ancient_append_vec_offset)
-            .unwrap_or(ANCIENT_APPEND_VEC_DEFAULT_OFFSET);
+            .and_then(|config| config.ancient_append_vec_offset)
+            .or(ANCIENT_APPEND_VEC_DEFAULT_OFFSET);
 
         let exhaustively_verify_refcounts = accounts_db_config
             .as_ref()
