@@ -583,14 +583,14 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
         if self.index.contents.capacity() == current_capacity {
             // make sure to grow to at least % more than the anticipated size
             // The indexing algorithm expects to require some over-allocation.
-            let anticipated_size = self.anticipated_size * 140 / 100;
+            let anticipated_size = self.anticipated_size * 100 / 100;
             let mut m = Measure::start("grow_index");
             //debug!("GROW_INDEX: {}", current_capacity_pow2);
             let mut count = 0;
             loop {
                 count += 1;
                 // grow relative to the current capacity
-                let new_capacity = (current_capacity * 110 / 100).max(anticipated_size);
+                let new_capacity = (current_capacity * 101 / 100).max(anticipated_size);
                 let mut index = BucketStorage::new_with_capacity(
                     Arc::clone(&self.drives),
                     1,
