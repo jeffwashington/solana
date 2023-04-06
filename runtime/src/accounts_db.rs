@@ -4320,6 +4320,7 @@ impl AccountsDb {
             return;
         }
 
+        return;
         let can_randomly_shrink = true;
         if self.create_ancient_storage == CreateAncientStorage::Append {
             self.combine_ancient_slots(
