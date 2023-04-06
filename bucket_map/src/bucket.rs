@@ -275,13 +275,28 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
         Some(elem.read_value(&self.index, &self.data))
     }
 
+    pub fn insert_or_return_existing(&mut self, key: &Pubkey, v: &T) -> Option<T> {
+        loop {
+            match self.try_write(key, std::iter::once(v), 1, 1, true) {
+                Ok(duplicate) => {
+                    return duplicate;
+                }
+                Err(err) => {
+                    self.grow(err);
+                    self.handle_delayed_grows();
+                }
+            }
+        }
+    }
+
     pub fn try_write(
         &mut self,
         key: &Pubkey,
         mut data: impl Iterator<Item = &'b T>,
         data_len: usize,
         ref_count: RefCount,
-    ) -> Result<(), BucketMapError> {
+        return_existing_if_exists: bool,
+    ) -> Result<Option<T>, BucketMapError> {
         let best_fit_bucket = MultipleSlots::data_bucket_from_num_slots(data_len as u64);
         if self.data.get(best_fit_bucket as usize).is_none() {
             // fail early if the data bucket we need doesn't exist - we don't want the index entry partially allocated
@@ -290,6 +305,9 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
         let max_search = self.index.max_search();
         let (elem, elem_ix) = Self::find_index_entry_mut(&mut self.index, key, self.random)?;
         let elem = if let Some(elem) = elem {
+            if return_existing_if_exists {
+                return Ok(Some(*elem.read_value(&self.index, &self.data).0.first().unwrap()));
+            }
             elem
         } else {
             let is_resizing = false;
@@ -320,7 +338,7 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
                     OccupiedEnum::ZeroSlots
                 },
             );
-            return Ok(());
+            return Ok(None);
         }
 
         // storing the slot list requires using the data file
@@ -347,7 +365,7 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
                 slice.iter_mut().zip(data).for_each(|(dest, src)| {
                     *dest = *src;
                 });
-                return Ok(());
+                return Ok(None);
             }
 
             // not updating in place, so remember old entry to free
@@ -412,7 +430,7 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
             // free the entry in the data bucket the data was previously stored in
             self.data[bucket_ix].free(location);
         }
-        Ok(())
+        Ok(None)
     }
 
     pub fn delete_key(&mut self, key: &Pubkey) {
@@ -614,7 +632,7 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
     pub fn insert(&mut self, key: &Pubkey, value: (&[T], RefCount)) {
         let (new, refct) = value;
         loop {
-            let rv = self.try_write(key, new.iter(), new.len(), refct);
+            let rv = self.try_write(key, new.iter(), new.len(), refct, false);
             match rv {
                 Ok(_) => return,
                 Err(err) => {

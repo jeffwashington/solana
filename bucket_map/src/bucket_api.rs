@@ -126,6 +126,12 @@ impl<T: Clone + Copy> BucketApi<T> {
         bucket.as_mut().unwrap().update(key, updatefn)
     }
 
+    pub fn insert_or_return_existing(&self, key: &Pubkey, v: &T) -> Option<T>
+    {
+        let mut bucket = self.get_write_bucket();
+        bucket.as_mut().unwrap().insert_or_return_existing(key, v)
+    }
+
     pub fn try_write(
         &self,
         pubkey: &Pubkey,
@@ -135,6 +141,7 @@ impl<T: Clone + Copy> BucketApi<T> {
         bucket
             .as_mut()
             .unwrap()
-            .try_write(pubkey, value.0.iter(), value.0.len(), value.1)
+            .try_write(pubkey, value.0.iter(), value.0.len(), value.1, false)
+            .map(|_| ())
     }
 }

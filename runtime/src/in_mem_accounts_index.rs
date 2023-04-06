@@ -1067,26 +1067,36 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
         insert.into_iter().for_each(|(slot, k, v)| {
             let entry = (slot, v);
             let new_ref_count = u64::from(!v.is_cached());
-            disk.update(&k, |current| {
-                match current {
-                    Some((current_slot_list, ref_count)) => {
-                        // already on disk, so remember the new (slot, info) for later
-                        duplicates.duplicates.push((slot, k, entry.1));
-                        if let Some((slot, _)) = current_slot_list.first() {
-                            // accurately account for there being a duplicate for the first entry that was previously added to the disk index.
-                            // That entry could not have known yet that it was a duplicate.
-                            // It is important to capture each slot with a duplicate because of slot limits applied to clean.
-                            duplicates.duplicates_put_on_disk.insert((*slot, k));
-                        }
-                        Some((current_slot_list.to_vec(), ref_count))
-                    }
-                    None => {
-                        count += 1;
-                        // not on disk, insert it
-                        Some((vec![(entry.0, entry.1.into())], new_ref_count))
-                    }
+            if true {
+                if let Some(duplicate) = disk.insert_or_return_existing(&k, &(entry.0, entry.1.into())) {
+                    duplicates.duplicates.push((slot, k, entry.1));
+                    // accurately account for there being a duplicate for the first entry that was previously added to the disk index.
+                    // That entry could not have known yet that it was a duplicate.
+                    // It is important to capture each slot with a duplicate because of slot limits applied to clean.
+                    duplicates.duplicates_put_on_disk.insert((duplicate.0, k));
                 }
-            });
+            } else {
+                disk.update(&k, |current| {
+                    match current {
+                        Some((current_slot_list, ref_count)) => {
+                            // already on disk, so remember the new (slot, info) for later
+                            duplicates.duplicates.push((slot, k, entry.1));
+                            if let Some((slot, _)) = current_slot_list.first() {
+                                // accurately account for there being a duplicate for the first entry that was previously added to the disk index.
+                                // That entry could not have known yet that it was a duplicate.
+                                // It is important to capture each slot with a duplicate because of slot limits applied to clean.
+                                duplicates.duplicates_put_on_disk.insert((*slot, k));
+                            }
+                            Some((current_slot_list.to_vec(), ref_count))
+                        }
+                        None => {
+                            count += 1;
+                            // not on disk, insert it
+                            Some((vec![(entry.0, entry.1.into())], new_ref_count))
+                        }
+                    }
+                });
+            }
         });
         // remove the guidance for how many entries the bucket will eventually contain since we have added all we knew about
         disk.set_anticipated_count(0);
