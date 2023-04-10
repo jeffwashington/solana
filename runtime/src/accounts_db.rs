@@ -538,7 +538,7 @@ impl Default for FillerAccountsConfig {
     }
 }
 
-const ANCIENT_APPEND_VEC_DEFAULT_OFFSET: Option<i64> = Some(-10_000);
+const ANCIENT_APPEND_VEC_DEFAULT_OFFSET: Option<i64> = Some(50_000);
 
 #[derive(Debug, Default, Clone)]
 pub struct AccountsDbConfig {
@@ -995,8 +995,7 @@ impl<'a> ReadableAccount for LoadedAccount<'a> {
         }
     }
 }
-
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum AccountsHashVerificationError {
     MissingAccountsHash,
     MismatchedAccountsHash,
@@ -1364,6 +1363,7 @@ type AccountInfoAccountsIndex = AccountsIndex<AccountInfo, AccountInfo>;
 // This structure handles the load/store of the accounts
 #[derive(Debug)]
 pub struct AccountsDb {
+    pub hash_calc: Mutex<()>,
     /// Keeps tracks of index into AppendVec on a per slot basis
     pub accounts_index: AccountInfoAccountsIndex,
 
@@ -2093,7 +2093,8 @@ impl ShrinkStats {
 
 impl ShrinkAncientStats {
     pub(crate) fn report(&self) {
-        if self.shrink_stats.last_report.should_update(1000) {
+        {
+            //if self.shrink_stats.last_report.should_update(1000) {
             datapoint_info!(
                 "shrink_ancient_stats",
                 (
@@ -2409,6 +2410,7 @@ impl AccountsDb {
             filler_account_slots_remaining: AtomicU64::default(),
             active_stats: ActiveStats::default(),
             accounts_hash_complete_oldest_non_ancient_slot: RwLock::default(),
+            hash_calc: Mutex::default(),
             skip_initial_hash_calc: false,
             ancient_append_vec_offset: None,
             accounts_index,
@@ -2916,14 +2918,18 @@ impl AccountsDb {
             .accounts_hash_complete_oldest_non_ancient_slot
             .write()
             .unwrap();
+        error!("notify_accounts_hash_calculated_complete: completed: {}, prior_oldest: {}, one_epoch_old: {}, max: {}",
+        completed_slot, *accounts_hash_complete_oldest_non_ancient_slot,
+        one_epoch_old_slot,
+        std::cmp::max(
+            *accounts_hash_complete_oldest_non_ancient_slot,
+            one_epoch_old_slot,
+        )
+    );
         *accounts_hash_complete_oldest_non_ancient_slot = std::cmp::max(
             *accounts_hash_complete_oldest_non_ancient_slot,
             one_epoch_old_slot,
         );
-        if let Some(offset) = self.ancient_append_vec_offset {
-            *accounts_hash_complete_oldest_non_ancient_slot =
-                Self::apply_offset_to_slot(*accounts_hash_complete_oldest_non_ancient_slot, offset);
-        }
 
         let accounts_hash_complete_oldest_non_ancient_slot =
             *accounts_hash_complete_oldest_non_ancient_slot;
@@ -2935,10 +2941,14 @@ impl AccountsDb {
     /// get the oldest slot that is within one epoch of the highest slot that has been used for hash calculation.
     /// The slot will have been offset by `self.ancient_append_vec_offset`
     fn get_accounts_hash_complete_oldest_non_ancient_slot(&self) -> Slot {
-        *self
+        let mut result = *self
             .accounts_hash_complete_oldest_non_ancient_slot
             .read()
-            .unwrap()
+            .unwrap();
+        if let Some(offset) = self.ancient_append_vec_offset {
+            result = Self::apply_offset_to_slot(result, offset);
+        }
+        result
     }
 
     /// Collect all the uncleaned slots, up to a max slot
@@ -3228,7 +3238,7 @@ impl AccountsDb {
                         let mut not_found_on_fork = 0;
                         let mut missing = 0;
                         let mut useful = 0;
-                        self.accounts_index.scan(
+                        self.accounts_index.scan2(
                             pubkeys.iter(),
                             |pubkey, slots_refs, _entry| {
                                 let mut useless = true;
@@ -3297,6 +3307,7 @@ impl AccountsDb {
                             },
                             None,
                             false,
+                            line!(),
                         );
                         found_not_zero_accum.fetch_add(found_not_zero, Ordering::Relaxed);
                         not_found_on_fork_accum.fetch_add(not_found_on_fork, Ordering::Relaxed);
@@ -3377,7 +3388,7 @@ impl AccountsDb {
                         .storage
                         .get_account_storage_entry(*slot, account_info.store_id())
                         .map(|store| store.count())
-                        .unwrap()
+                        .expect(&format!("{}", *slot))
                         - 1;
                     debug!(
                         "store_counts, inserting slot: {}, store id: {}, count: {}",
@@ -3784,12 +3795,13 @@ impl AccountsDb {
         let mut index = 0;
         let mut all_are_zero_lamports = true;
         let mut index_entries_being_shrunk = Vec::with_capacity(accounts.len());
-        self.accounts_index.scan(
+        self.accounts_index.scan2(
             accounts.iter().map(|account| account.pubkey()),
             |pubkey, slots_refs, entry| {
                 let mut result = AccountsIndexScanResult::None;
                 if let Some((slot_list, ref_count)) = slots_refs {
                     let stored_account = &accounts[index];
+                    assert_eq!(pubkey, stored_account.pubkey());
                     let is_alive = slot_list.iter().any(|(slot, _acct_info)| {
                         // if the accounts index contains an entry at this slot, then the append vec we're asking about contains this item and thus, it is alive at this slot
                         *slot == slot_to_shrink
@@ -3816,6 +3828,7 @@ impl AccountsDb {
             },
             None,
             true,
+            line!(),
         );
         assert_eq!(index, std::cmp::min(accounts.len(), count));
         stats.alive_accounts.fetch_add(alive, Ordering::Relaxed);
@@ -4328,21 +4341,31 @@ impl AccountsDb {
 
     /// get a sorted list of slots older than an epoch
     /// squash those slots into ancient append vecs
-    fn shrink_ancient_slots(&self) {
+    pub fn shrink_ancient_slots(&self) {
+        error!("shrink_ancient_slots: {}", line!());
         if self.ancient_append_vec_offset.is_none() {
+            error!("shrink_ancient_slots: {}", line!());
             return;
         }
 
         let can_randomly_shrink = true;
-        if self.create_ancient_storage == CreateAncientStorage::Append {
+        if false && self.create_ancient_storage == CreateAncientStorage::Append {
+            error!("shrink_ancient_slots: {}", line!());
             self.combine_ancient_slots(
                 self.get_sorted_potential_ancient_slots(),
                 can_randomly_shrink,
             );
         } else {
+            error!("shrink_ancient_slots: {}", line!());
             self.combine_ancient_slots_packed(
                 self.get_sorted_potential_ancient_slots(),
                 can_randomly_shrink,
+            );
+            error!(
+                "shrink_ancient_slots: {}, slots: {}, newest ancient: {}",
+                line!(),
+                self.get_sorted_potential_ancient_slots().len(),
+                self.get_accounts_hash_complete_oldest_non_ancient_slot()
             );
         }
     }
@@ -7558,9 +7581,12 @@ impl AccountsDb {
     /// if we ever try to calc hash where there are squashed append vecs within the last epoch, we will fail
     fn assert_safe_squashing_accounts_hash(&self, slot: Slot, epoch_schedule: &EpochSchedule) {
         let previous = self.get_accounts_hash_complete_oldest_non_ancient_slot();
-        let current = Self::get_oldest_slot_within_one_epoch_prior(slot, epoch_schedule);
+        let mut current = Self::get_oldest_slot_within_one_epoch_prior(slot, epoch_schedule);
+        if let Some(offset) = self.ancient_append_vec_offset {
+            current = Self::apply_offset_to_slot(current, offset);
+        }
         assert!(
-            previous <= current,
+             previous <= current,
             "get_accounts_hash_complete_oldest_non_ancient_slot: {previous}, get_oldest_slot_within_one_epoch_prior: {current}, slot: {slot}"
         );
     }
@@ -7641,6 +7667,7 @@ impl AccountsDb {
         flavor: CalcAccountsHashFlavor,
         accounts_hash_cache_path: PathBuf,
     ) -> Result<(AccountsHashEnum, u64), AccountsHashVerificationError> {
+        let _hold = self.hash_calc.lock().unwrap();
         let _guard = self.active_stats.activate(ActiveStatItem::Hash);
         stats.oldest_root = storages.range().start;
 
@@ -8192,7 +8219,7 @@ impl AccountsDb {
         self.thread_pool_clean.install(|| {
             (0..batches).into_par_iter().for_each(|batch| {
                 let skip = batch * UNREF_ACCOUNTS_BATCH_SIZE;
-                self.accounts_index.scan(
+                self.accounts_index.scan2(
                     pubkeys
                         .clone()
                         .skip(skip)
@@ -8209,6 +8236,7 @@ impl AccountsDb {
                     },
                     Some(AccountsIndexScanResult::Unref),
                     false,
+                    line!(),
                 )
             });
         });

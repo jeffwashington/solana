@@ -291,6 +291,7 @@ impl<T: IndexValue> AccountMapEntryInner<T> {
         let previous = self.ref_count.fetch_sub(1, Ordering::Release);
         self.set_dirty(true);
         if previous == 0 {
+            error!("unref to 0");
             inc_new_counter_info!("accounts_index-deref_from_0", 1);
         }
         previous == 0
@@ -1357,12 +1358,13 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
     ///   apply 'avoid_callback_result' if specified.
     ///   otherwise, call `callback`
     /// if 'provide_entry_in_callback' is true, populate callback with the Arc of the entry itself.
-    pub(crate) fn scan<'a, F, I>(
+    pub(crate) fn scan2<'a, F, I>(
         &self,
         pubkeys: I,
         mut callback: F,
         avoid_callback_result: Option<AccountsIndexScanResult>,
         provide_entry_in_callback: bool,
+        line: u32,
     ) where
         // params:
         //  pubkey looked up
@@ -1406,7 +1408,8 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
                         cache = match result {
                             AccountsIndexScanResult::Unref => {
                                 if locked_entry.unref() {
-                                    info!("scan: refcount of item already at 0: {pubkey}");
+                                    info!("scan: refcount of item already at 0: {pubkey}, line: {line}");
+                                    panic!("scan: refcount of item already at 0: {pubkey}, line: {line}")
                                 }
                                 true
                             }

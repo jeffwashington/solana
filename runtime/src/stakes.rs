@@ -237,7 +237,16 @@ impl Stakes<StakeAccount> {
             };
             let vote_account = vote_account.account();
             if vote_account != &account {
-                error!("vote account mismatch: {pubkey}, {vote_account:?}, {account:?}");
+                error!(
+                    "vote account mismatch: {pubkey}, {vote_account:?}, {account:?}, {:?}",
+                    (
+                        vote_account.lamports() != account.lamports(),
+                        vote_account.rent_epoch() != account.rent_epoch(),
+                        vote_account.data() != account.data(),
+                        vote_account.owner() != account.owner(),
+                        vote_account.executable() != account.executable(),
+                    )
+                );
                 return Err(Error::VoteAccountMismatch(*pubkey));
             }
         }

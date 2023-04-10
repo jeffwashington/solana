@@ -1737,7 +1737,7 @@ impl Bank {
         let epoch = self.epoch();
         let slot = self.slot();
         let (thread_pool, thread_pool_time) = measure!(
-            ThreadPoolBuilder::new().build().unwrap(),
+            ThreadPoolBuilder::new().thread_name(|i| format!("process_new_epoch{i:02}")).build().unwrap(),
             "thread_pool_creation",
         );
 
@@ -7391,6 +7391,7 @@ impl Bank {
         last_full_snapshot_slot: Slot,
         base: Option<(Slot, /*capitalization*/ u64)>,
     ) -> bool {
+        let accounts_db_skip_shrink = true;
         let (_, clean_time_us) = measure_us!({
             let should_clean = !accounts_db_skip_shrink && self.slot() > 0;
             if should_clean {
@@ -7425,7 +7426,7 @@ impl Bank {
         });
 
         let (verified_accounts, verify_accounts_time_us) = measure_us!({
-            let should_verify_accounts = !self.rc.accounts.accounts_db.skip_initial_hash_calc;
+            let should_verify_accounts = true;//false; // !self.rc.accounts.accounts_db.skip_initial_hash_calc;
             if should_verify_accounts {
                 info!("Verifying accounts...");
                 let verified = self.verify_accounts_hash(
@@ -7434,7 +7435,7 @@ impl Bank {
                         test_hash_calculation,
                         ignore_mismatch: false,
                         require_rooted_bank: false,
-                        run_in_background: true,
+                        run_in_background: false,
                         store_hash_raw_data_for_debug: false,
                     },
                 );
