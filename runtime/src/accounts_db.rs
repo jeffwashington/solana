@@ -8964,6 +8964,7 @@ impl AccountsDb {
             genesis_config.slots_per_year(),
             genesis_config.rent,
         );
+        assert_eq!(432_000, schedule.slots_per_epoch);
         let accounts_data_len = AtomicU64::new(0);
 
         let rent_paying_accounts_by_partition =
