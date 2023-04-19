@@ -4347,7 +4347,7 @@ impl AccountsDb {
         }
 
         let can_randomly_shrink = true;
-        if self.create_ancient_storage == CreateAncientStorage::Append {
+        if false && self.create_ancient_storage == CreateAncientStorage::Append {
             self.combine_ancient_slots(
                 self.get_sorted_potential_ancient_slots(),
                 can_randomly_shrink,
