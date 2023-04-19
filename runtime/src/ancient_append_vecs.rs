@@ -3,6 +3,8 @@
 //! 1. a slot that is older than an epoch old
 //! 2. multiple 'slots' squashed into a single older (ie. ancient) slot for convenience and performance
 //! Otherwise, an ancient append vec is the same as any other append vec
+
+use crate::accounts_db::ShrinkCollectRefs;
 use {
     crate::{
         account_storage::{meta::StoredAccountMeta, ShrinkInProgress},
@@ -452,6 +454,9 @@ impl AccountsDb {
             .zip(packed_contents)
             .collect::<Vec<_>>();
 
+        log::error!("shrink_pack4: # accounts {:?}", packer.iter().map(|(target_slot, pack)| pack.accounts.iter().map(|(_, a)| a.len()).sum::<usize>()).collect::<Vec<_>>());
+        log::error!("shrink_pack4: bytes: {:?}", packer.iter().map(|(target_slot, pack)| pack.bytes).collect::<Vec<_>>());
+
         // keep track of how many slots were shrunk away
         self.shrink_ancient_stats
             .ancient_append_vecs_shrunk
@@ -483,11 +488,14 @@ impl AccountsDb {
 
         let mut write_ancient_accounts = write_ancient_accounts.into_inner().unwrap();
 
+        let (_, us) = measure_us!(
         // write new storages where contents were unable to move because ref_count > 1
         self.write_ancient_accounts_to_same_slot_multiple_refs(
             accounts_to_combine.accounts_keep_slots.values(),
             &mut write_ancient_accounts,
-        );
+        ));
+        log::error!("shrink_pack4: # multiple refs: {:?}, # accts: {:?}, # bytes: {}, took: {}us", accounts_to_combine.accounts_keep_slots.len(),  accounts_to_combine.accounts_keep_slots.iter().map(|(_, alive_accounts)| alive_accounts.accounts.len()).sum::<usize>(),  accounts_to_combine.accounts_keep_slots.iter().map(|(_, alive_accounts)| alive_accounts.alive_bytes()).sum::<usize>(), us);
+
         write_ancient_accounts
     }
 
@@ -569,17 +577,28 @@ impl AccountsDb {
                 })
                 .collect::<Vec<_>>()
         });
-
+        let mut skipping = 0;
+        let mut i = 0;
+        let mut remove = vec![];
+        let mut many_ref_slots = std::collections::HashSet::<Slot>::default();
         for (shrink_collect, (info, _unique_accounts)) in accounts_to_combine
             .iter_mut()
             .zip(accounts_per_storage.iter())
         {
+            i += 1;
             self.revisit_accounts_with_many_refs(shrink_collect);
             let many_refs = &mut shrink_collect.alive_accounts.many_refs;
             if !many_refs.accounts.is_empty() {
                 // there are accounts with ref_count > 1. This means this account must remain IN this slot.
                 // The same account could exist in a newer or older slot. Moving this account across slots could result
                 // in this alive version of the account now being in a slot OLDER than the non-alive instances.
+                if shrink_collect.unrefed_pubkeys.is_empty() && shrink_collect.alive_accounts.one_ref.accounts.is_empty() {
+                    // only accounts in this append vec are alive and have > 1 ref, so nothing to be done for this append vec
+                    skipping += 1usize;
+                    remove.push(i-1);
+                    continue;
+                }
+                many_ref_slots.insert(info.slot);
                 accounts_keep_slots.insert(info.slot, std::mem::take(many_refs));
             } else {
                 // No alive accounts in this slot have a ref_count > 1. So, ALL alive accounts in this slot can be written to any other slot
@@ -587,6 +606,17 @@ impl AccountsDb {
                 target_slots_sorted.push(info.slot);
             }
         }
+        remove.into_iter().rev().for_each(|i| {
+            accounts_to_combine.remove(i);
+        });
+        log::error!("shrink_pack4: slots: {:?}", accounts_per_storage.iter().map(|(info, results)| info.slot).take(30).collect::<Vec<_>>());
+        log::error!("shrink_pack4: should_shrink: {:?}", accounts_per_storage.iter().map(|(info, results)| info.should_shrink).take(30).collect::<Vec<_>>());
+        log::error!("shrink_pack4: capacity: {:?}", accounts_per_storage.iter().map(|(info, results)| info.capacity).take(30).collect::<Vec<_>>());
+        log::error!("shrink_pack4: alive_bytes: {:?}", accounts_per_storage.iter().map(|(info, results)| info.alive_bytes).take(30).collect::<Vec<_>>());
+        log::error!("shrink_pack4: shrink_collect.one_ref: {:?}", accounts_to_combine.iter().map(|sc| sc.alive_accounts.one_ref.accounts.len()).take(30).collect::<Vec<_>>());
+        log::error!("shrink_pack4: shrink_collect.many_refs: {:?}", accounts_to_combine.iter().map(|sc| sc.alive_accounts.many_refs.accounts.len()).take(30).collect::<Vec<_>>());
+        log::error!("shrink_pack4: shrink_collect.many_refs with 0 one ref: {:?}", accounts_to_combine.iter().filter(|sc| sc.alive_accounts.one_ref.accounts.is_empty() && many_ref_slots.contains(&sc.slot)).count());
+        log::error!("shrink_pack4: shrink_collect.many_refs with 0 one ref, 0 unref'd: {:?}, skipped: {skipping}", accounts_to_combine.iter().filter(|sc| sc.alive_accounts.one_ref.accounts.is_empty() && many_ref_slots.contains(&sc.slot) && sc.unrefed_pubkeys.is_empty()).count());
         AccountsToCombine {
             accounts_to_combine,
             accounts_keep_slots,
