@@ -538,7 +538,7 @@ impl Default for FillerAccountsConfig {
     }
 }
 
-const ANCIENT_APPEND_VEC_DEFAULT_OFFSET: Option<i64> = Some(-10_000);
+const ANCIENT_APPEND_VEC_DEFAULT_OFFSET: Option<i64> = Some(300_000);
 
 #[derive(Debug, Default, Clone)]
 pub struct AccountsDbConfig {
@@ -4347,7 +4347,7 @@ impl AccountsDb {
         }
 
         let can_randomly_shrink = true;
-        if self.create_ancient_storage == CreateAncientStorage::Append {
+        if false && self.create_ancient_storage == CreateAncientStorage::Append {
             self.combine_ancient_slots(
                 self.get_sorted_potential_ancient_slots(),
                 can_randomly_shrink,
@@ -6923,7 +6923,6 @@ impl AccountsDb {
         // We'll also accumulate the lamports within each chunk and fewer chunks results in less contention to accumulate the sum.
         let chunks = crate::accounts_hash::MERKLE_FANOUT.pow(4);
         let total_lamports = Mutex::<u64>::new(0);
-        let stats = HashStats::default();
 
         let get_hashes = || {
             keys.par_chunks(chunks)
@@ -7014,16 +7013,6 @@ impl AccountsDb {
             ("hash", hash_time.as_us(), i64),
             ("hash_total", hash_total, i64),
             ("collect", collect.as_us(), i64),
-            (
-                "rehashed_rewrites",
-                stats.rehash_required.load(Ordering::Relaxed),
-                i64
-            ),
-            (
-                "rehashed_rewrites_unnecessary",
-                stats.rehash_unnecessary.load(Ordering::Relaxed),
-                i64
-            ),
         );
         self.assert_safe_squashing_accounts_hash(max_slot, config.epoch_schedule);
 

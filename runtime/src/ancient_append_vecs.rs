@@ -3,6 +3,8 @@
 //! 1. a slot that is older than an epoch old
 //! 2. multiple 'slots' squashed into a single older (ie. ancient) slot for convenience and performance
 //! Otherwise, an ancient append vec is the same as any other append vec
+
+use crate::accounts_db::ShrinkCollectRefs;
 use {
     crate::{
         account_storage::{meta::StoredAccountMeta, ShrinkInProgress},
@@ -258,6 +260,7 @@ impl AccountsDb {
         sorted_slots: Vec<Slot>,
         can_randomly_shrink: bool,
     ) {
+        log::error!("{}, slots: {}", line!(), sorted_slots.len());
         let tuning = PackedAncientStorageTuning {
             // only allow 10k slots old enough to be ancient
             max_ancient_slots: 10_000,
@@ -284,7 +287,7 @@ impl AccountsDb {
 
         // only log when we've spent 1s total
         // results will continue to accumulate otherwise
-        if self.shrink_ancient_stats.total_us.load(Ordering::Relaxed) > 1_000_000 {
+        if true { //self.shrink_ancient_stats.total_us.load(Ordering::Relaxed) > 1_000_000 {
             self.shrink_ancient_stats.report();
         }
     }
@@ -306,7 +309,15 @@ impl AccountsDb {
                 &ancient_slot_infos.all_infos[..],
             );
 
-        let accounts_to_combine = self.calc_accounts_to_combine(&accounts_per_storage);
+        let mut accounts_to_combine = self.calc_accounts_to_combine(&accounts_per_storage);
+        for i in 0..accounts_to_combine.accounts_to_combine.len() {
+            let swap =
+            thread_rng().gen_range(0, accounts_to_combine.accounts_to_combine.len());
+            if swap != i {
+                let x = &mut accounts_to_combine.accounts_to_combine;
+                x.swap(i, swap);
+            }
+        }
 
         // pack the accounts with 1 ref
         let pack = PackedAncientStorage::pack(
@@ -418,7 +429,7 @@ impl AccountsDb {
 
         for slot in &slots {
             if let Some(storage) = self.storage.get_slot_storage_entry(*slot) {
-                if infos.add(*slot, storage, can_randomly_shrink) {
+                if infos.add(*slot, storage, can_randomly_shrink && false) {
                     randoms += 1;
                 }
             }
@@ -452,6 +463,9 @@ impl AccountsDb {
             .zip(packed_contents)
             .collect::<Vec<_>>();
 
+        log::error!("shrink_pack4: # accounts {:?}", packer.iter().map(|(target_slot, pack)| pack.accounts.iter().map(|(_, a)| a.len()).sum::<usize>()).collect::<Vec<_>>());
+        log::error!("shrink_pack4: bytes: {:?}", packer.iter().map(|(target_slot, pack)| pack.bytes).collect::<Vec<_>>());
+
         // keep track of how many slots were shrunk away
         self.shrink_ancient_stats
             .ancient_append_vecs_shrunk
@@ -483,11 +497,14 @@ impl AccountsDb {
 
         let mut write_ancient_accounts = write_ancient_accounts.into_inner().unwrap();
 
+        let (_, us) = measure_us!(
         // write new storages where contents were unable to move because ref_count > 1
         self.write_ancient_accounts_to_same_slot_multiple_refs(
             accounts_to_combine.accounts_keep_slots.values(),
             &mut write_ancient_accounts,
-        );
+        ));
+        log::error!("shrink_pack4: # multiple refs: {:?}, # accts: {:?}, # bytes: {}, took: {}us", accounts_to_combine.accounts_keep_slots.len(),  accounts_to_combine.accounts_keep_slots.iter().map(|(_, alive_accounts)| alive_accounts.accounts.len()).sum::<usize>(),  accounts_to_combine.accounts_keep_slots.iter().map(|(_, alive_accounts)| alive_accounts.alive_bytes()).sum::<usize>(), us);
+
         write_ancient_accounts
     }
 
@@ -599,6 +616,12 @@ impl AccountsDb {
         remove.into_iter().rev().for_each(|i| {
             accounts_to_combine.remove(i);
         });
+        log::error!("shrink_pack4: slots: {:?}", accounts_per_storage.iter().map(|(info, results)| info.slot).take(30).collect::<Vec<_>>());
+        log::error!("shrink_pack4: should_shrink: {:?}", accounts_per_storage.iter().map(|(info, results)| info.should_shrink).take(30).collect::<Vec<_>>());
+        log::error!("shrink_pack4: capacity: {:?}", accounts_per_storage.iter().map(|(info, results)| info.capacity).take(30).collect::<Vec<_>>());
+        log::error!("shrink_pack4: alive_bytes: {:?}", accounts_per_storage.iter().map(|(info, results)| info.alive_bytes).take(30).collect::<Vec<_>>());
+        log::error!("shrink_pack4: shrink_collect.one_ref: {:?}", accounts_to_combine.iter().map(|sc| sc.alive_accounts.one_ref.accounts.len()).take(30).collect::<Vec<_>>());
+        log::error!("shrink_pack4: shrink_collect.many_refs: {:?}", accounts_to_combine.iter().map(|sc| sc.alive_accounts.many_refs.accounts.len()).take(30).collect::<Vec<_>>());
         AccountsToCombine {
             accounts_to_combine,
             accounts_keep_slots,
