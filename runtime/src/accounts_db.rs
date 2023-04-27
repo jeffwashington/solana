@@ -1364,6 +1364,7 @@ type AccountInfoAccountsIndex = AccountsIndex<AccountInfo, AccountInfo>;
 // This structure handles the load/store of the accounts
 #[derive(Debug)]
 pub struct AccountsDb {
+    pub lock_abs: RwLock<bool>,
     /// Keeps tracks of index into AppendVec on a per slot basis
     pub accounts_index: AccountInfoAccountsIndex,
 
@@ -2407,6 +2408,7 @@ impl AccountsDb {
         const ACCOUNTS_STACK_SIZE: usize = 8 * 1024 * 1024;
 
         AccountsDb {
+            lock_abs: RwLock::default(),
             assert_stakes_cache_consistency: false,
             bank_progress: BankCreationFreezingProgress::default(),
             create_ancient_storage: CreateAncientStorage::Append,
@@ -2914,6 +2916,10 @@ impl AccountsDb {
         }
     }
 
+    pub fn lock_abs(&self) {
+        *self.lock_abs.write().unwrap() = true;
+    }
+
     /// hash calc is completed as of 'slot'
     /// so, any process that wants to take action on really old slots can now proceed up to 'completed_slot'-slots per epoch
     pub fn notify_accounts_hash_calculated_complete(
@@ -3189,6 +3195,9 @@ impl AccountsDb {
         is_startup: bool,
         last_full_snapshot_slot: Option<Slot>,
     ) {
+        if *self.lock_abs.read().unwrap() {
+            return;
+        }
         if self.exhaustively_verify_refcounts {
             self.exhaustively_verify_refcounts(max_clean_root_inclusive);
         }
@@ -4343,6 +4352,7 @@ impl AccountsDb {
     /// squash those slots into ancient append vecs
     pub fn shrink_ancient_slots(&self) {
         if self.ancient_append_vec_offset.is_none() {
+            log::error!("{}", line!());
             return;
         }
 
@@ -4701,6 +4711,9 @@ impl AccountsDb {
     }
 
     pub fn shrink_candidate_slots(&self) -> usize {
+        if *self.lock_abs.read().unwrap() {
+            return 0;
+        }
         if !self.shrink_candidate_slots.lock().unwrap().is_empty() {
             // this can affect 'shrink_candidate_slots', so don't 'take' it until after this completes
             self.shrink_ancient_slots();

@@ -6995,6 +6995,8 @@ impl Bank {
     }
 
     pub fn run_final_hash_calc(&self, on_halt_store_hash_raw_data_for_debug: bool) {
+        self.rc.accounts.accounts_db.lock_abs();
+        self.rc.accounts.accounts_db.active_stats.wait_for_inactive();
         self.force_flush_accounts_cache();
         // note that this slot may not be a root
         _ = self.verify_accounts_hash(
@@ -7007,19 +7009,21 @@ impl Bank {
                 store_hash_raw_data_for_debug: on_halt_store_hash_raw_data_for_debug,
             },
         );
-        self.rc.accounts.accounts_db.notify_accounts_hash_calculated_complete(self.slot(), self.epoch_schedule());
-        self.rc.accounts.accounts_db.shrink_ancient_slots();
-        // note that this slot may not be a root
-        _ = self.verify_accounts_hash(
-            None,
-            VerifyAccountsHashConfig {
-                test_hash_calculation: false,
-                ignore_mismatch: true,
-                require_rooted_bank: false,
-                run_in_background: false,
-                store_hash_raw_data_for_debug: on_halt_store_hash_raw_data_for_debug,
-            },
-        );
+        self.rc.accounts.accounts_db.notify_accounts_hash_calculated_complete(189656710, self.epoch_schedule());
+        for _ in 0..1000 {
+            self.rc.accounts.accounts_db.shrink_ancient_slots();
+            // note that this slot may not be a root
+            _ = self.verify_accounts_hash(
+                None,
+                VerifyAccountsHashConfig {
+                    test_hash_calculation: false,
+                    ignore_mismatch: true,
+                    require_rooted_bank: false,
+                    run_in_background: false,
+                    store_hash_raw_data_for_debug: on_halt_store_hash_raw_data_for_debug,
+                },
+            );
+        }
     }
 
     /// Recalculate the hash_internal_state from the account stores. Would be used to verify a

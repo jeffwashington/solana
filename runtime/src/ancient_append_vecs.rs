@@ -95,7 +95,7 @@ impl AncientSlotInfos {
             let should_shrink = if capacity > 0 {
                 let alive_ratio = alive_bytes * 100 / capacity;
                 alive_ratio < 90
-                    || if can_randomly_shrink && thread_rng().gen_range(0, 10000) == 0 {
+                    || if can_randomly_shrink && thread_rng().gen_range(0, 10) == 0 {
                         was_randomly_shrunk = true;
                         true
                     } else {
@@ -260,6 +260,7 @@ impl AccountsDb {
         sorted_slots: Vec<Slot>,
         can_randomly_shrink: bool,
     ) {
+        log::error!("{}, slots: {}", line!(), sorted_slots.len());
         let tuning = PackedAncientStorageTuning {
             // only allow 10k slots old enough to be ancient
             max_ancient_slots: 10_000,
@@ -286,7 +287,7 @@ impl AccountsDb {
 
         // only log when we've spent 1s total
         // results will continue to accumulate otherwise
-        if self.shrink_ancient_stats.total_us.load(Ordering::Relaxed) > 1_000_000 {
+        if true { //self.shrink_ancient_stats.total_us.load(Ordering::Relaxed) > 1_000_000 {
             self.shrink_ancient_stats.report();
         }
     }

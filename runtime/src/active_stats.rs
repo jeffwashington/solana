@@ -46,6 +46,16 @@ impl ActiveStats {
             item: stat,
         }
     }
+    pub fn wait_for_inactive(&self) {
+        let vars = [&self.clean,
+        &self.shrink,
+        &self.squash_ancient,
+        &self.hash,
+        &self.flush,];
+        while vars.iter().map(|x| x.load(Ordering::Relaxed)).sum::<usize>() > 0 {
+            // wait
+        }
+    }
     /// update and log the change to the specified 'item'
     fn update_and_log(&self, item: ActiveStatItem, modify_stat: impl Fn(&AtomicUsize) -> usize) {
         let stat = match item {
