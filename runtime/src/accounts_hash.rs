@@ -239,7 +239,7 @@ impl HashStats {
     }
 }
 
-#[derive(Default, Debug, PartialEq, Eq, Clone)]
+#[derive(Default, Debug, PartialEq, Eq, Clone, PartialOrd, Ord)]
 pub struct CalculateHashIntermediate {
     pub hash: Hash,
     pub lamports: u64,

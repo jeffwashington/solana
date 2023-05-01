@@ -789,11 +789,13 @@ where
         verify_index,
         genesis_config,
     );
+    error!("{}{}", file!(), line!());
     accounts_db
         .accounts_index
         .rent_paying_accounts_by_partition
         .set(rent_paying_accounts_by_partition)
         .unwrap();
+        error!("{}{}", file!(), line!());
 
     accounts_db.maybe_add_filler_accounts(
         &genesis_config.epoch_schedule,
@@ -801,7 +803,9 @@ where
         snapshot_slot,
     );
 
+    error!("{}{}", file!(), line!());
     handle.join().unwrap();
+    error!("{}{}", file!(), line!());
     measure_notify.stop();
 
     datapoint_info!(
