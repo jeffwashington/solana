@@ -3246,6 +3246,9 @@ impl AccountsDb {
                             |pubkey, slots_refs, _entry| {
                                 let mut useless = true;
                                 if let Some((slot_list, ref_count)) = slots_refs {
+                                    let non_cached_entries = slot_list.iter().filter_map(|(_, info)| (!info.is_cached()).then_some(())).count() as u64;
+                                    assert!(non_cached_entries <= ref_count, "non_cached_entries: {}, rc: {}, {:?}, {}", non_cached_entries, ref_count, slot_list, pubkey);
+                            
                                     let index_in_slot_list = self.accounts_index.latest_slot(
                                         None,
                                         slot_list,
@@ -8852,17 +8855,6 @@ impl AccountsDb {
                 if pubkey == interesting || stored_account.hash() == &ih {
                     log::error!("{}, {}, {}, {}", pubkey, stored_account.hash(), slot, stored_account.lamports());
                 }
-
-                let hash = Self::hash_account(191374315, &stored_account, &pubkey, IncludeSlotInHash::IncludeSlot);
-                if pubkey == interesting || hash == ih {
-                    log::error!("store {}, {}, {}, {} (at 191374315)", pubkey, hash, 191374315, stored_account.lamports());
-                }
-                let hash = Self::hash_account(190944004, &stored_account, &pubkey, IncludeSlotInHash::IncludeSlot);
-                if pubkey == interesting || hash == ih {
-                    log::error!("store {}, {}, {}, {} (at 190944004)", pubkey, hash, 190944004, stored_account.lamports());
-                }
-                
-    
                 if secondary {
                     self.accounts_index.update_secondary_indexes(
                         &pubkey,

@@ -396,7 +396,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
                 else {
                     let rc = occupied.get().ref_count() as usize;
                     let non_cached_entries = occupied.get().slot_list.read().unwrap().iter().filter_map(|(_, info)| (!info.is_cached()).then_some(())).count();
-                    assert!(non_cached_entries <= rc, "non_cached_entries: {}, rc: {}", non_cached_entries, rc);
+                    //assert!(non_cached_entries <= rc, "non_cached_entries: {}, rc: {}", non_cached_entries, rc);
                 }
                 result
             }
@@ -471,7 +471,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
 
         let rc = entry.ref_count() as usize;
         let non_cached_entries = entry.slot_list.read().unwrap().iter().filter_map(|(_, info)| (!info.is_cached()).then_some(())).count();
-        assert!(non_cached_entries <= rc, "non_cached_entries: {}, rc: {}", non_cached_entries, rc);
+        //assert!(non_cached_entries <= rc, "non_cached_entries: {}, rc: {}", non_cached_entries, rc);
 
         self.set_age_to_future(entry, upsert_cached);
     }
