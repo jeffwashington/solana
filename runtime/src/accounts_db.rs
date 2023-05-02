@@ -8852,6 +8852,17 @@ impl AccountsDb {
                 if pubkey == interesting || stored_account.hash() == &ih {
                     log::error!("{}, {}, {}, {}", pubkey, stored_account.hash(), slot, stored_account.lamports());
                 }
+
+                let hash = Self::hash_account(191374315, &stored_account, &pubkey, IncludeSlotInHash::IncludeSlot);
+                if pubkey == interesting || hash == ih {
+                    log::error!("store {}, {}, {}, {} (at 191374315)", pubkey, hash, 191374315, stored_account.lamports());
+                }
+                let hash = Self::hash_account(190944004, &stored_account, &pubkey, IncludeSlotInHash::IncludeSlot);
+                if pubkey == interesting || hash == ih {
+                    log::error!("store {}, {}, {}, {} (at 190944004)", pubkey, hash, 190944004, stored_account.lamports());
+                }
+                
+    
                 if secondary {
                     self.accounts_index.update_secondary_indexes(
                         &pubkey,
