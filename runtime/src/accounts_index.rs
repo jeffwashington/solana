@@ -291,6 +291,7 @@ impl<T: IndexValue> AccountMapEntryInner<T> {
         let previous = self.ref_count.fetch_sub(1, Ordering::Release);
         self.set_dirty(true);
         if previous == 0 {
+            log::error!("accounts_index-deref_from_0");
             inc_new_counter_info!("accounts_index-deref_from_0", 1);
         }
         previous == 0

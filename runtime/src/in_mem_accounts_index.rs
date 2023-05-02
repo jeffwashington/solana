@@ -383,9 +383,20 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
                     // We have to have a write lock to the map here, which means nobody else can get
                     //  the arc, but someone may already have retrieved a clone of it.
                     // account index in_mem flushing is one such possibility
+                    if Arc::strong_count(occupied.get()) > 1 {
+                        log::error!("removing when arc ref count > 1");
+                    }
+                    if occupied.get().ref_count() > 0 {
+                        log::error!("ref count > 0 when deleting: {}", occupied.get().ref_count());
+                    }
                     self.delete_disk_key(occupied.key());
                     self.stats().dec_mem_count(self.bin);
                     occupied.remove();
+                }
+                else {
+                    let rc = occupied.get().ref_count() as usize;
+                    let non_cached_entries = occupied.get().slot_list.read().unwrap().iter().filter_map(|(_, info)| (!info.is_cached()).then_some(())).count();
+                    assert!(non_cached_entries <= rc, "non_cached_entries: {}, rc: {}", non_cached_entries, rc);
                 }
                 result
             }
@@ -457,6 +468,11 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
             // if slot list > 1, then we are going to hold this entry in memory until it gets set back to 1
             upsert_cached = true;
         }
+
+        let rc = entry.ref_count() as usize;
+        let non_cached_entries = entry.slot_list.read().unwrap().iter().filter_map(|(_, info)| (!info.is_cached()).then_some(())).count();
+        assert!(non_cached_entries <= rc, "non_cached_entries: {}, rc: {}", non_cached_entries, rc);
+
         self.set_age_to_future(entry, upsert_cached);
     }
 
