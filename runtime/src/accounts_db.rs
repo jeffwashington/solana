@@ -8388,10 +8388,20 @@ impl AccountsDb {
             return;
         }
 
+        let interesting = Pubkey::try_from("JARQT5Jeb3nXH8vjE1pMiX5RADWshsRyLyDd7V72TjuZ").unwrap();
+        let ih = solana_sdk::hash::Hash::from_str("8WVTAssW5PuNDPVAaeNQoPtk2bG68x4Y8k1esXEn6hnL").unwrap();
+
         let mut stats = BankHashStats::default();
         let mut total_data = 0;
         (0..accounts.len()).for_each(|index| {
             let account = accounts.account(index);
+            let pubkey = accounts.pubkey(index);
+            let slot = accounts.target_slot();
+            let hash = Self::hash_account(slot, account, pubkey, IncludeSlotInHash::IncludeSlot);
+            if pubkey == &interesting || hash == ih {
+                log::error!("store {}, {}, {}, {}", pubkey, hash, slot, account.lamports());
+            }
+        
             total_data += account.data().len();
             stats.update(account);
         });
@@ -8817,6 +8827,9 @@ impl AccountsDb {
             return SlotIndexGenerationInfo::default();
         }
 
+        let interesting = Pubkey::try_from("JARQT5Jeb3nXH8vjE1pMiX5RADWshsRyLyDd7V72TjuZ").unwrap();
+        let ih = solana_sdk::hash::Hash::from_str("8WVTAssW5PuNDPVAaeNQoPtk2bG68x4Y8k1esXEn6hnL").unwrap();
+
         let secondary = !self.account_indexes.is_empty();
 
         let mut rent_paying_accounts_by_partition = Vec::default();
@@ -8833,6 +8846,9 @@ impl AccountsDb {
                     stored_account,
                 },
             )| {
+                if pubkey == interesting || stored_account.hash() == &ih {
+                    log::error!("{}, {}, {}, {}", pubkey, stored_account.hash(), slot, stored_account.lamports());
+                }
                 if secondary {
                     self.accounts_index.update_secondary_indexes(
                         &pubkey,
