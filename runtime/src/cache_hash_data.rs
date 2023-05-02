@@ -180,7 +180,7 @@ impl CacheHashData {
         use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
         let bin_calc = PubkeyBinCalculator24::new(65536);
         use std::str::FromStr;
-        let interesting = Pubkey::from_str("6EnpckMpzS6k3fVMAjDXU8uDzg6zKbGzixAXipHiLiRA").unwrap();
+        let interesting = Pubkey::from_str("JARQT5Jeb3nXH8vjE1pMiX5RADWshsRyLyDd7V72TjuZ").unwrap();
         let p1 = crate::accounts_partition::partition_from_pubkey(&interesting, 432_000);
 
         use log::*;
