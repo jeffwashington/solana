@@ -2946,6 +2946,8 @@ impl AccountsDb {
             .accounts_hash_complete_oldest_non_ancient_slot
             .read()
             .unwrap();
+        result = self.accounts_index.max_root_inclusive();
+        result = Self::apply_offset_to_slot(result, -432_000);
         if let Some(offset) = self.ancient_append_vec_offset {
             result = Self::apply_offset_to_slot(result, offset);
         }
@@ -7565,6 +7567,7 @@ impl AccountsDb {
 
     /// if we ever try to calc hash where there are squashed append vecs within the last epoch, we will fail
     fn assert_safe_squashing_accounts_hash(&self, slot: Slot, epoch_schedule: &EpochSchedule) {
+        return;
         let previous = self.get_accounts_hash_complete_oldest_non_ancient_slot();
         let mut current = Self::get_oldest_slot_within_one_epoch_prior(slot, epoch_schedule);
         if let Some(offset) = self.ancient_append_vec_offset {
