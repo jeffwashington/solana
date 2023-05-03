@@ -463,8 +463,14 @@ impl AccountsDb {
             .zip(packed_contents)
             .collect::<Vec<_>>();
 
-        log::error!("shrink_pack4: # accounts {:?}", packer.iter().map(|(target_slot, pack)| pack.accounts.iter().map(|(_, a)| a.len()).sum::<usize>()).collect::<Vec<_>>());
-        log::error!("shrink_pack4: bytes: {:?}", packer.iter().map(|(target_slot, pack)| pack.bytes).collect::<Vec<_>>());
+        packer.iter().for_each(|(target_slot, pack)| {
+            pack.accounts.iter().for_each(|(old_slot, accounts)| {
+                log::error!("shrink_details: packing: slot {} into {}, {} accounts, {:?}", old_slot, target_slot, accounts.len(), accounts.iter().map(|a| a.pubkey().to_string().truncate(8)).collect::<Vec<_>>());
+            });
+        });
+
+        log::error!("shrink_pack4: # accounts {:?}", packer.iter().map(|(_target_slot, pack)| pack.accounts.iter().map(|(_, a)| a.len()).sum::<usize>()).collect::<Vec<_>>());
+        log::error!("shrink_pack4: bytes: {:?}", packer.iter().map(|(_target_slot, pack)| pack.bytes).collect::<Vec<_>>());
 
         // keep track of how many slots were shrunk away
         self.shrink_ancient_stats
@@ -496,6 +502,10 @@ impl AccountsDb {
         });
 
         let mut write_ancient_accounts = write_ancient_accounts.into_inner().unwrap();
+
+        accounts_to_combine.accounts_keep_slots.values().for_each(|alive_accounts| {
+            log::error!("shrink_details: keeping: slot {}, {} accounts, {:?}", alive_accounts.slot, alive_accounts.accounts.len(), alive_accounts.accounts.iter().map(|s| s.pubkey()).collect::<Vec<_>>());
+        });
 
         let (_, us) = measure_us!(
         // write new storages where contents were unable to move because ref_count > 1
@@ -552,6 +562,7 @@ impl AccountsDb {
                 true,
             );
         }
+        log::error!("shrink_details: finish: dropped_roots: {:?}", dropped_roots);        
         self.handle_dropped_roots_for_ancient(dropped_roots.into_iter());
         metrics.accumulate(&write_ancient_accounts.metrics);
     }
