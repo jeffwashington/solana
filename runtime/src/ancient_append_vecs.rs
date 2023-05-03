@@ -263,7 +263,7 @@ impl AccountsDb {
         log::error!("{}, slots: {}", line!(), sorted_slots.len());
         let tuning = PackedAncientStorageTuning {
             // only allow 10k slots old enough to be ancient
-            max_ancient_slots: 100,
+            max_ancient_slots: 10_000,
             // re-combine/shrink 55% of the data savings this pass
             percent_of_alive_shrunk_data: 55,
             ideal_storage_size: NonZeroU64::new(get_ancient_append_vec_capacity()).unwrap(),
@@ -1104,7 +1104,7 @@ pub mod tests {
                     .collect::<Vec<_>>();
 
                 let result = PackedAncientStorage::pack(
-                    accounts_to_combine.iter().rev(),
+                    accounts_to_combine.iter(),
                     NonZeroU64::new(ideal_size).unwrap(),
                 );
                 let storages_needed = result.len();
