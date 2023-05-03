@@ -465,7 +465,7 @@ impl AccountsDb {
 
         packer.iter().for_each(|(target_slot, pack)| {
             pack.accounts.iter().for_each(|(old_slot, accounts)| {
-                log::error!("shrink_details: packing: slot {} into {}, {} accounts, {:?}", old_slot, target_slot, accounts.len(), accounts.iter().map(|a| a.pubkey().to_string().truncate(8)).collect::<Vec<_>>());
+                log::error!("shrink_details: packing: slot {} into {}, {} accounts, {:?}", old_slot, target_slot, accounts.len(), accounts.iter().map(|a| { let mut a = format!("{}", a.pubkey()); a.truncate(8); a}).collect::<Vec<_>>());
             });
         });
 
@@ -504,7 +504,7 @@ impl AccountsDb {
         let mut write_ancient_accounts = write_ancient_accounts.into_inner().unwrap();
 
         accounts_to_combine.accounts_keep_slots.values().for_each(|alive_accounts| {
-            log::error!("shrink_details: keeping: slot {}, {} accounts, {:?}", alive_accounts.slot, alive_accounts.accounts.len(), alive_accounts.accounts.iter().map(|s| s.pubkey()).collect::<Vec<_>>());
+            log::error!("shrink_details: keeping: slot {}, {} accounts, {:?}", alive_accounts.slot, alive_accounts.accounts.len(), alive_accounts.accounts.iter().map(|s| { let mut a = format!("{}", s.pubkey()); a.truncate(8); a}).collect::<Vec<_>>());
         });
 
         let (_, us) = measure_us!(

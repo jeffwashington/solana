@@ -3247,7 +3247,10 @@ impl AccountsDb {
                                 let mut useless = true;
                                 if let Some((slot_list, ref_count)) = slots_refs {
                                     let non_cached_entries = slot_list.iter().filter_map(|(_, info)| (!info.is_cached()).then_some(())).count() as u64;
-                                    assert!(non_cached_entries <= ref_count, "non_cached_entries: {}, rc: {}, {:?}, {}", non_cached_entries, ref_count, slot_list, pubkey);
+                                    if non_cached_entries > ref_count {
+                                        //assert!(non_cached_entries <= ref_count, "non_cached_entries: {}, rc: {}, {:?}, {}", non_cached_entries, ref_count, slot_list, pubkey);
+                                        log::error!("non_cached_entries: {}, rc: {}, {:?}, {}", non_cached_entries, ref_count, slot_list, pubkey);
+                                    }
                             
                                     let index_in_slot_list = self.accounts_index.latest_slot(
                                         None,
