@@ -3229,6 +3229,8 @@ impl AccountsDb {
         let missing_accum = AtomicU64::new(0);
         let useful_accum = AtomicU64::new(0);
 
+        let interesting = Pubkey::try_from("8Fr3dcz1tJ4bz7xq1d299quL6QJbxC7hJadKUVJU6f5X").unwrap();
+
         // parallel scan the index.
         let (mut purges_zero_lamports, purges_old_accounts) = {
             let do_clean_scan = || {
@@ -3250,6 +3252,9 @@ impl AccountsDb {
                                     if non_cached_entries > ref_count {
                                         //assert!(non_cached_entries <= ref_count, "non_cached_entries: {}, rc: {}, {:?}, {}", non_cached_entries, ref_count, slot_list, pubkey);
                                         log::error!("non_cached_entries: {}, rc: {}, {:?}, {}", non_cached_entries, ref_count, slot_list, pubkey);
+                                    }
+                                    if &interesting == pubkey {
+                                        log::error!("clean_accounts: {}, rc: {}, {:?}, {}", non_cached_entries, ref_count, slot_list, pubkey);
                                     }
                             
                                     let index_in_slot_list = self.accounts_index.latest_slot(
@@ -8397,7 +8402,7 @@ impl AccountsDb {
             return;
         }
 
-        let interesting = Pubkey::try_from("JARQT5Jeb3nXH8vjE1pMiX5RADWshsRyLyDd7V72TjuZ").unwrap();
+        let interesting = Pubkey::try_from("8Fr3dcz1tJ4bz7xq1d299quL6QJbxC7hJadKUVJU6f5X").unwrap();
         let ih = solana_sdk::hash::Hash::from_str("8WVTAssW5PuNDPVAaeNQoPtk2bG68x4Y8k1esXEn6hnL").unwrap();
 
         let mut stats = BankHashStats::default();
@@ -8836,7 +8841,7 @@ impl AccountsDb {
             return SlotIndexGenerationInfo::default();
         }
 
-        let interesting = Pubkey::try_from("JARQT5Jeb3nXH8vjE1pMiX5RADWshsRyLyDd7V72TjuZ").unwrap();
+        let interesting = Pubkey::try_from("8Fr3dcz1tJ4bz7xq1d299quL6QJbxC7hJadKUVJU6f5X").unwrap();
         let ih = solana_sdk::hash::Hash::from_str("8WVTAssW5PuNDPVAaeNQoPtk2bG68x4Y8k1esXEn6hnL").unwrap();
 
         let secondary = !self.account_indexes.is_empty();
