@@ -8388,7 +8388,7 @@ impl AccountsDb {
             return;
         }
 
-        let interesting = Pubkey::try_from("JARQT5Jeb3nXH8vjE1pMiX5RADWshsRyLyDd7V72TjuZ").unwrap();
+        let interesting = Pubkey::try_from("4KYVT6z8s8uMXwZyY2xGUw28M3RLUwHuX2PoB5QW8uTT").unwrap();
         let ih = solana_sdk::hash::Hash::from_str("8WVTAssW5PuNDPVAaeNQoPtk2bG68x4Y8k1esXEn6hnL").unwrap();
 
         let mut stats = BankHashStats::default();
@@ -8827,7 +8827,7 @@ impl AccountsDb {
             return SlotIndexGenerationInfo::default();
         }
 
-        let interesting = Pubkey::try_from("JARQT5Jeb3nXH8vjE1pMiX5RADWshsRyLyDd7V72TjuZ").unwrap();
+        let interesting = Pubkey::try_from("4KYVT6z8s8uMXwZyY2xGUw28M3RLUwHuX2PoB5QW8uTT").unwrap();
         let ih = solana_sdk::hash::Hash::from_str("8WVTAssW5PuNDPVAaeNQoPtk2bG68x4Y8k1esXEn6hnL").unwrap();
 
         let secondary = !self.account_indexes.is_empty();
