@@ -4354,7 +4354,7 @@ impl AccountsDb {
 
     /// get a sorted list of slots older than an epoch
     /// squash those slots into ancient append vecs
-    fn shrink_ancient_slots(&self) {
+    pub fn shrink_ancient_slots(&self) {
         if self.ancient_append_vec_offset.is_none() {
             return;
         }

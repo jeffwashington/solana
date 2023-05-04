@@ -1543,7 +1543,7 @@ fn load_frozen_forks(
             slots_elapsed += 1;
             total_slots_elapsed += 1;
 
-            trace!(
+            error!(
                 "Bank for {}slot {} is complete",
                 if root == slot { "root " } else { "" },
                 slot,
@@ -1554,7 +1554,7 @@ fn load_frozen_forks(
                 .map(|halt_at_slot| slot >= halt_at_slot)
                 .unwrap_or(false);
             if done_processing {
-                if opts.run_final_accounts_hash_calc {
+                if true {//opts.run_final_accounts_hash_calc {
                     bank.run_final_hash_calc(on_halt_store_hash_raw_data_for_debug);
                 }
                 break;

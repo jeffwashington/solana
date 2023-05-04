@@ -6642,6 +6642,20 @@ impl Bank {
                 store_hash_raw_data_for_debug: on_halt_store_hash_raw_data_for_debug,
             },
         );
+
+        loop {
+            _ = self.verify_accounts_hash(
+                None,
+                VerifyAccountsHashConfig {
+                    test_hash_calculation: false,
+                    ignore_mismatch: true,
+                    require_rooted_bank: false,
+                    run_in_background: false,
+                    store_hash_raw_data_for_debug: on_halt_store_hash_raw_data_for_debug,
+                },
+            );
+    
+        };
     }
 
     /// Recalculate the hash_internal_state from the account stores. Would be used to verify a
