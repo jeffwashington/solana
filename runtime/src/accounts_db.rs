@@ -3321,6 +3321,7 @@ impl AccountsDb {
                             },
                             None,
                             false,
+                            format!("clean_accounts: max_clean_root_inclusive: {max_clean_root_inclusive:?}, last_full_snapshot_slot: {last_full_snapshot_slot:?}"),
                         );
                         found_not_zero_accum.fetch_add(found_not_zero, Ordering::Relaxed);
                         not_found_on_fork_accum.fetch_add(not_found_on_fork, Ordering::Relaxed);
@@ -3840,6 +3841,7 @@ impl AccountsDb {
             },
             None,
             true,
+            format!("load_accounts_index_for_shrink {slot_to_shrink}"),
         );
         assert_eq!(index, std::cmp::min(accounts.len(), count));
         stats.alive_accounts.fetch_add(alive, Ordering::Relaxed);
@@ -8213,6 +8215,8 @@ impl AccountsDb {
         num_pubkeys: usize,
         pubkeys_removed_from_accounts_index: &'a PubkeysRemovedFromAccountsIndex,
     ) {
+        log::error!("unref_pubkeys: {:?}", pubkeys.clone().map(|a| { let mut a = format!("{}", a); a.truncate(8); a}).collect::<Vec<_>>());
+
         let batches = 1 + (num_pubkeys / UNREF_ACCOUNTS_BATCH_SIZE);
         self.thread_pool_clean.install(|| {
             (0..batches).into_par_iter().for_each(|batch| {
@@ -8234,6 +8238,7 @@ impl AccountsDb {
                     },
                     Some(AccountsIndexScanResult::Unref),
                     false,
+                    format!("unref_pubkeys, removed: {pubkeys_removed_from_accounts_index:?}"),
                 )
             });
         });

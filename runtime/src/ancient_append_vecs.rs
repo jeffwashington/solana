@@ -335,6 +335,9 @@ impl AccountsDb {
             self.addref_accounts_failed_to_shrink_ancient(accounts_to_combine);
             return;
         }
+        accounts_to_combine.accounts_to_combine.iter().for_each(|a| {
+            log::error!("shrink ancient unref'd: {:?}", format!("{}, {:?}", a.slot, a.unrefed_pubkeys.iter().map(|a| { let mut a = format!("{}", a); a.truncate(8); a}).collect::<Vec<_>>()));
+        });
 
         let write_ancient_accounts = self.write_packed_storages(&accounts_to_combine, pack);
 
@@ -352,16 +355,21 @@ impl AccountsDb {
                 .accounts_to_combine
                 .into_par_iter()
                 .for_each(|combine| {
+                    log::error!("addref_accounts_failed_to_shrink_ancient: {}, {:?}",combine.slot, combine.unrefed_pubkeys.iter().map(|a| { let mut a = format!("{}", a); a.truncate(8); a}).collect::<Vec<_>>());
                     self.accounts_index.scan(
                         combine.unrefed_pubkeys.into_iter(),
-                        |_pubkey, _slots_refs, entry| {
+                        |pubkey, _slots_refs, entry| {
                             if let Some(entry) = entry {
                                 entry.addref();
+                            }
+                            else {
+                                panic!("missing to addref: {}", pubkey);
                             }
                             AccountsIndexScanResult::None
                         },
                         None,
                         true,
+                        format!("addref_accounts_failed_to_shrink_ancient"),
                     );
                 });
         });
@@ -585,6 +593,7 @@ impl AccountsDb {
 
         // `shrink_collect` all accounts in the append vecs we want to combine.
         // This also unrefs all dead accounts in those append vecs.
+        log::error!("{}", line!());
         let mut accounts_to_combine = self.thread_pool_clean.install(|| {
             accounts_per_storage
                 .par_iter()
@@ -694,6 +703,7 @@ impl AccountsDb {
             },
             None,
             false,
+            format!("revisit_accounts_with_many_refs"),
         );
         self.shrink_ancient_stats
             .second_pass_one_ref

@@ -1554,7 +1554,7 @@ fn load_frozen_forks(
                 .map(|halt_at_slot| slot >= halt_at_slot)
                 .unwrap_or(false);
             if done_processing {
-                if true {//opts.run_final_accounts_hash_calc {
+                if opts.run_final_accounts_hash_calc {
                     bank.run_final_hash_calc(on_halt_store_hash_raw_data_for_debug);
                 }
                 break;

@@ -396,7 +396,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
                 else {
                     let rc = occupied.get().ref_count() as usize;
                     let non_cached_entries = occupied.get().slot_list.read().unwrap().iter().filter_map(|(_, info)| (!info.is_cached()).then_some(())).count();
-                    //assert!(non_cached_entries <= rc, "non_cached_entries: {}, rc: {}", non_cached_entries, rc);
+                    assert!(non_cached_entries <= rc, "non_cached_entries: {}, rc: {}", non_cached_entries, rc);
                 }
                 result
             }
@@ -464,14 +464,18 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
     ) {
         let new_value: (Slot, T) = new_value.into();
         let mut upsert_cached = new_value.1.is_cached();
+        let sl_old = entry.slot_list.read().unwrap().clone();
         if Self::lock_and_update_slot_list(entry, new_value, other_slot, reclaims, reclaim) > 1 {
             // if slot list > 1, then we are going to hold this entry in memory until it gets set back to 1
             upsert_cached = true;
         }
 
-        let rc = entry.ref_count() as usize;
-        let non_cached_entries = entry.slot_list.read().unwrap().iter().filter_map(|(_, info)| (!info.is_cached()).then_some(())).count();
-        //assert!(non_cached_entries <= rc, "non_cached_entries: {}, rc: {}", non_cached_entries, rc);
+        {
+            let rc = entry.ref_count() as usize;
+            let sl = entry.slot_list.read().unwrap();
+            let non_cached_entries = sl.iter().filter_map(|(_, info)| (!info.is_cached()).then_some(())).count();
+            assert!(non_cached_entries <= rc, "non_cached_entries: {}, rc: {}, sl: {:?}, other slot: {other_slot:?}, sl_old: {sl_old:?}", non_cached_entries, rc, sl);
+        }
 
         self.set_age_to_future(entry, upsert_cached);
     }
@@ -642,11 +646,16 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
                     }
 
                     if matched_slot {
+                        assert!(!found_slot);
                         found_slot = true;
                     } else {
+                        assert!(!found_other_slot);
                         found_other_slot = true;
                     }
                     if !is_cur_account_cached {
+                        if found_slot && found_other_slot && !addref && !is_cur_account_cached && !account_info.is_cached() {
+                            panic!("found in 2 slots: {}, {:?}, all are not cached, {:?}", slot, other_slot, slot_list);
+                        }
                         // current info at 'slot' is NOT cached, so we should NOT addref. This slot already has a ref count for this pubkey.
                         addref = false;
                     }

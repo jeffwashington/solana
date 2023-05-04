@@ -1364,6 +1364,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
         mut callback: F,
         avoid_callback_result: Option<AccountsIndexScanResult>,
         provide_entry_in_callback: bool,
+        comment: String,
     ) where
         // params:
         //  pubkey looked up
@@ -1398,11 +1399,25 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
                             *result
                         } else {
                             let slot_list = &locked_entry.slot_list.read().unwrap();
-                            callback(
+                            let non_cached_entries = slot_list.iter().filter_map(|(_, info)| (!info.is_cached()).then_some(())).count() as u64;
+                            if non_cached_entries > locked_entry.ref_count() {
+                                //assert!(non_cached_entries <= ref_count, "non_cached_entries: {}, rc: {}, {:?}, {}", non_cached_entries, ref_count, slot_list, pubkey);
+                                log::error!("non_cached_entries: {}, rc: {}, {:?}, {}, {comment}", non_cached_entries, locked_entry.ref_count(), slot_list, pubkey);
+                            }
+
+                            let r = callback(
                                 pubkey,
                                 Some((slot_list, locked_entry.ref_count())),
                                 provide_entry_in_callback.then_some(locked_entry),
-                            )
+                            );
+                            if matches!(r, AccountsIndexScanResult::Unref) {
+                                let non_cached_entries = slot_list.iter().filter_map(|(_, info)| (!info.is_cached()).then_some(())).count() as u64;
+                                if non_cached_entries > locked_entry.ref_count() - 1 {
+                                    //assert!(non_cached_entries <= ref_count, "non_cached_entries: {}, rc: {}, {:?}, {}", non_cached_entries, ref_count, slot_list, pubkey);
+                                    log::error!("non_cached_entries: {}, rc: {}, {:?}, {}, {comment}", non_cached_entries, locked_entry.ref_count() - 1, slot_list, pubkey);
+                                }
+                            }
+                            r
                         };
                         cache = match result {
                             AccountsIndexScanResult::Unref => {
