@@ -4714,7 +4714,7 @@ impl AccountsDb {
     }
 
     pub fn shrink_candidate_slots(&self) -> usize {
-        if !self.shrink_candidate_slots.lock().unwrap().is_empty() {
+        {//if !self.shrink_candidate_slots.lock().unwrap().is_empty() {
             // this can affect 'shrink_candidate_slots', so don't 'take' it until after this completes
             self.shrink_ancient_slots();
         }
