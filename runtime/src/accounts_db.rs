@@ -2265,7 +2265,31 @@ impl<'a> ZeroLamport for StoredAccountMeta<'a> {
     }
 }
 
-type GenerateIndexAccountsMap<'a> = HashMap<Pubkey, StoredAccountMeta<'a>>;
+/// contain an account
+/// the account internally contains a pubkey
+/// the pubkey inside the account is used for a key in a hashset.
+/// This avoids having to use a separate `Pubkey` copy in a `HashMap`
+struct HashSetEntryStoredAccountMeta<'a> {
+    account: StoredAccountMeta<'a>,
+}
+
+/// eq, partial eq and hash of this struct only refer to the pubkey
+impl<'a> PartialEq for HashSetEntryStoredAccountMeta<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        self.account.pubkey().eq(other.account.pubkey())
+    }
+}
+
+impl<'a> Eq for HashSetEntryStoredAccountMeta<'a> {}
+
+/// eq, partial eq and hash of this struct only refer to the pubkey
+impl<'a> std::hash::Hash for HashSetEntryStoredAccountMeta<'a> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.account.pubkey().hash(state);
+    }
+}
+
+type GenerateIndexAccountsMap<'a> = HashSet<HashSetEntryStoredAccountMeta<'a>>;
 
 /// called on a struct while scanning append vecs
 trait AppendVecScan: Send + Sync + Clone {
@@ -8731,7 +8755,9 @@ impl AccountsDb {
         storage.accounts.account_iter().for_each(|stored_account| {
             let pubkey = stored_account.pubkey();
             assert!(!self.is_filler_account(pubkey));
-            accounts_map.insert(*pubkey, stored_account);
+            accounts_map.insert(HashSetEntryStoredAccountMeta {
+                account: stored_account,
+            });
         });
         accounts_map
     }
@@ -8772,32 +8798,33 @@ impl AccountsDb {
         let mut num_accounts_rent_paying = 0;
         let num_accounts = accounts_map.len();
         let mut amount_to_top_off_rent = 0;
-        let items = accounts_map.into_iter().map(|(pubkey, stored_account)| {
+        let items = accounts_map.into_iter().map(|stored_account| {
+            let pubkey = stored_account.account.pubkey();
             if secondary {
                 self.accounts_index.update_secondary_indexes(
                     &pubkey,
-                    &stored_account,
+                    &stored_account.account,
                     &self.account_indexes,
                 );
             }
-            if !stored_account.is_zero_lamport() {
-                accounts_data_len += stored_account.data().len() as u64;
+            if !stored_account.account.is_zero_lamport() {
+                accounts_data_len += stored_account.account.data().len() as u64;
             }
 
             if let Some(amount_to_top_off_rent_this_account) =
-                Self::stats_for_rent_payers(&pubkey, &stored_account, rent_collector)
+                Self::stats_for_rent_payers(&pubkey, &stored_account.account, rent_collector)
             {
                 amount_to_top_off_rent += amount_to_top_off_rent_this_account;
                 num_accounts_rent_paying += 1;
                 // remember this rent-paying account pubkey
-                rent_paying_accounts_by_partition.push(pubkey);
+                rent_paying_accounts_by_partition.push(*pubkey);
             }
 
             (
-                pubkey,
+                *pubkey,
                 AccountInfo::new(
-                    StorageLocation::AppendVec(store_id, stored_account.offset()), // will never be cached
-                    stored_account.lamports(),
+                    StorageLocation::AppendVec(store_id, stored_account.account.offset()), // will never be cached
+                    stored_account.account.lamports(),
                 ),
             )
         });
@@ -9025,9 +9052,8 @@ impl AccountsDb {
                             assert!(verify);
                             let mut lookup_time = Measure::start("lookup_time");
                             for account in accounts_map.into_iter() {
-                                let (key, account_info) = account;
-                                let lock = self.accounts_index.get_bin(&key);
-                                let x = lock.get(&key).unwrap();
+                                let lock = self.accounts_index.get_bin(account.account.pubkey());
+                                let x = lock.get(account.account.pubkey()).unwrap();
                                 let sl = x.slot_list.read().unwrap();
                                 let mut count = 0;
                                 for (slot2, account_info2) in sl.iter() {
@@ -9036,9 +9062,9 @@ impl AccountsDb {
                                         let ai = AccountInfo::new(
                                             StorageLocation::AppendVec(
                                                 store_id,
-                                                account_info.offset(),
+                                                account.account.offset(),
                                             ), // will never be cached
-                                            account_info.lamports(),
+                                            account.account.lamports(),
                                         );
                                         assert_eq!(&ai, account_info2);
                                     }
@@ -9275,8 +9301,8 @@ impl AccountsDb {
 
         // first collect into a local HashMap with no lock contention
         let mut storage_info_local = StorageSizeAndCount::default();
-        for (_, v) in accounts_map.iter() {
-            storage_info_local.stored_size += v.stored_size();
+        for v in accounts_map.iter() {
+            storage_info_local.stored_size += v.account.stored_size();
             storage_info_local.count += 1;
         }
         storage_size_accounts_map_time.stop();

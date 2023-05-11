@@ -1597,12 +1597,12 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
         self.account_maps.len()
     }
 
-    // Same functionally to upsert, but:
-    // 1. operates on a batch of items
-    // 2. holds the write lock for the duration of adding the items
-    // Can save time when inserting lots of new keys.
-    // But, does NOT update secondary index
-    // This is designed to be called at startup time.
+    /// Same functionally to upsert, but:
+    /// 1. operates on a batch of items
+    /// 2. holds the write lock for the duration of adding the items
+    /// Can save time when inserting lots of new keys.
+    /// But, does NOT update secondary index
+    /// This is designed to be called at startup time.
     #[allow(clippy::needless_collect)]
     pub(crate) fn insert_new_if_missing_into_primary_index(
         &self,
