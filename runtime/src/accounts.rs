@@ -26,6 +26,7 @@ use {
     itertools::Itertools,
     log::*,
     solana_address_lookup_table_program::{error::AddressLookupError, state::AddressLookupTable},
+    solana_measure::measure_us,
     solana_program_runtime::{
         compute_budget::{self, ComputeBudget},
         loaded_programs::LoadedProgramsForTxBatch,
@@ -44,6 +45,7 @@ use {
         },
         fee::FeeStructure,
         genesis_config::ClusterType,
+        hash::Hasher,
         message::{
             v0::{LoadedAddresses, MessageAddressTableLookup},
             SanitizedMessage,
@@ -1315,8 +1317,10 @@ impl Accounts {
     }
 
     /// Store the accounts into the DB
-    // allow(clippy) needed for various gating flags
+    /// allow(clippy) needed for various gating flags
+    /// returns additional lamports used to create dummy accounts
     #[allow(clippy::too_many_arguments)]
+    #[must_use]
     pub(crate) fn store_cached(
         &self,
         slot: Slot,
@@ -1327,7 +1331,7 @@ impl Accounts {
         durable_nonce: &DurableNonce,
         lamports_per_signature: u64,
         include_slot_in_hash: IncludeSlotInHash,
-    ) {
+    ) -> Option<u64> {
         let (accounts_to_store, transactions) = self.collect_accounts_to_store(
             txs,
             res,
@@ -1336,10 +1340,61 @@ impl Accounts {
             durable_nonce,
             lamports_per_signature,
         );
-        self.accounts_db.store_cached_inline_update_index(
+        let mut additional_lamports_result = None;
+        let create_dummy_accounts = true;
+        let mut pks = Vec::default();
+        if create_dummy_accounts {
+            let mut additional_lamports = 0;
+            let (_, us) = measure_us!({
+                for i in 0..accounts_to_store.len() {
+                    let mut src_account = AccountSharedData::default();
+                    src_account.set_lamports(1_000_000_000);
+                    let mut pk = accounts_to_store[i].0.clone();
+                    const NUM_DUPLICATES: usize = 30;
+                    for _duplicates in 0..NUM_DUPLICATES {
+                        // only add this if it doesn't already exist in the index
+                        let mut hasher = Hasher::default();
+                        hasher.hash(pk.as_ref());
+                        hasher.hash(&slot.to_be_bytes());
+                        pk = Pubkey::from(hasher.result().to_bytes());
+                        pks.push((pk, src_account.clone()));
+                    }
+                }
+
+                // only add pubkeys which don't exist yet.
+                // if it already exists, then cap changes will not be right
+                pks.retain(|(k, acct)| {
+                    let mut retain = true;
+                    self.accounts_db.accounts_index.scan(
+                        std::iter::once(k),
+                        |_pk, slot_ref, _entry| {
+                            retain = slot_ref.is_none();
+                            if retain {
+                                additional_lamports += acct.lamports();
+                            }
+                            crate::accounts_index::AccountsIndexScanResult::OnlyKeepInMemoryIfDirty
+                        },
+                        None,
+                        false,
+                    );
+                    retain
+                });
+            });
+            log::error!("adding {} dummy accounts, took: {}us, slot: {slot}", pks.len(), us);
+            let additional = pks
+                .iter()
+                .map(|(k, account)| (k, account))
+                .collect::<Vec<_>>();
+            self.accounts_db
+                .store_cached((slot, &additional[..], include_slot_in_hash), None);
+
+            additional_lamports_result = Some(additional_lamports);
+        }
+        self.accounts_db.store_cached(
             (slot, &accounts_to_store[..], include_slot_in_hash),
             Some(&transactions),
         );
+        additional_lamports_result
     }
 
     pub fn store_accounts_cached<'a, T: ReadableAccount + Sync + ZeroLamport + 'a>(

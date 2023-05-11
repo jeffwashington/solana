@@ -5796,7 +5796,7 @@ impl Bank {
 
         let mut write_time = Measure::start("write_time");
         let durable_nonce = DurableNonce::from_blockhash(&last_blockhash);
-        self.rc.accounts.store_cached(
+        let dummy_lamports = self.rc.accounts.store_cached(
             self.slot(),
             sanitized_txs,
             &execution_results,
@@ -5806,6 +5806,9 @@ impl Bank {
             lamports_per_signature,
             self.include_slot_in_hash(),
         );
+        if let Some(dummy_lamports) = dummy_lamports {
+            self.capitalization.fetch_add(dummy_lamports, Relaxed);
+        }
         let rent_debits = self.collect_rent(&execution_results, loaded_txs);
 
         // Cached vote and stake accounts are synchronized with accounts-db
