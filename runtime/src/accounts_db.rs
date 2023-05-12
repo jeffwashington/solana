@@ -7241,7 +7241,7 @@ impl AccountsDb {
                         assert!(!file_name.is_empty());
                         (!r.is_empty() && r.iter().any(|b| !b.is_empty())).then(|| {
                             // error if we can't write this
-                            cache_hash_data.save(&file_name, &r).unwrap();
+                            cache_hash_data.save(&file_name, r).unwrap();
                             cache_hash_data.load_map(&file_name).unwrap()
                         })
                     })
@@ -7678,6 +7678,7 @@ impl AccountsDb {
                 zero_lamport_accounts: flavor.zero_lamport_accounts(),
                 dir_for_temp_cache_files: self.transient_accounts_hash_cache_path.clone(),
             };
+            error!("jwash: scan_snapshot_stores_with_cache");
 
             // get raw data by scanning
             let cache_hash_data_files = self.scan_snapshot_stores_with_cache(
@@ -7690,11 +7691,14 @@ impl AccountsDb {
                 accounts_hasher.filler_account_suffix.as_ref(),
             )?;
 
+            error!("jwash: hash calc scan complete");
+
             // convert mmapped cache files into slices of data
             let cache_hash_intermediates = cache_hash_data_files
                 .iter()
                 .map(|d| d.get_cache_hash_data())
                 .collect::<Vec<_>>();
+            error!("jwash: convert mmapped cache files into slices of data");
 
             // rework slices of data into bins for parallel processing and to match data shape expected by 'rest_of_hash_calculation'
             let result = AccountsHasher::get_binned_data(
@@ -7702,6 +7706,8 @@ impl AccountsDb {
                 PUBKEY_BINS_FOR_CALCULATING_HASHES,
                 &bounds,
             );
+
+            error!("jwash: rework slices of data into bins for parallel processing and to match data shape expected by 'rest_of_hash_calculation'");
 
             // turn raw data into merkle tree hashes and sum of lamports
             let (accounts_hash, capitalization) =
