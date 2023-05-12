@@ -7658,6 +7658,9 @@ impl AccountsDb {
         let _guard = self.active_stats.activate(ActiveStatItem::Hash);
         stats.oldest_root = storages.range().start;
 
+        // random delay on hash calc start to cause different validators to hit hash calc at different times
+        sleep(Duration::from_secs(thread_rng().gen_range(0, 1200)));
+
         self.mark_old_slots_as_dirty(storages, config.epoch_schedule.slots_per_epoch, &mut stats);
 
         let slot = storages.max_slot_inclusive();
