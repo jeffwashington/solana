@@ -561,7 +561,7 @@ pub fn app<'a>(version: &'a str, default_args: &'a DefaultArgs) -> App<'a, 'a> {
                 .long("accounts-hash-interval-slots")
                 .value_name("NUMBER")
                 .takes_value(true)
-                .default_value(&u64::MAX)
+                .default_value(&"18446744073709551615")
                 .help("Number of slots between generating accounts hash.")
                 .validator(|val| {
                     if val.eq("0") {
