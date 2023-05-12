@@ -2975,6 +2975,8 @@ impl AccountsDb {
         // find the oldest dirty slot
         // we'll add logging if that append vec cannot be marked dead
         let mut min_dirty_slot = None::<u64>;
+        let previous_len = self.dirty_stores.len();
+        let (_, us) = measure_us!({
         self.dirty_stores.retain(|slot, store| {
             if *slot > max_slot_inclusive {
                 true
@@ -2983,7 +2985,8 @@ impl AccountsDb {
                 dirty_stores.push((*slot, store.clone()));
                 false
             }
-        });
+        });});
+        error!("jwash: construct_candidate_clean_keys: dirty stores: {}, prev len: {}, us: {us}", dirty_stores.len(), previous_len);
         let dirty_stores_len = dirty_stores.len();
         let pubkeys = DashSet::new();
         let dirty_ancient_stores = AtomicUsize::default();
@@ -3010,7 +3013,7 @@ impl AccountsDb {
                 .min()
                 .unwrap_or(&max_slot_inclusive.saturating_add(1));
         };
-
+        let (_, us) = measure_us!({
         if is_startup {
             // Free to consume all the cores during startup
             dirty_store_routine();
@@ -3018,11 +3021,14 @@ impl AccountsDb {
             self.thread_pool_clean.install(|| {
                 dirty_store_routine();
             });
-        }
-        trace!(
-            "dirty_stores.len: {} pubkeys.len: {}",
+        }});
+
+        error!(
+            "jwash: dirty_stores.len: {} pubkeys.len: {}, us: {}, startup: {}",
             dirty_stores_len,
-            pubkeys.len()
+            pubkeys.len(),
+            us,
+            is_startup,
         );
         timings.dirty_pubkeys_count = pubkeys.len() as u64;
         dirty_store_processing_time.stop();
