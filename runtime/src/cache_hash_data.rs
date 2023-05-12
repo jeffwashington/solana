@@ -285,7 +285,7 @@ impl CacheHashData {
     pub fn save(
         &self,
         file_name: impl AsRef<Path>,
-        data: &SavedTypeSlice,
+        data: Vec<Vec<EntryType>>,
     ) -> Result<(), std::io::Error> {
         let mut stats = CacheHashDataStats::default();
         let result = self.save_internal(file_name, data, &mut stats);
@@ -296,7 +296,7 @@ impl CacheHashData {
     fn save_internal(
         &self,
         file_name: impl AsRef<Path>,
-        data: &SavedTypeSlice,
+        data: Vec<Vec<EntryType>>,
         stats: &mut CacheHashDataStats,
     ) -> Result<(), std::io::Error> {
         let mut m = Measure::start("save");
@@ -329,11 +329,11 @@ impl CacheHashData {
 
         let mut m2 = Measure::start("write_to_mmap");
         let mut i = 0;
-        data.iter().for_each(|x| {
-            x.iter().for_each(|item| {
+        data.into_iter().for_each(|x| {
+            x.into_iter().for_each(|item| {
                 let d = cache_file.get_mut(i as u64);
                 i += 1;
-                *d = item.clone();
+                *d = item;
             })
         });
         assert_eq!(i, entries);
