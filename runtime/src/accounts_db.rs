@@ -7139,11 +7139,33 @@ impl AccountsDb {
         );
         let splitter = SplitAncientStorages::new(oldest_non_ancient_slot, snapshot_storages);
 
+        // limit us to 5 threads to scan
+        let max = 5;
+        let count = Mutex::new(0);
+
         stats.scan_chunks = splitter.chunk_count;
         (0..splitter.chunk_count)
             .into_par_iter()
             .map(|chunk| {
                 let mut scanner = scanner.clone();
+                {
+                    loop {
+                        let mut c = count.lock().unwrap();
+                        if *c < max {
+                            *c = *c + 1;
+                            break;
+                        }
+                        sleep(Duration::from_millis(100));
+                    }
+                }
+
+                let fnal = || {
+                    {
+                        let mut c = count.lock().unwrap();
+                        *c = *c - 1;
+                    }
+    
+                };
 
                 let range_this_chunk = splitter.get_slot_range(chunk)?;
 
@@ -7186,6 +7208,7 @@ impl AccountsDb {
                     );
                     if load_from_cache {
                         if let Ok(mapped_file) = cache_hash_data.load_map(&file_name) {
+                            fnal();
                             return Some(mapped_file);
                         }
                     }
@@ -7218,7 +7241,7 @@ impl AccountsDb {
                             .fetch_max(scan_us, Ordering::Relaxed);
                     }
                 }
-                (!init_accum)
+                let r = (!init_accum)
                     .then(|| {
                         let r = scanner.scanning_complete();
                         assert!(!file_name.is_empty());
@@ -7228,7 +7251,9 @@ impl AccountsDb {
                             cache_hash_data.load_map(&file_name).unwrap()
                         })
                     })
-                    .flatten()
+                    .flatten();
+                fnal();
+                r
             })
             .filter_map(|x| x)
             .collect()
