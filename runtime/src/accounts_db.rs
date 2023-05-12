@@ -158,6 +158,11 @@ pub enum IncludeSlotInHash {
     IrrelevantAssertOnUse,
 }
 
+lazy_static! {
+    pub static ref RANDOM_OFFSET: Slot = thread_rng().gen_range(0, 10000);
+}
+
+
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum CreateAncientStorage {
     /// ancient storages are created by appending
