@@ -1105,6 +1105,7 @@ impl AccountsHasher {
             None,
         );
         hash_time.stop();
+        error!("jwash: hash final: {}, {:?}", hash_time.as_us(), cumulative.cumulative);
         stats.hash_time_total_us += hash_time.as_us();
         (hash, total_lamports)
     }
