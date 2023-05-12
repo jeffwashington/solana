@@ -93,6 +93,21 @@ impl AccountHashesFile {
         );
         count_and_writer.0 += 1;
     }
+
+    /// write 'hash' to the file
+    /// If the file isn't open, create it first.
+    pub fn write_many(&mut self, hash: &[Hash]) {
+        if self.count_and_writer.is_none() {
+            // we have hashes to write but no file yet, so create a file that will auto-delete on drop
+            self.count_and_writer = Some((0, BufWriter::new(tempfile().unwrap())));
+        }
+        let mut count_and_writer = self.count_and_writer.as_mut().unwrap();
+        assert_eq!(
+            count_and_writer.1.write(unsafe { ::std::slice::from_raw_parts(hash.as_ptr() as *const u8, hash.len() * std::mem::size_of::<Hash>()) }).unwrap(),
+            hash.len() * std::mem::size_of::<Hash>()
+        );
+        count_and_writer.0 += hash.len();
+    }
 }
 
 /// parameters to calculate accounts hash
@@ -939,6 +954,8 @@ impl AccountsHasher {
         // this will change as items in pubkey_division[] are exhausted
         let mut first_item_to_pubkey_division = Vec::with_capacity(len);
         let mut hashes = AccountHashesFile::default();
+        const LOCAL_BUFFER_CAPACITY: usize = 10_000;
+        let mut local_hashes_buffer = Vec::with_capacity(LOCAL_BUFFER_CAPACITY);
         // initialize 'first_items', which holds the current lowest item in each slot group
         pubkey_division.iter().enumerate().for_each(|(i, bins)| {
             // check to make sure we can do bins[pubkey_bin]
@@ -995,13 +1012,15 @@ impl AccountsHasher {
             );
 
             // add lamports and get hash
-            if item.lamports != 0 {
+            if let Some(hash) = if item.lamports != 0 {
                 // do not include filler accounts in the hash
                 if !(filler_accounts_enabled && self.is_filler_account(&item.pubkey)) {
                     overall_sum = Self::checked_cast_for_capitalization(
                         item.lamports as u128 + overall_sum as u128,
                     );
-                    hashes.write(&item.hash);
+                    Some(item.hash)
+                } else {
+                    None
                 }
             } else {
                 // if lamports == 0, check if they should be included
@@ -1010,7 +1029,15 @@ impl AccountsHasher {
                     // the hash of its pubkey
                     let hash = blake3::hash(bytemuck::bytes_of(&item.pubkey));
                     let hash = Hash::new_from_array(hash.into());
-                    hashes.write(&hash);
+                    Some(hash)
+                } else {
+                    None
+                }
+            } {
+                local_hashes_buffer.push(hash);
+                if local_hashes_buffer.len() >= LOCAL_BUFFER_CAPACITY {
+                    hashes.write_many(&local_hashes_buffer[..]);
+                    local_hashes_buffer.clear();
                 }
             }
 
@@ -1031,6 +1058,8 @@ impl AccountsHasher {
                 duplicate_pubkey_indexes.clear();
             }
         }
+        hashes.write_many(&local_hashes_buffer[..]);
+        local_hashes_buffer.clear();
         (hashes, overall_sum, unreduced_count)
     }
 
@@ -1057,16 +1086,23 @@ impl AccountsHasher {
         );
 
         let cumulative = CumulativeHashesFromFiles::from_files(hashes);
-
+        let count = AtomicUsize::default();
+        let time = AtomicU64::default();
         let mut hash_time = Measure::start("hash");
         let (hash, _) = Self::compute_merkle_root_from_slices(
             cumulative.total_count(),
             MERKLE_FANOUT,
             None,
-            |start| cumulative.get_slice(start),
+            |start| {count.fetch_add(1, std::sync::atomic::Ordering::Relaxed); let (r, us) = solana_measure::measure_us!(cumulative.get_slice(start)); time.fetch_add(us, std::sync::atomic::Ordering::Relaxed); r},
             None,
         );
         hash_time.stop();
+        error!(
+            "jwash: hash final: {}, {:?}, time bin search: {}",
+            hash_time.as_us(),
+            count.load(std::sync::atomic::Ordering::Relaxed),
+            time.load(std::sync::atomic::Ordering::Relaxed)
+        );
         stats.hash_time_total_us += hash_time.as_us();
         (hash, total_lamports)
     }
