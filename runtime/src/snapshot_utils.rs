@@ -3,7 +3,7 @@ use {
         account_storage::AccountStorageMap,
         accounts_db::{
             AccountShrinkThreshold, AccountStorageEntry, AccountsDbConfig, AtomicAppendVecId,
-            CalcAccountsHashDataSource,
+            CalcAccountsHashDataSource,RANDOM_OFFSET,
         },
         accounts_file::AccountsFileError,
         accounts_hash::AccountsHash,
@@ -3337,11 +3337,13 @@ pub fn package_and_archive_incremental_snapshot(
     ))
 }
 
+
+
 pub fn should_take_full_snapshot(
     block_height: Slot,
     full_snapshot_archive_interval_slots: Slot,
 ) -> bool {
-    block_height % full_snapshot_archive_interval_slots == 0
+    block_height % full_snapshot_archive_interval_slots == *RANDOM_OFFSET
 }
 
 pub fn should_take_incremental_snapshot(
@@ -3349,7 +3351,7 @@ pub fn should_take_incremental_snapshot(
     incremental_snapshot_archive_interval_slots: Slot,
     last_full_snapshot_slot: Option<Slot>,
 ) -> bool {
-    block_height % incremental_snapshot_archive_interval_slots == 0
+    block_height % incremental_snapshot_archive_interval_slots == *RANDOM_OFFSET
         && last_full_snapshot_slot.is_some()
 }
 

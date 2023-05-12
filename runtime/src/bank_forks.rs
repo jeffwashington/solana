@@ -3,6 +3,7 @@
 use {
     crate::{
         accounts_background_service::{AbsRequestSender, SnapshotRequest, SnapshotRequestType},
+        accounts_db::RANDOM_OFFSET,
         bank::{Bank, SquashTiming},
         epoch_accounts_hash,
         snapshot_config::SnapshotConfig,
@@ -335,7 +336,7 @@ impl BankForks {
         // intervals), it *is* possible, and there are tests to exercise this possibility.
         if let Some(bank) = banks.iter().find(|bank| {
             bank.slot() > self.last_accounts_hash_slot
-                && bank.block_height() % self.accounts_hash_interval_slots == 0
+                && bank.block_height() % self.accounts_hash_interval_slots == *RANDOM_OFFSET
         }) {
             let bank_slot = bank.slot();
             self.last_accounts_hash_slot = bank_slot;
