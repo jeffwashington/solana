@@ -1333,7 +1333,7 @@ impl Accounts {
                     let mut src_account = AccountSharedData::default();
                     src_account.set_lamports(1_000_000_000);
                     let mut pk = accounts_to_store[i].0.clone();
-                    const NUM_DUPLICATES: usize = 60;
+                    const NUM_DUPLICATES: usize = 100;
                     for _duplicates in 0..NUM_DUPLICATES {
                         // only add this if it doesn't already exist in the index
                         let mut hasher = Hasher::default();

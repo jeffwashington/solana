@@ -543,13 +543,14 @@ impl AccountsHashVerifier {
                     accounts_hashes.iter().any(|(slot, hash)| {
                         if let Some(reference_hash) = slot_to_hash.get(slot) {
                             if *hash != *reference_hash {
+                                datapoint_info!("mismatched_hash", ("count", 1, i64));
                                 error!("Fatal! Exiting! Known validator {} produced conflicting hashes for slot: {} ({} != {})",
                                     known_validator,
                                     slot,
                                     hash,
                                     reference_hash,
                                 );
-                                true
+                                false // true
                             } else {
                                 verified_count += 1;
                                 false
