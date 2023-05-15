@@ -7740,7 +7740,7 @@ impl AccountsDb {
         stats.oldest_root = storages.range().start;
 
         // random delay on hash calc start to cause different validators to hit hash calc at different times
-        sleep(Duration::from_secs(thread_rng().gen_range(0, 1200)));
+        sleep(Duration::from_secs(thread_rng().gen_range(0..1200)));
 
         self.mark_old_slots_as_dirty(storages, config.epoch_schedule.slots_per_epoch, &mut stats);
 
@@ -8409,8 +8409,8 @@ impl AccountsDb {
         accounts_index_root_stats.clean_dead_slot_us += measure.as_us();
         if self.log_dead_slots.load(Ordering::Relaxed) {
             info!(
-                "remove_dead_slots_metadata: {} dead slots",
-                dead_slots.len()
+                "remove_dead_slots_metadata: {} dead slots, first: {:?}",
+                dead_slots.len(), dead_slots.first()
             );
             trace!("remove_dead_slots_metadata: dead_slots: {:?}", dead_slots);
         }
