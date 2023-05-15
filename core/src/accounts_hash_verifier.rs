@@ -571,6 +571,46 @@ impl AccountsHashVerifier {
                 exit.load(Ordering::Relaxed),
                 "Failed to send snapshot package: {err}, {snapshot_package:?}"
             );
+    }
+
+    fn should_halt(
+        cluster_info: &ClusterInfo,
+        known_validators: Option<&HashSet<Pubkey>>,
+        slot_to_hash: &mut HashMap<Slot, Hash>,
+    ) -> bool {
+        let mut verified_count = 0;
+        let mut highest_slot = 0;
+        if let Some(known_validators) = known_validators {
+            for known_validator in known_validators {
+                let is_conflicting = cluster_info.get_accounts_hash_for_node(known_validator, |accounts_hashes|
+                {
+                    accounts_hashes.iter().any(|(slot, hash)| {
+                        if let Some(reference_hash) = slot_to_hash.get(slot) {
+                            if *hash != *reference_hash {
+                                datapoint_info!("mismatched_hash", ("count", 1, i64));
+                                error!("Fatal! Exiting! Known validator {} produced conflicting hashes for slot: {} ({} != {})",
+                                    known_validator,
+                                    slot,
+                                    hash,
+                                    reference_hash,
+                                );
+                                false // true
+                            } else {
+                                verified_count += 1;
+                                false
+                            }
+                        } else {
+                            highest_slot = std::cmp::max(*slot, highest_slot);
+                            slot_to_hash.insert(*slot, *hash);
+                            false
+                        }
+                    })
+                }).unwrap_or(false);
+
+                if is_conflicting {
+                    return true;
+                }
+            }
         }
     }
 
