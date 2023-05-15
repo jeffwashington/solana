@@ -52,6 +52,7 @@ pub struct BucketMapHolderStats {
     pub flush_entries_updated_on_disk: AtomicU64,
     pub flush_entries_evicted_from_mem: AtomicU64,
     pub active_threads: AtomicU64,
+    pub scan_missing_us: AtomicU64,
     pub get_range_us: AtomicU64,
     last_age: AtomicU8,
     last_ages_flushed: AtomicU64,
@@ -373,6 +374,11 @@ impl BucketMapHolderStats {
                 ),
                 ("inserts", self.inserts.swap(0, Ordering::Relaxed), i64),
                 ("deletes", self.deletes.swap(0, Ordering::Relaxed), i64),
+                (
+                    "get_missing_us",
+                    self.scan_missing_us.load(Ordering::Relaxed),
+                    i64
+                ),
                 (
                     "active_threads",
                     self.active_threads.load(Ordering::Relaxed),
