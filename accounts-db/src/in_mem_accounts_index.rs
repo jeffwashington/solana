@@ -483,6 +483,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
         let mut found_with_read_lock = true;
         let mut found_initially_with_write_lock = false;
         let mut missing_on_disk = false;
+        let mut upsert_found_disk = false;
         // try to get it just from memory first using only a read lock
         self.get_only_in_mem(pubkey, false, |entry| {
             if let Some(entry) = entry {
@@ -515,6 +516,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
                             measure_us!(self.load_account_entry_from_disk(vacant.key()));
                         disk_read_inside_write_lock_us = Some(local_disk_read_inside_write_lock_us);
                         let new_value = if let Some(disk_entry) = disk_entry {
+                            upsert_found_disk = true;
                             // on disk, so merge new_value with what was on disk
                             self.update_slot_list_entry(
                                 &disk_entry,
@@ -544,6 +546,9 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
                         &self.stats().upsert_disk_lookup_us,
                         disk_read_inside_write_lock_us,
                     );
+                }
+                if upsert_found_disk {
+                    Self::update_stat(&self.stats().upsert_found_disk, 1);
                 }
                 Self::update_stat(
                     &self.stats().upsert_second_lookup_us,
