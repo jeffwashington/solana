@@ -7241,7 +7241,10 @@ impl AccountsDb {
                         assert!(!file_name.is_empty());
                         (!r.is_empty() && r.iter().any(|b| !b.is_empty())).then(|| {
                             // error if we can't write this
-                            cache_hash_data.save(&file_name, r).unwrap();
+                            let r = cache_hash_data.save(&file_name, r);
+                            if r.is_err() {
+                                error!("failed to write: {file_name:?}");
+                            }
                             cache_hash_data.load_map(&file_name).unwrap()
                         })
                     })
@@ -8282,8 +8285,8 @@ impl AccountsDb {
         accounts_index_root_stats.clean_dead_slot_us += measure.as_us();
         if self.log_dead_slots.load(Ordering::Relaxed) {
             info!(
-                "remove_dead_slots_metadata: {} dead slots",
-                dead_slots.len()
+                "remove_dead_slots_metadata: {} dead slots, first: {:?}",
+                dead_slots.len(), dead_slots.first()
             );
             trace!("remove_dead_slots_metadata: dead_slots: {:?}", dead_slots);
         }

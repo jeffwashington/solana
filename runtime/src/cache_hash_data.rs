@@ -312,7 +312,12 @@ impl CacheHashData {
         let entries = entries.iter().sum::<usize>();
         let capacity = cell_size * (entries as u64) + std::mem::size_of::<Header>() as u64;
 
-        let mmap = CacheHashDataFile::new_map(&cache_path, capacity)?;
+        let mmap = CacheHashDataFile::new_map(&cache_path, capacity);
+        if mmap.is_err() {
+            log::error!("save_internal failure: {:?}, path: {cache_path:?}, capacity: {capacity}", mmap);
+            log::error!("save_internal failure, contents: {:?}", std::fs::read_dir(self.cache_dir.clone()));
+        }
+        let mmap = mmap.unwrap();
         m1.stop();
         stats.create_save_us += m1.as_us();
         let mut cache_file = CacheHashDataFile {
