@@ -1363,7 +1363,13 @@ impl Accounts {
                     retain
                 });
             });
-            log::error!("adding {} dummy accounts, took: {}us, slot: {slot}", pks.len(), us);
+            //log::error!("adding {} dummy accounts, took: {}us, slot: {slot}", pks.len(), us);
+            datapoint_info!(
+                "dummy_accounts",
+                ("count", pks.len(), i64),
+                ("total_us", us, i64),
+            );
+            
             let additional = pks
                 .iter()
                 .map(|(k, account)| (k, account))
