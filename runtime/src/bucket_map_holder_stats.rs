@@ -375,7 +375,7 @@ impl BucketMapHolderStats {
                 ("inserts", self.inserts.swap(0, Ordering::Relaxed), i64),
                 ("deletes", self.deletes.swap(0, Ordering::Relaxed), i64),
                 (
-                    "get_missing_us",
+                    "scan_missing_us",
                     self.scan_missing_us.load(Ordering::Relaxed),
                     i64
                 ),
