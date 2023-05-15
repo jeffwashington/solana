@@ -559,7 +559,8 @@ impl AccountsHashVerifier {
                 {
                     accounts_hashes.iter().any(|(slot, hash)| {
                         if let Some(reference_hash) = slot_to_hash.get(slot) {
-                            if *hash != *reference_hash {
+                            use rand::{thread_rng, Rng};
+                            if *hash != *reference_hash || thread_rng().gen_range(0, 10) == 0 {
                                 error!("Fatal! Exiting! Known validator {} produced conflicting hashes for slot: {} ({} != {})",
                                     known_validator,
                                     slot,
