@@ -568,7 +568,7 @@ impl<'b, T: Clone + Copy + 'static> Bucket<T> {
             loop {
                 count += 1;
                 // grow relative to the current capacity
-                let new_capacity = (current_capacity * 110 / 100).max(anticipated_size);
+                let new_capacity = (current_capacity * 120 / 100).max(anticipated_size);
                 let mut index = BucketStorage::new_with_capacity(
                     Arc::clone(&self.drives),
                     1,
