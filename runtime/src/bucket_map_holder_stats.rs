@@ -382,7 +382,7 @@ impl BucketMapHolderStats {
                 ("deletes", self.deletes.swap(0, Ordering::Relaxed), i64),
                 (
                     "scan_missing_us",
-                    self.scan_missing_us.load(Ordering::Relaxed),
+                    self.scan_missing_us.swap(0, Ordering::Relaxed),
                     i64
                 ),
                 (
