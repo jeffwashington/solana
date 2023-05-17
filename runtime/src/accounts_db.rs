@@ -7153,6 +7153,7 @@ impl AccountsDb {
             .into_par_iter()
             .map(|chunk| {
                 let mut scanner = scanner.clone();
+                if false
                 {
                     loop {
                         let mut c = count.lock().unwrap();
