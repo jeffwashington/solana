@@ -162,7 +162,6 @@ lazy_static! {
     pub static ref RANDOM_OFFSET: Slot = thread_rng().gen_range(0, 10000);
 }
 
-
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum CreateAncientStorage {
     /// ancient storages are created by appending
@@ -2984,16 +2983,21 @@ impl AccountsDb {
         let mut min_dirty_slot = None::<u64>;
         let previous_len = self.dirty_stores.len();
         let (_, us) = measure_us!({
-        self.dirty_stores.retain(|slot, store| {
-            if *slot > max_slot_inclusive {
-                true
-            } else {
-                min_dirty_slot = min_dirty_slot.map(|min| min.min(*slot)).or(Some(*slot));
-                dirty_stores.push((*slot, store.clone()));
-                false
-            }
-        });});
-        error!("jwash: construct_candidate_clean_keys: dirty stores: {}, prev len: {}, us: {us}", dirty_stores.len(), previous_len);
+            self.dirty_stores.retain(|slot, store| {
+                if *slot > max_slot_inclusive {
+                    true
+                } else {
+                    min_dirty_slot = min_dirty_slot.map(|min| min.min(*slot)).or(Some(*slot));
+                    dirty_stores.push((*slot, store.clone()));
+                    false
+                }
+            });
+        });
+        error!(
+            "jwash: construct_candidate_clean_keys: dirty stores: {}, prev len: {}, us: {us}",
+            dirty_stores.len(),
+            previous_len
+        );
         let dirty_stores_len = dirty_stores.len();
         let pubkeys = DashSet::new();
         let dirty_ancient_stores = AtomicUsize::default();
@@ -3021,14 +3025,15 @@ impl AccountsDb {
                 .unwrap_or(&max_slot_inclusive.saturating_add(1));
         };
         let (_, us) = measure_us!({
-        if is_startup {
-            // Free to consume all the cores during startup
-            dirty_store_routine();
-        } else {
-            self.thread_pool_clean.install(|| {
+            if is_startup {
+                // Free to consume all the cores during startup
                 dirty_store_routine();
-            });
-        }});
+            } else {
+                self.thread_pool_clean.install(|| {
+                    dirty_store_routine();
+                });
+            }
+        });
 
         error!(
             "jwash: dirty_stores.len: {} pubkeys.len: {}, us: {}, startup: {}",
@@ -7137,122 +7142,125 @@ impl AccountsDb {
         let max = 5;
         let count = Mutex::new(0);
 
+        let chunks = (0..splitter.chunk_count).collect::<Vec<_>>();
         stats.scan_chunks = splitter.chunk_count;
-        (0..splitter.chunk_count)
-            .into_par_iter()
-            .map(|chunk| {
-                let mut scanner = scanner.clone();
-                if false
-                {
-                    loop {
-                        let mut c = count.lock().unwrap();
-                        if *c < max {
-                            *c = *c + 1;
-                            break;
-                        }
-                        sleep(Duration::from_millis(100));
-                    }
-                }
+        let width = (chunks.len() / max).max(1);
 
-                let fnal = || {
-                    {
+        let c = chunks
+            .par_chunks(width)
+            .map(|chunks| {
+                chunks.into_iter().map(|chunk| {
+                    let mut scanner = scanner.clone();
+                    if false {
+                        loop {
+                            let mut c = count.lock().unwrap();
+                            if *c < max {
+                                *c = *c + 1;
+                                break;
+                            }
+                            sleep(Duration::from_millis(100));
+                        }
+                    }
+
+                    let fnal = || {
                         let mut c = count.lock().unwrap();
                         *c = *c - 1;
-                    }
-    
-                };
+                    };
 
-                let range_this_chunk = splitter.get_slot_range(chunk)?;
+                    let range_this_chunk = splitter.get_slot_range(*chunk)?;
 
-                let slots_per_epoch = config
-                    .rent_collector
-                    .epoch_schedule
-                    .get_slots_in_epoch(config.rent_collector.epoch);
-                let one_epoch_old = snapshot_storages
-                    .range()
-                    .end
-                    .saturating_sub(slots_per_epoch);
+                    let slots_per_epoch = config
+                        .rent_collector
+                        .epoch_schedule
+                        .get_slots_in_epoch(config.rent_collector.epoch);
+                    let one_epoch_old = snapshot_storages
+                        .range()
+                        .end
+                        .saturating_sub(slots_per_epoch);
 
-                let file_name = {
-                    let mut load_from_cache = true;
-                    let mut hasher = hash_map::DefaultHasher::new();
-                    bin_range.start.hash(&mut hasher);
-                    bin_range.end.hash(&mut hasher);
-                    let is_first_scan_pass = bin_range.start == 0;
+                    let file_name = {
+                        let mut load_from_cache = true;
+                        let mut hasher = hash_map::DefaultHasher::new();
+                        bin_range.start.hash(&mut hasher);
+                        bin_range.end.hash(&mut hasher);
+                        let is_first_scan_pass = bin_range.start == 0;
 
-                    // calculate hash representing all storages in this chunk
-                    for (slot, storage) in snapshot_storages.iter_range(&range_this_chunk) {
-                        if is_first_scan_pass && slot < one_epoch_old {
-                            self.update_old_slot_stats(stats, storage);
-                        }
-                        if !Self::hash_storage_info(&mut hasher, storage, slot) {
-                            load_from_cache = false;
-                            break;
-                        }
-                    }
-                    // we have a hash value for the storages in this chunk
-                    // so, build a file name:
-                    let hash = hasher.finish();
-                    let file_name = format!(
-                        "{}.{}.{}.{}.{}",
-                        range_this_chunk.start,
-                        range_this_chunk.end,
-                        bin_range.start,
-                        bin_range.end,
-                        hash
-                    );
-                    if load_from_cache {
-                        if let Ok(mapped_file) = cache_hash_data.load_map(&file_name) {
-                            fnal();
-                            return Some(mapped_file);
-                        }
-                    }
-
-                    // fall through and load normally - we failed to load from a cache file
-                    file_name
-                };
-
-                let mut init_accum = true;
-                // load from cache failed, so create the cache file for this chunk
-                for (slot, storage) in snapshot_storages.iter_range(&range_this_chunk) {
-                    let ancient = slot < oldest_non_ancient_slot;
-                    let (_, scan_us) = measure_us!(if let Some(storage) = storage {
-                        if init_accum {
-                            let range = bin_range.end - bin_range.start;
-                            scanner.init_accum(range);
-                            init_accum = false;
-                        }
-                        scanner.set_slot(slot);
-
-                        Self::scan_single_account_storage(storage, &mut scanner);
-                    });
-                    if ancient {
-                        stats
-                            .sum_ancient_scans_us
-                            .fetch_add(scan_us, Ordering::Relaxed);
-                        stats.count_ancient_scans.fetch_add(1, Ordering::Relaxed);
-                        stats
-                            .longest_ancient_scan_us
-                            .fetch_max(scan_us, Ordering::Relaxed);
-                    }
-                }
-                let r = (!init_accum)
-                    .then(|| {
-                        let r = scanner.scanning_complete();
-                        assert!(!file_name.is_empty());
-                        (!r.is_empty() && r.iter().any(|b| !b.is_empty())).then(|| {
-                            // error if we can't write this
-                            let r = cache_hash_data.save(&file_name, r);
-                            if r.is_err() {
-                                error!("failed to write: {file_name:?}");
+                        // calculate hash representing all storages in this chunk
+                        for (slot, storage) in snapshot_storages.iter_range(&range_this_chunk) {
+                            if is_first_scan_pass && slot < one_epoch_old {
+                                self.update_old_slot_stats(stats, storage);
                             }
-                            cache_hash_data.load_map(&file_name).unwrap()
+                            if !Self::hash_storage_info(&mut hasher, storage, slot) {
+                                load_from_cache = false;
+                                break;
+                            }
+                        }
+                        // we have a hash value for the storages in this chunk
+                        // so, build a file name:
+                        let hash = hasher.finish();
+                        let file_name = format!(
+                            "{}.{}.{}.{}.{}",
+                            range_this_chunk.start,
+                            range_this_chunk.end,
+                            bin_range.start,
+                            bin_range.end,
+                            hash
+                        );
+                        if load_from_cache {
+                            if let Ok(mapped_file) = cache_hash_data.load_map(&file_name) {
+                                fnal();
+                                return Some(mapped_file);
+                            }
+                        }
+
+                        // fall through and load normally - we failed to load from a cache file
+                        file_name
+                    };
+
+                    let mut init_accum = true;
+                    // load from cache failed, so create the cache file for this chunk
+                    for (slot, storage) in snapshot_storages.iter_range(&range_this_chunk) {
+                        let ancient = slot < oldest_non_ancient_slot;
+                        let (_, scan_us) = measure_us!(if let Some(storage) = storage {
+                            if init_accum {
+                                let range = bin_range.end - bin_range.start;
+                                scanner.init_accum(range);
+                                init_accum = false;
+                            }
+                            scanner.set_slot(slot);
+
+                            Self::scan_single_account_storage(storage, &mut scanner);
+                        });
+                        if ancient {
+                            stats
+                                .sum_ancient_scans_us
+                                .fetch_add(scan_us, Ordering::Relaxed);
+                            stats.count_ancient_scans.fetch_add(1, Ordering::Relaxed);
+                            stats
+                                .longest_ancient_scan_us
+                                .fetch_max(scan_us, Ordering::Relaxed);
+                        }
+                    }
+                    let r = (!init_accum)
+                        .then(|| {
+                            let r = scanner.scanning_complete();
+                            assert!(!file_name.is_empty());
+                            (!r.is_empty() && r.iter().any(|b| !b.is_empty())).then(|| {
+                                // error if we can't write this
+                                let r = cache_hash_data.save(&file_name, r);
+                                if r.is_err() {
+                                    error!("failed to write: {file_name:?}");
+                                }
+                                cache_hash_data.load_map(&file_name).unwrap()
+                            })
                         })
-                    })
-                    .flatten();
-                fnal();
-                r
-            })
+                        .flatten();
+                    fnal();
+                    r
+                }).collect::<Vec<_>>()
+            });
+            c
+            .flatten()
             .filter_map(|x| x)
             .collect()
     }
@@ -8287,7 +8295,8 @@ impl AccountsDb {
         if self.log_dead_slots.load(Ordering::Relaxed) {
             info!(
                 "remove_dead_slots_metadata: {} dead slots, first: {:?}",
-                dead_slots.len(), dead_slots.first()
+                dead_slots.len(),
+                dead_slots.first()
             );
             trace!("remove_dead_slots_metadata: dead_slots: {:?}", dead_slots);
         }
