@@ -1446,6 +1446,11 @@ impl Bank {
         rent_collector.clone_with_epoch(epoch)
     }
 
+    /// Return true if the current bank falls in epoch reward interval
+    fn in_reward_interval(&self) -> bool {
+        matches!(self.epoch_reward_status, EpochRewardStatus::Active(_))
+    }
+
     fn _new_from_parent(
         parent: &Arc<Bank>,
         collector_id: &Pubkey,
@@ -7728,6 +7733,13 @@ impl Bank {
             ("waiting-time-us", measure.as_us(), i64),
         );
         Some(epoch_accounts_hash)
+    }
+
+    /// Return the epoch_reward_status field on the bank to serialize
+    /// Returns none if we are NOT in the reward interval.
+    pub(crate) fn get_epoch_reward_status_to_serialize(&self) -> Option<&EpochRewardStatus> {
+        self.in_reward_interval()
+            .then_some(&self.epoch_reward_status)
     }
 
     /// Convenience fn to get the Epoch Accounts Hash
