@@ -89,6 +89,7 @@ use {
     rand_chacha::{rand_core::SeedableRng, ChaChaRng},
     rayon::{
         iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator},
+        slice::ParallelSlice,
         ThreadPool, ThreadPoolBuilder,
     },
     solana_measure::{measure, measure::Measure, measure_us},
@@ -3192,8 +3193,13 @@ impl Bank {
         Self::sort_and_shuffle_partitioned_rewards(&mut stake_rewards, rewarded_epoch, rewards);
         let total = thread_pool.install(|| {
             stake_rewards
-                .par_iter()
-                .map(|stake_reward| stake_reward.stake_reward_info.lamports)
+                .par_chunks(10_000)
+                .map(|stake_rewards| {
+                    stake_rewards
+                        .iter()
+                        .map(|stake_reward| stake_reward.stake_reward_info.lamports)
+                        .sum::<i64>()
+                })
                 .sum::<i64>()
         });
 
