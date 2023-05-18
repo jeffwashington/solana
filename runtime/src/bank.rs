@@ -4014,7 +4014,7 @@ impl Bank {
         distributed_rewards: u64,
         distribution_complete_block_height: u64,
     ) {
-        assert!(self.partitioned_rewards_feature_enabled());
+        assert!(self.partitioned_rewards_feature_enabled() || self.rc.accounts.accounts_db.partitioned_epoch_rewards_testing.force_one_slot_partitioned_rewards);
 
         let epoch_rewards = sysvar::epoch_rewards::EpochRewards::new(
             total_rewards,
