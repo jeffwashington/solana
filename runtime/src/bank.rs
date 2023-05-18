@@ -3339,6 +3339,11 @@ impl Bank {
             }
         });
         assert!(vote_rewards.is_empty());
+        error!(
+            "verified matching: {}, {}",
+            partitioned_rewards.stake_rewards.stake_rewards.len(),
+            partitioned_rewards.vote_account_rewards.len()
+        );
     }
 
     fn load_vote_and_stake_accounts(
