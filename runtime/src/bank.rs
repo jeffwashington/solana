@@ -7117,8 +7117,13 @@ impl Bank {
         accounts: impl StorableAccounts<'a, T>,
     ) {
         assert!(!self.freeze_started());
+        use std::str::FromStr;
         let mut m = Measure::start("stakes_cache.check_and_store");
+        let t = Pubkey::from_str("ALK9YCCWTeM4y3LWtrppSZqJrmaQdwmkzYNjkHx7tsyy").unwrap();
         (0..accounts.len()).for_each(|i| {
+            if &t == accounts.pubkey(i) {
+                error!("store: {}, {:?}", t, accounts.account(i).to_account_shared_data());
+            }
             self.stakes_cache
                 .check_and_store(accounts.pubkey(i), accounts.account(i))
         });
