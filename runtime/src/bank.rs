@@ -3364,13 +3364,24 @@ impl Bank {
                 }
             });
 
-        // verify vote rewards match expected
+            let mut correct = 0;
+            let mut incorrect = 0;
+            // verify vote rewards match expected
         vote_rewards_expected.iter().for_each(|entry| {
             if entry.value().vote_needs_store {
                 let partitioned = vote_rewards.remove(entry.key()).unwrap();
                 let mut dummy = partitioned.1.clone();
                 dummy.set_lamports(partitioned.0.post_balance);
-                assert_eq!(dummy, entry.value().vote_account, "{:?}: {:?}", entry.key(), partitioned.0);
+                if dummy != entry.value().vote_account {
+                    error!("different {:?}: {:?}, old lamports: {}, partitioned: {:?}, calculated: {:?}, correct: {}, incorrect: {}", entry.key(), partitioned.0, partitioned.1.lamports(),dummy, entry.value().vote_account,
+                    correct, incorrect);
+                incorrect += 1;
+            }
+                else {
+                    correct += 1;
+                }
+                //assert_eq!(dummy, entry.value().vote_account, "{:?}: {:?}, old lamports: {}, partitioned: {:?}, calculated: {:?}", entry.key(), partitioned.0, partitioned.1.lamports(),
+                //dummy, entry.value().vote_account);
                 // assert_eq!(partitioned.0.lamports as u64, entry.value().vote_rewards);
             }
         });

@@ -2537,7 +2537,7 @@ impl AccountsDb {
         let partitioned_epoch_rewards_testing = PartitionedEpochRewardsTesting {
             reward_calculation_num_blocks: 0,
             stake_account_stores_per_block: u64::MAX,
-            force_one_slot_partitioned_rewards: true,
+            force_one_slot_partitioned_rewards: false,
         };
 
         let filler_account_suffix = if filler_accounts_config.count > 0 {
