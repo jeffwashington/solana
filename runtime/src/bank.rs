@@ -2965,6 +2965,9 @@ impl Bank {
                             return;
                         }
                     };
+                    use std::str::FromStr;
+                    let t = Pubkey::from_str("ALK9YCCWTeM4y3LWtrppSZqJrmaQdwmkzYNjkHx7tsyy").unwrap();
+
                     let stake_delegation = (*stake_pubkey, stake_account);
                     let mut vote_delegations = if let Some(vote_delegations) =
                         vote_with_stake_delegations_map.get_mut(vote_pubkey)
@@ -2974,6 +2977,9 @@ impl Bank {
                         let cached_vote_account = cached_vote_accounts.get(vote_pubkey);
                         let vote_account = match self.get_account_with_fixed_root(vote_pubkey) {
                             Some(vote_account) => {
+                                if vote_pubkey == &t {
+                                    error!("loading: {}, {:?}, stake: {}", vote_pubkey, vote_account, stake_pubkey);
+                                }
                                 if vote_account.owner() != &solana_vote_program::id() {
                                     invalid_vote_keys
                                         .insert(*vote_pubkey, InvalidCacheEntryReason::WrongOwner);
@@ -3372,8 +3378,10 @@ impl Bank {
                 let partitioned = vote_rewards.remove(entry.key()).unwrap();
                 let mut dummy = partitioned.1.clone();
                 dummy.set_lamports(partitioned.0.post_balance);
-                if dummy != entry.value().vote_account && partitioned.1 != entry.value().vote_account {
-                    error!("different {:?}: {:?}, old lamports: {}, partitioned: {:?}, calculated: {:?}, correct: {}, incorrect: {}", entry.key(), partitioned.0, partitioned.1.lamports(),dummy, entry.value().vote_account,
+                let mut to_store_normal = entry.value().vote_account.clone();
+                _ = to_store_normal.checked_add_lamports(entry.value().vote_rewards);
+                if dummy != to_store_normal && partitioned.1 != to_store_normal {
+                    error!("different {:?}: {:?}, old lamports: {}, partitioned: {:?}, calculated: {:?}, correct: {}, incorrect: {}", entry.key(), partitioned.0, partitioned.1.lamports(),dummy, to_store_normal,
                     correct, incorrect);
                 incorrect += 1;
             }
@@ -3576,6 +3584,8 @@ impl Bank {
         } = reward_calculate_params;
 
         let solana_vote_program: Pubkey = solana_vote_program::id();
+        use std::str::FromStr;
+        let t = Pubkey::from_str("ALK9YCCWTeM4y3LWtrppSZqJrmaQdwmkzYNjkHx7tsyy").unwrap();
 
         let get_vote_account = |vote_pubkey: &Pubkey| -> Option<VoteAccount> {
             if let Some(vote_account) = cached_vote_accounts.get(vote_pubkey) {
@@ -3634,6 +3644,10 @@ impl Bank {
                         reward_calc_tracer.as_ref(),
                         credits_auto_rewind,
                     );
+                    if vote_pubkey == t {
+                        error!("vote: {}, stake: {}", vote_pubkey, stake_pubkey);
+    
+                    }
 
                     let post_lamport = stake_account.lamports();
 
