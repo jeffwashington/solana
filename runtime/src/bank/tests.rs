@@ -12667,7 +12667,7 @@ fn test_reward_interval_normal() {
     let stake_rewards = (0..expected_num)
         .map(|_| StakeReward::random())
         .collect::<Vec<_>>();
-    bank.set_epoch_reward_status_active_for_test(0, stake_rewards);
+    bank.set_epoch_reward_status_active(stake_rewards);
 
     assert_eq!(bank.get_reward_credit_num_blocks(), 2);
     assert_eq!(
@@ -12691,7 +12691,7 @@ fn test_reward_interval_cap() {
     let stake_rewards = (0..expected_num)
         .map(|_| StakeReward::random())
         .collect::<Vec<_>>();
-    bank.set_epoch_reward_status_active_for_test(0, stake_rewards);
+    bank.set_epoch_reward_status_active(stake_rewards);
 
     assert_eq!(bank.get_reward_credit_num_blocks(), 1);
     assert_eq!(
@@ -12727,7 +12727,7 @@ fn test_get_epoch_reward_partition_range() {
         .map(|_| StakeReward::random())
         .collect::<Vec<_>>();
     let stake_rewards_clone = stake_rewards.clone();
-    bank.set_epoch_reward_status_active_for_test(0, stake_rewards);
+    bank.set_epoch_reward_status_active(stake_rewards);
 
     assert_eq!(bank.get_reward_credit_num_blocks(), 10);
 
@@ -12765,7 +12765,7 @@ fn test_get_epoch_reward_partition_range_panic() {
         .map(|_| StakeReward::random())
         .collect::<Vec<_>>();
     let stake_rewards_clone = stake_rewards.clone();
-    bank.set_epoch_reward_status_active_for_test(0, stake_rewards);
+    bank.set_epoch_reward_status_active(stake_rewards);
 
     // This call should panic, i.e. 15 is out of the num_credit_blocks
     let _range = bank.get_stake_rewards_in_partition(15, &stake_rewards_clone);
@@ -12793,7 +12793,7 @@ fn test_epoch_credit_rewards() {
         stake_reward.credit(1);
         expected_rewards += 1;
     }
-    bank.set_epoch_reward_status_active_for_test(0, stake_rewards.clone());
+    bank.set_epoch_reward_status_active(stake_rewards.clone());
 
     // Test partitioned stores
     let mut total_num = 0;
@@ -12834,7 +12834,7 @@ fn test_epoch_partitoned_reward_history_update() {
     for stake_reward in &mut stake_rewards {
         stake_reward.credit(1);
     }
-    bank.set_epoch_reward_status_active_for_test(0, stake_rewards.clone());
+    bank.set_epoch_reward_status_active(stake_rewards.clone());
 
     // Test partitioned reward history updates
     let pre_update_history_len = bank.rewards.read().unwrap().len();
@@ -13205,7 +13205,7 @@ fn test_epoch_reward_sysvar() {
 
     // create epoch rewards sysvar
     let expected_epoch_rewards = sysvar::epoch_rewards::EpochRewards::new(total_rewards, 10, 42);
-    bank.create_epoch_rewards(total_rewards, 10, 42);
+    bank.create_epoch_rewards_sys_var(total_rewards, 10, 42);
     let account = bank.get_account(&sysvar::epoch_rewards::id()).unwrap();
     assert_eq!(account.lamports(), total_rewards - 10);
     let epoch_rewards: sysvar::epoch_rewards::EpochRewards = from_account(&account).unwrap();
