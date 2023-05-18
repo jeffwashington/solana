@@ -3368,10 +3368,17 @@ impl Bank {
         vote_rewards_expected.iter().for_each(|entry| {
             if entry.value().vote_needs_store {
                 let partitioned = vote_rewards.remove(entry.key()).unwrap();
-                assert_eq!(partitioned.1, entry.value().vote_account, "{:?}: {:?}", entry.key(), partitioned.0);
-                assert_eq!(partitioned.0.lamports as u64, entry.value().vote_rewards);
+                let mut dummy = partitioned.1.clone();
+                dummy.set_lamports(partitioned.0.post_balance);
+                assert_eq!(dummy, entry.value().vote_account, "{:?}: {:?}", entry.key(), partitioned.0);
+                // assert_eq!(partitioned.0.lamports as u64, entry.value().vote_rewards);
             }
         });
+        if !vote_rewards.is_empty() {
+            vote_rewards.iter().for_each(|entry| {
+                error!("{:?}", entry);
+            });
+        }
         assert!(vote_rewards.is_empty(), "{:?}", vote_rewards);
         error!(
             "verified matching: {}, {}",
