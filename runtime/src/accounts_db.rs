@@ -1501,6 +1501,8 @@ pub struct AccountsDb {
     /// if true, end of epoch bank rewards will test the partitioned rewards distribution code
     pub(crate) test_partitioned_epoch_rewards: bool,
 
+    pub(crate) partitioned_epoch_rewards_testing: PartitionedEpochRewardsTesting,
+
     /// the full accounts hash calculation as of a predetermined block height 'N'
     /// to be included in the bank hash at a predetermined block height 'M'
     /// The cadence is once per epoch, all nodes calculate a full accounts hash as of a known slot calculated using 'N'
@@ -1509,6 +1511,13 @@ pub struct AccountsDb {
     pub epoch_accounts_hash_manager: EpochAccountsHashManager,
 
     pub(crate) bank_progress: BankCreationFreezingProgress,
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct PartitionedEpochRewardsTesting {
+    pub(crate) reward_calculation_num_blocks: Slot,
+    pub(crate) stake_account_stores_per_block: Slot,
+    pub(crate) force_one_slot_partitioned_rewards: bool,
 }
 
 #[derive(Debug, Default)]
@@ -2445,6 +2454,7 @@ impl AccountsDb {
             log_dead_slots: AtomicBool::new(true),
             exhaustively_verify_refcounts: false,
             test_partitioned_epoch_rewards: false,
+            partitioned_epoch_rewards_testing: PartitionedEpochRewardsTesting::default(),
             epoch_accounts_hash_manager: EpochAccountsHashManager::new_invalid(),
         }
     }
@@ -2524,6 +2534,12 @@ impl AccountsDb {
             .map(|config| config.test_partitioned_epoch_rewards)
             .unwrap_or(true /* note this is hacked for testing atm */);
 
+        let partitioned_epoch_rewards_testing = PartitionedEpochRewardsTesting {
+            reward_calculation_num_blocks: 0,
+            stake_account_stores_per_block: 1,
+            force_one_slot_partitioned_rewards: true,
+        };
+
         let filler_account_suffix = if filler_accounts_config.count > 0 {
             Some(solana_sdk::pubkey::new_rand())
         } else {
@@ -2542,6 +2558,7 @@ impl AccountsDb {
             filler_account_suffix,
             assert_stakes_cache_consistency,
             create_ancient_storage,
+            partitioned_epoch_rewards_testing,
             write_cache_limit_bytes: accounts_db_config
                 .as_ref()
                 .and_then(|x| x.write_cache_limit_bytes),
