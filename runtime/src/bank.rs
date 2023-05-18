@@ -2660,7 +2660,7 @@ impl Bank {
     //    - distributed vote rewards
     //    - stake rewards
     fn calculate_rewards_and_distribute_vote_rewards(
-        &mut self,
+        &self,
         prev_epoch: Epoch,
         reward_calc_tracer: Option<impl Fn(&RewardCalculationEvent) + Send + Sync>,
         thread_pool: &ThreadPool,
