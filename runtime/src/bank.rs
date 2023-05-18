@@ -3347,6 +3347,12 @@ impl Bank {
             assert_eq!(partitioned, stake_reward);
         });
         assert!(stake_rewards.is_empty());
+        error!(
+            "verified matching stake rewards, checking vote rewards: {}, {} out of expected: {}",
+            partitioned_rewards.stake_rewards.stake_rewards.len(),
+            partitioned_rewards.vote_account_rewards.len(),
+            vote_rewards_expected.len(),
+        );
 
         let mut vote_rewards: HashMap<Pubkey, (RewardInfo, AccountSharedData)> = HashMap::default();
         partitioned_rewards
@@ -3362,11 +3368,11 @@ impl Bank {
         vote_rewards_expected.iter().for_each(|entry| {
             if entry.value().vote_needs_store {
                 let partitioned = vote_rewards.remove(entry.key()).unwrap();
-                assert_eq!(partitioned.1, entry.value().vote_account);
+                assert_eq!(partitioned.1, entry.value().vote_account, "{:?}: {:?}", entry.key(), partitioned.0);
                 assert_eq!(partitioned.0.lamports as u64, entry.value().vote_rewards);
             }
         });
-        assert!(vote_rewards.is_empty());
+        assert!(vote_rewards.is_empty(), "{:?}", vote_rewards);
         error!(
             "verified matching: {}, {}",
             partitioned_rewards.stake_rewards.stake_rewards.len(),
