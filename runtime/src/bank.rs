@@ -3300,7 +3300,8 @@ impl Bank {
                 metrics,
             );
 
-            if self.rc.accounts.accounts_db.test_partitioned_epoch_rewards {
+            error!("self.rc.accounts.accounts_db.test_partitioned_epoch_rewards: {}", self.rc.accounts.accounts_db.test_partitioned_epoch_rewards);
+            if true || self.rc.accounts.accounts_db.test_partitioned_epoch_rewards {
                 self.compare_with_partitioned_rewards(
                     &stake_rewards,
                     &vote_account_rewards,
