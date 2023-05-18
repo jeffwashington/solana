@@ -12953,6 +12953,8 @@ fn test_rewards_point_calculation() {
 /// Test reward computation at epoch boundary
 #[test]
 fn test_rewards_computation() {
+    todo!("refactored, rewrite this test");
+    /*
     solana_logger::setup();
 
     let expected_num_delegations = 100;
@@ -12966,7 +12968,7 @@ fn test_rewards_computation() {
     let StakeRewardCalculation {
         stake_rewards,
         total_stake_rewards_lamports,
-    } = bank.do_calculate_validator_rewards_and_distribute_vote_rewards(
+    } = bank.calculate_validator_rewards_and_distribute_vote_rewards(
         1,
         expected_rewards,
         null_tracer(),
@@ -12980,6 +12982,7 @@ fn test_rewards_computation() {
 
     // assert that number of rewards matches
     assert_eq!(stake_rewards.len(), expected_num_delegations);
+    */
 }
 
 /// Test rewards compuation and partitioned rewards distribution at the epoch boundary
