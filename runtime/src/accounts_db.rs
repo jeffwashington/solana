@@ -2524,7 +2524,7 @@ impl AccountsDb {
             .unwrap_or_default();
 
         let partitioned_epoch_rewards_config: PartitionedEpochRewardsConfig =
-            PartitionedEpochRewardsConfig::new(TestPartitionedEpochRewards::ForcePartitionedEpochRewardsInOneBlock);
+            PartitionedEpochRewardsConfig::new(TestPartitionedEpochRewards::CompareResults);
 
         let filler_account_suffix = if filler_accounts_config.count > 0 {
             Some(solana_sdk::pubkey::new_rand())
