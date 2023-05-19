@@ -2792,6 +2792,7 @@ impl Bank {
         thread_pool: &ThreadPool,
         metrics: &mut RewardsMetrics,
     ) {
+        panic!("old school");
         let capitalization = self.capitalization();
         let PrevEpochInflationRewards {
             validator_rewards,
