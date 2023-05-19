@@ -4083,7 +4083,11 @@ impl Bank {
 
     /// Update EpochRewards sysvar with distributed rewards
     fn update_epoch_rewards_sysvar(&self, distributed: u64) {
-        assert!(self.partitioned_rewards_feature_enabled());
+        assert!(self.partitioned_rewards_feature_enabled() || self.rc
+        .accounts
+        .accounts_db
+        .partitioned_epoch_rewards_testing
+        .force_one_slot_partitioned_rewards);
 
         let mut epoch_rewards: sysvar::epoch_rewards::EpochRewards =
             from_account(&self.get_account(&sysvar::epoch_rewards::id()).unwrap()).unwrap();
