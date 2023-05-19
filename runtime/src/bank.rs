@@ -1744,17 +1744,16 @@ impl Bank {
                 // Save a snapshot of stakes for use in consensus and stake weighted networking
                 let leader_schedule_epoch = epoch_schedule.get_leader_schedule_epoch(slot);
                 new.update_epoch_stakes(leader_schedule_epoch);
-
-                if new.partitioned_rewards_feature_enabled()
-                    || new
-                        .rc
-                        .accounts
-                        .accounts_db
-                        .partitioned_epoch_rewards_testing
-                        .force_one_slot_partitioned_rewards
-                {
-                    new.distribute_partitioned_epoch_rewards();
-                }
+            }
+            if new.partitioned_rewards_feature_enabled()
+                || new
+                    .rc
+                    .accounts
+                    .accounts_db
+                    .partitioned_epoch_rewards_testing
+                    .force_one_slot_partitioned_rewards
+            {
+                new.distribute_partitioned_epoch_rewards();
             }
         });
 
@@ -3306,7 +3305,10 @@ impl Bank {
                 metrics,
             );
 
-            error!("self.rc.accounts.accounts_db.test_partitioned_epoch_rewards: {}", self.rc.accounts.accounts_db.test_partitioned_epoch_rewards);
+            error!(
+                "self.rc.accounts.accounts_db.test_partitioned_epoch_rewards: {}",
+                self.rc.accounts.accounts_db.test_partitioned_epoch_rewards
+            );
             if true || self.rc.accounts.accounts_db.test_partitioned_epoch_rewards {
                 self.compare_with_partitioned_rewards(
                     &stake_rewards,
@@ -3370,9 +3372,9 @@ impl Bank {
                 }
             });
 
-            let mut correct = 0;
-            let mut incorrect = 0;
-            // verify vote rewards match expected
+        let mut correct = 0;
+        let mut incorrect = 0;
+        // verify vote rewards match expected
         vote_rewards_expected.iter().for_each(|entry| {
             if entry.value().vote_needs_store {
                 let partitioned = vote_rewards.remove(entry.key()).unwrap();
@@ -3646,7 +3648,6 @@ impl Bank {
                     );
                     if vote_pubkey == t {
                         error!("vote: {}, stake: {}", vote_pubkey, stake_pubkey);
-    
                     }
 
                     let post_lamport = stake_account.lamports();
@@ -4053,7 +4054,15 @@ impl Bank {
         distributed_rewards: u64,
         distribution_complete_block_height: u64,
     ) {
-        assert!(self.partitioned_rewards_feature_enabled() || self.rc.accounts.accounts_db.partitioned_epoch_rewards_testing.force_one_slot_partitioned_rewards);
+        assert!(
+            self.partitioned_rewards_feature_enabled()
+                || self
+                    .rc
+                    .accounts
+                    .accounts_db
+                    .partitioned_epoch_rewards_testing
+                    .force_one_slot_partitioned_rewards
+        );
 
         let epoch_rewards = sysvar::epoch_rewards::EpochRewards::new(
             total_rewards,
@@ -7136,7 +7145,11 @@ impl Bank {
         let t = Pubkey::from_str("ALK9YCCWTeM4y3LWtrppSZqJrmaQdwmkzYNjkHx7tsyy").unwrap();
         (0..accounts.len()).for_each(|i| {
             if &t == accounts.pubkey(i) {
-                error!("store: {}, {:?}", t, accounts.account(i).to_account_shared_data());
+                error!(
+                    "store: {}, {:?}",
+                    t,
+                    accounts.account(i).to_account_shared_data()
+                );
             }
             self.stakes_cache
                 .check_and_store(accounts.pubkey(i), accounts.account(i))
