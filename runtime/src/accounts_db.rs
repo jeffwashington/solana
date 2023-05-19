@@ -2453,7 +2453,7 @@ impl AccountsDb {
             filler_account_suffix: None,
             log_dead_slots: AtomicBool::new(true),
             exhaustively_verify_refcounts: false,
-            test_partitioned_epoch_rewards: false,
+            test_partitioned_epoch_rewards: true,
             partitioned_epoch_rewards_testing: PartitionedEpochRewardsTesting::default(),
             epoch_accounts_hash_manager: EpochAccountsHashManager::new_invalid(),
         }
@@ -2533,6 +2533,7 @@ impl AccountsDb {
             .as_ref()
             .map(|config| config.test_partitioned_epoch_rewards)
             .unwrap_or(true /* note this is hacked for testing atm */);
+        let test_partitioned_epoch_rewards = true;
 
         let partitioned_epoch_rewards_testing = PartitionedEpochRewardsTesting {
             reward_calculation_num_blocks: 0,
