@@ -3390,6 +3390,7 @@ impl Bank {
                 else {
                     correct += 1;
                 }
+                assert_eq!(dummy, to_store_normal, "{:?}", entry.key());
                 //assert_eq!(dummy, entry.value().vote_account, "{:?}: {:?}, old lamports: {}, partitioned: {:?}, calculated: {:?}", entry.key(), partitioned.0, partitioned.1.lamports(),
                 //dummy, entry.value().vote_account);
                 // assert_eq!(partitioned.0.lamports as u64, entry.value().vote_rewards);
