@@ -254,7 +254,7 @@ impl BankForks {
             .get(&root)
             .expect("root bank didn't exist in bank_forks");
         let new_epoch = root_bank.epoch();
-        if old_epoch != new_epoch {
+        if old_epoch != new_epoch && false {
             info!(
                 "Root entering
                     epoch: {},
