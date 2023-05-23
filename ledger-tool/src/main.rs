@@ -2460,6 +2460,7 @@ fn main() {
                 }
             }
             ("verify", Some(arg_matches)) => {
+                panic!("{:?}", tempfile().unwrap());
                 let exit_signal = Arc::new(AtomicBool::new(false));
                 let no_os_memory_stats_reporting =
                     arg_matches.is_present("no_os_memory_stats_reporting");
