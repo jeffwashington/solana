@@ -288,12 +288,15 @@ impl AccountsDb {
         let ancient_slot_infos = self.collect_sort_filter_ancient_slots(sorted_slots, &tuning);
 
         if ancient_slot_infos.all_infos.is_empty() {
+            log::error!("ancient_append_vecs_packed: {}", line!());
             return; // nothing to do
         }
+        log::error!("ancient_append_vecs_packed: {}", line!());
         let accounts_per_storage = self
             .get_unique_accounts_from_storage_for_combining_ancient_slots(
                 &ancient_slot_infos.all_infos[..],
             );
+            log::error!("ancient_append_vecs_packed: {}", line!());
 
         let accounts_to_combine = self.calc_accounts_to_combine(&accounts_per_storage);
 
@@ -311,8 +314,10 @@ impl AccountsDb {
             // `shrink_collect` previously unref'd some accounts. We need to addref them
             // to restore the correct state since we failed to combine anything.
             self.addref_accounts_failed_to_shrink_ancient(accounts_to_combine);
+            log::error!("ancient_append_vecs_packed: {}", line!());
             return;
         }
+        log::error!("ancient_append_vecs_packed: {}", line!());
 
         let write_ancient_accounts = self.write_packed_storages(&accounts_to_combine, pack);
 
@@ -321,6 +326,7 @@ impl AccountsDb {
             write_ancient_accounts,
             metrics,
         );
+        log::error!("ancient_append_vecs_packed: {}", line!());
     }
 
     /// for each account in `unrefed_pubkeys`, in each `accounts_to_combine`, addref
