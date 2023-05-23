@@ -224,11 +224,14 @@ pub struct AppendVec {
 
 lazy_static! {
     pub static ref APPEND_VEC_MMAPPED_FILES_OPEN: AtomicU64 = AtomicU64::default();
+    pub static ref APPEND_VEC_MMAPPED_FILES_OPENED: AtomicU64 = AtomicU64::default();
+    pub static ref APPEND_VEC_MMAPPED_FILES_CLOSED: AtomicU64 = AtomicU64::default();
 }
 
 impl Drop for AppendVec {
     fn drop(&mut self) {
         if self.remove_on_drop {
+            APPEND_VEC_MMAPPED_FILES_CLOSED.fetch_add(1, Ordering::Relaxed);
             APPEND_VEC_MMAPPED_FILES_OPEN.fetch_sub(1, Ordering::Relaxed);
             if let Err(_e) = remove_file(&self.path) {
                 // promote this to panic soon.
@@ -284,6 +287,7 @@ impl AppendVec {
             );
             std::process::exit(1);
         });
+        APPEND_VEC_MMAPPED_FILES_OPENED.fetch_add(1, Ordering::Relaxed);
         APPEND_VEC_MMAPPED_FILES_OPEN.fetch_add(1, Ordering::Relaxed);
 
         AppendVec {
