@@ -755,6 +755,10 @@ impl AccountsHasher {
     pub fn accumulate_account_hashes(mut hashes: Vec<(Pubkey, Hash)>) -> Hash {
         Self::sort_hashes_by_pubkey(&mut hashes);
 
+        hashes.iter().for_each(|hash| {
+            log::error!("jw_hash: {:?}", hash);
+        });
+
         Self::compute_merkle_root_loop(hashes, MERKLE_FANOUT, |i| &i.1)
     }
 
