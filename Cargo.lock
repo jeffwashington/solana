@@ -6031,6 +6031,7 @@ dependencies = [
  "solana-version",
  "solana-vote-program",
  "solana_rbpf",
+ "tempfile",
  "tikv-jemallocator",
  "tokio",
 ]
