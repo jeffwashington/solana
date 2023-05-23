@@ -16,6 +16,7 @@ use {
         sysvar::epoch_schedule::EpochSchedule,
     },
     std::{
+        path::PathBuf,
         borrow::Borrow,
         convert::TryInto,
         fs::File,
@@ -472,7 +473,7 @@ impl CumulativeOffsets {
 }
 
 #[derive(Debug)]
-pub struct AccountsHasher {
+pub(crate) struct AccountsHasher {
     pub filler_account_suffix: Option<Pubkey>,
     pub zero_lamport_accounts: ZeroLamportAccounts,
     /// The directory where temporary cache files are put
