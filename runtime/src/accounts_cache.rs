@@ -335,6 +335,12 @@ impl AccountsCache {
     pub fn set_max_flush_root(&self, root: Slot) {
         self.max_flushed_root.fetch_max(root, Ordering::Relaxed);
     }
+
+    pub(crate) fn remove_pubkey_for_tests(&self, slot: Slot, pubkey: &Pubkey) {
+        if let Some(slot_cache) = self.slot_cache(slot) {
+            slot_cache.remove(pubkey);
+        }
+    }
 }
 
 #[cfg(test)]

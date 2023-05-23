@@ -1967,6 +1967,22 @@ impl Bank {
                 );
             }
             self.burn_and_purge_account(&sysvar::epoch_rewards::id(), account);
+            if false {
+                if !self.partitioned_rewards_feature_enabled()
+                    && (self
+                        .partitioned_epoch_rewards_config()
+                        .test_enable_partitioned_rewards
+                        && self.reward_calculation_num_blocks() == 0
+                        && self.partitioned_rewards_stake_account_stores_per_block() == u64::MAX)
+                {
+                    // we are testing prior to feature enabled. The creation and removal of SysvarEpochRewards1111111111111111111111111 causes accounts delta hash to differ.
+                    self.rc
+                        .accounts
+                        .accounts_db
+                        .accounts_cache
+                        .remove_pubkey_for_tests(self.slot(), &sysvar::epoch_rewards::id());
+                }
+            }
         }
     }
 
@@ -7532,11 +7548,17 @@ impl Bank {
     ///  of the delta of the ledger since the last vote and up to now
     fn hash_internal_state(&self) -> Hash {
         let slot = self.slot();
+        let ignore = (!self.partitioned_rewards_feature_enabled()
+        && (self
+            .partitioned_epoch_rewards_config()
+            .test_enable_partitioned_rewards
+            && self.reward_calculation_num_blocks() == 0
+            && self.partitioned_rewards_stake_account_stores_per_block() == u64::MAX)).then_some(sysvar::epoch_rewards::id());
         let accounts_delta_hash = self
             .rc
             .accounts
             .accounts_db
-            .calculate_accounts_delta_hash(slot);
+            .calculate_accounts_delta_hash(slot, ignore);
 
         let mut signature_count_buf = [0u8; 8];
         LittleEndian::write_u64(&mut signature_count_buf[..], self.signature_count());
