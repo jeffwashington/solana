@@ -1955,7 +1955,7 @@ impl DefaultArgs {
             max_snapshot_download_abort: MAX_SNAPSHOT_DOWNLOAD_ABORT.to_string(),
             snapshot_archive_format: DEFAULT_ARCHIVE_COMPRESSION.to_string(),
             contact_debug_interval: "120000".to_string(),
-            accounts_hash_interval_slots: "100".to_string(),
+            accounts_hash_interval_slots: DEFAULT_INCREMENTAL_SNAPSHOT_ARCHIVE_INTERVAL_SLOTS.to_string(),
             snapshot_version: SnapshotVersion::default(),
             rocksdb_shred_compaction: "level".to_string(),
             rocksdb_ledger_compression: "none".to_string(),
