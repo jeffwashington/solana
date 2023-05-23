@@ -2241,6 +2241,7 @@ pub fn is_snapshot_config_valid(
     snapshot_config: &SnapshotConfig,
     accounts_hash_interval_slots: Slot,
 ) -> bool {
+    panic!("{}, {}", snapshot_config.should_generate_snapshots(), accounts_hash_interval_slots);
     // if the snapshot config is configured to *not* take snapshots, then it is valid
     if !snapshot_config.should_generate_snapshots() {
         return true;
