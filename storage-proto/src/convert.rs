@@ -918,7 +918,7 @@ impl From<TransactionError> for tx_by_addr::TransactionError {
                 TransactionError::ResanitizationNeeded => {
                     tx_by_addr::TransactionErrorType::ResanitizationNeeded
                 }
-                TransactionError::StakeProgramUnavailable { .. } => {
+                TransactionError::StakeProgramUnavailable => {
                     tx_by_addr::TransactionErrorType::StakeProgramUnavailable
                 }
             } as i32,
