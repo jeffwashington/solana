@@ -12838,12 +12838,7 @@ fn test_store_vote_accounts_partitioned() {
             } else {
                 None
             };
-            let second = if let Some(p) = &e {
-                Some((p.0, p.1.vote_account.clone()))
-            } else {
-                None
-            };
-
+            let second = e.as_ref().map(|p| (p.0, p.1.vote_account.clone()));
             (first, second)
         })
         .collect::<Vec<_>>();
