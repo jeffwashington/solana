@@ -167,6 +167,30 @@ impl StakeReward {
     }
 }
 
+impl VoteReward {
+    pub fn random() -> Self {
+        let mut rng = rand::thread_rng();
+
+        let validator_pubkey = solana_sdk::pubkey::new_rand();
+        let validator_stake_lamports = rng.gen_range(1, 200);
+        let validator_voting_keypair = Keypair::new();
+
+        let validator_vote_account = vote_state::create_account(
+            &validator_voting_keypair.pubkey(),
+            &validator_pubkey,
+            rng.gen_range(1, 20),
+            validator_stake_lamports,
+        );
+
+        Self {
+            vote_account: validator_vote_account,
+            commission: rng.gen_range(1, 20),
+            vote_rewards: rng.gen_range(1, 200),
+            vote_needs_store: rng.gen_range(1, 20) > 10,
+        }
+    }
+}
+
 #[test]
 fn test_race_register_tick_freeze() {
     solana_logger::setup();
