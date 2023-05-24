@@ -1541,14 +1541,14 @@ impl Bank {
 
     /// reward calculation happens synchronously during the first block of the epoch boundary.
     /// So, # blocks for reward calculation is 1.
-    fn reward_calculation_num_blocks(&self) -> Slot {
+    fn get_reward_calculation_num_blocks(&self) -> Slot {
         self.partitioned_epoch_rewards_config()
             .reward_calculation_num_blocks
     }
 
     /// Return the total number of blocks in reward interval (including both calculation and crediting).
     fn get_reward_total_num_blocks(&self) -> u64 {
-        self.reward_calculation_num_blocks() + self.get_reward_credit_num_blocks()
+        self.get_reward_calculation_num_blocks() + self.get_reward_credit_num_blocks()
     }
 
     /// Return `RewardInterval` enum for current bank
@@ -1896,7 +1896,7 @@ impl Bank {
         );
 
         let slot = self.slot();
-        let credit_start = self.block_height() + self.reward_calculation_num_blocks();
+        let credit_start = self.block_height() + self.get_reward_calculation_num_blocks();
         let credit_end_exclusive = credit_start + self.get_reward_credit_num_blocks();
 
         // create EpochRewards sysvar that holds the balance of undistributed rewards with
@@ -1914,7 +1914,7 @@ impl Bank {
             );
             let height = self.block_height();
             let start_block_height = status.start_block_height;
-            let credit_start = start_block_height + self.reward_calculation_num_blocks();
+            let credit_start = start_block_height + self.get_reward_calculation_num_blocks();
             let credit_end_exclusive = credit_start + self.get_reward_credit_num_blocks();
 
             if height >= credit_start && height < credit_end_exclusive {
@@ -7561,7 +7561,7 @@ impl Bank {
             && (self
                 .partitioned_epoch_rewards_config()
                 .test_enable_partitioned_rewards
-                && self.reward_calculation_num_blocks() == 0
+                && self.get_reward_calculation_num_blocks() == 0
                 && self.partitioned_rewards_stake_account_stores_per_block() == u64::MAX))
             .then_some(sysvar::epoch_rewards::id());
         let accounts_delta_hash = self
