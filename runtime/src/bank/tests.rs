@@ -12981,7 +12981,7 @@ fn test_epoch_partitoned_reward_history_update() {
     );
 }
 
-// Test sort and shuffle partitioned rewards
+/// Test sort and shuffle partitioned rewards
 #[test]
 fn test_sort_and_shuffle_partitioned_rewards() {
     // setup the expected number of stake rewards
@@ -13036,6 +13036,23 @@ fn compare(a: &StakeRewards, b: &StakeRewards) {
         assert_eq!(&reward, stake_reward);
     });
     assert!(a.is_empty());
+}
+
+/// Test sort and shuffle empty partitioned rewards
+#[test]
+fn test_sort_and_shuffle_partitioned_rewards_empty() {
+    let thread_pool = ThreadPoolBuilder::new().build().unwrap();
+    let mut stake_rewards = vec![];
+    let total = 0;
+
+    Bank::sort_and_shuffle_partitioned_rewards(&mut stake_rewards, 1, total as u64, &thread_pool);
+
+    let total_after_sort_shuffle = stake_rewards
+        .iter()
+        .map(|stake_reward| stake_reward.stake_reward_info.lamports)
+        .sum::<i64>();
+
+    assert_eq!(total, total_after_sort_shuffle);
 }
 
 /// Helper function to create a bank that pays some rewards
