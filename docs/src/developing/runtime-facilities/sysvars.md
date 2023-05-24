@@ -153,6 +153,6 @@ EpochRewards sysvar only exists during reward period. Therefore, calling
 get an error, i.e. `UnsupportedSysvar`. This can serve as a method for
 determining whether epoch rewards distribution has finished.
 
-- Address: `SysvarEpochReward51111111111111111111111111`
+- Address: `SysvarEpochRewards1111111111111111111111111`
 - Layout:
   [EpochRewards](https://docs.rs/solana-program/VERSION_FOR_DOCS_RS/solana_program/epoch_rewards/struct.EpochRewards.html)
