@@ -12736,6 +12736,164 @@ fn test_get_stake_rewards_partition_range_panic() {
     let _range = bank.get_stake_rewards_in_partition(15, &stake_rewards_clone);
 }
 
+#[test]
+fn test_distribute_partitioned_epoch_rewards() {
+    let (genesis_config, _mint_keypair) = create_genesis_config(1_000_000 * LAMPORTS_PER_SOL);
+    let mut bank = Bank::new_for_tests(&genesis_config);
+
+    let expected_num = 100;
+
+    let stake_rewards = (0..expected_num)
+        .map(|_| StakeReward::random())
+        .collect::<Vec<_>>();
+
+    bank.set_epoch_reward_status_active(stake_rewards);
+
+    bank.distribute_partitioned_epoch_rewards();
+}
+
+#[test]
+fn test_distribute_partitioned_epoch_rewards_empty() {
+    let (genesis_config, _mint_keypair) = create_genesis_config(1_000_000 * LAMPORTS_PER_SOL);
+    let mut bank = Bank::new_for_tests(&genesis_config);
+
+    bank.set_epoch_reward_status_active(vec![]);
+
+    bank.distribute_partitioned_epoch_rewards();
+}
+
+#[test]
+fn test_deactivate_epoch_reward_status() {
+    let (genesis_config, _mint_keypair) = create_genesis_config(1_000_000 * LAMPORTS_PER_SOL);
+    let mut bank = Bank::new_for_tests(&genesis_config);
+
+    let expected_num = 100;
+
+    let stake_rewards = (0..expected_num)
+        .map(|_| StakeReward::random())
+        .collect::<Vec<_>>();
+
+    bank.set_epoch_reward_status_active(stake_rewards);
+
+    assert!(bank.get_reward_interval() == RewardInterval::InsideInterval);
+    bank.deactivate_epoch_reward_status();
+    assert!(bank.get_reward_interval() == RewardInterval::OutsideInterval);
+}
+
+#[test]
+fn test_store_stake_accounts_in_partition() {
+    let (genesis_config, _mint_keypair) = create_genesis_config(1_000_000 * LAMPORTS_PER_SOL);
+    let bank = Bank::new_for_tests(&genesis_config);
+
+    let expected_num = 100;
+
+    let stake_rewards = (0..expected_num)
+        .map(|_| StakeReward::random())
+        .collect::<Vec<_>>();
+
+    let expected_total = stake_rewards
+        .iter()
+        .map(|stake_reward| stake_reward.stake_reward_info.lamports)
+        .sum::<i64>() as u64;
+
+    let total_rewards_in_lamports = bank.store_stake_accounts_in_partition(&stake_rewards);
+    assert_eq!(expected_total, total_rewards_in_lamports);
+}
+
+#[test]
+fn test_store_stake_accounts_in_partition_empty() {
+    let (genesis_config, _mint_keypair) = create_genesis_config(1_000_000 * LAMPORTS_PER_SOL);
+    let bank = Bank::new_for_tests(&genesis_config);
+
+    let stake_rewards = vec![];
+
+    let expected_total = 0;
+
+    let total_rewards_in_lamports = bank.store_stake_accounts_in_partition(&stake_rewards);
+    assert_eq!(expected_total, total_rewards_in_lamports);
+}
+
+#[test]
+fn test_store_vote_accounts_partitioned() {
+    let (genesis_config, _mint_keypair) = create_genesis_config(1_000_000 * LAMPORTS_PER_SOL);
+    let bank = Bank::new_for_tests(&genesis_config);
+
+    let expected_vote_rewards_num = 100;
+
+    let vote_rewards = (0..expected_vote_rewards_num)
+        .map(|_| Some((Pubkey::new_unique(), VoteReward::random())))
+        .collect::<Vec<_>>();
+
+    let vote_rewards_account = vote_rewards
+        .into_iter()
+        .map(|e| {
+            let first = if let Some(p) = &e {
+                let info = RewardInfo {
+                    reward_type: RewardType::Voting,
+                    lamports: p.1.vote_rewards as i64,
+                    post_balance: p.1.vote_rewards,
+                    commission: Some(p.1.commission),
+                };
+                Some((p.0, info))
+            } else {
+                None
+            };
+            let second = if let Some(p) = &e {
+                Some((p.0, p.1.vote_account.clone()))
+            } else {
+                None
+            };
+
+            (first, second)
+        })
+        .collect::<Vec<_>>();
+
+    let mut metrics = RewardsMetrics::default();
+
+    let stored_vote_accounts =
+        bank.store_vote_accounts_partitioned(vote_rewards_account, &mut metrics);
+    assert_eq!(expected_vote_rewards_num, stored_vote_accounts.len());
+}
+
+#[test]
+fn test_store_vote_accounts_partitioned_empty() {
+    let (genesis_config, _mint_keypair) = create_genesis_config(1_000_000 * LAMPORTS_PER_SOL);
+    let bank = Bank::new_for_tests(&genesis_config);
+
+    let expected = 0;
+    let vote_rewards = vec![];
+    let mut metrics = RewardsMetrics::default();
+
+    let stored_vote_accounts = bank.store_vote_accounts_partitioned(vote_rewards, &mut metrics);
+    assert_eq!(expected, stored_vote_accounts.len());
+}
+
+#[test]
+fn test_update_reward_history_in_partition() {
+    let (genesis_config, _mint_keypair) = create_genesis_config(1_000_000 * LAMPORTS_PER_SOL);
+    let bank = Bank::new_for_tests(&genesis_config);
+
+    let expected_num = 100;
+
+    let stake_rewards = (0..expected_num)
+        .map(|_| StakeReward::random())
+        .collect::<Vec<_>>();
+
+    let num_in_history = bank.update_reward_history_in_partition(&stake_rewards);
+    assert_eq!(num_in_history, expected_num);
+}
+
+#[test]
+fn test_update_reward_history_in_partition_empty() {
+    let (genesis_config, _mint_keypair) = create_genesis_config(1_000_000 * LAMPORTS_PER_SOL);
+    let bank = Bank::new_for_tests(&genesis_config);
+
+    let stake_rewards = vec![];
+
+    let num_in_history = bank.update_reward_history_in_partition(&stake_rewards);
+    assert_eq!(num_in_history, 0);
+}
+
 /// Test partitioned credits of epoch rewards do cover all the rewards slice.
 #[test]
 fn test_epoch_credit_rewards() {
