@@ -3216,6 +3216,30 @@ impl Bank {
         let mut result = vec![vec![]; num_buckets];
 
         thread_pool.install(|| {
+            for test in 0..10000 {
+                let num_buckets = (stake_rewards.len() / 4096) + 1;
+                let mut result = vec![0; num_buckets];
+                let seed = seed + test; // can wrap
+                let buckets = stake_rewards
+                    .par_iter()
+                    .map(|reward| address_to_bucket(num_buckets, seed, &reward.stake_pubkey))
+                    .collect::<Vec<_>>();
+
+                for (bucket, _reward) in std::iter::zip(&buckets, stake_rewards) {
+                    result[*bucket] += 1;
+                }
+                let mut max = usize::MIN;
+                let mut min = usize::MAX;
+                let avg = stake_rewards.len() / num_buckets;
+                for count in result {
+                    max = max.max(count);
+                    min = min.min(count);
+                }
+                error!("seed,{},min,{},max,{},avg,{},num_buckets,{},num_pubkeys,{}", seed, min, max, avg, num_buckets, stake_rewards.len());
+            }
+        });
+
+        thread_pool.install(|| {
             let buckets = stake_rewards
                 .par_iter()
                 .map(|reward| address_to_bucket(num_buckets, seed, &reward.stake_pubkey))
