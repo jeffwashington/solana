@@ -12631,7 +12631,7 @@ fn test_get_reward_credit_num_blocks_normal() {
         .collect::<Vec<_>>();
 
     let thread_pool = ThreadPoolBuilder::new().build().unwrap();
-    let stake_rewards = Bank::hash_rewards_into_bucket(&stake_rewards, 1, 100, 2, &thread_pool);
+    let stake_rewards = Bank::hash_rewards_into_partitions(&stake_rewards, 1, 100, 2, &thread_pool);
     bank.set_epoch_reward_status_active(stake_rewards);
 
     assert_eq!(bank.get_reward_credit_num_blocks(), 2);
@@ -12659,7 +12659,7 @@ fn test_get_reward_credit_num_blocks_cap() {
         .collect::<Vec<_>>();
 
     let thread_pool = ThreadPoolBuilder::new().build().unwrap();
-    let stake_rewards = Bank::hash_rewards_into_bucket(&stake_rewards, 1, 100, 1, &thread_pool);
+    let stake_rewards = Bank::hash_rewards_into_partitions(&stake_rewards, 1, 100, 1, &thread_pool);
     bank.set_epoch_reward_status_active(stake_rewards);
 
     assert_eq!(bank.get_reward_credit_num_blocks(), 1);
@@ -12700,7 +12700,7 @@ fn test_get_stake_rewards_partition_range() {
 
     let thread_pool = ThreadPoolBuilder::new().build().unwrap();
     let stake_rewards_buckets =
-        Bank::hash_rewards_into_bucket(&stake_rewards, 1, 100, 10, &thread_pool);
+        Bank::hash_rewards_into_partitions(&stake_rewards, 1, 100, 10, &thread_pool);
     bank.set_epoch_reward_status_active(stake_rewards_buckets.clone());
 
     assert_eq!(bank.get_reward_credit_num_blocks(), 10);
@@ -12731,7 +12731,7 @@ fn test_get_stake_rewards_partition_range_panic() {
 
     let thread_pool = ThreadPoolBuilder::new().build().unwrap();
     let stake_rewards_bucket =
-        Bank::hash_rewards_into_bucket(&stake_rewards, 1, 100, 10, &thread_pool);
+        Bank::hash_rewards_into_partitions(&stake_rewards, 1, 100, 10, &thread_pool);
 
     bank.set_epoch_reward_status_active(stake_rewards_bucket.clone());
 
@@ -12751,7 +12751,7 @@ fn test_distribute_partitioned_epoch_rewards() {
         .collect::<Vec<_>>();
 
     let thread_pool = ThreadPoolBuilder::new().build().unwrap();
-    let stake_rewards = Bank::hash_rewards_into_bucket(&stake_rewards, 1, 100, 1, &thread_pool);
+    let stake_rewards = Bank::hash_rewards_into_partitions(&stake_rewards, 1, 100, 1, &thread_pool);
 
     bank.set_epoch_reward_status_active(stake_rewards);
 
@@ -12920,7 +12920,7 @@ fn test_epoch_credit_rewards() {
 
     let thread_pool = ThreadPoolBuilder::new().build().unwrap();
     let stake_rewards_bucket =
-        Bank::hash_rewards_into_bucket(&stake_rewards, 1, 100, 1, &thread_pool);
+        Bank::hash_rewards_into_partitions(&stake_rewards, 1, 100, 1, &thread_pool);
     bank.set_epoch_reward_status_active(stake_rewards_bucket.clone());
 
     // Test partitioned stores
@@ -12966,7 +12966,7 @@ fn test_epoch_partitoned_reward_history_update() {
 
     let thread_pool = ThreadPoolBuilder::new().build().unwrap();
     let stake_rewards_bucket =
-        Bank::hash_rewards_into_bucket(&stake_rewards, 1, 100, 1, &thread_pool);
+        Bank::hash_rewards_into_partitions(&stake_rewards, 1, 100, 1, &thread_pool);
 
     bank.set_epoch_reward_status_active(stake_rewards_bucket.clone());
 
@@ -13069,7 +13069,7 @@ fn test_sort_and_shuffle_partitioned_rewards_empty() {
 
 /// Test hash rewards into bucket
 #[test]
-fn test_hash_rewards_into_bucket() {
+fn test_hash_rewards_into_partitions() {
     // setup the expected number of stake rewards
     let expected_num = 12345;
 
@@ -13084,7 +13084,7 @@ fn test_hash_rewards_into_bucket() {
 
     let thread_pool = ThreadPoolBuilder::new().build().unwrap();
     let stake_rewards_in_bucket =
-        Bank::hash_rewards_into_bucket(&stake_rewards, 1, 0, 5, &thread_pool);
+        Bank::hash_rewards_into_partitions(&stake_rewards, 1, 0, 5, &thread_pool);
 
     let stake_rewards_in_bucket_clone = stake_rewards_in_bucket.iter().flatten().cloned().collect();
     compare(&stake_rewards, &stake_rewards_in_bucket_clone);
@@ -13105,13 +13105,13 @@ fn test_hash_rewards_into_bucket() {
 
 /// Test hash rewards into bucket for empty rewards
 #[test]
-fn test_hash_rewards_into_bucket_empty() {
+fn test_hash_rewards_into_partitions_empty() {
     let thread_pool = ThreadPoolBuilder::new().build().unwrap();
     let stake_rewards = vec![];
     let total = 0;
 
     let stake_rewards_in_bucket =
-        Bank::hash_rewards_into_bucket(&stake_rewards, 1, 0, 1, &thread_pool);
+        Bank::hash_rewards_into_partitions(&stake_rewards, 1, 0, 1, &thread_pool);
 
     let total_after_sort_shuffle = stake_rewards_in_bucket
         .iter()

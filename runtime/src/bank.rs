@@ -1117,7 +1117,7 @@ type VoteRewardsAccounts = Vec<(
 /// side effects.
 struct PartitionedRewardsCalculation {
     vote_account_rewards: VoteRewardsAccounts,
-    stake_rewards: Vec<StakeRewards>,
+    stake_rewards_in_partitions: Vec<StakeRewards>,
     total_stake_rewards_lamports: u64,
     old_vote_balance_and_staked: u64,
     validator_rewards: u64,
@@ -1136,7 +1136,7 @@ struct EpochRewardCalculateParamInfo<'a> {
 struct CalculateRewardsAndDistributeVoteRewardsResult {
     total_rewards: u64,
     distributed_rewards: u64,
-    stake_rewards: Vec<StakeRewards>,
+    stake_rewards_in_partitions: Vec<StakeRewards>,
 }
 
 pub(crate) type StakeRewards = Vec<StakeReward>;
@@ -1488,10 +1488,13 @@ impl Bank {
             .is_active(&enable_partitioned_epoch_reward::id())
     }
 
-    pub(crate) fn set_epoch_reward_status_active(&mut self, stake_rewards: Vec<StakeRewards>) {
+    pub(crate) fn set_epoch_reward_status_active(
+        &mut self,
+        stake_rewards_in_partitions: Vec<StakeRewards>,
+    ) {
         self.epoch_reward_status = EpochRewardStatus::Active(StartBlockHeightAndRewards {
             start_block_height: self.block_height,
-            calculated_epoch_stake_rewards: Arc::new(stake_rewards),
+            calculated_epoch_stake_rewards: Arc::new(stake_rewards_in_partitions),
         });
     }
 
@@ -1883,7 +1886,7 @@ impl Bank {
         let CalculateRewardsAndDistributeVoteRewardsResult {
             total_rewards,
             distributed_rewards,
-            stake_rewards,
+            stake_rewards_in_partitions,
         } = self.calculate_rewards_and_distribute_vote_rewards(
             parent_epoch,
             reward_calc_tracer,
@@ -1891,7 +1894,7 @@ impl Bank {
             rewards_metrics,
         );
 
-        self.set_epoch_reward_status_active(stake_rewards);
+        self.set_epoch_reward_status_active(stake_rewards_in_partitions);
 
         datapoint_warn!(
             "reward-status-update",
@@ -2646,18 +2649,19 @@ impl Bank {
             .unwrap_or_default();
 
         let num_rewards = stake_reward_calculation.stake_rewards.len();
-        let (stake_rewards_in_buckets, partition_us) = measure_us!(Self::hash_rewards_into_bucket(
-            &stake_reward_calculation.stake_rewards,
-            prev_epoch,
-            validator_rewards,
-            self.calculate_reward_credit_num_blocks(num_rewards) as usize,
-            thread_pool,
-        ));
+        let (stake_rewards_in_partitions, partition_us) =
+            measure_us!(Self::hash_rewards_into_partitions(
+                &stake_reward_calculation.stake_rewards,
+                prev_epoch,
+                validator_rewards,
+                self.calculate_reward_credit_num_blocks(num_rewards) as usize,
+                thread_pool,
+            ));
         metrics.hash_partition_rewards_us = partition_us;
 
         PartitionedRewardsCalculation {
             vote_account_rewards,
-            stake_rewards: stake_rewards_in_buckets,
+            stake_rewards_in_partitions,
             total_stake_rewards_lamports: stake_reward_calculation.total_stake_rewards_lamports,
             old_vote_balance_and_staked,
             validator_rewards,
@@ -2682,7 +2686,7 @@ impl Bank {
     ) -> CalculateRewardsAndDistributeVoteRewardsResult {
         let PartitionedRewardsCalculation {
             vote_account_rewards,
-            stake_rewards,
+            stake_rewards_in_partitions,
             total_stake_rewards_lamports,
             old_vote_balance_and_staked,
             validator_rewards,
@@ -2752,7 +2756,7 @@ impl Bank {
         CalculateRewardsAndDistributeVoteRewardsResult {
             total_rewards: validator_rewards_paid + total_stake_rewards_lamports,
             distributed_rewards: validator_rewards_paid,
-            stake_rewards,
+            stake_rewards_in_partitions,
         }
     }
 
@@ -3200,7 +3204,7 @@ impl Bank {
     }
 
     #[allow(dead_code)]
-    fn hash_rewards_into_bucket(
+    fn hash_rewards_into_partitions(
         stake_rewards: &StakeRewards,
         rewarded_epoch: Epoch,
         rewards: u64,
@@ -3214,9 +3218,8 @@ impl Bank {
         thread_pool.install(|| {
             let buckets = stake_rewards
                 .par_iter()
-                .map(|reward| {
-                    address_to_bucket(num_buckets, seed, &reward.stake_pubkey)
-                }).collect::<Vec<_>>();
+                .map(|reward| address_to_bucket(num_buckets, seed, &reward.stake_pubkey))
+                .collect::<Vec<_>>();
 
             for (bucket, reward) in std::iter::zip(buckets, stake_rewards) {
                 result[bucket].push(reward.clone());
@@ -3369,7 +3372,7 @@ impl Bank {
         // put partitioned stake rewards in a hashmap
         let mut stake_rewards: HashMap<Pubkey, &StakeReward> = HashMap::default();
         partitioned_rewards
-            .stake_rewards
+            .stake_rewards_in_partitions
             .iter()
             .flatten()
             .for_each(|stake_reward| {
@@ -3407,7 +3410,11 @@ impl Bank {
         assert!(vote_rewards.is_empty(), "{vote_rewards:?}");
         info!(
             "verified partitioned rewards calculation matching: {}, {}",
-            partitioned_rewards.stake_rewards.iter().flatten().count(),
+            partitioned_rewards
+                .stake_rewards_in_partitions
+                .iter()
+                .flatten()
+                .count(),
             partitioned_rewards.vote_account_rewards.len()
         );
     }
