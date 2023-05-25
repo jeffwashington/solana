@@ -3215,12 +3215,10 @@ impl Bank {
             let buckets = stake_rewards
                 .par_iter()
                 .map(|reward| {
-                    let bucket = address_to_bucket(num_buckets, seed, &reward.stake_pubkey);
-                    bucket
-                })
-                .collect::<Vec<_>>();
+                    address_to_bucket(num_buckets, seed, &reward.stake_pubkey)
+                }).collect::<Vec<_>>();
 
-            for (bucket, reward) in std::iter::zip(buckets, stake_rewards).into_iter() {
+            for (bucket, reward) in std::iter::zip(buckets, stake_rewards) {
                 result[bucket].push(reward.clone());
             }
             result
@@ -3861,7 +3859,7 @@ impl Bank {
     fn get_stake_rewards_in_partition<'a>(
         &self,
         partition_index: u64,
-        stake_rewards: &'a Vec<StakeRewards>,
+        stake_rewards: &'a [StakeRewards],
     ) -> &'a [StakeReward] {
         assert!(partition_index < self.get_reward_credit_num_blocks());
         &stake_rewards[partition_index as usize]
