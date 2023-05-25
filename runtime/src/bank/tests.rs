@@ -13067,6 +13067,61 @@ fn test_sort_and_shuffle_partitioned_rewards_empty() {
     assert_eq!(total, total_after_sort_shuffle);
 }
 
+/// Test hash rewards into bucket
+#[test]
+fn test_hash_rewards_into_bucket() {
+    // setup the expected number of stake rewards
+    let expected_num = 12345;
+
+    let stake_rewards = (0..expected_num)
+        .map(|_| StakeReward::random())
+        .collect::<Vec<_>>();
+
+    let total = stake_rewards
+        .iter()
+        .map(|stake_reward| stake_reward.stake_reward_info.lamports)
+        .sum::<i64>();
+
+    let thread_pool = ThreadPoolBuilder::new().build().unwrap();
+    let stake_rewards_in_bucket =
+        Bank::hash_rewards_into_bucket(&stake_rewards, 1, 0, 5, &thread_pool);
+
+    let stake_rewards_in_bucket_clone = stake_rewards_in_bucket.iter().flatten().cloned().collect();
+    compare(&stake_rewards, &stake_rewards_in_bucket_clone);
+
+    let total_after_hash_partition = stake_rewards_in_bucket
+        .iter()
+        .flatten()
+        .map(|stake_reward| stake_reward.stake_reward_info.lamports)
+        .sum::<i64>();
+
+    let total_num_after_hash_partition: usize =
+        stake_rewards_in_bucket.iter().map(|x| x.len()).sum();
+
+    // assert total is same, so nothing is dropped or duplicated
+    assert_eq!(total, total_after_hash_partition);
+    assert_eq!(expected_num, total_num_after_hash_partition);
+}
+
+/// Test hash rewards into bucket for empty rewards
+#[test]
+fn test_hash_rewards_into_bucket_empty() {
+    let thread_pool = ThreadPoolBuilder::new().build().unwrap();
+    let stake_rewards = vec![];
+    let total = 0;
+
+    let stake_rewards_in_bucket =
+        Bank::hash_rewards_into_bucket(&stake_rewards, 1, 0, 1, &thread_pool);
+
+    let total_after_sort_shuffle = stake_rewards_in_bucket
+        .iter()
+        .flatten()
+        .map(|stake_reward| stake_reward.stake_reward_info.lamports)
+        .sum::<i64>();
+
+    assert_eq!(total, total_after_sort_shuffle);
+}
+
 /// Helper function to create a bank that pays some rewards
 fn create_reward_bank(expected_num_delegations: usize) -> Bank {
     let validator_keypairs = (0..expected_num_delegations)
