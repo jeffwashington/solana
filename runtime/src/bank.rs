@@ -59,6 +59,7 @@ use {
         builtins::{BuiltinPrototype, BUILTINS},
         cost_tracker::CostTracker,
         epoch_accounts_hash::{self, EpochAccountsHash},
+        epoch_reward_hasher::address_to_bucket,
         epoch_stakes::{EpochStakes, NodeVoteAccounts},
         inline_spl_token,
         message_processor::MessageProcessor,
@@ -885,7 +886,7 @@ pub(crate) struct StartBlockHeightAndRewards {
     /// the block height of the slot at which rewards distribution began
     pub(crate) start_block_height: u64,
     /// calculated epoch rewards pending distribution
-    pub(crate) calculated_epoch_stake_rewards: Arc<StakeRewards>,
+    pub(crate) calculated_epoch_stake_rewards: Arc<Vec<StakeRewards>>,
 }
 
 /// Represent whether bank is in the reward phase or not.
@@ -1116,7 +1117,8 @@ type VoteRewardsAccounts = Vec<(
 /// side effects.
 struct PartitionedRewardsCalculation {
     vote_account_rewards: VoteRewardsAccounts,
-    stake_rewards: StakeRewardCalculation,
+    stake_rewards: Vec<StakeRewards>,
+    total_stake_rewards_lamports: u64,
     old_vote_balance_and_staked: u64,
     validator_rewards: u64,
     validator_rate: f64,
@@ -1134,7 +1136,7 @@ struct EpochRewardCalculateParamInfo<'a> {
 struct CalculateRewardsAndDistributeVoteRewardsResult {
     total_rewards: u64,
     distributed_rewards: u64,
-    stake_rewards: StakeRewards,
+    stake_rewards: Vec<StakeRewards>,
 }
 
 pub(crate) type StakeRewards = Vec<StakeReward>;
@@ -1486,7 +1488,7 @@ impl Bank {
             .is_active(&enable_partitioned_epoch_reward::id())
     }
 
-    pub(crate) fn set_epoch_reward_status_active(&mut self, stake_rewards: StakeRewards) {
+    pub(crate) fn set_epoch_reward_status_active(&mut self, stake_rewards: Vec<StakeRewards>) {
         self.epoch_reward_status = EpochRewardStatus::Active(StartBlockHeightAndRewards {
             start_block_height: self.block_height,
             calculated_epoch_stake_rewards: Arc::new(stake_rewards),
@@ -1512,30 +1514,35 @@ impl Bank {
             .stake_account_stores_per_block
     }
 
-    /// Calculate the number of blocks required to store rewards in all accounts.
-    fn get_reward_credit_num_blocks(&self) -> u64 {
+    /// Calculate the number of blocks required to distribute rewards in all accounts.
+    fn calculate_reward_credit_num_blocks(&self, num_rewards: usize) -> u64 {
         if self.epoch_schedule.warmup && self.epoch < self.first_normal_epoch() {
             1
         } else {
-            let num_chunks = if let EpochRewardStatus::Active(StartBlockHeightAndRewards {
-                start_block_height: _start_block_height,
-                calculated_epoch_stake_rewards: ref stake_rewards,
-            }) = self.epoch_reward_status
-            {
-                crate::accounts_hash::AccountsHasher::div_ceil(
-                    stake_rewards.len(),
-                    self.partitioned_rewards_stake_account_stores_per_block() as usize,
-                ) as u64
-            } else {
-                // To be consistent to the meaning of `num_chunks`. When stake_rewards is none. num_chunks = 0
-                // yeah. clamp to 1. Make sure that there is at least one block for reward credit.
-                // when we have sysvar account, we will need to do something after all rewards are distributed.
-                // Maybe we don't need to do anything. If that's the case, we can change to clamp to 0.
-                0
-            };
+            let num_chunks = crate::accounts_hash::AccountsHasher::div_ceil(
+                num_rewards,
+                self.partitioned_rewards_stake_account_stores_per_block() as usize,
+            ) as u64;
 
             // Limit the reward credit interval to 5% of the total number of slots in a epoch
             num_chunks.clamp(1, (self.epoch_schedule.slots_per_epoch / 20).max(1))
+        }
+    }
+
+    /// query epoch reward status directly for number credit blocks
+    fn get_reward_credit_num_blocks(&self) -> u64 {
+        if self.epoch_schedule.warmup && self.epoch < self.first_normal_epoch() {
+            return 1;
+        }
+
+        if let EpochRewardStatus::Active(StartBlockHeightAndRewards {
+            start_block_height: _start_block_height,
+            calculated_epoch_stake_rewards: ref stake_rewards,
+        }) = self.epoch_reward_status
+        {
+            stake_rewards.len() as u64
+        } else {
+            1
         }
     }
 
@@ -2627,7 +2634,7 @@ impl Bank {
 
         let old_vote_balance_and_staked = self.stakes_cache.stakes().vote_balance_and_staked();
 
-        let (vote_account_rewards, mut stake_rewards) = self
+        let (vote_account_rewards, stake_reward_calculation) = self
             .calculate_validator_rewards(
                 prev_epoch,
                 validator_rewards,
@@ -2638,18 +2645,20 @@ impl Bank {
             )
             .unwrap_or_default();
 
-        let (us_sort, us_shuffle) = Self::sort_and_shuffle_partitioned_rewards(
-            &mut stake_rewards.stake_rewards,
+        let num_rewards = stake_reward_calculation.stake_rewards.len();
+        let (stake_rewards_in_buckets, partition_us) = measure_us!(Self::hash_rewards_into_bucket(
+            &stake_reward_calculation.stake_rewards,
             prev_epoch,
             validator_rewards,
+            self.calculate_reward_credit_num_blocks(num_rewards) as usize,
             thread_pool,
-        );
-        metrics.sort_stake_accounts_us = us_sort;
-        metrics.shuffle_stake_accounts_us = us_shuffle;
+        ));
+        metrics.hash_partition_rewards_us = partition_us;
 
         PartitionedRewardsCalculation {
             vote_account_rewards,
-            stake_rewards,
+            stake_rewards: stake_rewards_in_buckets,
+            total_stake_rewards_lamports: stake_reward_calculation.total_stake_rewards_lamports,
             old_vote_balance_and_staked,
             validator_rewards,
             validator_rate,
@@ -2674,6 +2683,7 @@ impl Bank {
         let PartitionedRewardsCalculation {
             vote_account_rewards,
             stake_rewards,
+            total_stake_rewards_lamports,
             old_vote_balance_and_staked,
             validator_rewards,
             validator_rate,
@@ -2691,13 +2701,7 @@ impl Bank {
         // update reward history of JUST vote_rewards, stake_rewards is vec![] here
         self.update_reward_history(vec![], vote_rewards);
 
-        let StakeRewardCalculation {
-            stake_rewards,
-            total_stake_rewards_lamports,
-        } = stake_rewards;
-
         // the remaining code mirrors `update_rewards_with_thread_pool()`
-
         let new_vote_balance_and_staked = self.stakes_cache.stakes().vote_balance_and_staked();
 
         // This is for vote rewards only.
@@ -3195,6 +3199,34 @@ impl Bank {
         }
     }
 
+    #[allow(dead_code)]
+    fn hash_rewards_into_bucket(
+        stake_rewards: &StakeRewards,
+        rewarded_epoch: Epoch,
+        rewards: u64,
+        num_buckets: usize,
+        thread_pool: &ThreadPool,
+    ) -> Vec<StakeRewards> {
+        let seed = rewarded_epoch ^ rewards;
+
+        let mut result = vec![vec![]; num_buckets];
+
+        thread_pool.install(|| {
+            let buckets = stake_rewards
+                .par_iter()
+                .map(|reward| {
+                    let bucket = address_to_bucket(num_buckets, seed, &reward.stake_pubkey);
+                    bucket
+                })
+                .collect::<Vec<_>>();
+
+            for (bucket, reward) in std::iter::zip(buckets, stake_rewards).into_iter() {
+                result[bucket].push(reward.clone());
+            }
+            result
+        })
+    }
+
     /// Sort and shuffle rewards for partitioned distribution
     /// return (us time to sort, us time to shuffle)
     #[allow(dead_code)]
@@ -3340,8 +3372,8 @@ impl Bank {
         let mut stake_rewards: HashMap<Pubkey, &StakeReward> = HashMap::default();
         partitioned_rewards
             .stake_rewards
-            .stake_rewards
             .iter()
+            .flatten()
             .for_each(|stake_reward| {
                 stake_rewards.insert(stake_reward.stake_pubkey, stake_reward);
             });
@@ -3377,7 +3409,7 @@ impl Bank {
         assert!(vote_rewards.is_empty(), "{vote_rewards:?}");
         info!(
             "verified partitioned rewards calculation matching: {}, {}",
-            partitioned_rewards.stake_rewards.stake_rewards.len(),
+            partitioned_rewards.stake_rewards.iter().flatten().count(),
             partitioned_rewards.vote_account_rewards.len()
         );
     }
@@ -3829,13 +3861,10 @@ impl Bank {
     fn get_stake_rewards_in_partition<'a>(
         &self,
         partition_index: u64,
-        stake_rewards: &'a [StakeReward],
+        stake_rewards: &'a Vec<StakeRewards>,
     ) -> &'a [StakeReward] {
         assert!(partition_index < self.get_reward_credit_num_blocks());
-        let begin = self.partitioned_rewards_stake_account_stores_per_block() * partition_index;
-        let end_exclusive = (begin + self.partitioned_rewards_stake_account_stores_per_block())
-            .min(stake_rewards.len() as u64);
-        &stake_rewards[(begin as usize)..(end_exclusive as usize)]
+        &stake_rewards[partition_index as usize]
     }
 
     /// store stake rewards in partition
@@ -3985,7 +4014,7 @@ impl Bank {
     /// Store the rewards to AccountsDB, update reward history record and total capitalization.
     fn credit_epoch_rewards_in_partition(
         &self,
-        all_stake_rewards: &[StakeReward],
+        all_stake_rewards: &Vec<StakeRewards>,
         partition_index: u64,
     ) {
         let pre_capitalization = self.capitalization();

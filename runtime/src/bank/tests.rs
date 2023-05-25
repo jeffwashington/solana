@@ -12629,6 +12629,9 @@ fn test_get_reward_credit_num_blocks_normal() {
     let stake_rewards = (0..expected_num)
         .map(|_| StakeReward::random())
         .collect::<Vec<_>>();
+
+    let thread_pool = ThreadPoolBuilder::new().build().unwrap();
+    let stake_rewards = Bank::hash_rewards_into_bucket(&stake_rewards, 1, 100, 2, &thread_pool);
     bank.set_epoch_reward_status_active(stake_rewards);
 
     assert_eq!(bank.get_reward_credit_num_blocks(), 2);
@@ -12654,6 +12657,9 @@ fn test_get_reward_credit_num_blocks_cap() {
     let stake_rewards = (0..expected_num)
         .map(|_| StakeReward::random())
         .collect::<Vec<_>>();
+
+    let thread_pool = ThreadPoolBuilder::new().build().unwrap();
+    let stake_rewards = Bank::hash_rewards_into_bucket(&stake_rewards, 1, 100, 1, &thread_pool);
     bank.set_epoch_reward_status_active(stake_rewards);
 
     assert_eq!(bank.get_reward_credit_num_blocks(), 1);
@@ -12691,27 +12697,20 @@ fn test_get_stake_rewards_partition_range() {
     let stake_rewards = (0..expected_num)
         .map(|_| StakeReward::random())
         .collect::<Vec<_>>();
-    let stake_rewards_clone = stake_rewards.clone();
-    bank.set_epoch_reward_status_active(stake_rewards);
+
+    let thread_pool = ThreadPoolBuilder::new().build().unwrap();
+    let stake_rewards_buckets =
+        Bank::hash_rewards_into_bucket(&stake_rewards, 1, 100, 10, &thread_pool);
+    bank.set_epoch_reward_status_active(stake_rewards_buckets.clone());
 
     assert_eq!(bank.get_reward_credit_num_blocks(), 10);
 
     // assert expected full partition range
-    for i in 0..9 {
+    for i in 0..10 {
         let stake_rewards_in_partition =
-            bank.get_stake_rewards_in_partition(i as u64, &stake_rewards_clone);
-        assert_eq!(
-            &stake_rewards_clone[(i * 4096)..((i + 1) * 4096)],
-            stake_rewards_in_partition
-        );
+            bank.get_stake_rewards_in_partition(i as u64, &stake_rewards_buckets);
+        assert_eq!(&stake_rewards_buckets[i], stake_rewards_in_partition);
     }
-
-    // assert last partial partiton range
-    let stake_rewards_in_partition = bank.get_stake_rewards_in_partition(9, &stake_rewards_clone);
-    assert_eq!(
-        &stake_rewards_clone[9 * 4096..40959],
-        stake_rewards_in_partition
-    );
 }
 
 /// Test that reward partition range panics when passing out of range partition index
@@ -12729,11 +12728,15 @@ fn test_get_stake_rewards_partition_range_panic() {
     let stake_rewards = (0..expected_num)
         .map(|_| StakeReward::random())
         .collect::<Vec<_>>();
-    let stake_rewards_clone = stake_rewards.clone();
-    bank.set_epoch_reward_status_active(stake_rewards);
+
+    let thread_pool = ThreadPoolBuilder::new().build().unwrap();
+    let stake_rewards_bucket =
+        Bank::hash_rewards_into_bucket(&stake_rewards, 1, 100, 10, &thread_pool);
+
+    bank.set_epoch_reward_status_active(stake_rewards_bucket.clone());
 
     // This call should panic, i.e. 15 is out of the num_credit_blocks
-    let _range = bank.get_stake_rewards_in_partition(15, &stake_rewards_clone);
+    let _range = bank.get_stake_rewards_in_partition(15, &stake_rewards_bucket);
 }
 
 #[test]
@@ -12746,6 +12749,9 @@ fn test_distribute_partitioned_epoch_rewards() {
     let stake_rewards = (0..expected_num)
         .map(|_| StakeReward::random())
         .collect::<Vec<_>>();
+
+    let thread_pool = ThreadPoolBuilder::new().build().unwrap();
+    let stake_rewards = Bank::hash_rewards_into_bucket(&stake_rewards, 1, 100, 1, &thread_pool);
 
     bank.set_epoch_reward_status_active(stake_rewards);
 
@@ -12769,9 +12775,9 @@ fn test_deactivate_epoch_reward_status() {
 
     let expected_num = 100;
 
-    let stake_rewards = (0..expected_num)
+    let stake_rewards = vec![(0..expected_num)
         .map(|_| StakeReward::random())
-        .collect::<Vec<_>>();
+        .collect::<Vec<_>>()];
 
     bank.set_epoch_reward_status_active(stake_rewards);
 
@@ -12911,14 +12917,19 @@ fn test_epoch_credit_rewards() {
         stake_reward.credit(1);
         expected_rewards += 1;
     }
-    bank.set_epoch_reward_status_active(stake_rewards.clone());
+
+    let thread_pool = ThreadPoolBuilder::new().build().unwrap();
+    let stake_rewards_bucket =
+        Bank::hash_rewards_into_bucket(&stake_rewards, 1, 100, 1, &thread_pool);
+    bank.set_epoch_reward_status_active(stake_rewards_bucket.clone());
 
     // Test partitioned stores
     let mut total_num = 0;
     let mut total_rewards = 0;
 
     for partition_index in 0..bank.get_reward_credit_num_blocks() {
-        let stake_rewards = bank.get_stake_rewards_in_partition(partition_index, &stake_rewards);
+        let stake_rewards =
+            bank.get_stake_rewards_in_partition(partition_index, &stake_rewards_bucket);
         let total_rewards_in_lamports = bank.store_stake_accounts_in_partition(stake_rewards);
 
         let num_in_history = bank.update_reward_history_in_partition(stake_rewards);
@@ -12952,14 +12963,20 @@ fn test_epoch_partitoned_reward_history_update() {
     for stake_reward in &mut stake_rewards {
         stake_reward.credit(1);
     }
-    bank.set_epoch_reward_status_active(stake_rewards.clone());
+
+    let thread_pool = ThreadPoolBuilder::new().build().unwrap();
+    let stake_rewards_bucket =
+        Bank::hash_rewards_into_bucket(&stake_rewards, 1, 100, 1, &thread_pool);
+
+    bank.set_epoch_reward_status_active(stake_rewards_bucket.clone());
 
     // Test partitioned reward history updates
     let pre_update_history_len = bank.rewards.read().unwrap().len();
     let mut total_num_updates = 0;
 
     for partition_index in 0..bank.get_reward_credit_num_blocks() {
-        let stake_rewards = &bank.get_stake_rewards_in_partition(partition_index, &stake_rewards);
+        let stake_rewards =
+            &bank.get_stake_rewards_in_partition(partition_index, &stake_rewards_bucket);
 
         let num_history_updates = bank.update_reward_history_in_partition(stake_rewards);
 
