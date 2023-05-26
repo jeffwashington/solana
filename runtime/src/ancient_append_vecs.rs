@@ -410,6 +410,8 @@ impl AccountsDb {
 
         for slot in &slots {
             if let Some(storage) = self.storage.get_slot_storage_entry(*slot) {
+                log::error!("ancient_append_vecs_packed: {}, adding: {}, refs: {}", line!(), slot, Arc::strong_count(&storage));
+
                 if infos.add(*slot, storage, can_randomly_shrink) {
                     randoms += 1;
                 }
@@ -510,12 +512,17 @@ impl AccountsDb {
         metrics: &mut ShrinkStatsSub,
     ) {
         let mut dropped_roots = Vec::with_capacity(accounts_to_combine.accounts_to_combine.len());
+        log::error!("ancient_append_vecs_packed: {}, finish_combine: {}", line!(), accounts_to_combine.accounts_to_combine.len());
         for shrink_collect in accounts_to_combine.accounts_to_combine {
             let slot = shrink_collect.slot;
 
             let shrink_in_progress = write_ancient_accounts.shrinks_in_progress.remove(&slot);
             if shrink_in_progress.is_none() {
+                log::error!("ancient_append_vecs_packed: {}, no shrink in progress, slot: {}", line!(), slot);
                 dropped_roots.push(slot);
+            }
+            else{
+                log::error!("ancient_append_vecs_packed: {}, slot: {}", line!(), slot);
             }
             self.remove_old_stores_shrink(
                 &shrink_collect,
