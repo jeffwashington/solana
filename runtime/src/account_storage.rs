@@ -234,6 +234,8 @@ impl<'a> Drop for ShrinkInProgress<'a> {
             Some(self.old_store.append_vec_id())
         );
 
+        log::error!("ancient_append_vecs_packed: {}, slot: {}", line!(), self.slot);
+
         // The new store can be removed from 'shrink_in_progress_map'
         assert!(self
             .storage
