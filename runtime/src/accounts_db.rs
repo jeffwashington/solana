@@ -4133,10 +4133,12 @@ impl AccountsDb {
         };
 
         if let Some(shrink_in_progress) = shrink_in_progress {
+            log::error!("ancient_append_vecs_packed: {}", line!());
             // shrink is in progress, so 1 new append vec to keep, 1 old one to throw away
             not_retaining_store(shrink_in_progress.old_storage());
             // dropping 'shrink_in_progress' removes the old append vec that was being shrunk from db's storage
         } else if let Some(store) = self.storage.remove(&slot, shrink_can_be_active) {
+            log::error!("ancient_append_vecs_packed: {}", line!());
             // no shrink in progress, so all append vecs in this slot are dead
             not_retaining_store(&store);
         }
@@ -4155,9 +4157,13 @@ impl AccountsDb {
 
         let mut drop_storage_entries_elapsed = Measure::start("drop_storage_entries_elapsed");
         if recycle_stores.entry_count() < MAX_RECYCLE_STORES {
+            log::error!("ancient_append_vecs_packed: {}, {}", line!(), recycle_stores.entry_count());
             recycle_stores.add_entries(dead_storages);
             drop(recycle_stores);
         } else {
+            log::error!("ancient_append_vecs_packed: {}, {:?}", line!(), dead_storages.iter().map(|storage| {
+                Arc::strong_count(storage)
+            }).collect::<Vec<_>>());
             self.stats
                 .dropped_stores
                 .fetch_add(dead_storages.len() as u64, Ordering::Relaxed);
