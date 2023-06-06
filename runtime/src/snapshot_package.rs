@@ -225,6 +225,7 @@ pub struct SnapshotPackage {
     /// The instant this snapshot package was sent to the queue.
     /// Used to track how long snapshot packages wait before handling.
     pub enqueued: Instant,
+    pub fancy: bool,
 }
 
 impl SnapshotPackage {
@@ -261,6 +262,7 @@ impl SnapshotPackage {
             }
         };
 
+        crate::append_vec::APPEND_VEC_SNAPSHOT_PACKAGES_OPEN.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         Self {
             snapshot_archive_info: SnapshotArchiveInfo {
                 path: snapshot_archive_path,
@@ -274,7 +276,14 @@ impl SnapshotPackage {
             snapshot_version: snapshot_info.snapshot_version,
             snapshot_type,
             enqueued: Instant::now(),
+            fancy: true,
         }
+    }
+}
+
+impl Drop for SnapshotPackage {
+    fn drop(&mut self) {
+        crate::append_vec::APPEND_VEC_SNAPSHOT_PACKAGES_OPEN.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
     }
 }
 
