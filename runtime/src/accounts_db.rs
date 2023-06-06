@@ -535,7 +535,7 @@ impl Default for FillerAccountsConfig {
     }
 }
 
-const ANCIENT_APPEND_VEC_DEFAULT_OFFSET: Option<i64> = Some(-10_000);
+const ANCIENT_APPEND_VEC_DEFAULT_OFFSET: Option<i64> = Some(300_000);
 
 #[derive(Debug, Default, Clone)]
 pub struct AccountsDbConfig {
@@ -1466,7 +1466,7 @@ pub struct AccountsDb {
     /// Set of stores which are recently rooted or had accounts removed
     /// such that potentially a 0-lamport account update could be present which
     /// means we can remove the account from the index entirely.
-    dirty_stores: DashMap<Slot, Arc<AccountStorageEntry>>,
+    pub(crate) dirty_stores: DashMap<Slot, Arc<AccountStorageEntry>>,
 
     /// Zero-lamport accounts that are *not* purged during clean because they need to stay alive
     /// for incremental snapshot support.
@@ -3961,7 +3961,7 @@ impl AccountsDb {
             );
         }
 
-        error!("ancient_append_vecs_packed: {}, dead storages: {}", line!(), dead_storages.len());
+        error!("ancient_append_vecs_packed: {}, dead storages: {}, shrink_collect.all_are_zero_lamports: {}", line!(), dead_storages.len(), shrink_collect.all_are_zero_lamports);
         self.drop_or_recycle_stores(dead_storages, stats);
         time.stop();
 
