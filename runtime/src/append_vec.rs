@@ -226,6 +226,7 @@ lazy_static! {
     pub static ref APPEND_VEC_MMAPPED_FILES_OPEN: AtomicU64 = AtomicU64::default();
     pub static ref APPEND_VEC_MMAPPED_FILES_OPENED: AtomicU64 = AtomicU64::default();
     pub static ref APPEND_VEC_MMAPPED_FILES_CLOSED: AtomicU64 = AtomicU64::default();
+    pub static ref APPEND_VEC_SNAPSHOT_PACKAGES_OPEN: AtomicU64 = AtomicU64::default();
 }
 
 impl Drop for AppendVec {

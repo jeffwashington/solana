@@ -3244,7 +3244,7 @@ pub fn package_and_archive_full_snapshot(
     )?;
 
     Ok(FullSnapshotArchiveInfo::new(
-        snapshot_package.snapshot_archive_info,
+        snapshot_package.snapshot_archive_info.clone(),
     ))
 }
 
@@ -3330,7 +3330,7 @@ pub fn package_and_archive_incremental_snapshot(
 
     Ok(IncrementalSnapshotArchiveInfo::new(
         incremental_snapshot_base_slot,
-        snapshot_package.snapshot_archive_info,
+        snapshot_package.snapshot_archive_info.clone(),
     ))
 }
 
