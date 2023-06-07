@@ -288,8 +288,11 @@ impl AccountsDb {
         self.shrink_ancient_stats
             .slots_considered
             .fetch_add(sorted_slots.len() as u64, Ordering::Relaxed);
-        log::error!("ancient_append_vecs_packed: {}, # dirty stores: {}, # of these ancient in dirty stores: {}", line!(), self.dirty_stores.len(), sorted_slots.iter().filter_map(|slot| self.dirty_stores.contains_key(slot).then_some(())).count());
-
+        log::error!("ancient_append_vecs_packed: {}, # dirty stores: {}, # of these ancient in dirty stores: {}, shrinks in progress: {}", line!(), self.dirty_stores.len(), sorted_slots.iter().filter_map(|slot| self.dirty_stores.contains_key(slot).then_some(())).count(),
+        self
+        .storage
+        .shrink_in_progress_map.len()
+    );
         let ancient_slot_infos = self.collect_sort_filter_ancient_slots(sorted_slots, &tuning);
 
         if ancient_slot_infos.all_infos.is_empty() {
@@ -517,7 +520,9 @@ impl AccountsDb {
         metrics: &mut ShrinkStatsSub,
     ) {
         let mut dropped_roots = Vec::with_capacity(accounts_to_combine.accounts_to_combine.len());
-        log::error!("ancient_append_vecs_packed: {}, finish_combine: {}", line!(), accounts_to_combine.accounts_to_combine.len());
+        log::error!("ancient_append_vecs_packed: {}, finish_combine: {}, shrinks in progress: {}", line!(), accounts_to_combine.accounts_to_combine.len(), self
+        .storage
+        .shrink_in_progress_map.len());
         for shrink_collect in accounts_to_combine.accounts_to_combine {
             let slot = shrink_collect.slot;
 
