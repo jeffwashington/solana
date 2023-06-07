@@ -3840,7 +3840,7 @@ impl AccountsDb {
             }
         }
 
-        debug!(
+        info!(
             "process_dead_slots({}): {} {} {:?}",
             dead_slots.len(),
             clean_dead_slots,
@@ -4236,12 +4236,12 @@ impl AccountsDb {
 
         let mut drop_storage_entries_elapsed = Measure::start("drop_storage_entries_elapsed");
         if recycle_stores.entry_count() < MAX_RECYCLE_STORES {
-            log::error!("ancient_append_vecs_packed: {}, {}", line!(), recycle_stores.entry_count());
+            log::error!("ancient_append_vecs_packed: {}, {}, recycling", line!(), recycle_stores.entry_count());
             recycle_stores.add_entries(dead_storages);
             drop(recycle_stores);
         } else {
             log::error!("ancient_append_vecs_packed: {}, {:?}", line!(), dead_storages.iter().map(|storage| {
-                Arc::strong_count(storage)
+                (storage.slot(), Arc::strong_count(storage))
             }).collect::<Vec<_>>());
             self.stats
                 .dropped_stores
