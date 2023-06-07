@@ -534,7 +534,7 @@ impl Default for FillerAccountsConfig {
     }
 }
 
-const ANCIENT_APPEND_VEC_DEFAULT_OFFSET: Option<i64> = Some(300_000);
+const ANCIENT_APPEND_VEC_DEFAULT_OFFSET: Option<i64> = Some(400_000);
 
 #[derive(Debug, Default, Clone)]
 pub struct AccountsDbConfig {
