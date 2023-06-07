@@ -285,15 +285,17 @@ impl AccountsDb {
         tuning: PackedAncientStorageTuning,
         metrics: &mut ShrinkStatsSub,
     ) {
-        log::error!("ancient_append_vecs_packed: {}, # dirty stores: {}, # of these ancient in dirty stores: {}, shrinks in progress: {}", line!(), self.dirty_stores.len(), sorted_slots.iter().filter_map(|slot| self.dirty_stores.contains_key(slot).then_some(())).count(),
+        log::error!("ancient_append_vecs_packed: {}, # dirty stores: {}, # of these ancient in dirty stores: {}, shrinks in progress: {}, # shrink candidates: {}, # of these ancient in shrink candidates: {}", line!(), self.dirty_stores.len(), sorted_slots.iter().filter_map(|slot| self.dirty_stores.contains_key(slot).then_some(())).count(),
         self
         .storage
-        .shrink_in_progress_map.len()
+        .shrink_in_progress_map.len(),
+        self.shrink_candidate_slots.lock().unwrap().len(),
+        sorted_slots.iter().filter_map(|slot| self.shrink_candidate_slots.lock().unwrap().contains_key(slot).then_some(())).count()
     );
         let ancient_slot_infos = self.collect_sort_filter_ancient_slots(sorted_slots, &tuning);
 
         if ancient_slot_infos.all_infos.is_empty() {
-            log::error!("ancient_append_vecs_packed: {}", line!());
+            log::error!("ancient_append_vecs_packed: {}, nothing to do", line!());
             return; // nothing to do
         }
         log::error!("ancient_append_vecs_packed: {}", line!());
@@ -319,10 +321,10 @@ impl AccountsDb {
             // `shrink_collect` previously unref'd some accounts. We need to addref them
             // to restore the correct state since we failed to combine anything.
             self.addref_accounts_failed_to_shrink_ancient(accounts_to_combine);
-            log::error!("ancient_append_vecs_packed: {}", line!());
+            log::error!("ancient_append_vecs_packed: {}, Not enough slots", line!());
             return;
         }
-        log::error!("ancient_append_vecs_packed: {}", line!());
+        log::error!("ancient_append_vecs_packed: {}, enough slots", line!());
 
         let write_ancient_accounts = self.write_packed_storages(&accounts_to_combine, pack);
 
@@ -537,9 +539,14 @@ impl AccountsDb {
                 shrink_in_progress,
                 true,
             );
-
-            // If the slot is dead, remove the need to shrink the storage as the storage entries will be purged.
-            self.shrink_candidate_slots.lock().unwrap().remove(&slot);
+            // If the slot is dead, remove the need to shrink the storages as
+            // the storage entries will be purged.
+            {
+                let mut list = self.shrink_candidate_slots.lock().unwrap();
+                if list.remove(&slot).is_some() {
+                    log::error!("ancient_append_vecs_packed: {}, slot: {}, removed from shrink_candidate_slots", line!(), slot);
+                }
+            }
         }
         self.handle_dropped_roots_for_ancient(dropped_roots.into_iter());
         metrics.accumulate(&write_ancient_accounts.metrics);
