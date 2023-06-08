@@ -1893,7 +1893,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
     /// Remove the slot when the storage for the slot is freed
     /// Accounts no longer reference this slot.
     /// return true if slot was a root
-    pub fn clean_dead_slot(&self, slot: Slot, stats: &mut AccountsIndexRootsStats) -> bool {
+    pub fn clean_dead_slot(&self, slot: Slot) -> bool {
         let mut w_roots_tracker = self.roots_tracker.write().unwrap();
         let removed_from_unclean_roots = w_roots_tracker.uncleaned_roots.remove(&slot);
         let removed_from_previous_uncleaned_roots =
@@ -1916,15 +1916,18 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
             }
             false
         } else {
-            stats.roots_len = Some(w_roots_tracker.alive_roots.len());
-            stats.uncleaned_roots_len = Some(w_roots_tracker.uncleaned_roots.len());
-            stats.previous_uncleaned_roots_len =
-                Some(w_roots_tracker.previous_uncleaned_roots.len());
-            stats.roots_range = Some(w_roots_tracker.alive_roots.range_width());
             drop(w_roots_tracker);
             self.roots_removed.fetch_add(1, Ordering::Relaxed);
             true
         }
+    }
+
+    pub(crate) fn update_roots_stats(&self, stats: &mut AccountsIndexRootsStats) {
+        let roots_tracker = self.roots_tracker.read().unwrap();
+        stats.roots_len = Some(roots_tracker.alive_roots.len());
+        stats.uncleaned_roots_len = Some(roots_tracker.uncleaned_roots.len());
+        stats.previous_uncleaned_roots_len = Some(roots_tracker.previous_uncleaned_roots.len());
+        stats.roots_range = Some(roots_tracker.alive_roots.range_width());
     }
 
     pub fn min_alive_root(&self) -> Option<Slot> {

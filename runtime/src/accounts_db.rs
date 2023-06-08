@@ -4639,7 +4639,7 @@ impl AccountsDb {
 
         dropped_roots.for_each(|slot| {
             self.accounts_index
-                .clean_dead_slot(slot, &mut AccountsIndexRootsStats::default());
+                .clean_dead_slot(slot);
             accounts_delta_hashes.remove(&slot);
             bank_hash_stats.remove(&slot);
             // the storage has been removed from this slot and recycled or dropped
@@ -8248,7 +8248,7 @@ impl AccountsDb {
             .map(|slot| {
                 if self
                     .accounts_index
-                    .clean_dead_slot(*slot, &mut accounts_index_root_stats)
+                    .clean_dead_slot(*slot)
                 {
                     rooted_cleaned_count += 1;
                 } else {
@@ -8267,7 +8267,7 @@ impl AccountsDb {
             );
             trace!("remove_dead_slots_metadata: dead_slots: {:?}", dead_slots);
         }
-
+        self.accounts_index.update_roots_stats(&mut accounts_index_root_stats);
         accounts_index_root_stats.rooted_cleaned_count += rooted_cleaned_count;
         accounts_index_root_stats.unrooted_cleaned_count += unrooted_cleaned_count;
 
