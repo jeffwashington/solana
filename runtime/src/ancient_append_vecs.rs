@@ -285,13 +285,15 @@ impl AccountsDb {
         tuning: PackedAncientStorageTuning,
         metrics: &mut ShrinkStatsSub,
     ) {
+        let slots = self.shrink_candidate_slots.lock().unwrap();
         log::error!("ancient_append_vecs_packed: {}, # dirty stores: {}, # of these ancient in dirty stores: {}, shrinks in progress: {}, # shrink candidates: {}, # of these ancient in shrink candidates: {}", line!(), self.dirty_stores.len(), sorted_slots.iter().filter_map(|slot| self.dirty_stores.contains_key(slot).then_some(())).count(),
         self
         .storage
         .shrink_in_progress_map.len(),
-        self.shrink_candidate_slots.lock().unwrap().len(),
-        sorted_slots.iter().filter_map(|slot| self.shrink_candidate_slots.lock().unwrap().contains_key(slot).then_some(())).count()
+            slots.len(),
+            sorted_slots.iter().filter_map(|slot| slots.contains_key(slot).then_some(())).count()
     );
+        drop(slots);
         let ancient_slot_infos = self.collect_sort_filter_ancient_slots(sorted_slots, &tuning);
 
         if ancient_slot_infos.all_infos.is_empty() {
