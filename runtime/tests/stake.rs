@@ -294,6 +294,7 @@ fn test_stake_account_lifetime() {
     );
     genesis_config.rent = Rent::default();
     let bank = Bank::new_for_tests(&genesis_config);
+
     let mint_pubkey = mint_keypair.pubkey();
     let mut bank = Arc::new(bank);
     // Need to set the EAH to Valid so that `Bank::new_from_parent()` doesn't panic during freeze
@@ -421,7 +422,7 @@ fn test_stake_account_lifetime() {
     let pre_balance = bank.get_balance(&stake_pubkey);
 
     // next epoch bank should pay rewards
-    bank = next_epoch_and_n_slots(&bank, 0);
+    bank = next_epoch_and_n_slots(&bank, 2);
 
     // Test that balance increased, and that the balance got staked
     let staked = get_staked(&bank, &stake_pubkey);
@@ -489,7 +490,7 @@ fn test_stake_account_lifetime() {
         .send_and_confirm_message(&[&mint_keypair, &stake_keypair], message)
         .is_err());
 
-    let mut bank = next_epoch_and_n_slots(&bank, 0);
+    let mut bank = next_epoch_and_n_slots(&bank, 2);
 
     let bank_client = BankClient::new_shared(&bank);
 
@@ -535,7 +536,7 @@ fn test_stake_account_lifetime() {
         if get_staked(&bank, &split_stake_pubkey) == 0 {
             break;
         }
-        bank = next_epoch_and_n_slots(&bank, 0);
+        bank = next_epoch_and_n_slots(&bank, 2);
     }
     let bank_client = BankClient::new_shared(&bank);
 
