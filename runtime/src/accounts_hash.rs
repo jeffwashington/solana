@@ -20,7 +20,6 @@ use {
         convert::TryInto,
         fs::File,
         io::{BufWriter, Write},
-        path::PathBuf,
         sync::{
             atomic::{AtomicU64, AtomicUsize, Ordering},
             Arc, Mutex,

@@ -555,21 +555,6 @@ pub fn app<'a>(version: &'a str, default_args: &'a DefaultArgs) -> App<'a, 'a> {
                 .help("Disable reporting of OS disk statistics.")
         )
         .arg(
-            Arg::with_name("accounts-hash-interval-slots")
-                .long("accounts-hash-interval-slots")
-                .value_name("NUMBER")
-                .takes_value(true)
-                .default_value(&default_args.accounts_hash_interval_slots)
-                .help("Number of slots between generating accounts hash.")
-                .validator(|val| {
-                    if val.eq("0") {
-                        Err(String::from("Accounts hash interval cannot be zero"))
-                    } else {
-                        Ok(())
-                    }
-                }),
-        )
-        .arg(
             Arg::with_name("snapshot_version")
                 .long("snapshot-version")
                 .value_name("SNAPSHOT_VERSION")
