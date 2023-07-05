@@ -192,9 +192,14 @@ impl AncientSlotInfos {
             // we've gone too far, so get rid of this entry and all after it.
             // Every storage after this one is larger.
             if storages_remaining + ancient_storages_required < max_storages {
-                self.all_infos.truncate(i);
+                log::error!("ancient_append_vecs_packed: {}, would truncate to {}, bytes: {}, len: {}", line!(), i, cumulative_bytes, self.all_infos.len());
+                self.all_infos.truncate(i.min(10_000));
                 break;
             }
+        }
+        log::error!("ancient_append_vecs_packed: {}, {}, bytes: {}", line!(), self.all_infos.len(), cumulative_bytes);
+        if self.all_infos.len() > 10_000 {
+            self.all_infos.truncate(10_000);
         }
     }
 
@@ -211,6 +216,7 @@ impl AncientSlotInfos {
             // currently fewer storages than max, so nothing to shrink
             self.shrink_indexes.clear();
             self.all_infos.clear();
+            log::error!("ancient_append_vecs_packed: {}, all filtered out", line!());
             return;
         }
 
@@ -305,9 +311,10 @@ impl AccountsDb {
             .get_unique_accounts_from_storage_for_combining_ancient_slots(
                 &ancient_slot_infos.all_infos[..],
             );
-            log::error!("ancient_append_vecs_packed: {}", line!());
+        log::error!("ancient_append_vecs_packed: {} after get_unique_accounts_from_storage_for_combining_ancient_slots", line!());
 
         let accounts_to_combine = self.calc_accounts_to_combine(&accounts_per_storage);
+        log::error!("ancient_append_vecs_packed: {} after calc_accounts_to_combine: {}", line!(), accounts_to_combine.accounts_to_combine.len());
 
         // pack the accounts with 1 ref
         let pack = PackedAncientStorage::pack(
@@ -317,6 +324,7 @@ impl AccountsDb {
                 .map(|shrink_collect| &shrink_collect.alive_accounts.one_ref),
             tuning.ideal_storage_size,
         );
+        log::error!("ancient_append_vecs_packed: {}, after pack", line!());
 
         if pack.len() > accounts_to_combine.target_slots_sorted.len() {
             // Not enough slots to contain the accounts we are trying to pack.
@@ -417,9 +425,10 @@ impl AccountsDb {
         };
         let mut randoms = 0;
 
+        log::error!("ancient_append_vecs_packed: {}, adding: {}", line!(), slots.len());
         for slot in &slots {
             if let Some(storage) = self.storage.get_slot_storage_entry(*slot) {
-                log::error!("ancient_append_vecs_packed: {}, adding: {}, refs: {}", line!(), slot, Arc::strong_count(&storage));
+                // log::error!("ancient_append_vecs_packed: {}, adding: {}, refs: {}", line!(), slot, Arc::strong_count(&storage));
 
                 if infos.add(*slot, storage, can_randomly_shrink) {
                     randoms += 1;
