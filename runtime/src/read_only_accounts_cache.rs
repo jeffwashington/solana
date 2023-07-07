@@ -41,6 +41,7 @@ pub(crate) struct ReadOnlyAccountsCache {
     misses: AtomicU64,
     evicts: AtomicU64,
     eviction_us: AtomicU64,
+    update_lru_us: AtomicU64,
 }
 
 impl ReadOnlyAccountsCache {
@@ -54,6 +55,7 @@ impl ReadOnlyAccountsCache {
             misses: AtomicU64::default(),
             evicts: AtomicU64::default(),
             eviction_us: AtomicU64::default(),
+            update_lru_us: AtomicU64::default(),
         }
     }
 
@@ -86,11 +88,13 @@ impl ReadOnlyAccountsCache {
         // Move the entry to the end of the queue.
         // self.queue is modified while holding a reference to the cache entry;
         // so that another thread cannot write to the same key.
-        {
+        let (_, update_lru_us) = measure_us!({
             let mut queue = self.queue.lock().unwrap();
             queue.remove(entry.index);
             entry.index = queue.insert_last(key);
-        }
+        });
+        self.update_lru_us
+            .fetch_add(update_lru_us, Ordering::Relaxed);
         Some(entry.account.clone())
     }
 
@@ -164,13 +168,14 @@ impl ReadOnlyAccountsCache {
         self.data_size.load(Ordering::Relaxed)
     }
 
-    pub(crate) fn get_and_reset_stats(&self) -> (u64, u64, u64, u64) {
+    pub(crate) fn get_and_reset_stats(&self) -> (u64, u64, u64, u64, u64) {
         let hits = self.hits.swap(0, Ordering::Relaxed);
         let misses = self.misses.swap(0, Ordering::Relaxed);
         let evicts = self.evicts.swap(0, Ordering::Relaxed);
         let eviction_us = self.eviction_us.swap(0, Ordering::Relaxed);
+        let update_lru_us = self.update_lru_us.swap(0, Ordering::Relaxed);
 
-        (hits, misses, evicts, eviction_us)
+        (hits, misses, evicts, eviction_us, update_lru_us)
     }
 }
 
