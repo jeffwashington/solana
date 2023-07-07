@@ -1,8 +1,8 @@
 //! ReadOnlyAccountsCache used to store accounts, such as executable accounts,
 //! which can be large, loaded many times, and rarely change.
 use {
+    crate::index_list::{Index, IndexList},
     dashmap::{mapref::entry::Entry, DashMap},
-    index_list::{Index, IndexList},
     solana_measure::measure_us,
     solana_sdk::{
         account::{AccountSharedData, ReadableAccount},
@@ -108,8 +108,7 @@ impl ReadOnlyAccountsCache {
             // let update_lru = entry.ms_since_last_update() >= self.ms_to_skip_lru_update;
             if high_pass {//update_lru {
                 let mut queue = self.queue.lock().unwrap();
-                queue.remove(entry.index());
-                entry.set_index(queue.insert_last(key));
+                queue.move_to_last(entry.index());
                 entry
                     .last_update_time
                     .store(ReadOnlyAccountCacheEntry::timestamp(), Ordering::Relaxed);
