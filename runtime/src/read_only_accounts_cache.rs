@@ -42,6 +42,7 @@ pub(crate) struct ReadOnlyAccountsCache {
     evicts: AtomicU64,
     eviction_us: AtomicU64,
     update_lru_us: AtomicU64,
+    load_get_mut_us: AtomicU64,
 }
 
 impl ReadOnlyAccountsCache {
@@ -56,6 +57,7 @@ impl ReadOnlyAccountsCache {
             evicts: AtomicU64::default(),
             eviction_us: AtomicU64::default(),
             update_lru_us: AtomicU64::default(),
+            load_get_mut_us:  AtomicU64::default(),
         }
     }
 
@@ -77,6 +79,8 @@ impl ReadOnlyAccountsCache {
 
     pub(crate) fn load(&self, pubkey: Pubkey, slot: Slot) -> Option<AccountSharedData> {
         let key = (pubkey, slot);
+        use solana_measure::measure::Measure;
+        let mut m = Measure::start("");
         let mut entry = match self.cache.get_mut(&key) {
             None => {
                 self.misses.fetch_add(1, Ordering::Relaxed);
@@ -84,6 +88,8 @@ impl ReadOnlyAccountsCache {
             }
             Some(entry) => entry,
         };
+        m.stop();
+        self.load_get_mut_us.fetch_add(m.as_us(), Ordering::Relaxed);
         self.hits.fetch_add(1, Ordering::Relaxed);
         // Move the entry to the end of the queue.
         // self.queue is modified while holding a reference to the cache entry;
@@ -168,14 +174,15 @@ impl ReadOnlyAccountsCache {
         self.data_size.load(Ordering::Relaxed)
     }
 
-    pub(crate) fn get_and_reset_stats(&self) -> (u64, u64, u64, u64, u64) {
+    pub(crate) fn get_and_reset_stats(&self) -> (u64, u64, u64, u64, u64, u64) {
         let hits = self.hits.swap(0, Ordering::Relaxed);
         let misses = self.misses.swap(0, Ordering::Relaxed);
         let evicts = self.evicts.swap(0, Ordering::Relaxed);
         let eviction_us = self.eviction_us.swap(0, Ordering::Relaxed);
         let update_lru_us = self.update_lru_us.swap(0, Ordering::Relaxed);
+        let load_get_mut_us = self.load_get_mut_us.swap(0, Ordering::Relaxed);
 
-        (hits, misses, evicts, eviction_us, update_lru_us)
+        (hits, misses, evicts, eviction_us, update_lru_us, load_get_mut_us)
     }
 }
 
