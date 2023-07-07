@@ -2,7 +2,7 @@
 //! which can be large, loaded many times, and rarely change.
 use {
     dashmap::{mapref::entry::Entry, DashMap},
-    index_list::{Index, IndexList},
+    //index_list::{Index as CrateIndex, IndexList as CrateIndexList},
     solana_measure::measure_us,
     solana_sdk::{
         account::{AccountSharedData, ReadableAccount},
@@ -85,41 +85,83 @@ impl ReadOnlyAccountsCache {
         let timestamp = solana_sdk::timing::timestamp() / 100000;
         let selector = timestamp % 4;
         if selector == 0 || selector == 1 {
-
+            let key = (pubkey, slot);
+            let mut entry = match self.cache.get_mut(&key) {
+                None => {
+                    self.misses.fetch_add(1, Ordering::Relaxed);
+                    return None;
+                }
+                Some(entry) => entry,
+            };
+            self.hits.fetch_add(1, Ordering::Relaxed);
+            // Move the entry to the end of the queue.
+            // self.queue is modified while holding a reference to the cache entry;
+            // so that another thread cannot write to the same key.
+            {
+                let mut queue = self.queue.lock().unwrap();
+                queue.remove(entry.index);
+                entry.index = queue.insert_last(key);
+            }
+            Some(entry.account.clone())
         }
         else if selector == 2 {
-            
+            // read lock
+            let key = (pubkey, slot);
+            use solana_measure::measure::Measure;
+            let mut m = Measure::start("");
+            let entry = match self.cache.get(&key) {
+                None => {
+                    self.misses.fetch_add(1, Ordering::Relaxed);
+                    return None;
+                }
+                Some(entry) => entry,
+            };
+            m.stop();
+            // Move the entry to the end of the queue.
+            // self.queue is modified while holding a reference to the cache entry;
+            // so that another thread cannot write to the same key.
+            let (_, update_lru_us) = measure_us!({
+                let mut queue = self.queue.lock().unwrap();
+                queue.move_to_last(entry.index);
+            });
+            let account = entry.account.clone();
+            drop(entry);
+            self.load_get_mut_us.fetch_add(m.as_us(), Ordering::Relaxed);
+            self.hits.fetch_add(1, Ordering::Relaxed);
+            self.update_lru_us
+                .fetch_add(update_lru_us, Ordering::Relaxed);
+            Some(account)
         }
         else if selector == 3 {
-            
+            // downgrade
+            let key = (pubkey, slot);
+            use solana_measure::measure::Measure;
+            let mut m = Measure::start("");
+            let mut entry = match self.cache.get_mut(&key) {
+                None => {
+                    self.misses.fetch_add(1, Ordering::Relaxed);
+                    return None;
+                }
+                Some(entry) => entry,
+            };
+            m.stop();
+            // Move the entry to the end of the queue.
+            // self.queue is modified while holding a reference to the cache entry;
+            // so that another thread cannot write to the same key.
+            let (_, update_lru_us) = measure_us!({
+                let mut queue = self.queue.lock().unwrap();
+                queue.remove(entry.index);
+                entry.index = queue.insert_last(key);
+            });
+            let entry = entry.downgrade();
+            self.load_get_mut_us.fetch_add(m.as_us(), Ordering::Relaxed);
+            self.hits.fetch_add(1, Ordering::Relaxed);
+            self.update_lru_us
+                .fetch_add(update_lru_us, Ordering::Relaxed);
+            let ( account, account_clone_us) = measure_us!(entry.account.clone());
+            self.account_clone_us.fetch_add(account_clone_us, Ordering::Relaxed);
+            Some(account)
         }
-        let key = (pubkey, slot);
-        use solana_measure::measure::Measure;
-        let mut m = Measure::start("");
-        let mut entry = match self.cache.get_mut(&key) {
-            None => {
-                self.misses.fetch_add(1, Ordering::Relaxed);
-                return None;
-            }
-            Some(entry) => entry,
-        };
-        m.stop();
-        // Move the entry to the end of the queue.
-        // self.queue is modified while holding a reference to the cache entry;
-        // so that another thread cannot write to the same key.
-        let (_, update_lru_us) = measure_us!({
-            let mut queue = self.queue.lock().unwrap();
-            queue.remove(entry.index);
-            entry.index = queue.insert_last(key);
-        });
-        let entry = entry.downgrade();
-        self.load_get_mut_us.fetch_add(m.as_us(), Ordering::Relaxed);
-        self.hits.fetch_add(1, Ordering::Relaxed);
-        self.update_lru_us
-            .fetch_add(update_lru_us, Ordering::Relaxed);
-        let ( account, account_clone_us) = measure_us!(entry.account.clone());
-        self.account_clone_us.fetch_add(account_clone_us, Ordering::Relaxed);
-        Some(account)
     }
 
     fn account_size(&self, account: &AccountSharedData) -> usize {
@@ -350,4 +392,3 @@ mod tests {
         }
     }
 }
-
