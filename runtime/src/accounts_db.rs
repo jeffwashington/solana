@@ -8433,6 +8433,7 @@ impl AccountsDb {
                 eviction_us,
                 update_lru_us,
                 load_get_mut_us,
+                index_same,
             ) = self.read_only_accounts_cache.get_and_reset_stats();
             datapoint_info!(
                 "accounts_db_store_timings",
@@ -8507,6 +8508,7 @@ impl AccountsDb {
                 ("read_only_accounts_cache_eviction_us", eviction_us, i64),
                 ("read_only_accounts_cache_update_lru_us", update_lru_us, i64),
                 ("read_only_accounts_cache_load_get_mut_us", load_get_mut_us, i64),
+                ("read_only_accounts_cache_index_same", index_same, i64),
                 
             );
 
