@@ -8435,6 +8435,7 @@ impl AccountsDb {
                 load_get_mut_us,
                 index_same,
                 account_clone_us,
+                selector,
             ) = self.read_only_accounts_cache.get_and_reset_stats();
             datapoint_info!(
                 "accounts_db_store_timings",
@@ -8511,6 +8512,7 @@ impl AccountsDb {
                 ("read_only_accounts_cache_load_get_mut_us", load_get_mut_us, i64),
                 ("read_only_accounts_cache_index_same", index_same, i64),
                 ("read_only_accounts_cache_account_clone_us", account_clone_us, i64),
+                ("read_only_accounts_cache_selector", selector, i64),
             );
 
             let recycle_stores = self.recycle_stores.read().unwrap();
