@@ -8513,6 +8513,11 @@ impl AccountsDb {
                 ("read_only_accounts_cache_index_same", index_same, i64),
                 ("read_only_accounts_cache_account_clone_us", account_clone_us, i64),
                 ("read_only_accounts_cache_selector", selector, i64),
+
+                ("read_only_accounts_cache_eviction_per_account_ns", eviction_us * 1000 / read_only_cache_hits, i64),
+                ("read_only_accounts_cache_update_lru_per_account_ns", update_lru_us * 1000 / read_only_cache_hits, i64),
+                ("read_only_accounts_cache_load_get_mut_per_account_ns", load_get_mut_us * 1000 / read_only_cache_hits, i64),
+                ("read_only_accounts_cache_account_clone_per_account_ns", account_clone_us * 1000 / read_only_cache_hits, i64),
             );
 
             let recycle_stores = self.recycle_stores.read().unwrap();
