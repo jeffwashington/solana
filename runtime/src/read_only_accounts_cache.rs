@@ -85,10 +85,11 @@ impl ReadOnlyAccountsCache {
     }
 
     pub(crate) fn load(&self, pubkey: Pubkey, slot: Slot) -> Option<AccountSharedData> {
-        let timestamp = solana_sdk::timing::timestamp() / 100000;
+        let timestamp = solana_sdk::timing::timestamp() / 300000;
         let selector = timestamp % 4;
         self.selector.store(selector, Ordering::Relaxed);
-        if selector == 0 {
+        if selector == 1 {
+            // master with minor improvements to drop write lock earlier than updating hits stat
             let key = (pubkey, slot);
             use solana_measure::measure::Measure;
             let mut m = Measure::start("");
@@ -109,44 +110,45 @@ impl ReadOnlyAccountsCache {
                 entry.index = queue.insert_last(key);
             });
             let ( account, account_clone_us) = measure_us!(entry.account.clone());
-            self.account_clone_us.fetch_add(account_clone_us, Ordering::Relaxed);
             drop(entry);
+            self.account_clone_us.fetch_add(account_clone_us, Ordering::Relaxed);
             self.load_get_mut_us.fetch_add(m.as_us(), Ordering::Relaxed);
             self.hits.fetch_add(1, Ordering::Relaxed);
+            self.update_lru_us
+                .fetch_add(update_lru_us, Ordering::Relaxed);
+            Some(account)
+        }
+        else if selector == 0 {
+            // master
+            let key = (pubkey, slot);
+            use solana_measure::measure::Measure;
+            let mut m = Measure::start("");
+            let mut entry = match self.cache.get_mut(&key) {
+                None => {
+                    self.misses.fetch_add(1, Ordering::Relaxed);
+                    return None;
+                }
+                Some(entry) => entry,
+            };
+            m.stop();
+            self.hits.fetch_add(1, Ordering::Relaxed);
+            // Move the entry to the end of the queue.
+            // self.queue is modified while holding a reference to the cache entry;
+            // so that another thread cannot write to the same key.
+            let (_, update_lru_us) = measure_us!({
+                let mut queue = self.queue.lock().unwrap();
+                queue.remove(entry.index);
+                entry.index = queue.insert_last(key);
+            });
+            let ( account, account_clone_us) = measure_us!(entry.account.clone());
+            drop(entry);
+            self.account_clone_us.fetch_add(account_clone_us, Ordering::Relaxed);
+            self.load_get_mut_us.fetch_add(m.as_us(), Ordering::Relaxed);
             self.update_lru_us
                 .fetch_add(update_lru_us, Ordering::Relaxed);
             Some(account)
         }
         else if selector == 3 {
-            let key = (pubkey, slot);
-            use solana_measure::measure::Measure;
-            let mut m = Measure::start("");
-            let mut entry = match self.cache.get_mut(&key) {
-                None => {
-                    self.misses.fetch_add(1, Ordering::Relaxed);
-                    return None;
-                }
-                Some(entry) => entry,
-            };
-            m.stop();
-            self.hits.fetch_add(1, Ordering::Relaxed);
-            // Move the entry to the end of the queue.
-            // self.queue is modified while holding a reference to the cache entry;
-            // so that another thread cannot write to the same key.
-            let (_, update_lru_us) = measure_us!({
-                let mut queue = self.queue.lock().unwrap();
-                queue.remove(entry.index);
-                entry.index = queue.insert_last(key);
-            });
-            let ( account, account_clone_us) = measure_us!(entry.account.clone());
-            drop(entry);
-            self.account_clone_us.fetch_add(account_clone_us, Ordering::Relaxed);
-            self.load_get_mut_us.fetch_add(m.as_us(), Ordering::Relaxed);
-            self.update_lru_us
-                .fetch_add(update_lru_us, Ordering::Relaxed);
-            Some(account)
-        }
-        else if selector == 1 {
             // read lock
             let key = (pubkey, slot);
             use solana_measure::measure::Measure;
