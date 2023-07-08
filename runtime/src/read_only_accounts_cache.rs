@@ -43,6 +43,7 @@ pub(crate) struct ReadOnlyAccountsCache {
     eviction_us: AtomicU64,
     update_lru_us: AtomicU64,
     load_get_mut_us: AtomicU64,
+    account_clone_us: AtomicU64,
     index_same: AtomicU64,
 }
 
@@ -60,6 +61,7 @@ impl ReadOnlyAccountsCache {
             update_lru_us: AtomicU64::default(),
             load_get_mut_us:  AtomicU64::default(),
             index_same: AtomicU64::default(),
+            account_clone_us: AtomicU64::default(),
         }
     }
 
@@ -91,23 +93,22 @@ impl ReadOnlyAccountsCache {
             Some(entry) => entry,
         };
         m.stop();
-        self.load_get_mut_us.fetch_add(m.as_us(), Ordering::Relaxed);
-        self.hits.fetch_add(1, Ordering::Relaxed);
         // Move the entry to the end of the queue.
         // self.queue is modified while holding a reference to the cache entry;
         // so that another thread cannot write to the same key.
         let (_, update_lru_us) = measure_us!({
             let mut queue = self.queue.lock().unwrap();
             queue.remove(entry.index);
-            let old_index = entry.index;
             entry.index = queue.insert_last(key);
-            if entry.index == old_index {
-                self.index_same.fetch_add(1, Ordering::Relaxed);
-            }
         });
+        let entry = entry.downgrade();
+        self.load_get_mut_us.fetch_add(m.as_us(), Ordering::Relaxed);
+        self.hits.fetch_add(1, Ordering::Relaxed);
         self.update_lru_us
             .fetch_add(update_lru_us, Ordering::Relaxed);
-        Some(entry.account.clone())
+        let ( account, account_clone_us) = measure_us!(entry.account.clone());
+        self.account_clone_us.fetch_add(account_clone_us, Ordering::Relaxed);
+        Some(account)
     }
 
     fn account_size(&self, account: &AccountSharedData) -> usize {
@@ -180,16 +181,17 @@ impl ReadOnlyAccountsCache {
         self.data_size.load(Ordering::Relaxed)
     }
 
-    pub(crate) fn get_and_reset_stats(&self) -> (u64, u64, u64, u64, u64, u64, u64) {
+    pub(crate) fn get_and_reset_stats(&self) -> (u64, u64, u64, u64, u64, u64, u64, u64) {
         let hits = self.hits.swap(0, Ordering::Relaxed);
         let misses = self.misses.swap(0, Ordering::Relaxed);
         let evicts = self.evicts.swap(0, Ordering::Relaxed);
         let eviction_us = self.eviction_us.swap(0, Ordering::Relaxed);
         let update_lru_us = self.update_lru_us.swap(0, Ordering::Relaxed);
         let load_get_mut_us = self.load_get_mut_us.swap(0, Ordering::Relaxed);
-        let index_same = self.index_same.swap(0, Ordering::Relaxed);
+        let index_same: u64 = self.index_same.swap(0, Ordering::Relaxed);
+        let account_clone_us = self.account_clone_us.swap(0, Ordering::Relaxed);
         
-        (hits, misses, evicts, eviction_us, update_lru_us, load_get_mut_us, index_same)
+        (hits, misses, evicts, eviction_us, update_lru_us, load_get_mut_us, index_same, account_clone_us)
     }
 }
 
@@ -337,3 +339,4 @@ mod tests {
         }
     }
 }
+
