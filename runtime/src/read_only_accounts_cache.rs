@@ -92,7 +92,7 @@ impl ReadOnlyAccountsCache {
     }
 
     pub(crate) fn load(&self, pubkey: Pubkey, slot: Slot) -> Option<AccountSharedData> {
-        let timestamp = solana_sdk::timing::timestamp() / 60000;
+        let timestamp = solana_sdk::timing::timestamp() / 300000;
         let selector = timestamp % 3;
         let selector = if selector == 0 {
             0 // master
