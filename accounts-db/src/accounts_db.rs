@@ -4420,7 +4420,7 @@ impl AccountsDb {
             return;
         }
 
-        let can_randomly_shrink = true;
+        let can_randomly_shrink = false;
         let sorted_slots = self.get_sorted_potential_ancient_slots(oldest_non_ancient_slot);
         if self.create_ancient_storage == CreateAncientStorage::Append {
             log::error!("ancient_append_vecs_packed: {}", line!());
