@@ -35,6 +35,8 @@ pub(crate) struct ReadOnlyAccountsCache {
     // always sorted in the order that they have last been accessed. When doing
     // LRU eviction, cache entries are evicted from the front of the queue.
     queue: Mutex<IndexList<ReadOnlyCacheKey>>,
+    queue2: Mutex<Vec<Index>>,
+    preallocated_empty_queue2: Mutex<Vec<Index>>,
     max_data_size: usize,
     data_size: AtomicUsize,
     hits: AtomicU64,
@@ -50,6 +52,9 @@ pub(crate) struct ReadOnlyAccountsCache {
 }
 
 impl ReadOnlyAccountsCache {
+    fn allocate_queue2() -> Mutex<Vec<Index>> {
+        Mutex::new(Vec::with_capacity(30_000))
+    }
     pub(crate) fn new(max_data_size: usize) -> Self {
         Self {
             max_data_size,
@@ -65,6 +70,8 @@ impl ReadOnlyAccountsCache {
             index_same: AtomicU64::default(),
             account_clone_us: AtomicU64::default(),
             selector:  AtomicU64::default(),
+            preallocated_empty_queue2: Self::allocate_queue2(),
+            queue2: Self::allocate_queue2(),
         }
     }
 
@@ -85,9 +92,21 @@ impl ReadOnlyAccountsCache {
     }
 
     pub(crate) fn load(&self, pubkey: Pubkey, slot: Slot) -> Option<AccountSharedData> {
-        let timestamp = solana_sdk::timing::timestamp() / 300000;
-        let selector = timestamp % 4;
+        let timestamp = solana_sdk::timing::timestamp() / 60000;
+        let selector = timestamp % 3;
         self.selector.store(selector, Ordering::Relaxed);
+        let selector = 5;
+        let selector = if selector == 0 {
+            0 // master
+        }
+        else if selector == 1 {
+            3
+            // read lock
+        }
+        else {
+            // queue2 with read lock
+            4
+        };
         if selector == 1 {
             // master with minor improvements to drop write lock earlier than updating hits stat
             let key = (pubkey, slot);
@@ -177,6 +196,35 @@ impl ReadOnlyAccountsCache {
                 .fetch_add(update_lru_us, Ordering::Relaxed);
             Some(account)
         }
+        else if selector == 4 {
+            // read lock with new lru
+            let key = (pubkey, slot);
+            use solana_measure::measure::Measure;
+            let mut m = Measure::start("");
+            let entry = match self.cache.get(&key) {
+                None => {
+                    self.misses.fetch_add(1, Ordering::Relaxed);
+                    return None;
+                }
+                Some(entry) => entry,
+            };
+            m.stop();
+            // Move the entry to the end of the queue.
+            // self.queue is modified while holding a reference to the cache entry;
+            // so that another thread cannot write to the same key.
+            let (_, update_lru_us) = measure_us!({
+                let mut queue = self.queue2.lock().unwrap();
+                queue.push(entry.index);
+            });
+            let ( account, account_clone_us) = measure_us!(entry.account.clone());
+            self.account_clone_us.fetch_add(account_clone_us, Ordering::Relaxed);
+            drop(entry);
+            self.load_get_mut_us.fetch_add(m.as_us(), Ordering::Relaxed);
+            self.hits.fetch_add(1, Ordering::Relaxed);
+            self.update_lru_us
+                .fetch_add(update_lru_us, Ordering::Relaxed);
+            Some(account)
+        }
         else {
             // downgrade write lock to read lock
             let key = (pubkey, slot);
@@ -246,6 +294,20 @@ impl ReadOnlyAccountsCache {
     pub(crate) fn evict_old(&self) {
         // Evict entries from the front of the queue.
         let mut num_evicts = 0;
+
+        let (_, update_lru_us) = measure_us!({
+            let mut queue_bk = self.preallocated_empty_queue2.lock().unwrap();
+            let mut queue = self.queue2.lock().unwrap();
+            std::mem::swap(&mut *queue_bk, &mut *queue);
+            drop(queue);
+            let mut queue = self.queue.lock().unwrap();
+            for index in &*queue_bk {
+                queue.move_to_last(*index);
+            }
+            queue_bk.clear(); // leave allocated, but make empty
+        });
+
+
         let (_, eviction_us) = measure_us!({
             while self.should_evict() {
                 let (pubkey, slot) = match self.queue.lock().unwrap().get_first() {
