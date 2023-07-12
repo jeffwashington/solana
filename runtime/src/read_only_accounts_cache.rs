@@ -100,7 +100,7 @@ impl ReadOnlyAccountsCache {
     }
 
     pub(crate) fn load(&self, pubkey: Pubkey, slot: Slot) -> Option<AccountSharedData> {
-        let timestamp = solana_sdk::timing::timestamp() / 120000;
+        let timestamp = solana_sdk::timing::timestamp() / 600000;
         let selector = timestamp % 2;
         //let selector = 5; // force channel // force queue2 with read lock
         let selector = if selector == 0 {
