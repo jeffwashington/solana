@@ -433,15 +433,23 @@ impl AccountsDb {
         let mut randoms = 0;
 
         log::error!("ancient_append_vecs_packed: {}, adding: {}", line!(), slots.len());
+        let mut too_big = 0;
         for slot in &slots {
             if let Some(storage) = self.storage.get_slot_storage_entry(*slot) {
                 // log::error!("ancient_append_vecs_packed: {}, adding: {}, refs: {}", line!(), slot, Arc::strong_count(&storage));
+
+                if storage.capacity() > 1_300_000_000 {
+                    // already so big we don't want to use it
+                    too_big += 1;
+                    continue;
+                }
 
                 if infos.add(*slot, storage, can_randomly_shrink) {
                     randoms += 1;
                 }
             }
         }
+        log::error!("ancient_append_vecs_packed: {}, too big: {}", line!(), too_big);
         if randoms > 0 {
             self.shrink_ancient_stats
                 .random_shrink
