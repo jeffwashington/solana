@@ -50,6 +50,7 @@ impl MmapAccountHashesFile {
     }
 }
 
+use std::path::PathBuf;
 /// 1 file containing account hashes sorted by pubkey
 pub struct AccountHashesFile {
     /// # hashes and an open file that will be deleted on drop. None if there are zero hashes to represent, and thus, no file.
