@@ -500,7 +500,7 @@ pub struct PrunedBanksRequestHandler {
 
 impl PrunedBanksRequestHandler {
     pub fn handle_request(&self, bank: &Bank, is_serialized_with_abs: bool) -> usize {
-        let slots = self.pruned_banks_receiver.try_iter().collect::<Vec<_>>();
+        let slots = self.pruned_banks_receiver.try_iter().take(100).collect::<Vec<_>>();
         let count = slots.len();
         bank.rc.accounts.accounts_db.thread_pool_clean.install(|| {
             slots
