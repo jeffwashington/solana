@@ -15,6 +15,8 @@ const STATS_INTERVAL_MS: u64 = 10_000;
 
 #[derive(Debug, Default)]
 pub struct BucketMapHeldInMemStats {
+    pub ref_count0: AtomicU64,
+    pub ref_count2: AtomicU64,
     pub ref_count: AtomicU64,
     pub slot_list_len: AtomicU64,
     pub slot_list_cached: AtomicU64,
@@ -284,6 +286,16 @@ impl BucketMapHolderStats {
                 (
                     "ref_count",
                     self.held_in_mem.ref_count.swap(0, Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "ref_count0",
+                    self.held_in_mem.ref_count0.swap(0, Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "ref_count2",
+                    self.held_in_mem.ref_count2.swap(0, Ordering::Relaxed),
                     i64
                 ),
                 (
