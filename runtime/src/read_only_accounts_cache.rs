@@ -246,13 +246,14 @@ impl ReadOnlyAccountsCache {
                 Some(entry) => entry,
             };
             m.stop();
+            let ( account, account_clone_us) = measure_us!(entry.account.clone());
+            let index = entry.index;
+            drop(entry);
             // Move the entry to the end of the queue.
             // self.queue is modified while holding a reference to the cache entry;
             // so that another thread cannot write to the same key.
-            let (_, update_lru_us) = measure_us!({self.lru_sender.send(entry.index)});
-            let ( account, account_clone_us) = measure_us!(entry.account.clone());
+            let (_, update_lru_us) = measure_us!({self.lru_sender.send(index)});
             self.account_clone_us.fetch_add(account_clone_us, Ordering::Relaxed);
-            drop(entry);
             self.load_get_mut_us.fetch_add(m.as_us(), Ordering::Relaxed);
             self.hits.fetch_add(1, Ordering::Relaxed);
             self.update_lru_us
