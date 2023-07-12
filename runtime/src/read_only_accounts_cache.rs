@@ -13,6 +13,7 @@ use {
         atomic::{AtomicU64, AtomicUsize, Ordering},
         Mutex,
     },
+    crossbeam_channel::{bounded, Receiver, Sender},
 };
 
 const CACHE_ENTRY_SIZE: usize =
@@ -48,6 +49,8 @@ pub(crate) struct ReadOnlyAccountsCache {
     account_clone_us: AtomicU64,
     index_same: AtomicU64,
     selector: AtomicU64,
+    lru_sender: Sender<Index>,
+    lru_receiver: Receiver<Index>,
     
 }
 
@@ -56,6 +59,10 @@ impl ReadOnlyAccountsCache {
         Mutex::new(Vec::with_capacity(30_000))
     }
     pub(crate) fn new(max_data_size: usize) -> Self {
+
+        // spawn a new thread to wait for the join of the validator
+        let (lru_sender, lru_receiver) = bounded(100_000);
+
         Self {
             max_data_size,
             cache: DashMap::default(),
@@ -72,6 +79,7 @@ impl ReadOnlyAccountsCache {
             selector:  AtomicU64::default(),
             preallocated_empty_queue2: Self::allocate_queue2(),
             queue2: Self::allocate_queue2(),
+            lru_sender, lru_receiver,
         }
     }
 
@@ -94,13 +102,13 @@ impl ReadOnlyAccountsCache {
     pub(crate) fn load(&self, pubkey: Pubkey, slot: Slot) -> Option<AccountSharedData> {
         let timestamp = solana_sdk::timing::timestamp() / 60000;
         let selector = timestamp % 3;
-        let selector = 2; // force queue2 with read lock
+        //let selector = 2; // force queue2 with read lock
         let selector = if selector == 0 {
             0 // master
         }
         else if selector == 1 {
-            3
-            // read lock
+            5
+            // read lock, unbounded channel
         }
         else {
             // queue2 with read lock
@@ -225,6 +233,32 @@ impl ReadOnlyAccountsCache {
                 .fetch_add(update_lru_us, Ordering::Relaxed);
             Some(account)
         }
+        else if selector == 5 {
+            // read lock with new lru
+            let key = (pubkey, slot);
+            use solana_measure::measure::Measure;
+            let mut m = Measure::start("");
+            let entry = match self.cache.get(&key) {
+                None => {
+                    self.misses.fetch_add(1, Ordering::Relaxed);
+                    return None;
+                }
+                Some(entry) => entry,
+            };
+            m.stop();
+            // Move the entry to the end of the queue.
+            // self.queue is modified while holding a reference to the cache entry;
+            // so that another thread cannot write to the same key.
+            let (_, update_lru_us) = measure_us!({self.lru_sender.send(entry.index)});
+            let ( account, account_clone_us) = measure_us!(entry.account.clone());
+            self.account_clone_us.fetch_add(account_clone_us, Ordering::Relaxed);
+            drop(entry);
+            self.load_get_mut_us.fetch_add(m.as_us(), Ordering::Relaxed);
+            self.hits.fetch_add(1, Ordering::Relaxed);
+            self.update_lru_us
+                .fetch_add(update_lru_us, Ordering::Relaxed);
+            Some(account)
+        }
         else {
             // downgrade write lock to read lock
             let key = (pubkey, slot);
@@ -305,6 +339,19 @@ impl ReadOnlyAccountsCache {
                 queue.move_to_last(*index);
             }
             queue_bk.clear(); // leave allocated, but make empty
+        });
+
+        let (_, update_lru_us) = measure_us!({
+            let mut queue = self.queue.lock().unwrap();
+            loop {
+                use std::time::Duration;
+                if let Ok(index) = self.lru_receiver.recv_timeout(Duration::from_micros(1)) {
+                    queue.move_to_last(index);
+                }
+                else {
+                    break;
+                }
+            }
         });
 
 
