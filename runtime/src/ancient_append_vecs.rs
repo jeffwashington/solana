@@ -193,13 +193,13 @@ impl AncientSlotInfos {
             // Every storage after this one is larger.
             if storages_remaining + ancient_storages_required < max_storages {
                 log::error!("ancient_append_vecs_packed: {}, would truncate to {}, bytes: {}, len: {}", line!(), i, cumulative_bytes, self.all_infos.len());
-                self.all_infos.truncate(i.min(10_000));
+                self.all_infos.truncate(i.min(2_000));
                 break;
             }
         }
         log::error!("ancient_append_vecs_packed: {}, {}, bytes: {}", line!(), self.all_infos.len(), cumulative_bytes);
-        if self.all_infos.len() > 10_000 {
-            self.all_infos.truncate(10_000);
+        if self.all_infos.len() > 2_000 {
+            self.all_infos.truncate(2_000);
         }
     }
 
