@@ -13,7 +13,7 @@ use {
         atomic::{AtomicU64, AtomicUsize, Ordering},
         Mutex,
     },
-    crossbeam_channel::{bounded, Receiver, Sender},
+    crossbeam_channel::{unbounded, Receiver, Sender},
 };
 
 const CACHE_ENTRY_SIZE: usize =
@@ -61,7 +61,7 @@ impl ReadOnlyAccountsCache {
     pub(crate) fn new(max_data_size: usize) -> Self {
 
         // spawn a new thread to wait for the join of the validator
-        let (lru_sender, lru_receiver) = bounded(100_000);
+        let (lru_sender, lru_receiver) = unbounded();
 
         Self {
             max_data_size,
