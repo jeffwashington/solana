@@ -111,6 +111,7 @@ impl ReadOnlyAccountsCache {
             // read lock with new lru
             let key = (pubkey, slot);
             use solana_measure::measure::Measure;
+            let mut moverall = Measure::start("");
             let mut m = Measure::start("");
             let read = self.cache[self.bin_from_pubkey(&pubkey)].read().unwrap();
             let entry = match read.get(&key) {
@@ -134,6 +135,10 @@ impl ReadOnlyAccountsCache {
             self.hits.fetch_add(1, Ordering::Relaxed);
             self.update_lru_us
                 .fetch_add(update_lru_us, Ordering::Relaxed);
+            moverall.stop();
+            if moverall.as_ms() > 5 {
+                log::error!("SLOW: {:?}", (pubkey, slot, update_lru_us, m.as_us(), account_clone_us));
+            }
             Some(account)
     }
 
