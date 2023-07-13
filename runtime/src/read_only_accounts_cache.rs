@@ -13,7 +13,7 @@ use {
         atomic::{AtomicU64, AtomicUsize, Ordering},
         Mutex,
     },
-    crossbeam_channel::{unbounded, Receiver, Sender},
+    crossbeam_channel::{bounded, Receiver, Sender},
 };
 
 const CACHE_ENTRY_SIZE: usize =
@@ -61,7 +61,7 @@ impl ReadOnlyAccountsCache {
     pub(crate) fn new(max_data_size: usize) -> Self {
 
         // spawn a new thread to wait for the join of the validator
-        let (lru_sender, lru_receiver) = unbounded();
+        let (lru_sender, lru_receiver) = bounded(100_000);
 
         Self {
             max_data_size,
@@ -252,7 +252,7 @@ impl ReadOnlyAccountsCache {
             // Move the entry to the end of the queue.
             // self.queue is modified while holding a reference to the cache entry;
             // so that another thread cannot write to the same key.
-            let (_, update_lru_us) = measure_us!({self.lru_sender.send(index)});
+            let (_, update_lru_us) = measure_us!({self.lru_sender.try_send(index)});
             self.account_clone_us.fetch_add(account_clone_us, Ordering::Relaxed);
             self.load_get_mut_us.fetch_add(m.as_us(), Ordering::Relaxed);
             self.hits.fetch_add(1, Ordering::Relaxed);
