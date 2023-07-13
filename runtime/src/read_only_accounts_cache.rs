@@ -55,6 +55,7 @@ pub(crate) struct ReadOnlyAccountsCache {
     lru_sender: Sender<Index>,
     lru_receiver: Receiver<Index>,
     bin_calc: PubkeyBinCalculator24,
+    last_load: AtomicU64,
     
 }
 
@@ -88,6 +89,7 @@ impl ReadOnlyAccountsCache {
             queue2: Self::allocate_queue2(),
             lru_sender, lru_receiver,
             bin_calc: PubkeyBinCalculator24::new(BINS),
+            last_load: AtomicU64::default(),
         }
     }
 
@@ -109,6 +111,7 @@ impl ReadOnlyAccountsCache {
 
     pub(crate) fn load(&self, pubkey: Pubkey, slot: Slot) -> Option<AccountSharedData> {
             // read lock with new lru
+            let old = self.last_load.fetch_add(1, Ordering::Relaxed);
             let key = (pubkey, slot);
             use solana_measure::measure::Measure;
             let mut moverall = Measure::start("");
@@ -139,7 +142,8 @@ impl ReadOnlyAccountsCache {
                 .fetch_add(update_lru_us, Ordering::Relaxed);
             moverall.stop();
             if moverall.as_ms() > 5 {
-                log::error!("SLOW: {:?}", (pubkey, slot, update_lru_us, m.as_us(), account_clone_us, m3.as_us()));
+                let others = self.last_load.load(Ordering::Relaxed);
+                log::error!("SLOW: {:?}, others: {}", (pubkey, slot, update_lru_us, m.as_us(), account_clone_us, m3.as_us()), others - old);
             }
             Some(account)
     }
