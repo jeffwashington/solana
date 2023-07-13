@@ -155,6 +155,7 @@ impl ReadOnlyAccountsCache {
         // Insert the entry at the end of the queue.
         let mut queue = self.queue.lock().unwrap();
         let index = queue.insert_last(key);
+        drop(queue);
         let old_account_size;
         let index_remove;
         match self.cache[self.bin_from_pubkey(&pubkey)].write().unwrap().entry(key) {
