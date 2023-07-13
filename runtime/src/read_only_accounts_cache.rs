@@ -143,7 +143,7 @@ impl ReadOnlyAccountsCache {
             moverall.stop();
             if moverall.as_ms() > 5 {
                 let others = self.last_load.load(Ordering::Relaxed);
-                log::error!("SLOW: {:?}, others: {}", (pubkey, slot, update_lru_us, m.as_us(), account_clone_us, m3.as_us()), others - old);
+                log::error!("SLOW: {:?}, others: {} overall time: {}ms", (pubkey, slot, update_lru_us, m.as_us(), account_clone_us, m3.as_us()), others - old, moverall.as_ms());
             }
             Some(account)
     }
