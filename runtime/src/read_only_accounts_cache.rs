@@ -112,8 +112,10 @@ impl ReadOnlyAccountsCache {
             let key = (pubkey, slot);
             use solana_measure::measure::Measure;
             let mut moverall = Measure::start("");
-            let mut m = Measure::start("");
+            let mut m3 = Measure::start("");
             let read = self.cache[self.bin_from_pubkey(&pubkey)].read().unwrap();
+            m3.stop();
+            let mut m = Measure::start("");
             let entry = match read.get(&key) {
                 None => {
                     self.misses.fetch_add(1, Ordering::Relaxed);
@@ -131,13 +133,13 @@ impl ReadOnlyAccountsCache {
             // so that another thread cannot write to the same key.
             let (_, update_lru_us) = measure_us!({self.lru_sender.try_send(index)});
             self.account_clone_us.fetch_add(account_clone_us, Ordering::Relaxed);
-            self.load_get_mut_us.fetch_add(m.as_us(), Ordering::Relaxed);
+            self.load_get_mut_us.fetch_add(m.as_us() + m3.as_us(), Ordering::Relaxed);
             self.hits.fetch_add(1, Ordering::Relaxed);
             self.update_lru_us
                 .fetch_add(update_lru_us, Ordering::Relaxed);
             moverall.stop();
             if moverall.as_ms() > 5 {
-                log::error!("SLOW: {:?}", (pubkey, slot, update_lru_us, m.as_us(), account_clone_us));
+                log::error!("SLOW: {:?}", (pubkey, slot, update_lru_us, m.as_us(), account_clone_us, m3.as_us()));
             }
             Some(account)
     }
