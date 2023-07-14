@@ -6015,6 +6015,7 @@ impl AccountsDb {
     }
 
     pub fn remove_unrooted_slots(&self, remove_slots: &[(Slot, BankId)]) {
+        log::error!("remove_unrooted_slots: {}", line!());
         let rooted_slots = self
             .accounts_index
             .get_rooted_from_list(remove_slots.iter().map(|(slot, _)| slot));
@@ -6028,6 +6029,7 @@ impl AccountsDb {
             signal,
         } = &self.remove_unrooted_slots_synchronization;
 
+        log::error!("remove_unrooted_slots: {}", line!());
         {
             // Slots that are currently being flushed by flush_slot_cache()
 
@@ -6053,8 +6055,10 @@ impl AccountsDb {
                 .cloned()
                 .collect();
 
+            log::error!("remove_unrooted_slots: {}", line!());
             // Wait for cache flushes to finish
             loop {
+                log::error!("remove_unrooted_slots: {}", line!());
                 if !remaining_contended_flush_slots.is_empty() {
                     // Wait for the signal that the cache has finished flushing a slot
                     //
@@ -6077,6 +6081,7 @@ impl AccountsDb {
             }
         }
 
+        log::error!("remove_unrooted_slots: {}", line!());
         // Mark down these slots are about to be purged so that new attempts to scan these
         // banks fail, and any ongoing scans over these slots will detect that they should abort
         // their results
@@ -6087,18 +6092,21 @@ impl AccountsDb {
             }
         }
 
+        log::error!("remove_unrooted_slots: {}", line!());
         let remove_unrooted_purge_stats = PurgeStats::default();
         self.purge_slots_from_cache_and_store(
             remove_slots.iter().map(|(slot, _)| slot),
             &remove_unrooted_purge_stats,
             true,
         );
+        log::error!("remove_unrooted_slots: {}", line!());
         remove_unrooted_purge_stats.report("remove_unrooted_slots_purge_slots_stats", None);
 
         let mut currently_contended_slots = slots_under_contention.lock().unwrap();
         for (remove_slot, _) in remove_slots {
             assert!(currently_contended_slots.remove(remove_slot));
         }
+        log::error!("remove_unrooted_slots: {}", line!());
     }
 
     pub fn hash_account<T: ReadableAccount>(
