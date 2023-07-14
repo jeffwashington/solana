@@ -668,7 +668,7 @@ impl AccountsBackgroundService {
                         }
                         bank.shrink_candidate_slots();
                     }
-                    stats.record_and_maybe_submit(start_time.elapsed());
+                    stats.record_and_maybe_submit(start_time.elapsed(), bank.slot());
                     sleep(Duration::from_millis(INTERVAL_MS));
                 }
                 info!("AccountsBackgroundService has stopped");
