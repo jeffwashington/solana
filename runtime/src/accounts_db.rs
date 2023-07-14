@@ -6444,6 +6444,27 @@ impl AccountsDb {
             }
         });
 
+        if requested_flush_root.is_some() {
+            datapoint_info!(
+                "force_flush",
+                (
+                    "requested_flush_root",
+                    requested_flush_root.unwrap(),
+                    i64
+                ),
+            );
+        }
+        else {
+            datapoint_info!(
+                "force_flush",
+                (
+                    "requested_flush_root_none",
+                    1,
+                    i64
+                ),
+            );
+        }
+
         // Always flush up to `requested_flush_root`, which is necessary for things like snapshotting.
         let cached_roots: BTreeSet<Slot> = self.accounts_cache.clear_roots(requested_flush_root);
 
