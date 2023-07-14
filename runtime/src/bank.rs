@@ -1228,8 +1228,9 @@ impl Bank {
     }
 
     fn is_partitioned_rewards_feature_enabled(&self) -> bool {
-        self.feature_set
-            .is_active(&feature_set::enable_partitioned_epoch_reward::id())
+        //self.feature_set
+        //    .is_active(&feature_set::enable_partitioned_epoch_reward::id())
+        true
     }
 
     pub(crate) fn set_epoch_reward_status_active(
