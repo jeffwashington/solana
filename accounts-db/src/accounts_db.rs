@@ -1629,6 +1629,8 @@ pub struct PurgeStats {
     scan_storages_elapsed: AtomicU64,
     purge_accounts_index_elapsed: AtomicU64,
     handle_reclaims_elapsed: AtomicU64,
+    purge_keys_exact_us: AtomicU64,
+    remove_dead_slots_metadata_us: AtomicU64,
 }
 
 impl PurgeStats {
@@ -1705,6 +1707,16 @@ impl PurgeStats {
                 (
                     "handle_reclaims_elapsed",
                     self.handle_reclaims_elapsed.swap(0, Ordering::Relaxed) as i64,
+                    i64
+                ),
+                (
+                    "purge_keys_exact_us",
+                    self.purge_keys_exact_us.swap(0, Ordering::Relaxed) as i64,
+                    i64
+                ),
+                (
+                    "remove_dead_slots_metadata_us",
+                    self.remove_dead_slots_metadata_us.swap(0, Ordering::Relaxed) as i64,
                     i64
                 ),
             );
@@ -5996,15 +6008,17 @@ impl AccountsDb {
             .get_slot_storage_entry_shrinking_in_progress_ok(purged_slot)
             .is_none());
         let num_purged_keys = pubkey_to_slot_set.len();
-        let (reclaims, _) = self.purge_keys_exact(pubkey_to_slot_set.iter());
+        let ((reclaims, _), purge_keys_us) = measure_us!(self.purge_keys_exact(pubkey_to_slot_set.iter()));
+        self.external_purge_slots_stats.purge_keys_exact_us.fetch_add(purge_keys_us, Ordering::Relaxed);
         assert_eq!(reclaims.len(), num_purged_keys);
         if is_dead {
-            self.remove_dead_slots_metadata(
+            let (_, us) = measure_us!(self.remove_dead_slots_metadata(
                 std::iter::once(&purged_slot),
                 purged_slot_pubkeys,
                 None,
                 pubkeys_removed_from_accounts_index,
-            );
+            ));
+            self.external_purge_slots_stats.remove_dead_slots_metadata_us.fetch_add(us, Ordering::Relaxed);
         }
     }
 
