@@ -2989,6 +2989,9 @@ impl AccountsDb {
     }
 
     fn max_clean_root(&self, proposed_clean_root: Option<Slot>) -> Option<Slot> {
+        if self.accounts_index.min_ongoing_scan_root().is_some() {
+            log::error!("max_clean_root is: {:?}", self.accounts_index.min_ongoing_scan_root());
+        }
         match (
             self.accounts_index.min_ongoing_scan_root(),
             proposed_clean_root,
