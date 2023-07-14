@@ -1233,8 +1233,9 @@ impl Bank {
 
     #[allow(dead_code)]
     fn is_partitioned_rewards_feature_enabled(&self) -> bool {
-        self.feature_set
-            .is_active(&feature_set::enable_partitioned_epoch_reward::id())
+        //self.feature_set
+        //    .is_active(&feature_set::enable_partitioned_epoch_reward::id())
+        true
     }
 
     #[allow(dead_code)]
