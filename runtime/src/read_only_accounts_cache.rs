@@ -26,6 +26,7 @@ struct ReadOnlyAccountCacheEntry {
     index: Index, // Index of the entry in the eviction queue.
 }
 
+use std::collections::HashMap;
 #[derive(Debug)]
 pub(crate) struct ReadOnlyAccountsCache {
     cache: DashMap<ReadOnlyCacheKey, ReadOnlyAccountCacheEntry>,
@@ -48,6 +49,7 @@ pub(crate) struct ReadOnlyAccountsCache {
     account_clone_us: AtomicU64,
     index_same: AtomicU64,
     selector: AtomicU64,
+    keys: Mutex<HashMap<Pubkey, usize>>,
     
 }
 
@@ -72,6 +74,7 @@ impl ReadOnlyAccountsCache {
             selector:  AtomicU64::default(),
             preallocated_empty_queue2: Self::allocate_queue2(),
             queue2: Self::allocate_queue2(),
+            keys: Mutex::default(),
         }
     }
 
@@ -92,6 +95,14 @@ impl ReadOnlyAccountsCache {
     }
 
     pub(crate) fn load(&self, pubkey: Pubkey, slot: Slot) -> Option<AccountSharedData> {
+        match self.keys.lock().unwrap().entry(pubkey) {
+            std::collections::hash_map::Entry::Occupied(mut occupied) => {
+                *occupied.get_mut() += 1;
+            }
+            std::collections::hash_map::Entry::Vacant(vacant) => {
+                vacant.insert(1);
+            }
+        };
         let timestamp = solana_sdk::timing::timestamp() / 300000;
         let selector = timestamp % 5;
         self.selector.store(selector, Ordering::Relaxed);
@@ -339,7 +350,17 @@ impl ReadOnlyAccountsCache {
         let index_same: u64 = self.index_same.swap(0, Ordering::Relaxed);
         let account_clone_us = self.account_clone_us.swap(0, Ordering::Relaxed);
         let selector = self.selector.load(Ordering::Relaxed);
-        
+
+        let mut keys = HashMap::default();
+        std::mem::swap(&mut keys, &mut *self.keys.lock().unwrap());
+
+        let mut keys = keys.drain().map(|(k,v)| (v, k)).collect::<Vec<_>>();
+        let total = keys.iter().map(|(v,k)| v).sum::<usize>();
+        keys.sort();
+        log::error!("jw: top read only cache loads");
+        keys.iter().rev().take(40).for_each(|(v, k)| {
+            log::error!("jw: {},{},{}%", v, k, v * 100 / total);
+        });
         (hits, misses, evicts, eviction_us, update_lru_us, load_get_mut_us, index_same, account_clone_us, selector)
     }
 }
