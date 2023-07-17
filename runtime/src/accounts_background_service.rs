@@ -496,7 +496,7 @@ impl PrunedBanksRequestHandler {
                 pruned_bank_id,
                 is_serialized_with_abs,
             );
-            if count > 1000 {
+            if count > 100 {
                 // pick up the rest next time. we can't afford to block the abs thread too long
                 break;
             }
