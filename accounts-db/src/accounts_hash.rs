@@ -1124,7 +1124,7 @@ impl<'a> AccountsHasher<'a> {
             None,
         );
         hash_time.stop();
-        error!("jwash: hash final: {}, {:?}", hash_time.as_us(), cumulative.cumulative);
+        error!("jwash: hash final: {}, {:?}", hash_time.as_us(), ());// this is massive logging: cumulative.cumulative);
         stats.hash_time_total_us += hash_time.as_us();
         (hash, total_lamports)
     }
