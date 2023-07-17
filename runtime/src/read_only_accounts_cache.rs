@@ -93,7 +93,7 @@ impl ReadOnlyAccountsCache {
 
     pub(crate) fn load(&self, pubkey: Pubkey, slot: Slot) -> Option<AccountSharedData> {
         let timestamp = solana_sdk::timing::timestamp() / 300000;
-        let selector = timestamp % 6;
+        let selector = timestamp % 7;
         self.selector.store(selector, Ordering::Relaxed);
         if selector == 1 {
             // master with minor improvements to drop write lock earlier than updating hits stat
@@ -176,6 +176,40 @@ impl ReadOnlyAccountsCache {
                 let mut queue = self.queue.lock().unwrap();
                 queue.remove(entry.index());
                 entry.set_index(queue.insert_last(key));
+            });
+            let ( account, account_clone_us) = measure_us!(entry.account.clone());
+            drop(entry);
+            self.account_clone_us.fetch_add(account_clone_us, Ordering::Relaxed);
+            self.load_get_mut_us.fetch_add(m.as_us(), Ordering::Relaxed);
+            self.update_lru_us
+                .fetch_add(update_lru_us, Ordering::Relaxed);
+            Some(account)
+        }
+        else if selector == 6 {
+            // master with transmuted index, skipping lru update often on vote program account
+            let key = (pubkey, slot);
+            use rand::Rng;
+            use solana_measure::measure::Measure;
+            let mut m = Measure::start("");
+            let mut entry = match self.cache.get(&key) {
+                None => {
+                    self.misses.fetch_add(1, Ordering::Relaxed);
+                    return None;
+                }
+                Some(entry) => entry,
+            };
+            m.stop();
+            self.hits.fetch_add(1, Ordering::Relaxed);
+            // Move the entry to the end of the queue.
+            // self.queue is modified while holding a reference to the cache entry;
+            // so that another thread cannot write to the same key.
+            let (_, update_lru_us) = measure_us!({
+                use rand::thread_rng;                
+                if pubkey != solana_vote_program::id() || thread_rng().gen_range(0, 10_000) == 0 {
+                    let mut queue = self.queue.lock().unwrap();
+                    queue.remove(entry.index());
+                    entry.set_index(queue.insert_last(key));
+                }
             });
             let ( account, account_clone_us) = measure_us!(entry.account.clone());
             drop(entry);
