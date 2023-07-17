@@ -10,7 +10,7 @@ use {
         pubkey::Pubkey,
     },
     std::sync::{
-        atomic::{AtomicU64, AtomicUsize, Ordering},
+        atomic::{AtomicU32, AtomicU64, AtomicUsize, Ordering},
         Mutex,
     },
 };
@@ -23,7 +23,7 @@ type ReadOnlyCacheKey = (Pubkey, Slot);
 #[derive(Debug)]
 struct ReadOnlyAccountCacheEntry {
     account: AccountSharedData,
-    index: Index, // Index of the entry in the eviction queue.
+    index: AtomicU32, // Index of the entry in the eviction queue.
 }
 
 #[derive(Debug)]
@@ -93,7 +93,7 @@ impl ReadOnlyAccountsCache {
 
     pub(crate) fn load(&self, pubkey: Pubkey, slot: Slot) -> Option<AccountSharedData> {
         let timestamp = solana_sdk::timing::timestamp() / 300000;
-        let selector = timestamp % 5;
+        let selector = timestamp % 6;
         self.selector.store(selector, Ordering::Relaxed);
         if selector == 1 {
             // master with minor improvements to drop write lock earlier than updating hits stat
@@ -113,8 +113,8 @@ impl ReadOnlyAccountsCache {
             // so that another thread cannot write to the same key.
             let (_, update_lru_us) = measure_us!({
                 let mut queue = self.queue.lock().unwrap();
-                queue.remove(entry.index);
-                entry.index = queue.insert_last(key);
+                queue.remove(entry.index());
+                entry.set_index(queue.insert_last(key));
             });
             let ( account, account_clone_us) = measure_us!(entry.account.clone());
             drop(entry);
@@ -144,8 +144,38 @@ impl ReadOnlyAccountsCache {
             // so that another thread cannot write to the same key.
             let (_, update_lru_us) = measure_us!({
                 let mut queue = self.queue.lock().unwrap();
-                queue.remove(entry.index);
-                entry.index = queue.insert_last(key);
+                queue.remove(entry.index());
+                entry.set_index(queue.insert_last(key));
+            });
+            let ( account, account_clone_us) = measure_us!(entry.account.clone());
+            drop(entry);
+            self.account_clone_us.fetch_add(account_clone_us, Ordering::Relaxed);
+            self.load_get_mut_us.fetch_add(m.as_us(), Ordering::Relaxed);
+            self.update_lru_us
+                .fetch_add(update_lru_us, Ordering::Relaxed);
+            Some(account)
+        }
+        else if selector == 5 {
+            // master with transmuted index
+            let key = (pubkey, slot);
+            use solana_measure::measure::Measure;
+            let mut m = Measure::start("");
+            let mut entry = match self.cache.get(&key) {
+                None => {
+                    self.misses.fetch_add(1, Ordering::Relaxed);
+                    return None;
+                }
+                Some(entry) => entry,
+            };
+            m.stop();
+            self.hits.fetch_add(1, Ordering::Relaxed);
+            // Move the entry to the end of the queue.
+            // self.queue is modified while holding a reference to the cache entry;
+            // so that another thread cannot write to the same key.
+            let (_, update_lru_us) = measure_us!({
+                let mut queue = self.queue.lock().unwrap();
+                queue.remove(entry.index());
+                entry.set_index(queue.insert_last(key));
             });
             let ( account, account_clone_us) = measure_us!(entry.account.clone());
             drop(entry);
@@ -173,7 +203,7 @@ impl ReadOnlyAccountsCache {
             // so that another thread cannot write to the same key.
             let (_, update_lru_us) = measure_us!({
                 let mut queue = self.queue.lock().unwrap();
-                queue.move_to_last(entry.index);
+                queue.move_to_last(entry.index());
             });
             let ( account, account_clone_us) = measure_us!(entry.account.clone());
             self.account_clone_us.fetch_add(account_clone_us, Ordering::Relaxed);
@@ -202,7 +232,7 @@ impl ReadOnlyAccountsCache {
             // so that another thread cannot write to the same key.
             let (_, update_lru_us) = measure_us!({
                 let mut queue = self.queue2.lock().unwrap();
-                queue.push(entry.index);
+                queue.push(entry.index());
             });
             let ( account, account_clone_us) = measure_us!(entry.account.clone());
             self.account_clone_us.fetch_add(account_clone_us, Ordering::Relaxed);
@@ -231,8 +261,8 @@ impl ReadOnlyAccountsCache {
             // so that another thread cannot write to the same key.
             let (_, update_lru_us) = measure_us!({
                 let mut queue = self.queue.lock().unwrap();
-                queue.remove(entry.index);
-                entry.index = queue.insert_last(key);
+                queue.remove(entry.index());
+                entry.set_index(queue.insert_last(key));
             });
             let entry = entry.downgrade();
             self.load_get_mut_us.fetch_add(m.as_us(), Ordering::Relaxed);
@@ -260,7 +290,7 @@ impl ReadOnlyAccountsCache {
                 // Insert the entry at the end of the queue.
                 let mut queue = self.queue.lock().unwrap();
                 let index = queue.insert_last(key);
-                entry.insert(ReadOnlyAccountCacheEntry { account, index });
+                entry.insert(ReadOnlyAccountCacheEntry::new(account, index));
             }
             Entry::Occupied(mut entry) => {
                 let entry = entry.get_mut();
@@ -269,8 +299,8 @@ impl ReadOnlyAccountsCache {
                 entry.account = account;
                 // Move the entry to the end of the queue.
                 let mut queue = self.queue.lock().unwrap();
-                queue.remove(entry.index);
-                entry.index = queue.insert_last(key);
+                queue.remove(entry.index());
+                entry.set_index(queue.insert_last(key));
             }
         };
     }
@@ -315,7 +345,7 @@ impl ReadOnlyAccountsCache {
         // self.queue should be modified only after removing the entry from the
         // cache, so that this is still safe if another thread writes to the
         // same key.
-        self.queue.lock().unwrap().remove(entry.index);
+        self.queue.lock().unwrap().remove(entry.index());
         let account_size = self.account_size(&entry.account);
         self.data_size.fetch_sub(account_size, Ordering::Relaxed);
         Some(entry.account)
@@ -344,6 +374,25 @@ impl ReadOnlyAccountsCache {
     }
 }
 
+impl ReadOnlyAccountCacheEntry {
+    fn new(account: AccountSharedData, index: Index) -> Self {
+        let index = unsafe { std::mem::transmute::<Index, u32>(index) };
+        let index = AtomicU32::new(index);
+        Self { account, index }
+    }
+
+    #[inline]
+    fn index(&self) -> Index {
+        let index = self.index.load(Ordering::Relaxed);
+        unsafe { std::mem::transmute::<u32, Index>(index) }
+    }
+
+    #[inline]
+    fn set_index(&self, index: Index) {
+        let index = unsafe { std::mem::transmute::<Index, u32>(index) };
+        self.index.store(index, Ordering::Relaxed);
+    }
+}
 #[cfg(test)]
 mod tests {
     use {
