@@ -92,19 +92,8 @@ impl ReadOnlyAccountsCache {
     }
 
     pub(crate) fn load(&self, pubkey: Pubkey, slot: Slot) -> Option<AccountSharedData> {
-        let timestamp = solana_sdk::timing::timestamp() / 60000;
-        let selector = timestamp % 3;
-        let selector = if selector == 0 {
-            0 // master
-        }
-        else if selector == 1 {
-            3
-            // read lock
-        }
-        else {
-            // queue2 with read lock
-            4
-        };
+        let timestamp = solana_sdk::timing::timestamp() / 300000;
+        let selector = timestamp % 5;
         self.selector.store(selector, Ordering::Relaxed);
         if selector == 1 {
             // master with minor improvements to drop write lock earlier than updating hits stat
