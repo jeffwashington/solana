@@ -2879,6 +2879,7 @@ impl AccountsDb {
         let mut reclaims = Vec::new();
         let mut dead_keys = Vec::new();
 
+        let mut count = 0;
         for (pubkey, slots_set) in pubkey_to_slot_set {
             let is_empty = self
                 .accounts_index
@@ -2886,11 +2887,17 @@ impl AccountsDb {
             if is_empty {
                 dead_keys.push(pubkey);
             }
+            count += 1;
+            if count % 10_000 == 0 {
+                log::error!("purge_keys_exact: {}", count);
+            }
         }
 
+        log::error!("handle_dead_keys: {}", dead_keys.len());
         let pubkeys_removed_from_accounts_index = self
             .accounts_index
             .handle_dead_keys(&dead_keys, &self.account_indexes);
+        log::error!("~handle_dead_keys: {}", dead_keys.len());
         (reclaims, pubkeys_removed_from_accounts_index)
     }
 
