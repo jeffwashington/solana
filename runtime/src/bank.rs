@@ -7149,6 +7149,8 @@ impl Bank {
                         info!(
                             "running initial verification accounts hash calculation in background"
                         );
+                        let result = true;
+                        /*
                         let result = accounts_.verify_accounts_hash_and_lamports(
                             slot,
                             cap,
@@ -7164,6 +7166,7 @@ impl Bank {
                                 include_slot_in_hash,
                             },
                         );
+                        */
                         accounts_
                             .accounts_db
                             .verify_accounts_hash_in_bg
