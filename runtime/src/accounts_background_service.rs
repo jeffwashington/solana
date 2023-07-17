@@ -496,6 +496,10 @@ impl PrunedBanksRequestHandler {
                 pruned_bank_id,
                 is_serialized_with_abs,
             );
+            if count > 100 {
+                // pick up the rest next time. we can't afford to block the abs thread too long
+                break;
+            }
         }
 
         count
@@ -507,6 +511,7 @@ impl PrunedBanksRequestHandler {
         removed_slots_count: &mut usize,
         total_remove_slots_time: &mut u64,
     ) {
+        log::error!("remove_dead_slots: {}", line!());
         let mut remove_slots_time = Measure::start("remove_slots_time");
         *removed_slots_count += self.handle_request(bank, true);
         remove_slots_time.stop();
@@ -521,6 +526,7 @@ impl PrunedBanksRequestHandler {
             *total_remove_slots_time = 0;
             *removed_slots_count = 0;
         }
+        log::error!("~remove_dead_slots: {}", line!());
     }
 }
 

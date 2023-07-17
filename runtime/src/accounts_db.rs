@@ -8194,6 +8194,7 @@ impl AccountsDb {
         purged_stored_account_slots: Option<&mut AccountSlots>,
         pubkeys_removed_from_accounts_index: &PubkeysRemovedFromAccountsIndex,
     ) {
+        log::error!("remove_dead_slots_metadata: {}", line!());
         let mut measure = Measure::start("remove_dead_slots_metadata-ms");
         self.clean_dead_slots_from_accounts_index(
             dead_slots_iter.clone(),
@@ -8202,17 +8203,20 @@ impl AccountsDb {
             pubkeys_removed_from_accounts_index,
         );
 
-        let mut accounts_delta_hashes = self.accounts_delta_hashes.lock().unwrap();
-        let mut bank_hash_stats = self.bank_hash_stats.lock().unwrap();
+        let (mut accounts_delta_hashes, us1) = measure_us!(self.accounts_delta_hashes.lock().unwrap());
+        let (mut bank_hash_stats, us2) = measure_us!(self.bank_hash_stats.lock().unwrap());
+        let mut count = 0;
         for slot in dead_slots_iter {
             accounts_delta_hashes.remove(slot);
             bank_hash_stats.remove(slot);
+            count += 1;
         }
         drop(accounts_delta_hashes);
         drop(bank_hash_stats);
 
         measure.stop();
         inc_new_counter_info!("remove_dead_slots_metadata-ms", measure.as_ms() as usize);
+        log::error!("remove_dead_slots_metadata: {}, ms: {}, count: {}, {:?}", line!(), measure.as_ms(), count, (us1, us2));
     }
 
     /// lookup each pubkey in 'pubkeys' and unref it in the accounts index
