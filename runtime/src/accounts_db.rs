@@ -3285,7 +3285,7 @@ impl AccountsDb {
                                 if useless {
                                     AccountsIndexScanResult::OnlyKeepInMemoryIfDirty
                                 } else {
-                                    AccountsIndexScanResult::KeepInMemory
+                                    AccountsIndexScanResult::OnlyKeepInMemoryIfDirty
                                 }
                             },
                             None,
