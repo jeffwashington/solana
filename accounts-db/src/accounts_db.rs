@@ -1499,6 +1499,7 @@ pub struct AccountsDb {
     pub thread_pool: ThreadPool,
 
     pub thread_pool_clean: ThreadPool,
+    pub thread_pool_hash: ThreadPool,
 
     bank_hash_stats: Mutex<HashMap<Slot, BankHashStats>>,
     accounts_delta_hashes: Mutex<HashMap<Slot, AccountsDeltaHash>>,
@@ -2325,6 +2326,16 @@ pub fn make_min_priority_thread_pool() -> ThreadPool {
         .unwrap()
 }
 
+pub fn make_min_priority_thread_pool2() -> ThreadPool {
+    // Use lower thread count to reduce priority.
+    let num_threads = quarter_thread_count() / 2;
+    rayon::ThreadPoolBuilder::new()
+        .thread_name(|i| format!("solAccountsLo{i:02}"))
+        .num_threads(num_threads)
+        .build()
+        .unwrap()
+}
+
 #[cfg(RUSTC_WITH_SPECIALIZATION)]
 impl solana_frozen_abi::abi_example::AbiExample for AccountsDb {
     fn example() -> Self {
@@ -2528,6 +2539,7 @@ impl AccountsDb {
                 .build()
                 .unwrap(),
             thread_pool_clean: make_min_priority_thread_pool(),
+            thread_pool_hash: make_min_priority_thread_pool2(),
             bank_hash_stats: Mutex::new(bank_hash_stats),
             accounts_delta_hashes: Mutex::new(HashMap::new()),
             accounts_hashes: Mutex::new(HashMap::new()),
@@ -7901,7 +7913,7 @@ impl AccountsDb {
         };
 
         let result = if use_bg_thread_pool {
-            self.thread_pool_clean.install(scan_and_hash)
+            self.thread_pool_hash.install(scan_and_hash)
         } else {
             scan_and_hash()
         };
