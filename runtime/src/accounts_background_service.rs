@@ -491,6 +491,7 @@ impl PrunedBanksRequestHandler {
         let mut count = 0;
         for (pruned_slot, pruned_bank_id) in self.pruned_banks_receiver.try_iter() {
             count += 1;
+            log::error!("purge_slot: {}, count: {}", line!(), count);
             bank.rc.accounts.accounts_db.purge_slot(
                 pruned_slot,
                 pruned_bank_id,
@@ -583,6 +584,7 @@ impl AccountsBackgroundService {
 
                     // Grab the current root bank
                     let bank = bank_forks.read().unwrap().root_bank().clone();
+                    log::error!("AccountsBackgroundService: {}", line!());
 
                     // Purge accounts of any dead slots
                     request_handlers
@@ -593,9 +595,11 @@ impl AccountsBackgroundService {
                             &mut total_remove_slots_time,
                         );
 
-                    Self::expire_old_recycle_stores(&bank, &mut last_expiration_check_time);
+                        log::error!("AccountsBackgroundService: {}", line!());
+                        Self::expire_old_recycle_stores(&bank, &mut last_expiration_check_time);
 
-                    let non_snapshot_time = last_snapshot_end_time
+                        log::error!("AccountsBackgroundService: {}", line!());
+                        let non_snapshot_time = last_snapshot_end_time
                         .map(|last_snapshot_end_time: Instant| {
                             last_snapshot_end_time.elapsed().as_micros()
                         })
@@ -623,6 +627,7 @@ impl AccountsBackgroundService {
                     // snapshot requests.  This is because startup verification and snapshot
                     // request handling can both kick off accounts hash calculations in background
                     // threads, and these must not happen concurrently.
+                    log::error!("AccountsBackgroundService: {}", line!());
                     let snapshot_handle_result = bank
                         .is_startup_verification_complete()
                         .then(|| {
@@ -637,12 +642,14 @@ impl AccountsBackgroundService {
                     if snapshot_handle_result.is_some() {
                         last_snapshot_end_time = Some(Instant::now());
                     }
+                    log::error!("AccountsBackgroundService: {}", line!());
 
                     // Note that the flush will do an internal clean of the
                     // cache up to bank.slot(), so should be safe as long
                     // as any later snapshots that are taken are of
                     // slots >= bank.slot()
                     bank.flush_accounts_cache_if_needed();
+                    log::error!("AccountsBackgroundService: {}", line!());
 
                     if let Some(snapshot_handle_result) = snapshot_handle_result {
                         // Safe, see proof above

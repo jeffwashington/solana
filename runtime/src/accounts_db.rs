@@ -5744,6 +5744,7 @@ impl AccountsDb {
     ///        accounts_db relevant calls, such as shrinking, purging etc., in account background
     ///        service.
     pub fn purge_slot(&self, slot: Slot, bank_id: BankId, is_serialized_with_abs: bool) {
+        log::error!("purge_slot: {}", line!());
         if self.is_bank_drop_callback_enabled.load(Ordering::Acquire) && !is_serialized_with_abs {
             panic!(
                 "bad drop callpath detected; Bank::drop() must run serially with other logic in
@@ -5762,11 +5763,14 @@ impl AccountsDb {
             .unwrap()
             .remove(&bank_id)
         {
+            log::error!("purge_slot: {}", line!());
             // If this slot was already cleaned up, no need to do any further cleans
             return;
         }
 
+        log::error!("purge_slot: {}", line!());
         self.purge_slots(std::iter::once(&slot));
+        log::error!("purge_slot: {}", line!());
     }
 
     fn recycle_slot_stores(
@@ -5810,6 +5814,7 @@ impl AccountsDb {
                 );
             }
         }
+        log::error!("purge_slots_from_cache_and_store: {}", line!());
         for remove_slot in removed_slots {
             // This function is only currently safe with respect to `flush_slot_cache()` because
             // both functions run serially in AccountsBackgroundService.
@@ -5835,6 +5840,7 @@ impl AccountsDb {
             // a slot with all ticks, `Bank::new_from_parent()` immediately stores some sysvars
             // on bank creation.
         }
+        log::error!("purge_slots_from_cache_and_store: {}", line!());
 
         purge_stats
             .remove_cache_elapsed
@@ -6027,6 +6033,7 @@ impl AccountsDb {
 
     #[allow(clippy::needless_collect)]
     fn purge_slots<'a>(&self, slots: impl Iterator<Item = &'a Slot> + Clone) {
+        log::error!("purge_slots: {}", line!());
         // `add_root()` should be called first
         let mut safety_checks_elapsed = Measure::start("safety_checks_elapsed");
         let non_roots = slots
@@ -6047,6 +6054,7 @@ impl AccountsDb {
         self.purge_slots_from_cache_and_store(non_roots, &self.external_purge_slots_stats, false);
         self.external_purge_slots_stats
             .report("external_purge_slots_stats", Some(1000));
+        log::error!("purge_slots: {}", line!());
     }
 
     pub fn remove_unrooted_slots(&self, remove_slots: &[(Slot, BankId)]) {
