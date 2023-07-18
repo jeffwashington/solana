@@ -1281,16 +1281,24 @@ pub fn add_bank_snapshot(
     );
     add_snapshot_time.stop();
 
+    log::error!("fail {}", line!());
+
     let status_cache_path = bank_snapshot_dir.join(SNAPSHOT_STATUS_CACHE_FILENAME);
+    log::error!("fail {}, {status_cache_path:?}", line!());
     let (status_cache_consumed_size, status_cache_serialize) =
         measure!(serialize_status_cache(&slot_deltas, &status_cache_path)?);
+        log::error!("fail {}, {bank_snapshot_dir:?}", line!());
 
     let version_path = bank_snapshot_dir.join(SNAPSHOT_VERSION_FILENAME);
-    write_snapshot_version_file(version_path, snapshot_version).unwrap();
+    let r = write_snapshot_version_file(version_path, snapshot_version);
+    log::error!("fail {}, {r:?}", line!());
+    r.unwrap();
 
     // Mark this directory complete so it can be used.  Check this flag first before selecting for deserialization.
     let state_complete_path = bank_snapshot_dir.join(SNAPSHOT_STATE_COMPLETE_FILENAME);
+    log::error!("fail {}, {state_complete_path:?}", line!());
     fs_err::File::create(state_complete_path)?;
+    log::error!("fail {}", line!());
 
     // Monitor sizes because they're capped to MAX_SNAPSHOT_DATA_FILE_SIZE
     datapoint_info!(
