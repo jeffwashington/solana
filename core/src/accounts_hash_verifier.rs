@@ -71,9 +71,11 @@ impl AccountsHashVerifier {
                 let mut last_snapshot_storages = None;
                 loop {
                     if exit.load(Ordering::Relaxed) {
+                        log::error!("stop: {}", line!());
                         break;
                     }
 
+                    log::error!("stop: {}", line!());
                     let Some((
                         accounts_package,
                         num_outstanding_accounts_packages,
@@ -86,6 +88,7 @@ impl AccountsHashVerifier {
                         std::thread::sleep(LOOP_LIMITER);
                         continue;
                     };
+                    log::error!("stop: {}", line!());
                     info!("handling accounts package: {accounts_package:?}");
                     let enqueued_time = accounts_package.enqueued.elapsed();
 
@@ -251,11 +254,14 @@ impl AccountsHashVerifier {
         accounts_hash_fault_injector: Option<AccountsHashFaultInjector>,
         exit: &AtomicBool,
     ) {
+        log::error!("fail: {}", line!());
         let accounts_hash =
             Self::calculate_and_verify_accounts_hash(&accounts_package, snapshot_config);
+            log::error!("fail: {}", line!());
 
         Self::save_epoch_accounts_hash(&accounts_package, accounts_hash);
 
+        log::error!("fail: {}", line!());
         Self::push_accounts_hashes_to_cluster(
             &accounts_package,
             cluster_info,
@@ -264,6 +270,7 @@ impl AccountsHashVerifier {
             accounts_hash_fault_injector,
         );
 
+        log::error!("fail: {}", line!());
         Self::submit_for_packaging(
             accounts_package,
             snapshot_package_sender,
@@ -293,22 +300,26 @@ impl AccountsHashVerifier {
             },
         };
 
+        log::error!("fail {}", line!());
         let (
             accounts_hash_kind,
             accounts_hash_for_reserialize,
             bank_incremental_snapshot_persistence,
         ) = match accounts_hash_calculation_kind {
             CalcAccountsHashKind::Full => {
+                log::error!("fail {}", line!());
                 let (accounts_hash, _capitalization) =
                     Self::_calculate_full_accounts_hash(accounts_package);
                 (accounts_hash.into(), accounts_hash, None)
             }
             CalcAccountsHashKind::Incremental => {
+                log::error!("fail {}", line!());
                 let AccountsPackageKind::Snapshot(SnapshotKind::IncrementalSnapshot(base_slot)) =
                     accounts_package.package_kind
                 else {
                     panic!("Calculating incremental accounts hash requires a base slot");
                 };
+                log::error!("fail {}", line!());
                 let (base_accounts_hash, base_capitalization) = accounts_package
                     .accounts
                     .accounts_db
@@ -331,7 +342,9 @@ impl AccountsHashVerifier {
             }
         };
 
+        log::error!("fail {}", line!());
         if let Some(snapshot_info) = &accounts_package.snapshot_info {
+            log::error!("fail {}", line!());
             solana_runtime::serde_snapshot::reserialize_bank_with_new_accounts_hash(
                 &snapshot_info.bank_snapshot_dir,
                 accounts_package.slot,
@@ -340,9 +353,11 @@ impl AccountsHashVerifier {
             );
         }
 
+        log::error!("fail {}", line!());
         if accounts_package.package_kind
             == AccountsPackageKind::Snapshot(SnapshotKind::FullSnapshot)
         {
+            log::error!("fail {}", line!());
             accounts_package
                 .accounts
                 .accounts_db
@@ -390,6 +405,7 @@ impl AccountsHashVerifier {
         };
         timings.calc_storage_size_quartiles(&accounts_package.snapshot_storages);
 
+        log::error!("fail {}", line!());
         let calculate_accounts_hash_config = CalcAccountsHashConfig {
             use_bg_thread_pool: true,
             check_hash: false,
@@ -400,6 +416,7 @@ impl AccountsHashVerifier {
             include_slot_in_hash: accounts_package.include_slot_in_hash,
         };
 
+        log::error!("fail {}", line!());
         let slot = accounts_package.slot;
         let ((accounts_hash, lamports), measure_hash_us) = measure_us!(accounts_package
             .accounts
@@ -411,8 +428,10 @@ impl AccountsHashVerifier {
                 timings,
             )
             .unwrap()); // unwrap here will never fail since check_hash = false
+        log::error!("fail {}", line!());
 
         if accounts_package.expected_capitalization != lamports {
+            log::error!("fail {}", line!());
             // before we assert, run the hash calc again. This helps track down whether it could have been a failure in a race condition possibly with shrink.
             // We could add diagnostics to the hash calc here to produce a per bin cap or something to help narrow down how many pubkeys are different.
             let calculate_accounts_hash_config = CalcAccountsHashConfig {
@@ -440,13 +459,16 @@ impl AccountsHashVerifier {
                 );
         }
 
+        log::error!("fail {}", line!());
         assert_eq!(
             accounts_package.expected_capitalization, lamports,
             "accounts hash capitalization mismatch"
         );
+        log::error!("fail {}", line!());
         if let Some(expected_hash) = accounts_package.accounts_hash_for_testing {
             assert_eq!(expected_hash, accounts_hash);
         };
+        log::error!("fail {}", line!());
 
         datapoint_info!(
             "accounts_hash_verifier",
@@ -509,10 +531,12 @@ impl AccountsHashVerifier {
         accounts_package: &AccountsPackage,
         accounts_hash: AccountsHashKind,
     ) {
+        log::error!("fail {}", line!());
         if accounts_package.package_kind == AccountsPackageKind::EpochAccountsHash {
             let AccountsHashKind::Full(accounts_hash) = accounts_hash else {
                 panic!("EAH requires a full accounts hash!");
             };
+            log::error!("fail: {}", line!());
             info!(
                 "saving epoch accounts hash, slot: {}, hash: {}",
                 accounts_package.slot, accounts_hash.0,
