@@ -2,7 +2,7 @@
 //! which can be large, loaded many times, and rarely change.
 use {
     dashmap::{mapref::entry::Entry, DashMap},
-    //index_list::{Index as CrateIndex, IndexList as CrateIndexList},
+    index_list::{Index, IndexList},
     solana_measure::measure_us,
     solana_sdk::{
         account::{AccountSharedData, ReadableAccount},
@@ -93,7 +93,15 @@ impl ReadOnlyAccountsCache {
 
     pub(crate) fn load(&self, pubkey: Pubkey, slot: Slot) -> Option<AccountSharedData> {
         let timestamp = solana_sdk::timing::timestamp() / 300000;
-        let selector = timestamp % 7;
+        let selector = timestamp % 3;
+        let selector = if selector == 0 {
+            0 // master
+        } else if selector == 1 {
+            5 // behzad2
+        }
+        else {
+            6 // behzad2
+        };
         self.selector.store(selector, Ordering::Relaxed);
         if selector == 1 {
             // master with minor improvements to drop write lock earlier than updating hits stat
@@ -237,7 +245,8 @@ impl ReadOnlyAccountsCache {
             // so that another thread cannot write to the same key.
             let (_, update_lru_us) = measure_us!({
                 let mut queue = self.queue.lock().unwrap();
-                queue.move_to_last(entry.index());
+                panic!("");
+                //queue.move_to_last(entry.index());
             });
             let ( account, account_clone_us) = measure_us!(entry.account.clone());
             self.account_clone_us.fetch_add(account_clone_us, Ordering::Relaxed);
@@ -354,7 +363,8 @@ impl ReadOnlyAccountsCache {
             drop(queue);
             let mut queue = self.queue.lock().unwrap();
             for index in &*queue_bk {
-                queue.move_to_last(*index);
+                panic!("");
+                //queue.move_to_last(*index);
             }
             queue_bk.clear(); // leave allocated, but make empty
         });
@@ -573,6 +583,7 @@ mod tests {
     }
 }
 
+/*
 use std::convert::TryFrom;
 use std::fmt;
 use std::iter::DoubleEndedIterator;
@@ -1785,3 +1796,4 @@ mod tests {
         assert_eq!(size_of::<IndexList<u32>>(), 72);
     }
 }
+*/
