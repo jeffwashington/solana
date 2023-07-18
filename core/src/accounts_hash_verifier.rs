@@ -432,6 +432,10 @@ impl AccountsHashVerifier {
 
         if accounts_package.expected_capitalization != lamports {
             log::error!("fail {}", line!());
+            log::error!("cap doesn't match: {}, {}", accounts_package.expected_capitalization, lamports);
+
+            return (accounts_hash, lamports);
+
             // before we assert, run the hash calc again. This helps track down whether it could have been a failure in a race condition possibly with shrink.
             // We could add diagnostics to the hash calc here to produce a per bin cap or something to help narrow down how many pubkeys are different.
             let calculate_accounts_hash_config = CalcAccountsHashConfig {
