@@ -7599,6 +7599,7 @@ impl AccountsDb {
     /// Should only be called by AccountsHashVerifier, since it consumes the accounts hashes and
     /// knows which ones are still needed.
     pub fn purge_old_accounts_hashes(&self, last_full_snapshot_slot: Slot) {
+        log::error!("fail {}", line!());
         self.accounts_hashes
             .lock()
             .unwrap()
@@ -7714,6 +7715,7 @@ impl AccountsDb {
         storages: &SortedStorages<'_>,
         stats: HashStats,
     ) -> Result<(AccountsHash, u64), AccountsHashVerificationError> {
+        log::error!("fail {}", line!());
         let (accounts_hash, capitalization) = self._calculate_accounts_hash_from_storages(
             config,
             storages,
@@ -7722,6 +7724,7 @@ impl AccountsDb {
             self.full_accounts_hash_cache_path.clone(),
         )?;
         let AccountsHashEnum::Full(accounts_hash) = accounts_hash else {
+            log::error!("fail {}", line!());
             panic!("calculate_accounts_hash_from_storages must return a FullAccountsHash");
         };
         Ok((accounts_hash, capitalization))
