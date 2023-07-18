@@ -2833,9 +2833,8 @@ impl AccountsDb {
         exit: Arc<AtomicBool>,
     ) {
         loop {
-            if !condvar.wait_timeout(Duration::from_secs(1)) {
-                read_cache.evict_old();
-            }
+            _ = condvar.wait_timeout(Duration::from_secs(1));
+            read_cache.evict_old();
             if exit.load(Ordering::Relaxed) {
                 break;
             }
