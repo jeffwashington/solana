@@ -339,6 +339,12 @@ impl SnapshotRequestHandler {
         // Ensure all roots <= `self.slot()` have been flushed.
         // Note `max_flush_root` could be larger than self.slot() if there are
         // `> MAX_CACHE_SLOT` cached and rooted slots which triggered earlier flushes.
+        log::error!("abs: {}, {}, {}", line!(), snapshot_root_bank.slot(), snapshot_root_bank
+        .rc
+        .accounts
+        .accounts_db
+        .accounts_cache
+        .fetch_max_flush_root());
         assert!(
             snapshot_root_bank.slot()
                 <= snapshot_root_bank
@@ -350,6 +356,7 @@ impl SnapshotRequestHandler {
         );
         flush_accounts_cache_time.stop();
 
+        log::error!("abs: {}", line!());
         let accounts_hash_for_testing = previous_accounts_hash.map(|previous_accounts_hash| {
             let check_hash = false;
 
@@ -375,10 +382,12 @@ impl SnapshotRequestHandler {
             this_accounts_hash
         });
 
+        log::error!("abs: {}", line!());
         let mut clean_time = Measure::start("clean_time");
         snapshot_root_bank.clean_accounts(*last_full_snapshot_slot);
         clean_time.stop();
 
+        log::error!("abs: {}", line!());
         let mut shrink_time = Measure::start("shrink_time");
         snapshot_root_bank.shrink_candidate_slots();
         shrink_time.stop();
@@ -396,6 +405,7 @@ impl SnapshotRequestHandler {
                         self.snapshot_config.snapshot_version,
                         status_cache_slot_deltas,
                     )?;
+                    log::error!("abs: {}", line!());
                     AccountsPackage::new_for_snapshot(
                         accounts_package_type,
                         &snapshot_root_bank,
@@ -420,6 +430,7 @@ impl SnapshotRequestHandler {
                 AccountsPackageType::EpochAccountsHash => panic!("Illegal account package type: EpochAccountsHash packages must be from an EpochAccountsHash request!"),
             },
             SnapshotRequestType::EpochAccountsHash => {
+                log::error!("abs: {}", line!());
                 // skip the bank snapshot, just make an accounts package to send to AHV
                 AccountsPackage::new_for_epoch_accounts_hash(
                     accounts_package_type,
@@ -429,15 +440,19 @@ impl SnapshotRequestHandler {
                 )
             }
         };
+        log::error!("abs: {}", line!());
         let send_result = self.accounts_package_sender.send(accounts_package);
+        log::error!("abs: {}", line!());
         if let Err(err) = send_result {
             // Sending the accounts package should never fail *unless* we're shutting down.
             let accounts_package = &err.0;
+            log::error!("abs: {}", line!());
             assert!(
                 exit.load(Ordering::Relaxed),
                 "Failed to send accounts package: {err}, {accounts_package:?}"
             );
         }
+        log::error!("abs: {}", line!());
         snapshot_time.stop();
         info!(
             "Took bank snapshot. accounts package type: {:?}, slot: {}, bank hash: {}",
