@@ -370,6 +370,7 @@ impl ReadOnlyAccountsCache {
                 self.remove(pubkey, slot);
             }
         });
+        log::error!("queue: {}", self.queue.lock().unwrap().len());
         self.evicts.fetch_add(num_evicts, Ordering::Relaxed);
         self.eviction_us.fetch_add(eviction_us, Ordering::Relaxed);
     }
