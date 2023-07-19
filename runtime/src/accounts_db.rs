@@ -1657,7 +1657,7 @@ impl PurgeStats {
                 ),
                 (
                     "num_dead_keys",
-                    self.remove_dead_slots_metadata_us.swap(0, Ordering::Relaxed) as i64,
+                    self.num_dead_keys.swap(0, Ordering::Relaxed) as i64,
                     i64
                 ),
                 (
