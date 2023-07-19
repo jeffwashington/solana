@@ -307,10 +307,15 @@ impl ReadOnlyAccountsCache {
             queue_bk.clear(); // leave allocated, but make empty
         });
 
+        let mut no_first = false;
         let (_, eviction_us) = measure_us!({
             while self.should_evict() {
                 let (pubkey, slot) = match self.queue.lock().unwrap().get_first() {
-                    None => break,
+                    None => {
+        no_first = true;
+
+                        break;
+                    }
                     Some(key) => *key,
                 };
                 num_evicts += 1;
@@ -318,7 +323,7 @@ impl ReadOnlyAccountsCache {
             }
         });
         if num_evicts == 0 {
-            log::error!("queue entries: {}", self.queue.lock().unwrap().len());
+            log::error!("queue entries: {}, no_first: {no_first}, should_evict: {}, {:?}", self.queue.lock().unwrap().len(), self.should_evict(), (self.data_size.load(Ordering::Relaxed), self.max_data_size));
         }
 
         self.evicts.fetch_add(num_evicts, Ordering::Relaxed);
