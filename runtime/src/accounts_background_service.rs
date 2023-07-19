@@ -506,19 +506,26 @@ pub struct PrunedBanksRequestHandler {
 impl PrunedBanksRequestHandler {
     pub fn handle_request(&self, bank: &Bank, is_serialized_with_abs: bool) -> usize {
         let mut count = 0;
+        let mut slots = Vec::default();
         for (pruned_slot, pruned_bank_id) in self.pruned_banks_receiver.try_iter() {
             count += 1;
-            log::error!("purge_slot: {}, count: {}", line!(), count);
-            bank.rc.accounts.accounts_db.purge_slot(
-                pruned_slot,
-                pruned_bank_id,
-                is_serialized_with_abs,
-            );
+            slots.push((pruned_slot, pruned_bank_id));
             if count > 100 {
                 // pick up the rest next time. we can't afford to block the abs thread too long
                 break;
             }
         }
+        use rayon::iter::ParallelIterator;
+        use rayon::iter::IntoParallelIterator;
+        bank.accounts().accounts_db.thread_pool_clean.install(|| {
+            slots.into_par_iter().for_each(|(pruned_slot, pruned_bank_id)| {
+            log::error!("purge_slot: {}, count: {}", line!(), count);
+            bank.rc.accounts.accounts_db.purge_slot(
+                pruned_slot,
+                pruned_bank_id,
+                is_serialized_with_abs,
+            );});
+        });
 
         count
     }
