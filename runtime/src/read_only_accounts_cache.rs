@@ -1209,7 +1209,6 @@ impl<T> IndexList<T> {
     pub fn move_to_last(&mut self, index: Index) {
         // unlink where it is
         self.linkout_used(index);
-        self.linkin_free(index);
         self.linkin_last(index);
     }
 
