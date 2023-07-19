@@ -1632,6 +1632,9 @@ pub struct PurgeStats {
     handle_reclaims_elapsed: AtomicU64,
     purge_keys_exact_us: AtomicU64,
     remove_dead_slots_metadata_us: AtomicU64,
+    num_purge_keys_exact: AtomicU64,
+    num_dead_keys: AtomicU64,
+    num_keys_removed_from_index: AtomicU64,
 }
 
 impl PurgeStats {
@@ -1715,6 +1718,22 @@ impl PurgeStats {
                     self.purge_keys_exact_us.swap(0, Ordering::Relaxed) as i64,
                     i64
                 ),
+                (
+                    "num_purge_keys_exact",
+                    self.num_purge_keys_exact.swap(0, Ordering::Relaxed) as i64,
+                    i64
+                ),
+                (
+                    "num_dead_keys",
+                    self.remove_dead_slots_metadata_us.swap(0, Ordering::Relaxed) as i64,
+                    i64
+                ),
+                (
+                    "num_keys_removed_from_index",
+                    self.num_keys_removed_from_index.swap(0, Ordering::Relaxed) as i64,
+                    i64
+                ),
+           
                 (
                     "remove_dead_slots_metadata_us",
                     self.remove_dead_slots_metadata_us.swap(0, Ordering::Relaxed) as i64,
