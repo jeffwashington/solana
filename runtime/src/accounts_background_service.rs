@@ -491,6 +491,8 @@ impl PrunedBanksRequestHandler {
         let mut count = 0;
         for (pruned_slot, pruned_bank_id) in self.pruned_banks_receiver.try_iter() {
             count += 1;
+            bank.accounts().accounts_db.external_purge_slots_stats.purge_keys_exact_calls_abs.fetch_add(1, Ordering::Relaxed);
+
             bank.rc.accounts.accounts_db.purge_slot(
                 pruned_slot,
                 pruned_bank_id,
