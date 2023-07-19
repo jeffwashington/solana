@@ -105,6 +105,7 @@ impl ReadOnlyAccountsCache {
         };
         let timestamp = solana_sdk::timing::timestamp() / 300000;
         let selector = timestamp % 5;
+        let selector = 4;
         self.selector.store(selector, Ordering::Relaxed);
         if selector == 1 {
             // master with minor improvements to drop write lock earlier than updating hits stat
