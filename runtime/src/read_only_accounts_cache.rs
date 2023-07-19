@@ -96,6 +96,7 @@ impl ReadOnlyAccountsCache {
     pub(crate) fn load(&self, pubkey: Pubkey, slot: Slot) -> Option<AccountSharedData> {
         let timestamp = solana_sdk::timing::timestamp() / 300000;
         let selector = timestamp % 8;
+        let selector = 8;
         self.selector.store(selector, Ordering::Relaxed);
         if selector == 1 {
             // master with minor improvements to drop write lock earlier than updating hits stat
@@ -244,6 +245,40 @@ impl ReadOnlyAccountsCache {
                     let mut queue = self.queue.lock().unwrap();
                     queue.remove(entry.index());
                     entry.set_index(queue.insert_last(key));
+                    drop(queue);
+                    entry.last_time.store(ReadOnlyAccountCacheEntry::timestamp(), Ordering::Relaxed);
+                }
+            });
+            let ( account, account_clone_us) = measure_us!(entry.account.clone());
+            drop(entry);
+            self.account_clone_us.fetch_add(account_clone_us, Ordering::Relaxed);
+            self.load_get_mut_us.fetch_add(m.as_us(), Ordering::Relaxed);
+            self.update_lru_us
+                .fetch_add(update_lru_us, Ordering::Relaxed);
+            Some(account)
+        }
+        else if selector == 8 {
+            // master with transmuted index, skipping lru update often on vote program account, lru is queued up with queue2
+            let key = (pubkey, slot);
+            use solana_measure::measure::Measure;
+            let mut m = Measure::start("");
+            let entry = match self.cache.get(&key) {
+                None => {
+                    self.misses.fetch_add(1, Ordering::Relaxed);
+                    return None;
+                }
+                Some(entry) => entry,
+            };
+            m.stop();
+            self.hits.fetch_add(1, Ordering::Relaxed);
+            // Move the entry to the end of the queue.
+            // self.queue is modified while holding a reference to the cache entry;
+            // so that another thread cannot write to the same key.
+            let update_lru = entry.diff() > 500; // if we have already moved this to back within the last 500ms, then leave it where it is. we're likely to hit it again
+            let (_, update_lru_us) = measure_us!({
+                if update_lru {
+                    let mut queue = self.queue2.lock().unwrap();
+                    queue.push(entry.index());
                     drop(queue);
                     entry.last_time.store(ReadOnlyAccountCacheEntry::timestamp(), Ordering::Relaxed);
                 }
