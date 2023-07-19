@@ -8,6 +8,7 @@ use {
         account::{AccountSharedData, ReadableAccount},
         clock::Slot,
         pubkey::Pubkey,
+        timing::timestamp,
     },
     std::sync::{
         atomic::{AtomicU32, AtomicU64, AtomicUsize, Ordering},
@@ -24,6 +25,7 @@ type ReadOnlyCacheKey = (Pubkey, Slot);
 struct ReadOnlyAccountCacheEntry {
     account: AccountSharedData,
     index: AtomicU32, // Index of the entry in the eviction queue.
+    last_time: AtomicU32,
 }
 
 #[derive(Debug)]
@@ -93,14 +95,14 @@ impl ReadOnlyAccountsCache {
 
     pub(crate) fn load(&self, pubkey: Pubkey, slot: Slot) -> Option<AccountSharedData> {
         let timestamp = solana_sdk::timing::timestamp() / 300000;
-        let selector = timestamp % 7;
+        let selector = timestamp % 8;
         self.selector.store(selector, Ordering::Relaxed);
         if selector == 1 {
             // master with minor improvements to drop write lock earlier than updating hits stat
             let key = (pubkey, slot);
             use solana_measure::measure::Measure;
             let mut m = Measure::start("");
-            let mut entry = match self.cache.get_mut(&key) {
+            let entry = match self.cache.get_mut(&key) {
                 None => {
                     self.misses.fetch_add(1, Ordering::Relaxed);
                     return None;
@@ -130,7 +132,7 @@ impl ReadOnlyAccountsCache {
             let key = (pubkey, slot);
             use solana_measure::measure::Measure;
             let mut m = Measure::start("");
-            let mut entry = match self.cache.get_mut(&key) {
+            let entry = match self.cache.get_mut(&key) {
                 None => {
                     self.misses.fetch_add(1, Ordering::Relaxed);
                     return None;
@@ -160,7 +162,7 @@ impl ReadOnlyAccountsCache {
             let key = (pubkey, slot);
             use solana_measure::measure::Measure;
             let mut m = Measure::start("");
-            let mut entry = match self.cache.get(&key) {
+            let entry = match self.cache.get(&key) {
                 None => {
                     self.misses.fetch_add(1, Ordering::Relaxed);
                     return None;
@@ -191,7 +193,7 @@ impl ReadOnlyAccountsCache {
             use rand::Rng;
             use solana_measure::measure::Measure;
             let mut m = Measure::start("");
-            let mut entry = match self.cache.get(&key) {
+            let entry = match self.cache.get(&key) {
                 None => {
                     self.misses.fetch_add(1, Ordering::Relaxed);
                     return None;
@@ -209,6 +211,41 @@ impl ReadOnlyAccountsCache {
                     let mut queue = self.queue.lock().unwrap();
                     queue.remove(entry.index());
                     entry.set_index(queue.insert_last(key));
+                }
+            });
+            let ( account, account_clone_us) = measure_us!(entry.account.clone());
+            drop(entry);
+            self.account_clone_us.fetch_add(account_clone_us, Ordering::Relaxed);
+            self.load_get_mut_us.fetch_add(m.as_us(), Ordering::Relaxed);
+            self.update_lru_us
+                .fetch_add(update_lru_us, Ordering::Relaxed);
+            Some(account)
+        }
+        else if selector == 7 {
+            // master with transmuted index, skipping lru update often on vote program account
+            let key = (pubkey, slot);
+            use solana_measure::measure::Measure;
+            let mut m = Measure::start("");
+            let entry = match self.cache.get(&key) {
+                None => {
+                    self.misses.fetch_add(1, Ordering::Relaxed);
+                    return None;
+                }
+                Some(entry) => entry,
+            };
+            m.stop();
+            self.hits.fetch_add(1, Ordering::Relaxed);
+            // Move the entry to the end of the queue.
+            // self.queue is modified while holding a reference to the cache entry;
+            // so that another thread cannot write to the same key.
+            let update_lru = entry.diff() > 500; // if we have already moved this to back within the last 500ms, then leave it where it is. we're likely to hit it again
+            let (_, update_lru_us) = measure_us!({
+                if update_lru {
+                    let mut queue = self.queue.lock().unwrap();
+                    queue.remove(entry.index());
+                    entry.set_index(queue.insert_last(key));
+                    drop(queue);
+                    entry.last_time.store(ReadOnlyAccountCacheEntry::timestamp(), Ordering::Relaxed);
                 }
             });
             let ( account, account_clone_us) = measure_us!(entry.account.clone());
@@ -282,7 +319,7 @@ impl ReadOnlyAccountsCache {
             let key = (pubkey, slot);
             use solana_measure::measure::Measure;
             let mut m = Measure::start("");
-            let mut entry = match self.cache.get_mut(&key) {
+            let entry = match self.cache.get_mut(&key) {
                 None => {
                     self.misses.fetch_add(1, Ordering::Relaxed);
                     return None;
@@ -347,7 +384,7 @@ impl ReadOnlyAccountsCache {
         // Evict entries from the front of the queue.
         let mut num_evicts = 0;
 
-        let (_, update_lru_us) = measure_us!({
+        let (_, _update_lru_us) = measure_us!({
             let mut queue_bk = self.preallocated_empty_queue2.lock().unwrap();
             let mut queue = self.queue2.lock().unwrap();
             std::mem::swap(&mut *queue_bk, &mut *queue);
@@ -413,9 +450,14 @@ impl ReadOnlyAccountCacheEntry {
     fn new(account: AccountSharedData, index: Index) -> Self {
         let index = unsafe { std::mem::transmute::<Index, u32>(index) };
         let index = AtomicU32::new(index);
-        Self { account, index }
+        Self { account, index, last_time: AtomicU32::new(Self::timestamp()) }
     }
-
+    fn timestamp() -> u32 {
+        (timestamp() % (u32::MAX as u64 + 1)) as u32
+    }
+    fn diff(&self) -> u32 {
+        Self::timestamp().wrapping_sub(self.last_time.load(Ordering::Relaxed))
+    }
     #[inline]
     fn index(&self) -> Index {
         let index = self.index.load(Ordering::Relaxed);
