@@ -303,6 +303,7 @@ impl ReadOnlyAccountsCache {
             for index in &*queue_bk {
                 queue.move_to_last(*index);
             }
+            log::error!("moved to last: {}", queue_bk.len());
             queue_bk.clear(); // leave allocated, but make empty
         });
 
