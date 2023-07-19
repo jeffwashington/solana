@@ -1214,9 +1214,11 @@ impl<T> IndexList<T> {
     }
 
     pub fn move_to_last(&mut self, index: Index) {
-        // unlink where it is
-        self.linkout_used(index);
-        self.linkin_last(index);
+        if self.is_index_used(index) {
+            // unlink where it is
+            self.linkout_used(index);
+            self.linkin_last(index);
+        }
     }
 
     /// Create a new iterator over all the elements.
