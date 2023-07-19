@@ -1361,16 +1361,20 @@ impl Accounts {
                     }
                 }
 
+                use rayon::iter::ParallelIterator;
+                use rayon::iter::IntoParallelRefIterator;
+                use std::sync::atomic::AtomicU64;
                 // only add pubkeys which don't exist yet.
                 // if it already exists, then cap changes will not be right
-                pks.retain(|(k, acct)| {
+                let additional_lamports_atomic = AtomicU64::default();
+                let retain = pks.par_iter().map(|(k, acct)| {
                     let mut retain = true;
                     self.accounts_db.accounts_index.scan(
                         std::iter::once(k),
                         |_pk, slot_ref, _entry| {
                             retain = slot_ref.is_none();
                             if retain {
-                                additional_lamports += acct.lamports();
+                                additional_lamports_atomic.fetch_add(acct.lamports(), Ordering::Relaxed);
                             }
                             crate::accounts_index::AccountsIndexScanResult::OnlyKeepInMemoryIfDirty
                         },
@@ -1378,6 +1382,13 @@ impl Accounts {
                         false,
                     );
                     retain
+                }).collect::<Vec<_>>();
+                additional_lamports = additional_lamports_atomic.load(Ordering::Relaxed);
+                let mut i = 0;
+                pks.retain(|(k, acct)| {
+                    let r = retain[i];
+                    i += 1;
+                    r
                 });
             });
             //log::error!("adding {} dummy accounts, took: {}us, slot: {slot}", pks.len(), us);
