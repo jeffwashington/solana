@@ -1564,6 +1564,9 @@ pub(crate) struct PurgeStats {
     handle_reclaims_elapsed: AtomicU64,
     purge_keys_exact_us: AtomicU64,
     remove_dead_slots_metadata_us: AtomicU64,
+    num_purge_keys_exact: AtomicU64,
+    num_dead_keys: AtomicU64,
+    num_keys_removed_from_index: AtomicU64,
 }
 
 impl PurgeStats {
@@ -1647,6 +1650,22 @@ impl PurgeStats {
                     self.purge_keys_exact_us.swap(0, Ordering::Relaxed) as i64,
                     i64
                 ),
+                (
+                    "num_purge_keys_exact",
+                    self.num_purge_keys_exact.swap(0, Ordering::Relaxed) as i64,
+                    i64
+                ),
+                (
+                    "num_dead_keys",
+                    self.remove_dead_slots_metadata_us.swap(0, Ordering::Relaxed) as i64,
+                    i64
+                ),
+                (
+                    "num_keys_removed_from_index",
+                    self.num_keys_removed_from_index.swap(0, Ordering::Relaxed) as i64,
+                    i64
+                ),
+           
                 (
                     "remove_dead_slots_metadata_us",
                     self.remove_dead_slots_metadata_us.swap(0, Ordering::Relaxed) as i64,
@@ -2924,8 +2943,11 @@ impl AccountsDb {
             .accounts_index
             .handle_dead_keys(&dead_keys, &self.account_indexes);
         if dead_keys.len() != 0 || !pubkeys_removed_from_accounts_index.is_empty() {
-            log::error!("~handle_dead_keys: {}, pubkeys_removed_from_accounts_index: {}", dead_keys.len(), pubkeys_removed_from_accounts_index.len());
+            log::error!("~handle_dead_keys: dead_keys,{}, pubkeys_removed_from_accounts_index,{}", dead_keys.len(), pubkeys_removed_from_accounts_index.len());
         }
+        self.external_purge_slots_stats.num_purge_keys_exact.fetch_add(count, Ordering::Relaxed);
+        self.external_purge_slots_stats.num_dead_keys.fetch_add(dead_keys.len() as u64, Ordering::Relaxed);
+        self.external_purge_slots_stats.num_keys_removed_from_index.fetch_add(pubkeys_removed_from_accounts_index.len() as u64, Ordering::Relaxed);
         (reclaims, pubkeys_removed_from_accounts_index)
     }
 
