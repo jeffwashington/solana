@@ -2893,11 +2893,15 @@ impl AccountsDb {
             }
         }
 
-        log::error!("handle_dead_keys: {}", dead_keys.len());
+        if dead_keys.len() != 0 {
+            log::error!("handle_dead_keys: {}", dead_keys.len());
+        }
         let pubkeys_removed_from_accounts_index = self
             .accounts_index
             .handle_dead_keys(&dead_keys, &self.account_indexes);
-        log::error!("~handle_dead_keys: {}", dead_keys.len());
+        if dead_keys.len() != 0 || !pubkeys_removed_from_accounts_index.is_empty() {
+            log::error!("~handle_dead_keys: {}, pubkeys_removed_from_accounts_index: {}", dead_keys.len(), pubkeys_removed_from_accounts_index.len());
+        }
         (reclaims, pubkeys_removed_from_accounts_index)
     }
 
