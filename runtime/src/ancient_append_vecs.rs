@@ -183,6 +183,7 @@ impl AncientSlotInfos {
         self.shrink_indexes.clear();
         let total_storages = self.all_infos.len();
         let mut cumulative_bytes = 0u64;
+        let max_slots = 300;
         for (i, info) in self.all_infos.iter().enumerate() {
             saturating_add_assign!(cumulative_bytes, info.alive_bytes);
             let ancient_storages_required = (cumulative_bytes / ideal_storage_size + 1) as usize;
@@ -193,13 +194,13 @@ impl AncientSlotInfos {
             // Every storage after this one is larger.
             if storages_remaining + ancient_storages_required < max_storages {
                 log::error!("ancient_append_vecs_packed: {}, would truncate to {}, bytes: {}, len: {}", line!(), i, cumulative_bytes, self.all_infos.len());
-                self.all_infos.truncate(i.min(2_000));
+                self.all_infos.truncate(i.min(max_slots));
                 break;
             }
         }
         log::error!("ancient_append_vecs_packed: {}, {}, bytes: {}", line!(), self.all_infos.len(), cumulative_bytes);
-        if self.all_infos.len() > 2_000 {
-            self.all_infos.truncate(2_000);
+        if self.all_infos.len() > max_slots {
+            self.all_infos.truncate(max_slots);
         }
     }
 
