@@ -95,9 +95,12 @@ impl ReadOnlyAccountsCache {
 
     pub(crate) fn load(&self, pubkey: Pubkey, slot: Slot) -> Option<AccountSharedData> {
         let timestamp = solana_sdk::timing::timestamp() / 300000;
-        let selector = timestamp % 2;
+        let selector = timestamp % 3;
         let selector = if selector == 0 {
             3
+        }
+        else if selector == 1 {
+            9
         }
         else {
             5
@@ -296,7 +299,7 @@ impl ReadOnlyAccountsCache {
                 .fetch_add(update_lru_us, Ordering::Relaxed);
             Some(account)
         }
-        else if selector == 3 {
+        else if selector == 3 || selector == 9 {
             // read lock
             let key = (pubkey, slot);
             use solana_measure::measure::Measure;
@@ -314,7 +317,13 @@ impl ReadOnlyAccountsCache {
             // so that another thread cannot write to the same key.
             let (_, update_lru_us) = measure_us!({
                 let mut queue = self.queue.lock().unwrap();
-                queue.move_to_last(entry.index());
+                if selector == 3 {
+                    queue.move_to_last(entry.index());
+                }
+                else {
+                    queue.remove(entry.index());
+                    entry.set_index(queue.insert_last(key));
+                }
             });
             let ( account, account_clone_us) = measure_us!(entry.account.clone());
             self.account_clone_us.fetch_add(account_clone_us, Ordering::Relaxed);
