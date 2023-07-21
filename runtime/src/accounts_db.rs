@@ -1431,6 +1431,7 @@ pub struct AccountsDb {
     pub thread_pool: ThreadPool,
 
     pub thread_pool_clean: ThreadPool,
+    pub thread_pool_hash: ThreadPool,
 
     bank_hash_stats: Mutex<HashMap<Slot, BankHashStats>>,
     accounts_delta_hashes: Mutex<HashMap<Slot, AccountsDeltaHash>>,
@@ -1560,6 +1561,11 @@ pub(crate) struct PurgeStats {
     scan_storages_elapsed: AtomicU64,
     purge_accounts_index_elapsed: AtomicU64,
     handle_reclaims_elapsed: AtomicU64,
+    purge_keys_exact_us: AtomicU64,
+    remove_dead_slots_metadata_us: AtomicU64,
+    num_purge_keys_exact: AtomicU64,
+    num_dead_keys: AtomicU64,
+    num_keys_removed_from_index: AtomicU64,
 }
 
 impl PurgeStats {
@@ -1636,6 +1642,32 @@ impl PurgeStats {
                 (
                     "handle_reclaims_elapsed",
                     self.handle_reclaims_elapsed.swap(0, Ordering::Relaxed) as i64,
+                    i64
+                ),
+                (
+                    "purge_keys_exact_us",
+                    self.purge_keys_exact_us.swap(0, Ordering::Relaxed) as i64,
+                    i64
+                ),
+                (
+                    "num_purge_keys_exact",
+                    self.num_purge_keys_exact.swap(0, Ordering::Relaxed) as i64,
+                    i64
+                ),
+                (
+                    "num_dead_keys",
+                    self.num_dead_keys.swap(0, Ordering::Relaxed) as i64,
+                    i64
+                ),
+                (
+                    "num_keys_removed_from_index",
+                    self.num_keys_removed_from_index.swap(0, Ordering::Relaxed) as i64,
+                    i64
+                ),
+           
+                (
+                    "remove_dead_slots_metadata_us",
+                    self.remove_dead_slots_metadata_us.swap(0, Ordering::Relaxed) as i64,
                     i64
                 ),
             );
@@ -2259,6 +2291,16 @@ pub fn make_min_priority_thread_pool() -> ThreadPool {
         .unwrap()
 }
 
+pub fn make_min_priority_thread_pool2() -> ThreadPool {
+    // Use lower thread count to reduce priority.
+    let num_threads = quarter_thread_count() / 2;
+    rayon::ThreadPoolBuilder::new()
+        .thread_name(|i| format!("solAccountsLo{i:02}"))
+        .num_threads(num_threads)
+        .build()
+        .unwrap()
+}
+
 #[cfg(all(test, RUSTC_WITH_SPECIALIZATION))]
 impl solana_frozen_abi::abi_example::AbiExample for AccountsDb {
     fn example() -> Self {
@@ -2444,6 +2486,7 @@ impl AccountsDb {
                 .build()
                 .unwrap(),
             thread_pool_clean: make_min_priority_thread_pool(),
+            thread_pool_hash: make_min_priority_thread_pool2(),
             bank_hash_stats: Mutex::new(bank_hash_stats),
             accounts_delta_hashes: Mutex::new(HashMap::new()),
             accounts_hashes: Mutex::new(HashMap::new()),
@@ -2878,6 +2921,7 @@ impl AccountsDb {
         let mut reclaims = Vec::new();
         let mut dead_keys = Vec::new();
 
+        let mut count = 0;
         for (pubkey, slots_set) in pubkey_to_slot_set {
             let is_empty = self
                 .accounts_index
@@ -2885,15 +2929,31 @@ impl AccountsDb {
             if is_empty {
                 dead_keys.push(pubkey);
             }
+            count += 1;
+            if count % 10_000 == 0 {
+                log::error!("purge_keys_exact: {}", count);
+            }
         }
 
+        if dead_keys.len() != 0 {
+            log::error!("handle_dead_keys: {}", dead_keys.len());
+        }
         let pubkeys_removed_from_accounts_index = self
             .accounts_index
             .handle_dead_keys(&dead_keys, &self.account_indexes);
+        if dead_keys.len() != 0 || !pubkeys_removed_from_accounts_index.is_empty() {
+            log::error!("~handle_dead_keys: dead_keys,{}, pubkeys_removed_from_accounts_index,{}", dead_keys.len(), pubkeys_removed_from_accounts_index.len());
+        }
+        self.external_purge_slots_stats.num_purge_keys_exact.fetch_add(count, Ordering::Relaxed);
+        self.external_purge_slots_stats.num_dead_keys.fetch_add(dead_keys.len() as u64, Ordering::Relaxed);
+        self.external_purge_slots_stats.num_keys_removed_from_index.fetch_add(pubkeys_removed_from_accounts_index.len() as u64, Ordering::Relaxed);
         (reclaims, pubkeys_removed_from_accounts_index)
     }
 
     fn max_clean_root(&self, proposed_clean_root: Option<Slot>) -> Option<Slot> {
+        if self.accounts_index.min_ongoing_scan_root().is_some() {
+            log::error!("max_clean_root is: {:?}", self.accounts_index.min_ongoing_scan_root());
+        }
         match (
             self.accounts_index.min_ongoing_scan_root(),
             proposed_clean_root,
@@ -3184,6 +3244,7 @@ impl AccountsDb {
         last_full_snapshot_slot: Option<Slot>,
         epoch_schedule: &EpochSchedule,
     ) {
+        log::error!("clean_accounts: {}", line!());
         if self.exhaustively_verify_refcounts {
             self.exhaustively_verify_refcounts(max_clean_root_inclusive);
         }
@@ -3215,6 +3276,7 @@ impl AccountsDb {
         }
         sort.stop();
 
+        log::error!("clean_accounts: {}", line!());
         let total_keys_count = pubkeys.len();
         let mut accounts_scan = Measure::start("accounts_scan");
         let uncleaned_roots = self.accounts_index.clone_uncleaned_roots();
@@ -3223,6 +3285,7 @@ impl AccountsDb {
         let missing_accum = AtomicU64::new(0);
         let useful_accum = AtomicU64::new(0);
 
+        log::error!("clean_accounts: {}, {}", line!(), pubkeys.len());
         // parallel scan the index.
         let (mut purges_zero_lamports, purges_old_accounts) = {
             let do_clean_scan = || {
@@ -3299,7 +3362,7 @@ impl AccountsDb {
                                 if useless {
                                     AccountsIndexScanResult::OnlyKeepInMemoryIfDirty
                                 } else {
-                                    AccountsIndexScanResult::KeepInMemory
+                                    AccountsIndexScanResult::OnlyKeepInMemoryIfDirty
                                 }
                             },
                             None,
@@ -3327,6 +3390,7 @@ impl AccountsDb {
                 self.thread_pool_clean.install(do_clean_scan)
             }
         };
+        log::error!("clean_accounts: {}", line!());
         accounts_scan.stop();
 
         let mut clean_old_rooted = Measure::start("clean_old_roots");
@@ -3338,11 +3402,14 @@ impl AccountsDb {
                 epoch_schedule,
             );
 
-        self.do_reset_uncleaned_roots(max_clean_root_inclusive);
+            log::error!("clean_accounts: {}", line!());
+            self.do_reset_uncleaned_roots(max_clean_root_inclusive);
         clean_old_rooted.stop();
 
+        log::error!("clean_accounts: {}", line!());
         let mut store_counts_time = Measure::start("store_counts");
 
+        log::error!("clean_accounts: {}", line!());
         // Calculate store counts as if everything was purged
         // Then purge if we can
         let mut store_counts: HashMap<Slot, (usize, HashSet<Pubkey>)> = HashMap::new();
@@ -3398,10 +3465,12 @@ impl AccountsDb {
         }
         store_counts_time.stop();
 
+        log::error!("clean_accounts: {}", line!());
         let mut calc_deps_time = Measure::start("calc_deps");
         Self::calc_delete_dependencies(&purges_zero_lamports, &mut store_counts, min_dirty_slot);
         calc_deps_time.stop();
 
+        log::error!("clean_accounts: {}", line!());
         let mut purge_filter = Measure::start("purge_filter");
         self.filter_zero_lamport_clean_for_incremental_snapshots(
             max_clean_root_inclusive,
@@ -3411,6 +3480,7 @@ impl AccountsDb {
         );
         purge_filter.stop();
 
+        log::error!("clean_accounts: {}", line!());
         let mut reclaims_time = Measure::start("reclaims");
         // Recalculate reclaims with new purge set
         let pubkey_to_slot_set: Vec<_> = purges_zero_lamports
@@ -3426,6 +3496,7 @@ impl AccountsDb {
             })
             .collect();
 
+        log::error!("clean_accounts: {}", line!());
         let (reclaims, pubkeys_removed_from_accounts_index2) =
             self.purge_keys_exact(pubkey_to_slot_set.iter());
         pubkeys_removed_from_accounts_index
@@ -3443,6 +3514,7 @@ impl AccountsDb {
             &pubkeys_removed_from_accounts_index,
         );
 
+        log::error!("clean_accounts: {}", line!());
         reclaims_time.stop();
         measure_all.stop();
 
@@ -5740,6 +5812,7 @@ impl AccountsDb {
     ///        accounts_db relevant calls, such as shrinking, purging etc., in account background
     ///        service.
     pub fn purge_slot(&self, slot: Slot, bank_id: BankId, is_serialized_with_abs: bool) {
+        log::error!("purge_slot: {}", line!());
         if self.is_bank_drop_callback_enabled.load(Ordering::Acquire) && !is_serialized_with_abs {
             panic!(
                 "bad drop callpath detected; Bank::drop() must run serially with other logic in
@@ -5758,11 +5831,14 @@ impl AccountsDb {
             .unwrap()
             .remove(&bank_id)
         {
+            log::error!("purge_slot: {}", line!());
             // If this slot was already cleaned up, no need to do any further cleans
             return;
         }
 
+        log::error!("purge_slot: {}", line!());
         self.purge_slots(std::iter::once(&slot));
+        log::error!("purge_slot: {}", line!());
     }
 
     fn recycle_slot_stores(
@@ -5806,6 +5882,7 @@ impl AccountsDb {
                 );
             }
         }
+        log::error!("purge_slots_from_cache_and_store: {}", line!());
         for remove_slot in removed_slots {
             // This function is only currently safe with respect to `flush_slot_cache()` because
             // both functions run serially in AccountsBackgroundService.
@@ -5831,6 +5908,7 @@ impl AccountsDb {
             // a slot with all ticks, `Bank::new_from_parent()` immediately stores some sysvars
             // on bank creation.
         }
+        log::error!("purge_slots_from_cache_and_store: {}", line!());
 
         purge_stats
             .remove_cache_elapsed
@@ -5944,15 +6022,17 @@ impl AccountsDb {
             .get_slot_storage_entry_shrinking_in_progress_ok(purged_slot)
             .is_none());
         let num_purged_keys = pubkey_to_slot_set.len();
-        let (reclaims, _) = self.purge_keys_exact(pubkey_to_slot_set.iter());
+        let ((reclaims, _), purge_keys_us) = measure_us!(self.purge_keys_exact(pubkey_to_slot_set.iter()));
+        self.external_purge_slots_stats.purge_keys_exact_us.fetch_add(purge_keys_us, Ordering::Relaxed);
         assert_eq!(reclaims.len(), num_purged_keys);
         if is_dead {
-            self.remove_dead_slots_metadata(
+            let (_, us) = measure_us!(self.remove_dead_slots_metadata(
                 std::iter::once(&purged_slot),
                 purged_slot_pubkeys,
                 None,
                 pubkeys_removed_from_accounts_index,
-            );
+            ));
+            self.external_purge_slots_stats.remove_dead_slots_metadata_us.fetch_add(us, Ordering::Relaxed);
         }
     }
 
@@ -6021,6 +6101,7 @@ impl AccountsDb {
 
     #[allow(clippy::needless_collect)]
     fn purge_slots<'a>(&self, slots: impl Iterator<Item = &'a Slot> + Clone) {
+        log::error!("purge_slots: {}", line!());
         // `add_root()` should be called first
         let mut safety_checks_elapsed = Measure::start("safety_checks_elapsed");
         let non_roots = slots
@@ -6041,6 +6122,7 @@ impl AccountsDb {
         self.purge_slots_from_cache_and_store(non_roots, &self.external_purge_slots_stats, false);
         self.external_purge_slots_stats
             .report("external_purge_slots_stats", Some(1000));
+        log::error!("purge_slots: {}", line!());
     }
 
     pub fn remove_unrooted_slots(&self, remove_slots: &[(Slot, BankId)]) {
@@ -6437,6 +6519,27 @@ impl AccountsDb {
                 should_flush
             }
         });
+
+        if requested_flush_root.is_some() {
+            datapoint_info!(
+                "force_flush",
+                (
+                    "requested_flush_root",
+                    requested_flush_root.unwrap(),
+                    i64
+                ),
+            );
+        }
+        else {
+            datapoint_info!(
+                "force_flush",
+                (
+                    "requested_flush_root_none",
+                    1,
+                    i64
+                ),
+            );
+        }
 
         // Always flush up to `requested_flush_root`, which is necessary for things like snapshotting.
         let cached_roots: BTreeSet<Slot> = self.accounts_cache.clear_roots(requested_flush_root);
@@ -7533,6 +7636,7 @@ impl AccountsDb {
     /// Should only be called by AccountsHashVerifier, since it consumes the accounts hashes and
     /// knows which ones are still needed.
     pub fn purge_old_accounts_hashes(&self, last_full_snapshot_slot: Slot) {
+        log::error!("fail {}", line!());
         self.accounts_hashes
             .lock()
             .unwrap()
@@ -7648,6 +7752,7 @@ impl AccountsDb {
         storages: &SortedStorages<'_>,
         stats: HashStats,
     ) -> Result<(AccountsHash, u64), AccountsHashVerificationError> {
+        log::error!("fail {}", line!());
         let (accounts_hash, capitalization) = self._calculate_accounts_hash_from_storages(
             config,
             storages,
@@ -7656,6 +7761,7 @@ impl AccountsDb {
             self.full_accounts_hash_cache_path.clone(),
         )?;
         let AccountsHashEnum::Full(accounts_hash) = accounts_hash else {
+            log::error!("fail {}", line!());
             panic!("calculate_accounts_hash_from_storages must return a FullAccountsHash");
         };
         Ok((accounts_hash, capitalization))
@@ -7777,7 +7883,7 @@ impl AccountsDb {
         };
 
         let result = if use_bg_thread_pool {
-            self.thread_pool_clean.install(scan_and_hash)
+            self.thread_pool_hash.install(scan_and_hash)
         } else {
             scan_and_hash()
         };
