@@ -1262,11 +1262,13 @@ pub fn add_bank_snapshot(
     // The set of the account storages files is the necessary part of this snapshot state.  Hard-link them
     // from the operational accounts/ directory to here.
     hard_link_storages_to_snapshot(&bank_snapshot_dir, slot, snapshot_storages)?;
+    log::error!("fail {}", line!());
 
     let bank_snapshot_serializer = move |stream: &mut BufWriter<std::fs::File>| -> Result<()> {
         let serde_style = match snapshot_version {
             SnapshotVersion::V1_2_0 => SerdeStyle::Newer,
         };
+        log::error!("fail {}", line!());
         bank_to_stream(
             serde_style,
             stream.by_ref(),
@@ -1275,6 +1277,7 @@ pub fn add_bank_snapshot(
         )?;
         Ok(())
     };
+    log::error!("fail {}", line!());
     let (bank_snapshot_consumed_size, bank_serialize) = measure!(
         serialize_snapshot_data_file(&bank_snapshot_path, bank_snapshot_serializer)?,
         "bank serialize"
