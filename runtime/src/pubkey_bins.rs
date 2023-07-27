@@ -21,7 +21,7 @@ impl PubkeyBinCalculator24 {
         assert!(bins > 0);
         let max_plus_1 = 1 << MAX_BITS;
         assert!(bins <= max_plus_1);
-        assert!(bins.is_power_of_two());
+        assert!(bins.is_power_of_two(), "{bins}");
         let bits = Self::log_2(bins as u32);
         Self {
             shift_bits: MAX_BITS - bits,
