@@ -890,9 +890,12 @@ impl AccountsHasher {
             }
             // assume uniform distribution of pubkeys and put first guess close based on bin we're looking for
             let mut i = hash_data.len() * bin / bins;
+            let original_estimate = i;
             let estimate = &hash_data[i];
+
             let pubkey_bin = binner.bin_from_pubkey(&estimate.pubkey);
             if pubkey_bin != bin {
+                let high = pubkey_bin > bin;
                 let range = if pubkey_bin > bin {
                     // i pubkey is too large, so look prior to i
                     0..i
@@ -900,11 +903,14 @@ impl AccountsHasher {
                     // i pubkey is too small, so look after i
                     (i + 1)..hash_data.len()
                 };
-                let search = hash_data[range]
+                let search = hash_data[range.clone()]
                     .binary_search_by(|data| binner.bin_from_pubkey(&data.pubkey).cmp(&bin));
                 // returns None if the desired item doesn't exist
                 // otherwise, `i` is AN index with correct bin
-                i = search.ok()?;
+                i = search.ok()? + range.start;
+                let estimate = &hash_data[i];
+                let pubkey_bin = binner.bin_from_pubkey(&estimate.pubkey);
+                assert_eq!(pubkey_bin, bin, "{i}, start: {}, was high: {}, original estimate: {original_estimate}, bins: {bins}", range.start, high);
             }
 
             // found a pubkey with the correct bin. Now, we have to find the first one.
