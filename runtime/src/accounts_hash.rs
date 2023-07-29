@@ -924,6 +924,9 @@ impl AccountsHasher {
                     break;
                 }
             }
+            let estimate = &hash_data[i];
+            let pubkey_bin = binner.bin_from_pubkey(&estimate.pubkey);
+            assert_eq!(pubkey_bin, bin);
             Some(i)
         });
         stats
