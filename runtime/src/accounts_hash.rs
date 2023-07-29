@@ -777,42 +777,51 @@ impl AccountsHasher {
         // get slices per bin from each slice
         use crate::pubkey_bins::PubkeyBinCalculator24;
         let binner = PubkeyBinCalculator24::new(bins);
-        sorted_data_by_pubkey
-            .par_iter()
-            .map(|all_bins| {
-                let mut last_start_index = 0;
-                let mut result = Vec::with_capacity(bin_range.len());
-                let mut current_bin = bin_range.start;
-                let max_inclusive = all_bins.len();
-                for i in 0..=max_inclusive {
-                    let this_bin = if i != max_inclusive {
-                        let entry = &all_bins[i];
-                        let this_bin = binner.bin_from_pubkey(&entry.pubkey);
-                        if this_bin == current_bin {
-                            // this pk is in the same bin as we're currently investigating, so keep iterating
-                            continue;
-                        }
-                        this_bin
-                    } else {
-                        // we exhausted the source data, so 'this bin' is now the end (exclusive) bin
-                        // this case exists to handle the +1 case
-                        bin_range.end
-                    };
-                    // we found the first pubkey in the bin after the bin we were investigating
-                    // or we passed the end of the input list.
-                    // So, the bin we were investigating is now complete.
-                    result.push(&all_bins[last_start_index..i]);
-                    last_start_index = i;
-                    ((current_bin + 1)..this_bin).for_each(|_| {
-                        // the source data could contain a pubey from bin 1, then bin 5, skipping the bins in between.
-                        // In that case, fill in 2..5 with empty
-                        result.push(&all_bins[0..0]); // empty slice
-                    });
-                    current_bin = this_bin;
-                }
-                result
-            })
-            .collect::<Vec<_>>()
+        let (result, us) = solana_measure::measure_us!({
+            sorted_data_by_pubkey
+                .par_iter()
+                .map(|all_bins| {
+                    let mut last_start_index = 0;
+                    let mut result = Vec::with_capacity(bin_range.len());
+                    let mut current_bin = bin_range.start;
+                    let max_inclusive = all_bins.len();
+                    for i in 0..=max_inclusive {
+                        let this_bin = if i != max_inclusive {
+                            let entry = &all_bins[i];
+                            let this_bin = binner.bin_from_pubkey(&entry.pubkey);
+                            if this_bin == current_bin {
+                                // this pk is in the same bin as we're currently investigating, so keep iterating
+                                continue;
+                            }
+                            this_bin
+                        } else {
+                            // we exhausted the source data, so 'this bin' is now the end (exclusive) bin
+                            // this case exists to handle the +1 case
+                            bin_range.end
+                        };
+                        // we found the first pubkey in the bin after the bin we were investigating
+                        // or we passed the end of the input list.
+                        // So, the bin we were investigating is now complete.
+                        result.push(&all_bins[last_start_index..i]);
+                        last_start_index = i;
+                        ((current_bin + 1)..this_bin).for_each(|_| {
+                            // the source data could contain a pubey from bin 1, then bin 5, skipping the bins in between.
+                            // In that case, fill in 2..5 with empty
+                            result.push(&all_bins[0..0]); // empty slice
+                        });
+                        current_bin = this_bin;
+                    }
+                    result
+                })
+                .collect::<Vec<_>>()
+        });
+        error!(
+            "a: {}, {}us, bin_range: {:?}",
+            bins * sorted_data_by_pubkey.len(),
+            us,
+            bin_range
+        );
+        result
     }
 
     /// returns:
