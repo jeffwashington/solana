@@ -888,56 +888,43 @@ impl AccountsHasher {
             if hash_data.is_empty() {
                 return None;
             }
-            // assume uniform distribution of pubkeys
+            // assume uniform distribution of pubkeys and put first guess close based on bin we're looking for
             let mut i = hash_data.len() * bin / bins;
             let estimate = &hash_data[i];
             let pubkey_bin = binner.bin_from_pubkey(&estimate.pubkey);
-            let mut found_bin = pubkey_bin == bin;
-            if pubkey_bin > bin || found_bin {
-                // this pubkey is correct or too large
-                // search backwards until we find the first pubkey in `bin`
-                while i > 0 {
-                    i -= 1;
-                    searches += 1;
-                    let estimate = &hash_data[i];
-                    let pubkey_bin = binner.bin_from_pubkey(&estimate.pubkey);
-                    found_bin = found_bin || pubkey_bin == bin;
-
-                    if pubkey_bin < bin {
-                        // started with a pubkey in >= `bin`.
-                        // found a pubkey < bin
-                        // So, the i+1 pubkey is the best option we have.
-                        // If `found_bin`, then i is the first one.
-                        // Otherwise, there isn't a first one.
-                        i += 1;
-                        break;
-                    }
-                }
-                found_bin.then_some(i)
-            } else {
-                // this pubkey is too low
-                // search forward until we find the first pubkey in `bin`
-                while i + 1 < hash_data.len() {
-                    searches += 1;
-                    i += 1;
-                    let estimate = &hash_data[i];
-                    let pubkey_bin = binner.bin_from_pubkey(&estimate.pubkey);
-                    if pubkey_bin == bin {
-                        // Started with a pubkey too low.
-                        // Found a pubkey with matching `bin`.
-                        // So, this is the first pubkey in this bin.
-                        return Some(i);
-                    }
-                    if pubkey_bin > bin {
-                        // Started with a pubkey too low.
-                        // Now, found a pubkey too high.
-                        // So, there are no pubkeys that match `bin`.
-                        return None;
-                    }
-                }
-                // didn't find pubkeys == bin
-                None
+            if pubkey_bin != bin {
+                let range = if pubkey_bin > bin {
+                    // i pubkey is too large, so look prior to i
+                    0..i
+                } else {
+                    // i pubkey is too small, so look after i
+                    (i + 1)..hash_data.len()
+                };
+                let search = hash_data[range]
+                    .binary_search_by(|data| binner.bin_from_pubkey(&data.pubkey).cmp(&bin));
+                // returns None if the desired item doesn't exist
+                // otherwise, `i` is AN index with correct bin
+                i = search.ok()?;
             }
+
+            // found a pubkey with the correct bin. Now, we have to find the first one.
+            // search backwards until we find the first pubkey in `bin`
+            while i > 0 {
+                i -= 1;
+                searches += 1;
+                let estimate = &hash_data[i];
+                let pubkey_bin = binner.bin_from_pubkey(&estimate.pubkey);
+                if pubkey_bin < bin {
+                    // started with a pubkey in >= `bin`.
+                    // found a pubkey < bin
+                    // So, the i+1 pubkey is the best option we have.
+                    // If `found_bin`, then i is the first one.
+                    // Otherwise, there isn't a first one.
+                    i += 1;
+                    break;
+                }
+            }
+            Some(i)
         });
         stats
             .count_pubkey_bin_searches
