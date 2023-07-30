@@ -969,19 +969,23 @@ impl AccountsHasher {
             dir_for_temp_cache_files: self.dir_for_temp_cache_files.clone(),
         };
         // initialize 'first_items', which holds the current lowest item in each slot group
-        sorted_data_by_pubkey
-            .iter()
-            .enumerate()
-            .for_each(|(i, hash_data)| {
+        let data = (0..len)
+            .into_par_iter()
+            .filter_map(|i| {
+                let hash_data = sorted_data_by_pubkey[i];
                 let first_pubkey_in_bin =
                     Self::find_first_pubkey_in_bin(hash_data, pubkey_bin, bins, &binner, stats);
-                if let Some(first_pubkey_in_bin) = first_pubkey_in_bin {
-                    let k = hash_data[first_pubkey_in_bin].pubkey;
-                    first_items.push(k);
-                    first_item_to_pubkey_division.push(i);
-                    indexes.push(first_pubkey_in_bin);
-                }
-            });
+
+                first_pubkey_in_bin.map(|first_pubkey_in_bin| (i, first_pubkey_in_bin))
+            })
+            .collect::<Vec<_>>();
+        data.into_iter().for_each(|(i, first_pubkey_in_bin)| {
+            let hash_data = sorted_data_by_pubkey[i];
+            let k = hash_data[first_pubkey_in_bin].pubkey;
+            first_items.push(k);
+            first_item_to_pubkey_division.push(i);
+            indexes.push(first_pubkey_in_bin);
+        });
         let mut overall_sum = 0;
         let mut duplicate_pubkey_indexes = Vec::with_capacity(len);
         let filler_accounts_enabled = self.filler_accounts_enabled();
