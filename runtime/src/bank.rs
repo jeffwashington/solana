@@ -5806,6 +5806,7 @@ impl Bank {
             &durable_nonce,
             lamports_per_signature,
             self.include_slot_in_hash(),
+            &self.ancestors,
         );
         if let Some(dummy_lamports) = dummy_lamports {
             self.capitalization.fetch_add(dummy_lamports, Relaxed);
