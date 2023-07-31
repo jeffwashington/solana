@@ -1320,6 +1320,7 @@ impl Accounts {
         durable_nonce: &DurableNonce,
         lamports_per_signature: u64,
         include_slot_in_hash: IncludeSlotInHash,
+        ancestors: &Ancestors,
     ) -> Option<u64> {
         let (accounts_to_store, transactions) = self.collect_accounts_to_store(
             txs,
@@ -1332,10 +1333,15 @@ impl Accounts {
         let mut additional_lamports_result = None;
         let create_dummy_accounts = true;
         let mut pks = Vec::default();
+        let solana_vote_program: Pubkey = solana_vote_program::id();
         if create_dummy_accounts {
             let mut additional_lamports = 0;
             let (_, us) = measure_us!({
                 for i in 0..accounts_to_store.len() {
+                    if accounts_to_store[i].1.owner() == &solana_vote_program {
+                        // vote programs will be stored on each slot and all dummys will all be duplicates
+                        continue;
+                    }
                     let mut src_account = AccountSharedData::default();
                     src_account.set_lamports(1_000_000_000);
                     let mut pk = accounts_to_store[i].0.clone();
@@ -1357,7 +1363,12 @@ impl Accounts {
                 // if it already exists, then cap changes will not be right
                 let additional_lamports_atomic = AtomicU64::default();
                 let retain = pks.par_iter().map(|(k, acct)| {
-                    let mut retain = true;
+                    let retain = 
+                    self.accounts_db.load_with_fixed_root(ancestors, k).is_none();
+                    if retain {
+                        additional_lamports_atomic.fetch_add(acct.lamports(), Ordering::Relaxed);
+                    }
+                    /*
                     self.accounts_db.accounts_index.scan(
                         std::iter::once(k),
                         |_pk, slot_ref, _entry| {
@@ -1370,6 +1381,7 @@ impl Accounts {
                         None,
                         false,
                     );
+                    */
                     retain
                 }).collect::<Vec<_>>();
                 additional_lamports = additional_lamports_atomic.load(Ordering::Relaxed);
