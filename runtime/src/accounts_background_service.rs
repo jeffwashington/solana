@@ -316,7 +316,9 @@ impl SnapshotRequestHandler {
         } = snapshot_request;
 
         // we should not rely on the state of this validator until startup verification is complete
+        log::error!("abs: {}", line!());
         assert!(snapshot_root_bank.is_startup_verification_complete());
+        log::error!("abs: {}", line!());
 
         if accounts_package_kind == AccountsPackageKind::Snapshot(SnapshotKind::FullSnapshot) {
             *last_full_snapshot_slot = Some(snapshot_root_bank.slot());
@@ -396,6 +398,7 @@ impl SnapshotRequestHandler {
 
         // Snapshot the bank and send over an accounts package
         let mut snapshot_time = Measure::start("snapshot_time");
+        log::error!("abs: {}", line!());
         let snapshot_storages = snapshot_bank_utils::get_snapshot_storages(&snapshot_root_bank);
         let accounts_package = match request_kind {
             SnapshotRequestKind::Snapshot => match &accounts_package_kind {
