@@ -170,6 +170,8 @@ impl ReadOnlyAccountsCache {
 
     pub(crate) fn remove(&self, pubkey: Pubkey, slot: Slot) -> Option<AccountSharedData> {
         let (_, entry) = self.cache.remove(&(pubkey, slot))?;
+        log::error!("removed: {}", ReadOnlyAccountCacheEntry::timestamp() - entry.last_time);
+
         // self.queue should be modified only after removing the entry from the
         // cache, so that this is still safe if another thread writes to the
         // same key.
