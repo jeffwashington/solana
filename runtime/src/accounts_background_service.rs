@@ -314,7 +314,9 @@ impl SnapshotRequestHandler {
         } = snapshot_request;
 
         // we should not rely on the state of this validator until startup verification is complete
+        log::error!("abs: {}", line!());
         assert!(snapshot_root_bank.is_startup_verification_complete());
+        log::error!("abs: {}", line!());
 
         if accounts_package_type == AccountsPackageType::Snapshot(SnapshotType::FullSnapshot) {
             *last_full_snapshot_slot = Some(snapshot_root_bank.slot());
@@ -394,10 +396,13 @@ impl SnapshotRequestHandler {
 
         // Snapshot the bank and send over an accounts package
         let mut snapshot_time = Measure::start("snapshot_time");
+        log::error!("abs: {}", line!());
         let snapshot_storages = snapshot_bank_utils::get_snapshot_storages(&snapshot_root_bank);
+        log::error!("abs: {}", line!());
         let accounts_package = match request_type {
             SnapshotRequestType::Snapshot => match &accounts_package_type {
                 AccountsPackageType::Snapshot(_) => {
+                    log::error!("abs: {}", line!());
                     let bank_snapshot_info = snapshot_bank_utils::add_bank_snapshot(
                         &self.snapshot_config.bank_snapshots_dir,
                         &snapshot_root_bank,
@@ -419,6 +424,7 @@ impl SnapshotRequestHandler {
                     )
                 }
                 AccountsPackageType::AccountsHashVerifier => {
+                    log::error!("abs: {}", line!());
                     // skip the bank snapshot, just make an accounts package to send to AHV
                     AccountsPackage::new_for_accounts_hash_verifier(
                         accounts_package_type,

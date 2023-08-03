@@ -77,37 +77,45 @@ pub fn add_bank_snapshot(
     let do_add_bank_snapshot = || {
         let mut measure_everything = Measure::start("");
         let slot = bank.slot();
+        log::error!("abs: {}", line!());
         let bank_snapshot_dir = get_bank_snapshot_dir(&bank_snapshots_dir, slot);
+        log::error!("abs: {}", line!());
         if bank_snapshot_dir.exists() {
             return Err(AddBankSnapshotError::SnapshotDirAlreadyExists(
                 bank_snapshot_dir,
             ));
         }
+        log::error!("abs: {}", line!());
         fs_err::create_dir_all(&bank_snapshot_dir)
             .map_err(AddBankSnapshotError::CreateSnapshotDir)?;
 
         // the bank snapshot is stored as bank_snapshots_dir/slot/slot.BANK_SNAPSHOT_PRE_FILENAME_EXTENSION
+        log::error!("abs: {}", line!());
         let bank_snapshot_path = bank_snapshot_dir
             .join(get_snapshot_file_name(slot))
             .with_extension(snapshot_utils::BANK_SNAPSHOT_PRE_FILENAME_EXTENSION);
 
+        log::error!("abs: {}", line!());
         info!(
             "Creating bank snapshot for slot {}, path: {}",
             slot,
             bank_snapshot_path.display(),
         );
+        log::error!("abs: {}", line!());
 
         // We are constructing the snapshot directory to contain the full snapshot state information to allow
         // constructing a bank from this directory.  It acts like an archive to include the full state.
         // The set of the account storages files is the necessary part of this snapshot state.  Hard-link them
         // from the operational accounts/ directory to here.
+        log::error!("abs: {}", line!());
         let (_, measure_hard_linking) =
             measure!(
                 hard_link_storages_to_snapshot(&bank_snapshot_dir, slot, snapshot_storages)
                     .map_err(AddBankSnapshotError::HardLinkStorages)?
             );
 
-        let bank_snapshot_serializer =
+            log::error!("abs: {}", line!());
+            let bank_snapshot_serializer =
             move |stream: &mut BufWriter<std::fs::File>| -> snapshot_utils::Result<()> {
                 let serde_style = match snapshot_version {
                     SnapshotVersion::V1_2_0 => SerdeStyle::Newer,
@@ -120,7 +128,8 @@ pub fn add_bank_snapshot(
                 )?;
                 Ok(())
             };
-        let (bank_snapshot_consumed_size, bank_serialize) = measure!(
+            log::error!("abs: {}", line!());
+            let (bank_snapshot_consumed_size, bank_serialize) = measure!(
             serialize_snapshot_data_file(&bank_snapshot_path, bank_snapshot_serializer)
                 .map_err(|err| AddBankSnapshotError::SerializeBank(Box::new(err)))?,
             "bank serialize"
@@ -131,11 +140,13 @@ pub fn add_bank_snapshot(
         let (status_cache_consumed_size, status_cache_serialize) =
             measure!(serialize_status_cache(&slot_deltas, &status_cache_path)
                 .map_err(|err| AddBankSnapshotError::SerializeStatusCache(Box::new(err)))?);
+            log::error!("abs: {}", line!());
 
         let version_path = bank_snapshot_dir.join(snapshot_utils::SNAPSHOT_VERSION_FILENAME);
         let (_, measure_write_version_file) =
             measure!(write_snapshot_version_file(version_path, snapshot_version)
                 .map_err(AddBankSnapshotError::WriteSnapshotVersionFile)?);
+            log::error!("abs: {}", line!());
 
         // Mark this directory complete so it can be used.  Check this flag first before selecting for deserialization.
         let state_complete_path =
@@ -143,6 +154,7 @@ pub fn add_bank_snapshot(
         let (_, measure_write_state_complete_file) =
             measure!(fs_err::File::create(state_complete_path)
                 .map_err(AddBankSnapshotError::CreateStateCompleteFile)?);
+            log::error!("abs: {}", line!());
 
         measure_everything.stop();
 
