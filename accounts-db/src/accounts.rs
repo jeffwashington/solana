@@ -1334,6 +1334,7 @@ impl Accounts {
         let create_dummy_accounts = true;
         let mut pks = Vec::default();
         let solana_vote_program: Pubkey = solana_vote_program::id();
+        self.accounts_db.maybe_throttle_add();
         if create_dummy_accounts {
             let mut additional_lamports = 0;
             let (_, us) = measure_us!({
