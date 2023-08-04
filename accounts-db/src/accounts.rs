@@ -1363,6 +1363,7 @@ impl Accounts {
                 use std::sync::atomic::AtomicU64;
                 // only add pubkeys which don't exist yet.
                 // if it already exists, then cap changes will not be right
+                self.accounts_db.maybe_throttle_add();
                 let additional_lamports_atomic = AtomicU64::default();
                 let retain = pks.par_iter().map(|(k, acct)| {
                     let retain = 
@@ -1386,6 +1387,7 @@ impl Accounts {
                     */
                     retain
                 }).collect::<Vec<_>>();
+                self.accounts_db.maybe_throttle_add();
                 additional_lamports = additional_lamports_atomic.load(Ordering::Relaxed);
                 let mut i = 0;
                 pks.retain(|(k, acct)| {

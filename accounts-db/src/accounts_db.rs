@@ -3244,8 +3244,8 @@ impl AccountsDb {
     pub fn maybe_throttle_add(&self) {
         let now = solana_sdk::timing::timestamp();
         let accounts = self.accounts_index.account_maps.first().unwrap().stats().count_in_mem.load(Ordering::Relaxed);
-        if accounts > 200_000_000 {
-            sleep(Duration::from_millis(10));
+        if accounts > 100_000_000 {
+            sleep(Duration::from_millis(100));
         }
    
         //let ms = now.saturating_sub(self.last_time.load(Ordering::Relaxed));
