@@ -1362,6 +1362,9 @@ type AccountInfoAccountsIndex = AccountsIndex<AccountInfo, AccountInfo>;
 // This structure handles the load/store of the accounts
 #[derive(Debug)]
 pub struct AccountsDb {
+    pub last_time: AtomicU64,
+    pub last_accounts: AtomicU64,
+    pub throttling: AtomicBool,
     /// Keeps tracks of index into AppendVec on a per slot basis
     pub accounts_index: AccountInfoAccountsIndex,
 
@@ -2435,6 +2438,9 @@ impl AccountsDb {
         const ACCOUNTS_STACK_SIZE: usize = 8 * 1024 * 1024;
 
         AccountsDb {
+            last_accounts: AtomicU64::default(),
+            last_time: AtomicU64::default(),
+            throttling: AtomicBool::default(),
             bank_progress: BankCreationFreezingProgress::default(),
             create_ancient_storage: CreateAncientStorage::Pack,
             verify_accounts_hash_in_bg: VerifyAccountsHashInBackground::default(),
@@ -3135,6 +3141,16 @@ impl AccountsDb {
         }
 
         (pubkeys, min_dirty_slot)
+    }
+
+    pub fn maybe_throttle_add(&self) {
+        let now = solana_sdk::timing::timestamp();
+        let accounts = self.accounts_index.account_maps.first().unwrap().stats().count_in_mem.load(Ordering::Relaxed);
+        if accounts > 200_000_000 {
+            sleep(Duration::from_millis(10));
+        }
+   
+        //let ms = now.saturating_sub(self.last_time.load(Ordering::Relaxed));
     }
 
     /// Call clean_accounts() with the common parameters that tests/benches use.
