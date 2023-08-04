@@ -75,7 +75,7 @@ impl AccountsHashVerifier {
                         break;
                     }
 
-                    log::error!("stop: {}", line!());
+                    //log::error!("stop: {}", line!());
                     let Some((
                         accounts_package,
                         num_outstanding_accounts_packages,
