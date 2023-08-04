@@ -6515,6 +6515,8 @@ impl AccountsDb {
         // Always flush up to `requested_flush_root`, which is necessary for things like snapshotting.
         let cached_roots: BTreeSet<Slot> = self.accounts_cache.clear_roots(requested_flush_root);
 
+        log::error!("{}, cached roots: {}", line!(), cached_roots.len());
+
         // Iterate from highest to lowest so that we don't need to flush earlier
         // outdated updates in earlier roots
         let mut num_roots_flushed = 0;
