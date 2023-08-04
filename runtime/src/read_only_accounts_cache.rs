@@ -124,13 +124,15 @@ impl ReadOnlyAccountsCache {
             // self.queue is modified while holding a reference to the cache entry;
             // so that another thread cannot write to the same key.
             // If we updated the eviction queue within this much time, then leave it where it is. We're likely to hit it again.
-            let update_lru = entry.ms_since_last_time() >= self.ms_to_skip_lru_update;
+            let update_lru = true;// entry.ms_since_last_time() >= self.ms_to_skip_lru_update;
             if update_lru {
-                let mut queue = self.queue.lock().unwrap();
-                queue.remove(entry.index);
-                entry.index = queue.insert_last(key);
-                entry.last_time = ReadOnlyAccountCacheEntry::timestamp();
-                self.time_based_sampling.fetch_add(1, Ordering::Relaxed);
+                if let Ok(mut queue) = self.queue.try_lock() {
+                    // let mut queue = self.queue.lock().unwrap();
+                    queue.remove(entry.index);
+                    entry.index = queue.insert_last(key);
+                    entry.last_time = ReadOnlyAccountCacheEntry::timestamp();
+                    self.time_based_sampling.fetch_add(1, Ordering::Relaxed);
+                }
             }
             let account = entry.account.clone();
             drop(entry);
