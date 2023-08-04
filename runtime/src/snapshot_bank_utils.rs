@@ -120,18 +120,29 @@ pub fn add_bank_snapshot(
                 let serde_style = match snapshot_version {
                     SnapshotVersion::V1_2_0 => SerdeStyle::Newer,
                 };
-                bank_to_stream(
+                log::error!("abs: {}", line!());
+                let r = bank_to_stream(
                     serde_style,
                     stream.by_ref(),
                     bank,
                     &get_storages_to_serialize(snapshot_storages),
-                )?;
+                );
+                if r.is_err() {
+                    log::error!("abs: {}, {r:?}", line!());
+                }
+                r?;
+                log::error!("abs: {}", line!());
                 Ok(())
             };
             log::error!("abs: {}", line!());
-            let (bank_snapshot_consumed_size, bank_serialize) = measure!(
-            serialize_snapshot_data_file(&bank_snapshot_path, bank_snapshot_serializer)
-                .map_err(|err| AddBankSnapshotError::SerializeBank(Box::new(err)))?,
+            let (bank_snapshot_consumed_size, bank_serialize) = measure!({
+                let r = serialize_snapshot_data_file(&bank_snapshot_path, bank_snapshot_serializer)
+                .map_err(|err| AddBankSnapshotError::SerializeBank(Box::new(err)));
+            if r.is_err() {
+                log::error!("abs: {}, {r:?}", line!());
+            }
+                r?
+            },
             "bank serialize"
         );
 
