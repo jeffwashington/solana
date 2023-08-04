@@ -97,7 +97,7 @@ impl ReadOnlyAccountsCache {
                 return None;
             };
 
-            if self.counter.fetch_add(1, Ordering::Relaxed) % 1000 == 0 {
+            if self.counter.fetch_add(1, Ordering::Relaxed) % 64 == 0 {
                 self.high_pass.fetch_add(1, Ordering::Relaxed);
             }
             // Move the entry to the end of the queue.
