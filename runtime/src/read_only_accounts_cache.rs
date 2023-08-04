@@ -64,9 +64,12 @@ pub(crate) struct ReadOnlyAccountsCache {
 
     /// stats
     hits: AtomicU64,
+    time_based_sampling: AtomicU64,
+    high_pass: AtomicU64,
     misses: AtomicU64,
     evicts: AtomicU64,
     load_us: AtomicU64,
+    counter: AtomicU64,
 }
 
 impl ReadOnlyAccountsCache {
@@ -81,6 +84,11 @@ impl ReadOnlyAccountsCache {
             misses: AtomicU64::default(),
             evicts: AtomicU64::default(),
             load_us: AtomicU64::default(),
+            time_based_sampling: AtomicU64::default(),
+            high_pass: AtomicU64::default(),
+            counter: AtomicU64::default(),
+
+            
         }
     }
 
@@ -108,6 +116,10 @@ impl ReadOnlyAccountsCache {
                 self.misses.fetch_add(1, Ordering::Relaxed);
                 return None;
             };
+
+            if self.counter.fetch_add(1, Ordering::Relaxed) % 1000 == 0 {
+                self.high_pass.fetch_add(1, Ordering::Relaxed);
+            }
             // Move the entry to the end of the queue.
             // self.queue is modified while holding a reference to the cache entry;
             // so that another thread cannot write to the same key.
@@ -118,6 +130,7 @@ impl ReadOnlyAccountsCache {
                 queue.remove(entry.index);
                 entry.index = queue.insert_last(key);
                 entry.last_time = ReadOnlyAccountCacheEntry::timestamp();
+                self.time_based_sampling.fetch_add(1, Ordering::Relaxed);
             }
             let account = entry.account.clone();
             drop(entry);
@@ -189,13 +202,14 @@ impl ReadOnlyAccountsCache {
         self.data_size.load(Ordering::Relaxed)
     }
 
-    pub(crate) fn get_and_reset_stats(&self) -> (u64, u64, u64, u64) {
+    pub(crate) fn get_and_reset_stats(&self) -> (u64, u64, u64, u64,u64,u64) {
         let hits = self.hits.swap(0, Ordering::Relaxed);
         let misses = self.misses.swap(0, Ordering::Relaxed);
         let evicts = self.evicts.swap(0, Ordering::Relaxed);
         let load_us = self.load_us.swap(0, Ordering::Relaxed);
-
-        (hits, misses, evicts, load_us)
+        let time_based_sampling = self.time_based_sampling.swap(0, Ordering::Relaxed);
+        let high_pass = self.high_pass.swap(0, Ordering::Relaxed);
+        (hits, misses, evicts, load_us, time_based_sampling, high_pass)
     }
 }
 

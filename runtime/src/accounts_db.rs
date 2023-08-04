@@ -8400,6 +8400,7 @@ impl AccountsDb {
                 read_only_cache_misses,
                 read_only_cache_evicts,
                 read_only_cache_load_us,
+                time_based_sampling, high_pass,
             ) = self.read_only_accounts_cache.get_and_reset_stats();
             datapoint_info!(
                 "accounts_db_store_timings",
@@ -8472,8 +8473,13 @@ impl AccountsDb {
                     i64
                 ),
                 (
-                    "calc_stored_meta_us",
-                    self.stats.calc_stored_meta.swap(0, Ordering::Relaxed),
+                    "time_based_sampling",
+                    time_based_sampling,
+                    i64
+                ),
+                (
+                    "high_pass",
+                    high_pass,
                     i64
                 ),
             );
