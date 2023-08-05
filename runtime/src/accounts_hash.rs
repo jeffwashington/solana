@@ -1,3 +1,4 @@
+use crate::active_stats::ActiveStats;
 use {
     crate::{
         accounts_db::{AccountStorageEntry, IncludeSlotInHash, PUBKEY_BINS_FOR_CALCULATING_HASHES},
@@ -48,6 +49,8 @@ impl MmapAccountHashesFile {
 }
 
 use std::path::PathBuf;
+
+use crate::active_stats::{ActiveStatGuard, ActiveStatItem};
 /// 1 file containing account hashes sorted by pubkey
 pub struct AccountHashesFile {
     /// # hashes and an open file that will be deleted on drop. None if there are zero hashes to represent, and thus, no file.
@@ -458,6 +461,7 @@ pub struct AccountsHasher {
     pub zero_lamport_accounts: ZeroLamportAccounts,
     /// The directory where temporary cache files are put
     pub dir_for_temp_cache_files: PathBuf,
+    pub(crate) active_stats: ActiveStats,
 }
 
 impl AccountsHasher {
@@ -786,6 +790,8 @@ impl AccountsHasher {
         // a. vec: PUBKEY_BINS_FOR_CALCULATING_HASHES in pubkey order
         //      vec: individual hashes in pubkey order, 1 hash per
         // b. lamports
+        let _ = self.active_stats.activate(ActiveStatItem::HashDeDup);
+
         let mut zeros = Measure::start("eliminate zeros");
         let min_max_sum_entries_hashes = Mutex::new((usize::MAX, usize::MIN, 0u64, 0usize, 0usize));
         let hashes: Vec<_> = (0..max_bin)
@@ -1096,6 +1102,7 @@ impl AccountsHasher {
 
         let cumulative = CumulativeHashesFromFiles::from_files(hashes);
 
+        let _ = self.active_stats.activate(ActiveStatItem::HashMerkleTree);
         let mut hash_time = Measure::start("hash");
         let (hash, _) = Self::compute_merkle_root_from_slices(
             cumulative.total_count(),

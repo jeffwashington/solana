@@ -7644,6 +7644,8 @@ impl AccountsDb {
         config: &CalcAccountsHashConfig<'_>,
         filler_account_suffix: Option<&Pubkey>,
     ) -> Result<Vec<CacheHashDataFile>, AccountsHashVerificationError> {
+        let _ = self.active_stats.activate(ActiveStatItem::HashScan);
+
         let bin_calculator = PubkeyBinCalculator24::new(bins);
         assert!(bin_range.start < bins && bin_range.end <= bins && bin_range.start < bin_range.end);
         let mut time = Measure::start("scan all accounts");
@@ -7823,6 +7825,7 @@ impl AccountsDb {
                 },
                 zero_lamport_accounts: flavor.zero_lamport_accounts(),
                 dir_for_temp_cache_files: self.transient_accounts_hash_cache_path.clone(),
+                active_stats: ActiveStats::default(),
             };
 
             // get raw data by scanning
