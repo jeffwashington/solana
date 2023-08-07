@@ -1337,11 +1337,11 @@ impl Accounts {
         let create_dummy_accounts = true;
         let mut pks = Vec::default();
         let solana_vote_program: Pubkey = solana_vote_program::id();
-        self.accounts_db.maybe_throttle_add();
         if create_dummy_accounts {
             let mut additional_lamports = 0;
             let (_, us) = measure_us!({
                 for i in 0..accounts_to_store.len() {
+                    self.accounts_db.maybe_throttle_add();
                     if accounts_to_store[i].1.owner() == &solana_vote_program {
                         // vote programs will be stored on each slot and all dummys will all be duplicates
                         continue;
@@ -1369,6 +1369,7 @@ impl Accounts {
                 self.accounts_db.maybe_throttle_add();
                 let additional_lamports_atomic = AtomicU64::default();
                 let retain = pks.par_iter().map(|(k, acct)| {
+                    self.accounts_db.maybe_throttle_add();
                     let retain = 
                     self.accounts_db.load_with_fixed_root(ancestors, k).is_none();
                     if retain {

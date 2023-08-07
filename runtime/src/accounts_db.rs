@@ -1364,7 +1364,7 @@ type AccountInfoAccountsIndex = AccountsIndex<AccountInfo, AccountInfo>;
 pub struct AccountsDb {
     pub last_time: AtomicU64,
     pub last_accounts: AtomicU64,
-    pub throttling: AtomicBool,
+    pub throttling: AtomicU64,
     /// Keeps tracks of index into AppendVec on a per slot basis
     pub accounts_index: AccountInfoAccountsIndex,
 
@@ -2440,7 +2440,7 @@ impl AccountsDb {
         AccountsDb {
             last_accounts: AtomicU64::default(),
             last_time: AtomicU64::default(),
-            throttling: AtomicBool::default(),
+            throttling: AtomicU64::default(),
             bank_progress: BankCreationFreezingProgress::default(),
             create_ancient_storage: CreateAncientStorage::Pack,
             verify_accounts_hash_in_bg: VerifyAccountsHashInBackground::default(),
@@ -3147,7 +3147,10 @@ impl AccountsDb {
         let now = solana_sdk::timing::timestamp();
         let accounts = self.accounts_index.account_maps.first().unwrap().stats().count_in_mem.load(Ordering::Relaxed);
         if accounts > 100_000_000 {
+            self.last_accounts.store(accounts as u64, Ordering::Relaxed);
+            self.throttling.fetch_add(1, Ordering::Relaxed);
             sleep(Duration::from_millis(100));
+            self.throttling.fetch_sub(1, Ordering::Relaxed);
         }
    
         //let ms = now.saturating_sub(self.last_time.load(Ordering::Relaxed));
@@ -6986,6 +6989,8 @@ impl AccountsDb {
             ("total_bytes", total_bytes, i64),
             ("total_alive_bytes", total_alive_bytes, i64),
             ("total_alive_ratio", total_alive_ratio, f64),
+            ("delays", self.throttling.load(Ordering::Relaxed), i64),
+            ("last_num_accounts", self.last_accounts.swap(0, Ordering::Relaxed), i64),
         );
         datapoint_info!(
             "accounts_db-perf-stats",
