@@ -2360,7 +2360,10 @@ impl AccountsDb {
         accounts_hash_cache_path: Option<PathBuf>,
     ) -> Self {
         let num_threads = get_thread_count();
-        const MAX_READ_ONLY_CACHE_DATA_SIZE: usize = 400_000_000; // 400M bytes
+        // 400M bytes
+        const MAX_READ_ONLY_CACHE_DATA_SIZE: usize = 400_000_000;
+        // read only cache does not update lru on read of an entry unless it has been at least this many ms since the last lru update
+        const READ_ONLY_CACHE_MS_TO_SKIP_LRU_UPDATE: u32 = 100;
 
         let mut temp_accounts_hash_cache_path = None;
         let accounts_hash_cache_path = accounts_hash_cache_path.unwrap_or_else(|| {
@@ -2391,7 +2394,10 @@ impl AccountsDb {
             storage: AccountStorage::default(),
             accounts_cache: AccountsCache::default(),
             sender_bg_hasher: None,
-            read_only_accounts_cache: ReadOnlyAccountsCache::new(MAX_READ_ONLY_CACHE_DATA_SIZE),
+            read_only_accounts_cache: ReadOnlyAccountsCache::new(
+                MAX_READ_ONLY_CACHE_DATA_SIZE,
+                READ_ONLY_CACHE_MS_TO_SKIP_LRU_UPDATE,
+            ),
             recycle_stores: RwLock::new(RecycleStores::default()),
             uncleaned_pubkeys: DashMap::new(),
             next_id: AtomicAppendVecId::new(0),
@@ -8387,6 +8393,7 @@ impl AccountsDb {
                 read_only_cache_misses,
                 read_only_cache_evicts,
                 read_only_cache_load_us,
+                time_based_sampling, high_pass,
             ) = self.read_only_accounts_cache.get_and_reset_stats();
             datapoint_info!(
                 "accounts_db_store_timings",
@@ -8459,8 +8466,13 @@ impl AccountsDb {
                     i64
                 ),
                 (
-                    "calc_stored_meta_us",
-                    self.stats.calc_stored_meta.swap(0, Ordering::Relaxed),
+                    "time_based_sampling",
+                    time_based_sampling,
+                    i64
+                ),
+                (
+                    "high_pass",
+                    high_pass,
                     i64
                 ),
             );
