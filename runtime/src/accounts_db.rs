@@ -2346,11 +2346,10 @@ impl<'a> AppendVecScan for ScanState<'a> {
     fn set_slot(&mut self, slot: Slot) {
         self.current_slot = slot;
     }
-    fn init_accum(&mut self, _count: usize) {
+    fn init_accum(&mut self, count: usize) {
         // need good initial estimate to avoid repeated re-allocation while scanning
-        if self.accum.is_empty() {
-            // stop doing initial allocation for now
-            // self.accum = Vec::with_capacity(count);
+        if self.accum.is_empty() && self.accum.capacity() < count {
+            self.accum = Vec::with_capacity(count);
         }
     }
     fn found_account(&mut self, loaded_account: &LoadedAccount) {
@@ -7164,9 +7163,10 @@ impl AccountsDb {
     where
         S: AppendVecScan,
     {
-        storage.accounts.account_iter().for_each(|account| {
-            scanner.found_account(&LoadedAccount::Stored(account))
-        });
+        storage
+            .accounts
+            .account_iter()
+            .for_each(|account| scanner.found_account(&LoadedAccount::Stored(account)));
     }
 
     fn update_old_slot_stats(&self, stats: &HashStats, storage: Option<&Arc<AccountStorageEntry>>) {
@@ -7346,12 +7346,17 @@ impl AccountsDb {
 
                 let mut init_accum = true;
                 // load from cache failed, so create the cache file for this chunk
+
+                let count = snapshot_storages
+                    .iter_range(&range_this_chunk)
+                    .filter_map(|(_, storage)| storage.map(|storage| storage.count()))
+                    .sum::<usize>();
+
                 for (slot, storage) in snapshot_storages.iter_range(&range_this_chunk) {
                     let ancient = slot < oldest_non_ancient_slot;
                     let (_, scan_us) = measure_us!(if let Some(storage) = storage {
                         if init_accum {
-                            let range = bin_range.end - bin_range.start;
-                            scanner.init_accum(range);
+                            scanner.init_accum(count);
                             init_accum = false;
                         }
                         scanner.set_slot(slot);
@@ -7697,7 +7702,7 @@ impl AccountsDb {
                 time.fetch_add(sort_time.as_us(), Ordering::Relaxed);
                 accum
             },
-            time.load(Ordering::Relaxed)
+            time.load(Ordering::Relaxed),
         )
     }
 
