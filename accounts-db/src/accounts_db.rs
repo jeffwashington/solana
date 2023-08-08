@@ -490,7 +490,7 @@ pub const ACCOUNTS_DB_CONFIG_FOR_BENCHMARKS: AccountsDbConfig = AccountsDbConfig
     test_partitioned_epoch_rewards: TestPartitionedEpochRewards::None,
 };
 
-pub type BinnedHashData = Vec<Vec<CalculateHashIntermediate>>;
+pub type BinnedHashData = Vec<CalculateHashIntermediate>;
 
 struct LoadAccountsIndexForShrink<'a, T: ShrinkCollectRefs<'a>> {
     /// all alive accounts
@@ -2424,8 +2424,9 @@ impl<'a> AppendVecScan for ScanState<'a> {
         self.bin_range.contains(&self.pubkey_to_bin_index)
     }
     fn init_accum(&mut self, count: usize) {
+        // need good initial estimate to avoid repeated re-allocation while scanning
         if self.accum.is_empty() {
-            self.accum.append(&mut vec![Vec::new(); count]);
+            self.accum = Vec::with_capacity(count);
         }
     }
     fn found_account(&mut self, loaded_account: &LoadedAccount) {
@@ -2459,7 +2460,7 @@ impl<'a> AppendVecScan for ScanState<'a> {
         }
         let source_item = CalculateHashIntermediate::new(loaded_hash, balance, *pubkey);
         self.init_accum(self.range);
-        self.accum[self.pubkey_to_bin_index].push(source_item);
+        self.accum.push(source_item);
     }
     fn scanning_complete(mut self) -> BinnedHashData {
         let timing = AccountsDb::sort_slot_storage_scan(&mut self.accum);
@@ -7461,7 +7462,7 @@ impl AccountsDb {
                     .then(|| {
                         let r = scanner.scanning_complete();
                         assert!(!file_name.is_empty());
-                        (!r.is_empty() && r.iter().any(|b| !b.is_empty())).then(|| {
+                        (!r.is_empty()).then(|| {
                             // error if we can't write this
                             cache_hash_data.save(&file_name, &r).unwrap();
                             cache_hash_data
@@ -7794,13 +7795,11 @@ impl AccountsDb {
 
     fn sort_slot_storage_scan(accum: &mut BinnedHashData) -> u64 {
         let time = AtomicU64::new(0);
-        accum.iter_mut().for_each(|items| {
-            let mut sort_time = Measure::start("sort");
-            // sort_by vs unstable because slot and write_version are already in order
-            items.sort_by(AccountsHasher::compare_two_hash_entries);
-            sort_time.stop();
-            time.fetch_add(sort_time.as_us(), Ordering::Relaxed);
-        });
+        let mut sort_time = Measure::start("sort");
+        // sort_by vs unstable because slot and write_version are already in order
+        accum.sort_by(AccountsHasher::compare_two_hash_entries);
+        sort_time.stop();
+        time.fetch_add(sort_time.as_us(), Ordering::Relaxed);
 
         time.load(Ordering::Relaxed)
     }

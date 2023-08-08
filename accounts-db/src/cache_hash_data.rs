@@ -316,7 +316,7 @@ impl CacheHashData {
     pub fn save(
         &self,
         file_name: impl AsRef<Path>,
-        data: &SavedTypeSlice,
+        data: &[EntryType],
     ) -> Result<(), std::io::Error> {
         self.save_internal(file_name, data)
     }
@@ -324,7 +324,7 @@ impl CacheHashData {
     fn save_internal(
         &self,
         file_name: impl AsRef<Path>,
-        data: &SavedTypeSlice,
+        data: &[EntryType],
     ) -> Result<(), std::io::Error> {
         let mut m = Measure::start("save");
         let cache_path = self.cache_dir.join(file_name);
@@ -332,19 +332,10 @@ impl CacheHashData {
         let _ignored = remove_file(&cache_path);
         let cell_size = std::mem::size_of::<EntryType>() as u64;
         let mut m1 = Measure::start("create save");
-        let entries = data
-            .iter()
-            .map(|x: &Vec<EntryType>| x.len())
-            .collect::<Vec<_>>();
-        let entries = entries.iter().sum::<usize>();
+        let entries = data.len();
         let capacity = cell_size * (entries as u64) + std::mem::size_of::<Header>() as u64;
 
-        let mmap = CacheHashDataFile::new_map(&cache_path, capacity);
-        if mmap.is_err() {
-            log::error!("save_internal failure: {:?}, path: {cache_path:?}, capacity: {capacity}", mmap);
-            log::error!("save_internal failure, contents: {:?}", std::fs::read_dir(self.cache_dir.clone()));
-        }
-        let mmap = mmap.unwrap();
+        let mmap = CacheHashDataFile::new_map(&cache_path, capacity)?;
         m1.stop();
         self.stats
             .create_save_us
@@ -367,12 +358,10 @@ impl CacheHashData {
 
         let mut m2 = Measure::start("write_to_mmap");
         let mut i = 0;
-        data.iter().for_each(|x| {
-            x.iter().for_each(|item| {
+        data.iter().for_each(|item| {
                 let d = cache_file.get_mut(i as u64);
                 i += 1;
                 *d = item.clone();
-            })
         });
         assert_eq!(i, entries);
         m2.stop();
