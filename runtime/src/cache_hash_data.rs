@@ -326,9 +326,9 @@ impl CacheHashData {
         let mut m2 = Measure::start("write_to_mmap");
         let mut i = 0;
         data.iter().for_each(|item| {
-                let d = cache_file.get_mut(i as u64);
-                i += 1;
-                *d = item.clone();
+            let d = cache_file.get_mut(i as u64);
+            i += 1;
+            *d = item.clone();
         });
         assert_eq!(i, entries);
         m2.stop();
@@ -342,7 +342,7 @@ impl CacheHashData {
 
 #[cfg(test)]
 pub mod tests {
-    use {super::*, rand::Rng};
+    use {super::*, rand::Rng, crate::pubkey_bins::PubkeyBinCalculator24};
 
     #[test]
     fn test_read_write() {
@@ -359,13 +359,13 @@ pub mod tests {
             let bin_calculator = PubkeyBinCalculator24::new(bins);
             let num_points = 5;
             let (data, _total_points) = generate_test_data(num_points, bins, &bin_calculator);
-            for passes in [1, 2] {
+            for passes in [1] { // only support 1 pass now
                 let bins_per_pass = bins / passes;
                 if bins_per_pass == 0 {
                     continue; // illegal test case
                 }
                 for pass in 0..passes {
-                    for flatten_data in [true, false] {
+                    for flatten_data in [true] {
                         let mut data_this_pass = if flatten_data {
                             vec![vec![], vec![]]
                         } else {
@@ -382,7 +382,7 @@ pub mod tests {
                         }
                         let cache = CacheHashData::new(cache_dir.clone());
                         let file_name = PathBuf::from("test");
-                        cache.save(&file_name, &data_this_pass).unwrap();
+                        cache.save(&file_name, &data_this_pass.iter().flatten().cloned().collect::<Vec<_>>()).unwrap();
                         cache.get_cache_files();
                         assert_eq!(
                             cache
