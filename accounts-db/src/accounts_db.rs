@@ -2350,9 +2350,9 @@ pub fn make_min_priority_thread_pool() -> ThreadPool {
 
 pub fn make_min_priority_thread_pool2() -> ThreadPool {
     // Use lower thread count to reduce priority.
-    let num_threads = quarter_thread_count() / 2;
+    let num_threads = quarter_thread_count();
     rayon::ThreadPoolBuilder::new()
-        .thread_name(|i| format!("solAccountsLo{i:02}"))
+        .thread_name(|i| format!("solAccountsHa{i:02}"))
         .num_threads(num_threads)
         .build()
         .unwrap()
