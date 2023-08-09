@@ -8119,8 +8119,10 @@ impl Bank {
             && epoch_accounts_hash_utils::is_enabled_this_epoch(self)
             && epoch_accounts_hash_utils::is_in_calculation_window(self);
         if !should_get_epoch_accounts_hash {
+            error!("abs: {} waiting for eah, slot: {}", line!(), self.slot());
             return None;
         }
+        error!("abs: {} waiting for eah, slot: {}", line!(), self.slot());
 
         let (epoch_accounts_hash, measure) = measure!(self
             .rc
