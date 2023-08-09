@@ -97,7 +97,7 @@ impl ReadOnlyAccountsCache {
                 return None;
             };
 
-            let high_pass = self.counter.fetch_add(1, Ordering::Relaxed) % 64 == 0;
+            let high_pass = self.counter.fetch_add(1, Ordering::Relaxed) % 32 == 0;
             if high_pass {
                 self.high_pass.fetch_add(1, Ordering::Relaxed);
             }
