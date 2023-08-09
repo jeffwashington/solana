@@ -7276,6 +7276,7 @@ impl AccountsDb {
         let max = 5;
         let count = Mutex::new(0);
 
+        log::error!("scan_account_storage_no_bank, chunks: {}", splitter.chunk_count);
         stats.scan_chunks = splitter.chunk_count;
         (0..splitter.chunk_count)
             .into_par_iter()
