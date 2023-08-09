@@ -2331,11 +2331,9 @@ trait AppendVecScan: Send + Sync + Clone {
     /// found `account` in the append vec
     fn found_account(&mut self, account: &LoadedAccount);
     /// scanning is done
-    fn scanning_complete(self) -> BinnedHashData;
+    fn scanning_complete(self) -> Option<CacheHashDataFile>;
     /// initialize accumulator
-    fn init_accum(&mut self, count: usize);
-    fn get_accum(&mut self) -> BinnedHashData;
-    fn set_accum(&mut self, accum: BinnedHashData);
+    fn init_accum(&mut self, count: usize, cache_hash_data: &CacheHashData, file_name: &String);
 }
 
 #[derive(Clone)]
@@ -2344,10 +2342,11 @@ trait AppendVecScan: Send + Sync + Clone {
 /// Some of these are constant across all pubkeys, some are constant across a slot.
 /// Some could be unique per pubkey.
 struct ScanState<'a> {
+    /// current index in `cache_data` when adding
+    i: usize,
     /// slot we're currently scanning
     current_slot: Slot,
     /// accumulated results
-    accum: BinnedHashData,
     bin_calculator: &'a PubkeyBinCalculator24,
     bin_range: &'a Range<usize>,
     config: &'a CalcAccountsHashConfig<'a>,
@@ -2355,15 +2354,17 @@ struct ScanState<'a> {
     filler_account_suffix: Option<&'a Pubkey>,
     range: usize,
     sort_time: Arc<AtomicU64>,
+    cache_data: Option<Arc<CacheHashDataFile>>,
 }
 
 impl<'a> AppendVecScan for ScanState<'a> {
     fn set_slot(&mut self, slot: Slot) {
         self.current_slot = slot;
     }
-    fn init_accum(&mut self, _count: usize) {
+    fn init_accum(&mut self, count: usize, cache_hash_data: &CacheHashData, file_name: &String) {
         // need good initial estimate to avoid repeated re-allocation while scanning
-        if self.accum.is_empty() {
+        if self.cache_data.is_none() {
+            self.cache_data = Some(Arc::new(cache_hash_data.allocate(file_name, count).unwrap()));
             // stop doing initial allocation for now
             // self.accum = Vec::with_capacity(count);
         }
@@ -2393,19 +2394,17 @@ impl<'a> AppendVecScan for ScanState<'a> {
             }
         }
         let source_item = CalculateHashIntermediate::new(loaded_hash, balance, *pubkey);
-        self.init_accum(self.range);
-        self.accum.push(source_item);
+        self.cache_data.as_ref().unwrap().get_slice(self.i as u64)[0] = source_item;
+        self.i += 1;
     }
-    fn scanning_complete(self) -> BinnedHashData {
-        let (result, timing) = AccountsDb::sort_slot_storage_scan(self.accum);
-        self.sort_time.fetch_add(timing, Ordering::Relaxed);
-        result
-    }
-    fn get_accum(&mut self) -> BinnedHashData {
-        std::mem::take(&mut self.accum)
-    }
-    fn set_accum(&mut self, accum: BinnedHashData) {
-        self.accum = accum;
+    fn scanning_complete(self) -> Option<CacheHashDataFile> {
+        self.cache_data.map(|cache_data| {
+            let mut cache_data = Arc::try_unwrap(cache_data).ok().unwrap();
+            cache_data.capacity = self.i as u64;
+            let timing = AccountsDb::sort_slot_storage_scan(&mut cache_data.get_slice(0)[..cache_data.capacity as usize]);
+            self.sort_time.fetch_add(timing, Ordering::Relaxed);
+            cache_data
+        })
     }
 }
 
@@ -7224,13 +7223,19 @@ impl AccountsDb {
                 };
 
                 let mut init_accum = true;
+                let count = snapshot_storages.iter_range(&range_this_chunk).filter_map(|(_, storage)| storage
+                    .map(|storage| 
+                        storage.count()))
+                .sum::<usize>();
+
                 // load from cache failed, so create the cache file for this chunk
                 for (slot, storage) in snapshot_storages.iter_range(&range_this_chunk) {
                     let ancient = slot < oldest_non_ancient_slot;
                     let (_, scan_us) = measure_us!(if let Some(storage) = storage {
                         if init_accum {
                             let range = bin_range.end - bin_range.start;
-                            scanner.init_accum(range);
+                            assert!(!file_name.is_empty());
+                            scanner.init_accum(count, cache_hash_data, &file_name);
                             init_accum = false;
                         }
                         scanner.set_slot(slot);
@@ -7249,13 +7254,7 @@ impl AccountsDb {
                 }
                 (!init_accum)
                     .then(|| {
-                        let r = scanner.scanning_complete();
-                        assert!(!file_name.is_empty());
-                        (!r.is_empty()).then(|| {
-                            // error if we can't write this
-                            cache_hash_data.save(&file_name, &r).unwrap();
-                            cache_hash_data.load_map(&file_name).unwrap()
-                        })
+                        scanner.scanning_complete()
                     })
                     .flatten()
             })
@@ -7524,7 +7523,7 @@ impl AccountsDb {
 
         let scanner = ScanState {
             current_slot: Slot::default(),
-            accum: BinnedHashData::default(),
+            i: 0,
             bin_calculator: &bin_calculator,
             config,
             mismatch_found: mismatch_found.clone(),
@@ -7532,6 +7531,7 @@ impl AccountsDb {
             range,
             bin_range,
             sort_time: sort_time.clone(),
+            cache_data: None,
         };
 
         let result = self.scan_account_storage_no_bank(
@@ -7559,19 +7559,16 @@ impl AccountsDb {
         Ok(result)
     }
 
-    fn sort_slot_storage_scan(mut accum: BinnedHashData) -> (BinnedHashData, u64) {
+    fn sort_slot_storage_scan(accum: &mut [CalculateHashIntermediate]) -> u64 {
         let time = AtomicU64::new(0);
-        (
             {
                 let mut sort_time = Measure::start("sort");
                 // sort_by vs unstable because slot and write_version are already in order
                 accum.par_sort_by(AccountsHasher::compare_two_hash_entries);
                 sort_time.stop();
                 time.fetch_add(sort_time.as_us(), Ordering::Relaxed);
-                accum
-            },
+            }
             time.load(Ordering::Relaxed)
-        )
     }
 
     /// normal code path returns the common cache path
@@ -7698,7 +7695,7 @@ impl AccountsDb {
             // convert mmapped cache files into slices of data
             let cache_hash_intermediates = cache_hash_data_files
                 .iter()
-                .map(|d| d.get_cache_hash_data())
+                .map(|d| &*d.get_cache_hash_data())
                 .collect::<Vec<_>>();
 
             // turn raw data into merkle tree hashes and sum of lamports
@@ -10868,13 +10865,7 @@ pub mod tests {
         fn set_slot(&mut self, slot: Slot) {
             self.current_slot = slot;
         }
-        fn init_accum(&mut self, _count: usize) {}
-        fn get_accum(&mut self) -> BinnedHashData {
-            std::mem::take(&mut self.accum)
-        }
-        fn set_accum(&mut self, accum: BinnedHashData) {
-            self.accum = accum;
-        }
+        fn init_accum(&mut self, count: usize, cache_hash_data: &CacheHashData, file_name: &String) {}
         fn found_account(&mut self, loaded_account: &LoadedAccount) {
             self.calls.fetch_add(1, Ordering::Relaxed);
             assert_eq!(loaded_account.pubkey(), &self.pubkey);
@@ -10885,8 +10876,8 @@ pub mod tests {
                 self.pubkey,
             )]);
         }
-        fn scanning_complete(self) -> BinnedHashData {
-            self.accum
+        fn scanning_complete(self) -> Option<CacheHashDataFile> {
+            None
         }
     }
 
@@ -11150,7 +11141,7 @@ pub mod tests {
         fn set_slot(&mut self, slot: Slot) {
             self.current_slot = slot;
         }
-        fn init_accum(&mut self, _count: usize) {}
+        fn init_accum(&mut self, count: usize, cache_hash_data: &CacheHashData, file_name: &String) {}
         fn found_account(&mut self, loaded_account: &LoadedAccount) {
             self.calls.fetch_add(1, Ordering::Relaxed);
             let first = loaded_account.pubkey() == &self.pubkey1;
@@ -11169,12 +11160,6 @@ pub mod tests {
         }
         fn scanning_complete(self) -> BinnedHashData {
             self.accum
-        }
-        fn get_accum(&mut self) -> BinnedHashData {
-            std::mem::take(&mut self.accum)
-        }
-        fn set_accum(&mut self, accum: BinnedHashData) {
-            self.accum = accum;
         }
     }
 
