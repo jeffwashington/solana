@@ -2326,8 +2326,6 @@ type GenerateIndexAccountsMap<'a> = HashMap<Pubkey, StoredAccountMeta<'a>>;
 
 /// called on a struct while scanning append vecs
 trait AppendVecScan: Send + Sync + Clone {
-    /// return true if this pubkey should be included
-    fn filter(&mut self, pubkey: &Pubkey) -> bool;
     /// set current slot of the scan
     fn set_slot(&mut self, slot: Slot);
     /// found `account` in the append vec
@@ -2357,30 +2355,21 @@ struct ScanState<'a> {
     filler_account_suffix: Option<&'a Pubkey>,
     range: usize,
     sort_time: Arc<AtomicU64>,
-    pubkey_to_bin_index: usize,
 }
 
 impl<'a> AppendVecScan for ScanState<'a> {
     fn set_slot(&mut self, slot: Slot) {
         self.current_slot = slot;
     }
-    fn filter(&mut self, pubkey: &Pubkey) -> bool {
-        self.pubkey_to_bin_index = self.bin_calculator.bin_from_pubkey(pubkey);
-        self.bin_range.contains(&self.pubkey_to_bin_index)
-    }
-    fn init_accum(&mut self, count: usize) {
+    fn init_accum(&mut self, _count: usize) {
         // need good initial estimate to avoid repeated re-allocation while scanning
         if self.accum.is_empty() {
-            self.accum = Vec::with_capacity(count);
+            // stop doing initial allocation for now
+            // self.accum = Vec::with_capacity(count);
         }
     }
     fn found_account(&mut self, loaded_account: &LoadedAccount) {
         let pubkey = loaded_account.pubkey();
-        assert!(self.bin_range.contains(&self.pubkey_to_bin_index)); // get rid of this once we have confidence
-
-        // when we are scanning with bin ranges, we don't need to use exact bin numbers. Subtract to make first bin we care about at index 0.
-        self.pubkey_to_bin_index -= self.bin_range.start;
-
         let balance = loaded_account.lamports();
         let mut loaded_hash = loaded_account.loaded_hash();
 
@@ -7080,9 +7069,7 @@ impl AccountsDb {
         S: AppendVecScan,
     {
         storage.accounts.account_iter().for_each(|account| {
-            if scanner.filter(account.pubkey()) {
-                scanner.found_account(&LoadedAccount::Stored(account))
-            }
+            scanner.found_account(&LoadedAccount::Stored(account))
         });
     }
 
@@ -7545,7 +7532,6 @@ impl AccountsDb {
             range,
             bin_range,
             sort_time: sort_time.clone(),
-            pubkey_to_bin_index: 0,
         };
 
         let result = self.scan_account_storage_no_bank(
@@ -7578,10 +7564,8 @@ impl AccountsDb {
         (
             {
                 let mut sort_time = Measure::start("sort");
-                {
-                    // sort_by vs unstable because slot and write_version are already in order
-                    accum.sort_by(AccountsHasher::compare_two_hash_entries);
-                }
+                // sort_by vs unstable because slot and write_version are already in order
+                accum.par_sort_by(AccountsHasher::compare_two_hash_entries);
                 sort_time.stop();
                 time.fetch_add(sort_time.as_us(), Ordering::Relaxed);
                 accum
@@ -10881,9 +10865,6 @@ pub mod tests {
     }
 
     impl AppendVecScan for TestScan {
-        fn filter(&mut self, _pubkey: &Pubkey) -> bool {
-            true
-        }
         fn set_slot(&mut self, slot: Slot) {
             self.current_slot = slot;
         }
@@ -11168,9 +11149,6 @@ pub mod tests {
     impl AppendVecScan for TestScanSimple {
         fn set_slot(&mut self, slot: Slot) {
             self.current_slot = slot;
-        }
-        fn filter(&mut self, _pubkey: &Pubkey) -> bool {
-            true
         }
         fn init_accum(&mut self, _count: usize) {}
         fn found_account(&mut self, loaded_account: &LoadedAccount) {
