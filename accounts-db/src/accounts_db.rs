@@ -3244,12 +3244,19 @@ impl AccountsDb {
 
     pub fn maybe_throttle_add(&self) {
         let now = solana_sdk::timing::timestamp();
-        let accounts = self.accounts_index.account_maps.first().unwrap().stats().count_in_mem.load(Ordering::Relaxed);
-        if accounts > 100_000_000 {
-            self.last_accounts.store(accounts as u64, Ordering::Relaxed);
-            self.throttling.fetch_add(1, Ordering::Relaxed);
-            sleep(Duration::from_millis(100));
-            self.throttling.fetch_sub(1, Ordering::Relaxed);
+        loop {
+            let accounts = self.accounts_index.account_maps.first().unwrap().stats().count_in_mem.load(Ordering::Relaxed);
+            if accounts > 100_000_000 {
+                self.last_accounts.store(accounts as u64, Ordering::Relaxed);
+                self.throttling.fetch_add(1, Ordering::Relaxed);
+                sleep(Duration::from_millis(100));
+                self.throttling.fetch_sub(1, Ordering::Relaxed);
+                if accounts > 200_000_000 {
+                    // stall while we are bigger than 200M accounts here
+                    continue;
+                }
+            }
+            break;
         }
    
         //let ms = now.saturating_sub(self.last_time.load(Ordering::Relaxed));
