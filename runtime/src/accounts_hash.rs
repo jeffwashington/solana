@@ -790,7 +790,7 @@ impl AccountsHasher {
         // a. vec: PUBKEY_BINS_FOR_CALCULATING_HASHES in pubkey order
         //      vec: individual hashes in pubkey order, 1 hash per
         // b. lamports
-        let _ = self.active_stats.activate(ActiveStatItem::HashDeDup);
+        let _guard = self.active_stats.activate(ActiveStatItem::HashDeDup);
 
         let mut zeros = Measure::start("eliminate zeros");
         let min_max_sum_entries_hashes = Mutex::new((usize::MAX, usize::MIN, 0u64, 0usize, 0usize));
@@ -1102,7 +1102,7 @@ impl AccountsHasher {
 
         let cumulative = CumulativeHashesFromFiles::from_files(hashes);
 
-        let _ = self.active_stats.activate(ActiveStatItem::HashMerkleTree);
+        let _guard = self.active_stats.activate(ActiveStatItem::HashMerkleTree);
         let mut hash_time = Measure::start("hash");
         let (hash, _) = Self::compute_merkle_root_from_slices(
             cumulative.total_count(),
