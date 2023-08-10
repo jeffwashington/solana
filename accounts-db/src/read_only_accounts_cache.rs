@@ -98,9 +98,6 @@ impl ReadOnlyAccountsCache {
             };
 
             let high_pass = self.counter.fetch_add(1, Ordering::Relaxed) % 64 == 0;
-            if high_pass {
-                self.high_pass.fetch_add(1, Ordering::Relaxed);
-            }
             // Move the entry to the end of the queue.
             // self.queue is modified while holding a reference to the cache entry;
             // so that another thread cannot write to the same key.
@@ -109,9 +106,6 @@ impl ReadOnlyAccountsCache {
             if high_pass {//update_lru {
                 let mut queue = self.queue.lock().unwrap();
                 queue.move_to_last(entry.index());
-                entry
-                    .last_update_time
-                    .store(ReadOnlyAccountCacheEntry::timestamp(), Ordering::Relaxed);
                 // self.time_based_sampling.fetch_add(1, Ordering::Relaxed);
             }
             let account = entry.account.clone();
