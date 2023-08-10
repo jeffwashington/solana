@@ -90,6 +90,7 @@ impl ReadOnlyAccountsCache {
     }
 
     pub(crate) fn load(&self, pubkey: Pubkey, slot: Slot) -> Option<AccountSharedData> {
+        let update_lru;
         let (account, load_us) = measure_us!({
             let key = (pubkey, slot);
             let Some(entry) = self.cache.get(&key) else {
@@ -97,21 +98,17 @@ impl ReadOnlyAccountsCache {
                 return None;
             };
 
-            if self.counter.fetch_add(1, Ordering::Relaxed) % 32 == 0 {
-                self.high_pass.fetch_add(1, Ordering::Relaxed);
-            }
             // Move the entry to the end of the queue.
             // self.queue is modified while holding a reference to the cache entry;
             // so that another thread cannot write to the same key.
             // If we updated the eviction queue within this much time, then leave it where it is. We're likely to hit it again.
-            let update_lru = entry.ms_since_last_update() >= self.ms_to_skip_lru_update;
+            update_lru = entry.ms_since_last_update() >= self.ms_to_skip_lru_update;
             if update_lru {
                 let mut queue = self.queue.lock().unwrap();
                 queue.move_to_last(entry.index());
                 entry
                     .last_update_time
                     .store(ReadOnlyAccountCacheEntry::timestamp(), Ordering::Relaxed);
-                self.time_based_sampling.fetch_add(1, Ordering::Relaxed);
             }
             let account = entry.account.clone();
             drop(entry);
@@ -119,6 +116,9 @@ impl ReadOnlyAccountsCache {
             Some(account)
         });
         self.load_us.fetch_add(load_us, Ordering::Relaxed);
+        if update_lru {
+            self.time_based_sampling.fetch_add(1, Ordering::Relaxed);
+        }
         account
     }
 
