@@ -2415,6 +2415,9 @@ impl<'a> AppendVecScan for ScanState<'a> {
         self.i += 1;
     }
     fn scanning_complete(mut self) -> Option<CacheHashDataFile> {
+        if self.cache_data.is_none() {
+            assert!(self.cache_data_bk.is_empty());
+        }
         self.cache_data.map(|mut cache_data| {
             assert_eq!(self.i, self.cache_data_bk.len());
             assert_eq!(&cache_data.get_slice(0)[..self.i], &self.cache_data_bk);
