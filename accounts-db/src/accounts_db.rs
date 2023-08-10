@@ -2400,8 +2400,8 @@ impl<'a> AppendVecScan for ScanState<'a> {
     fn scanning_complete(self) -> Option<CacheHashDataFile> {
         self.cache_data.map(|cache_data| {
             let mut cache_data = Arc::try_unwrap(cache_data).ok().unwrap();
-            cache_data.capacity = self.i as u64;
-            let timing = AccountsDb::sort_slot_storage_scan(&mut cache_data.get_slice(0)[..cache_data.capacity as usize]);
+            cache_data.capacity = (self.i * std::mem::size_of::<CalculateHashIntermediate>()) as u64;
+            let timing = AccountsDb::sort_slot_storage_scan(cache_data.get_slice(0));
             self.sort_time.fetch_add(timing, Ordering::Relaxed);
             cache_data
         })
