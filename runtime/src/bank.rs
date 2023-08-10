@@ -7106,7 +7106,7 @@ impl Bank {
         let epoch_schedule = self.epoch_schedule();
         let rent_collector = self.rent_collector();
         let include_slot_in_hash = self.include_slot_in_hash();
-        if config.run_in_background {
+        if config.run_in_background && false {
             let ancestors = ancestors.clone();
             let accounts = Arc::clone(accounts);
             let epoch_schedule = *epoch_schedule;
