@@ -105,7 +105,7 @@ impl ReadOnlyAccountsCache {
             update_lru = entry.ms_since_last_update() >= self.ms_to_skip_lru_update;
             if update_lru {
                 let mut queue = self.queue.lock().unwrap();
-                queue.move_last(entry.index());
+                queue.move_to_last(entry.index());
                 entry
                     .last_update_time
                     .store(ReadOnlyAccountCacheEntry::timestamp(), Ordering::Relaxed);
