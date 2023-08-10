@@ -2366,7 +2366,9 @@ impl<'a> AppendVecScan for ScanState<'a> {
     }
     fn filter(&mut self, pubkey: &Pubkey) -> bool {
         self.pubkey_to_bin_index = self.bin_calculator.bin_from_pubkey(pubkey);
-        self.bin_range.contains(&self.pubkey_to_bin_index)
+        let r = self.bin_range.contains(&self.pubkey_to_bin_index);
+        assert!(r, "{}, {:?}", pubkey, self.bin_range);
+        r
     }
     fn init_accum(&mut self, count: usize) {
         if self.accum.is_empty() {
