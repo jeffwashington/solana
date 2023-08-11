@@ -70,13 +70,31 @@ impl CacheHashDataFile {
     }
 
     /// get '&[EntryType]' from cache file [ix..]
-    fn get_slice(&self, ix: u64) -> &[EntryType] {
+    pub(crate) fn get_slice(&self, ix: u64) -> &[EntryType] {
         let start = self.get_element_offset_byte(ix);
-        let item_slice: &[u8] = &self.mmap[start..];
+        let item_slice: &[u8] = &self.mmap[start..self.capacity as usize];
         let remaining_elements = item_slice.len() / std::mem::size_of::<EntryType>();
         unsafe {
-            let item = item_slice.as_ptr() as *const EntryType;
+            let item: *const CalculateHashIntermediate = item_slice.as_ptr() as *const EntryType;
             std::slice::from_raw_parts(item, remaining_elements)
+        }
+    }
+
+    pub(crate) fn truncate(&mut self, num_elements: usize) {
+        let start = self.get_element_offset_byte(0);
+        let header = self.get_header_mut();
+        header.count = num_elements;
+        self.capacity = (num_elements * std::mem::size_of::<EntryType>() + start) as u64;
+    }
+
+    /// get '&[EntryType]' from cache file [ix..]
+    pub(crate) fn get_slice_mut(&mut self, ix: u64) -> &mut [EntryType] {
+        let start = self.get_element_offset_byte(ix);
+        let item_slice: &[u8] = &self.mmap[start..self.capacity as usize];
+        let remaining_elements = item_slice.len() / std::mem::size_of::<EntryType>();
+        unsafe {
+            let item = item_slice.as_ptr() as *mut EntryType;
+            std::slice::from_raw_parts_mut(item, remaining_elements)
         }
     }
 
@@ -288,7 +306,19 @@ impl CacheHashData {
         data: &[EntryType],
     ) -> Result<(), std::io::Error> {
         let mut stats = CacheHashDataStats::default();
-        let result = self.save_internal(file_name, data, &mut stats);
+        let result = self.save_internal(file_name, data, &mut stats, None);
+        self.stats.lock().unwrap().accumulate(&stats);
+        result.map(|_| ())
+    }
+
+    /// save 'data' to 'file_name'
+    pub(crate) fn allocate(
+        &self,
+        file_name: impl AsRef<Path>,
+        len: usize,
+    ) -> Result<CacheHashDataFile, std::io::Error> {
+        let mut stats = CacheHashDataStats::default();
+        let result = self.save_internal(file_name, &[], &mut stats, Some(len));
         self.stats.lock().unwrap().accumulate(&stats);
         result
     }
@@ -298,14 +328,15 @@ impl CacheHashData {
         file_name: impl AsRef<Path>,
         data: &[EntryType],
         stats: &mut CacheHashDataStats,
-    ) -> Result<(), std::io::Error> {
+        allocate_len: Option<usize>,
+    ) -> Result<CacheHashDataFile, std::io::Error> {
         let mut m = Measure::start("save");
         let cache_path = self.cache_dir.join(file_name);
         // overwrite any existing file at this path
         let _ignored = remove_file(&cache_path);
         let cell_size = std::mem::size_of::<EntryType>() as u64;
         let mut m1 = Measure::start("create save");
-        let entries = data.len();
+        let entries = allocate_len.unwrap_or(data.len());
         let capacity = cell_size * (entries as u64) + std::mem::size_of::<Header>() as u64;
 
         let mmap = CacheHashDataFile::new_map(&cache_path, capacity)?;
@@ -330,19 +361,23 @@ impl CacheHashData {
             i += 1;
             *d = item.clone();
         });
-        assert_eq!(i, entries);
+        if allocate_len.is_some() {
+            assert_eq!(i, 0);
+        } else {
+            assert_eq!(i, entries);
+        }
         m2.stop();
         stats.write_to_mmap_us += m2.as_us();
         m.stop();
         stats.save_us += m.as_us();
         stats.saved_to_cache += 1;
-        Ok(())
+        Ok(cache_file)
     }
 }
 
 #[cfg(test)]
 pub mod tests {
-    use {super::*, rand::Rng, crate::pubkey_bins::PubkeyBinCalculator24};
+    use {super::*, crate::pubkey_bins::PubkeyBinCalculator24, rand::Rng};
 
     #[test]
     fn test_read_write() {
@@ -359,7 +394,8 @@ pub mod tests {
             let bin_calculator = PubkeyBinCalculator24::new(bins);
             let num_points = 5;
             let (data, _total_points) = generate_test_data(num_points, bins, &bin_calculator);
-            for passes in [1] { // only support 1 pass now
+            for passes in [1] {
+                // only support 1 pass now
                 let bins_per_pass = bins / passes;
                 if bins_per_pass == 0 {
                     continue; // illegal test case
@@ -382,7 +418,12 @@ pub mod tests {
                         }
                         let cache = CacheHashData::new(cache_dir.clone());
                         let file_name = PathBuf::from("test");
-                        cache.save(&file_name, &data_this_pass.iter().flatten().cloned().collect::<Vec<_>>()).unwrap();
+                        cache
+                            .save(
+                                &file_name,
+                                &data_this_pass.iter().flatten().cloned().collect::<Vec<_>>(),
+                            )
+                            .unwrap();
                         cache.get_cache_files();
                         assert_eq!(
                             cache
