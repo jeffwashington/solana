@@ -10,6 +10,7 @@ pub struct ActiveStats {
     hash: AtomicUsize,
     flush: AtomicUsize,
     hash_scan: AtomicUsize,
+    hash_sort: AtomicUsize,
     hash_dedup: AtomicUsize,
     hash_merkle: AtomicUsize,
 }
@@ -64,6 +65,7 @@ impl ActiveStats {
             ActiveStatItem::HashDeDup => &self.hash_dedup,
             ActiveStatItem::HashMerkleTree => &self.hash_merkle,
             ActiveStatItem::HashScan => &self.hash_scan,
+            ActiveStatItem::HashSort => &self.hash_sort,
         };
         let value = modify_stat(stat);
         match item {
@@ -84,6 +86,9 @@ impl ActiveStats {
             }
             ActiveStatItem::HashScan => {
                 datapoint_info!("accounts_db_active", ("hash_scan", value, i64))
+            }
+            ActiveStatItem::HashSort => {
+                datapoint_info!("accounts_db_active", ("hash_sort", value, i64))
             }
         };
     }
