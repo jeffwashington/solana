@@ -2434,7 +2434,8 @@ impl<'a> AppendVecScan for ScanState<'a> {
     fn init_accum(&mut self, count: usize, cache_hash_data: &CacheHashData, file_name: &str) {
         // need good initial estimate to avoid repeated re-allocation while scanning
         if self.cache_data.is_none() {
-            self.cache_data = Some(cache_hash_data.allocate(file_name, count).unwrap());
+            self.count = count;
+            self.cache_data = Some(cache_hash_data.allocate(file_name, count * 2).unwrap());
             // stop doing initial allocation for now
             // self.accum = Vec::with_capacity(count);
         }
