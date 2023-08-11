@@ -2321,8 +2321,6 @@ trait AppendVecScan: Send + Sync + Clone {
     fn scanning_complete(self) -> BinnedHashData;
     /// initialize accumulator
     fn init_accum(&mut self, count: usize);
-    fn get_accum(&mut self) -> BinnedHashData;
-    fn set_accum(&mut self, accum: BinnedHashData);
 }
 
 #[derive(Clone)]
@@ -2387,12 +2385,6 @@ impl<'a> AppendVecScan for ScanState<'a> {
         let (result, timing) = AccountsDb::sort_slot_storage_scan(self.accum);
         self.sort_time.fetch_add(timing, Ordering::Relaxed);
         result
-    }
-    fn get_accum(&mut self) -> BinnedHashData {
-        std::mem::take(&mut self.accum)
-    }
-    fn set_accum(&mut self, accum: BinnedHashData) {
-        self.accum = accum;
     }
 }
 
@@ -10844,12 +10836,6 @@ pub mod tests {
             self.current_slot = slot;
         }
         fn init_accum(&mut self, _count: usize) {}
-        fn get_accum(&mut self) -> BinnedHashData {
-            std::mem::take(&mut self.accum)
-        }
-        fn set_accum(&mut self, accum: BinnedHashData) {
-            self.accum = accum;
-        }
         fn found_account(&mut self, loaded_account: &LoadedAccount) {
             self.calls.fetch_add(1, Ordering::Relaxed);
             assert_eq!(loaded_account.pubkey(), &self.pubkey);
@@ -11144,12 +11130,6 @@ pub mod tests {
         }
         fn scanning_complete(self) -> BinnedHashData {
             self.accum
-        }
-        fn get_accum(&mut self) -> BinnedHashData {
-            std::mem::take(&mut self.accum)
-        }
-        fn set_accum(&mut self, accum: BinnedHashData) {
-            self.accum = accum;
         }
     }
 
