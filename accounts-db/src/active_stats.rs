@@ -24,6 +24,7 @@ pub enum ActiveStatItem {
     HashScan,
     HashDeDup,
     HashMerkleTree,
+    HashSort,
 }
 
 /// sole purpose is to handle 'drop' so that stat is decremented when self is dropped

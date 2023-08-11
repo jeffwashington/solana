@@ -2413,6 +2413,7 @@ struct ScanState<'a> {
     range: usize,
     sort_time: Arc<AtomicU64>,
     pubkey_to_bin_index: usize,
+    db: &'a AccountsDb,
 }
 
 impl<'a> AppendVecScan for ScanState<'a> {
@@ -2462,10 +2463,15 @@ impl<'a> AppendVecScan for ScanState<'a> {
         self.init_accum(self.range);
         self.accum.push(source_item);
     }
-    fn scanning_complete(mut self) -> BinnedHashData {
-        let timing = AccountsDb::sort_slot_storage_scan(&mut self.accum);
-        self.sort_time.fetch_add(timing, Ordering::Relaxed);
-        self.accum
+    fn scanning_complete(self) -> Option<CacheHashDataFile> {
+        self.cache_data.map(|mut cache_data| {
+            cache_data.truncate(self.i);
+            assert_eq!(cache_data.get_slice_mut(0).len(), self.i);
+            let timing = self.db.sort_slot_storage_scan(cache_data.get_slice_mut(0));
+
+            self.sort_time.fetch_add(timing, Ordering::Relaxed);
+            cache_data
+        })
     }
 }
 
@@ -7774,6 +7780,7 @@ impl AccountsDb {
             bin_range,
             sort_time: sort_time.clone(),
             pubkey_to_bin_index: 0,
+            db: self,
         };
 
         let result = self.scan_account_storage_no_bank(
@@ -7801,14 +7808,16 @@ impl AccountsDb {
         Ok(result)
     }
 
-    fn sort_slot_storage_scan(accum: &mut BinnedHashData) -> u64 {
+    fn sort_slot_storage_scan(&self, accum: &mut [CalculateHashIntermediate]) -> u64 {
         let time = AtomicU64::new(0);
-        let mut sort_time = Measure::start("sort");
-        // sort_by vs unstable because slot and write_version are already in order
-        accum.sort_by(AccountsHasher::compare_two_hash_entries);
-        sort_time.stop();
-        time.fetch_add(sort_time.as_us(), Ordering::Relaxed);
-
+        {
+            let mut sort_time = Measure::start("sort");
+            let _guard = self.active_stats.activate(ActiveStatItem::HashSort);
+            // sort_by vs unstable because slot and write_version are already in order
+            accum.par_sort_by(AccountsHasher::compare_two_hash_entries);
+            sort_time.stop();
+            time.fetch_add(sort_time.as_us(), Ordering::Relaxed);
+        }
         time.load(Ordering::Relaxed)
     }
 
