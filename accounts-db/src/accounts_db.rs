@@ -2350,6 +2350,7 @@ struct ScanState<'a> {
     filler_account_suffix: Option<&'a Pubkey>,
     sort_time: Arc<AtomicU64>,
     cache_data: Option<CacheHashDataFile>,
+    count: usize,
 }
 
 impl<'a> Clone for ScanState<'a> {
@@ -2363,6 +2364,7 @@ impl<'a> Clone for ScanState<'a> {
             sort_time: self.sort_time.clone(),
             // this is the only non-trivial clone
             cache_data: None,
+            count: 0,
         }
     }
 }
@@ -2374,7 +2376,8 @@ impl<'a> AppendVecScan for ScanState<'a> {
     fn init_accum(&mut self, count: usize, cache_hash_data: &CacheHashData, file_name: &str) {
         // need good initial estimate to avoid repeated re-allocation while scanning
         if self.cache_data.is_none() {
-            self.cache_data = Some(cache_hash_data.allocate(file_name, count).unwrap());
+            self.count = count;
+            self.cache_data = Some(cache_hash_data.allocate(file_name, count * 2).unwrap());
             // stop doing initial allocation for now
             // self.accum = Vec::with_capacity(count);
         }
@@ -2404,10 +2407,18 @@ impl<'a> AppendVecScan for ScanState<'a> {
             }
         }
         let source_item = CalculateHashIntermediate::new(loaded_hash, balance, *pubkey);
-        self.cache_data
-            .as_mut()
-            .unwrap()
-            .get_slice_mut(self.i as u64)[0] = source_item;
+        let elts = self.cache_data.as_ref().map(|cache_data| cache_data.get_num_elts()).unwrap_or_default();
+        if elts <= self.i {
+            //log::error!("too few elts: {}, {}, {}, {}", elts, self.i, self.count, self.cache_data.is_none());
+        }
+        let m = self.cache_data
+        .as_mut()
+        .unwrap()
+        .get_slice_mut(self.i as u64);
+        if m.len() == 0 {
+            log::error!("too few elts: {}, {}, {}", elts, self.i, self.count);
+        }
+        m[0] = source_item;
         self.i += 1;
     }
     fn scanning_complete(self) -> Option<CacheHashDataFile> {
@@ -7081,10 +7092,18 @@ impl AccountsDb {
     where
         S: AppendVecScan,
     {
+        let count = storage.count();
+        let mut found = 0;
         storage
             .accounts
             .account_iter()
-            .for_each(|account| scanner.found_account(&LoadedAccount::Stored(account)));
+            .for_each(|account| {
+                scanner.found_account(&LoadedAccount::Stored(account));
+                found += 1;
+            });
+        if found > count {
+            error!("storage expected {}, had {}", count, found);
+        }
     }
 
     fn update_old_slot_stats(&self, stats: &HashStats, storage: Option<&Arc<AccountStorageEntry>>) {
@@ -7537,6 +7556,7 @@ impl AccountsDb {
             filler_account_suffix,
             sort_time: sort_time.clone(),
             cache_data: None,
+            count: 0,
         };
 
         let result = self.scan_account_storage_no_bank(

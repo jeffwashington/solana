@@ -87,6 +87,13 @@ impl CacheHashDataFile {
         self.capacity = (num_elements * std::mem::size_of::<EntryType>() + start) as u64;
     }
 
+    pub fn get_num_elts(&self) -> usize {
+        let start = self.get_element_offset_byte(0);
+        let item_slice: &[u8] = &self.mmap[start..self.capacity as usize];
+        let remaining_elements = item_slice.len() / std::mem::size_of::<EntryType>();
+        remaining_elements
+    }
+
     /// get '&[EntryType]' from cache file [ix..]
     pub(crate) fn get_slice_mut(&mut self, ix: u64) -> &mut [EntryType] {
         let start = self.get_element_offset_byte(ix);
