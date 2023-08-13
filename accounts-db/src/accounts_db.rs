@@ -1495,6 +1495,8 @@ pub struct AccountsDb {
         Mutex<HashMap<Slot, (IncrementalAccountsHash, /*capitalization*/ u64)>>,
 
     pub stats: AccountsStats,
+    read_cache_hit_data_len: AtomicU64,
+    read_cache_miss_data_len: AtomicU64,
 
     clean_accounts_stats: CleanAccountsStats,
 
@@ -2454,6 +2456,8 @@ impl AccountsDb {
         const ACCOUNTS_STACK_SIZE: usize = 8 * 1024 * 1024;
 
         AccountsDb {
+            read_cache_hit_data_len: AtomicU64::default(),
+            read_cache_miss_data_len: AtomicU64::default(),
             create_ancient_storage: CreateAncientStorage::Pack,
             verify_accounts_hash_in_bg: VerifyAccountsHashInBackground::default(),
             filler_accounts_per_slot: AtomicU64::default(),
@@ -5473,6 +5477,7 @@ impl AccountsDb {
                     {
                         return None;
                     }
+                    self.read_cache_hit_data_len.fetch_add(account.data().len() as u64, Ordering::Relaxed);
                     return Some((account, slot));
                 }
             }
@@ -5516,6 +5521,7 @@ impl AccountsDb {
             However, by the assumption for contradiction above ,  'A' has already been updated in 'S' which means '(S, A)'
             must exist in the write cache, which is a contradiction.
             */
+            self.read_cache_miss_data_len.fetch_add(account.data().len() as u64, Ordering::Relaxed);
             self.read_only_accounts_cache
                 .store(*pubkey, slot, account.clone());
         }
@@ -8499,6 +8505,17 @@ impl AccountsDb {
                 (
                     "total_data",
                     self.stats.store_total_data.swap(0, Ordering::Relaxed),
+                    i64
+                ),
+                
+                (
+                    "read_cache_hit_data_len",
+                    self.read_cache_hit_data_len.swap(0, Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "read_cache_miss_data_len",
+                    self.read_cache_miss_data_len.swap(0, Ordering::Relaxed),
                     i64
                 ),
                 (
