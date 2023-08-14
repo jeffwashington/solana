@@ -104,11 +104,12 @@ impl ReadOnlyAccountsCache {
             // If we updated the eviction queue within this much time, then leave it where it is. We're likely to hit it again.
             update_lru = entry.ms_since_last_update() >= self.ms_to_skip_lru_update;
             if update_lru {
-                let mut queue = self.queue.lock().unwrap();
-                queue.move_to_last(entry.index());
-                entry
-                    .last_update_time
-                    .store(ReadOnlyAccountCacheEntry::timestamp(), Ordering::Relaxed);
+                if let Ok(mut queue) = self.queue.try_lock() {
+                    queue.move_to_last(entry.index());
+                    entry
+                        .last_update_time
+                        .store(ReadOnlyAccountCacheEntry::timestamp(), Ordering::Relaxed);
+                }
             }
             let account = entry.account.clone();
             drop(entry);
