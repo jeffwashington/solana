@@ -7,7 +7,7 @@ use {
     solana_measure::measure::Measure,
     std::{
         collections::HashSet,
-        fs::{self, remove_file, OpenOptions},
+        fs::{self, remove_file, File, OpenOptions},
         io::{Seek, SeekFrom, Write},
         path::{Path, PathBuf},
         sync::{Arc, Mutex},
@@ -27,6 +27,7 @@ pub struct CacheHashDataFile {
     cell_size: u64,
     mmap: MmapMut,
     capacity: u64,
+    file: File,
 }
 
 impl CacheHashDataFile {
@@ -85,13 +86,19 @@ impl CacheHashDataFile {
         let header = self.get_header_mut();
         header.count = num_elements;
         self.capacity = (num_elements * std::mem::size_of::<EntryType>() + start) as u64;
+        let file_len = self.file.metadata().unwrap().len();
+        if let Err(err) = self.file.set_len(self.capacity) {
+            panic!(
+                "error truncating file from {} to {}, err: {:?}",
+                file_len, self.capacity, err
+            );
+        }
     }
 
     pub fn get_num_elts(&self) -> usize {
         let start = self.get_element_offset_byte(0);
         let item_slice: &[u8] = &self.mmap[start..self.capacity as usize];
-        let remaining_elements = item_slice.len() / std::mem::size_of::<EntryType>();
-        remaining_elements
+        item_slice.len() / std::mem::size_of::<EntryType>()
     }
 
     /// get '&[EntryType]' from cache file [ix..]
@@ -137,8 +144,8 @@ impl CacheHashDataFile {
         }
     }
 
-    fn new_map(file: impl AsRef<Path>, capacity: u64) -> Result<MmapMut, std::io::Error> {
-        let mut data = OpenOptions::new()
+    fn new_map(file: impl AsRef<Path>, capacity: u64) -> Result<(MmapMut, File), std::io::Error> {
+        let mut file = OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
@@ -147,21 +154,21 @@ impl CacheHashDataFile {
         // Theoretical performance optimization: write a zero to the end of
         // the file so that we won't have to resize it later, which may be
         // expensive.
-        data.seek(SeekFrom::Start(capacity - 1)).unwrap();
-        data.write_all(&[0]).unwrap();
-        data.rewind().unwrap();
-        data.flush().unwrap();
-        Ok(unsafe { MmapMut::map_mut(&data).unwrap() })
+        file.seek(SeekFrom::Start(capacity - 1)).unwrap();
+        file.write_all(&[0]).unwrap();
+        file.rewind().unwrap();
+        file.flush().unwrap();
+        Ok((unsafe { MmapMut::map_mut(&file).unwrap() }, file))
     }
 
-    fn load_map(file: impl AsRef<Path>) -> Result<MmapMut, std::io::Error> {
-        let data = OpenOptions::new()
+    fn load_map(file: impl AsRef<Path>) -> Result<(MmapMut, File), std::io::Error> {
+        let file = OpenOptions::new()
             .read(true)
             .write(true)
             .create(false)
             .open(file)?;
 
-        Ok(unsafe { MmapMut::map_mut(&data).unwrap() })
+        Ok((unsafe { MmapMut::map_mut(&file).unwrap() }, file))
     }
 }
 
@@ -257,7 +264,7 @@ impl CacheHashData {
         let path = self.cache_dir.join(&file_name);
         let file_len = std::fs::metadata(&path)?.len();
         let mut m1 = Measure::start("read_file");
-        let mmap = CacheHashDataFile::load_map(&path)?;
+        let (mmap, file) = CacheHashDataFile::load_map(&path)?;
         m1.stop();
         stats.read_us = m1.as_us();
         let header_size = std::mem::size_of::<Header>() as u64;
@@ -278,6 +285,7 @@ impl CacheHashData {
             mmap,
             cell_size,
             capacity: 0,
+            file,
         };
         let header = cache_file.get_header_mut();
         let entries = header.count;
@@ -290,10 +298,10 @@ impl CacheHashData {
         if capacity != file_len {
             log::error!("expected: {capacity}, len on disk: {file_len} {}, entries: {entries}, cell_size: {cell_size}", path.display());
         }
-        /*assert_eq!(
+        assert_eq!(
             capacity, file_len,
             "expected: {capacity}, len on disk: {file_len} {}, entries: {entries}, cell_size: {cell_size}", path.display(),
-        );*/
+        );
 
         stats.total_entries = entries;
         stats.cache_file_size += capacity as usize;
@@ -349,13 +357,14 @@ impl CacheHashData {
         let entries = allocate_len.unwrap_or(data.len());
         let capacity = cell_size * (entries as u64) + std::mem::size_of::<Header>() as u64;
 
-        let mmap = CacheHashDataFile::new_map(&cache_path, capacity)?;
+        let (mmap, file) = CacheHashDataFile::new_map(&cache_path, capacity)?;
         m1.stop();
         stats.create_save_us += m1.as_us();
         let mut cache_file = CacheHashDataFile {
             mmap,
             cell_size,
             capacity,
+            file,
         };
 
         let header = cache_file.get_header_mut();

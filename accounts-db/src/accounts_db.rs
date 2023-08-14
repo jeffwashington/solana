@@ -2415,7 +2415,7 @@ impl<'a> AppendVecScan for ScanState<'a> {
         .as_mut()
         .unwrap()
         .get_slice_mut(self.i as u64);
-        if m.len() == 0 {
+        if m.is_empty() {
             log::error!("too few elts: {}, {}, {}", elts, self.i, self.count);
         }
         m[0] = source_item;
@@ -7720,7 +7720,7 @@ impl AccountsDb {
             // convert mmapped cache files into slices of data
             let cache_hash_intermediates = cache_hash_data_files
                 .iter()
-                .map(|d| &*d.get_cache_hash_data())
+                .map(|d| d.get_cache_hash_data())
                 .collect::<Vec<_>>();
 
             // turn raw data into merkle tree hashes and sum of lamports
@@ -11176,8 +11176,8 @@ pub mod tests {
                 pubkey: Pubkey::default(),
             });
         }
-        fn scanning_complete(self) -> BinnedHashData {
-            self.accum
+        fn scanning_complete(self) -> Option<CacheHashDataFile> {
+            panic!("");
         }
     }
 
