@@ -97,7 +97,7 @@ impl ReadOnlyAccountsCache {
                 return None;
             };
 
-            let high_pass = self.counter.fetch_add(1, Ordering::Relaxed) % 16 == 0;
+            let high_pass = self.counter.fetch_add(1, Ordering::Relaxed) % 8 == 0;
             // Move the entry to the end of the queue.
             // self.queue is modified while holding a reference to the cache entry;
             // so that another thread cannot write to the same key.
