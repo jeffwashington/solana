@@ -321,7 +321,7 @@ impl CacheHashData {
     pub fn save(
         &self,
         file_name: impl AsRef<Path>,
-        data: &[EntryType],
+        data: &SavedTypeSlice,
     ) -> Result<(), std::io::Error> {
         let mut stats = CacheHashDataStats::default();
         let result = self.save_internal(file_name, data, &mut stats, None);
@@ -344,7 +344,7 @@ impl CacheHashData {
     fn save_internal(
         &self,
         file_name: impl AsRef<Path>,
-        data: &[EntryType],
+        data: &SavedTypeSlice,
         stats: &mut CacheHashDataStats,
         allocate_len: Option<usize>,
     ) -> Result<CacheHashDataFile, std::io::Error> {
@@ -375,10 +375,12 @@ impl CacheHashData {
 
         let mut m2 = Measure::start("write_to_mmap");
         let mut i = 0;
-        data.iter().for_each(|item| {
-            let d = cache_file.get_mut(i as u64);
-            i += 1;
-            *d = item.clone();
+        data.iter().for_each(|x| {
+            x.iter().for_each(|item| {
+                let d = cache_file.get_mut(i as u64);
+                i += 1;
+                *d = item.clone();
+            })
         });
         if allocate_len.is_some() {
             assert_eq!(i, 0);
@@ -396,7 +398,7 @@ impl CacheHashData {
 
 #[cfg(test)]
 pub mod tests {
-    use {super::*, crate::pubkey_bins::PubkeyBinCalculator24, rand::Rng};
+    use {super::*, rand::Rng};
 
     #[test]
     fn test_read_write() {
@@ -420,7 +422,7 @@ pub mod tests {
                     continue; // illegal test case
                 }
                 for pass in 0..passes {
-                    for flatten_data in [true] {
+                    for flatten_data in [true, false] {
                         let mut data_this_pass = if flatten_data {
                             vec![vec![], vec![]]
                         } else {
