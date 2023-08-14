@@ -7589,7 +7589,7 @@ impl AccountsDb {
         {
             let mut sort_time = Measure::start("sort");
             // sort_by vs unstable because slot and write_version are already in order
-            accum.par_sort_by(AccountsHasher::compare_two_hash_entries);
+            accum.sort_by(AccountsHasher::compare_two_hash_entries);
             sort_time.stop();
             time.fetch_add(sort_time.as_us(), Ordering::Relaxed);
         }
