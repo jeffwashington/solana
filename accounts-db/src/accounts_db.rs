@@ -2334,6 +2334,7 @@ trait AppendVecScan: Send + Sync + Clone {
     fn scanning_complete(self) -> Option<CacheHashDataFile>;
     /// initialize accumulator
     fn init_accum(&mut self, count: usize, cache_hash_data: &CacheHashData, file_name: &str);
+    fn initial_scan_complete(&mut self, cache_hash_data: &CacheHashData, file_name: &str);
 }
 
 /// state to keep while scanning append vec accounts for hash calculation
@@ -2354,6 +2355,10 @@ struct ScanState<'a> {
     sort_time: Arc<AtomicU64>,
     cache_data: Option<CacheHashDataFile>,
     count: usize,
+    initial_scan_complete: bool,
+    distributions: Option<Vec<usize>>,
+    current_index_per_bin: Option<Vec<usize>>,
+    start_index_per_bin:  Option<Vec<usize>>,
 }
 
 impl<'a> Clone for ScanState<'a> {
@@ -2370,6 +2375,10 @@ impl<'a> Clone for ScanState<'a> {
             // this is the only non-trivial clone
             cache_data: None,
             count: 0,
+            distributions: None,
+            initial_scan_complete: false,
+            current_index_per_bin: None,
+            start_index_per_bin: None,
         }
     }
 }
@@ -2378,23 +2387,46 @@ impl<'a> AppendVecScan for ScanState<'a> {
     fn set_slot(&mut self, slot: Slot) {
         self.current_slot = slot;
     }
-    fn init_accum(&mut self, count: usize, cache_hash_data: &CacheHashData, file_name: &str) {
+    fn initial_scan_complete(&mut self, cache_hash_data: &CacheHashData, file_name: &str) {
+        let distributions = self.distributions.as_mut().unwrap();
+        self.initial_scan_complete = true;
+        let mut current_index_per_bin = Vec::with_capacity(self.bins);
+        current_index_per_bin.push(0);
+        self.cache_data = Some(cache_hash_data.allocate(file_name, self.count).unwrap());
+
+        let mut start = 0;
+        (1..self.bins).for_each(|bin| {
+            let width_this_bin = distributions[bin-1];
+            let first_element = start + width_this_bin;
+            assert_eq!(current_index_per_bin.len(), bin);
+            current_index_per_bin.push(first_element);
+            start += width_this_bin;
+        });
+        assert_eq!(start, self.count);
+        self.current_index_per_bin = Some(current_index_per_bin);
+        self.start_index_per_bin = self.current_index_per_bin.clone();
+    }
+    fn init_accum(&mut self, _count: usize, cache_hash_data: &CacheHashData, file_name: &str) {
         // need good initial estimate to avoid repeated re-allocation while scanning
-        if self.cache_data.is_none() {
-            self.count = count;
-            self.cache_data = Some(cache_hash_data.allocate(file_name, count * 10).unwrap());
-            // stop doing initial allocation for now
-            // self.accum = Vec::with_capacity(count);
+        if self.distributions.is_none() {
+            self.distributions = Some(vec![0; self.bins]);
         }
     }
     fn found_account(&mut self, loaded_account: &LoadedAccount) {
         let pubkey = loaded_account.pubkey();
+        let bin = self.bin_calculator.bin_from_pubkey(pubkey);
+        if !self.initial_scan_complete {
+            self.distributions.as_mut().unwrap()[bin] += 1;
+            self.count += 1;
+            return;
+        }
 
         // when we are scanning with bin ranges, we don't need to use exact bin numbers. Subtract to make first bin we care about at index 0.
         let balance = loaded_account.lamports();
         let mut loaded_hash = loaded_account.loaded_hash();
 
         let hash_is_missing = loaded_hash == Hash::default();
+
         if (self.config.check_hash || hash_is_missing)
             && !AccountsDb::is_filler_account_helper(pubkey, self.filler_account_suffix)
         {
@@ -2414,27 +2446,27 @@ impl<'a> AppendVecScan for ScanState<'a> {
             }
         }
         let source_item = CalculateHashIntermediate::new(loaded_hash, balance, *pubkey);
-        let elts = self.cache_data.as_ref().map(|cache_data| cache_data.get_num_elts()).unwrap_or_default();
-        if elts <= self.i {
-            //log::error!("too few elts: {}, {}, {}, {}", elts, self.i, self.count, self.cache_data.is_none());
-        }
+        let this_i = &mut self.current_index_per_bin.as_mut().unwrap()[bin];
         let m = self.cache_data
         .as_mut()
         .unwrap()
-        .get_slice_mut(self.i as u64);
-        if m.is_empty() {
-            log::error!("too few elts: {}, {}, {}", elts, self.i, self.count);
-        }
+        .get_slice_mut(*this_i as u64);
+        *this_i = *this_i + 1;
         m[0] = source_item;
-        self.i += 1;
     }
     fn scanning_complete(self) -> Option<CacheHashDataFile> {
         self.cache_data.map(|mut cache_data| {
-            cache_data.truncate(self.i);
-            assert_eq!(cache_data.get_slice_mut(0).len(), self.i);
-            let timing = AccountsDb::sort_slot_storage_scan(cache_data.get_slice_mut(0));
+            assert_eq!(cache_data.get_slice_mut(0).len(), self.count);
+            // the pubkeys were put in ranges within the flat slice.
+            // So, we can sort each range to sort the overall vec much faster.
+            (0..self.bins).for_each(|bin| {
+                // cache_data.truncate(self.i);
+                let data = &mut cache_data.get_slice_mut(self.start_index_per_bin.as_ref().unwrap()[bin] as u64)[..self.distributions.as_ref().unwrap()[bin]];
 
-            self.sort_time.fetch_add(timing, Ordering::Relaxed);
+                let timing = AccountsDb::sort_slot_storage_scan(data);
+
+                self.sort_time.fetch_add(timing, Ordering::Relaxed);
+            });
             cache_data
         })
     }
@@ -7099,7 +7131,7 @@ impl AccountsDb {
     where
         S: AppendVecScan,
     {
-        let count = storage.count();
+        let count = storage.accounts.len();
         let mut found = 0;
         storage
             .accounts
@@ -7108,7 +7140,7 @@ impl AccountsDb {
                 scanner.found_account(&LoadedAccount::Stored(account));
                 found += 1;
             });
-        if found > count {
+        if found != count {
             error!("storage expected {}, had {}", count, found);
         }
     }
@@ -7271,7 +7303,26 @@ impl AccountsDb {
                     .filter_map(|(_, storage)| storage.map(|storage| storage.accounts.len()))
                     .sum::<usize>();
 
+                // first pass is to get distribution of pubkeys to bins
+                let (_, us) = measure_us!(
                 for (slot, storage) in snapshot_storages.iter_range(&range_this_chunk) {
+                    let ancient = slot < oldest_non_ancient_slot;
+                    let (_, scan_us) = measure_us!(if let Some(storage) = storage {
+                        if init_accum {
+                            scanner.init_accum(count, cache_hash_data, &file_name);
+                            init_accum = false;
+                        }
+                        scanner.set_slot(slot);
+
+                        Self::scan_single_account_storage(storage, &mut scanner);
+                    });
+                    scanner.initial_scan_complete(cache_hash_data, &file_name);
+                });
+                stats.initial_scan_time.fetch_add(us, Ordering::Relaxed);
+
+                // second pass puts resulting hash data in the range where each pubkey belongs in the output vec
+                let (_, us) = measure_us!(
+                    for (slot, storage) in snapshot_storages.iter_range(&range_this_chunk) {
                     let ancient = slot < oldest_non_ancient_slot;
                     let (_, scan_us) = measure_us!(if let Some(storage) = storage {
                         if init_accum {
@@ -7291,7 +7342,8 @@ impl AccountsDb {
                             .longest_ancient_scan_us
                             .fetch_max(scan_us, Ordering::Relaxed);
                     }
-                }
+                });
+                stats.second_pass_scan_time.fetch_add(us, Ordering::Relaxed);
                 (!init_accum).then(|| scanner.scanning_complete()).flatten()
             })
             .filter_map(|x| x)
@@ -7567,6 +7619,10 @@ impl AccountsDb {
             sort_time: sort_time.clone(),
             cache_data: None,
             count: 0,
+            initial_scan_complete: false,
+            distributions: None,
+            start_index_per_bin: None,
+            current_index_per_bin: None,
         };
 
         let result = self.scan_account_storage_no_bank(

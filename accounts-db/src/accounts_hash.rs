@@ -159,6 +159,8 @@ pub struct HashStats {
     pub sum_ancient_scans_us: AtomicU64,
     pub count_ancient_scans: AtomicU64,
     pub pubkey_bin_search_us: AtomicU64,
+    pub initial_scan_time: AtomicU64,
+    pub second_pass_scan_time: AtomicU64,
 }
 impl HashStats {
     pub fn calc_storage_size_quartiles(&mut self, storages: &[Arc<AccountStorageEntry>]) {
@@ -231,6 +233,16 @@ impl HashStats {
             (
                 "longest_ancient_scan_us",
                 self.longest_ancient_scan_us.load(Ordering::Relaxed),
+                i64
+            ),
+            (
+                "initial_scan_time",
+                self.initial_scan_time.load(Ordering::Relaxed),
+                i64
+            ),
+            (
+                "second_pass_scan_time",
+                self.second_pass_scan_time.load(Ordering::Relaxed),
                 i64
             ),
             (
