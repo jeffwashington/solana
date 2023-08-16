@@ -194,6 +194,7 @@ impl BucketMapHolderStats {
         if elapsed_ms < STATS_INTERVAL_MS {
             return;
         }
+        return;
 
         if !self.last_time.should_update(STATS_INTERVAL_MS) {
             return;

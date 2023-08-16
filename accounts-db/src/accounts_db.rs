@@ -5521,7 +5521,19 @@ impl AccountsDb {
             However, by the assumption for contradiction above ,  'A' has already been updated in 'S' which means '(S, A)'
             must exist in the write cache, which is a contradiction.
             */
+            use crate::read_only_accounts_cache::Keep;
             self.read_cache_miss_data_len.fetch_add(account.data().len() as u64, Ordering::Relaxed);
+            if self.read_only_accounts_cache.has_been_in_cache.get(&(*pubkey, slot)).is_some() {
+                self.read_only_accounts_cache.kept.lock().unwrap().missed_and_loaded.push((*pubkey, slot, {
+                    Keep {
+                        account: account.clone(),
+                        pubkey: *pubkey,
+                        slot,
+                        time_from_start: 0,
+                        num_lru_updates: 0,
+                    }
+                }));
+            }
             self.read_only_accounts_cache
                 .store(*pubkey, slot, account.clone());
         }
@@ -8456,6 +8468,48 @@ impl AccountsDb {
 
     fn report_store_timings(&self) {
         if self.stats.last_store_report.should_update(1000) {
+            let mut r = self.read_only_accounts_cache.kept.lock().unwrap();
+            let last = std::mem::take(&mut *r);
+            drop(r);
+            last.removed_ms_not_in_dashmap.iter().for_each(|e| {
+                log::error!("removed_ms_not_in_dashmap: {e:?}");
+            });
+            last.removed_sampling_not_in_dashmap.iter().for_each(|e| {
+                log::error!("removed_sampling_not_in_dashmap: {e:?}");
+            });
+            last.removed_ms_still_in_sampling.iter().for_each(|e| {
+                log::error!("removed_ms_still_in_sampling: {:?}", e.2);
+            });
+            last.removed_sampling_still_in_ms.iter().for_each(|e| {
+                log::error!("removed_sampling_still_in_ms: {:?}", e.2);
+            });
+            last.missed_and_loaded.iter().for_each(|e| {
+                log::error!("missed_and_loaded: {:?}", e.2);
+            });
+            let limit = 2_000;
+            let mut count = 0;
+            let mut sum = 0;
+            last.would_have_missed_sampling.iter().for_each(|e| {
+                if e.2.account.data().len() <= limit {
+                    count += 1;
+                    sum += e.2.account.data().len();
+                    log::error!("would_have_missed_sampling: {:?}", e.2);
+                }
+            });
+            if count > 0 {
+                log::error!("would_have_missed_sampling total: {:?}, sum,{}", count, sum);
+            }
+            let mut count = 0;
+            last.would_have_missed_sampling.iter().for_each(|e| {
+                if e.2.account.data().len() > limit {
+                    count += 1;
+                    sum += e.2.account.data().len();
+                    log::error!("would_have_missed_sampling(big): {:?}", e.2);
+                }
+            });
+            if count > 0 && sum > 0 {
+                log::error!("would_have_missed_sampling(big) total: {:?}, sum,{}", count, sum);
+            }
             let (
                 read_only_cache_hits,
                 read_only_cache_misses,
