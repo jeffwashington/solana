@@ -1605,6 +1605,7 @@ pub struct AccountsStats {
     checkand_get_loaded_account: AtomicU64,
     loads_from_appendvec: AtomicU64,
     store: AtomicU64,
+    big_accounts_loaded: Mutex<Vec<(Pubkey, usize)>>,
 }
 
 #[derive(Debug, Default)]
@@ -5536,6 +5537,10 @@ impl AccountsDb {
             let (_, us) = measure_us!(
             self.read_only_accounts_cache
                 .store(*pubkey, slot, account.clone()));
+            let len = account.data().len();
+            if len > 50_000 {
+                self.stats.big_accounts_loaded.lock().unwrap().push((*pubkey, len));
+            }
             self.stats.store.fetch_add(us, Ordering::Relaxed);
         }
         Some((account, slot))
@@ -8476,8 +8481,26 @@ impl AccountsDb {
                 read_only_cache_load_us,
                 time_based_sampling, high_pass,
             ) = self.read_only_accounts_cache.get_and_reset_stats();
+            let mut sum = 0;
+            let big = std::mem::take(&mut *self.stats.big_accounts_loaded.lock().unwrap());
+            big.iter().for_each(|(k, len)| {
+                sum += len;
+                log::error!("big accounts loaded,{},{}", k, len);
+            });
+
+
             datapoint_info!(
                 "accounts_db_store_timings",
+                (
+                    "big_accounts_count",
+                    big.len(),
+                    i64
+                ),
+                (
+                    "big_accounts_sum",
+                    sum,
+                    i64
+                ),
                 (
                     "hash_accounts",
                     self.stats.store_hash_accounts.swap(0, Ordering::Relaxed),
