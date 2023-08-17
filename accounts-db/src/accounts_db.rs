@@ -1601,6 +1601,10 @@ pub struct AccountsStats {
     handle_dead_keys_us: AtomicU64,
     purge_exact_us: AtomicU64,
     purge_exact_count: AtomicU64,
+    retry_to_get_account_accessor: AtomicU64,
+    checkand_get_loaded_account: AtomicU64,
+    loads_from_appendvec: AtomicU64,
+    store: AtomicU64,
 }
 
 #[derive(Debug, Default)]
@@ -5493,17 +5497,24 @@ impl AccountsDb {
             }
         }
 
-        let (mut account_accessor, slot) = self.retry_to_get_account_accessor(
+        let (r, us) = measure_us!(self.retry_to_get_account_accessor(
             slot,
             storage_location,
             ancestors,
             pubkey,
             max_root,
             load_hint,
-        )?;
+        ));
+        let is_cached;
+        self.stats.loads_from_appendvec.fetch_add(1, Ordering::Relaxed);
+        self.stats.retry_to_get_account_accessor.fetch_add(us, Ordering::Relaxed);
+        let (mut account_accessor, slot) = r?;
+        let (account, us) = measure_us!({
         let loaded_account = account_accessor.check_and_get_loaded_account();
-        let is_cached = loaded_account.is_cached();
-        let account = loaded_account.take_account();
+        is_cached = loaded_account.is_cached();
+        loaded_account.take_account()
+        });
+        self.stats.checkand_get_loaded_account.fetch_add(us, Ordering::Relaxed);
         if matches!(load_zero_lamports, LoadZeroLamports::None) && account.is_zero_lamport() {
             return None;
         }
@@ -5522,8 +5533,10 @@ impl AccountsDb {
             must exist in the write cache, which is a contradiction.
             */
             self.read_cache_miss_data_len.fetch_add(account.data().len() as u64, Ordering::Relaxed);
+            let (_, us) = measure_us!(
             self.read_only_accounts_cache
-                .store(*pubkey, slot, account.clone());
+                .store(*pubkey, slot, account.clone()));
+            self.stats.store.fetch_add(us, Ordering::Relaxed);
         }
         Some((account, slot))
     }
@@ -8523,6 +8536,29 @@ impl AccountsDb {
                     self.read_only_accounts_cache.cache_len(),
                     i64
                 ),
+                (
+                    "load_retry_to_get_account_accessor",
+                    self.stats.retry_to_get_account_accessor.swap(0, Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "checkand_get_loaded_account",
+                    self.stats.checkand_get_loaded_account.swap(0, Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "loads_from_appendvec",
+                    self.stats.loads_from_appendvec.swap(0, Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "store_us",
+                    self.stats.store.swap(0, Ordering::Relaxed),
+                    i64
+                ),
+                
+                
+                
                 (
                     "read_only_accounts_cache_data_size",
                     self.read_only_accounts_cache.data_size(),
