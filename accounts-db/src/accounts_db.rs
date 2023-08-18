@@ -2441,7 +2441,7 @@ impl AccountsDb {
         // 400M bytes
         const MAX_READ_ONLY_CACHE_DATA_SIZE: usize = 400_000_000;
         // read only cache does not update lru on read of an entry unless it has been at least this many ms since the last lru update
-        const READ_ONLY_CACHE_MS_TO_SKIP_LRU_UPDATE: u32 = 4000;
+        const READ_ONLY_CACHE_MS_TO_SKIP_LRU_UPDATE: u32 = 16000;
 
         let mut temp_accounts_hash_cache_path = None;
         let accounts_hash_cache_path = accounts_hash_cache_path.unwrap_or_else(|| {
