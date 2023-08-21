@@ -145,7 +145,8 @@ impl<O: BucketOccupied> BucketStorage<O> {
             offset,
             "header size must be a multiple of u64"
         );
-        let cell_size = elem_size * num_elems + offset as u64;
+        assert_eq!(num_elems, 1);
+        let cell_size = elem_size;
         let bytes = Self::allocate_to_fill_page(&mut capacity, cell_size);
         let (mmap, path) = Self::new_map(&drives, bytes, &stats);
         Self {
