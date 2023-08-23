@@ -150,6 +150,11 @@ pub(crate) fn report_new_bank_metrics(
             timings.fill_sysvar_cache_time_us,
             i64
         ),
+        ("waiting_for_epoch_accounts_hash", self
+        .rc
+        .accounts
+        .accounts_db
+        .epoch_accounts_hash_manager.waiting.load(Ordering::Relaxed) as i32,i64),
     );
 }
 

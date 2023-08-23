@@ -3161,7 +3161,8 @@ impl AccountsDb {
         let now = solana_sdk::timing::timestamp();
         loop {
             let accounts = self.accounts_index.account_maps.first().unwrap().stats().count_in_mem.load(Ordering::Relaxed);
-            if accounts > 100_000_000 {
+            if accounts > 100_000_000 || self
+            .epoch_accounts_hash_manager.waiting.load(Ordering::Relaxed) {
                 self.last_accounts.store(accounts as u64, Ordering::Relaxed);
                 self.throttling.fetch_add(1, Ordering::Relaxed);
                 sleep(Duration::from_millis(100));
