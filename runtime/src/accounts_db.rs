@@ -2338,6 +2338,7 @@ struct ScanState<'a> {
     sort_time: Arc<AtomicU64>,
     cache_data: Option<CacheHashDataFile>,
     count: usize,
+    db: &'a AccountsDb,
 }
 
 impl<'a> Clone for ScanState<'a> {
@@ -2352,6 +2353,7 @@ impl<'a> Clone for ScanState<'a> {
             // this is the only non-trivial clone
             cache_data: None,
             count: 0,
+            db: self.db,
         }
     }
 }
@@ -2412,7 +2414,7 @@ impl<'a> AppendVecScan for ScanState<'a> {
         self.cache_data.map(|mut cache_data| {
             cache_data.truncate(self.i);
             assert_eq!(cache_data.get_slice_mut(0).len(), self.i);
-            let timing = AccountsDb::sort_slot_storage_scan(cache_data.get_slice_mut(0));
+            let timing = self.db.sort_slot_storage_scan(cache_data.get_slice_mut(0));
 
             self.sort_time.fetch_add(timing, Ordering::Relaxed);
             cache_data
@@ -7687,6 +7689,7 @@ impl AccountsDb {
             sort_time: sort_time.clone(),
             cache_data: None,
             count: 0,
+            db: self,
         };
 
         let result = self.scan_account_storage_no_bank(
@@ -7714,10 +7717,11 @@ impl AccountsDb {
         Ok(result)
     }
 
-    fn sort_slot_storage_scan(accum: &mut [CalculateHashIntermediate]) -> u64 {
+    fn sort_slot_storage_scan(&self, accum: &mut [CalculateHashIntermediate]) -> u64 {
         let time = AtomicU64::new(0);
         {
             let mut sort_time = Measure::start("sort");
+            let _guard = self.active_stats.activate(ActiveStatItem::HashSort);
             // sort_by vs unstable because slot and write_version are already in order
             accum.par_sort_by(AccountsHasher::compare_two_hash_entries);
             sort_time.stop();
