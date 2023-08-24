@@ -1487,6 +1487,7 @@ impl Bank {
         time.stop();
 
         report_new_bank_metrics(
+            &new,
             slot,
             parent.slot(),
             new.block_height,
