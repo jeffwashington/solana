@@ -28,7 +28,7 @@ use {
         epoch_accounts_hash::EpochAccountsHash,
         rent_collector::RentCollector,
     },
-    solana_measure::measure::Measure,
+    solana_measure::{measure::Measure, measure_us},
     solana_sdk::{
         clock::{Epoch, Slot, UnixTimestamp},
         deserialize_utils::default_on_eof,
@@ -926,14 +926,19 @@ where
         })
         .unwrap();
 
-    let IndexGenerationInfo {
-        accounts_data_len,
-        rent_paying_accounts_by_partition,
-    } = accounts_db.generate_index(
+    let (
+        IndexGenerationInfo {
+            accounts_data_len,
+            rent_paying_accounts_by_partition,
+        },
+        us,
+    ) = measure_us!(accounts_db.generate_index(
         limit_load_slot_count_from_snapshot,
         verify_index,
         genesis_config,
-    );
+    ));
+    datapoint_info!("generate-index()", ("overall_us", us, i64),);
+
     accounts_db
         .accounts_index
         .rent_paying_accounts_by_partition
