@@ -2362,9 +2362,10 @@ impl<'a> AppendVecScan for ScanState<'a> {
     fn set_slot(&mut self, slot: Slot) {
         self.current_slot = slot;
     }
-    fn init_accum(&mut self, count: usize, cache_hash_data: &CacheHashData, file_name: &str) {
+    fn init_accum(&mut self, mut count: usize, cache_hash_data: &CacheHashData, file_name: &str) {
         // need good initial estimate to avoid repeated re-allocation while scanning
         if self.cache_data.is_none() {
+            count = count.max(111_111); // why would we end up with 0? not sure but we are
             self.count = count;
             self.cache_data = Some(cache_hash_data.allocate(file_name, count * 2).unwrap());
             // stop doing initial allocation for now
