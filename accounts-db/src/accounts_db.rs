@@ -2435,6 +2435,9 @@ impl<'a> AppendVecScan for ScanState<'a> {
     }
     fn init_accum(&mut self, mut count: usize, cache_hash_data: &CacheHashData, file_name: &str) {
         // need good initial estimate to avoid repeated re-allocation while scanning
+        if count == 0 {
+            log::error!("count = 0, {}", self.cache_data.is_none());
+        }
         if self.cache_data.is_none() {
             count = count.max(111_111); // why would we end up with 0? not sure but we are
             self.count = count;
@@ -2478,6 +2481,9 @@ impl<'a> AppendVecScan for ScanState<'a> {
         .get_slice_mut(self.i as u64);
         if m.len() == 0 {
             log::error!("too few elts: {}, {}, {}", elts, self.i, self.count);
+            if self.count == 0 {
+                panic!("count was 0!: {}", self.current_slot);
+            }
         }
         m[0] = source_item;
         self.i += 1;
@@ -7480,6 +7486,20 @@ impl AccountsDb {
                     .iter_range(&range_this_chunk)
                     .filter_map(|(_, storage)| storage.map(|storage| storage.count()))
                     .sum::<usize>();
+                if count == 0 {
+                    log::error!("recorded count of 0");
+                    snapshot_storages
+                    .iter_range(&range_this_chunk)
+                    .for_each(|(_slot, storage)|{
+                        if storage.is_none() {
+                            log::error!("recorded count of 0: {:?}", _slot);
+                        }
+                        else {
+                            let storage = storage.as_ref().unwrap();
+                            log::error!("recorded count of 0: {:?}", (_slot, storage.count(), storage.accounts.account_iter().count()));
+                        }
+                    });
+                }
 
                 for (slot, storage) in snapshot_storages.iter_range(&range_this_chunk) {
                     let ancient = slot < oldest_non_ancient_slot;
