@@ -9300,6 +9300,8 @@ impl AccountsDb {
             // outer vec is accounts index bin (determined by pubkey value)
             // inner vec is the pubkeys within that bin that are present in > 1 slot
             let unique_pubkeys_by_bin = Mutex::new(Vec::<Vec<Pubkey>>::default());
+            let mut timings = GenerateIndexTimings::default();
+
             if pass == 0 {
                 // tell accounts index we are done adding the initial accounts at startup
                 let mut m = Measure::start("accounts_index_idle_us");
@@ -9317,6 +9319,12 @@ impl AccountsDb {
                             let unique_keys =
                                 HashSet::<Pubkey>::from_iter(slot_keys.iter().map(|(_, key)| *key));
                             for (slot, key) in slot_keys {
+                                let mut dup = timings.dups                .entry(slot)
+                                .or_insert_with(|| Vec::default());
+                            dup.push(key);
+                            let mut dup = timings.dups2                .entry(key)
+                            .or_insert_with(|| Vec::default());
+                        dup.push(slot);
                                 match self.uncleaned_pubkeys.entry(slot) {
                                     Occupied(mut occupied) => occupied.get_mut().push(key),
                                     Vacant(vacant) => {
@@ -9354,7 +9362,7 @@ impl AccountsDb {
                 storage_size_accounts_map_us: storage_info_timings.storage_size_accounts_map_us,
                 storage_size_accounts_map_flatten_us: storage_info_timings
                     .storage_size_accounts_map_flatten_us,
-                ..GenerateIndexTimings::default()
+                ..timings
             };
 
             // subtract data.len() from accounts_data_len for all old accounts that are in the index twice
@@ -9369,7 +9377,6 @@ impl AccountsDb {
             let append2 = AtomicU64::default();
             let append3 = AtomicU64::default();
             let uncleaned_pubkeys = AtomicU64::default();
-            let mut countt = 0;
             if pass == 0 {
                 let accounts_data_len_from_duplicates = unique_pubkeys_by_bin
                     .par_iter()
@@ -9444,13 +9451,6 @@ impl AccountsDb {
                     // 10 567 905)
                     // 18 510 665
                     uncleaned_pubkeys.load(Ordering::Relaxed),
-                )
-            );
-            log::error!(
-                "generate_index: {:?}",
-                (
-                    countt,
-                    unique_pubkeys.len(),
                 )
             );
             // (231744157, 6237521, 64262235, 5347, 4096, 2796, 118107, 445339)
