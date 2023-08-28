@@ -624,6 +624,8 @@ struct GenerateIndexTimings {
     pub slot_insert: AtomicU64,
     pub get_account_read_entry: AtomicU64,
     pub max_slots_per_pubkey: AtomicU64,
+    pub dups: DashMap<Slot, Vec<Pubkey>>,
+    pub dups2: DashMap<Pubkey, Vec<Slot>>,
 }
 
 #[derive(Default, Debug, PartialEq, Eq)]
@@ -695,6 +697,27 @@ impl GenerateIndexTimings {
                 i64
             ),
         );
+
+        let mut keys_by_slot = Vec::default();
+        let mut distribution = HashMap::<usize, Slot>::default();
+        self.dups.iter().for_each(|entry| {
+            let keys = entry.value().len();
+            let slot = *entry.key();
+            keys_by_slot.push((keys, slot));
+            if let Some(v) = distribution.get_mut(&keys) {
+                *v = *v + 1;
+            }
+            else {
+                distribution.insert(1, 1);
+            }
+        });
+        keys_by_slot.sort();
+        let mut distribution = distribution.into_iter().collect::<Vec<_>>();
+        distribution.sort();
+        distribution.iter().rev().for_each(|(len, count)| {
+            log::error!("distribution: {},{}", len, count);
+        });
+
     }
 }
 
