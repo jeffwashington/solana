@@ -1865,6 +1865,20 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
             .contains(&slot)
     }
 
+    pub(crate) fn add_batch_roots_at_startup<'a, I>(&self, roots: I)
+    where
+        I: Iterator<Item = &'a Slot>,
+    {
+        self.roots_added.fetch_add(1, Ordering::Relaxed);
+        let mut w_roots_tracker = self.roots_tracker.write().unwrap();
+        roots.cloned().for_each(|slot| {
+            // `AccountsDb::flush_accounts_cache()` relies on roots being added in order
+            assert!(slot >= w_roots_tracker.alive_roots.max_inclusive());
+            // 'slot' is a root, so it is both 'root' and 'original'
+            w_roots_tracker.alive_roots.insert(slot);
+        });
+    }
+
     pub fn add_root(&self, slot: Slot) {
         self.roots_added.fetch_add(1, Ordering::Relaxed);
         let mut w_roots_tracker = self.roots_tracker.write().unwrap();

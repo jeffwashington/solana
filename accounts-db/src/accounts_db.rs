@@ -621,6 +621,8 @@ struct GenerateIndexTimings {
     pub accounts_data_len_dedup_time_us: u64,
     pub total_duplicate_slot_keys: u64,
     pub populate_duplicate_keys_us: u64,
+    pub slot_insert: AtomicU64,
+    pub get_account_read_entry: AtomicU64,
 }
 
 #[derive(Default, Debug, PartialEq, Eq)]
@@ -641,6 +643,8 @@ impl GenerateIndexTimings {
             ("insertion_time_us", self.insertion_time_us, i64),
             ("min_bin_size", self.min_bin_size as i64, i64),
             ("max_bin_size", self.max_bin_size as i64, i64),
+            ("slot_insert", self.slot_insert.load(Ordering::Relaxed), i64),
+            ("get_account_read_entry", self.get_account_read_entry.load(Ordering::Relaxed), i64),
             (
                 "storage_size_accounts_map_us",
                 self.storage_size_accounts_map_us as i64,
@@ -9339,6 +9343,7 @@ impl AccountsDb {
             let max = AtomicU64::default();
             let append2 = AtomicU64::default();
             let append3 = AtomicU64::default();
+            let uncleaned_pubkeys = AtomicU64::default();
             if pass == 0 {
                 let accounts_data_len_from_duplicates = unique_pubkeys_by_bin
                     .par_iter()
@@ -9379,14 +9384,15 @@ impl AccountsDb {
             }
             accounts_data_len_dedup_timer.stop();
             timings.accounts_data_len_dedup_time_us = accounts_data_len_dedup_timer.as_us();
-
+            let mut lll = 0;
+            let mut all_roots = 0;
             if pass == 0 {
                 let m = Measure::start("");
                 let uncleaned_roots = uncleaned_roots.into_inner().unwrap();
+                lll = uncleaned_roots.len();
                 // Need to add these last, otherwise older updates will be cleaned
-                for root in &slots {
-                    self.accounts_index.add_root(*root);
-                }
+                all_roots = slots.len();
+                self.accounts_index.add_batch_roots_at_startup(slots.iter());
                 append2.fetch_add(m.end_as_us(), Ordering::Relaxed);
                 let m = Measure::start("");
                 self.accounts_index
@@ -9406,8 +9412,14 @@ impl AccountsDb {
                     max.load(Ordering::Relaxed),
                     append2.load(Ordering::Relaxed),
                     append3.load(Ordering::Relaxed),
+                    lll,
+                    all_roots,
+                    // 18 510 665
+                    uncleaned_pubkeys.load(Ordering::Relaxed),
                 )
             );
+            // (231744157, 6237521, 64262235, 5347, 4096, 2796, 118107, 445339)
+            // (209024223, 5645087, 59025457, 5347, 4096, 8601, 117 502)
 
             timings.report();
         }
@@ -9461,7 +9473,9 @@ impl AccountsDb {
         let mut removed_rent_paying = 0;
         let mut removed_top_off = 0;
         pubkeys.iter().for_each(|pubkey| {
+            let m = Measure::start("");
             if let Some(entry) = self.accounts_index.get_account_read_entry(pubkey) {
+                timings.get_account_read_entry.fetch_add(m.end_as_us(), Ordering::Relaxed);
                 let slot_list = entry.slot_list();
                 if slot_list.len() < 2 {
                     return;
@@ -9473,7 +9487,9 @@ impl AccountsDb {
                 // the slot where duplicate accounts are found in the index need to be in 'uncleaned_slots' list, too.
                 let max = slot_list.iter().map(|(slot, _)| slot).max().unwrap();
                 slot_list.iter().for_each(|(slot, account_info)| {
+                    let m = Measure::start("");
                     uncleaned_slots.insert(*slot);
+                    timings.slot_insert.fetch_add(m.end_as_us(), Ordering::Relaxed);
                     if slot == max {
                         // the info in 'max' is the most recent, current info for this pubkey
                         return;
