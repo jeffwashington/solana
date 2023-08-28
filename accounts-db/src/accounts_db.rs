@@ -623,6 +623,7 @@ struct GenerateIndexTimings {
     pub populate_duplicate_keys_us: u64,
     pub slot_insert: AtomicU64,
     pub get_account_read_entry: AtomicU64,
+    pub max_slots_per_pubkey: AtomicU64,
 }
 
 #[derive(Default, Debug, PartialEq, Eq)]
@@ -645,6 +646,7 @@ impl GenerateIndexTimings {
             ("max_bin_size", self.max_bin_size as i64, i64),
             ("slot_insert", self.slot_insert.load(Ordering::Relaxed), i64),
             ("get_account_read_entry", self.get_account_read_entry.load(Ordering::Relaxed), i64),
+            ("max_slots_per_pubkey", self.max_slots_per_pubkey.load(Ordering::Relaxed), i64),
             (
                 "storage_size_accounts_map_us",
                 self.storage_size_accounts_map_us as i64,
@@ -9487,6 +9489,7 @@ impl AccountsDb {
             if let Some(entry) = self.accounts_index.get_account_read_entry(pubkey) {
                 timings.get_account_read_entry.fetch_add(m.end_as_us(), Ordering::Relaxed);
                 let slot_list = entry.slot_list();
+                timings.max_slots_per_pubkey.fetch_max(slot_list.len() as u64, Ordering::Relaxed);
                 if slot_list.len() < 2 {
                     return;
                 }
