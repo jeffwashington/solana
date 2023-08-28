@@ -698,6 +698,9 @@ impl GenerateIndexTimings {
             ),
         );
 
+        let mut logged: HashSet<usize> = HashSet::default();
+
+        log::error!("{}, {}", self.dups.len(), self.dups2.len());
         let mut keys_by_slot = Vec::default();
         let mut distribution = HashMap::<usize, Slot>::default();
         self.dups.iter().for_each(|entry| {
@@ -706,6 +709,9 @@ impl GenerateIndexTimings {
             keys_by_slot.push((keys, slot));
             if let Some(v) = distribution.get_mut(&keys) {
                 *v = *v + 1;
+                if *v == 9000 && logged.insert(keys) {
+                    log::error!("slot with many pubkeys: {}, {:?}", slot, entry.value().iter().take(1).collect::<Vec<_>>());
+                }
             }
             else {
                 distribution.insert(1, 1);
@@ -9321,10 +9327,10 @@ impl AccountsDb {
                             for (slot, key) in slot_keys {
                                 let mut dup = timings.dups                .entry(slot)
                                 .or_insert_with(|| Vec::default());
-                            dup.push(key);
+                            dup.value_mut().push(key);
                             let mut dup = timings.dups2                .entry(key)
                             .or_insert_with(|| Vec::default());
-                        dup.push(slot);
+                        dup.value_mut().push(slot);
                                 match self.uncleaned_pubkeys.entry(slot) {
                                     Occupied(mut occupied) => occupied.get_mut().push(key),
                                     Vacant(vacant) => {
