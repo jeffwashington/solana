@@ -9321,10 +9321,13 @@ impl AccountsDb {
                         unique_pubkeys.insert(*pubkey);
                     })
                 });
+                let m = Measure::start("");
                 let accounts_data_len_from_duplicates = unique_pubkeys
                     .into_iter()
-                    .collect::<Vec<_>>()
-                    .par_chunks(4096)
+                    .collect::<Vec<_>>();
+                panic!("{}", m.end_as_us());
+
+                let accounts_data_len_from_duplicates = accounts_data_len_from_duplicates.par_chunks(4096)
                     .map(|pubkeys| {
                         let (count, uncleaned_roots_this_group) = self
                             .visit_duplicate_pubkeys_during_startup(
