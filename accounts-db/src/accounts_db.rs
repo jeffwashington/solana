@@ -9332,6 +9332,13 @@ impl AccountsDb {
             let mut accounts_data_len_dedup_timer =
                 Measure::start("handle accounts data len duplicates");
             let uncleaned_roots = Mutex::new(HashSet::<Slot>::default());
+            let lock = AtomicU64::default();
+            let append = AtomicU64::default();
+            let visit = AtomicU64::default();
+            let chunks = AtomicU64::default();
+            let max = AtomicU64::default();
+            let append2 = AtomicU64::default();
+            let append3 = AtomicU64::default();
             if pass == 0 {
                 let accounts_data_len_from_duplicates = unique_pubkeys_by_bin
                     .par_iter()
@@ -9339,21 +9346,31 @@ impl AccountsDb {
                         unique_keys
                             .par_chunks(4096)
                             .map(|pubkeys| {
+                                chunks.fetch_add(1, Ordering::Relaxed);
+                                let m = Measure::start("");
+                                max.fetch_max(pubkeys.len() as u64, Ordering::Relaxed);
                                 let (count, uncleaned_roots_this_group) = self
                                     .visit_duplicate_pubkeys_during_startup(
                                         pubkeys,
                                         &rent_collector,
                                         &timings,
                                     );
+                                visit.fetch_add(m.end_as_us(), Ordering::Relaxed);
+
+                                let m = Measure::start("");                                    
                                 let mut uncleaned_roots = uncleaned_roots.lock().unwrap();
+                                lock.fetch_add(m.end_as_us(), Ordering::Relaxed);
+                                let m = Measure::start("");
                                 uncleaned_roots_this_group.into_iter().for_each(|slot| {
                                     uncleaned_roots.insert(slot);
                                 });
+                                append.fetch_add(m.end_as_us(), Ordering::Relaxed);
                                 count
                             })
                             .sum::<u64>()
                     })
                     .sum();
+                // generate_index: (213128986, 5 734 068, 59 059 164, 5347, 4096)
                 accounts_data_len.fetch_sub(accounts_data_len_from_duplicates, Ordering::Relaxed);
                 info!(
                     "accounts data len: {}",
@@ -9364,18 +9381,34 @@ impl AccountsDb {
             timings.accounts_data_len_dedup_time_us = accounts_data_len_dedup_timer.as_us();
 
             if pass == 0 {
+                let m = Measure::start("");
                 let uncleaned_roots = uncleaned_roots.into_inner().unwrap();
                 // Need to add these last, otherwise older updates will be cleaned
                 for root in &slots {
                     self.accounts_index.add_root(*root);
                 }
+                append2.fetch_add(m.end_as_us(), Ordering::Relaxed);
+                let m = Measure::start("");
                 self.accounts_index
                     .add_uncleaned_roots(uncleaned_roots.into_iter());
-
                 self.set_storage_count_and_alive_bytes(storage_info, &mut timings);
+                append3.fetch_add(m.end_as_us(), Ordering::Relaxed);
             }
             total_time.stop();
             timings.total_time_us = total_time.as_us();
+            log::error!(
+                "generate_index: {:?}",
+                (
+                    lock.load(Ordering::Relaxed),
+                    append.load(Ordering::Relaxed),
+                    visit.load(Ordering::Relaxed),
+                    chunks.load(Ordering::Relaxed),
+                    max.load(Ordering::Relaxed),
+                    append2.load(Ordering::Relaxed),
+                    append3.load(Ordering::Relaxed),
+                )
+            );
+
             timings.report();
         }
 
