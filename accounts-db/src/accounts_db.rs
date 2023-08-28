@@ -9344,6 +9344,7 @@ impl AccountsDb {
             let append2 = AtomicU64::default();
             let append3 = AtomicU64::default();
             let uncleaned_pubkeys = AtomicU64::default();
+            let mut countt = 0;
             if pass == 0 {
                 let accounts_data_len_from_duplicates = unique_pubkeys_by_bin
                     .par_iter()
@@ -9367,7 +9368,7 @@ impl AccountsDb {
                                 lock.fetch_add(m.end_as_us(), Ordering::Relaxed);
                                 let m = Measure::start("");
                                 uncleaned_roots_this_group.into_iter().for_each(|slot| {
-                                    uncleaned_roots.insert(slot);
+                                    // uncleaned_roots.insert(slot);
                                 });
                                 append.fetch_add(m.end_as_us(), Ordering::Relaxed);
                                 count
@@ -9414,8 +9415,17 @@ impl AccountsDb {
                     append3.load(Ordering::Relaxed),
                     lll,
                     all_roots,
+                    // (214353262, 6543054, 95560553, 4813, 4096, 4984, 208433, 445339, 445660, 
+                    // 10 567 905)
                     // 18 510 665
                     uncleaned_pubkeys.load(Ordering::Relaxed),
+                )
+            );
+            log::error!(
+                "generate_index: {:?}",
+                (
+                    countt,
+                    unique_pubkeys.len(),
                 )
             );
             // (231744157, 6237521, 64262235, 5347, 4096, 2796, 118107, 445339)
