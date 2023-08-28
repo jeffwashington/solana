@@ -9504,6 +9504,7 @@ impl AccountsDb {
                         // the info in 'max' is the most recent, current info for this pubkey
                         return;
                     }
+                    /*
                     let maybe_storage_entry = self
                         .storage
                         .get_account_storage_entry(*slot, account_info.store_id());
@@ -9518,6 +9519,7 @@ impl AccountsDb {
                         removed_rent_paying += 1;
                         removed_top_off += lamports_to_top_off;
                     }
+                    */
                 });
             }
         });
