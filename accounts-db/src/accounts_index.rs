@@ -1649,7 +1649,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
             let r_account_maps = &self.account_maps[pubkey_bin];
             let mut insert_time = Measure::start("insert_into_primary_index");
             if use_disk {
-                r_account_maps.startup_insert_only(slot, items.into_iter());
+                r_account_maps.startup_insert_only(slot, items);
             } else {
                 // not using disk buckets, so just write to in-mem
                 // this is no longer the default case
