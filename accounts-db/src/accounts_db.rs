@@ -7591,7 +7591,7 @@ impl AccountsDb {
                 let mut timings = HashStats {
                     collect_snapshots_us: collect_time.as_us(),
                     storage_sort_us: sort_time.as_us(),
-                    ..HashStats::default()
+                    ..HashStats::new()
                 };
                 timings.calc_storage_size_quartiles(&combined_maps);
 
@@ -8042,7 +8042,7 @@ impl AccountsDb {
             let calculated_incremental_accounts_hash = self.calculate_incremental_accounts_hash(
                 &calc_config,
                 &sorted_storages,
-                HashStats::default(),
+                HashStats::new(),
             )?;
             let found_incremental_accounts_hash = self
                 .get_incremental_accounts_hash(slot)
