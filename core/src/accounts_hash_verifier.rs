@@ -401,7 +401,7 @@ impl AccountsHashVerifier {
 
         let mut timings = HashStats {
             storage_sort_us,
-            ..HashStats::default()
+            ..HashStats::new()
         };
         timings.calc_storage_size_quartiles(&accounts_package.snapshot_storages);
 
@@ -459,7 +459,7 @@ impl AccountsHashVerifier {
                 .calculate_accounts_hash_from_storages(
                     &calculate_accounts_hash_config,
                     &sorted_storages,
-                    HashStats::default(),
+                    HashStats::new(),
                 );
         }
 
@@ -514,7 +514,7 @@ impl AccountsHashVerifier {
                     &calculate_accounts_hash_config,
                     &sorted_storages,
                     accounts_package.slot,
-                    HashStats::default(),
+                    HashStats::new(),
                 )
                 .unwrap() // unwrap here will never fail since check_hash = false
         );

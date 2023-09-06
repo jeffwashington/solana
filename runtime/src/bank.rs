@@ -7545,7 +7545,7 @@ impl Bank {
                 &config,
                 &sorted_storages,
                 self.slot(),
-                HashStats::default(),
+                HashStats::new(),
             )
             .unwrap() // unwrap here will never fail since check_hash = false
             .0
