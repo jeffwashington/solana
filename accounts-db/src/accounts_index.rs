@@ -1586,7 +1586,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
         &self,
         slot: Slot,
         item_len: usize,
-        items: impl Iterator<Item = (Pubkey, T)>,
+        items: impl Iterator<Item = (Pubkey, T, usize)>,
     ) -> (Vec<Pubkey>, u64) {
         // big enough so not likely to re-allocate, small enough to not over-allocate by too much
         // this assumes the largest bin contains twice the expected amount of the average size per bin
@@ -1608,14 +1608,14 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
             })
             .collect::<Vec<_>>();
         let mut dirty_pubkeys = items
-            .filter_map(|(pubkey, account_info)| {
+            .filter_map(|(pubkey, account_info, data_len)| {
                 let pubkey_bin = self.bin_calculator.bin_from_pubkey(&pubkey);
                 let binned_index = (pubkey_bin + random_offset) % bins;
                 // this value is equivalent to what update() below would have created if we inserted a new item
                 let is_zero_lamport = account_info.is_zero_lamport();
                 let result = if is_zero_lamport { Some(pubkey) } else { None };
 
-                binned[binned_index].1.push((pubkey, (slot, account_info)));
+                binned[binned_index].1.push((pubkey, (slot, account_info), data_len));
                 result
             })
             .collect::<Vec<_>>();
@@ -1627,29 +1627,25 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
             let r_account_maps = &self.account_maps[pubkey_bin];
             let mut insert_time = Measure::start("insert_into_primary_index");
             if use_disk {
-                r_account_maps.startup_insert_only(items.into_iter());
+                r_account_maps.startup_insert_only(&items);
             } else {
                 // not using disk buckets, so just write to in-mem
                 // this is no longer the default case
-                items
-                    .into_iter()
-                    .for_each(|(pubkey, (slot, account_info))| {
-                        let new_entry = PreAllocatedAccountMapEntry::new(
-                            slot,
-                            account_info,
-                            &self.storage.storage,
-                            use_disk,
-                        );
-                        match r_account_maps
-                            .insert_new_entry_if_missing_with_lock(pubkey, new_entry)
-                        {
-                            InsertNewEntryResults::DidNotExist => {}
-                            InsertNewEntryResults::ExistedNewEntryZeroLamports => {}
-                            InsertNewEntryResults::ExistedNewEntryNonZeroLamports => {
-                                dirty_pubkeys.push(pubkey);
-                            }
+                items.into_iter().for_each(|(pubkey, (slot, account_info), _data_len)| {
+                    let new_entry = PreAllocatedAccountMapEntry::new(
+                        slot,
+                        account_info,
+                        &self.storage.storage,
+                        use_disk,
+                    );
+                    match r_account_maps.insert_new_entry_if_missing_with_lock(pubkey, new_entry) {
+                        InsertNewEntryResults::DidNotExist => {}
+                        InsertNewEntryResults::ExistedNewEntryZeroLamports => {}
+                        InsertNewEntryResults::ExistedNewEntryNonZeroLamports => {
+                            dirty_pubkeys.push(pubkey);
                         }
-                    });
+                    }
+                });
             }
             insert_time.stop();
             insertion_time.fetch_add(insert_time.as_us(), Ordering::Relaxed);
@@ -1661,15 +1657,21 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
     /// use Vec<> because the internal vecs are already allocated per bin
     pub(crate) fn populate_and_retrieve_duplicate_keys_from_startup(
         &self,
-        f: impl Fn(Vec<(Slot, Pubkey)>) + Sync + Send,
+        f_us: &AtomicU64,
+        populate_dups_us: &AtomicU64,
+        f: impl Fn(Vec<(Pubkey, Vec<crate::in_mem_accounts_index::InsertIndex<T>>)>) + Sync + Send,
     ) {
         (0..self.bins())
             .into_par_iter()
-            .map(|pubkey_bin| {
+            .for_each(|pubkey_bin| {
                 let r_account_maps = &self.account_maps[pubkey_bin];
-                r_account_maps.populate_and_retrieve_duplicate_keys_from_startup()
+                let m = Measure::start("");
+                let r = r_account_maps.populate_and_retrieve_duplicate_keys_from_startup();
+                populate_dups_us.fetch_add(m.end_as_us(), Ordering::Relaxed);
+                let m = Measure::start("");
+                f(r);
+                f_us.fetch_add(m.end_as_us(), Ordering::Relaxed);
             })
-            .for_each(f);
     }
 
     /// Updates the given pubkey at the given slot with the new account information.
