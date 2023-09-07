@@ -69,7 +69,7 @@ pub type ScanResult<T> = Result<T, ScanError>;
 pub type SlotList<T> = Vec<(Slot, T)>;
 pub type SlotSlice<'s, T> = &'s [(Slot, T)];
 pub type RefCount = u64;
-pub type AccountMap<T, U> = Arc<InMemAccountsIndex<T, U>>;
+pub type AccountMap<T> = Arc<InMemAccountsIndex<T>>;
 
 #[derive(Default, Debug, PartialEq, Eq)]
 pub(crate) struct GenerateIndexResult<T: IndexValue> {
@@ -493,8 +493,8 @@ pub struct AccountsIndexRootsStats {
     pub clean_dead_slot_us: u64,
 }
 
-pub struct AccountsIndexIterator<'a, T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> {
-    account_maps: &'a LockMapTypeSlice<T, U>,
+pub struct AccountsIndexIterator<'a, T: IndexValue> {
+    account_maps: &'a LockMapTypeSlice<T>,
     bin_calculator: &'a PubkeyBinCalculator24,
     start_bound: Bound<Pubkey>,
     end_bound: Bound<Pubkey>,
@@ -502,9 +502,9 @@ pub struct AccountsIndexIterator<'a, T: IndexValue, U: DiskIndexValue + From<T> 
     collect_all_unsorted: bool,
 }
 
-impl<'a, T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndexIterator<'a, T, U> {
+impl<'a, T: IndexValue> AccountsIndexIterator<'a, T> {
     fn range<R>(
-        map: &AccountMaps<T, U>,
+        map: &AccountMaps<T>,
         range: R,
         collect_all_unsorted: bool,
     ) -> Vec<(Pubkey, AccountMapEntry<T>)>
@@ -562,7 +562,7 @@ impl<'a, T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndexIter
     }
 
     pub fn new<R>(
-        index: &'a AccountsIndex<T, U>,
+        index: &'a AccountsIndex<T>,
         range: Option<&R>,
         collect_all_unsorted: bool,
     ) -> Self
@@ -602,8 +602,8 @@ impl<'a, T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndexIter
     }
 }
 
-impl<'a, T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> Iterator
-    for AccountsIndexIterator<'a, T, U>
+impl<'a, T: IndexValue> Iterator
+    for AccountsIndexIterator<'a, T>
 {
     type Item = Vec<(Pubkey, AccountMapEntry<T>)>;
     fn next(&mut self) -> Option<Self::Item> {
@@ -642,10 +642,10 @@ pub trait ZeroLamport {
     fn is_zero_lamport(&self) -> bool;
 }
 
-type MapType<T, U> = AccountMap<T, U>;
-type LockMapType<T, U> = Vec<MapType<T, U>>;
-type LockMapTypeSlice<T, U> = [MapType<T, U>];
-type AccountMaps<'a, T, U> = &'a MapType<T, U>;
+type MapType<T> = AccountMap<T>;
+type LockMapType<T> = Vec<MapType<T>>;
+type LockMapTypeSlice<T> = [MapType<T>];
+type AccountMaps<'a, T> = &'a MapType<T>;
 
 #[derive(Debug, Default)]
 pub struct ScanSlotTracker {
@@ -675,8 +675,8 @@ pub enum AccountsIndexScanResult {
 #[derive(Debug)]
 /// T: account info type to interact in in-memory items
 /// U: account info type to be persisted to disk
-pub struct AccountsIndex<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> {
-    pub account_maps: LockMapType<T, U>,
+pub struct AccountsIndex<T: IndexValue> {
+    pub account_maps: LockMapType<T>,
     pub bin_calculator: PubkeyBinCalculator24,
     program_id_index: SecondaryIndex<DashMapSecondaryIndexEntry>,
     spl_token_mint_index: SecondaryIndex<DashMapSecondaryIndexEntry>,
@@ -695,7 +695,7 @@ pub struct AccountsIndex<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> {
     // scanning the fork with that Bank at the tip is no longer possible.
     pub removed_bank_ids: Mutex<HashSet<BankId>>,
 
-    storage: AccountsIndexStorage<T, U>,
+    storage: AccountsIndexStorage<T>,
 
     /// when a scan's accumulated data exceeds this limit, abort the scan
     pub scan_results_limit_bytes: Option<usize>,
@@ -713,7 +713,7 @@ pub struct AccountsIndex<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> {
     pub rent_paying_accounts_by_partition: OnceLock<RentPayingAccountsByPartition>,
 }
 
-impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
+impl<T: IndexValue> AccountsIndex<T> {
     pub fn default_for_tests() -> Self {
         Self::new(Some(ACCOUNTS_INDEX_CONFIG_FOR_TESTING), Arc::default())
     }
@@ -752,9 +752,9 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
         config: Option<AccountsIndexConfig>,
         exit: Arc<AtomicBool>,
     ) -> (
-        LockMapType<T, U>,
+        LockMapType<T>,
         PubkeyBinCalculator24,
-        AccountsIndexStorage<T, U>,
+        AccountsIndexStorage<T>,
     ) {
         let bins = config
             .as_ref()
@@ -769,7 +769,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
         (account_maps, bin_calculator, storage)
     }
 
-    fn iter<R>(&self, range: Option<&R>, collect_all_unsorted: bool) -> AccountsIndexIterator<T, U>
+    fn iter<R>(&self, range: Option<&R>, collect_all_unsorted: bool) -> AccountsIndexIterator<T>
     where
         R: RangeBounds<Pubkey>,
     {
@@ -1131,7 +1131,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
     pub fn get_account_read_entry_with_lock(
         &self,
         pubkey: &Pubkey,
-        lock: &AccountMaps<'_, T, U>,
+        lock: &AccountMaps<'_, T>,
     ) -> Option<ReadAccountMapEntry<T>> {
         lock.get(pubkey)
             .map(ReadAccountMapEntry::from_account_map_entry)
@@ -1580,7 +1580,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
         );
     }
 
-    pub(crate) fn get_bin(&self, pubkey: &Pubkey) -> AccountMaps<T, U> {
+    pub(crate) fn get_bin(&self, pubkey: &Pubkey) -> AccountMaps<T> {
         &self.account_maps[self.bin_calculator.bin_from_pubkey(pubkey)]
     }
 
@@ -1678,7 +1678,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
             // count only considers non-duplicate accounts
             count += items.len();
             if use_disk {
-                r_account_maps.startup_insert_only(items.into_iter());
+                r_account_maps.startup_insert_only(items);
             } else {
                 // not using disk buckets, so just write to in-mem
                 // this is no longer the default case

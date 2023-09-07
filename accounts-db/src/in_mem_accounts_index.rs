@@ -88,15 +88,15 @@ impl<T: IndexValue> PossibleEvictions<T> {
 }
 
 // one instance of this represents one bin of the accounts index.
-pub struct InMemAccountsIndex<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> {
+pub struct InMemAccountsIndex<T: IndexValue> {
     last_age_flushed: AtomicU8,
 
     // backing store
     map_internal: RwLock<InMemMap<T>>,
-    storage: Arc<BucketMapHolder<T, U>>,
+    storage: Arc<BucketMapHolder<T, T>>,
     bin: usize,
 
-    bucket: Option<Arc<BucketApi<(Slot, U)>>>,
+    bucket: Option<Arc<BucketApi<(Slot, T)>>>,
 
     // pubkey ranges that this bin must hold in the cache while the range is present in this vec
     pub cache_ranges_held: CacheRangesHeld,
@@ -126,7 +126,7 @@ pub struct InMemAccountsIndex<T: IndexValue, U: DiskIndexValue + From<T> + Into<
     pub(crate) startup_stats: Arc<StartupStats>,
 }
 
-impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> Debug for InMemAccountsIndex<T, U> {
+impl<T: IndexValue> Debug for InMemAccountsIndex<T> {
     fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Ok(())
     }
@@ -170,8 +170,8 @@ struct FlushScanResult<T> {
     evictions_random: Vec<(Pubkey, AccountMapEntry<T>)>,
 }
 
-impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T, U> {
-    pub fn new(storage: &Arc<BucketMapHolder<T, U>>, bin: usize) -> Self {
+impl<T: IndexValue> InMemAccountsIndex<T> {
+    pub fn new(storage: &Arc<BucketMapHolder<T, T>>, bin: usize) -> Self {
         let num_ages_to_distribute_flushes = Age::MAX - storage.ages_to_stay_in_cache;
         Self {
             map_internal: RwLock::default(),
@@ -257,7 +257,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
         keys
     }
 
-    fn load_from_disk(&self, pubkey: &Pubkey) -> Option<(SlotList<U>, RefCount)> {
+    fn load_from_disk(&self, pubkey: &Pubkey) -> Option<(SlotList<T>, RefCount)> {
         self.bucket.as_ref().and_then(|disk| {
             let m = Measure::start("load_disk_found_count");
             let entry_disk = disk.read_value(pubkey);
@@ -668,7 +668,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
     // convert from raw data on disk to AccountMapEntry, set to age in future
     fn disk_to_cache_entry(
         &self,
-        slot_list: SlotList<U>,
+        slot_list: SlotList<T>,
         ref_count: RefCount,
     ) -> AccountMapEntry<T> {
         Arc::new(AccountMapEntryInner::new(
@@ -687,11 +687,18 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
 
     /// Queue up these insertions for when the flush thread is dealing with this bin.
     /// This is very fast and requires no lookups or disk access.
-    pub fn startup_insert_only(&self, items: impl Iterator<Item = (Pubkey, (Slot, T), u64)>) {
+    pub fn startup_insert_only(&self, mut items: impl Iterator<Item = (Pubkey, (Slot, T), u64)>) {
         assert!(self.storage.get_startup());
         assert!(self.bucket.is_some());
 
         let mut insert = self.startup_info.insert.lock().unwrap();
+        let required = insert.len() + items.len();
+        if insert.capacity() < required {
+            let m = Measure::start("");
+            insert.reserve((required * 150 / 100).max(50_000));
+            self.stats().reserve_us.fetch_add(m.end_as_us(), Ordering::Relaxed);
+            self.stats().reserve_count.fetch_add(1, Ordering::Relaxed);
+        }
         // todo: memcpy the new slice into our vector already
         // todo: avoid reallocs and just allocate another vec instead of likely resizing this one over and over
         let m = Measure::start("copy");
@@ -731,7 +738,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
             Entry::Occupied(occupied) => {
                 // in cache, so merge into cache
                 let (slot, account_info) = new_entry.into();
-                InMemAccountsIndex::<T, U>::lock_and_update_slot_list(
+                InMemAccountsIndex::<T>::lock_and_update_slot_list(
                     occupied.get(),
                     (slot, account_info),
                     None, // should be None because we don't expect a different slot # during index generation
@@ -749,7 +756,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
                 self.stats().inc_mem_count(self.bin);
                 if let Some(disk_entry) = disk_entry {
                     let (slot, account_info) = new_entry.into();
-                    InMemAccountsIndex::<T, U>::lock_and_update_slot_list(
+                    InMemAccountsIndex::<T>::lock_and_update_slot_list(
                         &disk_entry,
                         (slot, account_info),
                         // None because we are inserting the first element in the slot list for this pubkey.
@@ -1543,8 +1550,8 @@ struct EvictionsGuard<'a> {
 
 impl<'a> EvictionsGuard<'a> {
     #[must_use = "if unused, this evictions lock will be immediately unlocked"]
-    fn lock<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>>(
-        in_mem_accounts_index: &'a InMemAccountsIndex<T, U>,
+    fn lock<T: IndexValue>(
+        in_mem_accounts_index: &'a InMemAccountsIndex<T>,
     ) -> Self {
         Self::lock_with(
             &in_mem_accounts_index.stop_evictions,

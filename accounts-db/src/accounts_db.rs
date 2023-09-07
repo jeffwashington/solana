@@ -1468,7 +1468,7 @@ struct RemoveUnrootedSlotsSynchronization {
     signal: Condvar,
 }
 
-type AccountInfoAccountsIndex = AccountsIndex<AccountInfo, AccountInfo>;
+type AccountInfoAccountsIndex = AccountsIndex<AccountInfo>;
 
 // This structure handles the load/store of the accounts
 #[derive(Debug)]
