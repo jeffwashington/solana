@@ -1596,64 +1596,47 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
         // This results in calls to insert_new_entry_if_missing_with_lock from different threads starting at different bins.
         let random_offset = thread_rng().gen_range(0..bins);
         let use_disk = self.storage.storage.disk.is_some();
-        let mut binned = (0..bins)
-            .map(|mut pubkey_bin| {
-                // opposite of (pubkey_bin + random_offset) % bins
-                pubkey_bin = if pubkey_bin < random_offset {
-                    pubkey_bin + bins - random_offset
-                } else {
-                    pubkey_bin - random_offset
-                };
-                (pubkey_bin, Vec::with_capacity(expected_items_per_bin))
-            })
-            .collect::<Vec<_>>();
+        let mut binned = Vec::with_capacity(item_len);
         let mut dirty_pubkeys = items
             .filter_map(|(pubkey, account_info)| {
-                let pubkey_bin = self.bin_calculator.bin_from_pubkey(&pubkey);
-                let binned_index = (pubkey_bin + random_offset) % bins;
                 // this value is equivalent to what update() below would have created if we inserted a new item
                 let is_zero_lamport = account_info.is_zero_lamport();
                 let result = if is_zero_lamport { Some(pubkey) } else { None };
 
-                binned[binned_index].1.push((pubkey, (slot, account_info)));
+                binned.push((pubkey, (slot, account_info)));
                 result
             })
             .collect::<Vec<_>>();
-        binned.retain(|x| !x.1.is_empty());
+        binned.sort_unstable_by(|a, b| a.0.cmp(&b.0));
 
         let insertion_time = AtomicU64::new(0);
 
-        binned.into_iter().for_each(|(pubkey_bin, items)| {
-            let r_account_maps = &self.account_maps[pubkey_bin];
-            let mut insert_time = Measure::start("insert_into_primary_index");
-            if use_disk {
-                r_account_maps.startup_insert_only(items.into_iter());
-            } else {
-                // not using disk buckets, so just write to in-mem
-                // this is no longer the default case
-                items
-                    .into_iter()
-                    .for_each(|(pubkey, (slot, account_info))| {
-                        let new_entry = PreAllocatedAccountMapEntry::new(
-                            slot,
-                            account_info,
-                            &self.storage.storage,
-                            use_disk,
-                        );
-                        match r_account_maps
-                            .insert_new_entry_if_missing_with_lock(pubkey, new_entry)
-                        {
-                            InsertNewEntryResults::DidNotExist => {}
-                            InsertNewEntryResults::ExistedNewEntryZeroLamports => {}
-                            InsertNewEntryResults::ExistedNewEntryNonZeroLamports => {
-                                dirty_pubkeys.push(pubkey);
-                            }
-                        }
-                    });
+        let mut i = 0;
+        let mut start_i = 0;
+        let mut start_bin = None;
+        let mut time = 0;
+        while i <= binned.len() {
+            let pubkey_bin = if i < binned.len() {
+                self.bin_calculator.bin_from_pubkey(&binned[i].0)
             }
-            insert_time.stop();
-            insertion_time.fetch_add(insert_time.as_us(), Ordering::Relaxed);
-        });
+            else {
+                bins
+            };
+            if Some(pubkey_bin) != start_bin {
+                if start_bin.is_some() {
+                    // found end, so write this range
+                    let r_account_maps = &self.account_maps[start_bin.unwrap()];
+                    let mut insert_time = Measure::start("insert_into_primary_index");
+                    r_account_maps.startup_insert_only(binned[start_i..i].iter());
+                    insert_time.stop();
+                    time += insert_time.as_us();
+                }
+                start_bin = Some(pubkey_bin);
+                start_i = i;
+            }
+            i += 1;
+        }
+        insertion_time.fetch_add(time, Ordering::Relaxed);
 
         (dirty_pubkeys, insertion_time.load(Ordering::Relaxed))
     }
