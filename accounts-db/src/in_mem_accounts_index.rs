@@ -699,6 +699,9 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
             self.stats().reserve_us.fetch_add(m.end_as_us(), Ordering::Relaxed);
             self.stats().reserve_count.fetch_add(1, Ordering::Relaxed);
         }
+        self.stats().max_reserve.fetch_max(insert.capacity() as u64, Ordering::Relaxed);
+
+        self.stats().max_alloc.fetch_max(items.len() as u64, Ordering::Relaxed);
         // todo: memcpy the new slice into our vector already
         // todo: avoid reallocs and just allocate another vec instead of likely resizing this one over and over
         let m = Measure::start("copy");

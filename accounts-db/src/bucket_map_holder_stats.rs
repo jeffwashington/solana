@@ -66,6 +66,8 @@ pub struct BucketMapHolderStats {
     pub copy_us: AtomicU64,
     pub reserve_count: AtomicU64,
     pub reserve_us: AtomicU64,
+    pub max_alloc: AtomicU64,
+    pub max_reserve: AtomicU64,
 }
 
 impl BucketMapHolderStats {
@@ -534,6 +536,18 @@ impl BucketMapHolderStats {
                 (
                     "reserve_count",
                     self.reserve_count
+                        .swap(0, Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "max_alloc",
+                    self.max_alloc
+                        .swap(0, Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "max_reserve",
+                    self.max_reserve
                         .swap(0, Ordering::Relaxed),
                     i64
                 ),
