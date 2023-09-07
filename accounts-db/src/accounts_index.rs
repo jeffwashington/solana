@@ -1604,7 +1604,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
                 } else {
                     pubkey_bin - random_offset
                 };
-                (pubkey_bin, Vec::with_capacity(expected_items_per_bin))
+                (pubkey_bin, Vec::default())
             })
             .collect::<Vec<_>>();
         let mut dirty_pubkeys = items
