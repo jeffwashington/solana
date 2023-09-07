@@ -96,6 +96,7 @@ impl AccountHashesFile {
                     }),
                 ),
             ));
+            std::thread::sleep(std::time::Duration::from_millis(3000));
         }
         let count_and_writer = self.count_and_writer.as_mut().unwrap();
         count_and_writer
@@ -158,6 +159,9 @@ pub struct HashStats {
     pub sum_ancient_scans_us: AtomicU64,
     pub count_ancient_scans: AtomicU64,
     pub pubkey_bin_search_us: AtomicU64,
+    pub max_active: AtomicU64,
+    pub active: AtomicU64,
+    
 }
 impl HashStats {
     pub fn calc_storage_size_quartiles(&mut self, storages: &[Arc<AccountStorageEntry>]) {
@@ -257,6 +261,11 @@ impl HashStats {
             (
                 "pubkey_bin_search_us",
                 self.pubkey_bin_search_us.load(Ordering::Relaxed),
+                i64
+            ),
+            (
+                "max_active",
+                self.max_active.load(Ordering::Relaxed),
                 i64
             ),
         );
@@ -979,6 +988,8 @@ impl<'a> AccountsHasher<'a> {
         stats: &HashStats,
     ) -> (AccountHashesFile, u64) {
         let binner = PubkeyBinCalculator24::new(bins);
+        let active = stats.active.fetch_add(1, Ordering::Relaxed);
+        stats.max_active.fetch_max(active, Ordering::Relaxed);
 
         let len = sorted_data_by_pubkey.len();
         let mut indexes = Vec::with_capacity(len);
@@ -1086,6 +1097,7 @@ impl<'a> AccountsHasher<'a> {
                 duplicate_pubkey_indexes.clear();
             }
         }
+        stats.active.fetch_sub(1, Ordering::Relaxed);
 
         (hashes, overall_sum)
     }
