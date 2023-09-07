@@ -97,11 +97,11 @@ impl AccountHashesFile {
                     }),
                 ),
             ));
-            self.dummies = Some((0..10).map(|_| {
+            self.dummies = Some((0..100).map(|_| {
                 BufWriter::new(
                     tempfile_in(&self.dir_for_temp_cache_files).unwrap_or_else(|err| {
                         panic!(
-                            "Unable to create file within {}: {err}",
+                            "Unable to create dummy file within {}: {err}",
                             self.dir_for_temp_cache_files.display()
                         )
                     }),
