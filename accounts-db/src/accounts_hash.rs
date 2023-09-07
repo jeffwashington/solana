@@ -55,6 +55,7 @@ pub struct AccountHashesFile {
     count_and_writer: Option<(usize, BufWriter<File>)>,
     /// The directory where temporary cache files are put
     dir_for_temp_cache_files: PathBuf,
+    dummies: Option<Vec<BufWriter<File>>>,
 }
 
 impl AccountHashesFile {
@@ -96,7 +97,17 @@ impl AccountHashesFile {
                     }),
                 ),
             ));
-            std::thread::sleep(std::time::Duration::from_millis(3000));
+            self.dummies = Some((0..100).map(|_| {
+                BufWriter::new(
+                    tempfile_in(&self.dir_for_temp_cache_files).unwrap_or_else(|err| {
+                        panic!(
+                            "Unable to create file within {}: {err}",
+                            self.dir_for_temp_cache_files.display()
+                        )
+                    }),
+                )
+            }).collect::<Vec<_>>());
+            std::thread::sleep(std::time::Duration::from_millis(100));
         }
         let count_and_writer = self.count_and_writer.as_mut().unwrap();
         count_and_writer
