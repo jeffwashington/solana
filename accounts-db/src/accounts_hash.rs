@@ -100,7 +100,7 @@ impl AccountHashesFile {
         let count_and_writer = self.count_and_writer.as_mut().unwrap();
         count_and_writer
             .1
-            .write_all(hash.as_ref())
+            .write(hash.as_ref())
             .unwrap_or_else(|err| {
                 panic!(
                     "Unable to write file within {}: {err}",
