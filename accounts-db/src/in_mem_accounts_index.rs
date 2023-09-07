@@ -695,7 +695,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
         let required = insert.len() + items.len();
         if insert.capacity() < required {
             let m = Measure::start("");
-            insert.reserve((required * 150 / 100).max(50_000));
+            insert.reserve(required);//(required * 150 / 100).max(50_000));
             self.stats().reserve_us.fetch_add(m.end_as_us(), Ordering::Relaxed);
             self.stats().reserve_count.fetch_add(1, Ordering::Relaxed);
         }
