@@ -32,7 +32,9 @@ pub const MERKLE_FANOUT: usize = 16;
 
 /// 1 file containing account hashes sorted by pubkey, mapped into memory
 struct MmapAccountHashesFile {
+    /// raw slice of `Hash` values. Can be a larger slice than `count`
     mmap: MmapMut,
+    /// # of valid Hash entries in `mmap`
     count: usize,
 }
 
@@ -55,7 +57,7 @@ pub struct AccountHashesFile {
     count_and_writer: Option<(usize, MmapAccountHashesFile)>,
     /// The directory where temporary cache files are put
     dir_for_temp_cache_files: PathBuf,
-
+    /// # bytes allocated
     capacity: usize,
 }
 
@@ -85,16 +87,12 @@ impl AccountHashesFile {
         if self.count_and_writer.is_none() {
             // we have hashes to write but no file yet, so create a file that will auto-delete on drop
 
-            let file = Some(
-                tempfile_in(&self.dir_for_temp_cache_files).unwrap_or_else(|err| {
-                    panic!(
-                        "Unable to create file within {}: {err}",
-                        self.dir_for_temp_cache_files.display()
-                    )
-                }),
-            );
-
-            let mut data = file.unwrap();
+            let mut data = tempfile_in(&self.dir_for_temp_cache_files).unwrap_or_else(|err| {
+                panic!(
+                    "Unable to create file within {}: {err}",
+                    self.dir_for_temp_cache_files.display()
+                )
+            });
 
             // Theoretical performance optimization: write a zero to the end of
             // the file so that we won't have to resize it later, which may be
@@ -1286,7 +1284,7 @@ pub mod tests {
             Self {
                 count_and_writer: None,
                 dir_for_temp_cache_files,
-                capacity: 1024, /* default 1k */
+                capacity: 1024, /* default 1k for tests */
             }
         }
     }
