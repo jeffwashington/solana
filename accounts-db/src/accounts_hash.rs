@@ -98,7 +98,8 @@ impl AccountHashesFile {
                 ),
             ));
             self.dummies = Some((0..10).map(|_| {
-                BufWriter::new(
+                BufWriter::with_capacity(
+                    24_000,
                     tempfile_in(&self.dir_for_temp_cache_files).unwrap_or_else(|err| {
                         panic!(
                             "Unable to create dummy file within {}: {err}",
