@@ -1033,7 +1033,7 @@ impl<'a> AccountsHasher<'a> {
         let mut hashes = AccountHashesFile {
             count_and_writer: None,
             dir_for_temp_cache_files: self.dir_for_temp_cache_files.clone(),
-            capacity: max_inclusive_num_pubkeys * std::mem::size_of<Hash>(),
+            capacity: max_inclusive_num_pubkeys * std::mem::size_of::<Hash>(),
         };
 
         let mut overall_sum = 0;
