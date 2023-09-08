@@ -1,3 +1,4 @@
+use std::sync::Mutex;
 use {
     crate::{
         accounts_db::{AccountStorageEntry, IncludeSlotInHash, PUBKEY_BINS_FOR_CALCULATING_HASHES},
@@ -79,14 +80,13 @@ impl AccountHashesFile {
             .unwrap_or_default()
     }
 
-    /// write 'hash' to the file
-    /// If the file isn't open, create it first.
-    pub fn write(&mut self, hash: &Hash) {
+    pub fn allocate(&mut self) {
         if self.count_and_writer.is_none() {
             // we have hashes to write but no file yet, so create a file that will auto-delete on drop
             self.count_and_writer = Some((
                 0,
-                BufWriter::new(
+                BufWriter::with_capacity(
+                    256_000,
                     tempfile_in(&self.dir_for_temp_cache_files).unwrap_or_else(|err| {
                         panic!(
                             "Unable to create file within {}: {err}",
@@ -96,6 +96,12 @@ impl AccountHashesFile {
                 ),
             ));
         }
+    }
+
+    /// write 'hash' to the file
+    /// If the file isn't open, create it first.
+    pub fn write(&mut self, hash: &Hash) {
+        self.allocate();
         let count_and_writer = self.count_and_writer.as_mut().unwrap();
         count_and_writer
             .1
@@ -783,7 +789,15 @@ impl<'a> AccountsHasher<'a> {
         let _guard = self.active_stats.activate(ActiveStatItem::HashDeDup);
 
         let mut zeros = Measure::start("eliminate zeros");
-        let (hashes, hash_total, lamports_total) = (0..max_bin)
+        let stuff =(0..max_bin).map(|bin| {
+            let mut hashes = AccountHashesFile {
+                count_and_writer: None,
+                dir_for_temp_cache_files: self.dir_for_temp_cache_files.clone(),
+            };
+            hashes.allocate();
+            (bin, Mutex::new(hashes))
+        }).collect::<Vec<_>>();
+        let (hashes, hash_total, lamports_total) = stuff
             .into_par_iter()
             .fold(
                 || {
@@ -793,12 +807,13 @@ impl<'a> AccountsHasher<'a> {
                         /*lamports sum*/ 0_u64,
                     )
                 },
-                |mut accum, bin| {
+                |mut accum, (bin, hashes)| {
                     let (hashes_file, lamports_bin) = self.de_dup_accounts_in_parallel(
                         sorted_data_by_pubkey,
                         bin,
                         max_bin,
                         stats,
+                        hashes,
                     );
                     accum.2 = accum
                         .2
@@ -962,7 +977,6 @@ impl<'a> AccountsHasher<'a> {
         stats.pubkey_bin_search_us.fetch_add(us, Ordering::Relaxed);
         result
     }
-
     // go through: [..][pubkey_bin][..] and return hashes and lamport sum
     //   slot groups^                ^accounts found in a slot group, sorted by pubkey, higher slot, write_version
     // 1. handle zero lamport accounts
@@ -976,6 +990,7 @@ impl<'a> AccountsHasher<'a> {
         pubkey_bin: usize,
         bins: usize,
         stats: &HashStats,
+        mut hashes: Mutex<AccountHashesFile>,
     ) -> (AccountHashesFile, u64) {
         let binner = PubkeyBinCalculator24::new(bins);
 
@@ -984,11 +999,8 @@ impl<'a> AccountsHasher<'a> {
         let mut first_items = Vec::with_capacity(len);
         // map from index of an item in first_items[] to index of the corresponding item in sorted_data_by_pubkey[]
         // this will change as items in sorted_data_by_pubkey[] are exhausted
+        let mut hashes = hashes.into_inner().unwrap();
         let mut first_item_to_pubkey_division = Vec::with_capacity(len);
-        let mut hashes = AccountHashesFile {
-            count_and_writer: None,
-            dir_for_temp_cache_files: self.dir_for_temp_cache_files.clone(),
-        };
         // initialize 'first_items', which holds the current lowest item in each slot group
         sorted_data_by_pubkey
             .iter()
