@@ -1046,15 +1046,21 @@ impl<'a> AccountsHasher<'a> {
                     first_item_to_pubkey_division.push(i);
                     indexes.push(first_pubkey_in_bin);
                     let m = Measure::start("");
-                    let mut first_pubkey_in_next_bin = first_pubkey_in_bin + 1;
-                    while first_pubkey_in_next_bin < hash_data.len() {
-                        if binner.bin_from_pubkey(&hash_data[first_pubkey_in_next_bin].pubkey)
-                            != pubkey_bin
-                        {
-                            break;
+                    let mut first_pubkey_in_next_bin = if pubkey_bin < bins {
+                        let mut first_pubkey_in_next_bin = first_pubkey_in_bin + 1;
+                        while first_pubkey_in_next_bin < hash_data.len() {
+                            if binner.bin_from_pubkey(&hash_data[first_pubkey_in_next_bin].pubkey)
+                                != pubkey_bin
+                            {
+                                break;
+                            }
+                            first_pubkey_in_next_bin += 1000;
                         }
-                        first_pubkey_in_next_bin += 1;
+                        first_pubkey_in_next_bin
                     }
+                    else {
+                        hash_data.len()
+                    };
                     time_in_last += m.end_as_us();
                     let len = first_pubkey_in_next_bin - first_pubkey_in_bin;
                     overall_len += len;
