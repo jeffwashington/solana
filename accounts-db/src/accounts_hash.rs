@@ -81,9 +81,10 @@ impl AccountHashesFile {
             .unwrap_or_default()
     }
 
-    /// write 'hash' to the file
-    /// If the file isn't open, create it first.
-    pub fn write(&mut self, hash: &Hash) {
+    pub(crate) fn get_write_slice(&mut self) -> &mut [Hash] {
+        if self.capacity == 0 {
+            return &mut [];
+        }
         if self.count_and_writer.is_none() {
             // we have hashes to write but no file yet, so create a file that will auto-delete on drop
 
@@ -122,15 +123,17 @@ impl AccountHashesFile {
                 },
             ));
         }
-        let (count, writer) = self.count_and_writer.as_mut().unwrap();
-        let start = *count * std::mem::size_of::<Hash>();
-        let end = start + std::mem::size_of::<Hash>();
-
+        let (_count, writer) = self.count_and_writer.as_mut().unwrap();
         unsafe {
-            let ptr = writer.mmap[start..end].as_ptr() as *mut Hash;
-            *ptr = *hash;
-        };
-        *count += 1;
+            let ptr = writer.mmap[..].as_ptr() as *mut Hash;
+            std::slice::from_raw_parts_mut(ptr, self.capacity / std::mem::size_of::<Hash>())
+        }
+    }
+
+    pub(crate) fn set_count(&mut self, count: usize) {
+        if let Some((count_update, writer)) = self.count_and_writer.as_mut() {
+            *count_update = count;
+        }
     }
 }
 
@@ -1051,6 +1054,9 @@ impl<'a> AccountsHasher<'a> {
         let mut duplicate_pubkey_indexes = Vec::with_capacity(len);
         let filler_accounts_enabled = self.filler_accounts_enabled();
 
+        let hashes_slice = hashes.get_write_slice();
+        let mut count = 0;
+
         // this loop runs once per unique pubkey contained in any slot group
         while !first_items.is_empty() {
             let loop_stop = { first_items.len() - 1 }; // we increment at the beginning of the loop
@@ -1098,7 +1104,8 @@ impl<'a> AccountsHasher<'a> {
                     overall_sum = Self::checked_cast_for_capitalization(
                         item.lamports as u128 + overall_sum as u128,
                     );
-                    hashes.write(&item.hash);
+                    hashes_slice[count] = item.hash;
+                    count += 1;
                 }
             } else {
                 // if lamports == 0, check if they should be included
@@ -1107,7 +1114,8 @@ impl<'a> AccountsHasher<'a> {
                     // the hash of its pubkey
                     let hash = blake3::hash(bytemuck::bytes_of(&item.pubkey));
                     let hash = Hash::new_from_array(hash.into());
-                    hashes.write(&hash);
+                    hashes_slice[count] = hash;
+                    count += 1;
                 }
             }
 
@@ -1129,6 +1137,7 @@ impl<'a> AccountsHasher<'a> {
                 duplicate_pubkey_indexes.clear();
             }
         }
+        hashes.set_count(count);
 
         (hashes, overall_sum)
     }
