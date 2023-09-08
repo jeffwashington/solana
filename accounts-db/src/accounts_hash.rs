@@ -511,10 +511,14 @@ impl<'a> AccountsHasher<'a> {
             .into_par_iter()
             .map(|i| {
                 let start_index = i * fanout;
-                let end_index = std::cmp::min(start_index + fanout, total_hashes);
+                let first_pubkey_in_next_bin = std::cmp::min(start_index + fanout, total_hashes);
 
                 let mut hasher = Hasher::default();
-                for item in hashes.iter().take(end_index).skip(start_index) {
+                for item in hashes
+                    .iter()
+                    .take(first_pubkey_in_next_bin)
+                    .skip(start_index)
+                {
                     let h = extractor(item);
                     hasher.hash(h.as_ref());
                 }
@@ -597,12 +601,13 @@ impl<'a> AccountsHasher<'a> {
             .map(|i| {
                 // summary:
                 // this closure computes 1 or 3 levels of merkle tree (all chunks will be 1 or all will be 3)
-                // for a subset (our chunk) of the input data [start_index..end_index]
+                // for a subset (our chunk) of the input data [start_index..first_pubkey_in_next_bin]
 
                 // index into get_hash_slice_starting_at_index where this chunk's range begins
                 let start_index = i * num_hashes_per_chunk;
                 // index into get_hash_slice_starting_at_index where this chunk's range ends
-                let end_index = std::cmp::min(start_index + num_hashes_per_chunk, total_hashes);
+                let first_pubkey_in_next_bin =
+                    std::cmp::min(start_index + num_hashes_per_chunk, total_hashes);
 
                 // will compute the final result for this closure
                 let mut hasher = Hasher::default();
@@ -618,7 +623,7 @@ impl<'a> AccountsHasher<'a> {
                 if !three_level {
                     // 1 group of fanout
                     // The result of this loop is a single hash value from fanout input hashes.
-                    for i in start_index..end_index {
+                    for i in start_index..first_pubkey_in_next_bin {
                         if data_index >= data_len {
                             // we exhausted our data, fetch next slice starting at i
                             data = get_hash_slice_starting_at_index(i);
@@ -651,12 +656,12 @@ impl<'a> AccountsHasher<'a> {
                     // Now, some details:
                     // The result of this loop is a single hash value from fanout^3 input hashes.
                     // concepts:
-                    //  what we're conceptually hashing: "raw_hashes"[start_index..end_index]
+                    //  what we're conceptually hashing: "raw_hashes"[start_index..first_pubkey_in_next_bin]
                     //   example: [a,b,c,d,e,f]
                     //   but... hashes[] may really be multiple vectors that are pieced together.
                     //   example: [[a,b],[c],[d,e,f]]
                     //   get_hash_slice_starting_at_index(any_index) abstracts that and returns a slice starting at raw_hashes[any_index..]
-                    //   such that the end of get_hash_slice_starting_at_index may be <, >, or = end_index
+                    //   such that the end of get_hash_slice_starting_at_index may be <, >, or = first_pubkey_in_next_bin
                     //   example: get_hash_slice_starting_at_index(1) returns [b]
                     //            get_hash_slice_starting_at_index(3) returns [d,e,f]
                     // This code is basically 3 iterations of merkle tree hashing occurring simultaneously.
@@ -668,11 +673,11 @@ impl<'a> AccountsHasher<'a> {
                     // If there are < fanout^3 hashes, then this code stops when it runs out of raw hashes and returns whatever it hashed.
                     // This is always how the very last elements work in a merkle tree.
                     let mut i = start_index;
-                    while i < end_index {
+                    while i < first_pubkey_in_next_bin {
                         let mut hasher_j = Hasher::default();
                         for _j in 0..fanout {
                             let mut hasher_k = Hasher::default();
-                            let end = std::cmp::min(end_index - i, fanout);
+                            let end = std::cmp::min(first_pubkey_in_next_bin - i, fanout);
                             for _k in 0..end {
                                 if data_index >= data_len {
                                     // we exhausted our data, fetch next slice starting at i
@@ -685,7 +690,7 @@ impl<'a> AccountsHasher<'a> {
                                 i += 1;
                             }
                             hasher_j.hash(hasher_k.result().as_ref());
-                            if i >= end_index {
+                            if i >= first_pubkey_in_next_bin {
                                 break;
                             }
                         }
@@ -990,10 +995,10 @@ impl<'a> AccountsHasher<'a> {
             dir_for_temp_cache_files: self.dir_for_temp_cache_files.clone(),
         };
         // initialize 'first_items', which holds the current lowest item in each slot group
-        sorted_data_by_pubkey
+        let max_inclusive_num_pubkeys = sorted_data_by_pubkey
             .iter()
             .enumerate()
-            .for_each(|(i, hash_data)| {
+            .map(|(i, hash_data)| {
                 let first_pubkey_in_bin =
                     Self::find_first_pubkey_in_bin(hash_data, pubkey_bin, bins, &binner, stats);
                 if let Some(first_pubkey_in_bin) = first_pubkey_in_bin {
@@ -1001,8 +1006,21 @@ impl<'a> AccountsHasher<'a> {
                     first_items.push(k);
                     first_item_to_pubkey_division.push(i);
                     indexes.push(first_pubkey_in_bin);
+                    let mut first_pubkey_in_next_bin = first_pubkey_in_bin + 1;
+                    while first_pubkey_in_next_bin < hash_data.len() {
+                        if binner.bin_from_pubkey(&hash_data[first_pubkey_in_next_bin].pubkey)
+                            != pubkey_bin
+                        {
+                            break;
+                        }
+                        first_pubkey_in_next_bin += 1;
+                    }
+                    first_pubkey_in_next_bin - first_pubkey_in_bin
+                } else {
+                    0
                 }
-            });
+            })
+            .sum::<usize>();
         let mut overall_sum = 0;
         let mut duplicate_pubkey_indexes = Vec::with_capacity(len);
         let filler_accounts_enabled = self.filler_accounts_enabled();
