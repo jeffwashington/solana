@@ -1054,7 +1054,7 @@ impl<'a> AccountsHasher<'a> {
                             {
                                 break;
                             }
-                            first_pubkey_in_next_bin += 100;
+                            first_pubkey_in_next_bin += 10;
                         }
                         first_pubkey_in_next_bin
                     }
