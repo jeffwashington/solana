@@ -19,7 +19,6 @@ use {
     std::{
         borrow::Borrow,
         convert::TryInto,
-        fs::File,
         io::{Seek, SeekFrom, Write},
         path::PathBuf,
         sync::{
@@ -101,7 +100,7 @@ impl AccountHashesFile {
 
             //UNSAFE: Required to create a Mmap
             let map = unsafe { MmapMut::map_mut(&data) };
-            let mut map = map.unwrap_or_else(|e| {
+            let map = map.unwrap_or_else(|e| {
                 error!(
                     "Failed to map the data file (size: {}): {}.\n
                         Please increase sysctl vm.max_map_count or equivalent for your platform.",
@@ -109,6 +108,8 @@ impl AccountHashesFile {
                 );
                 std::process::exit(1);
             });
+
+            self.count_and_writer = Some((0, MmapAccountHashesFile { mmap: map }));
         }
         let (count, writer) = self.count_and_writer.as_mut().unwrap();
         let start = *count * std::mem::size_of::<Hash>();
@@ -1001,10 +1002,7 @@ impl<'a> AccountsHasher<'a> {
         // map from index of an item in first_items[] to index of the corresponding item in sorted_data_by_pubkey[]
         // this will change as items in sorted_data_by_pubkey[] are exhausted
         let mut first_item_to_pubkey_division = Vec::with_capacity(len);
-        let mut hashes = AccountHashesFile {
-            count_and_writer: None,
-            dir_for_temp_cache_files: self.dir_for_temp_cache_files.clone(),
-        };
+
         // initialize 'first_items', which holds the current lowest item in each slot group
         let max_inclusive_num_pubkeys = sorted_data_by_pubkey
             .iter()
@@ -1032,6 +1030,12 @@ impl<'a> AccountsHasher<'a> {
                 }
             })
             .sum::<usize>();
+        let mut hashes = AccountHashesFile {
+            count_and_writer: None,
+            dir_for_temp_cache_files: self.dir_for_temp_cache_files.clone(),
+            capacity: max_inclusive_num_pubkeys,
+        };
+
         let mut overall_sum = 0;
         let mut duplicate_pubkey_indexes = Vec::with_capacity(len);
         let filler_accounts_enabled = self.filler_accounts_enabled();
@@ -1269,6 +1273,7 @@ pub mod tests {
             Self {
                 count_and_writer: None,
                 dir_for_temp_cache_files,
+                capacity: 1024, /* default 1k */
             }
         }
     }
