@@ -33,13 +33,14 @@ pub const MERKLE_FANOUT: usize = 16;
 /// 1 file containing account hashes sorted by pubkey, mapped into memory
 struct MmapAccountHashesFile {
     mmap: MmapMut,
+    count: usize,
 }
 
 impl MmapAccountHashesFile {
     /// return a slice of account hashes starting at 'index'
     fn read(&self, index: usize) -> &[Hash] {
         let start = std::mem::size_of::<Hash>() * index;
-        let item_slice: &[u8] = &self.mmap[start..];
+        let item_slice: &[u8] = &self.mmap[start..self.count * std::mem::size_of::<Hash>()];
         let remaining_elements = item_slice.len() / std::mem::size_of::<Hash>();
         unsafe {
             let item = item_slice.as_ptr() as *const Hash;
@@ -61,7 +62,13 @@ pub struct AccountHashesFile {
 impl AccountHashesFile {
     /// map the file into memory and return a reader that can access it by slice
     fn get_reader(&mut self) -> Option<(usize, MmapAccountHashesFile)> {
-        std::mem::take(&mut self.count_and_writer)
+        let mut count_and_writer = std::mem::take(&mut self.count_and_writer);
+        if let Some((count, reader)) = count_and_writer.as_mut() {
+            assert!(*count * std::mem::size_of::<Hash>() <= self.capacity);
+            // file was likely over allocated
+            reader.count = *count;
+        }
+        count_and_writer
     }
 
     /// # hashes stored in this file
@@ -109,7 +116,13 @@ impl AccountHashesFile {
                 std::process::exit(1);
             });
 
-            self.count_and_writer = Some((0, MmapAccountHashesFile { mmap: map }));
+            self.count_and_writer = Some((
+                0,
+                MmapAccountHashesFile {
+                    mmap: map,
+                    count: self.capacity / std::mem::size_of::<Hash>(),
+                },
+            ));
         }
         let (count, writer) = self.count_and_writer.as_mut().unwrap();
         let start = *count * std::mem::size_of::<Hash>();
