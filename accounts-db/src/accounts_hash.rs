@@ -166,6 +166,9 @@ pub struct HashStats {
     pub scan_time_total_us: u64,
     pub zeros_time_total_us: u64,
     pub hash_time_total_us: u64,
+    pub time_in_last: AtomicU64,
+    pub overall_len: AtomicU64,
+    
     pub sort_time_total_us: u64,
     pub hash_total: usize,
     pub num_snapshot_storage: usize,
@@ -282,6 +285,16 @@ impl HashStats {
             (
                 "pubkey_bin_search_us",
                 self.pubkey_bin_search_us.load(Ordering::Relaxed),
+                i64
+            ),
+            (
+                "time_in_last",
+                self.time_in_last.load(Ordering::Relaxed),
+                i64
+            ),
+            (
+                "overall_len",
+                self.overall_len.load(Ordering::Relaxed),
                 i64
             ),
         );
@@ -1017,6 +1030,9 @@ impl<'a> AccountsHasher<'a> {
         // this will change as items in sorted_data_by_pubkey[] are exhausted
         let mut first_item_to_pubkey_division = Vec::with_capacity(len);
 
+        let mut time_in_last = 0;
+        let mut overall_len = 0;
+
         // initialize 'first_items', which holds the current lowest item in each slot group
         let max_inclusive_num_pubkeys = sorted_data_by_pubkey
             .iter()
@@ -1029,6 +1045,7 @@ impl<'a> AccountsHasher<'a> {
                     first_items.push(k);
                     first_item_to_pubkey_division.push(i);
                     indexes.push(first_pubkey_in_bin);
+                    let m = Measure::start("");
                     let mut first_pubkey_in_next_bin = first_pubkey_in_bin + 1;
                     while first_pubkey_in_next_bin < hash_data.len() {
                         if binner.bin_from_pubkey(&hash_data[first_pubkey_in_next_bin].pubkey)
@@ -1038,12 +1055,17 @@ impl<'a> AccountsHasher<'a> {
                         }
                         first_pubkey_in_next_bin += 1;
                     }
-                    first_pubkey_in_next_bin - first_pubkey_in_bin
+                    time_in_last += m.end_as_us();
+                    let len = first_pubkey_in_next_bin - first_pubkey_in_bin;
+                    overall_len += len;
+                    len
                 } else {
                     0
                 }
             })
             .sum::<usize>();
+        stats.overall_len.fetch_add(overall_len as u64, Ordering::Relaxed);
+        stats.time_in_last.fetch_add(time_in_last, Ordering::Relaxed);
         let mut hashes = AccountHashesFile {
             count_and_writer: None,
             dir_for_temp_cache_files: self.dir_for_temp_cache_files.clone(),
