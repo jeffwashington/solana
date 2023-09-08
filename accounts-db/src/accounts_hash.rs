@@ -102,7 +102,7 @@ impl AccountHashesFile {
                 .unwrap();
             data.write_all(&[0]).unwrap();
             data.rewind().unwrap();
-            data.flush().unwrap();
+            // remove this data.flush().unwrap();
 
             //UNSAFE: Required to create a Mmap
             let map = unsafe { MmapMut::map_mut(&data) };
