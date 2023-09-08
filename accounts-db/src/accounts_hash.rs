@@ -20,7 +20,7 @@ use {
         borrow::Borrow,
         convert::TryInto,
         fs::File,
-        io::{BufWriter, Write},
+        io::{Seek, SeekFrom, Write},
         path::PathBuf,
         sync::{
             atomic::{AtomicU64, AtomicUsize, Ordering},
@@ -52,23 +52,17 @@ impl MmapAccountHashesFile {
 /// 1 file containing account hashes sorted by pubkey
 pub struct AccountHashesFile {
     /// # hashes and an open file that will be deleted on drop. None if there are zero hashes to represent, and thus, no file.
-    count_and_writer: Option<(usize, BufWriter<File>)>,
+    count_and_writer: Option<(usize, MmapAccountHashesFile)>,
     /// The directory where temporary cache files are put
     dir_for_temp_cache_files: PathBuf,
+
+    capacity: usize,
 }
 
 impl AccountHashesFile {
     /// map the file into memory and return a reader that can access it by slice
     fn get_reader(&mut self) -> Option<(usize, MmapAccountHashesFile)> {
-        std::mem::take(&mut self.count_and_writer).map(|(count, writer)| {
-            let file = Some(writer.into_inner().unwrap());
-            (
-                count,
-                MmapAccountHashesFile {
-                    mmap: unsafe { MmapMut::map_mut(file.as_ref().unwrap()).unwrap() },
-                },
-            )
-        })
+        std::mem::take(&mut self.count_and_writer)
     }
 
     /// # hashes stored in this file
@@ -84,30 +78,47 @@ impl AccountHashesFile {
     pub fn write(&mut self, hash: &Hash) {
         if self.count_and_writer.is_none() {
             // we have hashes to write but no file yet, so create a file that will auto-delete on drop
-            self.count_and_writer = Some((
-                0,
-                BufWriter::new(
-                    tempfile_in(&self.dir_for_temp_cache_files).unwrap_or_else(|err| {
-                        panic!(
-                            "Unable to create file within {}: {err}",
-                            self.dir_for_temp_cache_files.display()
-                        )
-                    }),
-                ),
-            ));
-        }
-        let count_and_writer = self.count_and_writer.as_mut().unwrap();
-        count_and_writer
-            .1
-            .write_all(hash.as_ref())
-            .unwrap_or_else(|err| {
-                panic!(
-                    "Unable to write file within {}: {err}",
-                    self.dir_for_temp_cache_files.display()
-                )
-            });
 
-        count_and_writer.0 += 1;
+            let file = Some(
+                tempfile_in(&self.dir_for_temp_cache_files).unwrap_or_else(|err| {
+                    panic!(
+                        "Unable to create file within {}: {err}",
+                        self.dir_for_temp_cache_files.display()
+                    )
+                }),
+            );
+
+            let mut data = file.unwrap();
+
+            // Theoretical performance optimization: write a zero to the end of
+            // the file so that we won't have to resize it later, which may be
+            // expensive.
+            data.seek(SeekFrom::Start((self.capacity - 1) as u64))
+                .unwrap();
+            data.write_all(&[0]).unwrap();
+            data.rewind().unwrap();
+            data.flush().unwrap();
+
+            //UNSAFE: Required to create a Mmap
+            let map = unsafe { MmapMut::map_mut(&data) };
+            let mut map = map.unwrap_or_else(|e| {
+                error!(
+                    "Failed to map the data file (size: {}): {}.\n
+                        Please increase sysctl vm.max_map_count or equivalent for your platform.",
+                    self.capacity, e
+                );
+                std::process::exit(1);
+            });
+        }
+        let (count, writer) = self.count_and_writer.as_mut().unwrap();
+        let start = *count * std::mem::size_of::<Hash>();
+        let end = start + std::mem::size_of::<Hash>();
+
+        unsafe {
+            let ptr = writer.mmap[start..end].as_ptr() as *mut Hash;
+            *ptr = *hash;
+        };
+        *count += 1;
     }
 }
 
