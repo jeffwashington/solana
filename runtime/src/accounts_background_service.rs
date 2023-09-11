@@ -521,7 +521,6 @@ pub struct PrunedBanksRequestHandler {
 }
 
 impl PrunedBanksRequestHandler {
-<<<<<<< HEAD
     #[cfg_attr(feature = "dev-context-only-utils", qualifiers(pub))]
     fn handle_request(&self, bank: &Bank) -> usize {
         let mut banks_to_purge: Vec<_> = self.pruned_banks_receiver.try_iter().collect();
@@ -555,22 +554,6 @@ impl PrunedBanksRequestHandler {
                     accounts_db.purge_slot(*slot, *bank_id, true);
                 })
             });
-=======
-    pub fn handle_request(&self, bank: &Bank, is_serialized_with_abs: bool) -> usize {
-        let slots = self.pruned_banks_receiver.try_iter().take((bank.rc.accounts.accounts_db.accounts_cache.num_slots() / 2).max(100)).collect::<Vec<_>>();
-        let count = slots.len();
-        log::error!("purge_slot: {}, count: {}, num: {}", line!(), count, bank.rc.accounts.accounts_db.accounts_cache.num_slots());
-        bank.rc.accounts.accounts_db.thread_pool_clean.install(|| {
-            slots
-                .into_par_iter()
-                .for_each(|(pruned_slot, pruned_bank_id)| {
-                    bank.rc.accounts.accounts_db.purge_slot(
-                        pruned_slot,
-                        pruned_bank_id,
-                        is_serialized_with_abs,
-                    );
-                });
->>>>>>> 4becf498d2 (pop in all its glory)
         });
 
         num_banks_to_purge
