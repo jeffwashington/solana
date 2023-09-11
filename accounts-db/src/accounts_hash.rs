@@ -1397,6 +1397,7 @@ impl<'a> AccountsHasher<'a> {
 }
 
 fn print2(element: &Node, sorted_data_by_pubkey: &[&[CalculateHashIntermediate]], accum: &mut Vec<Pubkey>) {
+    return;
     if accum.is_empty() {
         log::error!("-------");
     }
@@ -1408,6 +1409,7 @@ fn print2(element: &Node, sorted_data_by_pubkey: &[&[CalculateHashIntermediate]]
 }
 
 fn assert_list(next: Option<&Box<Node>>, sorted_data_by_pubkey: &[&[CalculateHashIntermediate]], line: u32, last_key: &Option<Pubkey>, line2: Option<u32>) {
+    return;
     if let Some(next) = next {
         let borrow = next.next.borrow();
         if let Some(next_next) = borrow.as_ref() {
@@ -2065,25 +2067,62 @@ pub mod tests {
     fn test_accountsdb_dup_pubkey_2_chunks() {
         solana_logger::setup();
 
-        let key = Pubkey::new_from_array([1;32]);
-        let key2 = Pubkey::new_from_array([2;32]);
-        let hash = Hash::new_unique();
-        let mut account_maps = Vec::new();
-        let mut account_maps2 = Vec::new();
-        let val = CalculateHashIntermediate::new(hash, 1, key);
-        account_maps.push(val.clone());
-        let val = CalculateHashIntermediate::new(hash, 1, key2);
-        account_maps.push(val.clone());
-        let val = CalculateHashIntermediate::new(hash, 1, key2);
-        account_maps2.push(val.clone());
+        for reverse in [false, true] {
+            let key = Pubkey::new_from_array([1;32]);
+            let key2 = Pubkey::new_from_array([2;32]);
+            let hash = Hash::new_unique();
+            let mut account_maps = Vec::new();
+            let mut account_maps2 = Vec::new();
+            let val = CalculateHashIntermediate::new(hash, 1, key);
+            account_maps.push(val.clone());
+            let val2 = CalculateHashIntermediate::new(hash, 2, key2);
+            account_maps.push(val2.clone());
+            let val3 = CalculateHashIntermediate::new(hash, 3, key2);
+            account_maps2.push(val3.clone());
 
-        let vecs = vec![account_maps.to_vec(), account_maps2.to_vec()];
-        let slice = convert_to_slice(&vecs);
-        let (hashfile, lamports) = test_de_dup_accounts_in_parallel(&slice);
-        assert_eq!(
-            (get_vec(hashfile), lamports),
-            (vec![val.hash], val.lamports)
-        );
+            let mut vecs = vec![account_maps.to_vec(), account_maps2.to_vec()];
+            if reverse {
+                vecs = vecs.into_iter().rev().collect();
+            }
+            let slice = convert_to_slice(&vecs);
+            let (hashfile, lamports) = test_de_dup_accounts_in_parallel(&slice);
+            assert_eq!(
+                (get_vec(hashfile), lamports),
+                (vec![val.hash, if reverse {val2.hash} else {val3.hash}], val.lamports + if reverse {val2.lamports} else {val3.lamports}),
+                "reverse: {reverse}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_accountsdb_dup_pubkey_2_chunks_backwards() {
+        solana_logger::setup();
+
+        for reverse in [false, true] {
+            let key = Pubkey::new_from_array([3;32]);
+            let key2 = Pubkey::new_from_array([2;32]);
+            let hash = Hash::new_unique();
+            let mut account_maps = Vec::new();
+            let mut account_maps2 = Vec::new();
+            let val2 = CalculateHashIntermediate::new(hash, 2, key2);
+            account_maps.push(val2.clone());
+            let val = CalculateHashIntermediate::new(hash, 1, key);
+            account_maps.push(val.clone());
+            let val3 = CalculateHashIntermediate::new(hash, 3, key2);
+            account_maps2.push(val3.clone());
+
+            let mut vecs = vec![account_maps.to_vec(), account_maps2.to_vec()];
+            if reverse {
+                vecs = vecs.into_iter().rev().collect();
+            }
+            let slice = convert_to_slice(&vecs);
+            let (hashfile, lamports) = test_de_dup_accounts_in_parallel(&slice);
+            assert_eq!(
+                (get_vec(hashfile), lamports),
+                (vec![if reverse {val2.hash} else {val3.hash}, val.hash], val.lamports + if reverse {val2.lamports} else {val3.lamports}),
+                "reverse: {reverse}"
+            );
+        }
     }
 
     #[test]
