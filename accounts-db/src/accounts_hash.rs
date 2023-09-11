@@ -43,6 +43,7 @@ fn insert(
     to_insert_key: &Pubkey,
     sorted_data_by_pubkey: &[&[CalculateHashIntermediate]],
     mut to_insert: Box<Node>,
+    depth: usize,
 ) -> (Option<Box<Node>>, Option<Box<Node>>, u32) {
     let current = last.borrow();
     if current.is_some() {
@@ -51,8 +52,9 @@ fn insert(
         //jefferror!("insert visiting: {}", c2_entry.pubkey.as_ref()[0]);
         if to_insert_key > &c2_entry.pubkey {
             // current goes after this node somewhere
+            assert_list(last.borrow().as_ref(), sorted_data_by_pubkey, line!(), &None, None);
             let (to_insert, to_retry, line) =
-                insert(&c2.next, to_insert_key, sorted_data_by_pubkey, to_insert);
+                insert(&c2.next, to_insert_key, sorted_data_by_pubkey, to_insert, depth + 1);
             if let Some(mut to_insert) = to_insert {
                 //jefferror!("{}", line!());
                 // did not find someone to insert it after, so it goes after us
@@ -64,6 +66,7 @@ fn insert(
                 // nothing for caller to do, no new node with duplicates to re-sort
                 (None, None, line!())
             } else {
+                assert_list(last.borrow().as_ref(), sorted_data_by_pubkey, line!(), &None, Some(line));
                 //jefferror!("{}", line!());
                 // already inserted, so return through
                 (None, to_retry, line)
@@ -74,9 +77,11 @@ fn insert(
             drop(c2_entry);
             drop(c2);
             drop(current);
+            assert_list(last.borrow().as_ref(), sorted_data_by_pubkey, line!(), &None, None);
             let next: Option<Box<Node>> = std::mem::take(&mut last.borrow_mut());
             *to_insert.next.borrow_mut() = next;
             *last.borrow_mut() = Some(to_insert);
+            assert_list(last.borrow().as_ref(), sorted_data_by_pubkey, line!(), &None, None);
 
             // the one to insert goes before us, so insert before us, telling calling fn to update
             (None, None, line!())
@@ -1273,7 +1278,7 @@ impl<'a> AccountsHasher<'a> {
                 // current needs to be inserted in a non-head position in the linked list
                 let last: &RefCell<Option<Box<Node>>> = &head.as_ref().unwrap().next;
                 assert_list(head.as_ref(), sorted_data_by_pubkey, line!(), &last_pk, None);
-                let (to_insert, new_current, line) = insert(last, &key, sorted_data_by_pubkey, current);
+                let (to_insert, new_current, line) = insert(last, &key, sorted_data_by_pubkey, current, 0);
                 assert_list(head.as_ref(), sorted_data_by_pubkey, line!(), &last_pk, Some(line));
                 if let Some(mut to_insert) = to_insert {
                     let current = std::mem::take(&mut head).unwrap();
@@ -2036,6 +2041,34 @@ pub mod tests {
     }
 
     #[test]
+    fn test_accountsdb_dup_pubkey_2_chunks() {
+        solana_logger::setup();
+
+        let key = Pubkey::new_unique();
+        let hash = Hash::new_unique();
+        let mut account_maps = Vec::new();
+        let val = CalculateHashIntermediate::new(hash, 1, key);
+        account_maps.push(val.clone());
+
+        let vecs = vec![account_maps.to_vec()];
+        let slice = convert_to_slice(&vecs);
+        let (hashfile, lamports) = test_de_dup_accounts_in_parallel(&slice);
+        assert_eq!(
+            (get_vec(hashfile), lamports),
+            (vec![val.hash], val.lamports)
+        );
+
+        // zero original lamports, higher version
+        let val = CalculateHashIntermediate::new(hash, 0, key);
+        account_maps.push(val); // has to be after previous entry since account_maps are in slot order
+
+        let vecs = vec![account_maps.to_vec()];
+        let slice = convert_to_slice(&vecs);
+        let (hashfile, lamports) = test_de_dup_accounts_in_parallel(&slice);
+        assert_eq!((get_vec(hashfile), lamports), (vec![], 0));
+    }
+
+    #[test]
     fn test_accountsdb_cumulative_offsets1_d() {
         let input = vec![vec![0, 1], vec![], vec![2, 3, 4], vec![]];
         let cumulative = CumulativeOffsets::from_raw(&input);
@@ -2468,7 +2501,7 @@ pub mod tests {
                 head = Some(to_insert);
             }
             else {
-                let (to_insert, new_current) = insert(last, &key, &sorted_data_by_pubkey, to_insert);
+                let (to_insert, new_current, _) = insert(last, &key, &sorted_data_by_pubkey, to_insert, 0);
                 if let Some(mut to_insert) = to_insert {
                     panic!("unepxected");
                     let current = std::mem::take(&mut head).unwrap();
@@ -2529,7 +2562,7 @@ pub mod tests {
                 head = Some(to_insert);
             }
             else {
-                let (to_insert, new_current) = insert(last, &key, &sorted_data_by_pubkey, to_insert);
+                let (to_insert, new_current, _last) = insert(last, &key, &sorted_data_by_pubkey, to_insert, 0);
                 if let Some(mut to_insert) = to_insert {
                     panic!("unepxected");
                     let current = std::mem::take(&mut head).unwrap();
