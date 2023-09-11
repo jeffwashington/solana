@@ -15,6 +15,7 @@ use {
         pubkey::Pubkey,
         slot_history::Slot,
         sysvar::epoch_schedule::EpochSchedule,
+        timing::AtomicInterval,
     },
     std::{
         borrow::Borrow,
@@ -171,8 +172,22 @@ pub struct HashStats {
     pub sum_ancient_scans_us: AtomicU64,
     pub count_ancient_scans: AtomicU64,
     pub pubkey_bin_search_us: AtomicU64,
+    pub last_time: AtomicU64,
+    pub start_time: AtomicU64,
+    pub number_deduped: AtomicU64,
+    pub total_expected: AtomicU64,
+    pub number_deduped_since_last_time: AtomicU64,
+    pub dedup_threads_active: AtomicU64,
+    pub cycle: AtomicInterval,
 }
 impl HashStats {
+    pub fn new() -> Self {
+        Self {
+            start_time: AtomicU64::new(solana_sdk::timing::timestamp()),
+            ..Self::default()
+        }
+    }
+
     pub fn calc_storage_size_quartiles(&mut self, storages: &[Arc<AccountStorageEntry>]) {
         let mut sum = 0;
         let mut sizes = storages
@@ -992,6 +1007,7 @@ impl<'a> AccountsHasher<'a> {
         bins: usize,
         stats: &HashStats,
     ) -> (AccountHashesFile, u64) {
+        stats.dedup_threads_active.fetch_add(1, Ordering::Relaxed);
         let binner = PubkeyBinCalculator24::new(bins);
 
         let len = sorted_data_by_pubkey.len();
@@ -1115,8 +1131,30 @@ impl<'a> AccountsHasher<'a> {
                 });
                 duplicate_pubkey_indexes.clear();
             }
+            stats.number_deduped_since_last_time.fetch_add(1, Ordering::Relaxed);
+            if stats.cycle.should_update(10_000) {
+                let start_time = stats.start_time.load(Ordering::Relaxed);
+                let elapsed = solana_sdk::timing::timestamp() - start_time;
+                if elapsed > 0 {
+                    let done = stats.number_deduped_since_last_time.swap(0, Ordering::Relaxed);
+                    let total = stats.number_deduped.fetch_add(done, Ordering::Relaxed) + done;
+                    let recent_rate_per_s = done / 10;
+                    let rate_per_s = total / (elapsed * 1000);
+                    datapoint_info!(
+                        "dedup",
+                        ("total_elapsed_s", elapsed * 1000, i64),
+                        ("total_rate", rate_per_s, i64),
+                        ("recent_rate", recent_rate_per_s, i64),
+                        ("total_deduped", total, i64),
+                        ("recent_deduped", done, i64),
+                        ("threads_active", stats.dedup_threads_active.load(Ordering::Relaxed), i64),
+                        ("num_chunks", sorted_data_by_pubkey.len(), i64),
+                    );
+                }
+            }
         }
-
+        stats.dedup_threads_active.fetch_sub(1, Ordering::Relaxed);
+    
         (hashes, overall_sum)
     }
 
@@ -1153,6 +1191,7 @@ impl<'a> AccountsHasher<'a> {
             None,
         );
         hash_time.stop();
+        error!("jwash: hash final: {}, {:?}", hash_time.as_us(), ());// this is massive logging: cumulative.cumulative);
         stats.hash_time_total_us += hash_time.as_us();
         (hash, total_lamports)
     }

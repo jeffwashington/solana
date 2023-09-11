@@ -43,7 +43,7 @@ use {
 };
 
 pub const ITER_BATCH_SIZE: usize = 1000;
-pub const BINS_DEFAULT: usize = 8192;
+pub const BINS_DEFAULT: usize = 262144;
 pub const BINS_FOR_TESTING: usize = 2; // we want > 1, but each bin is a few disk files with a disk based index, so fewer is better
 pub const BINS_FOR_BENCHMARKS: usize = 8192;
 pub const FLUSH_THREADS_TESTING: usize = 1;
@@ -1385,7 +1385,9 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
                 lock = Some(&self.account_maps[bin]);
                 last_bin = bin;
             }
-            lock.as_ref().unwrap().get_internal(pubkey, |entry| {
+            let mut m = Measure::start("scan");
+            let lock_temp = lock.as_ref().unwrap();
+            lock_temp.get_internal(pubkey, |entry| {
                 let mut cache = false;
                 match entry {
                     Some(locked_entry) => {
@@ -1411,6 +1413,8 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
                         };
                     }
                     None => {
+                        m.stop();
+                        lock_temp.stats().scan_missing_us.fetch_add(m.as_us(), Ordering::Relaxed);
                         avoid_callback_result.unwrap_or_else(|| callback(pubkey, None, None));
                     }
                 }

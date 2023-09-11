@@ -27,6 +27,8 @@ pub enum Protocol {
     QUIC,
 }
 
+// we used to disable quic here for kin sim
+
 pub trait ConnectionManager {
     type ConnectionPool: ConnectionPool;
     type NewConnectionConfig;

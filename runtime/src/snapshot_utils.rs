@@ -993,17 +993,24 @@ where
     F: FnOnce(&mut BufWriter<std::fs::File>) -> Result<()>,
 {
     let data_file = fs_err::File::create(data_file_path)?.into();
+    log::error!("abs: {}", line!());
     let mut data_file_stream = BufWriter::new(data_file);
+    log::error!("abs: {}", line!());
     serializer(&mut data_file_stream)?;
+    log::error!("abs: {}", line!());
     data_file_stream.flush()?;
+    log::error!("abs: {}", line!());
 
     let consumed_size = data_file_stream.stream_position()?;
+    log::error!("abs: {}", line!());
     if consumed_size > maximum_file_size {
+        log::error!("abs: {}, {consumed_size}, {maximum_file_size}", line!());
         let error_message = format!(
             "too large snapshot data file to serialize: {data_file_path:?} has {consumed_size} bytes"
         );
         return Err(get_io_error(&error_message));
     }
+    log::error!("abs: {}", line!());
     Ok(consumed_size)
 }
 

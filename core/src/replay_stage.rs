@@ -3441,6 +3441,7 @@ impl ReplayStage {
 
             match switch_fork_decision {
                 SwitchForkDecision::FailedSwitchThreshold(switch_proof_stake, total_stake) => {
+                    datapoint_info!("FailedSwitchThreshold", ("count", 1, i64));
                     let reset_bank = heaviest_bank_on_same_voted_fork;
                     let final_switch_fork_decision = Self::select_forks_failed_switch_threshold(
                         reset_bank.map(|bank| bank.as_ref()),
@@ -3455,6 +3456,7 @@ impl ReplayStage {
                     reset_bank.map(|b| (b, final_switch_fork_decision))
                 }
                 SwitchForkDecision::FailedSwitchDuplicateRollback(latest_duplicate_ancestor) => {
+                    datapoint_info!("FailedSwitchDuplicateRollback", ("count", 1, i64));
                     // If we can't switch and our last vote was on an unconfirmed, duplicate slot,
                     // then we need to reset to the heaviest bank, even if the heaviest bank is not
                     // a descendant of the last vote (usually for switch threshold failures we reset
