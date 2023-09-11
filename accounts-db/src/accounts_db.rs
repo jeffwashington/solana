@@ -1810,10 +1810,24 @@ impl SplitAncientStorages {
         snapshot_storages: &SortedStorages,
     ) -> Vec<Slot> {
         let range = snapshot_storages.range();
-        snapshot_storages
+        let mut i = 0;
+        let mut i_last_large_capacity = usize::MAX;
+        let mut possible_ancient_slots = snapshot_storages
             .iter_range(&(range.start..oldest_non_ancient_slot))
-            .filter_map(|(slot, storage)| storage.map(|_| slot))
-            .collect()
+            .filter_map(|(slot, storage)| {
+                storage.map(|storage| {
+                    if storage.capacity() > get_ancient_append_vec_capacity() * 50 / 100 {
+                        // even though the slot is in range of being an ancient append vec, if it isn't actually a large append vec,
+                        // then we are better off treating all these slots as normally cachable to reduce work in dedup
+                        i_last_large_capacity = 0;
+                    }
+                    i += 1;
+                    slot
+                })
+            })
+            .collect::<Vec<_>>();
+        possible_ancient_slots.truncate(i_last_large_capacity);
+        possible_ancient_slots
     }
 
     /// create once ancient slots have been identified
