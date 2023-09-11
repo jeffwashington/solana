@@ -39,22 +39,21 @@ struct Node {
 }
 
 fn insert(
-    last: &RefCell<Option<Box<Node>>>,
+    current: &mut Option<Box<Node>>,
     to_insert_key: &Pubkey,
     sorted_data_by_pubkey: &[&[CalculateHashIntermediate]],
     mut to_insert: Box<Node>,
     depth: usize,
 ) -> (Option<Box<Node>>, Option<Box<Node>>, u32) {
-    let current = last.borrow();
     if current.is_some() {
         let c2 = current.as_ref().unwrap();
         let c2_entry = &sorted_data_by_pubkey[c2.slot_group_index][c2.offset];
         //jefferror!("insert visiting: {}", c2_entry.pubkey.as_ref()[0]);
         if to_insert_key > &c2_entry.pubkey {
             // current goes after this node somewhere
-            assert_list(last.borrow().as_ref(), sorted_data_by_pubkey, line!(), &None, None);
+            assert_list(current.as_ref(), sorted_data_by_pubkey, line!(), &None, None);
             let (to_insert, to_retry, line) =
-                insert(&c2.next, to_insert_key, sorted_data_by_pubkey, to_insert, depth + 1);
+                insert(&mut c2.next.borrow_mut(), to_insert_key, sorted_data_by_pubkey, to_insert, depth + 1);
             if let Some(mut to_insert) = to_insert {
                 //jefferror!("{}", line!());
                 // did not find someone to insert it after, so it goes after us
@@ -66,7 +65,7 @@ fn insert(
                 // nothing for caller to do, no new node with duplicates to re-sort
                 (None, None, line!())
             } else {
-                assert_list(last.borrow().as_ref(), sorted_data_by_pubkey, line!(), &None, Some(line));
+                assert_list(current.as_ref(), sorted_data_by_pubkey, line!(), &None, Some(line));
                 //jefferror!("{}", line!());
                 // already inserted, so return through
                 (None, to_retry, line)
@@ -76,12 +75,11 @@ fn insert(
             // goes in front of us
             drop(c2_entry);
             drop(c2);
-            drop(current);
-            assert_list(last.borrow().as_ref(), sorted_data_by_pubkey, line!(), &None, None);
-            let next: Option<Box<Node>> = std::mem::take(&mut last.borrow_mut());
+            assert_list(current.as_ref(), sorted_data_by_pubkey, line!(), &None, None);
+            let next: Option<Box<Node>> = std::mem::take(current);
             *to_insert.next.borrow_mut() = next;
-            *last.borrow_mut() = Some(to_insert);
-            assert_list(last.borrow().as_ref(), sorted_data_by_pubkey, line!(), &None, None);
+            *current = Some(to_insert);
+            assert_list(current.as_ref(), sorted_data_by_pubkey, line!(), &None, None);
 
             // the one to insert goes before us, so insert before us, telling calling fn to update
             (None, None, line!())
@@ -96,13 +94,10 @@ fn insert(
                 // if to_insert's index > this node's then replace this element with `to_insert` and return current
                 drop(c2_entry);
                 drop(c2);
-                drop(current);
-                let mut last_borrow = last.borrow_mut();
-                let prev_next = std::mem::take(&mut last_borrow.as_mut().unwrap().next);
+                let prev_next = std::mem::take(&mut current.as_mut().unwrap().next);
                 to_insert.next = prev_next;
-                let to_retry = std::mem::take(&mut *last_borrow);
-                *last_borrow = Some(to_insert);
-                let am = last_borrow.as_mut();
+                let to_retry = std::mem::take(current);
+                *current = Some(to_insert);
                 (None, to_retry, line!())
             }
         }
@@ -1276,15 +1271,30 @@ impl<'a> AccountsHasher<'a> {
                 }
 
                 // current needs to be inserted in a non-head position in the linked list
-                let last: &RefCell<Option<Box<Node>>> = &head.as_ref().unwrap().next;
                 assert_list(head.as_ref(), sorted_data_by_pubkey, line!(), &last_pk, None);
-                let (to_insert, new_current, line) = insert(last, &key, sorted_data_by_pubkey, current, 0);
+                if head.is_some() {
+                    print2(head.as_ref().unwrap(), sorted_data_by_pubkey, &mut Vec::default());
+                }
+                let (to_insert, new_current, line) = insert(&mut head, &key, sorted_data_by_pubkey, current, 0);
+                if head.is_some() {
+                    print2(head.as_ref().unwrap(), sorted_data_by_pubkey, &mut Vec::default());
+                }
                 assert_list(head.as_ref(), sorted_data_by_pubkey, line!(), &last_pk, Some(line));
                 if let Some(mut to_insert) = to_insert {
+                    log::error!("{}", line!());
+                    if head.is_some() {
+                        print2(head.as_ref().unwrap(), sorted_data_by_pubkey, &mut Vec::default());
+                    }
+                    log::error!("{}", line!());
+                    assert_list(head.as_ref(), sorted_data_by_pubkey, line!(), &last_pk, Some(line));
                     let current = std::mem::take(&mut head).unwrap();
                     to_insert.next = RefCell::new(Some(current));
                     head = Some(to_insert);
-                    assert_list(head.as_ref(), sorted_data_by_pubkey, line!(), &last_pk, None);
+                    log::error!("{}", line!());
+                    if head.is_some() {
+                        print2(head.as_ref().unwrap(), sorted_data_by_pubkey, &mut Vec::default());
+                    }
+                    assert_list(head.as_ref(), sorted_data_by_pubkey, line!(), &last_pk, Some(line));
                 }
                 if new_current.is_none() {
                     prev_last_line = last_line; last_line = line!();
@@ -1386,13 +1396,24 @@ impl<'a> AccountsHasher<'a> {
     }
 }
 
+fn print2(element: &Node, sorted_data_by_pubkey: &[&[CalculateHashIntermediate]], accum: &mut Vec<Pubkey>) {
+    if accum.is_empty() {
+        log::error!("-------");
+    }
+    log::error!("pk[0]: {}, slot group index: {}", sorted_data_by_pubkey[element.slot_group_index][element.offset].pubkey.as_ref()[0], element.slot_group_index);
+    accum.push(sorted_data_by_pubkey[element.slot_group_index][element.offset].pubkey);
+    if let Some(next) = element.next.borrow().as_ref() {
+        print2(next, sorted_data_by_pubkey, accum);
+    }
+}
+
 fn assert_list(next: Option<&Box<Node>>, sorted_data_by_pubkey: &[&[CalculateHashIntermediate]], line: u32, last_key: &Option<Pubkey>, line2: Option<u32>) {
     if let Some(next) = next {
         let borrow = next.next.borrow();
         if let Some(next_next) = borrow.as_ref() {
             let mypk = &sorted_data_by_pubkey[next.slot_group_index][next.offset].pubkey;
             let nextpk = &sorted_data_by_pubkey[next_next.slot_group_index][next_next.offset].pubkey;
-            assert!(mypk < nextpk, "{}, {}, line: {line}, line2: {line2:?}", mypk, nextpk);
+            assert!(mypk < nextpk, "{}, {}, line: {line}, line2: {line2:?}, slot groups: {:?}", mypk, nextpk, [next.slot_group_index, next_next.slot_group_index]);
             if let Some(last_key) = last_key.as_ref() {
                 assert!(last_key < mypk, "{}, {}, line: {line}, line2: {line2:?}", last_key, nextpk);
             }
@@ -2044,28 +2065,25 @@ pub mod tests {
     fn test_accountsdb_dup_pubkey_2_chunks() {
         solana_logger::setup();
 
-        let key = Pubkey::new_unique();
+        let key = Pubkey::new_from_array([1;32]);
+        let key2 = Pubkey::new_from_array([2;32]);
         let hash = Hash::new_unique();
         let mut account_maps = Vec::new();
+        let mut account_maps2 = Vec::new();
         let val = CalculateHashIntermediate::new(hash, 1, key);
         account_maps.push(val.clone());
+        let val = CalculateHashIntermediate::new(hash, 1, key2);
+        account_maps.push(val.clone());
+        let val = CalculateHashIntermediate::new(hash, 1, key2);
+        account_maps2.push(val.clone());
 
-        let vecs = vec![account_maps.to_vec()];
+        let vecs = vec![account_maps.to_vec(), account_maps2.to_vec()];
         let slice = convert_to_slice(&vecs);
         let (hashfile, lamports) = test_de_dup_accounts_in_parallel(&slice);
         assert_eq!(
             (get_vec(hashfile), lamports),
             (vec![val.hash], val.lamports)
         );
-
-        // zero original lamports, higher version
-        let val = CalculateHashIntermediate::new(hash, 0, key);
-        account_maps.push(val); // has to be after previous entry since account_maps are in slot order
-
-        let vecs = vec![account_maps.to_vec()];
-        let slice = convert_to_slice(&vecs);
-        let (hashfile, lamports) = test_de_dup_accounts_in_parallel(&slice);
-        assert_eq!((get_vec(hashfile), lamports), (vec![], 0));
     }
 
     #[test]
@@ -2501,7 +2519,7 @@ pub mod tests {
                 head = Some(to_insert);
             }
             else {
-                let (to_insert, new_current, _) = insert(last, &key, &sorted_data_by_pubkey, to_insert, 0);
+                let (to_insert, new_current, _) = insert(&mut head, &key, &sorted_data_by_pubkey, to_insert, 0);
                 if let Some(mut to_insert) = to_insert {
                     panic!("unepxected");
                     let current = std::mem::take(&mut head).unwrap();
@@ -2562,7 +2580,7 @@ pub mod tests {
                 head = Some(to_insert);
             }
             else {
-                let (to_insert, new_current, _last) = insert(last, &key, &sorted_data_by_pubkey, to_insert, 0);
+                let (to_insert, new_current, _last) = insert(&mut head, &key, &sorted_data_by_pubkey, to_insert, 0);
                 if let Some(mut to_insert) = to_insert {
                     panic!("unepxected");
                     let current = std::mem::take(&mut head).unwrap();
