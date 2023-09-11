@@ -48,30 +48,46 @@ fn insert(
     if current.is_some() {
         let c2 = current.as_ref().unwrap();
         let c2_entry = &sorted_data_by_pubkey[c2.slot_group_index][c2.offset];
+        //jefferror!("insert visiting: {}", c2_entry.pubkey.as_ref()[0]);
         if to_insert_key > &c2_entry.pubkey {
             // current goes after this node somewhere
             let (to_insert, to_retry) =
                 insert(&c2.next, to_insert_key, sorted_data_by_pubkey, to_insert);
             if let Some(mut to_insert) = to_insert {
+                //jefferror!("{}", line!());
                 // did not find someone to insert it after, so it goes after us
                 let mut next = c2.next.borrow_mut();
                 *to_insert.next.borrow_mut() = std::mem::take(&mut next);
                 *next = Some(to_insert);
+                drop(next);
+
                 // nothing for caller to do, no new node with duplicates to re-sort
                 (None, None)
             } else {
+                //jefferror!("{}", line!());
                 // already inserted, so return through
                 (None, to_retry)
             }
         } else if to_insert_key < &c2_entry.pubkey {
+            //jefferror!("{}, current index: {}, to insert index: {}", line!(), c2.slot_group_index, to_insert.slot_group_index);
+            // goes in front of us
+            drop(c2_entry);
+            drop(c2);
+            drop(current);
+            let next: Option<Box<Node>> = std::mem::take(&mut last.borrow_mut());
+            *to_insert.next.borrow_mut() = next;
+            *last.borrow_mut() = Some(to_insert);
+
             // the one to insert goes before us, so insert before us, telling calling fn to update
-            (Some(to_insert), None)
+            (None, None)
         } else {
             // we are = the current one
             if to_insert.slot_group_index < c2.slot_group_index {
+                //jefferror!("{}", line!());
                 // if to_insert's index < this node's then don't change the list but return `to_insert` to keep advancing it
                 (None, Some(to_insert))
             } else {
+                //jefferror!("{}", line!());
                 // if to_insert's index > this node's then replace this element with `to_insert` and return current
                 drop(c2_entry);
                 drop(c2);
@@ -86,6 +102,7 @@ fn insert(
             }
         }
     } else {
+        //jefferror!("{}", line!());
         (Some(to_insert), None)
     }
 }
@@ -1190,7 +1207,7 @@ impl<'a> AccountsHasher<'a> {
             }
 
             // looping to add next item to working set
-            while let Some((key, mut slot_group_index, mut offset)) = next {
+            while let Some((key, slot_group_index, offset)) = next {
                 current.slot_group_index = slot_group_index;
                 current.offset = offset;
                 assert!(current.next.borrow().is_none());
@@ -1893,7 +1910,7 @@ pub mod tests {
                     assert_eq!(expected[expected_index], packaged_result);
 
                     // for generating expected results
-                    // error!("{:?},", packaged_result);
+                    // //jefferror!("{:?},", packaged_result);
                     expected_index += 1;
                 }
             }
@@ -2366,39 +2383,56 @@ pub mod tests {
     #[test]
     fn test_linked_list() {
         solana_logger::setup();
-        let mut head = None::<Box<Node>>;
-        let pks = vec![
-            (Pubkey::new_from_array([0; 32]), (0, 0)),
-            (Pubkey::new_from_array([2; 32]), (1, 0)),
-            (Pubkey::new_from_array([4; 32]), (2, 0)),
-        ];
-        pks.iter()
-            .rev()
-            .for_each(|(key, (slot_group_index, offset))| {
-                let me = Node {
-                    slot_group_index: *slot_group_index,
-                    offset: *offset,
-                    next: RefCell::new(std::mem::take(&mut head)),
-                };
-                head = Some(Box::new(me));
+        for insert_idx in [0, 2, 4, 6] {
+            let mut head = None::<Box<Node>>;
+            let mut pks = vec![
+                (Pubkey::new_from_array([1; 32]), (0, 0)),
+                (Pubkey::new_from_array([3; 32]), (1, 0)),
+                (Pubkey::new_from_array([5; 32]), (2, 0)),
+            ];
+            pks.iter()
+                .rev()
+                .for_each(|(key, (slot_group_index, offset))| {
+                    let me = Node {
+                        slot_group_index: *slot_group_index,
+                        offset: *offset,
+                        next: RefCell::new(std::mem::take(&mut head)),
+                    };
+                    head = Some(Box::new(me));
+                });
+
+            pks.push(     (Pubkey::new_from_array([insert_idx as u8; 32]), (3, 0)));
+            let key = pks[3].0;
+            //jefferror!("insert: pk[0]: {}", key.as_ref()[0]);
+            let current = Box::new(Node {
+                offset: pks[3].1.1,
+                slot_group_index: pks[3].1.0,
+                next: RefCell::default(),
             });
+            let last: &RefCell<Option<Box<Node>>> = &head.as_ref().unwrap().next;
 
-        let key = Pubkey::new_from_array([1; 32]);
-        let current = Box::new(Node {
-            offset: 0,
-            slot_group_index: 10,
-            next: RefCell::default(),
-        });
-        let last: &RefCell<Option<Box<Node>>> = &head.as_ref().unwrap().next;
-
-        let mut raw = Vec::default();
-        pks.iter().for_each(|(k, (index, offset))| {
-            while *index >= raw.len() {
-                raw.push(Vec::default());
+            let mut raw = Vec::default();
+            pks.iter().for_each(|(k, (index, offset))| {
+                while *index >= raw.len() {
+                    raw.push(Vec::default());
+                }
+                raw[*index].push(CalculateHashIntermediate {pubkey: *k, lamports: 1, hash: Hash::default() },)
+            });
+            let sorted_data_by_pubkey = raw.iter().map(|r| &r[..]).collect::<Vec<_>>();
+            print(&head.as_ref().unwrap(), &sorted_data_by_pubkey);
+            let (to_insert, new_current) = insert(last, &key, &sorted_data_by_pubkey, current);
+            if let Some(mut to_insert) = to_insert {
+                let current = std::mem::take(&mut head).unwrap();
+                to_insert.next = RefCell::new(Some(current));
+                head = Some(to_insert);
             }
-            raw[*index].push(CalculateHashIntermediate {pubkey: *k, lamports: 1, hash: Hash::default() },)
-        });
-        let sorted_data_by_pubkey = raw.iter().map(|r| &r[..]).collect::<Vec<_>>();
-        let (to_insert, new_current) = insert(last, &key, &sorted_data_by_pubkey, current);
+            print(&head.as_ref().unwrap(), &sorted_data_by_pubkey);
+        }
+    }
+    fn print(element: &Node, sorted_data_by_pubkey: &[&[CalculateHashIntermediate]],) {
+        //jefferror!("pk[0]: {}, slot group index: {}", sorted_data_by_pubkey[element.slot_group_index][element.offset].pubkey.as_ref()[0], element.slot_group_index);
+        if let Some(next) = element.next.borrow().as_ref() {
+            print(next, sorted_data_by_pubkey);
+        }
     }
 }
