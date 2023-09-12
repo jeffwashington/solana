@@ -15736,13 +15736,13 @@ pub mod tests {
 
         let storage = accounts.storage.get_slot_storage_entry(slot0).unwrap();
         let storage_info = StorageSizeAndCountMap::default();
-        let accounts_map = accounts.process_storage_slot(&storage);
         accounts.generate_index_for_slot(
-            accounts_map,
+            storage.accounts.account_iter(),
             slot0,
             0,
             &RentCollector::default(),
             &storage_info,
+            storage.approx_stored_count(),
         );
         assert_eq!(storage_info.len(), 1);
         for entry in storage_info.iter() {
@@ -15759,13 +15759,13 @@ pub mod tests {
         // empty store
         let storage = accounts.create_and_insert_store(0, 1, "test");
         let storage_info = StorageSizeAndCountMap::default();
-        let accounts_map = accounts.process_storage_slot(&storage);
         accounts.generate_index_for_slot(
-            accounts_map,
+            storage.accounts.account_iter(),
             0,
             0,
             &RentCollector::default(),
             &storage_info,
+            storage.approx_stored_count(),
         );
         assert!(storage_info.is_empty());
     }
@@ -15798,13 +15798,13 @@ pub mod tests {
 
         let storage = accounts.storage.get_slot_storage_entry(slot0).unwrap();
         let storage_info = StorageSizeAndCountMap::default();
-        let accounts_map = accounts.process_storage_slot(&storage);
         accounts.generate_index_for_slot(
-            accounts_map,
+            storage.accounts.account_iter(),
             0,
             0,
             &RentCollector::default(),
             &storage_info,
+            storage.approx_stored_count(),
         );
         assert_eq!(storage_info.len(), 1);
         for entry in storage_info.iter() {

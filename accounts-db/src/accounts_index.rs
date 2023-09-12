@@ -2196,7 +2196,7 @@ pub mod tests {
 
         let index = AccountsIndex::<bool, bool>::default_for_tests();
         let account_info = true;
-        let items = vec![(*pubkey, account_info)];
+        let items = vec![(pubkey, account_info)];
         index.set_startup(Startup::Startup);
         index.insert_new_if_missing_into_primary_index(slot, items.len(), items.into_iter());
         index.set_startup(Startup::Normal);
@@ -2231,7 +2231,7 @@ pub mod tests {
         // not zero lamports
         let index = AccountsIndex::<bool, bool>::default_for_tests();
         let account_info = false;
-        let items = vec![(*pubkey, account_info)];
+        let items = vec![(pubkey, account_info)];
         index.set_startup(Startup::Startup);
         index.insert_new_if_missing_into_primary_index(slot, items.len(), items.into_iter());
         index.set_startup(Startup::Normal);
@@ -2330,6 +2330,48 @@ pub mod tests {
     }
 
     #[test]
+    fn test_batch_insert_duplicates() {
+        for reverse in [false, true] {
+            let slot0 = 0;
+            let key0 = solana_sdk::pubkey::new_rand();
+
+            let index = AccountsIndex::<bool, bool>::default_for_tests();
+            let account_infos = [true, false];
+
+            index.set_startup(Startup::Startup);
+            let mut items = vec![(&key0, account_infos[0]), (&key0, account_infos[1])];
+            if reverse {
+                items = items.into_iter().rev().collect();
+            }
+            index.insert_new_if_missing_into_primary_index(slot0, items.len(), items.into_iter());
+            index.set_startup(Startup::Normal);
+            let count = AtomicUsize::default();
+            index.populate_and_retrieve_duplicate_keys_from_startup(|dups| {
+                if !dups.is_empty() {
+                    assert_eq!(dups.len(), 2);
+                    count.fetch_add(dups.len(), Ordering::Relaxed);
+                    for (slot, key) in dups {
+                        assert_eq!(slot, slot0);
+                        assert_eq!(key0, key);
+                    }
+                }
+            });
+            // should visit all instances of each duplicate
+            assert_eq!(count.load(Ordering::Relaxed), 2);
+
+            for key in [key0].iter() {
+                let entry = index.get_account_read_entry(key).unwrap();
+                assert_eq!(entry.ref_count(), 1, "reverse: {reverse}");
+                assert_eq!(
+                    entry.slot_list().to_vec(),
+                    vec![(slot0, account_infos[if reverse { 1 } else { 0 }]),],
+                    "reverse: {reverse}"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn test_batch_insert() {
         let slot0 = 0;
         let key0 = solana_sdk::pubkey::new_rand();
@@ -2339,7 +2381,7 @@ pub mod tests {
         let account_infos = [true, false];
 
         index.set_startup(Startup::Startup);
-        let items = vec![(key0, account_infos[0]), (key1, account_infos[1])];
+        let items = vec![(&key0, account_infos[0]), (&key1, account_infos[1])];
         index.insert_new_if_missing_into_primary_index(slot0, items.len(), items.into_iter());
         index.set_startup(Startup::Normal);
 
@@ -2389,7 +2431,7 @@ pub mod tests {
                 UPSERT_POPULATE_RECLAIMS,
             );
         } else {
-            let items = vec![(key, account_infos[0])];
+            let items = vec![(&key, account_infos[0])];
             index.set_startup(Startup::Startup);
             index.insert_new_if_missing_into_primary_index(slot0, items.len(), items.into_iter());
             index.set_startup(Startup::Normal);
@@ -2434,7 +2476,7 @@ pub mod tests {
                 index.set_startup(Startup::Normal);
             }
 
-            let items = vec![(key, account_infos[1])];
+            let items = vec![(&key, account_infos[1])];
             index.set_startup(Startup::Startup);
             index.insert_new_if_missing_into_primary_index(slot1, items.len(), items.into_iter());
             index.set_startup(Startup::Normal);
