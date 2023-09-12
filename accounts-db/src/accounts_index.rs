@@ -1588,11 +1588,11 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
     // This is designed to be called at startup time.
     // returns (dirty_pubkeys, insertion_time_us, # accounts found in `items`)
     #[allow(clippy::needless_collect)]
-    pub(crate) fn insert_new_if_missing_into_primary_index(
+    pub(crate) fn insert_new_if_missing_into_primary_index<'a>(
         &self,
         slot: Slot,
         approx_items_len: usize,
-        items: impl Iterator<Item = (Pubkey, T)>,
+        items: impl Iterator<Item = (&'a Pubkey, T)>,
     ) -> (Vec<Pubkey>, u64, usize) {
         // big enough so not likely to re-allocate, small enough to not over-allocate by too much
         // this assumes the largest bin contains twice the expected amount of the average size per bin
@@ -1621,7 +1621,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
                 let binned_index = (pubkey_bin + random_offset) % bins;
                 // this value is equivalent to what update() below would have created if we inserted a new item
                 let is_zero_lamport = account_info.is_zero_lamport();
-                let result = if is_zero_lamport { Some(pubkey) } else { None };
+                let result = if is_zero_lamport { Some(*pubkey) } else { None };
 
                 binned[binned_index].1.push((pubkey, (slot, account_info)));
                 result
@@ -1649,12 +1649,12 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
                             use_disk,
                         );
                         match r_account_maps
-                            .insert_new_entry_if_missing_with_lock(pubkey, new_entry)
+                            .insert_new_entry_if_missing_with_lock(*pubkey, new_entry)
                         {
                             InsertNewEntryResults::DidNotExist => {}
                             InsertNewEntryResults::ExistedNewEntryZeroLamports => {}
                             InsertNewEntryResults::ExistedNewEntryNonZeroLamports => {
-                                dirty_pubkeys.push(pubkey);
+                                dirty_pubkeys.push(*pubkey);
                             }
                         }
                     });

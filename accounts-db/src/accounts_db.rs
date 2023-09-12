@@ -8988,7 +8988,7 @@ impl AccountsDb {
             }
 
             (
-                *pubkey,
+                pubkey,
                 AccountInfo::new(
                     StorageLocation::AppendVec(store_id, stored_account.offset()), // will never be cached
                     stored_account.lamports(),
