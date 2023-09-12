@@ -1586,17 +1586,18 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
     // Can save time when inserting lots of new keys.
     // But, does NOT update secondary index
     // This is designed to be called at startup time.
+    // returns (dirty_pubkeys, insertion_time_us, # accounts found in `items`)
     #[allow(clippy::needless_collect)]
     pub(crate) fn insert_new_if_missing_into_primary_index(
         &self,
         slot: Slot,
-        item_len: usize,
+        approx_items_len: usize,
         items: impl Iterator<Item = (Pubkey, T)>,
-    ) -> (Vec<Pubkey>, u64) {
+    ) -> (Vec<Pubkey>, u64, usize) {
         // big enough so not likely to re-allocate, small enough to not over-allocate by too much
         // this assumes the largest bin contains twice the expected amount of the average size per bin
         let bins = self.bins();
-        let expected_items_per_bin = item_len * 2 / bins;
+        let expected_items_per_bin = approx_items_len * 2 / bins;
         // offset bin 0 in the 'binned' array by a random amount.
         // This results in calls to insert_new_entry_if_missing_with_lock from different threads starting at different bins.
         let random_offset = thread_rng().gen_range(0..bins);
@@ -1612,8 +1613,10 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
                 (pubkey_bin, Vec::with_capacity(expected_items_per_bin))
             })
             .collect::<Vec<_>>();
+        let mut count = 0;
         let mut dirty_pubkeys = items
             .filter_map(|(pubkey, account_info)| {
+                count += 1;
                 let pubkey_bin = self.bin_calculator.bin_from_pubkey(&pubkey);
                 let binned_index = (pubkey_bin + random_offset) % bins;
                 // this value is equivalent to what update() below would have created if we inserted a new item
@@ -1660,7 +1663,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
             insertion_time.fetch_add(insert_time.as_us(), Ordering::Relaxed);
         });
 
-        (dirty_pubkeys, insertion_time.load(Ordering::Relaxed))
+        (dirty_pubkeys, insertion_time.load(Ordering::Relaxed), count)
     }
 
     /// use Vec<> because the internal vecs are already allocated per bin
