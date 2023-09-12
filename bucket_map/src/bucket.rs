@@ -345,7 +345,7 @@ impl<'b, T: Clone + Copy + PartialEq + std::fmt::Debug + 'static> Bucket<T> {
     pub fn batch_insert_non_duplicates_internal(
         index: &mut BucketStorage<IndexBucket<T>>,
         data_buckets: &[BucketStorage<DataBucket>],
-        items: &[(Pubkey, T)],
+        items: &[(Pubkey, T, u64)],
         reverse_sorted_entries: &mut Vec<(u64, usize)>,
         duplicates: &mut Vec<(usize, T)>,
     ) -> Result<(), BucketMapError> {
@@ -355,7 +355,7 @@ impl<'b, T: Clone + Copy + PartialEq + std::fmt::Debug + 'static> Bucket<T> {
 
         // pop one entry at a time to insert
         'outer: while let Some((ix_entry_raw, i)) = reverse_sorted_entries.pop() {
-            let (k, v) = &items[i];
+            let (k, v, _data_len) = &items[i];
             let ix_entry = ix_entry_raw % cap;
             // search for an empty spot starting at `ix_entry`
             for search in 0..search_end {

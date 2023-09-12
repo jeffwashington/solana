@@ -689,7 +689,8 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
         let m = Measure::start("copy");
         items
             .into_iter()
-            .for_each(|(k, (slot, v), data_len)| insert.push((k, (slot, v.into()))));
+            .for_each(|(k, (slot, v), data_len)| insert.push((k, (slot, v.into()), data_len)));
+
         self.startup_stats
             .copy_data_us
             .fetch_add(m.end_as_us(), Ordering::Relaxed);
@@ -1082,8 +1083,9 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
         let disk = self.bucket.as_ref().unwrap();
         let mut count = insert.len() as u64;
         for (i, duplicate_entry) in disk.batch_insert_non_duplicates(&insert) {
-            let (k, entry) = &insert[i];
-            duplicates.duplicates.push((entry.0, *k, entry.1.into()));
+            let (pubkey, (slot, info), data_len) = &insert[i];
+            let pubkey = *pubkey;
+            let slot = *slot;
             // accurately account for there being a duplicate for the first entry that was previously added to the disk index.
             // That entry could not have known yet that it was a duplicate.
             // It is important to capture each slot with a duplicate because of slot limits applied to clean.
