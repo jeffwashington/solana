@@ -282,9 +282,9 @@ impl<'b, T: Clone + Copy + PartialEq + std::fmt::Debug + 'static> Bucket<T> {
     /// for each item in `items`, get the hash value when hashed with `random`.
     /// Return a vec of tuples:
     /// (hash_value, index in `items`)
-    fn index_entries(items: &[(Pubkey, T)], random: u64) -> Vec<(u64, usize)> {
+    fn index_entries(items: &[(Pubkey, T, u64)], random: u64) -> Vec<(u64, usize)> {
         let mut inserts = Vec::with_capacity(items.len());
-        items.iter().enumerate().for_each(|(i, (key, _v))| {
+        items.iter().enumerate().for_each(|(i, (key, _v, _data_len))| {
             let ix = Self::bucket_index_ix(key, random);
             inserts.push((ix, i));
         });
@@ -293,7 +293,7 @@ impl<'b, T: Clone + Copy + PartialEq + std::fmt::Debug + 'static> Bucket<T> {
 
     /// batch insert of `items`. Assumption is a single slot list element and ref_count == 1.
     /// For any pubkeys that already exist, the index in `items` of the failed insertion and the existing data (previously put in the index) are returned.
-    pub(crate) fn batch_insert_non_duplicates(&mut self, items: &[(Pubkey, T)]) -> Vec<(usize, T)> {
+    pub(crate) fn batch_insert_non_duplicates(&mut self, items: &[(Pubkey, T, u64)]) -> Vec<(usize, T)> {
         assert!(
             !self.at_least_one_entry_deleted,
             "efficient batch insertion can only occur prior to any deletes"

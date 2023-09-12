@@ -150,7 +150,7 @@ struct StartupInfoDuplicates<T: IndexValue> {
 #[derive(Default, Debug)]
 struct StartupInfo<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> {
     /// entries to add next time we are flushing to disk
-    insert: Mutex<Vec<(Pubkey, (Slot, U))>>,
+    insert: Mutex<Vec<(Pubkey, (Slot, U), u64)>>,
     /// pubkeys with more than 1 entry
     duplicates: Mutex<StartupInfoDuplicates<T>>,
 }
@@ -1091,7 +1091,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
             // It is important to capture each slot with a duplicate because of slot limits applied to clean.
             duplicates
                 .duplicates_put_on_disk
-                .insert((duplicate_entry.0, *k));
+                .insert((duplicate_entry.0, pubkey));
             count -= 1;
         }
 
