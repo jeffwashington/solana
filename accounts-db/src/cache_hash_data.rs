@@ -389,7 +389,7 @@ mod tests {
             &self,
             file_name: impl AsRef<Path>,
         ) -> Result<CacheHashDataFile, std::io::Error> {
-            let reference = self.get_file_reference_to_map_later(file_name)?;
+            let mut reference = self.get_file_reference_to_map_later(file_name)?;
             reference.map()
         }
     }

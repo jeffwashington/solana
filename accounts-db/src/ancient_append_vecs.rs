@@ -74,6 +74,38 @@ struct AncientSlotInfos {
     /// total alive bytes across all slots
     total_alive_bytes: u64,
 }
+use crossbeam_channel::Sender;
+struct AncientPackingBackground {
+    sender: Sender<AncientPacking>,
+}
+
+struct AncientPacking {
+}
+use std::thread::Builder;
+use crossbeam_channel::Receiver;
+use std::sync::atomic::AtomicBool;
+use crossbeam_channel::unbounded;
+impl AncientPackingBackground {
+    pub(crate) fn new(db: &AccountsDb, exit: Arc<AtomicBool>) -> Self {
+        let (sender, receiver) = unbounded();
+        Builder::new()
+            .name("solDbAncient".to_string())
+            .spawn(move || {
+                Self::do_background(receiver, exit);
+            })
+            .unwrap();
+        //self.sender_bg_hasher = Some(sender);
+        Self {
+            sender,
+        }
+    }
+
+    fn do_background(receiver: Receiver<AncientPacking>, exit: Arc<AtomicBool>) {
+        while !exit.load(Ordering::Relaxed) {
+
+        }
+    }
+}
 
 impl AncientSlotInfos {
     /// add info for 'storage'
