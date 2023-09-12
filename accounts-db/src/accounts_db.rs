@@ -8964,6 +8964,7 @@ impl AccountsDb {
         slot: &Slot,
         store_id: AppendVecId,
         rent_collector: &RentCollector,
+        storage_info: &StorageSizeAndCountMap,
     ) -> SlotIndexGenerationInfo {
         if accounts_map.is_empty() {
             return SlotIndexGenerationInfo::default();
@@ -8976,7 +8977,11 @@ impl AccountsDb {
         let mut num_accounts_rent_paying = 0;
         let num_accounts = accounts_map.len();
         let mut amount_to_top_off_rent = 0;
+        // first collect into a local HashMap with no lock contention
+        let mut storage_info_local = StorageSizeAndCount::default();
+
         let items = accounts_map.into_iter().map(|(pubkey, stored_account)| {
+            storage_info_local.stored_size += stored_account.stored_size();
             if secondary {
                 self.accounts_index.update_secondary_indexes(
                     &pubkey,
@@ -9009,6 +9014,13 @@ impl AccountsDb {
         let (dirty_pubkeys, insert_time_us) = self
             .accounts_index
             .insert_new_if_missing_into_primary_index(*slot, num_accounts, items);
+
+        {
+            // second, collect into the shared DashMap once we've figured out all the info per store_id
+            let mut info = storage_info.entry(store_id).or_default();
+            info.stored_size += storage_info_local.stored_size;
+            info.count += num_accounts;
+        }
 
         // dirty_pubkeys will contain a pubkey if an item has multiple rooted entries for
         // a given pubkey. If there is just a single item, there is no cleaning to
@@ -9183,12 +9195,6 @@ impl AccountsDb {
 
                         scan_time.stop();
                         scan_time_sum += scan_time.as_us();
-                        Self::update_storage_info(
-                            &storage_info,
-                            &accounts_map,
-                            &storage_info_timings,
-                            store_id,
-                        );
 
                         let insert_us = if pass == 0 {
                             // generate index
@@ -9206,6 +9212,7 @@ impl AccountsDb {
                                 slot,
                                 store_id,
                                 &rent_collector,
+                                &storage_info,
                             );
                             rent_paying.fetch_add(rent_paying_this_slot, Ordering::Relaxed);
                             amount_to_top_off_rent
@@ -9481,36 +9488,6 @@ impl AccountsDb {
         (accounts_data_len_from_duplicates as u64, uncleaned_slots)
     }
 
-    fn update_storage_info(
-        storage_info: &StorageSizeAndCountMap,
-        accounts_map: &GenerateIndexAccountsMap<'_>,
-        timings: &Mutex<GenerateIndexTimings>,
-        store_id: AppendVecId,
-    ) {
-        let mut storage_size_accounts_map_time = Measure::start("storage_size_accounts_map");
-
-        // first collect into a local HashMap with no lock contention
-        let mut storage_info_local = StorageSizeAndCount::default();
-        for (_, v) in accounts_map.iter() {
-            storage_info_local.stored_size += v.stored_size();
-            storage_info_local.count += 1;
-        }
-        storage_size_accounts_map_time.stop();
-        // second, collect into the shared DashMap once we've figured out all the info per store_id
-        let mut storage_size_accounts_map_flatten_time =
-            Measure::start("storage_size_accounts_map_flatten_time");
-        if !accounts_map.is_empty() {
-            let mut info = storage_info.entry(store_id).or_default();
-            info.stored_size += storage_info_local.stored_size;
-            info.count += storage_info_local.count;
-        }
-        storage_size_accounts_map_flatten_time.stop();
-
-        let mut timings = timings.lock().unwrap();
-        timings.storage_size_accounts_map_us += storage_size_accounts_map_time.as_us();
-        timings.storage_size_accounts_map_flatten_us +=
-            storage_size_accounts_map_flatten_time.as_us();
-    }
     fn set_storage_count_and_alive_bytes(
         &self,
         stored_sizes_and_counts: StorageSizeAndCountMap,
@@ -15774,11 +15751,12 @@ pub mod tests {
         let storage = accounts.storage.get_slot_storage_entry(slot0).unwrap();
         let storage_info = StorageSizeAndCountMap::default();
         let accounts_map = accounts.process_storage_slot(&storage);
-        AccountsDb::update_storage_info(
+        accounts.generate_index_for_slot(
+            accounts_map,
+            &slot0,
+            0,
+            &RentCollector::default(),
             &storage_info,
-            &accounts_map,
-            &Mutex::default(),
-            storage.append_vec_id(),
         );
         assert_eq!(storage_info.len(), 1);
         for entry in storage_info.iter() {
@@ -15796,11 +15774,12 @@ pub mod tests {
         let storage = accounts.create_and_insert_store(0, 1, "test");
         let storage_info = StorageSizeAndCountMap::default();
         let accounts_map = accounts.process_storage_slot(&storage);
-        AccountsDb::update_storage_info(
+        accounts.generate_index_for_slot(
+            accounts_map,
+            &0,
+            0,
+            &RentCollector::default(),
             &storage_info,
-            &accounts_map,
-            &Mutex::default(),
-            storage.append_vec_id(),
         );
         assert!(storage_info.is_empty());
     }
@@ -15834,11 +15813,12 @@ pub mod tests {
         let storage = accounts.storage.get_slot_storage_entry(slot0).unwrap();
         let storage_info = StorageSizeAndCountMap::default();
         let accounts_map = accounts.process_storage_slot(&storage);
-        AccountsDb::update_storage_info(
+        accounts.generate_index_for_slot(
+            accounts_map,
+            &0,
+            0,
+            &RentCollector::default(),
             &storage_info,
-            &accounts_map,
-            &Mutex::default(),
-            storage.append_vec_id(),
         );
         assert_eq!(storage_info.len(), 1);
         for entry in storage_info.iter() {
