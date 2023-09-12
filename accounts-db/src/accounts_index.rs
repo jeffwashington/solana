@@ -1591,7 +1591,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
         &self,
         slot: Slot,
         item_len: usize,
-        items: impl Iterator<Item = (Pubkey, T)>,
+        items: impl Iterator<Item = (Pubkey, T, u64)>,
     ) -> (Vec<Pubkey>, u64) {
         // big enough so not likely to re-allocate, small enough to not over-allocate by too much
         // this assumes the largest bin contains twice the expected amount of the average size per bin
@@ -1613,14 +1613,16 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
             })
             .collect::<Vec<_>>();
         let mut dirty_pubkeys = items
-            .filter_map(|(pubkey, account_info)| {
+            .filter_map(|(pubkey, account_info, data_len)| {
                 let pubkey_bin = self.bin_calculator.bin_from_pubkey(&pubkey);
                 let binned_index = (pubkey_bin + random_offset) % bins;
                 // this value is equivalent to what update() below would have created if we inserted a new item
                 let is_zero_lamport = account_info.is_zero_lamport();
                 let result = if is_zero_lamport { Some(pubkey) } else { None };
 
-                binned[binned_index].1.push((pubkey, (slot, account_info)));
+                binned[binned_index]
+                    .1
+                    .push((pubkey, (slot, account_info), data_len));
                 result
             })
             .collect::<Vec<_>>();
@@ -1638,7 +1640,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
                 // this is no longer the default case
                 items
                     .into_iter()
-                    .for_each(|(pubkey, (slot, account_info))| {
+                    .for_each(|(pubkey, (slot, account_info), _data_len)| {
                         let new_entry = PreAllocatedAccountMapEntry::new(
                             slot,
                             account_info,

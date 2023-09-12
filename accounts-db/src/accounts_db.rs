@@ -9003,6 +9003,7 @@ impl AccountsDb {
                     StorageLocation::AppendVec(store_id, stored_account.offset()), // will never be cached
                     stored_account.lamports(),
                 ),
+                stored_account.data_len(),
             )
         });
 
