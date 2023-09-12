@@ -60,7 +60,7 @@ use {
         cache_hash_data::{CacheHashData, CacheHashDataFileReference},
         contains::Contains,
         epoch_accounts_hash::EpochAccountsHashManager,
-        in_mem_accounts_index::StartupStats,
+        in_mem_accounts_index::{InsertIndex, StartupStats},
         partitioned_rewards::{PartitionedEpochRewardsConfig, TestPartitionedEpochRewards},
         pubkey_bins::PubkeyBinCalculator24,
         read_only_accounts_cache::ReadOnlyAccountsCache,
@@ -72,7 +72,6 @@ use {
     blake3::traits::digest::Digest,
     crossbeam_channel::{unbounded, Receiver, Sender},
     dashmap::{
-        mapref::entry::Entry::{Occupied, Vacant},
         DashMap, DashSet,
     },
     log::*,
@@ -634,6 +633,8 @@ struct StorageSizeAndCount {
     pub stored_size: usize,
     /// number of accounts in the storage including both alive and dead accounts
     pub count: usize,
+    /// bytes cleaned during index generation
+    pub dead_bytes: usize,
 }
 type StorageSizeAndCountMap = DashMap<AppendVecId, StorageSizeAndCount>;
 
@@ -9003,6 +9004,7 @@ impl AccountsDb {
                     StorageLocation::AppendVec(store_id, stored_account.offset()), // will never be cached
                     stored_account.lamports(),
                 ),
+                stored_account.data_len(),
             )
         });
 
@@ -9289,27 +9291,52 @@ impl AccountsDb {
                     // this has to happen before visit_duplicate_pubkeys_during_startup below
                     // get duplicate keys from acct idx. We have to wait until we've finished flushing.
                     self.accounts_index
-                        .populate_and_retrieve_duplicate_keys_from_startup(|slot_keys| {
-                            total_duplicate_slot_keys
-                                .fetch_add(slot_keys.len() as u64, Ordering::Relaxed);
-                            let unique_keys =
-                                HashSet::<Pubkey>::from_iter(slot_keys.iter().map(|(_, key)| *key));
-                            for (slot, key) in slot_keys {
-                                match self.uncleaned_pubkeys.entry(slot) {
-                                    Occupied(mut occupied) => occupied.get_mut().push(key),
-                                    Vacant(vacant) => {
-                                        vacant.insert(vec![key]);
-                                    }
-                                }
-                            }
-                            let unique_pubkeys_by_bin_inner =
-                                unique_keys.into_iter().collect::<Vec<_>>();
-                            // does not matter that this is not ordered by slot
-                            unique_pubkeys_by_bin
-                                .lock()
-                                .unwrap()
-                                .push(unique_pubkeys_by_bin_inner);
-                        });
+                        .populate_and_retrieve_duplicate_keys_from_startup(
+                            |slot_keys| {
+                                total_duplicate_slot_keys
+                                    .fetch_add(slot_keys.len() as u64, Ordering::Relaxed);
+                                rayon::join(
+                                    || {
+                                        if false {
+                                            let mut map = self.shrink_candidate_slots.lock().unwrap();
+                                            for (_key, slot_infos) in &slot_keys {
+                                                for info in slot_infos {
+                                                    map.insert(info.slot);
+                                                }
+                                            }
+                                        }
+                                    },
+                                    || {
+                                        let mut sum = 0;
+                                        for (_key, slot_infos) in &slot_keys {
+                                            // the first one needs to be cleaned
+                                            // todo: does it? why? zero lamports still exist in index and append vecs
+                                            /*
+                                                            if let Some(insert_index) = slot_infos.first() {
+                                                                match self.uncleaned_pubkeys.entry(insert_index.slot) {
+                                                    Occupied(mut occupied) => occupied.get_mut().push(key),
+                                                    Vacant(vacant) => {
+                                                        vacant.insert(vec![key]);
+                                                    }
+                                                }
+                                            }
+                                                            */
+                                            // the others need to be used to reduce the data len, rent paying accounts, and storage alive bytes
+                                            let accounts_data_len_from_duplicates = self
+                                                .process_cleaned_pubkeys_during_generate_index(
+                                                    &slot_infos[1..],
+                                                    &storage_info,
+                                                );
+                                            sum += accounts_data_len_from_duplicates;
+                                        }
+                                        accounts_data_len.fetch_sub(
+                                            sum,
+                                            Ordering::Relaxed,
+                                        );
+                                    },
+                                );
+                            },
+                        );
                 })
                 .1;
             }
@@ -9421,6 +9448,43 @@ impl AccountsDb {
         }
     }
 
+    /// reduce total data len by sum of all account's data len
+    /// reduce each append vec's alive count by removed account's len
+    /// if account's data len is not known, look it up
+    /// returns data len sum from all duplicate accounts that were cleaned
+    fn process_cleaned_pubkeys_during_generate_index(
+        &self,
+        infos: &[InsertIndex<AccountInfo>],
+        storage_info: &StorageSizeAndCountMap,
+    ) -> u64 {
+        infos
+            .iter()
+            .map(
+                |InsertIndex {
+                     slot,
+                     info,
+                     data_len,
+                 }| {
+                    let data_len = data_len.unwrap_or_else(|| {
+                        // we did not record the data len of this account previously, so we have to load the account
+                        let maybe_storage_entry = self
+                            .storage
+                            .get_account_storage_entry(*slot, info.store_id());
+                        let mut accessor = LoadedAccountAccessor::Stored(
+                            maybe_storage_entry.map(|entry| (entry, info.offset())),
+                        );
+                        let loaded_account = accessor.check_and_get_loaded_account();
+                        loaded_account.data().len() as u64
+                    });
+                    // remember to initially mark the duplicate bytes as dead when we create this append vec
+                    let mut storage_info = storage_info.get_mut(&info.store_id()).unwrap();
+                    storage_info.dead_bytes += aligned_stored_size(data_len as usize);
+                    data_len
+                },
+            )
+            .sum()
+    }
+
     /// Used during generate_index() to:
     /// 1. get the _duplicate_ accounts data len from the given pubkeys
     /// 2. get the slots that contained duplicate pubkeys
@@ -9530,7 +9594,10 @@ impl AccountsDb {
                     store.count(),
                 );
                 store.count_and_status.write().unwrap().0 = entry.count;
-                store.alive_bytes.store(entry.stored_size, Ordering::SeqCst);
+                store.alive_bytes.store(
+                    entry.stored_size.saturating_sub(entry.dead_bytes),
+                    Ordering::SeqCst,
+                );
             } else {
                 trace!("id: {} clearing count", id);
                 store.count_and_status.write().unwrap().0 = 0;
