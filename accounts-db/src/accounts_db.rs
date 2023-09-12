@@ -2334,8 +2334,6 @@ impl<'a> ZeroLamport for StoredAccountMeta<'a> {
     }
 }
 
-type GenerateIndexAccountsMap<'a> = HashMap<Pubkey, StoredAccountMeta<'a>>;
-
 /// called on a struct while scanning append vecs
 trait AppendVecScan: Send + Sync + Clone {
     /// return true if this pubkey should be included
@@ -8926,20 +8924,6 @@ impl AccountsDb {
         (result, slots)
     }
 
-    fn process_storage_slot<'a>(
-        &self,
-        storage: &'a Arc<AccountStorageEntry>,
-    ) -> GenerateIndexAccountsMap<'a> {
-        let num_accounts = storage.approx_stored_count();
-        let mut accounts_map = GenerateIndexAccountsMap::with_capacity(num_accounts);
-        storage.accounts.account_iter().for_each(|stored_account| {
-            let pubkey = stored_account.pubkey();
-            assert!(!self.is_filler_account(pubkey));
-            accounts_map.insert(*pubkey, stored_account);
-        });
-        accounts_map
-    }
-
     /// return Some(lamports_to_top_off) if 'account' would collect rent
     fn stats_for_rent_payers<T: ReadableAccount>(
         pubkey: &Pubkey,
@@ -8958,35 +8942,36 @@ impl AccountsDb {
         })
     }
 
-    fn generate_index_for_slot(
+    fn generate_index_for_slot<'a>(
         &self,
-        accounts_map: GenerateIndexAccountsMap<'_>,
+        accounts_map: impl Iterator<Item = StoredAccountMeta<'a>>,
         slot: &Slot,
         store_id: AppendVecId,
         rent_collector: &RentCollector,
+        storage_info: &StorageSizeAndCountMap,
+        num_items_approximation: usize,
     ) -> SlotIndexGenerationInfo {
-        if accounts_map.is_empty() {
-            return SlotIndexGenerationInfo::default();
-        }
-
         let secondary = !self.account_indexes.is_empty();
 
         let mut rent_paying_accounts_by_partition = Vec::default();
         let mut accounts_data_len = 0;
         let mut num_accounts_rent_paying = 0;
-        let num_accounts = accounts_map.len();
         let mut amount_to_top_off_rent = 0;
-        let items = accounts_map.into_iter().map(|(pubkey, stored_account)| {
+
+        // first collect into a local HashMap with no lock contention
+        let mut storage_info_local = StorageSizeAndCount::default();
+
+        let items = accounts_map.into_iter().map(|stored_account| {
+            storage_info_local.stored_size += stored_account.stored_size();
+            let pubkey = stored_account.pubkey();
             if secondary {
                 self.accounts_index.update_secondary_indexes(
-                    &pubkey,
+                    pubkey,
                     &stored_account,
                     &self.account_indexes,
                 );
             }
-            if !stored_account.is_zero_lamport() {
-                accounts_data_len += stored_account.data().len() as u64;
-            }
+            accounts_data_len += stored_account.data().len() as u64;
 
             if let Some(amount_to_top_off_rent_this_account) =
                 Self::stats_for_rent_payers(&pubkey, &stored_account, rent_collector)
@@ -8994,11 +8979,11 @@ impl AccountsDb {
                 amount_to_top_off_rent += amount_to_top_off_rent_this_account;
                 num_accounts_rent_paying += 1;
                 // remember this rent-paying account pubkey
-                rent_paying_accounts_by_partition.push(pubkey);
+                rent_paying_accounts_by_partition.push(*pubkey);
             }
 
             (
-                pubkey,
+                *pubkey,
                 AccountInfo::new(
                     StorageLocation::AppendVec(store_id, stored_account.offset()), // will never be cached
                     stored_account.lamports(),
@@ -9006,9 +8991,19 @@ impl AccountsDb {
             )
         });
 
-        let (dirty_pubkeys, insert_time_us) = self
+        let (dirty_pubkeys, insert_time_us, num_accounts) = self
             .accounts_index
-            .insert_new_if_missing_into_primary_index(*slot, num_accounts, items);
+            .insert_new_if_missing_into_primary_index(*slot, num_items_approximation, items);
+
+        if num_accounts == 0 {
+            return SlotIndexGenerationInfo::default();
+        }
+        {
+            // second, collect into the shared DashMap once we've figured out all the info per store_id
+            let mut info = storage_info.entry(store_id).or_default();
+            info.stored_size += storage_info_local.stored_size;
+            info.count += num_accounts;
+        }
 
         // dirty_pubkeys will contain a pubkey if an item has multiple rooted entries for
         // a given pubkey. If there is just a single item, there is no cleaning to
@@ -9178,17 +9173,10 @@ impl AccountsDb {
                             // no storage at this slot, no information to pull out
                             continue;
                         };
-                        let accounts_map = self.process_storage_slot(&storage);
                         let store_id = storage.append_vec_id();
 
                         scan_time.stop();
                         scan_time_sum += scan_time.as_us();
-                        Self::update_storage_info(
-                            &storage_info,
-                            &accounts_map,
-                            &storage_info_timings,
-                            store_id,
-                        );
 
                         let insert_us = if pass == 0 {
                             // generate index
@@ -9202,10 +9190,12 @@ impl AccountsDb {
                                 rent_paying_accounts_by_partition:
                                     rent_paying_accounts_by_partition_this_slot,
                             } = self.generate_index_for_slot(
-                                accounts_map,
+                                storage.accounts.account_iter(),
                                 slot,
                                 store_id,
                                 &rent_collector,
+                                &storage_info,
+                                storage.approx_stored_count(),
                             );
                             rent_paying.fetch_add(rent_paying_this_slot, Ordering::Relaxed);
                             amount_to_top_off_rent
@@ -9225,31 +9215,7 @@ impl AccountsDb {
                             insert_us
                         } else {
                             // verify index matches expected and measure the time to get all items
-                            assert!(verify);
-                            let mut lookup_time = Measure::start("lookup_time");
-                            for account in accounts_map.into_iter() {
-                                let (key, account_info) = account;
-                                let lock = self.accounts_index.get_bin(&key);
-                                let x = lock.get(&key).unwrap();
-                                let sl = x.slot_list.read().unwrap();
-                                let mut count = 0;
-                                for (slot2, account_info2) in sl.iter() {
-                                    if slot2 == slot {
-                                        count += 1;
-                                        let ai = AccountInfo::new(
-                                            StorageLocation::AppendVec(
-                                                store_id,
-                                                account_info.offset(),
-                                            ), // will never be cached
-                                            account_info.lamports(),
-                                        );
-                                        assert_eq!(&ai, account_info2);
-                                    }
-                                }
-                                assert_eq!(1, count);
-                            }
-                            lookup_time.stop();
-                            lookup_time.as_us()
+                            0
                         };
                         insertion_time_us.fetch_add(insert_us, Ordering::Relaxed);
                     }
@@ -9481,36 +9447,6 @@ impl AccountsDb {
         (accounts_data_len_from_duplicates as u64, uncleaned_slots)
     }
 
-    fn update_storage_info(
-        storage_info: &StorageSizeAndCountMap,
-        accounts_map: &GenerateIndexAccountsMap<'_>,
-        timings: &Mutex<GenerateIndexTimings>,
-        store_id: AppendVecId,
-    ) {
-        let mut storage_size_accounts_map_time = Measure::start("storage_size_accounts_map");
-
-        // first collect into a local HashMap with no lock contention
-        let mut storage_info_local = StorageSizeAndCount::default();
-        for (_, v) in accounts_map.iter() {
-            storage_info_local.stored_size += v.stored_size();
-            storage_info_local.count += 1;
-        }
-        storage_size_accounts_map_time.stop();
-        // second, collect into the shared DashMap once we've figured out all the info per store_id
-        let mut storage_size_accounts_map_flatten_time =
-            Measure::start("storage_size_accounts_map_flatten_time");
-        if !accounts_map.is_empty() {
-            let mut info = storage_info.entry(store_id).or_default();
-            info.stored_size += storage_info_local.stored_size;
-            info.count += storage_info_local.count;
-        }
-        storage_size_accounts_map_flatten_time.stop();
-
-        let mut timings = timings.lock().unwrap();
-        timings.storage_size_accounts_map_us += storage_size_accounts_map_time.as_us();
-        timings.storage_size_accounts_map_flatten_us +=
-            storage_size_accounts_map_flatten_time.as_us();
-    }
     fn set_storage_count_and_alive_bytes(
         &self,
         stored_sizes_and_counts: StorageSizeAndCountMap,
