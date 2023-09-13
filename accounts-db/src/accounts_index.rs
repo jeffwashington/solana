@@ -71,6 +71,18 @@ pub type SlotSlice<'s, T> = &'s [(Slot, T)];
 pub type RefCount = u64;
 pub type AccountMap<T, U> = Arc<InMemAccountsIndex<T, U>>;
 
+#[derive(Default, Debug, PartialEq, Eq)]
+pub(crate) struct StorageSizeAndCount {
+    /// alive size stored
+    pub stored_size_alive: usize,
+    /// dead size stored
+    pub stored_size_dead: usize,
+    /// number of alive accounts
+    pub count_alive: usize,
+    /// number of dead accounts
+    pub count_dead: usize,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 /// how accounts index 'upsert' should handle reclaims
 pub enum UpsertReclaim {
@@ -1586,12 +1598,14 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
     // Can save time when inserting lots of new keys.
     // But, does NOT update secondary index
     // This is designed to be called at startup time.
+    // returns (dirty_pubkeys, insertion_time_us)
     #[allow(clippy::needless_collect)]
     pub(crate) fn insert_new_if_missing_into_primary_index(
         &self,
         slot: Slot,
         item_len: usize,
         items: impl Iterator<Item = (Pubkey, T)>,
+        storage_size_and_count: &mut StorageSizeAndCount,
     ) -> (Vec<Pubkey>, u64) {
         // big enough so not likely to re-allocate, small enough to not over-allocate by too much
         // this assumes the largest bin contains twice the expected amount of the average size per bin
@@ -1612,6 +1626,8 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
                 (pubkey_bin, Vec::with_capacity(expected_items_per_bin))
             })
             .collect::<Vec<_>>();
+        let mut count = 0;
+        let mut stored_size_alive = 0;
         let mut dirty_pubkeys = items
             .filter_map(|(pubkey, account_info)| {
                 let pubkey_bin = self.bin_calculator.bin_from_pubkey(&pubkey);
@@ -1619,6 +1635,8 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
                 // this value is equivalent to what update() below would have created if we inserted a new item
                 let is_zero_lamport = account_info.is_zero_lamport();
                 let result = if is_zero_lamport { Some(pubkey) } else { None };
+
+                stored_size_alive += stored_account.stored_size();
 
                 binned[binned_index].1.push((pubkey, (slot, account_info)));
                 result
@@ -1631,6 +1649,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
         binned.into_iter().for_each(|(pubkey_bin, items)| {
             let r_account_maps = &self.account_maps[pubkey_bin];
             let mut insert_time = Measure::start("insert_into_primary_index");
+            count += items.len();
             if use_disk {
                 r_account_maps.startup_insert_only(items.into_iter());
             } else {
@@ -1660,6 +1679,8 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
             insertion_time.fetch_add(insert_time.as_us(), Ordering::Relaxed);
         });
 
+        storage_size_and_count.count_alive += count;
+        storage_size_and_count.stored_size_alive += stored_size_alive;
         (dirty_pubkeys, insertion_time.load(Ordering::Relaxed))
     }
 

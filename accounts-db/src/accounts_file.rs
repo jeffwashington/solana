@@ -166,6 +166,7 @@ impl AccountsFile {
     }
 }
 
+#[derive(Clone)]
 pub struct AccountsFileIter<'a> {
     file_entry: &'a AccountsFile,
     offset: usize,
