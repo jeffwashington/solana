@@ -2440,9 +2440,9 @@ impl<'a> AppendVecScan for ScanState<'a> {
             log::error!("count = 0, {}", self.cache_data.is_none());
         }
         if self.cache_data.is_none() {
-            count = count.max(111_111); // why would we end up with 0? not sure but we are
+            //count = count.max(111_111); // why would we end up with 0? not sure but we are
             self.count = count;
-            self.cache_data = Some(cache_hash_data.allocate(file_name, count * 2).unwrap());
+            self.cache_data = Some(cache_hash_data.allocate(file_name, count * 101/100).unwrap());
             // stop doing initial allocation for now
             // self.accum = Vec::with_capacity(count);
         }
@@ -7495,7 +7495,7 @@ impl AccountsDb {
 
                 let count = snapshot_storages
                     .iter_range(&range_this_chunk)
-                    .filter_map(|(_, storage)| storage.map(|storage| storage.count()))
+                    .filter_map(|(_, storage)| storage.map(|storage| storage.approx_stored_count()))
                     .sum::<usize>();
                 if count == 0 {
                     log::error!("recorded count of 0");
