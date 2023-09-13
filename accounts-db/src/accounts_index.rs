@@ -73,10 +73,12 @@ pub type AccountMap<T, U> = Arc<InMemAccountsIndex<T, U>>;
 
 #[derive(Default, Debug, PartialEq, Eq)]
 pub(crate) struct StorageSizeAndCount {
-    /// total size stored, including both alive and dead bytes
-    pub stored_size: usize,
-    /// number of accounts in the storage including both alive and dead accounts
-    pub count: usize,
+    /// alive size stored
+    pub stored_size_alive: usize,
+    /// number of alive accounts
+    pub count_alive: usize,
+    /// number of dead accounts
+    pub count_dead: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1672,7 +1674,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
             insertion_time.fetch_add(insert_time.as_us(), Ordering::Relaxed);
         });
 
-        storage_size_and_count.count += count;
+        storage_size_and_count.count_alive += count;
         (dirty_pubkeys, insertion_time.load(Ordering::Relaxed))
     }
 

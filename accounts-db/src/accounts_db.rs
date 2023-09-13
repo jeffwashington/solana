@@ -8910,12 +8910,17 @@ impl AccountsDb {
     fn process_storage_slot<'a>(
         &self,
         storage: &'a Arc<AccountStorageEntry>,
+        storage_info_local: &mut StorageSizeAndCount,
     ) -> GenerateIndexAccountsMap<'a> {
         let num_accounts = storage.approx_stored_count();
         let mut accounts_map = GenerateIndexAccountsMap::with_capacity(num_accounts);
         storage.accounts.account_iter().for_each(|stored_account| {
             let pubkey = stored_account.pubkey();
             assert!(!self.is_filler_account(pubkey));
+            if let Some(_duplicate_account) = accounts_map.insert(*pubkey, stored_account) {
+                // this pubkey was already found in this slot. The prior one is overwritten by the later one.
+                storage_info_local.count_dead += 1;
+            }
         });
         accounts_map
     }
@@ -8944,7 +8949,8 @@ impl AccountsDb {
         slot: Slot,
         store_id: AppendVecId,
         rent_collector: &RentCollector,
-        storage_info: &StorageSizeAndCountMap,
+        final_storage_info: &StorageSizeAndCountMap,
+        mut storage_info: StorageSizeAndCount,
     ) -> SlotIndexGenerationInfo {
         if accounts_map.is_empty() {
             return SlotIndexGenerationInfo::default();
@@ -8990,17 +8996,16 @@ impl AccountsDb {
             )
         });
 
-        // first collect into a local HashMap with no lock contention
-        let mut storage_info_local = StorageSizeAndCount::default();
         let (dirty_pubkeys, insert_time_us) = self
             .accounts_index
             .insert_new_if_missing_into_primary_index(slot, num_accounts, items, &mut storage_info);
 
         {
             // second, collect into the shared DashMap once we've figured out all the info per store_id
-            let mut info = storage_info.entry(store_id).or_default();
-            info.stored_size += stored_size_alive;
-            info.count += storage_info_local.count;
+            let mut info = final_storage_info.entry(store_id).or_default();
+            info.stored_size_alive += stored_size_alive;
+            info.count_alive += storage_info.count_alive;
+            info.count_dead += storage_info.count_dead;
         }
 
         // dirty_pubkeys will contain a pubkey if an item has multiple rooted entries for
