@@ -309,8 +309,7 @@ impl<'b, T: Clone + Copy + PartialEq + std::fmt::Debug + 'static> Bucket<T> {
             // sort entries by their index % cap, so we'll search over the same spots in the file close to each other
             // `reverse()` is so we can efficiently pop off the end but get ascending order index values
             // sort before calling to make `batch_insert_non_duplicates_internal` easier to test.
-            // sort stable so that any duplicates are encountered in order
-            entries.sort_by(|a, b| (a.0 % cap).cmp(&(b.0 % cap)).reverse());
+            entries.sort_unstable_by(|a, b| (a.0 % cap).cmp(&(b.0 % cap)).reverse());
 
             let result = Self::batch_insert_non_duplicates_internal(
                 &mut self.index,
