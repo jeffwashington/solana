@@ -142,7 +142,7 @@ pub enum InsertNewEntryResults {
 struct StartupInfoDuplicates<T: IndexValue> {
     /// entries that were found to have duplicate index entries.
     /// When all entries have been inserted, these can be resolved and held in memory.
-    duplicates: Vec<(Slot, Pubkey, T)>,
+    duplicates: Vec<(Slot, Pubkey, T, usize)>,
     /// pubkeys that were already added to disk and later found to be duplicates,
     duplicates_put_on_disk: HashSet<(Slot, Pubkey)>,
 }
@@ -1081,15 +1081,16 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
         // merge all items into the disk index now
         let disk = self.bucket.as_ref().unwrap();
         let mut count = insert.len() as u64;
-        for (i, duplicate_entry) in disk.batch_insert_non_duplicates(&insert) {
-            let (k, entry) = &insert[i];
-            duplicates.duplicates.push((entry.0, *k, entry.1.into()));
+        for (i, (duplicate_slot, _duplicate_account_info)) in disk.batch_insert_non_duplicates(&insert) {
+            let (k, (slot, account_info)) = &insert[i];
+            // `i` is included here so that we know the original order if the same pubkey appears here twice.
+            duplicates.duplicates.push((*slot, *k, (*account_info).into(), i));
             // accurately account for there being a duplicate for the first entry that was previously added to the disk index.
             // That entry could not have known yet that it was a duplicate.
             // It is important to capture each slot with a duplicate because of slot limits applied to clean.
             duplicates
                 .duplicates_put_on_disk
-                .insert((duplicate_entry.0, *k));
+                .insert((duplicate_slot, *k));
             count -= 1;
         }
 
@@ -1109,13 +1110,14 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
         let duplicates_put_on_disk = std::mem::take(&mut duplicate_items.duplicates_put_on_disk);
         drop(duplicate_items);
 
-        duplicates_put_on_disk
-            .into_iter()
-            .chain(duplicates.into_iter().map(|(slot, key, info)| {
+        duplicates.into_iter().map(|(slot, key, info, insert_index)| { // todo use `insert_index`
+            
                 let entry = PreAllocatedAccountMapEntry::new(slot, info, &self.storage, true);
                 self.insert_new_entry_if_missing_with_lock(key, entry);
                 (slot, key)
-            }))
+            })
+            .chain(duplicates_put_on_disk
+                .into_iter())
             .collect()
     }
 
