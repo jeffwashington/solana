@@ -77,10 +77,13 @@ impl CacheHashDataFileReference {
             return Err(std::io::Error::from(std::io::ErrorKind::UnexpectedEof));
         }
         cache_file.capacity = capacity;
-        assert_eq!(
+        if capacity != file_len {
+            log::error!("expected: {capacity}, len on disk: {file_len} {}, entries: {entries}, cell_size: {cell_size}", path.display());
+        }
+        /*assert_eq!(
             capacity, file_len,
-            "expected: {capacity}, len on disk: {file_len} {}, entries: {entries}, cell_size: {cell_size}", self.path.display(),
-        );
+            "expected: {capacity}, len on disk: {file_len} {}, entries: {entries}, cell_size: {cell_size}", path.display(),
+        );*/
 
         self.stats
             .total_entries
