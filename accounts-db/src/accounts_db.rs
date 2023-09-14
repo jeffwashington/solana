@@ -9486,8 +9486,8 @@ impl AccountsDb {
             let id = store.append_vec_id();
             // Should be default at this point
             assert_eq!(store.alive_bytes(), 0);
-            assert_eq!(store.approx_stored_count(), 0);
             if let Some(entry) = stored_sizes_and_counts.get(&id) {
+                assert_eq!(store.approx_stored_count(), entry.count);
                 trace!(
                     "id: {} setting count: {} cur: {}",
                     id,
