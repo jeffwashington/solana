@@ -1055,6 +1055,7 @@ impl AccountStorageEntry {
         let tail = AccountsFile::file_name(slot, id);
         let path = Path::new(path).join(tail);
         let accounts = AccountsFile::AppendVec(AppendVec::new(&path, true, file_size as usize));
+        log::error!("default");
 
         Self {
             id: AtomicAppendVecId::new(id),
@@ -1072,6 +1073,8 @@ impl AccountStorageEntry {
         accounts: AccountsFile,
         num_accounts: usize,
     ) -> Self {
+        log::error!("new existing account: {slot}, {num_accounts}");
+
         Self {
             id: AtomicAppendVecId::new(id),
             slot: AtomicU64::new(slot),
@@ -1158,6 +1161,7 @@ impl AccountStorageEntry {
     }
 
     fn add_account(&self, num_bytes: usize) {
+        log::error!("add account");
         let mut count_and_status = self.count_and_status.write().unwrap();
         *count_and_status = (count_and_status.0 + 1, count_and_status.1);
         self.approx_store_count.fetch_add(1, Ordering::Relaxed);
@@ -9492,6 +9496,8 @@ impl AccountsDb {
                 );
                 store.count_and_status.write().unwrap().0 = entry.count;
                 store.alive_bytes.store(entry.stored_size, Ordering::SeqCst);
+                log::error!("set count");
+
                 store
                     .approx_store_count
                     .store(entry.count, Ordering::Relaxed);
