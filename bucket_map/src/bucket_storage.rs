@@ -4,7 +4,7 @@ use {
     rand::{thread_rng, Rng},
     solana_measure::measure::Measure,
     std::{
-        fs::{remove_file, OpenOptions},
+        fs::OpenOptions,
         io::{Seek, SeekFrom, Write},
         path::PathBuf,
         sync::{
@@ -72,7 +72,6 @@ pub trait BucketCapacity {
 }
 
 pub struct BucketStorage<O: BucketOccupied> {
-    path: PathBuf,
     mmap: MmapMut,
     pub cell_size: u64,
     pub count: Arc<AtomicU64>,
@@ -88,7 +87,7 @@ pub enum BucketStorageError {
 
 impl<O: BucketOccupied> Drop for BucketStorage<O> {
     fn drop(&mut self) {
-        _ = remove_file(&self.path);
+        // _ = remove_file(&self.path);
     }
 }
 
@@ -147,10 +146,10 @@ impl<O: BucketOccupied> BucketStorage<O> {
         );
         let cell_size = elem_size * num_elems + offset as u64;
         let bytes = Self::allocate_to_fill_page(&mut capacity, cell_size);
-        let (mmap, path, file_name) = Self::new_map(&drives, bytes, &stats);
+        let (mmap, _path, file_name) = Self::new_map(&drives, bytes, &stats);
         (
             Self {
-                path,
+                //path, todo - figure out when to delete
                 mmap,
                 cell_size,
                 count,
@@ -202,6 +201,66 @@ impl<O: BucketOccupied> BucketStorage<O> {
         )
     }
 
+    pub fn load(
+        drives: Arc<Vec<PathBuf>>,
+        elem_size: u64,
+        max_search: MaxSearch,
+        stats: Arc<BucketStats>,
+        count: Arc<AtomicU64>,
+        file_name: u128,
+    ) -> Option<Self> {
+        let offset = O::offset_to_first_data() as u64;
+        let size_of_u64 = std::mem::size_of::<u64>() as u64;
+        assert_eq!(
+            offset / size_of_u64 * size_of_u64,
+            offset,
+            "header size must be a multiple of u64"
+        );
+        let measure_new_file = Measure::start("measure_new_file");
+        let (path, num_elems) = drives
+            .iter()
+            .filter_map(|drive| {
+                let pos = format!("{}", file_name,);
+                let file = drive.join(pos);
+                std::fs::metadata(&file)
+                    .ok()
+                    .map(|metadata| (file, (metadata.len() - offset) / elem_size))
+            })
+            .next()?;
+        let data = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(false)
+            .open(path.clone())
+            .map_err(|e| {
+                panic!(
+                    "Unable to create data file {} in current dir({:?}): {:?}",
+                    path.display(),
+                    std::env::current_dir(),
+                    e
+                );
+            })
+            .unwrap();
+
+        let measure_mmap = Measure::start("measure_mmap");
+        let mmap = unsafe { MmapMut::map_mut(&data).unwrap() };
+        // log::error!("loaded: elems: {}, offset: {}, slice size: {}", num_elems, offset, mmap.len());
+        stats
+            .mmap_us
+            .fetch_add(measure_mmap.end_as_us(), Ordering::Relaxed);
+        stats
+            .new_file_us
+            .fetch_add(measure_new_file.as_us(), Ordering::Relaxed);
+        Some(Self {
+            mmap,
+            cell_size: elem_size,
+            count,
+            stats,
+            max_search,
+            contents: O::new(Capacity::Actual(num_elems)),
+        })
+    }
+
     pub(crate) fn copying_entry(&mut self, ix_new: u64, other: &Self, ix_old: u64) {
         let start = self.get_start_offset_with_header(ix_new);
         let start_old = other.get_start_offset_with_header(ix_old);
@@ -236,7 +295,7 @@ impl<O: BucketOccupied> BucketStorage<O> {
     /// 'is_resizing' true if caller is resizing the index (so don't increment count)
     /// 'is_resizing' false if caller is adding an item to the index (so increment count)
     pub fn occupy(&mut self, ix: u64, is_resizing: bool) -> Result<(), BucketStorageError> {
-        assert!(ix < self.capacity(), "occupy: bad index size");
+        debug_assert!(ix < self.capacity(), "occupy: bad index size");
         let mut e = Err(BucketStorageError::AlreadyOccupied);
         //debug!("ALLOC {} {}", ix, uid);
         if self.try_lock(ix) {
@@ -249,17 +308,19 @@ impl<O: BucketOccupied> BucketStorage<O> {
     }
 
     pub fn free(&mut self, ix: u64) {
-        assert!(ix < self.capacity(), "bad index size");
+        debug_assert!(ix < self.capacity(), "bad index size");
         let start = self.get_start_offset_with_header(ix);
         self.contents.free(&mut self.mmap[start..], ix as usize);
         self.count.fetch_sub(1, Ordering::Relaxed);
     }
 
+    #[inline]
     fn get_start_offset_with_header(&self, ix: u64) -> usize {
-        assert!(ix < self.capacity(), "bad index size");
+        debug_assert!(ix < self.capacity(), "bad index size");
         (self.cell_size * ix) as usize
     }
 
+    #[inline]
     fn get_start_offset(&self, ix: u64, header: IncludeHeader) -> usize {
         self.get_start_offset_with_header(ix)
             + match header {
@@ -280,6 +341,7 @@ impl<O: BucketOccupied> BucketStorage<O> {
         unsafe { slice.get_unchecked_mut(0) }
     }
 
+    #[inline]
     pub(crate) fn get<T>(&self, ix: u64) -> &T {
         let slice = self.get_slice::<T>(ix, 1, IncludeHeader::NoHeader);
         // SAFETY: `get_cell_slice` ensures there's at least one element in the slice
@@ -292,6 +354,7 @@ impl<O: BucketOccupied> BucketStorage<O> {
         unsafe { slice.get_unchecked_mut(0) }
     }
 
+    #[inline]
     pub(crate) fn get_slice<T>(&self, ix: u64, len: u64, header: IncludeHeader) -> &[T] {
         // If the caller is including the header, then `len` *must* be 1
         debug_assert!(
@@ -387,6 +450,7 @@ impl<O: BucketOccupied> BucketStorage<O> {
         stats
             .mmap_us
             .fetch_add(measure_mmap.as_us(), Ordering::Relaxed);
+
         res
     }
 

@@ -15,6 +15,14 @@ pub struct BucketStats {
     pub find_index_entry_mut_us: AtomicU64,
     pub file_count: AtomicU64,
     pub total_file_size: AtomicU64,
+    pub searches: AtomicU64,
+    pub searches2: AtomicU64,
+    pub not_found_count: AtomicU64,
+    pub resizes3: AtomicU64,
+    pub active: AtomicU64,
+    pub active_max: AtomicU64,
+    pub batch_us: AtomicU64,
+    pub batch_count: AtomicU64,
 }
 
 impl BucketStats {
