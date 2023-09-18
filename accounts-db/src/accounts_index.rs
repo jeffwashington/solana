@@ -1719,15 +1719,13 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
     /// use Vec<> because the internal vecs are already allocated per bin
     pub(crate) fn populate_and_retrieve_duplicate_keys_from_startup(
         &self,
-        f: impl Fn(Vec<(Slot, Pubkey)>) + Sync + Send,
+        f: impl Fn(Vec<(Pubkey, Vec<crate::in_mem_accounts_index::InsertIndex<T>>)>) + Sync + Send,
     ) {
-        (0..self.bins())
-            .into_par_iter()
-            .map(|pubkey_bin| {
-                let r_account_maps = &self.account_maps[pubkey_bin];
-                r_account_maps.populate_and_retrieve_duplicate_keys_from_startup()
-            })
-            .for_each(f);
+        (0..self.bins()).into_par_iter().for_each(|pubkey_bin| {
+            let r_account_maps = &self.account_maps[pubkey_bin];
+            let r = r_account_maps.populate_and_retrieve_duplicate_keys_from_startup();
+            f(r);
+        })
     }
 
     /// Updates the given pubkey at the given slot with the new account information.
@@ -2599,7 +2597,28 @@ pub mod tests {
             index.set_startup(Startup::Normal);
         }
         assert!(gc.is_empty());
-        index.populate_and_retrieve_duplicate_keys_from_startup(|_slot_keys| {});
+        // The combination of non-upsert and disk index results in us doing a clean as we add.
+        // This means the end results of the index are different than the upsert method or the non-disk index method.
+        let clean_during_generate = !upsert && use_disk;
+        let expected_duplicates = Mutex::new(vec![(slot0, account_infos[0])]);
+        index.populate_and_retrieve_duplicate_keys_from_startup(|slot_keys| {
+            slot_keys.into_iter().for_each(|(pubkey, mut infos)| {
+                assert_eq!(key, pubkey);
+                assert_eq!(infos.len(), 2);
+                // second (and following) ones were duplicates and were NOT inserted into the index because they were lower slots
+                let insert = infos.pop().unwrap();
+                assert_eq!(
+                    (insert.slot, insert.info),
+                    expected_duplicates.lock().unwrap().pop().unwrap()
+                );
+                // first one is the one that was inserted into the index
+                let insert = infos.pop().unwrap();
+                assert_eq!((insert.slot, insert.info), (slot1, account_infos[1]));
+            });
+        });
+        if clean_during_generate {
+            assert!(expected_duplicates.lock().unwrap().is_empty());
+        }
 
         for lock in &[false, true] {
             let read_lock = if *lock {
@@ -2616,10 +2635,21 @@ pub mod tests {
                 index.get_account_read_entry(&key).unwrap()
             };
 
-            assert_eq!(entry.ref_count(), if is_cached { 0 } else { 2 });
+            assert_eq!(
+                entry.ref_count(),
+                if is_cached {
+                    0
+                } else {
+                    1 + Into::<u64>::into(!clean_during_generate)
+                }
+            );
             assert_eq!(
                 entry.slot_list().to_vec(),
-                vec![(slot0, account_infos[0]), (slot1, account_infos[1])]
+                if clean_during_generate {
+                    vec![(slot1, account_infos[1])]
+                } else {
+                    vec![(slot0, account_infos[0]), (slot1, account_infos[1])]
+                }
             );
 
             let new_entry = PreAllocatedAccountMapEntry::new(
@@ -2628,7 +2658,10 @@ pub mod tests {
                 &index.storage.storage,
                 false,
             );
-            assert_eq!(entry.slot_list()[1], new_entry.into());
+            assert_eq!(
+                entry.slot_list()[Into::<usize>::into(!clean_during_generate)],
+                new_entry.into()
+            );
         }
     }
 
