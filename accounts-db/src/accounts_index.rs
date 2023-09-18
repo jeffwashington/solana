@@ -71,14 +71,6 @@ pub type SlotSlice<'s, T> = &'s [(Slot, T)];
 pub type RefCount = u64;
 pub type AccountMap<T> = Arc<InMemAccountsIndex<T>>;
 
-#[derive(Default, Debug, PartialEq, Eq)]
-pub(crate) struct GenerateIndexResult<T: IndexValue> {
-    /// number of accounts inserted in the index
-    pub count: usize,
-    /// pubkeys which were present multiple times in the insertion request.
-    pub duplicates: Option<Vec<(Pubkey, (Slot, T), u64)>>,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 /// how accounts index 'upsert' should handle reclaims
 pub enum UpsertReclaim {
@@ -1682,21 +1674,25 @@ impl<T: IndexValue> AccountsIndex<T> {
             } else {
                 // not using disk buckets, so just write to in-mem
                 // this is no longer the default case
-                items.into_iter().for_each(|(pubkey, (slot, account_info), _data_len)| {
-                    let new_entry = PreAllocatedAccountMapEntry::new(
-                        slot,
-                        account_info,
-                        &self.storage.storage,
-                        use_disk,
-                    );
-                    match r_account_maps.insert_new_entry_if_missing_with_lock(pubkey, new_entry) {
-                        InsertNewEntryResults::DidNotExist => {}
-                        InsertNewEntryResults::ExistedNewEntryZeroLamports => {}
-                        InsertNewEntryResults::ExistedNewEntryNonZeroLamports => {
-                            dirty_pubkeys.push(pubkey);
+                items
+                    .into_iter()
+                    .for_each(|(pubkey, (slot, account_info), _data_len)| {
+                        let new_entry = PreAllocatedAccountMapEntry::new(
+                            slot,
+                            account_info,
+                            &self.storage.storage,
+                            use_disk,
+                        );
+                        match r_account_maps
+                            .insert_new_entry_if_missing_with_lock(pubkey, new_entry)
+                        {
+                            InsertNewEntryResults::DidNotExist => {}
+                            InsertNewEntryResults::ExistedNewEntryZeroLamports => {}
+                            InsertNewEntryResults::ExistedNewEntryNonZeroLamports => {
+                                dirty_pubkeys.push(pubkey);
+                            }
                         }
-                    }
-                });
+                    });
             }
             insert_time.stop();
             insertion_time.fetch_add(insert_time.as_us(), Ordering::Relaxed);
@@ -2148,56 +2144,6 @@ pub mod tests {
     }
 
     #[test]
-    fn test_remove_older_duplicate_pubkeys() {
-        let pk1 = Pubkey::new_from_array([0; 32]);
-        let pk2 = Pubkey::new_from_array([1; 32]);
-        let slot0 = 0;
-        let info2 = 55;
-        let mut items = vec![];
-        let removed = AccountsIndex::<u64, u64>::remove_older_duplicate_pubkeys(&mut items);
-        assert!(items.is_empty());
-        assert!(removed.is_none());
-        let mut items = vec![(pk1, (slot0, 1u64)), (pk2, (slot0, 2))];
-        let expected = items.clone();
-        let removed = AccountsIndex::<u64, u64>::remove_older_duplicate_pubkeys(&mut items);
-        assert_eq!(items, expected);
-        assert!(removed.is_none());
-
-        for dup in 0..3 {
-            for other in 0..dup + 2 {
-                let first_info = 10u64;
-                let mut items = vec![(pk1, (slot0, first_info))];
-                let mut expected_dups = items.clone();
-                for i in 0..dup {
-                    let this_dup = (pk1, (slot0, i + 10u64 + 1));
-                    if i < dup.saturating_sub(1) {
-                        expected_dups.push(this_dup);
-                    }
-                    items.push(this_dup);
-                }
-                let mut expected = vec![*items.last().unwrap()];
-                let other_item = (pk2, (slot0, info2));
-                if other == dup + 1 {
-                    // don't insert
-                } else if other == dup {
-                    expected.push(other_item);
-                    items.push(other_item);
-                } else {
-                    expected.push(other_item);
-                    items.insert(other as usize, other_item);
-                }
-                let result = AccountsIndex::<u64, u64>::remove_older_duplicate_pubkeys(&mut items);
-                assert_eq!(items, expected);
-                if dup != 0 {
-                    assert_eq!(result.unwrap(), expected_dups);
-                } else {
-                    assert!(result.is_none());
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_secondary_index_include_exclude() {
         let pk1 = Pubkey::new_unique();
         let pk2 = Pubkey::new_unique();
@@ -2302,7 +2248,11 @@ pub mod tests {
         let account_info = true;
         let index = AccountsIndex::<bool, bool>::default_for_tests();
         let account_info2: bool = !account_info;
-        let items = vec![(*pubkey, account_info), (*pubkey, account_info2)];
+        let data_len = 0;
+        let items = vec![
+            (*pubkey, account_info, data_len),
+            (*pubkey, account_info2, data_len),
+        ];
         index.set_startup(Startup::Startup);
         let (_, _, result) =
             index.insert_new_if_missing_into_primary_index(slot, items.len(), items.into_iter());
@@ -2336,7 +2286,8 @@ pub mod tests {
 
         let index = AccountsIndex::<bool, bool>::default_for_tests();
         let account_info = true;
-        let items = vec![(*pubkey, account_info)];
+        let data_len = 0;
+        let items = vec![(*pubkey, account_info, data_len)];
         index.set_startup(Startup::Startup);
         let expected_len = items.len();
         let (_, _, result) =
@@ -2374,7 +2325,7 @@ pub mod tests {
         // not zero lamports
         let index = AccountsIndex::<bool, bool>::default_for_tests();
         let account_info = false;
-        let items = vec![(*pubkey, account_info)];
+        let items = vec![(*pubkey, account_info, data_len)];
         index.set_startup(Startup::Startup);
         let expected_len = items.len();
         let (_, _, result) =
@@ -2483,9 +2434,13 @@ pub mod tests {
 
         let index = AccountsIndex::<bool, bool>::default_for_tests();
         let account_infos = [true, false];
+        let data_len = 0;
 
         index.set_startup(Startup::Startup);
-        let items = vec![(key0, account_infos[0]), (key1, account_infos[1])];
+        let items = vec![
+            (key0, account_infos[0], data_len),
+            (key1, account_infos[1], data_len),
+        ];
         let expected_len = items.len();
         let (_, _, result) =
             index.insert_new_if_missing_into_primary_index(slot0, items.len(), items.into_iter());
@@ -2515,6 +2470,7 @@ pub mod tests {
         let slot0 = 0;
         let slot1 = 1;
         let key = solana_sdk::pubkey::new_rand();
+        let data_len = 0;
 
         let mut config = ACCOUNTS_INDEX_CONFIG_FOR_TESTING;
         config.index_limit_mb = if use_disk {
@@ -2538,7 +2494,7 @@ pub mod tests {
                 UPSERT_POPULATE_RECLAIMS,
             );
         } else {
-            let items = vec![(key, account_infos[0])];
+            let items = vec![(key, account_infos[0], data_len)];
             index.set_startup(Startup::Startup);
             let expected_len = items.len();
             let (_, _, result) = index.insert_new_if_missing_into_primary_index(
@@ -2589,7 +2545,7 @@ pub mod tests {
                 index.set_startup(Startup::Normal);
             }
 
-            let items = vec![(key, account_infos[1])];
+            let items = vec![(key, account_infos[1], data_len)];
             index.set_startup(Startup::Startup);
             let expected_len = items.len();
             let (_, _, result) = index.insert_new_if_missing_into_primary_index(

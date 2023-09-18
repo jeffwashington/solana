@@ -155,7 +155,6 @@ pub(crate) struct InsertIndex<U: DiskIndexValue> {
 #[derive(Default, Debug)]
 struct StartupInfo<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> {
     /// entries to add next time we are flushing to disk
-    /// todo: Vec<(slot, Vec<pubkey, ...)
     insert: Mutex<Vec<(Pubkey, (Slot, U), u64)>>,
     /// pubkeys with more than 1 entry
     duplicates: Mutex<StartupInfoDuplicates<T>>,
@@ -687,7 +686,7 @@ impl<T: IndexValue> InMemAccountsIndex<T> {
 
     /// Queue up these insertions for when the flush thread is dealing with this bin.
     /// This is very fast and requires no lookups or disk access.
-    pub fn startup_insert_only(&self, mut items: impl Iterator<Item = (Pubkey, (Slot, T), u64)>) {
+    pub fn startup_insert_only(&self, items: impl Iterator<Item = (Pubkey, (Slot, T), u64)>) {
         assert!(self.storage.get_startup());
         assert!(self.bucket.is_some());
 
