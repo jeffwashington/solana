@@ -1806,7 +1806,7 @@ impl SplitAncientStorages {
                     if storage.capacity() > get_ancient_append_vec_capacity() * 50 / 100 {
                         // even though the slot is in range of being an ancient append vec, if it isn't actually a large append vec,
                         // then we are better off treating all these slots as normally cachable to reduce work in dedup
-                        i_last_large_capacity = 0;
+                        i_last_large_capacity = i;
                     }
                     i += 1;
                     slot
