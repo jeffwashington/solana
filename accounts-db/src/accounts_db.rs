@@ -9339,7 +9339,7 @@ impl AccountsDb {
                                     let mut map = self.shrink_candidate_slots.lock().unwrap();
                                     for (_key, slot_infos) in &slot_keys {
                                         for info in slot_infos {
-                                            map.insert(info.slot);
+                                            //map.insert(info.slot);
                                         }
                                     }
                                 },
