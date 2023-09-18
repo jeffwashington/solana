@@ -88,7 +88,7 @@ impl CacheHashDataFileReference {
         }
         cache_file.capacity = capacity;
         if capacity != file_len {
-            log::error!("expected: {capacity}, len on disk: {file_len} {}, entries: {entries}, cell_size: {cell_size}", path.display());
+            log::error!("expected: {capacity}, len on disk: {file_len} {}, entries: {entries}, cell_size: {cell_size}", self.path.display());
         }
         /*assert_eq!(
             capacity, file_len,
