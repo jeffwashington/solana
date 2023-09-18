@@ -2442,7 +2442,7 @@ impl<'a> AppendVecScan for ScanState<'a> {
         if self.cache_data.is_none() {
             //count = count.max(111_111); // why would we end up with 0? not sure but we are
             self.count = count;
-            self.cache_data = Some(cache_hash_data.allocate(file_name, count * 101/100).unwrap());
+            self.cache_data = Some(cache_hash_data.allocate(file_name, count).unwrap());
             // stop doing initial allocation for now
             // self.accum = Vec::with_capacity(count);
         }
