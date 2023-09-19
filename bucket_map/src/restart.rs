@@ -94,6 +94,7 @@ impl Restart {
     /// loads and mmaps restart file if it exists
     /// returns None if the file doesn't exist or is incompatible or corrupt (in obvious ways)
     pub fn get_restart_file(config: &BucketMapConfig, max_search: MaxSearch) -> Option<Restart> {
+        log::error!("{}", line!());
         let path = config.restart_config_file.as_ref()?;
         let metadata = std::fs::metadata(path).ok()?;
         let file_len = metadata.len();
@@ -101,6 +102,7 @@ impl Restart {
         let expected_len = Self::expected_len(config.max_buckets);
         if expected_len as u64 != file_len {
             // mismatched len, so ignore this file
+            log::error!("{}", line!());
             return None;
         }
 
@@ -110,6 +112,7 @@ impl Restart {
             .create(false)
             .open(path)
             .ok()?;
+        log::error!("{}", line!());
         let mmap = unsafe { MmapMut::map_mut(&file).unwrap() };
 
         let restart = Restart { mmap };
@@ -118,9 +121,11 @@ impl Restart {
             || header.buckets != config.max_buckets
             || header.max_search != max_search as usize
         {
+            log::error!("{}", line!());
             // file doesn't match our current configuration, so we have to restart with fresh buckets
             return None;
         }
+        log::error!("{}", line!());
 
         Some(restart)
     }
