@@ -9346,7 +9346,7 @@ impl AccountsDb {
                                     );
                                 let mut uncleaned_roots = uncleaned_roots.lock().unwrap();
                                 uncleaned_roots_this_group.into_iter().for_each(|slot| {
-                                    uncleaned_roots.insert(slot);
+                                    //uncleaned_roots.insert(slot);
                                 });
                                 count
                             })
