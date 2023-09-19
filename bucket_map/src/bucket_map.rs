@@ -134,7 +134,7 @@ impl<T: Clone + Copy + Debug + PartialEq> BucketMap<T> {
             max_buckets_pow2: log2(config.max_buckets) as u8,
             stats,
             temp_dir,
-            erase_drives_on_drop: true,
+            erase_drives_on_drop: false,
         }
     }
 

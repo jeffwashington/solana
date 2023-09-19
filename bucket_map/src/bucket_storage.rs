@@ -88,7 +88,7 @@ pub enum BucketStorageError {
 
 impl<O: BucketOccupied> Drop for BucketStorage<O> {
     fn drop(&mut self) {
-        self.delete();
+        // self.delete();
     }
 }
 
