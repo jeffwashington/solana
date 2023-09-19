@@ -9637,6 +9637,9 @@ impl AccountsDb {
                     entry.stored_size.saturating_sub(entry.dead_bytes),
                     Ordering::SeqCst,
                 );
+                if entry.dead_bytes > entry.stored_size * 80 / 100 {
+                    log::error!("slot: {_slot}, ratio: {}", entry.dead_bytes * 100 / entry.stored_size);
+                }
                 assert!(
                     store.approx_stored_count() >= entry.count,
                     "{}, {}",
