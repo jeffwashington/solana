@@ -457,7 +457,7 @@ pub struct RootsTracker {
     /// Updated every time we add a new root or clean/shrink an append vec into irrelevancy.
     /// Range is approximately the last N slots where N is # slots per epoch.
     pub alive_roots: RollingBitField,
-    uncleaned_roots: HashSet<Slot>,
+    uncleaned_roots: RollingBitField,
 }
 
 impl Default for RootsTracker {
