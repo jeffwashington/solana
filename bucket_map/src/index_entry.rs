@@ -36,6 +36,15 @@ struct DataBucketRefCountOccupiedHeader {
     packed_ref_count: PackedRefCount,
 }
 
+pub enum InitIfMatches {
+    /// this entry is occupied and contains a pubkey with a different value, so this entry could not be updated
+    FoundDuplicate,
+    /// this entry was free and contains this pubkey and either value matched or the value was written to match
+    SuccessfulInit,
+    /// this entry had a different pubkey
+    PubkeyMismatch,
+}
+
 /// allocated in `contents` in a BucketStorage
 #[derive(Copy, Clone)]
 #[repr(C)]
@@ -371,10 +380,55 @@ impl<T: Copy + PartialEq + 'static> IndexEntryPlaceInBucket<T> {
         index_bucket.contents.set_enum_tag(self.ix, tag);
     }
 
+    pub fn init_one_slot_in_index(&self, index_bucket: &mut BucketStorage<IndexBucket<T>>) {
+        index_bucket
+            .contents
+            .set_enum_tag(self.ix, OccupiedEnumTag::OneSlotInIndex);
+    }
+
     pub fn init(&self, index_bucket: &mut BucketStorage<IndexBucket<T>>, pubkey: &Pubkey) {
         self.set_slot_count_enum_value(index_bucket, OccupiedEnum::ZeroSlots);
         let index_entry = index_bucket.get_mut::<IndexEntry<T>>(self.ix);
         index_entry.key = *pubkey;
+    }
+
+    /// If the entry matches the pubkey and is unoccupied, then store `data` here and occupy the entry.
+    pub(crate) fn init_if_matches<'a>(
+        &self,
+        index_bucket: &'a mut BucketStorage<IndexBucket<T>>,
+        data: &T,
+        k: &Pubkey,
+    ) -> InitIfMatches {
+        let enum_tag = index_bucket.contents.get_enum_tag(self.ix);
+        let index_entry = index_bucket.get::<IndexEntry<T>>(self.ix);
+        if &index_entry.key == k {
+            if unsafe { &index_entry.contents.single_element } == data {
+                index_bucket
+                    .contents
+                    .set_enum_tag(self.ix, OccupiedEnumTag::OneSlotInIndex);
+                InitIfMatches::SuccessfulInit
+            } else if enum_tag == OccupiedEnumTag::Free {
+                // pubkey is same, but value is different, so update value
+                self.set_slot_count_enum_value(index_bucket, OccupiedEnum::OneSlotInIndex(data));
+                InitIfMatches::SuccessfulInit
+            } else {
+                // found occupied duplicate of this pubkey
+                InitIfMatches::FoundDuplicate
+            }
+        } else {
+            InitIfMatches::PubkeyMismatch
+        }
+    }
+
+    pub(crate) fn read_value_assume_one<'a>(
+        &self,
+        index_bucket: &'a BucketStorage<IndexBucket<T>>,
+    ) -> Option<&'a T> {
+        let enum_tag = index_bucket.contents.get_enum_tag(self.ix);
+        (enum_tag == OccupiedEnumTag::Free).then(|| {
+            let index_entry = index_bucket.get::<IndexEntry<T>>(self.ix);
+            unsafe { &index_entry.contents.single_element }
+        })
     }
 
     pub(crate) fn read_value<'a>(
