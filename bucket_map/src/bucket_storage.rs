@@ -213,6 +213,47 @@ impl<O: BucketOccupied> BucketStorage<O> {
         )
     }
 
+    /// load and mmap the file that is this disk bucket if possible
+    pub(crate) fn load(
+        drives: Arc<Vec<PathBuf>>,
+        elem_size: u64,
+        max_search: MaxSearch,
+        stats: Arc<BucketStats>,
+        count: Arc<AtomicU64>,
+        file_name: u128,
+    ) -> Option<Self> {
+        let offset = O::offset_to_first_data() as u64;
+        let size_of_u64 = std::mem::size_of::<u64>() as u64;
+        assert_eq!(
+            offset / size_of_u64 * size_of_u64,
+            offset,
+            "header size must be a multiple of u64"
+        );
+        let (path, num_elems) = drives
+            .iter()
+            .filter_map(|drive| {
+                let pos = format!("{}", file_name,);
+                let file = drive.join(pos);
+                std::fs::metadata(&file)
+                    .ok()
+                    .map(|metadata| (file, (metadata.len() - offset) / elem_size))
+            })
+            .next()?;
+        let mmap = Self::map_open_file(path.clone(), false, 0, &stats)?;
+
+        Some(Self {
+            path,
+            mmap,
+            cell_size: elem_size,
+            count,
+            stats,
+            max_search,
+            contents: O::new(Capacity::Actual(num_elems)),
+            // since we loaded it, it persisted from last time. We obviously want to keep it present disk.
+            delete_file_on_drop: false,
+        })
+    }
+
     pub(crate) fn copying_entry(&mut self, ix_new: u64, other: &Self, ix_old: u64) {
         let start = self.get_start_offset_with_header(ix_new);
         let start_old = other.get_start_offset_with_header(ix_old);
