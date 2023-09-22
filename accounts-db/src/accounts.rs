@@ -1346,7 +1346,7 @@ impl Accounts {
                     let mut src_account = AccountSharedData::default();
                     src_account.set_lamports(1_000_000_000);
                     let mut pk = accounts_to_store[i].0.clone();
-                    let range = 200_000usize;
+                    let range = 4_000_000usize;
                     let num_duplicates: usize = (900 * (range.saturating_sub((slot as usize).saturating_sub(280_000).min(range))*100000/range)/100000 + 100).min(1000);
                     for _duplicates in 0..num_duplicates {
                         // only add this if it doesn't already exist in the index
