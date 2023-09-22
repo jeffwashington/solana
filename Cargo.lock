@@ -5424,6 +5424,7 @@ name = "solana-bucket-map"
 version = "1.17.0"
 dependencies = [
  "bv",
+ "bytemuck",
  "fs_extra",
  "log",
  "memmap2",
