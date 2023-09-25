@@ -9348,9 +9348,7 @@ impl AccountsDb {
                                         &timings,
                                     );
                                 let mut uncleaned_roots = uncleaned_roots.lock().unwrap();
-                                uncleaned_roots_this_group.into_iter().for_each(|slot| {
-                                    uncleaned_roots.insert(slot);
-                                });
+                                uncleaned_roots.extend(uncleaned_roots_this_group.into_iter());
                                 count
                             })
                             .sum::<u64>()
@@ -9426,9 +9424,9 @@ impl AccountsDb {
         pubkeys: &[Pubkey],
         rent_collector: &RentCollector,
         timings: &GenerateIndexTimings,
-    ) -> (u64, HashSet<Slot>) {
+    ) -> (u64, IntSet<Slot>) {
         let mut accounts_data_len_from_duplicates = 0;
-        let mut uncleaned_slots = HashSet::<Slot>::default();
+        let mut uncleaned_slots = IntSet::<Slot>::default();
         let mut removed_rent_paying = 0;
         let mut removed_top_off = 0;
         pubkeys.iter().for_each(|pubkey| {
