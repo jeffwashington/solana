@@ -345,6 +345,7 @@ impl<'b, T: Clone + Copy + PartialEq + std::fmt::Debug + 'static> Bucket<T> {
         let mut entries = Self::index_entries(items, self.random);
         let mut duplicates = Vec::default();
         let mut entries_created_on_disk = 0;
+        let mut insert_offsets = 0;
         // insert, but resizes may be necessary
         loop {
             let cap = self.index.capacity();
@@ -359,6 +360,7 @@ impl<'b, T: Clone + Copy + PartialEq + std::fmt::Debug + 'static> Bucket<T> {
                 items,
                 &mut entries,
                 &mut entries_created_on_disk,
+                &mut insert_offsets,
                 &mut duplicates,
                 self.reused_file_at_startup,
             );
@@ -370,18 +372,20 @@ impl<'b, T: Clone + Copy + PartialEq + std::fmt::Debug + 'static> Bucket<T> {
                         items.len().saturating_sub(duplicates.len()) as u64,
                         Ordering::Relaxed,
                     );
-                    self.index.stats.startup.entries_reused.fetch_add(
+                    let stats = &self.index.stats.startup;
+                    stats.entries_reused.fetch_add(
                         items
                             .len()
                             .saturating_sub(duplicates.len())
                             .saturating_sub(entries_created_on_disk) as u64,
                         Ordering::Relaxed,
                     );
-                    self.index
-                        .stats
-                        .startup
+                    stats
                         .entries_created
                         .fetch_add(entries_created_on_disk as u64, Ordering::Relaxed);
+                    stats
+                        .insert_offsets
+                        .fetch_add(insert_offsets as u64, Ordering::Relaxed);
                     return duplicates;
                 }
                 Err(error) => {
@@ -405,6 +409,7 @@ impl<'b, T: Clone + Copy + PartialEq + std::fmt::Debug + 'static> Bucket<T> {
         data_buckets: &[BucketStorage<DataBucket>],
         items: &[(Pubkey, T)],
         reverse_sorted_entries: &mut Vec<(u64, usize)>,
+        insert_offsets: &mut usize,
         duplicates: &mut Vec<(usize, T)>,
     ) {
         let max_search = index.max_search();
@@ -432,6 +437,9 @@ impl<'b, T: Clone + Copy + PartialEq + std::fmt::Debug + 'static> Bucket<T> {
                         continue;
                     }
                 }
+                if search != 0 {
+                    *insert_offsets += search as usize;
+                }
                 continue 'outer; // this 'insertion' is completed - either because we found a duplicate or we occupied an entry in the file
             }
             // this pubkey did not exist in the file already and we exhausted the search space, so have to try the old way
@@ -454,6 +462,7 @@ impl<'b, T: Clone + Copy + PartialEq + std::fmt::Debug + 'static> Bucket<T> {
         items: &[(Pubkey, T)],
         reverse_sorted_entries: &mut Vec<(u64, usize)>,
         entries_created_on_disk: &mut usize,
+        insert_offsets: &mut usize,
         duplicates: &mut Vec<(usize, T)>,
         try_to_reuse_disk_data: bool,
     ) -> Result<(), BucketMapError> {
@@ -467,6 +476,7 @@ impl<'b, T: Clone + Copy + PartialEq + std::fmt::Debug + 'static> Bucket<T> {
                 data_buckets,
                 items,
                 reverse_sorted_entries,
+                insert_offsets,
                 duplicates,
             );
         }
@@ -496,6 +506,9 @@ impl<'b, T: Clone + Copy + PartialEq + std::fmt::Debug + 'static> Bucket<T> {
                     // new data stored should be stored in IndexEntry and NOT in data file
                     // new data len is 1
                     elem.set_slot_count_enum_value(index, OccupiedEnum::OneSlotInIndex(v));
+                    if search != 0 {
+                        *insert_offsets += search as usize;
+                    }
                     continue 'outer; // this 'insertion' is completed: inserted successfully
                 } else {
                     // occupied, see if the key already exists here

@@ -7,6 +7,7 @@ use std::sync::{
 pub struct StartupBucketStats {
     pub entries_created: AtomicU64,
     pub entries_reused: AtomicU64,
+    pub insert_offsets: AtomicU64,
 }
 
 #[derive(Debug, Default)]
