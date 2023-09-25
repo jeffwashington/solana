@@ -9273,7 +9273,9 @@ impl AccountsDb {
             let mut populate_duplicate_keys_us = 0;
             // outer vec is accounts index bin (determined by pubkey value)
             // inner vec is the pubkeys within that bin that are present in > 1 slot
-            let unique_pubkeys_by_bin = Mutex::new(Vec::<Vec<Pubkey>>::default());
+            let unique_pubkeys_by_bin = Mutex::new(Vec::<Vec<Pubkey>>::with_capacity(
+                crate::accounts_index::BINS_DEFAULT,
+            ));
             if pass == 0 {
                 // tell accounts index we are done adding the initial accounts at startup
                 let mut m = Measure::start("accounts_index_idle_us");
