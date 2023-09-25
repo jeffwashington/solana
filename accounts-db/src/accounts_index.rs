@@ -458,7 +458,7 @@ pub struct RootsTracker {
     /// Updated every time we add a new root or clean/shrink an append vec into irrelevancy.
     /// Range is approximately the last N slots where N is # slots per epoch.
     pub alive_roots: RollingBitField,
-    uncleaned_roots: IntSet<Slot>,
+    uncleaned_roots: HashSet<Slot>,
 }
 
 impl Default for RootsTracker {
@@ -474,7 +474,7 @@ impl RootsTracker {
     pub fn new(max_width: u64) -> Self {
         Self {
             alive_roots: RollingBitField::new(max_width),
-            uncleaned_roots: IntSet::default(),
+            uncleaned_roots: HashSet::default(),
         }
     }
 
@@ -1995,7 +1995,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
         tracker.alive_roots.get_all()
     }
 
-    pub fn clone_uncleaned_roots(&self) -> IntSet<Slot> {
+    pub fn clone_uncleaned_roots(&self) -> HashSet<Slot> {
         self.roots_tracker.read().unwrap().uncleaned_roots.clone()
     }
 
