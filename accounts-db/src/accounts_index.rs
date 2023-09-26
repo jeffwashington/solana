@@ -1593,41 +1593,33 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
     /// Returns `HashSet` of duplicate pubkeys.
     fn remove_older_duplicate_pubkeys(
         items: &mut Vec<(Pubkey, (Slot, T))>,
+        hashset: &mut HashSet<Pubkey>,
     ) -> Option<Vec<(Pubkey, (Slot, T))>> {
         if items.len() < 2 {
             return None;
         }
-        // stable sort by pubkey.
-        // Earlier entries are overwritten by later entries
-        items.sort_by(|a, b| a.0.cmp(&b.0));
         let mut duplicates = None::<Vec<(Pubkey, (Slot, T))>>;
-
-        // Iterate the items vec from the end to the beginning. Adjacent duplicated items will be
-        // written to the front of the vec.
-        let n = items.len();
-        let mut last_key = items[n - 1].0;
-        let mut write = n - 1;
-        let mut curr = write;
-
-        while curr > 0 {
-            let curr_item = items[curr - 1];
-
-            if curr_item.0 == last_key {
-                let mut duplicates_insert = duplicates.unwrap_or_default();
-                duplicates_insert.push(curr_item);
-                duplicates = Some(duplicates_insert);
-                curr -= 1;
-            } else {
-                if curr < write {
-                    items[write - 1] = curr_item;
-                }
-                curr -= 1;
-                write -= 1;
-                last_key = curr_item.0;
+        let mut i = 0;
+        while i < items.len() {
+            let (k, v) = &items[i];
+            if hashset.insert(*k) {
+                i += 1;
+                continue;
             }
+            let mut j = i;
+            while j > 0 {
+                j = j - 1;
+                if items[j].0 == *k {
+                    let mut duplicates_insert = duplicates.unwrap_or_default();
+                    duplicates_insert.push(items.remove(j));
+                    duplicates = Some(duplicates_insert);
+                    break;
+                }
+            }
+            assert!(j > 0);
+            // continue without incrementing i. We removed an earlier element from the vec.
         }
-
-        items.drain(..(write - curr));
+        hashset.clear();
 
         duplicates
     }
@@ -1674,6 +1666,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
         // lock contention.
         let random_offset = thread_rng().gen_range(0..bins);
         let mut duplicates = Vec::default();
+        let mut hashset = HashSet::default();
         (0..bins).for_each(|pubkey_bin| {
             let pubkey_bin = (pubkey_bin + random_offset) % bins;
             let mut items = std::mem::take(&mut binned[pubkey_bin]);
@@ -1681,7 +1674,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
                 return;
             }
 
-            let these_duplicates = Self::remove_older_duplicate_pubkeys(&mut items);
+            let these_duplicates = Self::remove_older_duplicate_pubkeys(&mut items, &mut hashset);
             if let Some(mut these_duplicates) = these_duplicates {
                 duplicates.append(&mut these_duplicates);
             }
