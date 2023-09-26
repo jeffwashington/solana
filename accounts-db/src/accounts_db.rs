@@ -8980,6 +8980,10 @@ impl AccountsDb {
                 rent_paying_accounts_by_partition.push(*pubkey);
             }
 
+            if stored_account.rent_epoch() < 100 && stored_account.rent_epoch() > 0 {
+                log::error!("{}, lamports: {}, rent_epoch: {}, owner: {}, data_len: {}", stored_account.pubkey(), stored_account.lamports(), stored_account.rent_epoch(), stored_account.owner(), stored_account.data().len());
+            }
+
             (
                 *pubkey,
                 AccountInfo::new(
