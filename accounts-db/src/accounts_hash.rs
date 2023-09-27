@@ -1026,22 +1026,6 @@ impl<'a> AccountsHasher<'a> {
     ) {
         // looping to add next item to working set
         while let Some(ItemLocation { key, pointer }) = next {
-            // if `new key` is less than the min key in the working set, skip binary search and
-            // insert item to the end vec directly
-            if let Some(SlotGroupPointer {
-                slot_group_index: current_min_slot_group_index,
-                offset: current_min_offset,
-            }) = working_set.last()
-            {
-                let current_min_key = &sorted_data_by_pubkey[*current_min_slot_group_index]
-                    [*current_min_offset]
-                    .pubkey;
-                if *key < current_min_key {
-                    working_set.push(*pointer);
-                    break;
-                }
-            }
-
             let found = working_set.binary_search_by(|pointer| {
                 let prob = &sorted_data_by_pubkey[pointer.slot_group_index][pointer.offset].pubkey;
                 (*key).cmp(prob)
