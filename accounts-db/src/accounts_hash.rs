@@ -1025,10 +1025,10 @@ impl<'a> AccountsHasher<'a> {
         binner: &PubkeyBinCalculator24,
     ) {
         // looping to add next item to working set
-        while let Some(ItemLocation { key, pointer }) = next {
+        while let Some(ItemLocation { key, pointer }) = std::mem::take(next) {
             let found = working_set.binary_search_by(|pointer| {
                 let prob = &sorted_data_by_pubkey[pointer.slot_group_index][pointer.offset].pubkey;
-                (*key).cmp(prob)
+                key.cmp(prob)
             });
 
             match found {
@@ -1036,7 +1036,7 @@ impl<'a> AccountsHasher<'a> {
                     // found a new new key, insert into the working_set. This is O(n/2) on
                     // average. Theoretically, this operation could be expensive and may be further
                     // optimized in future.
-                    working_set.insert(index, *pointer);
+                    working_set.insert(index, pointer);
                     break;
                 }
                 Ok(index) => {
@@ -1048,10 +1048,7 @@ impl<'a> AccountsHasher<'a> {
                             sorted_data_by_pubkey,
                             pubkey_bin,
                             binner,
-                            &ItemLocation {
-                                key,
-                                pointer: *pointer,
-                            },
+                            &ItemLocation { key, pointer },
                         );
                         *next = new_next;
                     } else {
@@ -1065,7 +1062,7 @@ impl<'a> AccountsHasher<'a> {
                                 pointer: *found,
                             },
                         );
-                        *found = *pointer;
+                        *found = pointer;
                         *next = new_next;
                     }
                 }
