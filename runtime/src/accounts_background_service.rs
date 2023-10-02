@@ -503,8 +503,7 @@ pub struct PrunedBanksRequestHandler {
 }
 
 impl PrunedBanksRequestHandler {
-    #[cfg_attr(feature = "dev-context-only-utils", qualifiers(pub))]
-    fn handle_request(&self, bank: &Bank) -> usize {
+    pub fn handle_request(&self, bank: &Bank) -> usize {
         let mut banks_to_purge: Vec<_> = self.pruned_banks_receiver.try_iter().collect();
         // We need a stable sort to ensure we purge banks—with the same slot—in the same order
         // they were sent into the channel.
@@ -706,7 +705,11 @@ impl AccountsBackgroundService {
                             bank.clean_accounts(last_full_snapshot_slot);
                             last_cleaned_block_height = bank.block_height();
                         }
-                        bank.shrink_candidate_slots();
+                        bank.shrink_candidate_slots_arc(
+                            exit.clone(),
+                            //&request_handlers.pruned_banks_request_handler,
+                            //bank_forks.clone(),
+                        );
                     }
                     stats.record_and_maybe_submit(start_time.elapsed());
                     sleep(Duration::from_millis(INTERVAL_MS));
