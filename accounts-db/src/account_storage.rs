@@ -124,7 +124,8 @@ impl AccountStorage {
     }
 
     pub(crate) fn insert(&self, slot: Slot, store: Arc<AccountStorageEntry>) {
-        assert!(self.no_shrink_in_progress());
+        // bprumo NOTE: ancient packer can be running, so need to change the assert below
+        //assert!(self.no_shrink_in_progress());
         assert!(self
             .map
             .insert(
