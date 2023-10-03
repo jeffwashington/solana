@@ -1574,8 +1574,6 @@ pub struct AccountsDb {
     /// Some time later (to allow for slow calculation time), the bank hash at a slot calculated using 'M' includes the full accounts hash.
     /// Thus, the state of all accounts on a validator is known to be correct at least once per epoch.
     pub epoch_accounts_hash_manager: EpochAccountsHashManager,
-
-    pub ancient_packer_thread: Mutex<Option<thread::JoinHandle<()>>>,
 }
 
 #[derive(Debug, Default)]
@@ -2542,7 +2540,6 @@ impl AccountsDb {
             exhaustively_verify_refcounts: false,
             partitioned_epoch_rewards_config: PartitionedEpochRewardsConfig::default(),
             epoch_accounts_hash_manager: EpochAccountsHashManager::new_invalid(),
-            ancient_packer_thread: Mutex::new(None),
         }
     }
 
@@ -3253,13 +3250,6 @@ impl AccountsDb {
         last_full_snapshot_slot: Option<Slot>,
         epoch_schedule: &EpochSchedule,
     ) {
-        // if the ancient packer thread is running, abort; we cannot clean at the same time
-        if self.ancient_packer_thread.lock().unwrap().is_some() {
-            info!("bprumo DEBUG: skipping clean; ancient append vec packer is running");
-            return;
-        }
-        info!("bprumo DEBUG: running clean...");
-
         if self.exhaustively_verify_refcounts {
             self.exhaustively_verify_refcounts(max_clean_root_inclusive);
         }
@@ -4439,21 +4429,20 @@ impl AccountsDb {
             return;
         }
 
+        assert_eq!(self.create_ancient_storage, CreateAncientStorage::Pack);
+
         info!("bprumo DEBUG: shrinking ancient slots...");
+        let start = Instant::now();
         let local_exit = Arc::new(AtomicBool::new(false));
         rayon::join(
             || {
                 let can_randomly_shrink = true;
                 let sorted_slots = self.get_sorted_potential_ancient_slots(oldest_non_ancient_slot);
-                if self.create_ancient_storage == CreateAncientStorage::Append {
-                    self.combine_ancient_slots(sorted_slots, can_randomly_shrink);
-                } else {
-                    self.combine_ancient_slots_packed(sorted_slots, can_randomly_shrink);
-                }
+                self.combine_ancient_slots_packed(sorted_slots, can_randomly_shrink);
                 local_exit.store(true, Ordering::Relaxed);
             },
             || loop {
-                info!("bprumo DEBUG: flush accounts cache while shrinking ancient slots, flush root: {flush_root}");
+                info!("bprumo DEBUG: flush accounts cache while shrinking ancient slots, flush root: {flush_root}, duration: {:?}", start.elapsed());
                 if local_exit.load(Ordering::Relaxed) || exit.load(Ordering::Relaxed) {
                     break;
                 }
@@ -4465,10 +4454,13 @@ impl AccountsDb {
                     self.flush_accounts_cache(false, Some(flush_root));
                 }
 
-                std::thread::sleep(Duration::from_secs(1));
+                std::thread::sleep(Duration::from_secs(5));
             },
         );
-        info!("bprumo DEBUG: shrinking ancient slots... Done");
+        info!(
+            "bprumo DEBUG: shrinking ancient slots... Done, and took {:?}",
+            start.elapsed()
+        );
     }
 
     /// 'accounts' that exist in the current slot we are combining into a different ancient slot
