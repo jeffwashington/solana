@@ -677,8 +677,7 @@ impl AccountsBackgroundService {
                         }
                         bank.shrink_candidate_slots_arc(
                             exit.clone(),
-                            //&request_handlers.pruned_banks_request_handler,
-                            //bank_forks.clone(),
+                            &request_handlers.pruned_banks_request_handler.pruned_banks_receiver,
                         );
                     }
                     stats.record_and_maybe_submit(start_time.elapsed());

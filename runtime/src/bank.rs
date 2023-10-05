@@ -7954,8 +7954,7 @@ impl Bank {
     pub fn shrink_candidate_slots_arc(
         &self,
         exit: Arc<AtomicBool>,
-        //pruned_banks_request_handler: &PrunedBanksRequestHandler,
-        //bank_forks: Arc<BankForks>,
+        pruned_banks_receiver: &crossbeam_channel::Receiver<(Slot, BankId)>,
     ) -> usize {
         self.rc
             .accounts
@@ -7964,8 +7963,7 @@ impl Bank {
             .shrink_candidate_slots_arc(
                 self.epoch_schedule(),
                 exit,
-                //pruned_banks_request_handler,
-                //bank_forks,
+                pruned_banks_receiver,
                 self.slot(),
             )
     }

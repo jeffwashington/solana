@@ -4421,8 +4421,7 @@ impl AccountsDb {
         self: Arc<Self>,
         oldest_non_ancient_slot: Slot,
         exit: Arc<AtomicBool>,
-        //pruned_banks_request_handler: &PrunedBanksRequestHandler,
-        //bank_forks: Arc<solana_runtime::bank_forks::BankForks>,
+        pruned_banks_receiver: &Receiver<(Slot, BankId)>,
         flush_root: Slot,
     ) {
         if self.ancient_append_vec_offset.is_none() {
@@ -4447,12 +4446,8 @@ impl AccountsDb {
                     break;
                 }
 
-                {
-                    //let bank = bank_forks.read().unwrap().root_bank();
-                    //pruned_banks_request_handler.handle_request(&bank);
-                    //bank.flush_accounts_cache_if_needed();
-                    self.flush_accounts_cache(false, Some(flush_root));
-                }
+                self.do_handle_pruned_banks_request(pruned_banks_receiver);
+                self.flush_accounts_cache(false, Some(flush_root));
 
                 std::thread::sleep(Duration::from_secs(1));
             },
@@ -4461,6 +4456,45 @@ impl AccountsDb {
             "bprumo DEBUG: shrinking ancient slots... Done, and took {:?}",
             start.elapsed()
         );
+    }
+
+    pub fn do_handle_pruned_banks_request(
+        &self,
+        pruned_banks_receiver: &Receiver<(Slot, BankId)>,
+    ) -> usize {
+        let mut banks_to_purge: Vec<_> = pruned_banks_receiver.try_iter().collect();
+        // We need a stable sort to ensure we purge banks—with the same slot—in the same order
+        // they were sent into the channel.
+        banks_to_purge.sort_by_key(|(slot, _id)| *slot);
+        let num_banks_to_purge = banks_to_purge.len();
+
+        // Group the banks into slices with the same slot
+        let grouped_banks_to_purge: Vec<_> =
+            GroupBy::new(banks_to_purge.as_slice(), |a, b| a.0 == b.0).collect();
+
+        // Log whenever we need to handle banks with the same slot.  Purposely do this *before* we
+        // call `purge_slot()` to ensure we get the datapoint (in case there's an assert/panic).
+        let num_banks_with_same_slot =
+            num_banks_to_purge.saturating_sub(grouped_banks_to_purge.len());
+        if num_banks_with_same_slot > 0 {
+            datapoint_info!(
+                "pruned_banks_request_handler",
+                ("num_pruned_banks", num_banks_to_purge, i64),
+                ("num_banks_with_same_slot", num_banks_with_same_slot, i64),
+            );
+        }
+
+        // Purge all the slots in parallel
+        // Banks for the same slot are purged sequentially
+        self.thread_pool_clean.install(|| {
+            grouped_banks_to_purge.into_par_iter().for_each(|group| {
+                group.iter().for_each(|(slot, bank_id)| {
+                    self.purge_slot(*slot, *bank_id, true);
+                })
+            });
+        });
+
+        num_banks_to_purge
     }
 
     /// 'accounts' that exist in the current slot we are combining into a different ancient slot
@@ -4800,8 +4834,7 @@ impl AccountsDb {
         self: Arc<Self>,
         epoch_schedule: &EpochSchedule,
         exit: Arc<AtomicBool>,
-        //pruned_banks_request_handler: &PrunedBanksRequestHandler,
-        //bank_forks: Arc<BankForks>,
+        pruned_banks_receiver: &Receiver<(Slot, BankId)>,
         flush_root: Slot,
     ) -> usize {
         let oldest_non_ancient_slot = self.get_oldest_non_ancient_slot(epoch_schedule);
@@ -4810,8 +4843,7 @@ impl AccountsDb {
             self.clone().shrink_ancient_slots_arc(
                 oldest_non_ancient_slot,
                 exit,
-                //pruned_banks_request_handler,
-                //bank_forks,
+                pruned_banks_receiver,
                 flush_root,
             );
         }
@@ -4886,45 +4918,6 @@ impl AccountsDb {
         inc_new_counter_info!("shrink_pended_stores-count", pended_counts);
 
         num_candidates
-    }
-
-    pub fn do_handle_pruned_banks_request(
-        &self,
-        pruned_banks_receiver: &Receiver<(Slot, BankId)>,
-    ) -> usize {
-        let mut banks_to_purge: Vec<_> = pruned_banks_receiver.try_iter().collect();
-        // We need a stable sort to ensure we purge banks—with the same slot—in the same order
-        // they were sent into the channel.
-        banks_to_purge.sort_by_key(|(slot, _id)| *slot);
-        let num_banks_to_purge = banks_to_purge.len();
-
-        // Group the banks into slices with the same slot
-        let grouped_banks_to_purge: Vec<_> =
-            GroupBy::new(banks_to_purge.as_slice(), |a, b| a.0 == b.0).collect();
-
-        // Log whenever we need to handle banks with the same slot.  Purposely do this *before* we
-        // call `purge_slot()` to ensure we get the datapoint (in case there's an assert/panic).
-        let num_banks_with_same_slot =
-            num_banks_to_purge.saturating_sub(grouped_banks_to_purge.len());
-        if num_banks_with_same_slot > 0 {
-            datapoint_info!(
-                "pruned_banks_request_handler",
-                ("num_pruned_banks", num_banks_to_purge, i64),
-                ("num_banks_with_same_slot", num_banks_with_same_slot, i64),
-            );
-        }
-
-        // Purge all the slots in parallel
-        // Banks for the same slot are purged sequentially
-        self.thread_pool_clean.install(|| {
-            grouped_banks_to_purge.into_par_iter().for_each(|group| {
-                group.iter().for_each(|(slot, bank_id)| {
-                    self.purge_slot(*slot, *bank_id, true);
-                })
-            });
-        });
-
-        num_banks_to_purge
     }
 
     pub fn shrink_candidate_slots(&self, epoch_schedule: &EpochSchedule) -> usize {
