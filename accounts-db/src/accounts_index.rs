@@ -1393,7 +1393,9 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
                 lock = Some(&self.account_maps[bin]);
                 last_bin = bin;
             }
-            lock.as_ref().unwrap().get_internal(pubkey, |entry| {
+            let mut m = Measure::start("scan");
+            let lock_temp = lock.as_ref().unwrap();
+            lock_temp.get_internal(pubkey, |entry| {
                 let mut cache = false;
                 match entry {
                     Some(locked_entry) => {
@@ -1419,6 +1421,8 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
                         };
                     }
                     None => {
+                        m.stop();
+                        lock_temp.stats().scan_missing_us.fetch_add(m.as_us(), Ordering::Relaxed);
                         avoid_callback_result.unwrap_or_else(|| callback(pubkey, None, None));
                     }
                 }
