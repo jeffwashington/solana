@@ -264,7 +264,7 @@ impl SnapshotPackage {
         let mut snapshot_storages = accounts_package.snapshot_storages;
         let snapshot_archive_path = match snapshot_kind {
             SnapshotKind::FullSnapshot => {
-                panic!("creating full snapshot!");
+                //panic!("creating full snapshot!");
                 snapshot_utils::build_full_snapshot_archive_path(
                 snapshot_info.full_snapshot_archives_dir,
                 accounts_package.slot,
