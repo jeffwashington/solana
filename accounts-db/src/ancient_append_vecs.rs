@@ -192,7 +192,8 @@ impl AncientSlotInfos {
             // combined ancient storages is less than the threshold, then
             // we've gone too far, so get rid of this entry and all after it.
             // Every storage after this one is larger.
-            if storages_remaining + ancient_storages_required < max_storages {
+            let low_water_mark_offset = max_storages / 2;
+            if storages_remaining + ancient_storages_required + low_water_mark_offset < max_storages {
                 log::error!("ancient_append_vecs_packed: {}, would truncate to {}, bytes: {}, len: {}", line!(), i, cumulative_bytes, self.all_infos.len());
                 //self.all_infos.truncate(i.min(max_slots));
                 self.all_infos.truncate(i);
@@ -264,6 +265,8 @@ impl AccountsDb {
             ideal_storage_size: NonZeroU64::new(get_ancient_append_vec_capacity()).unwrap(),
             can_randomly_shrink,
         };
+        assert!(!tuning.can_randomly_shrink);
+
 
         let _guard = self.active_stats.activate(ActiveStatItem::SquashAncient);
 
@@ -381,6 +384,8 @@ impl AccountsDb {
         slots: Vec<Slot>,
         tuning: &PackedAncientStorageTuning,
     ) -> AncientSlotInfos {
+        assert!(!tuning.can_randomly_shrink);
+
         let mut ancient_slot_infos = self.calc_ancient_slot_info(slots, tuning.can_randomly_shrink);
 
         ancient_slot_infos.filter_ancient_slots(tuning);
@@ -429,6 +434,7 @@ impl AccountsDb {
             all_infos: Vec::with_capacity(len),
             ..AncientSlotInfos::default()
         };
+        assert!(!can_randomly_shrink);
         let mut randoms = 0;
 
         log::error!("ancient_append_vecs_packed: {}, adding: {}", line!(), slots.len());
@@ -444,6 +450,7 @@ impl AccountsDb {
                 }
 
                 if infos.add(*slot, storage, can_randomly_shrink) {
+                    log::error!("ancient_append_vecs_packed: {}, random: {}", line!(), can_randomly_shrink);
                     randoms += 1;
                 }
             }

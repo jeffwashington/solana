@@ -4753,6 +4753,7 @@ impl AccountsDb {
         slot: Slot,
         can_randomly_shrink: bool,
     ) -> bool {
+        panic!("abfdfdc");
         let accounts = &storage.accounts;
 
         self.shrink_ancient_stats
