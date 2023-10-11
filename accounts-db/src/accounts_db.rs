@@ -4617,7 +4617,7 @@ impl AccountsDb {
         let local_exit = Arc::new(AtomicBool::new(false));
         rayon::join(
             || {
-                let can_randomly_shrink = true;
+                let can_randomly_shrink = false;
                 let sorted_slots = self.get_sorted_potential_ancient_slots(oldest_non_ancient_slot);
                 self.combine_ancient_slots_packed(sorted_slots, can_randomly_shrink);
                 local_exit.store(true, Ordering::Relaxed);
