@@ -194,6 +194,7 @@ impl AncientSlotInfos {
             // we've gone too far, so get rid of this entry and all after it.
             // Every storage after this one is larger.
             if storages_remaining + ancient_storages_required < low_threshold {
+                log::error!("jwash: below low: {:?}", (storages_remaining, ancient_storages_required, low_threshold, i, self.all_infos.len()));
                 self.all_infos.truncate(i);
                 break;
             }
