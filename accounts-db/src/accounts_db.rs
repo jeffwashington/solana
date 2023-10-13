@@ -2012,8 +2012,9 @@ pub(crate) struct ShrinkAncientStats {
 #[derive(Debug, Default)]
 pub(crate) struct ShrinkStatsSub {
     pub(crate) store_accounts_timing: StoreAccountsTiming,
-    pub(crate) rewrite_elapsed_us: u64,
+    pub(crate) rewrite_elapsed_us2: u64,
     pub(crate) create_and_insert_store_elapsed_us: u64,
+    pub(crate) number_unpackable_slots: usize,
 }
 
 impl ShrinkStatsSub {
@@ -2021,10 +2022,14 @@ impl ShrinkStatsSub {
     pub(crate) fn accumulate(&mut self, other: &Self) {
         self.store_accounts_timing
             .accumulate(&other.store_accounts_timing);
-        saturating_add_assign!(self.rewrite_elapsed_us, other.rewrite_elapsed_us);
+        saturating_add_assign!(self.rewrite_elapsed_us2, other.rewrite_elapsed_us2);
         saturating_add_assign!(
             self.create_and_insert_store_elapsed_us,
             other.create_and_insert_store_elapsed_us
+        );
+        saturating_add_assign!(
+            self.number_unpackable_slots,
+            other.number_unpackable_slots
         );
     }
 }
@@ -2041,6 +2046,7 @@ pub struct ShrinkStats {
     handle_reclaims_elapsed: AtomicU64,
     remove_old_stores_shrink_us: AtomicU64,
     rewrite_elapsed: AtomicU64,
+    number_unpackable_slots: AtomicU64,
     drop_storage_entries_elapsed: AtomicU64,
     recycle_stores_write_elapsed: AtomicU64,
     accounts_removed: AtomicUsize,
@@ -2217,6 +2223,13 @@ impl ShrinkAncientStats {
                 (
                     "rewrite_elapsed",
                     self.shrink_stats.rewrite_elapsed.swap(0, Ordering::Relaxed) as i64,
+                    i64
+                ),
+                (
+                    "number_unpackable_slots",
+                    self.shrink_stats
+                        .number_unpackable_slots
+                        .swap(0, Ordering::Relaxed) as i64,
                     i64
                 ),
                 (
@@ -4133,7 +4146,7 @@ impl AccountsDb {
             );
 
             rewrite_elapsed.stop();
-            stats_sub.rewrite_elapsed_us = rewrite_elapsed.as_us();
+            stats_sub.rewrite_elapsed_us2 = rewrite_elapsed.as_us();
 
             // `store_accounts_frozen()` above may have purged accounts from some
             // other storage entries (the ones that were just overwritten by this
@@ -4176,7 +4189,10 @@ impl AccountsDb {
         );
         shrink_stats
             .rewrite_elapsed
-            .fetch_add(stats_sub.rewrite_elapsed_us, Ordering::Relaxed);
+            .fetch_add(stats_sub.rewrite_elapsed_us2, Ordering::Relaxed);
+        shrink_stats
+            .number_unpackable_slots
+            .fetch_add(stats_sub.number_unpackable_slots as u64, Ordering::Relaxed);
     }
 
     /// get stores for 'slot'
@@ -4672,7 +4688,7 @@ impl AccountsDb {
             stats_sub.store_accounts_timing.accumulate(&timing);
         }
         rewrite_elapsed.stop();
-        stats_sub.rewrite_elapsed_us = rewrite_elapsed.as_us();
+        stats_sub.rewrite_elapsed_us2 = rewrite_elapsed.as_us();
 
         if slot != current_ancient.slot() {
             // all append vecs in this slot have been combined into an ancient append vec
@@ -7941,7 +7957,7 @@ impl AccountsDb {
             ScanStorageResult::Stored(stored_result) => stored_result.into_iter().collect(),
         };
 
-        hashes.iter().for_each(|(k, h)| {
+        hashes.iter().for_each(|(k, _h)| {
             skipped_rewrites.remove(k);
         });
         hashes.extend(skipped_rewrites.into_iter());
