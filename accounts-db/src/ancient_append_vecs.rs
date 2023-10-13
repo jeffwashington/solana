@@ -184,7 +184,7 @@ impl AncientSlotInfos {
         let total_storages = self.all_infos.len();
         let mut cumulative_bytes = 0u64;
         // take bytes of 20% of max_storages at a time
-        let low_threshold = 80 * max_storages / 100;
+        let low_threshold = 96 * max_storages / 100;
         for (i, info) in self.all_infos.iter().enumerate() {
             saturating_add_assign!(cumulative_bytes, info.alive_bytes);
             let ancient_storages_required = (cumulative_bytes / ideal_storage_size + 1) as usize;
