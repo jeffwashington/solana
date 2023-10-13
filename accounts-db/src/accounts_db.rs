@@ -5857,7 +5857,7 @@ impl AccountsDb {
             if let Some(min) = removed_slots.clone().min() {
                 info!(
                     "purge_slots_from_cache_and_store: {:?}",
-                    self.get_pubkey_hash_for_slot(*min).0
+                    self.get_pubkey_hash_for_slot(*min, Vec::default()).0
                 );
             }
         }
@@ -7922,8 +7922,13 @@ impl AccountsDb {
     pub fn get_pubkey_hash_for_slot(
         &self,
         slot: Slot,
+        skipped_rewrites: Vec<(Pubkey, AccountHash)>,
     ) -> (Vec<(Pubkey, AccountHash)>, u64, Measure) {
         let mut scan = Measure::start("scan");
+
+        let mut skipped_rewrites = skipped_rewrites
+            .into_iter()
+            .collect::<HashMap<Pubkey, AccountHash>>();
 
         let scan_result: ScanStorageResult<(Pubkey, AccountHash), DashMap<Pubkey, AccountHash>> =
             self.scan_account_storage(
@@ -7940,10 +7945,16 @@ impl AccountsDb {
         scan.stop();
 
         let accumulate = Measure::start("accumulate");
-        let hashes: Vec<_> = match scan_result {
+        let mut hashes: Vec<_> = match scan_result {
             ScanStorageResult::Cached(cached_result) => cached_result,
             ScanStorageResult::Stored(stored_result) => stored_result.into_iter().collect(),
         };
+
+        hashes.iter().for_each(|(k, h)| {
+            skipped_rewrites.remove(k);
+        });
+        hashes.extend(skipped_rewrites.into_iter());
+
         (hashes, scan.as_us(), accumulate)
     }
 
@@ -7988,8 +7999,12 @@ impl AccountsDb {
     ///
     /// As part of calculating the accounts delta hash, get a list of accounts modified this slot
     /// (aka dirty pubkeys) and add them to `self.uncleaned_pubkeys` for future cleaning.
-    pub fn calculate_accounts_delta_hash(&self, slot: Slot) -> AccountsDeltaHash {
-        self.calculate_accounts_delta_hash_internal(slot, None)
+    pub fn calculate_accounts_delta_hash(
+        &self,
+        slot: Slot,
+        skipped_rewrites: Vec<(Pubkey, AccountHash)>,
+    ) -> AccountsDeltaHash {
+        self.calculate_accounts_delta_hash_internal(slot, None, skipped_rewrites)
     }
 
     /// Calculate accounts delta hash for `slot`
@@ -8000,8 +8015,10 @@ impl AccountsDb {
         &self,
         slot: Slot,
         ignore: Option<Pubkey>,
+        skipped_rewrites: Vec<(Pubkey, AccountHash)>,
     ) -> AccountsDeltaHash {
-        let (mut hashes, scan_us, mut accumulate) = self.get_pubkey_hash_for_slot(slot);
+        let (mut hashes, scan_us, mut accumulate) =
+            self.get_pubkey_hash_for_slot(slot, skipped_rewrites);
         let dirty_keys = hashes.iter().map(|(pubkey, _hash)| *pubkey).collect();
         if let Some(ignore) = ignore {
             hashes.retain(|k| k.0 != ignore);
