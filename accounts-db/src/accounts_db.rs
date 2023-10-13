@@ -3263,6 +3263,9 @@ impl AccountsDb {
         last_full_snapshot_slot: Option<Slot>,
         epoch_schedule: &EpochSchedule,
     ) {
+        let oldest_non_ancient_slot = self.get_oldest_non_ancient_slot(epoch_schedule);
+        self.shrink_ancient_slots(oldest_non_ancient_slot);
+                
         if self.exhaustively_verify_refcounts {
             self.exhaustively_verify_refcounts(max_clean_root_inclusive);
         }
@@ -4770,7 +4773,7 @@ impl AccountsDb {
         let oldest_non_ancient_slot = self.get_oldest_non_ancient_slot(epoch_schedule);
         if !self.shrink_candidate_slots.lock().unwrap().is_empty() {
             // this can affect 'shrink_candidate_slots', so don't 'take' it until after this completes
-            self.shrink_ancient_slots(oldest_non_ancient_slot);
+            //self.shrink_ancient_slots(oldest_non_ancient_slot);
         }
 
         let shrink_candidates_slots =
