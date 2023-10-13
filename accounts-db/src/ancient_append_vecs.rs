@@ -184,7 +184,7 @@ impl AncientSlotInfos {
         let total_storages = self.all_infos.len();
         let mut cumulative_bytes = 0u64;
         // take bytes of 20% of max_storages at a time
-        let low_threshold = 96 * max_storages / 100;
+        let low_threshold = 90 * max_storages / 100;
         for (i, info) in self.all_infos.iter().enumerate() {
             saturating_add_assign!(cumulative_bytes, info.alive_bytes);
             let ancient_storages_required = (cumulative_bytes / ideal_storage_size + 1) as usize;
@@ -294,6 +294,7 @@ impl AccountsDb {
         let ancient_slot_infos = self.collect_sort_filter_ancient_slots(sorted_slots, &tuning);
 
         if ancient_slot_infos.all_infos.is_empty() {
+            log::error!("ancient packing: is empty");
             return; // nothing to do
         }
         let accounts_per_storage = self
@@ -302,6 +303,7 @@ impl AccountsDb {
             );
 
         let accounts_to_combine = self.calc_accounts_to_combine(&accounts_per_storage);
+        metrics.number_unpackable_slots += accounts_to_combine.number_unpackable_slots;
 
         // pack the accounts with 1 ref
         let pack = PackedAncientStorage::pack(
@@ -316,6 +318,7 @@ impl AccountsDb {
             // Not enough slots to contain the accounts we are trying to pack.
             // `shrink_collect` previously unref'd some accounts. We need to addref them
             // to restore the correct state since we failed to combine anything.
+            log::error!("ancient packing: not enough slots: {:?}", (pack.len(), accounts_to_combine.target_slots_sorted.len()));
             self.addref_accounts_failed_to_shrink_ancient(accounts_to_combine);
             return;
         }
@@ -376,7 +379,7 @@ impl AccountsDb {
         let target_slot = accounts_to_write.target_slot();
         let (shrink_in_progress, create_and_insert_store_elapsed_us) =
             measure_us!(self.get_store_for_shrink(target_slot, bytes));
-        let (store_accounts_timing, rewrite_elapsed_us) = measure_us!(self.store_accounts_frozen(
+        let (store_accounts_timing, rewrite_elapsed_us2) = measure_us!(self.store_accounts_frozen(
             accounts_to_write,
             None::<Vec<Hash>>,
             shrink_in_progress.new_storage(),
@@ -386,8 +389,9 @@ impl AccountsDb {
 
         write_ancient_accounts.metrics.accumulate(&ShrinkStatsSub {
             store_accounts_timing,
-            rewrite_elapsed_us,
+            rewrite_elapsed_us2,
             create_and_insert_store_elapsed_us,
+            number_unpackable_slots: 0,
         });
         write_ancient_accounts
             .shrinks_in_progress
@@ -587,6 +591,7 @@ impl AccountsDb {
                 target_slots_sorted.push(info.slot);
             }
         }
+        let number_unpackable_slots = remove.len();
         remove.into_iter().rev().for_each(|i| {
             accounts_to_combine.remove(i);
         });
@@ -594,6 +599,7 @@ impl AccountsDb {
             accounts_to_combine,
             accounts_keep_slots,
             target_slots_sorted,
+            number_unpackable_slots,
         }
     }
 
@@ -721,6 +727,7 @@ struct AccountsToCombine<'a> {
     /// Some of these slots will have ancient append vecs created at them to contain everything in 'accounts_to_combine'
     /// The rest will become dead slots with no accounts in them.
     target_slots_sorted: Vec<Slot>,
+    number_unpackable_slots: usize,
 }
 
 #[derive(Default)]
