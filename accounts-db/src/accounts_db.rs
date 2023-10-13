@@ -8002,7 +8002,7 @@ impl AccountsDb {
             ScanStorageResult::Stored(stored_result) => stored_result.into_iter().collect(),
         };
 
-        hashes.iter().for_each(|(k, h)| {
+        hashes.iter().for_each(|(k, _h)| {
             skipped_rewrites.remove(k);
         });
         hashes.extend(skipped_rewrites.into_iter());

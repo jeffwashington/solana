@@ -182,6 +182,7 @@ impl AncientSlotInfos {
         self.shrink_indexes.clear();
         let total_storages = self.all_infos.len();
         let mut cumulative_bytes = 0u64;
+        let low_threshold = max_storages * 50 / 100;
         for (i, info) in self.all_infos.iter().enumerate() {
             saturating_add_assign!(cumulative_bytes, info.alive_bytes);
             let ancient_storages_required = (cumulative_bytes / ideal_storage_size + 1) as usize;
@@ -190,7 +191,8 @@ impl AncientSlotInfos {
             // combined ancient storages is less than the threshold, then
             // we've gone too far, so get rid of this entry and all after it.
             // Every storage after this one is larger.
-            if storages_remaining + ancient_storages_required < max_storages {
+            if storages_remaining + ancient_storages_required < low_threshold {
+                log::error!("jwash: below low: {:?}", (storages_remaining, ancient_storages_required, low_threshold, i, self.all_infos.len()));
                 self.all_infos.truncate(i);
                 break;
             }
