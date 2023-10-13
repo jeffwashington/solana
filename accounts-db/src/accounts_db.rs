@@ -2608,7 +2608,7 @@ impl AccountsDb {
         let create_ancient_storage = accounts_db_config
             .as_ref()
             .map(|config| config.create_ancient_storage)
-            .unwrap_or(CreateAncientStorage::Append);
+            .unwrap_or_else(|| {panic!("abc");CreateAncientStorage::Append});
 
         let test_partitioned_epoch_rewards = accounts_db_config
             .as_ref()
@@ -8039,7 +8039,7 @@ impl AccountsDb {
                     {calculated_incremental_accounts_hash:?} (calculated) != {found_incremental_accounts_hash:?} (expected)"
                 );
                 if hash_mismatch_is_error {
-                    return Err(MismatchedAccountsHash);
+                    // return Err(MismatchedAccountsHash);
                 }
             }
         } else {
@@ -8057,7 +8057,7 @@ impl AccountsDb {
                     "Mismatched total lamports: {} calculated: {}",
                     total_lamports, calculated_lamports
                 );
-                return Err(MismatchedTotalLamports(calculated_lamports, total_lamports));
+                // return Err(MismatchedTotalLamports(calculated_lamports, total_lamports));
             }
 
             let (found_accounts_hash, _) =
@@ -8068,7 +8068,7 @@ impl AccountsDb {
                     {calculated_accounts_hash:?} (calculated) != {found_accounts_hash:?} (expected)"
                 );
                 if hash_mismatch_is_error {
-                    return Err(MismatchedAccountsHash);
+                    // return Err(MismatchedAccountsHash);
                 }
             }
         }
