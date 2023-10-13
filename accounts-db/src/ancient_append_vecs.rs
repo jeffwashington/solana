@@ -276,7 +276,7 @@ impl AccountsDb {
 
         // only log when we've spent 1s total
         // results will continue to accumulate otherwise
-        if self.shrink_ancient_stats.total_us.load(Ordering::Relaxed) > 1_000_000 {
+        {//if self.shrink_ancient_stats.total_us.load(Ordering::Relaxed) > 1_000_000 {
             self.shrink_ancient_stats.report();
         }
     }
