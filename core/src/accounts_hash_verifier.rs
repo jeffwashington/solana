@@ -416,6 +416,10 @@ impl AccountsHashVerifier {
             .unwrap()); // unwrap here will never fail since check_hash = false
 
         if accounts_package.expected_capitalization != lamports {
+            warn!(
+                "mismatch lamports: {}, {}",
+                accounts_package.expected_capitalization, lamports
+            );
             // before we assert, run the hash calc again. This helps track down whether it could have been a failure in a race condition possibly with shrink.
             // We could add diagnostics to the hash calc here to produce a per bin cap or something to help narrow down how many pubkeys are different.
             let calculate_accounts_hash_config = CalcAccountsHashConfig {
