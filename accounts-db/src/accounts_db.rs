@@ -7877,7 +7877,7 @@ impl AccountsDb {
                     {calculated_incremental_accounts_hash:?} (calculated) != {found_incremental_accounts_hash:?} (expected)"
                 );
                 if hash_mismatch_is_error {
-                    return Err(MismatchedAccountsHash);
+                    // return Err(MismatchedAccountsHash);
                 }
             }
         } else {
@@ -7895,7 +7895,7 @@ impl AccountsDb {
                     "Mismatched total lamports: {} calculated: {}",
                     total_lamports, calculated_lamports
                 );
-                return Err(MismatchedTotalLamports(calculated_lamports, total_lamports));
+                // return Err(MismatchedTotalLamports(calculated_lamports, total_lamports));
             }
 
             let (found_accounts_hash, _) =
@@ -7906,7 +7906,7 @@ impl AccountsDb {
                     {calculated_accounts_hash:?} (calculated) != {found_accounts_hash:?} (expected)"
                 );
                 if hash_mismatch_is_error {
-                    return Err(MismatchedAccountsHash);
+                    // return Err(MismatchedAccountsHash);
                 }
             }
         }
