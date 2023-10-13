@@ -74,10 +74,11 @@ use {
             TransactionLoadResult,
         },
         accounts_db::{
-            AccountShrinkThreshold, AccountStorageEntry, AccountsDbConfig,
+            AccountShrinkThreshold, AccountStorageEntry, AccountsDb, AccountsDbConfig,
             CalcAccountsHashDataSource, IncludeSlotInHash, VerifyAccountsHashAndLamportsConfig,
             ACCOUNTS_DB_CONFIG_FOR_BENCHMARKS, ACCOUNTS_DB_CONFIG_FOR_TESTING,
         },
+        accounts_hash::AccountHash,
         accounts_hash::{AccountsHash, CalcAccountsHashConfig, HashStats, IncrementalAccountsHash},
         accounts_index::{AccountSecondaryIndexes, IndexKey, ScanConfig, ScanResult, ZeroLamport},
         accounts_partition::{self, Partition, PartitionIndex},
@@ -507,6 +508,7 @@ impl PartialEq for Bank {
             return true;
         }
         let Self {
+            skipped_rewrites: _,
             rc: _,
             status_cache: _,
             blockhash_queue,
@@ -815,6 +817,8 @@ pub struct Bank {
     /// The change to accounts data size in this Bank, due to off-chain events (i.e. rent collection)
     accounts_data_size_delta_off_chain: AtomicI64,
 
+    skipped_rewrites: RwLock<Vec<(Pubkey, AccountHash)>>,
+
     /// Transaction fee structure
     pub fee_structure: FeeStructure,
 
@@ -1013,6 +1017,7 @@ impl Bank {
 
     fn default_with_accounts(accounts: Accounts) -> Self {
         let mut bank = Self {
+            skipped_rewrites: RwLock::default(),
             incremental_snapshot_persistence: None,
             rc: BankRc::new(accounts, Slot::default()),
             status_cache: Arc::<RwLock<BankStatusCache>>::default(),
@@ -1344,6 +1349,7 @@ impl Bank {
 
         let accounts_data_size_initial = parent.load_accounts_data_size();
         let mut new = Self {
+            skipped_rewrites: RwLock::default(),
             incremental_snapshot_persistence: None,
             rc,
             status_cache,
@@ -1798,6 +1804,7 @@ impl Bank {
         );
         let stakes_accounts_load_duration = now.elapsed();
         let mut bank = Self {
+            skipped_rewrites: RwLock::default(),
             incremental_snapshot_persistence: fields.incremental_snapshot_persistence,
             rc: bank_rc,
             status_cache: Arc::<RwLock<BankStatusCache>>::default(),
@@ -5998,7 +6005,7 @@ impl Bank {
     ///  it is time for rent collection, but the account is rent exempt.
     /// false if rent collection DOES rewrite accounts if the account is rent exempt
     /// This is the default behavior historically.
-    fn bank_hash_skips_rent_rewrites(&self) -> bool {
+    fn _bank_hash_skips_rent_rewrites(&self) -> bool {
         self.feature_set
             .is_active(&feature_set::skip_rent_rewrites::id())
     }
@@ -6024,10 +6031,11 @@ impl Bank {
             Vec::<(&Pubkey, &AccountSharedData)>::with_capacity(accounts.len());
         let mut time_collecting_rent_us = 0;
         let mut time_storing_accounts_us = 0;
-        let can_skip_rewrites = self.bank_hash_skips_rent_rewrites();
+        let can_skip_rewrites = true; // self.bank_hash_skips_rent_rewrites();
         let set_exempt_rent_epoch_max: bool = self
             .feature_set
             .is_active(&solana_sdk::feature_set::set_exempt_rent_epoch_max::id());
+        let mut skipped_rewrites = Vec::default();
         for (pubkey, account, _loaded_slot) in accounts.iter_mut() {
             let (rent_collected_info, measure) =
                 measure!(self.rent_collector.collect_from_existing_account(
@@ -6073,9 +6081,21 @@ impl Bank {
                 }
                 total_rent_collected_info += rent_collected_info;
                 accounts_to_store.push((pubkey, account));
+            } else {
+                let hash = AccountsDb::hash_account(
+                    self.slot(),
+                    account,
+                    &pubkey,
+                    self.include_slot_in_hash(),
+                );
+                skipped_rewrites.push((*pubkey, hash));
             }
             rent_debits.insert(pubkey, rent_collected_info.rent_amount, account.lamports());
         }
+        self.skipped_rewrites
+            .write()
+            .unwrap()
+            .append(&mut skipped_rewrites);
 
         if !accounts_to_store.is_empty() {
             // TODO: Maybe do not call `store_accounts()` here.  Instead return `accounts_to_store`
@@ -7101,7 +7121,11 @@ impl Bank {
             .rc
             .accounts
             .accounts_db
-            .calculate_accounts_delta_hash_internal(slot, ignore);
+            .calculate_accounts_delta_hash_internal(
+                slot,
+                ignore,
+                std::mem::take(&mut self.skipped_rewrites.write().unwrap()),
+            );
 
         let mut signature_count_buf = [0u8; 8];
         LittleEndian::write_u64(&mut signature_count_buf[..], self.signature_count());
