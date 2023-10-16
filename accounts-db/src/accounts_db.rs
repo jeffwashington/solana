@@ -551,7 +551,7 @@ impl Default for FillerAccountsConfig {
     }
 }
 
-const ANCIENT_APPEND_VEC_DEFAULT_OFFSET: Option<i64> = Some(-10_000);
+const ANCIENT_APPEND_VEC_DEFAULT_OFFSET: Option<i64> = Some(60000);
 
 #[derive(Debug, Default, Clone)]
 pub struct AccountsDbConfig {
@@ -9449,6 +9449,56 @@ impl AccountsDb {
         }
 
         self.accounts_index.log_secondary_indexes();
+
+        let oldest_non_ancient_slot = self.get_oldest_non_ancient_slot(&EpochSchedule::default());
+        for slot in slots {
+            if slot < oldest_non_ancient_slot {
+                if let Some(storage) = self.storage.get_slot_storage_entry(slot) {
+                    let accounts = storage.all_accounts();
+                    if accounts.len() < 100 {
+                        let mut all_bad = true;
+                        for account in &accounts {
+                            let k = account.pubkey();
+                            match self.accounts_index.get(k, None, None) {
+                                AccountIndexGetResult::Found(entry, _offset) => {
+                                    if entry.slot_list().len() == 1 {
+                                        all_bad = false;
+                                        break;
+                                    }
+                                }
+                                _ => {
+                                    all_bad = false;
+                                    break;
+                                }
+                            }
+                        }
+                        let pk = Pubkey::from_str("ETchVVcCYiqisTfhrQ2xYFcPsATgz7Cc3AFTg1dT47J4").unwrap();
+                        let pk2 = Pubkey::from_str("3Aw9vCLMdNFTsBPJ7AytXe5onBGREdoWerkKPGjgkrjJ").unwrap();
+                        
+                        if all_bad {
+                            for account in &accounts {
+                                
+                                let k = account.pubkey();
+                                match self.accounts_index.get(k, None, None) {
+                                    AccountIndexGetResult::Found(entry, _offset) => {
+                                        log::error!("{},# accounts,{},{:?}", slot, accounts.len(), (oldest_non_ancient_slot - slot, *k, *account.owner(), entry.slot_list().iter().map(|(index_slot, _info)| *index_slot as i64 - slot as i64).collect::<Vec<_>>()));
+                                        {//if entrypk == *k || pk2 == *k {
+                                            entry.slot_list().iter().for_each(|(index_slot, _info)| {
+                                                if let Some(storage) = self.storage.get_slot_storage_entry(*index_slot) {
+                                                    log::error!("slot: {index_slot}, bytes: {}, # accounts: {}, relative slot: {}", storage.accounts.capacity(), storage.approx_stored_count(), *index_slot as i64 - slot as i64);
+                                                }
+                                            });
+                                        }
+                                    }
+                                    _ => {
+                                    }
+                                }
+                            }
+                            }
+                    }
+                }
+            }
+        }
 
         IndexGenerationInfo {
             accounts_data_len: accounts_data_len.load(Ordering::Relaxed),
