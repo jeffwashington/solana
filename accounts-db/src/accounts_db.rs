@@ -301,6 +301,13 @@ impl<'a> ShrinkCollectRefs<'a> for ShrinkCollectAliveSeparatedByRefs<'a> {
         {
             &mut self.many_refs_this_is_newest_alive
         } else {
+            log::error!(
+                "potential clean error: {}, owner: {}, len: {}, slot_list: {:?}",
+                account.pubkey(),
+                account.owner(),
+                account.data().len(),
+                slot_list
+            );
             // this entry is alive but is older
             &mut self.many_refs_old_alive
         };
@@ -2041,6 +2048,7 @@ pub(crate) struct ShrinkAncientStats {
 
 #[derive(Debug, Default)]
 pub(crate) struct ShrinkStatsSub {
+    pub(crate) capacity_last_slot: u64,
     pub(crate) store_accounts_timing: StoreAccountsTiming,
     pub(crate) rewrite_elapsed_us: u64,
     pub(crate) create_and_insert_store_elapsed_us: u64,
@@ -2062,9 +2070,9 @@ impl ShrinkStatsSub {
             self.count_newest_alive_packed,
             other.count_newest_alive_packed
         );
+        self.capacity_last_slot = other.capacity_last_slot.max(self.capacity_last_slot);
     }
 }
-
 #[derive(Debug, Default)]
 pub struct ShrinkStats {
     last_report: AtomicInterval,
@@ -2079,6 +2087,7 @@ pub struct ShrinkStats {
     rewrite_elapsed: AtomicU64,
     unpackable_slots_count: AtomicU64,
     count_newest_alive_packed: AtomicU64,
+    capacity_last_slot: AtomicU64,
     drop_storage_entries_elapsed: AtomicU64,
     recycle_stores_write_elapsed: AtomicU64,
     accounts_removed: AtomicUsize,
@@ -2260,6 +2269,13 @@ impl ShrinkAncientStats {
                 "count_newest_alive_packed",
                 self.shrink_stats
                     .count_newest_alive_packed
+                    .swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "capacity_last_slot",
+                self.shrink_stats
+                    .capacity_last_slot
                     .swap(0, Ordering::Relaxed) as i64,
                 i64
             ),
@@ -4228,8 +4244,15 @@ impl AccountsDb {
             .rewrite_elapsed
             .fetch_add(stats_sub.rewrite_elapsed_us, Ordering::Relaxed);
         shrink_stats
+            .count_newest_alive_packed
+            .fetch_add(stats_sub.count_newest_alive_packed as u64, Ordering::Relaxed);
+        shrink_stats
             .unpackable_slots_count
             .fetch_add(stats_sub.unpackable_slots_count as u64, Ordering::Relaxed);
+        shrink_stats
+            .capacity_last_slot
+            .fetch_max(stats_sub.capacity_last_slot as u64, Ordering::Relaxed);
+        
     }
 
     /// get stores for 'slot'
