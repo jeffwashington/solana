@@ -229,7 +229,12 @@ pub struct VerifyAccountsHashAndLamportsConfig<'a> {
 pub(crate) trait ShrinkCollectRefs<'a>: Sync + Send {
     fn with_capacity(capacity: usize, slot: Slot) -> Self;
     fn collect(&mut self, other: Self);
-    fn add(&mut self, ref_count: u64, account: &'a StoredAccountMeta<'a>, slot_list: &[(Slot, AccountInfo)]);
+    fn add(
+        &mut self,
+        ref_count: u64,
+        account: &'a StoredAccountMeta<'a>,
+        slot_list: &[(Slot, AccountInfo)],
+    );
     fn len(&self) -> usize;
     fn alive_bytes(&self) -> usize;
     fn alive_accounts(&self) -> &Vec<&'a StoredAccountMeta<'a>>;
@@ -247,7 +252,12 @@ impl<'a> ShrinkCollectRefs<'a> for AliveAccounts<'a> {
             slot,
         }
     }
-    fn add(&mut self, _ref_count: u64, account: &'a StoredAccountMeta<'a>, _slot_list: &[(Slot, AccountInfo)]) {
+    fn add(
+        &mut self,
+        _ref_count: u64,
+        account: &'a StoredAccountMeta<'a>,
+        _slot_list: &[(Slot, AccountInfo)],
+    ) {
         self.accounts.push(account);
         self.bytes = self.bytes.saturating_add(account.stored_size());
     }
@@ -265,7 +275,8 @@ impl<'a> ShrinkCollectRefs<'a> for AliveAccounts<'a> {
 impl<'a> ShrinkCollectRefs<'a> for ShrinkCollectAliveSeparatedByRefs<'a> {
     fn collect(&mut self, other: Self) {
         self.one_ref.collect(other.one_ref);
-        self.many_refs_this_is_newest_alive.collect(other.many_refs_this_is_newest_alive);
+        self.many_refs_this_is_newest_alive
+            .collect(other.many_refs_this_is_newest_alive);
         self.many_refs_old_alive.collect(other.many_refs_old_alive);
     }
     fn with_capacity(capacity: usize, slot: Slot) -> Self {
@@ -275,19 +286,32 @@ impl<'a> ShrinkCollectRefs<'a> for ShrinkCollectAliveSeparatedByRefs<'a> {
             many_refs_old_alive: AliveAccounts::with_capacity(0, slot),
         }
     }
-    fn add(&mut self, ref_count: u64, account: &'a StoredAccountMeta<'a>, slot_list: &[(Slot, AccountInfo)]) {
+    fn add(
+        &mut self,
+        ref_count: u64,
+        account: &'a StoredAccountMeta<'a>,
+        slot_list: &[(Slot, AccountInfo)],
+    ) {
         let other = if ref_count == 1 {
             &mut self.one_ref
-        } else if slot_list.len() ==1 || !slot_list.iter().any(|(slot_list_slot, _info)| slot_list_slot > &self.many_refs_old_alive.slot) {
+        } else if slot_list.len() == 1
+            || !slot_list
+                .iter()
+                .any(|(slot_list_slot, _info)| slot_list_slot > &self.many_refs_old_alive.slot)
+        {
             &mut self.many_refs_this_is_newest_alive
         } else {
+            log::error!("potential clean error: {}, owner: {}, len: {}, slot_list: {:?}", account.pubkey(), account.owner(), account.data().len(), slot_list);
             // this entry is alive but is older
             &mut self.many_refs_old_alive
         };
         other.add(ref_count, account, &[]);
     }
     fn len(&self) -> usize {
-        self.one_ref.len().saturating_add(self.many_refs_old_alive.len()).saturating_add(self.many_refs_this_is_newest_alive.len())
+        self.one_ref
+            .len()
+            .saturating_add(self.many_refs_old_alive.len())
+            .saturating_add(self.many_refs_this_is_newest_alive.len())
     }
     fn alive_bytes(&self) -> usize {
         self.one_ref
@@ -2018,6 +2042,7 @@ pub(crate) struct ShrinkAncientStats {
 
 #[derive(Debug, Default)]
 pub(crate) struct ShrinkStatsSub {
+    pub(crate) capacity_last_slot: u64,
     pub(crate) store_accounts_timing: StoreAccountsTiming,
     pub(crate) rewrite_elapsed_us: u64,
     pub(crate) create_and_insert_store_elapsed_us: u64,
@@ -2035,10 +2060,13 @@ impl ShrinkStatsSub {
             other.create_and_insert_store_elapsed_us
         );
         saturating_add_assign!(self.count_unpackable_slots, other.count_unpackable_slots);
-        saturating_add_assign!(self.count_newest_alive_packed, other.count_newest_alive_packed);
+        saturating_add_assign!(
+            self.count_newest_alive_packed,
+            other.count_newest_alive_packed
+        );
+        self.capacity_last_slot = other.capacity_last_slot.max(self.capacity_last_slot);
     }
 }
-
 #[derive(Debug, Default)]
 pub struct ShrinkStats {
     last_report: AtomicInterval,
@@ -2053,6 +2081,7 @@ pub struct ShrinkStats {
     rewrite_elapsed: AtomicU64,
     count_unpackable_slots: AtomicU64,
     count_newest_alive_packed: AtomicU64,
+    capacity_last_slot: AtomicU64,
     drop_storage_entries_elapsed: AtomicU64,
     recycle_stores_write_elapsed: AtomicU64,
     accounts_removed: AtomicUsize,
@@ -2235,6 +2264,13 @@ impl ShrinkAncientStats {
                     "count_newest_alive_packed",
                     self.shrink_stats
                         .count_newest_alive_packed
+                        .swap(0, Ordering::Relaxed) as i64,
+                    i64
+                ),
+                (
+                    "capacity_last_slot",
+                    self.shrink_stats
+                        .capacity_last_slot
                         .swap(0, Ordering::Relaxed) as i64,
                     i64
                 ),
@@ -4204,8 +4240,15 @@ impl AccountsDb {
             .rewrite_elapsed
             .fetch_add(stats_sub.rewrite_elapsed_us, Ordering::Relaxed);
         shrink_stats
+            .count_newest_alive_packed
+            .fetch_add(stats_sub.count_newest_alive_packed as u64, Ordering::Relaxed);
+        shrink_stats
             .count_unpackable_slots
             .fetch_add(stats_sub.count_unpackable_slots as u64, Ordering::Relaxed);
+        shrink_stats
+            .capacity_last_slot
+            .fetch_max(stats_sub.capacity_last_slot as u64, Ordering::Relaxed);
+        
     }
 
     /// get stores for 'slot'

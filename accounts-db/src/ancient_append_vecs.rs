@@ -289,6 +289,9 @@ impl AccountsDb {
             .slots_considered
             .fetch_add(sorted_slots.len() as u64, Ordering::Relaxed);
         let ancient_slot_infos = self.collect_sort_filter_ancient_slots(sorted_slots, &tuning);
+        if let Some(last) = ancient_slot_infos.all_infos.last() {
+            metrics.capacity_last_slot = last.storage.capacity();
+        }
 
         if ancient_slot_infos.all_infos.is_empty() {
             return; // nothing to do
@@ -313,6 +316,18 @@ impl AccountsDb {
         // sort highest slot to lowest slot
         many_refs_newest.sort_unstable_by(|a, b| b.slot.cmp(&a.slot));
         metrics.count_newest_alive_packed += many_refs_newest.len();
+
+        let highest_slot = accounts_to_combine.target_slots_sorted.last().unwrap();
+        if many_refs_newest.iter().any(|many| &many.slot < highest_slot) {
+            datapoint_info!(
+                "shrink_ancient_stats",
+                ("high_slot", 1, i64),
+            );
+    
+            log::error!("highest slot is not high enough: {:?}, slots: {:?}", many_refs_newest.iter().map(|many| many.slot).collect::<Vec<_>>(), accounts_to_combine.target_slots_sorted);
+            self.addref_accounts_failed_to_shrink_ancient(accounts_to_combine);
+            return;
+        }
 
         // pack the accounts with 1 ref or
         let pack = PackedAncientStorage::pack(
@@ -403,6 +418,7 @@ impl AccountsDb {
             create_and_insert_store_elapsed_us,
             count_unpackable_slots: 0,
             count_newest_alive_packed: 0,
+            capacity_last_slot: 0,
         });
         write_ancient_accounts
             .shrinks_in_progress
