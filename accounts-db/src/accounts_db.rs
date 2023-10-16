@@ -301,7 +301,13 @@ impl<'a> ShrinkCollectRefs<'a> for ShrinkCollectAliveSeparatedByRefs<'a> {
         {
             &mut self.many_refs_this_is_newest_alive
         } else {
-            log::error!("potential clean error: {}, owner: {}, len: {}, slot_list: {:?}", account.pubkey(), account.owner(), account.data().len(), slot_list);
+            log::error!(
+                "potential clean error: {}, owner: {}, len: {}, slot_list: {:?}",
+                account.pubkey(),
+                account.owner(),
+                account.data().len(),
+                slot_list
+            );
             // this entry is alive but is older
             &mut self.many_refs_old_alive
         };
@@ -2196,169 +2202,167 @@ impl ShrinkStats {
 
 impl ShrinkAncientStats {
     pub(crate) fn report(&self) {
-        if self.shrink_stats.last_report.should_update(1000) {
-            datapoint_info!(
-                "shrink_ancient_stats",
-                (
-                    "num_slots_shrunk",
-                    self.shrink_stats
-                        .num_slots_shrunk
-                        .swap(0, Ordering::Relaxed) as i64,
-                    i64
-                ),
-                (
-                    "storage_read_elapsed",
-                    self.shrink_stats
-                        .storage_read_elapsed
-                        .swap(0, Ordering::Relaxed) as i64,
-                    i64
-                ),
-                (
-                    "index_read_elapsed",
-                    self.shrink_stats
-                        .index_read_elapsed
-                        .swap(0, Ordering::Relaxed) as i64,
-                    i64
-                ),
-                (
-                    "create_and_insert_store_elapsed",
-                    self.shrink_stats
-                        .create_and_insert_store_elapsed
-                        .swap(0, Ordering::Relaxed) as i64,
-                    i64
-                ),
-                (
-                    "store_accounts_elapsed",
-                    self.shrink_stats
-                        .store_accounts_elapsed
-                        .swap(0, Ordering::Relaxed) as i64,
-                    i64
-                ),
-                (
-                    "update_index_elapsed",
-                    self.shrink_stats
-                        .update_index_elapsed
-                        .swap(0, Ordering::Relaxed) as i64,
-                    i64
-                ),
-                (
-                    "handle_reclaims_elapsed",
-                    self.shrink_stats
-                        .handle_reclaims_elapsed
-                        .swap(0, Ordering::Relaxed) as i64,
-                    i64
-                ),
-                (
-                    "remove_old_stores_shrink_us",
-                    self.shrink_stats
-                        .remove_old_stores_shrink_us
-                        .swap(0, Ordering::Relaxed) as i64,
-                    i64
-                ),
-                (
-                    "rewrite_elapsed",
-                    self.shrink_stats.rewrite_elapsed.swap(0, Ordering::Relaxed) as i64,
-                    i64
-                ),
-                (
-                    "count_newest_alive_packed",
-                    self.shrink_stats
-                        .count_newest_alive_packed
-                        .swap(0, Ordering::Relaxed) as i64,
-                    i64
-                ),
-                (
-                    "capacity_last_slot",
-                    self.shrink_stats
-                        .capacity_last_slot
-                        .swap(0, Ordering::Relaxed) as i64,
-                    i64
-                ),
-                (
-                    "count_unpackable_slots",
-                    self.shrink_stats
-                        .count_unpackable_slots
-                        .swap(0, Ordering::Relaxed) as i64,
-                    i64
-                ),
-                (
-                    "drop_storage_entries_elapsed",
-                    self.shrink_stats
-                        .drop_storage_entries_elapsed
-                        .swap(0, Ordering::Relaxed) as i64,
-                    i64
-                ),
-                (
-                    "recycle_stores_write_time",
-                    self.shrink_stats
-                        .recycle_stores_write_elapsed
-                        .swap(0, Ordering::Relaxed) as i64,
-                    i64
-                ),
-                (
-                    "accounts_removed",
-                    self.shrink_stats
-                        .accounts_removed
-                        .swap(0, Ordering::Relaxed) as i64,
-                    i64
-                ),
-                (
-                    "bytes_removed",
-                    self.shrink_stats.bytes_removed.swap(0, Ordering::Relaxed) as i64,
-                    i64
-                ),
-                (
-                    "bytes_written",
-                    self.shrink_stats.bytes_written.swap(0, Ordering::Relaxed) as i64,
-                    i64
-                ),
-                (
-                    "alive_accounts",
-                    self.shrink_stats.alive_accounts.swap(0, Ordering::Relaxed) as i64,
-                    i64
-                ),
-                (
-                    "dead_accounts",
-                    self.shrink_stats.dead_accounts.swap(0, Ordering::Relaxed) as i64,
-                    i64
-                ),
-                (
-                    "accounts_loaded",
-                    self.shrink_stats.accounts_loaded.swap(0, Ordering::Relaxed) as i64,
-                    i64
-                ),
-                (
-                    "ancient_append_vecs_shrunk",
-                    self.ancient_append_vecs_shrunk.swap(0, Ordering::Relaxed) as i64,
-                    i64
-                ),
-                (
-                    "random",
-                    self.random_shrink.swap(0, Ordering::Relaxed) as i64,
-                    i64
-                ),
-                (
-                    "slots_considered",
-                    self.slots_considered.swap(0, Ordering::Relaxed) as i64,
-                    i64
-                ),
-                (
-                    "ancient_scanned",
-                    self.ancient_scanned.swap(0, Ordering::Relaxed) as i64,
-                    i64
-                ),
-                (
-                    "total_us",
-                    self.total_us.swap(0, Ordering::Relaxed) as i64,
-                    i64
-                ),
-                (
-                    "second_pass_one_ref",
-                    self.second_pass_one_ref.swap(0, Ordering::Relaxed) as i64,
-                    i64
-                ),
-            );
-        }
+        datapoint_info!(
+            "shrink_ancient_stats",
+            (
+                "num_slots_shrunk",
+                self.shrink_stats
+                    .num_slots_shrunk
+                    .swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "storage_read_elapsed",
+                self.shrink_stats
+                    .storage_read_elapsed
+                    .swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "index_read_elapsed",
+                self.shrink_stats
+                    .index_read_elapsed
+                    .swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "create_and_insert_store_elapsed",
+                self.shrink_stats
+                    .create_and_insert_store_elapsed
+                    .swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "store_accounts_elapsed",
+                self.shrink_stats
+                    .store_accounts_elapsed
+                    .swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "update_index_elapsed",
+                self.shrink_stats
+                    .update_index_elapsed
+                    .swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "handle_reclaims_elapsed",
+                self.shrink_stats
+                    .handle_reclaims_elapsed
+                    .swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "remove_old_stores_shrink_us",
+                self.shrink_stats
+                    .remove_old_stores_shrink_us
+                    .swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "rewrite_elapsed",
+                self.shrink_stats.rewrite_elapsed.swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "count_newest_alive_packed",
+                self.shrink_stats
+                    .count_newest_alive_packed
+                    .swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "capacity_last_slot",
+                self.shrink_stats
+                    .capacity_last_slot
+                    .swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "count_unpackable_slots",
+                self.shrink_stats
+                    .count_unpackable_slots
+                    .swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "drop_storage_entries_elapsed",
+                self.shrink_stats
+                    .drop_storage_entries_elapsed
+                    .swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "recycle_stores_write_time",
+                self.shrink_stats
+                    .recycle_stores_write_elapsed
+                    .swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "accounts_removed",
+                self.shrink_stats
+                    .accounts_removed
+                    .swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "bytes_removed",
+                self.shrink_stats.bytes_removed.swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "bytes_written",
+                self.shrink_stats.bytes_written.swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "alive_accounts",
+                self.shrink_stats.alive_accounts.swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "dead_accounts",
+                self.shrink_stats.dead_accounts.swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "accounts_loaded",
+                self.shrink_stats.accounts_loaded.swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "ancient_append_vecs_shrunk",
+                self.ancient_append_vecs_shrunk.swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "random",
+                self.random_shrink.swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "slots_considered",
+                self.slots_considered.swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "ancient_scanned",
+                self.ancient_scanned.swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "total_us",
+                self.total_us.swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "second_pass_one_ref",
+                self.second_pass_one_ref.swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+        );
     }
 }
 
@@ -4239,16 +4243,16 @@ impl AccountsDb {
         shrink_stats
             .rewrite_elapsed
             .fetch_add(stats_sub.rewrite_elapsed_us, Ordering::Relaxed);
-        shrink_stats
-            .count_newest_alive_packed
-            .fetch_add(stats_sub.count_newest_alive_packed as u64, Ordering::Relaxed);
+        shrink_stats.count_newest_alive_packed.fetch_add(
+            stats_sub.count_newest_alive_packed as u64,
+            Ordering::Relaxed,
+        );
         shrink_stats
             .count_unpackable_slots
             .fetch_add(stats_sub.count_unpackable_slots as u64, Ordering::Relaxed);
         shrink_stats
             .capacity_last_slot
             .fetch_max(stats_sub.capacity_last_slot as u64, Ordering::Relaxed);
-        
     }
 
     /// get stores for 'slot'
