@@ -7393,7 +7393,7 @@ impl Bank {
                 calculated_hash,
                 expected_hash
             );
-            true//false
+            true //false
         }
     }
 

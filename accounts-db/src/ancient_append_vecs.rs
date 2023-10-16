@@ -20,9 +20,7 @@ use {
     rand::{thread_rng, Rng},
     rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator},
     solana_measure::measure_us,
-    solana_sdk::{
-        account::ReadableAccount, clock::Slot, hash::Hash, pubkey::Pubkey, saturating_add_assign,
-    },
+    solana_sdk::{account::ReadableAccount, clock::Slot, hash::Hash, saturating_add_assign},
     std::{
         collections::HashMap,
         num::NonZeroU64,
@@ -294,15 +292,30 @@ impl AccountsDb {
                 &ancient_slot_infos.all_infos[..],
             );
 
-        let accounts_to_combine = self.calc_accounts_to_combine(&accounts_per_storage);
+        let mut accounts_to_combine = self.calc_accounts_to_combine(&accounts_per_storage);
         metrics.unpackable_slots_count += accounts_to_combine.unpackable_slots_count;
 
-        // pack the accounts with 1 ref
+        let mut many_refs_newest = accounts_to_combine
+            .accounts_to_combine
+            .iter_mut()
+            .filter_map(|alive| {
+                let newest_alive =
+                    std::mem::take(&mut alive.alive_accounts.many_refs_this_is_newest_alive);
+                (!newest_alive.accounts.is_empty()).then(|| newest_alive)
+            })
+            .collect::<Vec<_>>();
+        // sort highest slot to lowest slot
+        many_refs_newest.sort_unstable_by(|a, b| b.slot.cmp(&a.slot));
+        metrics.count_newest_alive_packed += many_refs_newest.len();
+
+        // pack the accounts with 1 ref or
         let pack = PackedAncientStorage::pack(
-            accounts_to_combine
-                .accounts_to_combine
-                .iter()
-                .map(|shrink_collect| &shrink_collect.alive_accounts.one_ref),
+            many_refs_newest.iter().chain(
+                accounts_to_combine
+                    .accounts_to_combine
+                    .iter()
+                    .map(|shrink_collect| &shrink_collect.alive_accounts.one_ref),
+            ),
             tuning.ideal_storage_size,
         );
 
@@ -383,6 +396,7 @@ impl AccountsDb {
             rewrite_elapsed_us,
             create_and_insert_store_elapsed_us,
             unpackable_slots_count: 0,
+            count_newest_alive_packed: 0,
         });
         write_ancient_accounts
             .shrinks_in_progress
@@ -563,19 +577,24 @@ impl AccountsDb {
             .enumerate()
         {
             self.revisit_accounts_with_many_refs(shrink_collect);
-            let many_refs = &mut shrink_collect.alive_accounts.many_refs;
-            if !many_refs.accounts.is_empty() {
+            let many_refs_old_alive = &mut shrink_collect.alive_accounts.many_refs_old_alive;
+            if !many_refs_old_alive.accounts.is_empty() {
                 // there are accounts with ref_count > 1. This means this account must remain IN this slot.
                 // The same account could exist in a newer or older slot. Moving this account across slots could result
                 // in this alive version of the account now being in a slot OLDER than the non-alive instances.
                 if shrink_collect.unrefed_pubkeys.is_empty()
                     && shrink_collect.alive_accounts.one_ref.accounts.is_empty()
+                    && shrink_collect
+                        .alive_accounts
+                        .many_refs_this_is_newest_alive
+                        .accounts
+                        .is_empty()
                 {
                     // all accounts in this append vec are alive and have > 1 ref, so nothing to be done for this append vec
                     remove.push(i);
                     continue;
                 }
-                accounts_keep_slots.insert(info.slot, std::mem::take(many_refs));
+                accounts_keep_slots.insert(info.slot, std::mem::take(many_refs_old_alive));
             } else {
                 // No alive accounts in this slot have a ref_count > 1. So, ALL alive accounts in this slot can be written to any other slot
                 // we find convenient. There is NO other instance of any account to conflict with.
@@ -595,18 +614,20 @@ impl AccountsDb {
         }
     }
 
-    /// return pubkeys from `many_refs` accounts
-    fn get_many_refs_pubkeys<'a>(
+    /*
+    /// return pubkeys from `many_refs_old_alive` accounts
+    fn get_many_refs_old_alive_pubkeys<'a>(
         shrink_collect: &ShrinkCollect<'a, ShrinkCollectAliveSeparatedByRefs<'a>>,
     ) -> Vec<Pubkey> {
         shrink_collect
             .alive_accounts
-            .many_refs
+            .many_refs_old_alive
             .accounts
             .iter()
             .map(|account| *account.pubkey())
             .collect::<Vec<_>>()
     }
+    */
 
     /// After calling `shrink_collect()` on many slots, any dead accounts in those slots would be unref'd.
     /// Alive accounts which had ref_count > 1 are stored in `shrink_collect.alive_accounts.many_refs`.
@@ -616,8 +637,11 @@ impl AccountsDb {
     /// move the account from `many_refs` to `one_ref`.
     fn revisit_accounts_with_many_refs<'a>(
         &self,
-        shrink_collect: &mut ShrinkCollect<'a, ShrinkCollectAliveSeparatedByRefs<'a>>,
+        _shrink_collect: &mut ShrinkCollect<'a, ShrinkCollectAliveSeparatedByRefs<'a>>,
     ) {
+        // todo
+        return;
+        /*
         // collect pk values here to avoid borrow checker
         let pks = Self::get_many_refs_pubkeys(shrink_collect);
         let mut index = 0;
@@ -631,7 +655,7 @@ impl AccountsDb {
                         // This entry has been unref'd during shrink ancient, so it can now move out of `many_refs` and into `one_ref`.
                         // This could happen if the same pubkey is in 2 append vecs that are BOTH being shrunk right now.
                         // Note that `shrink_collect()`, which was previously called to create `shrink_collect`, unrefs any dead accounts.
-                        let many_refs = &mut shrink_collect.alive_accounts.many_refs;
+                        let many_refs_old_alive = &mut shrink_collect.alive_accounts.many_refs_old_alive;
                         let account = many_refs.accounts.remove(index - 1);
                         if many_refs.accounts.is_empty() {
                             // all accounts in `many_refs` now have only 1 ref, so this slot can now be combined into another.
@@ -653,6 +677,7 @@ impl AccountsDb {
         self.shrink_ancient_stats
             .second_pass_one_ref
             .fetch_add(saved, Ordering::Relaxed);
+        */
     }
 
     /// create packed storage and write contents of 'packed' to it.
