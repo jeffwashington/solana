@@ -311,14 +311,27 @@ impl AccountsDb {
         many_refs_newest.sort_unstable_by(|a, b| b.slot.cmp(&a.slot));
         metrics.count_newest_alive_packed += many_refs_newest.len();
 
+
+
         let highest_slot = accounts_to_combine.target_slots_sorted.last().unwrap();
-        if many_refs_newest.iter().any(|many| &many.slot < highest_slot) {
-            datapoint_info!(
-                "shrink_ancient_stats",
-                ("high_slot", 1, i64),
+
+        for i in 0..accounts_to_combine.target_slots_sorted.len()-1 {
+            assert!(accounts_to_combine.target_slots_sorted[i] < accounts_to_combine.target_slots_sorted[i+1], "{}, {}, {}", accounts_to_combine.target_slots_sorted[i], accounts_to_combine.target_slots_sorted[i+1], i);
+        }
+        if many_refs_newest
+            .iter()
+            .any(|many| &many.slot > highest_slot)
+        {
+            datapoint_info!("shrink_ancient_stats", ("high_slot", 1, i64),);
+
+            log::error!(
+                "highest slot is not high enough: {:?}, slots: {:?}",
+                many_refs_newest
+                    .iter()
+                    .map(|many| many.slot)
+                    .collect::<Vec<_>>(),
+                accounts_to_combine.target_slots_sorted
             );
-    
-            log::error!("highest slot is not high enough: {:?}, slots: {:?}", many_refs_newest.iter().map(|many| many.slot).collect::<Vec<_>>(), accounts_to_combine.target_slots_sorted);
             self.addref_accounts_failed_to_shrink_ancient(accounts_to_combine);
             return;
         }

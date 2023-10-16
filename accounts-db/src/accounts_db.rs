@@ -4252,7 +4252,6 @@ impl AccountsDb {
         shrink_stats
             .capacity_last_slot
             .fetch_max(stats_sub.capacity_last_slot as u64, Ordering::Relaxed);
-        
     }
 
     /// get stores for 'slot'
