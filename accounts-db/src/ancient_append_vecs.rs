@@ -311,7 +311,7 @@ impl AccountsDb {
         many_refs_newest.sort_unstable_by(|a, b| b.slot.cmp(&a.slot));
         metrics.count_newest_alive_packed += many_refs_newest.len();
 
-
+        accounts_to_combine.target_slots_sorted.sort_unstable();
 
         let highest_slot = accounts_to_combine.target_slots_sorted.last().unwrap();
 
