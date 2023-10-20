@@ -1796,7 +1796,7 @@ impl SplitAncientStorages {
     ) -> Vec<Slot> {
         let range = snapshot_storages.range();
         let mut i = 0;
-        let mut len_trucate = 0;
+        let mut len_truncate = 0;
         let mut ancient = 0;
         let mut possible_ancient_slots = snapshot_storages
             .iter_range(&(range.start..oldest_non_ancient_slot))
@@ -1808,14 +1808,18 @@ impl SplitAncientStorages {
                         // even though the slot is in range of being an ancient append vec, if it isn't actually a large append vec,
                         // then we are better off treating all these slots as normally cachable to reduce work in dedup.
                         // Since this one is large, for the moment, this one becomes the highest slot where we want to individually cache files.
-                        len_trucate = i;
+                        len_truncate = i;
                     }
                     slot
                 })
             })
             .collect::<Vec<_>>();
-        log::info!("get_ancient_slots: ancient: {ancient}, total old: {}, truncate to: {}", possible_ancient_slots.len(), len_truncate);
-        possible_ancient_slots.truncate(len_trucate);
+        log::info!(
+            "get_ancient_slots: ancient: {ancient}, total old: {}, truncate to: {}",
+            possible_ancient_slots.len(),
+            len_truncate
+        );
+        possible_ancient_slots.truncate(len_truncate);
         possible_ancient_slots
     }
 
@@ -2044,7 +2048,7 @@ pub(crate) struct ShrinkAncientStats {
     pub(crate) random_shrink: AtomicU64,
     pub(crate) slots_considered: AtomicU64,
     pub(crate) ancient_scanned: AtomicU64,
-    pub(crate) second_pass_one_ref: AtomicU64,
+    pub(crate) bytes_ancient_created: AtomicU64,
 }
 
 #[derive(Debug, Default)]
@@ -2075,7 +2079,7 @@ impl ShrinkStatsSub {
 #[derive(Debug, Default)]
 pub struct ShrinkStats {
     last_report: AtomicInterval,
-    num_slots_shrunk: AtomicUsize,
+    pub(crate) num_slots_shrunk: AtomicUsize,
     storage_read_elapsed: AtomicU64,
     index_read_elapsed: AtomicU64,
     create_and_insert_store_elapsed: AtomicU64,
@@ -2349,8 +2353,8 @@ impl ShrinkAncientStats {
                 i64
             ),
             (
-                "second_pass_one_ref",
-                self.second_pass_one_ref.swap(0, Ordering::Relaxed) as i64,
+                "bytes_ancient_created",
+                self.bytes_ancient_created.swap(0, Ordering::Relaxed) as i64,
                 i64
             ),
         );
@@ -4207,14 +4211,20 @@ impl AccountsDb {
             );
         }
 
-        Self::update_shrink_stats(&self.shrink_stats, stats_sub);
+        Self::update_shrink_stats(&self.shrink_stats, stats_sub, true);
         self.shrink_stats.report();
     }
 
-    pub(crate) fn update_shrink_stats(shrink_stats: &ShrinkStats, stats_sub: ShrinkStatsSub) {
-        shrink_stats
-            .num_slots_shrunk
-            .fetch_add(1, Ordering::Relaxed);
+    pub(crate) fn update_shrink_stats(
+        shrink_stats: &ShrinkStats,
+        stats_sub: ShrinkStatsSub,
+        increment_count: bool,
+    ) {
+        if increment_count {
+            shrink_stats
+                .num_slots_shrunk
+                .fetch_add(1, Ordering::Relaxed);
+        }
         shrink_stats.create_and_insert_store_elapsed.fetch_add(
             stats_sub.create_and_insert_store_elapsed_us,
             Ordering::Relaxed,
@@ -4755,7 +4765,7 @@ impl AccountsDb {
         // we should not try to shrink any of the stores from this slot anymore. All shrinking for this slot is now handled by ancient append vec code.
         self.shrink_candidate_slots.lock().unwrap().remove(&slot);
 
-        Self::update_shrink_stats(&self.shrink_ancient_stats.shrink_stats, stats_sub);
+        Self::update_shrink_stats(&self.shrink_ancient_stats.shrink_stats, stats_sub, true);
     }
 
     /// each slot in 'dropped_roots' has been combined into an ancient append vec.
