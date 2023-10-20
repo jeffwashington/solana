@@ -1776,7 +1776,7 @@ impl SplitAncientStorages {
         // 4. unevenly divided chunk of most recent slots (may be empty)
         let ancient_slots =
             Self::get_ancient_slots(oldest_non_ancient_slot, snapshot_storages, |storage| {
-                storage.capacity() > get_ancient_append_vec_capacity() * 50 / 100
+                storage.capacity() > get_ancient_append_vec_capacity() * 80 / 100
             });
 
         let first_non_ancient_slot = ancient_slots
@@ -1797,12 +1797,14 @@ impl SplitAncientStorages {
         let range = snapshot_storages.range();
         let mut i = 0;
         let mut len_trucate = 0;
+        let mut ancient = 0;
         let mut possible_ancient_slots = snapshot_storages
             .iter_range(&(range.start..oldest_non_ancient_slot))
             .filter_map(|(slot, storage)| {
                 storage.map(|storage| {
                     i += 1;
                     if treat_as_ancient(storage) {
+                        ancient += 1;
                         // even though the slot is in range of being an ancient append vec, if it isn't actually a large append vec,
                         // then we are better off treating all these slots as normally cachable to reduce work in dedup.
                         // Since this one is large, for the moment, this one becomes the highest slot where we want to individually cache files.
@@ -1812,6 +1814,7 @@ impl SplitAncientStorages {
                 })
             })
             .collect::<Vec<_>>();
+        log::info!("get_ancient_slots: ancient: {ancient}, total old: {}, truncate to: {}", possible_ancient_slots.len(), len_truncate);
         possible_ancient_slots.truncate(len_trucate);
         possible_ancient_slots
     }
