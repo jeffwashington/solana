@@ -9024,6 +9024,7 @@ impl AccountsDb {
             if let Some(amount_to_top_off_rent_this_account) =
                 Self::stats_for_rent_payers(pubkey, &stored_account, rent_collector)
             {
+                log::error!("jw_rent_paying,{},{},{},{}", pubkey, amount_to_top_off_rent_this_account, stored_account.lamports(), stored_account.data_len());
                 amount_to_top_off_rent += amount_to_top_off_rent_this_account;
                 num_accounts_rent_paying += 1;
                 // remember this rent-paying account pubkey
