@@ -9024,7 +9024,7 @@ impl AccountsDb {
             if let Some(amount_to_top_off_rent_this_account) =
                 Self::stats_for_rent_payers(pubkey, &stored_account, rent_collector)
             {
-                log::error!("jw_rent_paying,{},{},{},{}", pubkey, amount_to_top_off_rent_this_account, stored_account.lamports(), stored_account.data_len());
+                //log::error!("jw_rent_paying,{},{},{},{}", pubkey, amount_to_top_off_rent_this_account, stored_account.lamports(), stored_account.data_len());
                 amount_to_top_off_rent += amount_to_top_off_rent_this_account;
                 num_accounts_rent_paying += 1;
                 // remember this rent-paying account pubkey
@@ -9437,6 +9437,29 @@ impl AccountsDb {
         }
 
         self.accounts_index.log_secondary_indexes();
+
+        let rent_collector2 = RentCollector::new(
+            schedule.get_epoch(max_slot)+1,
+            schedule,
+            genesis_config.slots_per_year(),
+            genesis_config.rent,
+        );
+rent_paying_accounts_by_partition.lock().unwrap().accounts.iter().for_each(|ks| {
+            ks.iter().for_each(|k| {
+        
+            if let Some((a, _)) = self.load_with_fixed_root(&Ancestors::default(), k) {
+                if let Some(amount_to_top_off_rent_this_account) =
+                Self::stats_for_rent_payers(k, &a, &rent_collector)
+            {
+                let mut due = rent_collector.get_rent_due(&a);
+                if due.lamports() == 0 {
+                    due = rent_collector2.get_rent_due(&a);
+                }
+                log::error!("jw_rent_paying2,{},{},{},{},{},{}", k, amount_to_top_off_rent_this_account, a.lamports(), a.data().len(), due.lamports(), a.lamports()/(due.lamports().max(1)));
+            }
+            }});
+        }
+        );
 
         IndexGenerationInfo {
             accounts_data_len: accounts_data_len.load(Ordering::Relaxed),
