@@ -2043,6 +2043,10 @@ pub(crate) struct ShrinkAncientStats {
     pub(crate) slots_considered: AtomicU64,
     pub(crate) ancient_scanned: AtomicU64,
     pub(crate) bytes_ancient_created: AtomicU64,
+    pub(crate) total_alive_bytes: AtomicU64,
+    pub(crate) total_dead_bytes: AtomicU64,
+    pub(crate) total_alive_accounts: AtomicU64,
+    pub(crate) total_dead_accounts: AtomicU64,
 }
 
 #[derive(Debug, Default)]
@@ -2349,6 +2353,26 @@ impl ShrinkAncientStats {
             (
                 "bytes_ancient_created",
                 self.bytes_ancient_created.swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "total_alive_bytes",
+                self.total_alive_bytes.swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "total_dead_bytes",
+                self.total_dead_bytes.swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "total_alive_accounts",
+                self.total_alive_accounts.swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "total_dead_accounts",
+                self.total_dead_accounts.swap(0, Ordering::Relaxed) as i64,
                 i64
             ),
         );

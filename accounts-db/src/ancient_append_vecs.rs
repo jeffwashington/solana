@@ -472,6 +472,26 @@ impl AccountsDb {
 
         for slot in &slots {
             if let Some(storage) = self.storage.get_slot_storage_entry(*slot) {
+                let stats = &self.shrink_ancient_stats;
+
+                // keep track of data for all ancient slots
+                let alive_bytes = storage.alive_bytes() as u64;
+                let alive_accounts = storage.count() as u64;
+                stats
+                    .total_alive_bytes
+                    .fetch_add(alive_bytes, Ordering::Relaxed);
+                stats.total_dead_bytes.fetch_add(
+                    storage.capacity().saturating_sub(alive_bytes),
+                    Ordering::Relaxed,
+                );
+                stats
+                    .total_alive_accounts
+                    .fetch_add(alive_accounts, Ordering::Relaxed);
+                stats.total_dead_accounts.fetch_add(
+                    (storage.approx_stored_count() as u64).saturating_sub(alive_accounts),
+                    Ordering::Relaxed,
+                );
+
                 if infos.add(*slot, storage, can_randomly_shrink) {
                     randoms += 1;
                 }
