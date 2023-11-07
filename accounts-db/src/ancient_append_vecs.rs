@@ -152,8 +152,14 @@ impl AncientSlotInfos {
         let mut i = 0;
         datapoint_info!("shrink_ancient_stats", ("total_alive_bytes_shrink", self.total_alive_bytes_shrink, i64));
         let mut wrote = false;
+        log::error!("jw_shrink_ancient:start");
         for info_index in &self.shrink_indexes {
             let info = &mut self.all_infos[*info_index];
+            let storage = &info.storage;
+            // keep track of data for all ancient slots
+            let alive_bytes = storage.alive_bytes() as u64;
+            let alive_accounts = storage.count() as u64;
+            log::error!("jw_shrink_ancient:{},{},{},{},{},{},{}", info.slot, alive_bytes, storage.capacity().wrapping_sub(alive_bytes), alive_accounts, (storage.approx_stored_count() as u64).wrapping_sub(alive_accounts), storage.capacity(), storage.approx_stored_count());
             if bytes_to_shrink_due_to_ratio >= threshold_bytes {
                 if !wrote {
                     wrote = true;
@@ -485,6 +491,7 @@ impl AccountsDb {
                 // keep track of data for all ancient slots
                 let alive_bytes = storage.alive_bytes() as u64;
                 let alive_accounts = storage.count() as u64;
+                // log::error!("jw_shrink_ancient:{},{},{},{},{},{},{}", slot, alive_bytes, storage.capacity().wrapping_sub(alive_bytes), alive_accounts, (storage.approx_stored_count() as u64).wrapping_sub(alive_accounts), storage.capacity(), storage.approx_stored_count());
                 stats
                     .total_alive_bytes
                     .fetch_add(alive_bytes, Ordering::Relaxed);
