@@ -149,9 +149,16 @@ impl AncientSlotInfos {
         // from slots that exceeded the shrink threshold.
         // The goal is to limit overall i/o in this pass while making progress.
         let threshold_bytes = self.total_alive_bytes_shrink * percent_of_alive_shrunk_data / 100;
+        let mut i = 0;
+        datapoint_info!("shrink_ancient_stats", ("total_alive_bytes_shrink", self.total_alive_bytes_shrink, i64));
+        let mut wrote = false;
         for info_index in &self.shrink_indexes {
             let info = &mut self.all_infos[*info_index];
             if bytes_to_shrink_due_to_ratio >= threshold_bytes {
+                if !wrote {
+                    wrote = true;
+                    datapoint_info!("shrink_ancient_stats", ("alive_bytes_slot_count", i, i64));
+                }
                 // we exceeded the amount to shrink due to alive ratio, so don't shrink this one just due to 'should_shrink'
                 // It MAY be shrunk based on total capacity still.
                 // Mark it as false for 'should_shrink' so it gets evaluated solely based on # of files.
@@ -159,6 +166,7 @@ impl AncientSlotInfos {
             } else {
                 saturating_add_assign!(bytes_to_shrink_due_to_ratio, info.alive_bytes);
             }
+            i += 1;
         }
     }
 
