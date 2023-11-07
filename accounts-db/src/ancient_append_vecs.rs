@@ -372,6 +372,7 @@ impl AccountsDb {
         );
 
         if pack.len() > accounts_to_combine.target_slots_sorted.len() {
+            datapoint_info!("shrink_ancient_stats", ("too_few_slots", 1, i64));
             // Not enough slots to contain the accounts we are trying to pack.
             // `shrink_collect` previously unref'd some accounts. We need to addref them
             // to restore the correct state since we failed to combine anything.
