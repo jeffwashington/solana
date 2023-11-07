@@ -2047,6 +2047,7 @@ pub(crate) struct ShrinkAncientStats {
     pub(crate) total_dead_bytes: AtomicU64,
     pub(crate) total_alive_accounts: AtomicU64,
     pub(crate) total_dead_accounts: AtomicU64,
+    pub(crate) tx_ancient_writable_accounts: AtomicU64,
 }
 
 #[derive(Debug, Default)]
@@ -2348,6 +2349,11 @@ impl ShrinkAncientStats {
             (
                 "total_us",
                 self.total_us.swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "tx_ancient_writable_accounts",
+                self.tx_ancient_writable_accounts.swap(0, Ordering::Relaxed) as i64,
                 i64
             ),
             (
