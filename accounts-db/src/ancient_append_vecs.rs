@@ -634,11 +634,17 @@ impl AccountsDb {
             accounts_per_storage
                 .par_iter()
                 .map(|(info, unique_accounts)| {
-                    self.shrink_collect::<ShrinkCollectAliveSeparatedByRefs<'_>>(
+                    let results = self.shrink_collect::<ShrinkCollectAliveSeparatedByRefs<'_>>(
                         &info.storage,
                         unique_accounts,
                         &self.shrink_ancient_stats.shrink_stats,
-                    )
+                    );
+                    if info.storage.capacity() > 100_000_000 {
+                        let mut unrefed = results.unrefed_pubkeys.iter().collect::<Vec<_>>();
+                        unrefed.sort_unstable();
+                        log::error!("jw_dead2,{},{},{:?}", info.slot, results.unrefed_pubkeys.len(), unrefed.iter().take(20).collect::<Vec<_>>());
+                    }
+                    results
                 })
                 .collect::<Vec<_>>()
         });
