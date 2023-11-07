@@ -350,6 +350,8 @@ impl Accounts {
             .unique()
             .collect::<Vec<&u8>>();
 
+        let ancient_slot = ancestors.max_slot().saturating_sub(432_000);
+
         let mut accounts = account_keys
             .iter()
             .enumerate()
@@ -384,7 +386,7 @@ impl Accounts {
                     } else {
                         self.accounts_db
                             .load_with_fixed_root(ancestors, key)
-                            .map(|(mut account, _)| {
+                            .map(|(mut account, slot)| {
                                 if message.is_writable(i) {
                                     let rent_due = rent_collector
                                         .collect_from_existing_account(
@@ -394,6 +396,12 @@ impl Accounts {
                                             set_exempt_rent_epoch_max,
                                         )
                                         .rent_amount;
+                                    if slot < ancient_slot {
+                                        self.accounts_db
+                                            .shrink_ancient_stats
+                                            .tx_ancient_writable_accounts
+                                            .fetch_add(1, Ordering::Relaxed);
+                                    }
                                     (account.data().len(), account, rent_due)
                                 } else {
                                     (account.data().len(), account, 0)
