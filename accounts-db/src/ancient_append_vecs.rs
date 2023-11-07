@@ -472,6 +472,9 @@ impl AccountsDb {
 
         for slot in &slots {
             if let Some(storage) = self.storage.get_slot_storage_entry(*slot) {
+                self.shrink_ancient_stats
+                    .accumulate_ancient_storage_stats(&storage);
+
                 if infos.add(*slot, storage, can_randomly_shrink) {
                     randoms += 1;
                 }

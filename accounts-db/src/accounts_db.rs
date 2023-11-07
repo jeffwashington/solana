@@ -2043,6 +2043,10 @@ pub(crate) struct ShrinkAncientStats {
     pub(crate) slots_considered: AtomicU64,
     pub(crate) ancient_scanned: AtomicU64,
     pub(crate) bytes_ancient_created: AtomicU64,
+    pub(crate) total_alive_bytes: AtomicU64,
+    pub(crate) total_dead_bytes: AtomicU64,
+    pub(crate) total_alive_accounts: AtomicU64,
+    pub(crate) total_dead_accounts: AtomicU64,
 }
 
 #[derive(Debug, Default)]
@@ -2351,6 +2355,45 @@ impl ShrinkAncientStats {
                 self.bytes_ancient_created.swap(0, Ordering::Relaxed) as i64,
                 i64
             ),
+            (
+                "total_alive_bytes",
+                self.total_alive_bytes.swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "total_dead_bytes",
+                self.total_dead_bytes.swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "total_alive_accounts",
+                self.total_alive_accounts.swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "total_dead_accounts",
+                self.total_dead_accounts.swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+        );
+    }
+
+    /// keep track of data for all ancient slots
+    pub(crate) fn accumulate_ancient_storage_stats(&self, storage: &AccountStorageEntry) {
+        // keep track of data for all ancient slots
+        let alive_bytes = storage.alive_bytes() as u64;
+        let alive_accounts = storage.count() as u64;
+        self.total_alive_bytes
+            .fetch_add(alive_bytes, Ordering::Relaxed);
+        self.total_dead_bytes.fetch_add(
+            storage.capacity().saturating_sub(alive_bytes),
+            Ordering::Relaxed,
+        );
+        self.total_alive_accounts
+            .fetch_add(alive_accounts, Ordering::Relaxed);
+        self.total_dead_accounts.fetch_add(
+            (storage.approx_stored_count() as u64).saturating_sub(alive_accounts),
+            Ordering::Relaxed,
         );
     }
 }
@@ -4565,6 +4608,9 @@ impl AccountsDb {
         self.shrink_ancient_stats
             .slots_considered
             .fetch_add(1, Ordering::Relaxed);
+
+        self.shrink_ancient_stats
+            .accumulate_ancient_storage_stats(storage);
 
         if is_ancient(accounts) {
             self.shrink_ancient_stats
