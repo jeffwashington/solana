@@ -404,6 +404,12 @@ impl Accounts {
                                     }
                                     (account.data().len(), account, rent_due)
                                 } else {
+                                    if slot < ancient_slot {
+                                        self.accounts_db
+                                            .shrink_ancient_stats
+                                            .tx_ancient_readable_accounts
+                                            .fetch_add(1, Ordering::Relaxed);
+                                    }
                                     (account.data().len(), account, 0)
                                 }
                             })
@@ -548,9 +554,16 @@ impl Accounts {
                         builtins_start_index.saturating_add(owner_index)
                     } else {
                         let owner_index = accounts.len();
-                        if let Some((owner_account, _)) =
+                        if let Some((owner_account, slot_loaded)) =
                             self.accounts_db.load_with_fixed_root(ancestors, owner_id)
                         {
+                            if slot_loaded < ancient_slot {
+                                self.accounts_db
+                                    .shrink_ancient_stats
+                                    .tx_ancient_readable_program_accounts
+                                    .fetch_add(1, Ordering::Relaxed);
+                            }
+
                             if disable_builtin_loader_ownership_chains
                                 && !native_loader::check_id(owner_account.owner())
                                 || !owner_account.executable()

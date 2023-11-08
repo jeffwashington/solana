@@ -2048,6 +2048,9 @@ pub(crate) struct ShrinkAncientStats {
     pub(crate) total_alive_accounts: AtomicU64,
     pub(crate) total_dead_accounts: AtomicU64,
     pub(crate) tx_ancient_writable_accounts: AtomicU64,
+    pub(crate) tx_ancient_readable_accounts: AtomicU64,
+    pub(crate) tx_ancient_readable_program_accounts: AtomicU64,
+    pub(crate) attempts_count: AtomicU64,
 }
 
 #[derive(Debug, Default)]
@@ -2206,6 +2209,11 @@ impl ShrinkAncientStats {
         datapoint_info!(
             "shrink_ancient_stats",
             (
+                "attempts_count",
+                self.attempts_count.swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
                 "num_slots_shrunk",
                 self.shrink_stats
                     .num_slots_shrunk
@@ -2349,6 +2357,16 @@ impl ShrinkAncientStats {
             (
                 "total_us",
                 self.total_us.swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "tx_ancient_readable_accounts",
+                self.tx_ancient_readable_accounts.swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "tx_ancient_readable_program_accounts",
+                self.tx_ancient_readable_program_accounts.swap(0, Ordering::Relaxed) as i64,
                 i64
             ),
             (

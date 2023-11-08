@@ -150,7 +150,14 @@ impl AncientSlotInfos {
         // The goal is to limit overall i/o in this pass while making progress.
         let threshold_bytes = self.total_alive_bytes_shrink * percent_of_alive_shrunk_data / 100;
         let mut i = 0;
-        datapoint_info!("shrink_ancient_stats", ("total_alive_bytes_shrink", self.total_alive_bytes_shrink, i64));
+        datapoint_info!(
+            "shrink_ancient_stats",
+            (
+                "total_alive_bytes_shrink",
+                self.total_alive_bytes_shrink,
+                i64
+            )
+        );
         let mut wrote = false;
         log::error!("jw_shrink_ancient:start");
         for info_index in &self.shrink_indexes {
@@ -159,7 +166,16 @@ impl AncientSlotInfos {
             // keep track of data for all ancient slots
             let alive_bytes = storage.alive_bytes() as u64;
             let alive_accounts = storage.count() as u64;
-            log::error!("jw_shrink_ancient:{},{},{},{},{},{},{}", info.slot, alive_bytes, storage.capacity().wrapping_sub(alive_bytes), alive_accounts, (storage.approx_stored_count() as u64).wrapping_sub(alive_accounts), storage.capacity(), storage.approx_stored_count());
+            log::error!(
+                "jw_shrink_ancient:{},{},{},{},{},{},{}",
+                info.slot,
+                alive_bytes,
+                storage.capacity().wrapping_sub(alive_bytes),
+                alive_accounts,
+                (storage.approx_stored_count() as u64).wrapping_sub(alive_accounts),
+                storage.capacity(),
+                storage.approx_stored_count()
+            );
             if bytes_to_shrink_due_to_ratio >= threshold_bytes {
                 if !wrote {
                     wrote = true;
@@ -263,6 +279,10 @@ impl AccountsDb {
         sorted_slots: Vec<Slot>,
         can_randomly_shrink: bool,
     ) {
+        self.shrink_ancient_stats
+            .attempts_count
+            .fetch_add(1, Ordering::Relaxed);
+
         let tuning = PackedAncientStorageTuning {
             // only allow 10k slots old enough to be ancient
             max_ancient_slots: 10_000,
@@ -642,7 +662,12 @@ impl AccountsDb {
                     if info.storage.capacity() > 100_000_000 {
                         let mut unrefed = results.unrefed_pubkeys.iter().collect::<Vec<_>>();
                         unrefed.sort_unstable();
-                        log::error!("jw_dead2,{},{},{:?}", info.slot, results.unrefed_pubkeys.len(), unrefed.iter().take(20).collect::<Vec<_>>());
+                        log::error!(
+                            "jw_dead2,{},{},{:?}",
+                            info.slot,
+                            results.unrefed_pubkeys.len(),
+                            unrefed.iter().take(20).collect::<Vec<_>>()
+                        );
                     }
                     results
                 })
