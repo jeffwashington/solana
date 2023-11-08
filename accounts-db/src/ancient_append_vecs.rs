@@ -46,7 +46,7 @@ struct PackedAncientStorageTuning {
 
 /// info about a storage eligible to be combined into an ancient append vec.
 /// Useful to help sort vecs of storages.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct SlotInfo {
     storage: Arc<AccountStorageEntry>,
     /// slot of storage
@@ -61,7 +61,7 @@ struct SlotInfo {
 
 /// info for all storages in ancient slots
 /// 'all_infos' contains all slots and storages that are ancient
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 struct AncientSlotInfos {
     /// info on all ancient storages
     all_infos: Vec<SlotInfo>,
@@ -165,6 +165,11 @@ impl AncientSlotInfos {
         all.sort_by(|a,b| b.0.cmp(&a.0));
         log::error!("jw_shrink_a_paths:{:?}", all.iter().enumerate().filter(|(i, a)| a.0 > 100_000_000 || i < &10).collect::<Vec<_>>());
 
+        let mut all = self.all_infos.clone();
+        let bkup_shrink_indexes = self.shrink_indexes.clone();
+        self.shrink_indexes = (0..all.len()).collect::<Vec<_>>();
+        self.sort_shrink_indexes_by_bytes_saved();
+
         for info_index in &self.shrink_indexes {
             let info = &mut self.all_infos[*info_index];
             let storage = &info.storage;
@@ -172,15 +177,22 @@ impl AncientSlotInfos {
             let alive_bytes = storage.alive_bytes() as u64;
             let alive_accounts = storage.count() as u64;
             log::error!(
-                "jw_shrink_ancient:{},{},{},{},{},{},{}",
+                "jw_shrink_ancient:{},{},{},{},{},{},{},{}",
                 info.slot,
                 alive_bytes,
                 storage.capacity().wrapping_sub(alive_bytes),
                 alive_accounts,
                 (storage.approx_stored_count() as u64).wrapping_sub(alive_accounts),
                 storage.capacity(),
-                storage.approx_stored_count()
+                storage.approx_stored_count(),
+                info.should_shrink,
             );
+        }
+        self.shrink_indexes = bkup_shrink_indexes;
+
+
+        for info_index in &self.shrink_indexes {
+            let info = &mut self.all_infos[*info_index];
             if bytes_to_shrink_due_to_ratio >= threshold_bytes {
                 if !wrote {
                     wrote = true;
