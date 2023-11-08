@@ -386,7 +386,7 @@ impl Accounts {
                     } else {
                         self.accounts_db
                             .load_with_fixed_root(ancestors, key)
-                            .map(|(mut account, slot)| {
+                            .map(|(mut account, slot_loaded)| {
                                 if message.is_writable(i) {
                                     let rent_due = rent_collector
                                         .collect_from_existing_account(
@@ -396,7 +396,7 @@ impl Accounts {
                                             set_exempt_rent_epoch_max,
                                         )
                                         .rent_amount;
-                                    if slot < ancient_slot {
+                                    if slot_loaded < ancient_slot {
                                         self.accounts_db
                                             .shrink_ancient_stats
                                             .tx_ancient_writable_accounts
@@ -404,11 +404,21 @@ impl Accounts {
                                     }
                                     (account.data().len(), account, rent_due)
                                 } else {
-                                    if slot < ancient_slot {
+                                    if slot_loaded < ancient_slot {
                                         self.accounts_db
                                             .shrink_ancient_stats
                                             .tx_ancient_readable_accounts
                                             .fetch_add(1, Ordering::Relaxed);
+
+                                        if !self.accounts_db.read_only_accounts_cache.in_cache(key, slot_loaded) {
+                                    
+                                            self.accounts_db
+                                            .shrink_ancient_stats
+                                            .tx_ancient_readable_accounts_not_in_cache
+                                            .fetch_add(1, Ordering::Relaxed);
+        
+                                        }
+        
                                     }
                                     (account.data().len(), account, 0)
                                 }

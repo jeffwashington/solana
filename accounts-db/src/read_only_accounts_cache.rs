@@ -57,7 +57,7 @@ impl ReadOnlyCacheStats {
 }
 
 #[derive(Debug)]
-pub(crate) struct ReadOnlyAccountsCache {
+pub struct ReadOnlyAccountsCache {
     cache: DashMap<ReadOnlyCacheKey, ReadOnlyAccountCacheEntry>,
     /// When an item is first entered into the cache, it is added to the end of
     /// the queue. Also each time an entry is looked up from the cache it is

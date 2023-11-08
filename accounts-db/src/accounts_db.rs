@@ -1489,7 +1489,7 @@ pub struct AccountsDb {
     write_cache_limit_bytes: Option<u64>,
 
     sender_bg_hasher: Option<Sender<CachedAccount>>,
-    read_only_accounts_cache: ReadOnlyAccountsCache,
+    pub read_only_accounts_cache: ReadOnlyAccountsCache,
 
     recycle_stores: RwLock<RecycleStores>,
 
@@ -2050,6 +2050,7 @@ pub(crate) struct ShrinkAncientStats {
     pub(crate) tx_ancient_writable_accounts: AtomicU64,
     pub(crate) tx_ancient_readable_accounts: AtomicU64,
     pub(crate) tx_ancient_readable_program_accounts: AtomicU64,
+    pub(crate) tx_ancient_readable_accounts_not_in_cache: AtomicU64,
     pub(crate) attempts_count: AtomicU64,
 }
 
@@ -2362,6 +2363,12 @@ impl ShrinkAncientStats {
             (
                 "tx_ancient_readable_accounts",
                 self.tx_ancient_readable_accounts.swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            
+            (
+                "tx_ancient_readable_accounts_not_in_cache",
+                self.tx_ancient_readable_accounts_not_in_cache.swap(0, Ordering::Relaxed) as i64,
                 i64
             ),
             (
