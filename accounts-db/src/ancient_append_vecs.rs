@@ -85,8 +85,6 @@ impl AncientSlotInfos {
     ) -> bool {
         let mut was_randomly_shrunk = false;
         let alive_bytes = storage.alive_bytes() as u64;
-        let mut highest_dead_accounts_non_shrinkable_count = 1000;
-        let mut highest_dead_accounts_non_shrinkable = None;
         if alive_bytes > 0 {
             let capacity = storage.accounts.capacity();
             let should_shrink = if capacity > 0 {
@@ -111,13 +109,6 @@ impl AncientSlotInfos {
                 saturating_add_assign!(self.total_alive_bytes_shrink, alive_bytes);
                 self.shrink_indexes.push(self.all_infos.len());
             }
-            else {
-                let dead_accounts = storage.approx_stored_count().saturating_sub(storage.count());
-                if dead_accounts > highest_dead_accounts_non_shrinkable_count {
-                    highest_dead_accounts_non_shrinkable_count = dead_accounts;
-                    highest_dead_accounts_non_shrinkable = Some(self.all_infos.len());
-                }
-            }
             self.all_infos.push(SlotInfo {
                 slot,
                 capacity,
@@ -126,9 +117,6 @@ impl AncientSlotInfos {
                 should_shrink,
             });
             saturating_add_assign!(self.total_alive_bytes, alive_bytes);
-        }
-        if let Some(highest) = highest_dead_accounts_non_shrinkable {
-            self.shrink_indexes.push(highest);
         }
         was_randomly_shrunk
     }
@@ -546,6 +534,9 @@ impl AccountsDb {
         };
         let mut randoms = 0;
 
+        let mut highest_dead_accounts_non_shrinkable_count = 1000;
+        let mut highest_dead_accounts_non_shrinkable = None;
+
         for slot in &slots {
             if let Some(storage) = self.storage.get_slot_storage_entry(*slot) {
                 self.shrink_ancient_stats
@@ -554,8 +545,21 @@ impl AccountsDb {
                 if infos.add(*slot, storage, can_randomly_shrink) {
                     randoms += 1;
                 }
+                else {
+                    let storage2 = infos.all_infos.last().unwrap();
+                    let storage = &storage2.storage;
+                    let dead_accounts = storage.approx_stored_count().saturating_sub(storage.count());
+                    if dead_accounts > highest_dead_accounts_non_shrinkable_count {
+                        highest_dead_accounts_non_shrinkable_count = dead_accounts;
+                        highest_dead_accounts_non_shrinkable = Some(infos.all_infos.len() - 1);
+                    }
+                }
             }
         }
+        if let Some(highest) = highest_dead_accounts_non_shrinkable {
+            infos.shrink_indexes.push(highest);
+        }
+
         if randoms > 0 {
             self.shrink_ancient_stats
                 .random_shrink
