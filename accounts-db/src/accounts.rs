@@ -401,6 +401,13 @@ impl Accounts {
                                             .shrink_ancient_stats
                                             .tx_ancient_writable_accounts
                                             .fetch_add(1, Ordering::Relaxed);
+
+                                        if !self.accounts_db.read_only_accounts_cache.in_cache(key, slot_loaded) {
+                                            self.accounts_db
+                                                .shrink_ancient_stats
+                                                .tx_ancient_writable_accounts_not_in_cache
+                                                .fetch_add(1, Ordering::Relaxed);
+                                        }
                                     }
                                     (account.data().len(), account, rent_due)
                                 } else {
