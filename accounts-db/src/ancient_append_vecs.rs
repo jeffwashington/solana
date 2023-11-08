@@ -546,17 +546,24 @@ impl AccountsDb {
                     randoms += 1;
                 }
                 else {
-                    let storage2 = infos.all_infos.last().unwrap();
-                    let storage = &storage2.storage;
-                    let dead_accounts = storage.approx_stored_count().saturating_sub(storage.count());
-                    if dead_accounts > highest_dead_accounts_non_shrinkable_count {
-                        highest_dead_accounts_non_shrinkable_count = dead_accounts;
-                        highest_dead_accounts_non_shrinkable = Some(infos.all_infos.len() - 1);
+                    let i = infos.all_infos.len() - 1;
+                    if infos.shrink_indexes.last() != Some(&i) {
+                        // we don't think we need to shrink this one
+                        // But, it may contain the most dead accounts.
+                        let storage2 = infos.all_infos.last().unwrap();
+                        let storage = &storage2.storage;
+                        let dead_accounts = storage.approx_stored_count().saturating_sub(storage.count());
+                        if dead_accounts > highest_dead_accounts_non_shrinkable_count {
+                            highest_dead_accounts_non_shrinkable_count = dead_accounts;
+                            highest_dead_accounts_non_shrinkable = Some(i);
+                        }
                     }
                 }
             }
         }
         if let Some(highest) = highest_dead_accounts_non_shrinkable {
+            log::error!("jw_shrink_ancient:adding highest: {}, # dead accounts {}", infos.all_infos[highest].slot, highest_dead_accounts_non_shrinkable_count);
+            infos.all_infos[highest].should_shrink = true;
             infos.shrink_indexes.push(highest);
         }
 
