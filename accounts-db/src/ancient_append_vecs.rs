@@ -1026,12 +1026,13 @@ impl<'a> AccountsToStore<'a> {
 
 /// capacity of an ancient append vec
 pub fn get_ancient_append_vec_capacity() -> u64 {
+    const PAGE_SIZE: u64 = 4 * 1024;
     use crate::append_vec::MAXIMUM_APPEND_VEC_FILE_SIZE;
-    // smaller than max by a bit just in case
-    // some functions add slop on allocation
-    // The bigger an append vec is, the more unwieldy it becomes to shrink, create, write.
-    // 1/10 of max is a reasonable size in practice.
-    MAXIMUM_APPEND_VEC_FILE_SIZE / 10 - 2048
+
+    // 134217728 bytes
+    let result = PAGE_SIZE * 32768;
+    assert!(result < MAXIMUM_APPEND_VEC_FILE_SIZE);
+    result
 }
 
 /// is this a max-size append vec designed to be used as an ancient append vec?
