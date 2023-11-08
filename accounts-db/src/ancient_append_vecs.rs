@@ -160,6 +160,11 @@ impl AncientSlotInfos {
         );
         let mut wrote = false;
         log::error!("jw_shrink_ancient:start");
+
+        let mut all = self.all_infos.iter().map(|info| (info.capacity, info.storage.accounts.get_path(), info.slot)).collect::<Vec<_>>();
+        all.sort_by(|a,b| b.0.cmp(&a.0));
+        log::error!("jw_shrink_a_paths:{:?}", all.iter().enumerate().filter(|(i, a)| a.0 > 100_000_000 || i < &10).collect::<Vec<_>>());
+
         for info_index in &self.shrink_indexes {
             let info = &mut self.all_infos[*info_index];
             let storage = &info.storage;
