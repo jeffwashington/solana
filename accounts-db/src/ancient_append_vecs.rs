@@ -170,24 +170,37 @@ impl AncientSlotInfos {
         self.shrink_indexes = (0..all.len()).collect::<Vec<_>>();
         self.sort_shrink_indexes_by_bytes_saved();
 
+        let mut biggest = 0;
+        let mut most_dead_accounts = 0;
+
         for info_index in &self.shrink_indexes {
             let info = &mut self.all_infos[*info_index];
             let storage = &info.storage;
             // keep track of data for all ancient slots
             let alive_bytes = storage.alive_bytes() as u64;
             let alive_accounts = storage.count() as u64;
+            let dead_accounts = (storage.approx_stored_count() as u64).wrapping_sub(alive_accounts);
+            if dead_accounts > most_dead_accounts {
+                most_dead_accounts = dead_accounts;
+                biggest = *info_index;
+            }
             log::error!(
                 "jw_shrink_ancient:{},{},{},{},{},{},{},{}",
                 info.slot,
                 alive_bytes,
                 storage.capacity().wrapping_sub(alive_bytes),
                 alive_accounts,
-                (storage.approx_stored_count() as u64).wrapping_sub(alive_accounts),
+                dead_accounts,
                 storage.capacity(),
                 storage.approx_stored_count(),
                 info.should_shrink,
             );
         }
+
+        if self.shrink_indexes.len() > 0 {
+            // here, log individual dead pubkeys
+        }
+
         self.shrink_indexes = bkup_shrink_indexes;
 
 

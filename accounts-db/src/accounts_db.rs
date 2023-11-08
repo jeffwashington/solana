@@ -4601,6 +4601,7 @@ impl AccountsDb {
         current_ancient: &mut CurrentAncientAppendVec,
         can_randomly_shrink: bool,
     ) -> Option<Arc<AccountStorageEntry>> {
+        panic!("shouldn't be appending");
         self.storage
             .get_slot_storage_entry(slot)
             .and_then(|storage| {
