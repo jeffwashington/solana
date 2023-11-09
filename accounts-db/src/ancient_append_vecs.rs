@@ -35,8 +35,12 @@ struct PackedAncientStorageTuning {
     /// Doing too much burns too much time and disk i/o.
     /// Doing too little could cause us to never catch up and have old data accumulate.
     percent_of_alive_shrunk_data: u64,
-    /// number of ancient slots we should aim to have. If we have more than this, combine further.
-    max_ancient_slots: usize,
+    /// max number of ancient slots the system can allow. If we have more than this, combine further (until we're sufficiently below this # (80%)).
+    /// This is an upper bound on what the system can support
+    max_total_ancient_slots: usize,
+    /// when we exceed this number of small ancient slots, combine to something below this number (like half).
+    /// This allows continuous small progress.
+    max_small_ancient_slots: usize,
     /// # of bytes in an ideal ancient storage size
     ideal_storage_size: NonZeroU64,
     /// true if storages can be randomly shrunk even if they aren't eligible
@@ -127,7 +131,7 @@ impl AncientSlotInfos {
         // 1. should_shrink: largest bytes saved above some cutoff of ratio
         self.choose_storages_to_shrink(tuning.percent_of_alive_shrunk_data);
         // 2. smallest files so we get the largest number of files to remove
-        self.filter_by_smallest_capacity(tuning.max_ancient_slots, tuning.ideal_storage_size);
+        self.filter_by_smallest_capacity(tuning);
     }
 
     // sort 'shrink_indexes' by most bytes saved, highest to lowest
@@ -187,12 +191,7 @@ impl AncientSlotInfos {
             let ancient_storages_required = (cumulative_bytes / ideal_storage_size + 1) as usize;
             let storages_remaining = total_storages - i - 1;
 
-            // if the remaining uncombined storages and the # of resulting
-            // combined ancient storages is less than the threshold, then
-            // we've gone too far, so get rid of this entry and all after it.
-            // Every storage after this one is larger.
-            let low_water_mark_offset = max_storages / 2;
-            if storages_remaining + ancient_storages_required + low_water_mark_offset < max_storages
+            if storages_remaining + ancient_storages_required < max_storages
             {
                 log::error!(
                     "ancient_append_vecs_packed: {}, would truncate to {}, bytes: {}, len: {}",
@@ -224,9 +223,28 @@ impl AncientSlotInfos {
     /// Combining too many storages costs i/o and cpu so the goal is to find the sweet spot so
     /// that we make progress in cleaning/shrinking/combining but that we don't cause unnecessary
     /// churn.
-    fn filter_by_smallest_capacity(&mut self, max_storages: usize, ideal_storage_size: NonZeroU64) {
+    fn filter_by_smallest_capacity(&mut self, tuning: &PackedAncientStorageTuning) {
         let total_storages = self.all_infos.len();
-        if total_storages <= max_storages {
+        let mut done = total_storages < tuning.max_small_ancient_slots;
+
+        let mut max_storages = 0;
+        if !done {
+            // now, check small and overall
+            let small_size = u64::from(tuning.ideal_storage_size) / 10;
+            let total_small_storages = self.all_infos.iter().filter(|info| info.capacity < small_size).count();
+            if total_storages > tuning.max_total_ancient_slots {
+                // limit that applies is the overall max, so pack to be under that limit
+                max_storages = tuning.max_total_ancient_slots.saturating_sub(tuning.max_small_ancient_slots);
+            }
+            else if total_small_storages < tuning.max_small_ancient_slots {
+                done = true;
+            }
+            else {
+                // limit that applies is the small storage limit
+                max_storages = tuning.max_small_ancient_slots / 2;
+            }
+        }
+        if done {
             // currently fewer storages than max, so nothing to shrink
             self.shrink_indexes.clear();
             self.all_infos.clear();
@@ -243,7 +261,7 @@ impl AncientSlotInfos {
 
         // remove any storages we don't need to combine this pass to achieve
         // # resulting storages <= 'max_storages'
-        self.truncate_to_max_storages(max_storages, ideal_storage_size);
+        self.truncate_to_max_storages(max_storages, tuning.ideal_storage_size);
     }
 }
 
@@ -269,8 +287,10 @@ impl AccountsDb {
         can_randomly_shrink: bool,
     ) {
         let tuning = PackedAncientStorageTuning {
-            // only allow 10k slots old enough to be ancient
-            max_ancient_slots: 10_000,
+            // only allow 50k slots old enough to be ancient
+            max_total_ancient_slots: 50_000,
+            // only allow 50k slots old enough to be ancient
+            max_small_ancient_slots: 2_000,
             // re-combine/shrink 55% of the data savings this pass
             percent_of_alive_shrunk_data: 55,
             ideal_storage_size: NonZeroU64::new(get_ancient_append_vec_capacity()).unwrap(),
