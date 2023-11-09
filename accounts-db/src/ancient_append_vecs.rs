@@ -184,8 +184,9 @@ impl AncientSlotInfos {
                 most_dead_accounts = dead_accounts;
                 biggest = *info_index;
             }
+            let sorted_location = bkup_shrink_indexes.iter().position(|i| i == info_index).unwrap_or(bkup_shrink_indexes.len() + *info_index);
             log::error!(
-                "jw_shrink_ancient:{},{},{},{},{},{},{},{}",
+                "jw_shrink_ancient:{},{},{},{},{},{},{},{},{}",
                 info.slot,
                 alive_bytes,
                 storage.capacity().wrapping_sub(alive_bytes),
@@ -194,6 +195,7 @@ impl AncientSlotInfos {
                 storage.capacity(),
                 storage.approx_stored_count(),
                 info.should_shrink,
+                sorted_location,
             );
         }
 
@@ -280,11 +282,14 @@ impl AncientSlotInfos {
             return;
         }
 
-        // sort by 'should_shrink' then smallest capacity to largest
+        // sort by 'should_shrink', then smallest capacity to largest, then smallest alive bytes to largest
+        // So, we get all the ones we should shrink first, then we try to remove the most slots by removing the smallest files.
+        // We prefer the smallest files with the least alive bytes so that we save the most space.
         self.all_infos.sort_unstable_by(|l, r| {
             r.should_shrink
                 .cmp(&l.should_shrink)
                 .then_with(|| l.capacity.cmp(&r.capacity))
+                .then_with(|| l.alive_bytes.cmp(&r.alive_bytes))
         });
 
         // remove any storages we don't need to combine this pass to achieve
@@ -1034,7 +1039,7 @@ pub fn get_ancient_append_vec_capacity() -> u64 {
     const PAGE_SIZE: u64 = 4 * 1024;
     use crate::append_vec::MAXIMUM_APPEND_VEC_FILE_SIZE;
 
-    // 134217728 bytes
+    // 134,217,728 bytes
     let result = PAGE_SIZE * 32768;
     assert!(result < MAXIMUM_APPEND_VEC_FILE_SIZE);
     result
