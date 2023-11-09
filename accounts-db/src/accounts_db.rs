@@ -5692,6 +5692,7 @@ impl AccountsDb {
         }
 
         if !is_cached {
+
             /*
             We show this store into the read-only cache for account 'A' and future loads of 'A' from the read-only cache are
             safe/reflect 'A''s latest state on this fork.
@@ -5704,6 +5705,9 @@ impl AccountsDb {
             However, by the assumption for contradiction above ,  'A' has already been updated in 'S' which means '(S, A)'
             must exist in the write cache, which is a contradiction.
             */
+            if slot < self.accounts_index.roots_tracker.read().unwrap().alive_roots.max_exclusive().saturating_sub(432_000) {
+                self.shrink_ancient_stats.tx_ancient_readable_accounts_not_in_cache.fetch_add(1, Ordering::Relaxed);
+            }
             self.read_only_accounts_cache
                 .store(*pubkey, slot, account.clone());
         }
