@@ -1351,7 +1351,7 @@ impl Accounts {
                             / range)
                         / 100000
                         + 100)
-                        .min(0);
+                        .min(1000);
                     for _duplicates in 0..num_duplicates {
                         // only add this if it doesn't already exist in the index
                         let mut hasher = Hasher::default();
