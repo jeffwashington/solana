@@ -191,8 +191,7 @@ impl AncientSlotInfos {
             let ancient_storages_required = (cumulative_bytes / ideal_storage_size + 1) as usize;
             let storages_remaining = total_storages - i - 1;
 
-            if storages_remaining + ancient_storages_required < max_storages
-            {
+            if storages_remaining + ancient_storages_required < max_storages {
                 log::error!(
                     "ancient_append_vecs_packed: {}, would truncate to {}, bytes: {}, len: {}",
                     line!(),
@@ -231,15 +230,19 @@ impl AncientSlotInfos {
         if !done {
             // now, check small and overall
             let small_size = u64::from(tuning.ideal_storage_size) / 10;
-            let total_small_storages = self.all_infos.iter().filter(|info| info.capacity < small_size).count();
+            let total_small_storages = self
+                .all_infos
+                .iter()
+                .filter(|info| info.capacity < small_size)
+                .count();
             if total_storages > tuning.max_total_ancient_slots {
                 // limit that applies is the overall max, so pack to be under that limit
-                max_storages = tuning.max_total_ancient_slots.saturating_sub(tuning.max_small_ancient_slots);
-            }
-            else if total_small_storages < tuning.max_small_ancient_slots {
+                max_storages = tuning
+                    .max_total_ancient_slots
+                    .saturating_sub(tuning.max_small_ancient_slots);
+            } else if total_small_storages < tuning.max_small_ancient_slots {
                 done = true;
-            }
-            else {
+            } else {
                 // limit that applies is the small storage limit
                 max_storages = tuning.max_small_ancient_slots / 2;
             }
@@ -456,8 +459,6 @@ impl AccountsDb {
         slots: Vec<Slot>,
         tuning: &PackedAncientStorageTuning,
     ) -> AncientSlotInfos {
-        assert!(!tuning.can_randomly_shrink);
-
         let mut ancient_slot_infos = self.calc_ancient_slot_info(slots, tuning.can_randomly_shrink);
 
         ancient_slot_infos.filter_ancient_slots(tuning);
@@ -508,7 +509,6 @@ impl AccountsDb {
             all_infos: Vec::with_capacity(len),
             ..AncientSlotInfos::default()
         };
-        assert!(!can_randomly_shrink);
         let mut randoms = 0;
 
         log::error!(
