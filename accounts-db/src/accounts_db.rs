@@ -498,7 +498,6 @@ impl AncientSlotPubkeys {
 pub(crate) struct ShrinkCollect<'a, T: ShrinkCollectRefs<'a>> {
     pub(crate) slot: Slot,
     pub(crate) capacity: u64,
-    pub(crate) aligned_total_bytes: u64,
     pub(crate) unrefed_pubkeys: Vec<&'a Pubkey>,
     pub(crate) alive_accounts: T,
     /// total size in storage of all alive accounts
@@ -4152,7 +4151,6 @@ impl AccountsDb {
         ShrinkCollect {
             slot,
             capacity: *capacity,
-            aligned_total_bytes,
             unrefed_pubkeys,
             alive_accounts,
             alive_total_bytes,
@@ -4219,7 +4217,7 @@ impl AccountsDb {
             self.shrink_collect::<AliveAccounts<'_>>(store, &unique_accounts, &self.shrink_stats);
 
         // This shouldn't happen if alive_bytes/approx_stored_count are accurate
-        if Self::should_not_shrink(shrink_collect.aligned_total_bytes, shrink_collect.capacity) {
+        if Self::should_not_shrink(shrink_collect.alive_total_bytes as u64, shrink_collect.capacity) {
             self.shrink_stats
                 .skipped_shrink
                 .fetch_add(1, Ordering::Relaxed);
@@ -4235,20 +4233,19 @@ impl AccountsDb {
 
         let total_accounts_after_shrink = shrink_collect.alive_accounts.len();
         debug!(
-            "shrinking: slot: {}, accounts: ({} => {}) bytes: ({} ; aligned to: {}) original: {}",
+            "shrinking: slot: {}, accounts: ({} => {}) bytes: {} original: {}",
             slot,
             shrink_collect.total_starting_accounts,
             total_accounts_after_shrink,
             shrink_collect.alive_total_bytes,
-            shrink_collect.aligned_total_bytes,
             shrink_collect.capacity,
         );
 
         let mut stats_sub = ShrinkStatsSub::default();
         let mut rewrite_elapsed = Measure::start("rewrite_elapsed");
-        if shrink_collect.aligned_total_bytes > 0 {
+        if shrink_collect.alive_total_bytes > 0 {
             let (shrink_in_progress, time_us) =
-                measure_us!(self.get_store_for_shrink(slot, shrink_collect.aligned_total_bytes));
+                measure_us!(self.get_store_for_shrink(slot, shrink_collect.alive_total_bytes as u64));
             stats_sub.create_and_insert_store_elapsed_us = time_us;
 
             // here, we're writing back alive_accounts. That should be an atomic operation
