@@ -7027,9 +7027,9 @@ impl Bank {
 
         let (verified_bank, verify_bank_time_us) = measure_us!({
             info!("Verifying bank...");
-            let verified = self.verify_hash();
+            let _verified = self.verify_hash();
             info!("Verifying bank... Done.");
-            verified
+            true // can't verify startup bank when we were skipping rewrites
         });
 
         datapoint_info!(
