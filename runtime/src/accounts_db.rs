@@ -1922,6 +1922,7 @@ pub(crate) struct ShrinkAncientStats {
     pub(crate) slots_considered: AtomicU64,
     pub(crate) ancient_scanned: AtomicU64,
     pub(crate) second_pass_one_ref: AtomicU64,
+    pub(crate) num_calls: AtomicU64,
 }
 
 #[derive(Debug, Default)]
@@ -2078,6 +2079,11 @@ impl ShrinkAncientStats {
                     self.shrink_stats
                         .num_slots_shrunk
                         .swap(0, Ordering::Relaxed) as i64,
+                    i64
+                ),
+                (
+                    "num_calls",
+                    self.num_calls.swap(0, Ordering::Relaxed) as i64,
                     i64
                 ),
                 (
@@ -4432,6 +4438,7 @@ impl AccountsDb {
         if sorted_slots.is_empty() {
             return;
         }
+        self.shrink_ancient_stats.num_calls.fetch_add(1, Ordering::Relaxed);
         let mut guard = None;
 
         // the ancient append vec currently being written to
@@ -7778,7 +7785,7 @@ impl AccountsDb {
             .into_iter()
             .collect::<HashMap<Pubkey, Hash>>();
 
-        hashes.iter().for_each(|(k, h)| {
+        hashes.iter().for_each(|(k, _h)| {
             skipped_rewrites.remove(k);
         });
         hashes.extend(skipped_rewrites.into_iter());
