@@ -398,7 +398,8 @@ impl CurrentAncientAppendVec {
             previous_available.saturating_sub(self.append_vec().accounts.remaining_bytes());
         assert_eq!(
             bytes_written,
-            accounts_to_store.get_bytes(storage_selector) as u64
+            accounts_to_store.get_bytes(storage_selector) as u64,
+            "{},{},{}", previous_available, self.append_vec().accounts.remaining_bytes(), self.append_vec().capacity(),
         );
 
         (timing, bytes_written)

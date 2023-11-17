@@ -327,7 +327,7 @@ impl AppendVec {
 
     /// how many more bytes can be stored in this append vec
     pub fn remaining_bytes(&self) -> u64 {
-        (self.capacity()).saturating_sub(self.len() as u64)
+        (self.capacity()).saturating_sub(u64_align!(self.len()) as u64)
     }
 
     pub fn len(&self) -> usize {
@@ -648,6 +648,7 @@ impl AppendVec {
 pub mod tests {
     use {
         super::{test_utils::*, *},
+        crate::accounts_db::INCLUDE_SLOT_IN_HASH_TESTS,
         assert_matches::assert_matches,
         memoffset::offset_of,
         rand::{thread_rng, Rng},
@@ -737,18 +738,19 @@ pub mod tests {
     #[should_panic(expected = "accounts.has_hash_and_write_version()")]
     fn test_storable_accounts_with_hashes_and_write_versions_new() {
         let account = AccountSharedData::default();
-        // for (Slot, &'a [(&'a Pubkey, &'a T)])
+        // for (Slot, &'a [(&'a Pubkey, &'a T)], IncludeSlotInHash)
         let slot = 0 as Slot;
         let pubkey = Pubkey::default();
         StorableAccountsWithHashesAndWriteVersions::<'_, '_, _, _, &AccountHash>::new(&(
             slot,
             &[(&pubkey, &account)][..],
+            INCLUDE_SLOT_IN_HASH_TESTS,
         ));
     }
 
     fn test_mismatch(correct_hashes: bool, correct_write_versions: bool) {
         let account = AccountSharedData::default();
-        // for (Slot, &'a [(&'a Pubkey, &'a T)])
+        // for (Slot, &'a [(&'a Pubkey, &'a T)], IncludeSlotInHash)
         let slot = 0 as Slot;
         let pubkey = Pubkey::default();
         // mismatch between lens of accounts, hashes, write_versions
@@ -761,7 +763,7 @@ pub mod tests {
             write_versions.push(0);
         }
         StorableAccountsWithHashesAndWriteVersions::new_with_hashes_and_write_versions(
-            &(slot, &[(&pubkey, &account)][..]),
+            &(slot, &[(&pubkey, &account)][..], INCLUDE_SLOT_IN_HASH_TESTS),
             hashes,
             write_versions,
         );
@@ -793,7 +795,7 @@ pub mod tests {
 
     #[test]
     fn test_storable_accounts_with_hashes_and_write_versions_empty() {
-        // for (Slot, &'a [(&'a Pubkey, &'a T)])
+        // for (Slot, &'a [(&'a Pubkey, &'a T)], IncludeSlotInHash)
         let account = AccountSharedData::default();
         let slot = 0 as Slot;
         let pubkeys = [Pubkey::default()];
@@ -801,7 +803,7 @@ pub mod tests {
         let write_versions = Vec::default();
         let mut accounts = vec![(&pubkeys[0], &account)];
         accounts.clear();
-        let accounts2 = (slot, &accounts[..]);
+        let accounts2 = (slot, &accounts[..], INCLUDE_SLOT_IN_HASH_TESTS);
         let storable =
             StorableAccountsWithHashesAndWriteVersions::new_with_hashes_and_write_versions(
                 &accounts2,
@@ -814,7 +816,7 @@ pub mod tests {
 
     #[test]
     fn test_storable_accounts_with_hashes_and_write_versions_hash_and_write_version() {
-        // for (Slot, &'a [(&'a Pubkey, &'a T)])
+        // for (Slot, &'a [(&'a Pubkey, &'a T)], IncludeSlotInHash)
         let account = AccountSharedData::default();
         let slot = 0 as Slot;
         let pubkeys = [Pubkey::from([5; 32]), Pubkey::from([6; 32])];
@@ -824,7 +826,7 @@ pub mod tests {
         ];
         let write_versions = vec![42, 43];
         let accounts = [(&pubkeys[0], &account), (&pubkeys[1], &account)];
-        let accounts2 = (slot, &accounts[..]);
+        let accounts2 = (slot, &accounts[..], INCLUDE_SLOT_IN_HASH_TESTS);
         let storable =
             StorableAccountsWithHashesAndWriteVersions::new_with_hashes_and_write_versions(
                 &accounts2,
@@ -849,13 +851,13 @@ pub mod tests {
             ..Account::default()
         }
         .to_account_shared_data();
-        // for (Slot, &'a [(&'a Pubkey, &'a T)])
+        // for (Slot, &'a [(&'a Pubkey, &'a T)], IncludeSlotInHash)
         let slot = 0 as Slot;
         let pubkey = Pubkey::default();
         let hashes = vec![AccountHash(Hash::default())];
         let write_versions = vec![0];
         let accounts = [(&pubkey, &account)];
-        let accounts2 = (slot, &accounts[..]);
+        let accounts2 = (slot, &accounts[..], INCLUDE_SLOT_IN_HASH_TESTS);
         let storable =
             StorableAccountsWithHashesAndWriteVersions::new_with_hashes_and_write_versions(
                 &accounts2,
@@ -872,9 +874,9 @@ pub mod tests {
             ..Account::default()
         }
         .to_account_shared_data();
-        // for (Slot, &'a [(&'a Pubkey, &'a T)])
+        // for (Slot, &'a [(&'a Pubkey, &'a T)], IncludeSlotInHash)
         let accounts = [(&pubkey, &account)];
-        let accounts2 = (slot, &accounts[..]);
+        let accounts2 = (slot, &accounts[..], INCLUDE_SLOT_IN_HASH_TESTS);
         let storable =
             StorableAccountsWithHashesAndWriteVersions::new_with_hashes_and_write_versions(
                 &accounts2,
