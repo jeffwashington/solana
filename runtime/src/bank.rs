@@ -7555,6 +7555,9 @@ impl Bank {
             }
         });
 
+        self.rc.accounts.accounts_db.shrink_ancient_slots(self.epoch_schedule());
+        panic!("done");
+
         let (verified_accounts, verify_accounts_time_us) = measure_us!({
             let should_verify_accounts = !self.rc.accounts.accounts_db.skip_initial_hash_calc;
             if should_verify_accounts {
@@ -7583,7 +7586,7 @@ impl Bank {
         });
 
         let (verified_bank, verify_bank_time_us) = measure_us!({
-            let should_verify_bank = !self
+            let should_verify_bank = false && !self
                 .rc
                 .accounts
                 .accounts_db
