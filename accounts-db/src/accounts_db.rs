@@ -4532,7 +4532,7 @@ impl AccountsDb {
         can_randomly_shrink: bool,
     ) -> bool {
         let accounts = &storage.accounts;
-
+        log::error!("jw:{},{},{},{}", slot, storage.capacity(), storage.alive_bytes(), storage.accounts.len());
         self.shrink_ancient_stats
             .slots_considered
             .fetch_add(1, Ordering::Relaxed);
