@@ -198,9 +198,9 @@ impl AncientSlotInfos {
             }
         }
         log::error!("ancient_append_vecs_packed: {}, {}, bytes: {}", line!(), self.all_infos.len(), cumulative_bytes);
-        if self.all_infos.len() > max_slots {
-            self.all_infos.truncate(max_slots);
-        }
+        // if self.all_infos.len() > max_slots {
+        //     self.all_infos.truncate(max_slots);
+        // }
    }
 
     /// remove entries from 'all_infos' such that combining
@@ -1008,6 +1008,7 @@ pub const fn get_ancient_append_vec_capacity() -> u64 {
 
     RESULT
 }
+
 
 /// is this a max-size append vec designed to be used as an ancient append vec?
 pub fn is_ancient(storage: &AccountsFile) -> bool {
