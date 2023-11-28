@@ -182,7 +182,6 @@ impl AncientSlotInfos {
         let total_storages = self.all_infos.len();
         let mut cumulative_bytes = 0u64;
 
-        let max_slots = 300;
         for (i, info) in self.all_infos.iter().enumerate() {
             saturating_add_assign!(cumulative_bytes, info.alive_bytes);
             let ancient_storages_required = (cumulative_bytes / ideal_storage_size + 1) as usize;
@@ -192,16 +191,28 @@ impl AncientSlotInfos {
             // we've gone too far, so get rid of this entry and all after it.
             // Every storage after this one is larger
             if storages_remaining + ancient_storages_required < max_storages {
-                log::error!("ancient_append_vecs_packed: {}, would truncate to {}, bytes: {}, len: {}", line!(), i, cumulative_bytes, self.all_infos.len());
-                self.all_infos.truncate(i.min(max_slots));
+                log::error!(
+                    "ancient_append_vecs_packed: {}, would truncate to {}, bytes: {}, len: {}",
+                    line!(),
+                    i,
+                    cumulative_bytes,
+                    self.all_infos.len()
+                );
+                self.all_infos.truncate(i);
                 break;
             }
         }
-        log::error!("ancient_append_vecs_packed: {}, {}, bytes: {}", line!(), self.all_infos.len(), cumulative_bytes);
+        log::error!(
+            "ancient_append_vecs_packed: {}, {}, bytes: {}",
+            line!(),
+            self.all_infos.len(),
+            cumulative_bytes
+        );
+        // let max_slots = 300;
         // if self.all_infos.len() > max_slots {
         //     self.all_infos.truncate(max_slots);
         // }
-   }
+    }
 
     /// remove entries from 'all_infos' such that combining
     /// the remaining entries into storages of 'ideal_storage_size'
@@ -490,7 +501,11 @@ impl AccountsDb {
         };
         let mut randoms = 0;
 
-        log::error!("ancient_append_vecs_packed: {}, adding: {}", line!(), slots.len());
+        log::error!(
+            "ancient_append_vecs_packed: {}, adding: {}",
+            line!(),
+            slots.len()
+        );
         let mut too_big = 0;
         for slot in &slots {
             if let Some(storage) = self.storage.get_slot_storage_entry(*slot) {
@@ -507,7 +522,11 @@ impl AccountsDb {
                 }
             }
         }
-        log::error!("ancient_append_vecs_packed: {}, too big: {}", line!(), too_big);
+        log::error!(
+            "ancient_append_vecs_packed: {}, too big: {}",
+            line!(),
+            too_big
+        );
         if randoms > 0 {
             self.shrink_ancient_stats
                 .random_shrink
@@ -606,18 +625,24 @@ impl AccountsDb {
         metrics: &mut ShrinkStatsSub,
     ) {
         let mut dropped_roots = Vec::with_capacity(accounts_to_combine.accounts_to_combine.len());
-        log::error!("ancient_append_vecs_packed: {}, finish_combine: {}, shrinks in progress: {}", line!(), accounts_to_combine.accounts_to_combine.len(), self
-        .storage
-        .shrink_in_progress_map.len());
+        log::error!(
+            "ancient_append_vecs_packed: {}, finish_combine: {}, shrinks in progress: {}",
+            line!(),
+            accounts_to_combine.accounts_to_combine.len(),
+            self.storage.shrink_in_progress_map.len()
+        );
         for shrink_collect in accounts_to_combine.accounts_to_combine {
             let slot = shrink_collect.slot;
 
             let shrink_in_progress = write_ancient_accounts.shrinks_in_progress.remove(&slot);
             if shrink_in_progress.is_none() {
-                log::error!("ancient_append_vecs_packed: {}, no shrink in progress, slot: {}", line!(), slot);
+                log::error!(
+                    "ancient_append_vecs_packed: {}, no shrink in progress, slot: {}",
+                    line!(),
+                    slot
+                );
                 dropped_roots.push(slot);
-            }
-            else{
+            } else {
                 log::error!("ancient_append_vecs_packed: {}, slot: {}", line!(), slot);
             }
             self.remove_old_stores_shrink(
