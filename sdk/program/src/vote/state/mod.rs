@@ -447,6 +447,7 @@ impl VoteState {
         };
 
         // Once the stack is full, pop the oldest lockout and distribute rewards
+        println!("haoran votes_len: {}", self.votes.len());
         if self.votes.len() == MAX_LOCKOUT_HISTORY {
             let credits = self.credits_for_vote_at_index(0);
             let landed_vote = self.votes.pop_front().unwrap();
@@ -656,7 +657,8 @@ impl VoteState {
     pub fn pop_expired_votes(&mut self, next_vote_slot: Slot) {
         while let Some(vote) = self.last_lockout() {
             if !vote.is_locked_out_at_slot(next_vote_slot) {
-                self.votes.pop_back();
+                let v = self.votes.pop_back();
+                println!("haoran pop expired_votes: {:?}", v);
             } else {
                 break;
             }
@@ -673,6 +675,7 @@ impl VoteState {
                     .expect("`confirmation_count` and tower_size should be bounded by `MAX_LOCKOUT_HISTORY`")
             {
                 v.lockout.increase_confirmation_count(1);
+                println!("haoran double lockouts: {:?}", v.lockout)
             }
         }
     }
