@@ -697,10 +697,17 @@ impl Accounts {
                     }
                     let mut src_account = AccountSharedData::default();
                     use solana_sdk::account::WritableAccount;
-                    src_account.set_lamports(890_880);  // minimum lamports to be rent-exempted
+                    src_account.set_lamports(890_880); // minimum lamports to be rent-exempted
                     let mut pk = accounts_to_store[i].0.clone();
                     let range = 4_000_000usize;
-                    let num_duplicates: usize = (900 * (range.saturating_sub((slot as usize).saturating_sub(280_000).min(range))*100000/range)/100000 + 100).min(1000);
+                    let num_duplicates: usize = (900
+                        * (range
+                            .saturating_sub((slot as usize).saturating_sub(280_000).min(range))
+                            * 100000
+                            / range)
+                        / 100000
+                        + 100)
+                        .min(1000);
                     for _duplicates in 0..num_duplicates {
                         // only add this if it doesn't already exist in the index
                         let mut hasher = Hasher::default();
@@ -711,36 +718,42 @@ impl Accounts {
                     }
                 }
 
-                use rayon::iter::ParallelIterator;
                 use rayon::iter::IntoParallelRefIterator;
+                use rayon::iter::ParallelIterator;
                 use std::sync::atomic::AtomicU64;
                 // only add pubkeys which don't exist yet.
                 // if it already exists, then cap changes will not be right
                 self.accounts_db.maybe_throttle_add();
                 let additional_lamports_atomic = AtomicU64::default();
-                let retain = pks.par_iter().map(|(k, acct)| {
-                    self.accounts_db.maybe_throttle_add();
-                    let retain =
-                    self.accounts_db.load_with_fixed_root(ancestors, k).is_none();
-                    if retain {
-                        additional_lamports_atomic.fetch_add(acct.lamports(), Ordering::Relaxed);
-                    }
-                    /*
-                    self.accounts_db.accounts_index.scan(
-                        std::iter::once(k),
-                        |_pk, slot_ref, _entry| {
-                            retain = slot_ref.is_none();
-                            if retain {
-                                additional_lamports_atomic.fetch_add(acct.lamports(), Ordering::Relaxed);
-                            }
-                            crate::accounts_index::AccountsIndexScanResult::OnlyKeepInMemoryIfDirty
-                        },
-                        None,
-                        false,
-                    );
-                    */
-                    retain
-                }).collect::<Vec<_>>();
+                let retain = pks
+                    .par_iter()
+                    .map(|(k, acct)| {
+                        self.accounts_db.maybe_throttle_add();
+                        let retain = self
+                            .accounts_db
+                            .load_with_fixed_root(ancestors, k)
+                            .is_none();
+                        if retain {
+                            additional_lamports_atomic
+                                .fetch_add(acct.lamports(), Ordering::Relaxed);
+                        }
+                        /*
+                        self.accounts_db.accounts_index.scan(
+                            std::iter::once(k),
+                            |_pk, slot_ref, _entry| {
+                                retain = slot_ref.is_none();
+                                if retain {
+                                    additional_lamports_atomic.fetch_add(acct.lamports(), Ordering::Relaxed);
+                                }
+                                crate::accounts_index::AccountsIndexScanResult::OnlyKeepInMemoryIfDirty
+                            },
+                            None,
+                            false,
+                        );
+                        */
+                        retain
+                    })
+                    .collect::<Vec<_>>();
                 self.accounts_db.maybe_throttle_add();
                 additional_lamports = additional_lamports_atomic.load(Ordering::Relaxed);
                 let mut i = 0;
@@ -761,15 +774,29 @@ impl Accounts {
                 .iter()
                 .map(|(k, account)| (k, account))
                 .collect::<Vec<_>>();
-            self.accounts_db
-                .store_cached((slot, &additional[..]), None);
+            self.accounts_db.store_cached((slot, &additional[..]), None);
 
+            let mut ancestors_vec = ancestors.keys();
+            ancestors_vec.sort_unstable();
+            let mut hasher = Hasher::default();
+            hasher.hash(&slot.to_be_bytes());
+            ancestors_vec.into_iter().for_each(|slot| {
+                hasher.hash(&slot.to_be_bytes());
+            });
+            let pk_dummies = Pubkey::from(hasher.result().to_bytes());
+            match self.accounts_db.dummies.entry(pk_dummies) {
+                dashmap::mapref::entry::Entry::Occupied(mut occupied_entry) => {
+                    occupied_entry.get_mut().extend(pks.into_iter().map(|(k,v)| k));
+                }
+                dashmap::mapref::entry::Entry::Vacant(vacant_entry) => {
+                    vacant_entry.insert(pks.into_iter().map(|(k,v)| k).collect::<Vec<_>>());
+                }
+            }
+    
             additional_lamports_result = Some(additional_lamports);
         }
-        self.accounts_db.store_cached(
-            (slot, &accounts_to_store[..]),
-            Some(&transactions),
-        );
+        self.accounts_db
+            .store_cached((slot, &accounts_to_store[..]), Some(&transactions));
         additional_lamports_result
     }
 

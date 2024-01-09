@@ -6981,6 +6981,30 @@ impl Bank {
                 self.skipped_rewrites.lock().unwrap().clone(),
             );
 
+        {
+            let mut ancestors_vec = self.ancestors.keys();
+            ancestors_vec.sort_unstable();
+            let mut hasher = solana_sdk::hash::Hasher::default();
+            hasher.hash(&slot.to_be_bytes());
+            ancestors_vec.iter().for_each(|slot| {
+                hasher.hash(&slot.to_be_bytes());
+            });
+            let pk_dummies = Pubkey::from(hasher.result().to_bytes());
+            let (all_dummies, count) = if let Some((_, mut keys)) = self.rc.accounts.accounts_db.dummies.remove(&pk_dummies) {
+                keys.sort_unstable();
+                let mut hasher = solana_sdk::hash::Hasher::default();
+                let count = keys.len();
+                keys.into_iter().for_each(|key| {
+                    hasher.hash(key.as_ref());
+                });
+                (Pubkey::from(hasher.result().to_bytes()), count)
+            }
+            else {
+                (Pubkey::default(), 0)
+            };
+            log::info!("dummies: {}, {}, {}, {:?}", self.slot(), all_dummies, count, ancestors_vec);
+        }
+
         let mut signature_count_buf = [0u8; 8];
         LittleEndian::write_u64(&mut signature_count_buf[..], self.signature_count());
 

@@ -1419,6 +1419,7 @@ type AccountInfoAccountsIndex = AccountsIndex<AccountInfo, AccountInfo>;
 // This structure handles the load/store of the accounts
 #[derive(Debug)]
 pub struct AccountsDb {
+    pub dummies: DashMap<Pubkey, Vec<Pubkey>>,
     pub last_time: AtomicU64,
     pub last_accounts: AtomicU64,
     pub throttling: AtomicU64,
@@ -2562,6 +2563,7 @@ impl AccountsDb {
         const ACCOUNTS_STACK_SIZE: usize = 8 * 1024 * 1024;
 
         AccountsDb {
+            dummies: DashMap::default(),
             last_accounts: AtomicU64::default(),
             last_time: AtomicU64::default(),
             throttling: AtomicU64::default(),
