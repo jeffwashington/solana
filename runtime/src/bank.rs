@@ -1464,8 +1464,12 @@ impl Bank {
                     .min(slots_in_epoch)
                     .checked_div(2)
                     .unwrap();
-            let mut loaded_programs_cache = new.loaded_programs_cache.write().unwrap();
+            let loaded_programs_cache = new.loaded_programs_cache.read().unwrap();
             if loaded_programs_cache.upcoming_environments.is_some() {
+                drop(loaded_programs_cache);
+                log::error!("is_some");
+                let mut loaded_programs_cache = new.loaded_programs_cache.write().unwrap();
+                assert!(loaded_programs_cache.upcoming_environments.is_some());
                 if let Some((key, program_to_recompile)) =
                     loaded_programs_cache.programs_to_recompile.pop()
                 {
@@ -1478,6 +1482,7 @@ impl Bank {
                 || slot_index.saturating_add(slots_in_recompilation_phase) >= slots_in_epoch
             {
                 // Anticipate the upcoming program runtime environment for the next epoch,
+                log::error!("new_epoch");
                 // so we can try to recompile loaded programs before the feature transition hits.
                 drop(loaded_programs_cache);
                 let (feature_set, _new_feature_activations) = new.compute_active_feature_set(true);
@@ -4685,6 +4690,7 @@ impl Bank {
         ProgramAccountLoadResult::InvalidAccountData
     }
 
+    // check here
     pub fn load_program(
         &self,
         pubkey: &Pubkey,
