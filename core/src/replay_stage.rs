@@ -1558,6 +1558,7 @@ impl ReplayStage {
             root_bank.clear_slot_signatures(slot);
 
             // Remove cached entries of the programs that were deployed in this slot.
+            log::error!("{}", line!());
             root_bank
                 .loaded_programs_cache
                 .write()

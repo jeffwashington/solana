@@ -1558,6 +1558,7 @@ impl Bank {
             },
         );
 
+        log::error!("read {}", line!());
         parent
             .loaded_programs_cache
             .read()
@@ -1565,6 +1566,7 @@ impl Bank {
             .stats
             .submit(parent.slot());
 
+        log::error!("{}", line!());
         new.loaded_programs_cache.write().unwrap().stats.reset();
         new
     }
@@ -4697,6 +4699,7 @@ impl Bank {
         reload: bool,
         recompile: Option<Arc<LoadedProgram>>,
     ) -> Arc<LoadedProgram> {
+        log::error!("read {}", line!());
         let loaded_programs_cache = self.loaded_programs_cache.read().unwrap();
         let effective_epoch = if recompile.is_some() {
             loaded_programs_cache.latest_root_epoch.saturating_add(1)
@@ -4830,6 +4833,7 @@ impl Bank {
     }
 
     pub fn clear_program_cache(&self) {
+        log::error!("{}", line!());
         self.loaded_programs_cache
             .write()
             .unwrap()
@@ -5085,6 +5089,7 @@ impl Bank {
         loop {
             let (program_to_load, task_cookie, task_waiter) = {
                 // Lock the global cache.
+                log::error!("{}", line!());
                 let mut loaded_programs_cache = self.loaded_programs_cache.write().unwrap();
                 // Initialize our local cache.
                 if loaded_programs_for_txs.is_none() {
@@ -5309,6 +5314,7 @@ impl Bank {
         execution_time.stop();
 
         const SHRINK_LOADED_PROGRAMS_TO_PERCENTAGE: u8 = 90;
+        log::error!("{}", line!());
         self.loaded_programs_cache
             .write()
             .unwrap()
@@ -5671,6 +5677,7 @@ impl Bank {
             } = execution_result
             {
                 if details.status.is_ok() {
+                    log::error!("{}", line!());
                     let mut cache = self.loaded_programs_cache.write().unwrap();
                     cache.merge(programs_modified_by_tx);
                     cache.merge(programs_updated_only_for_global_cache);
@@ -6662,6 +6669,7 @@ impl Bank {
             }
         }
 
+        log::error!("{}", line!());
         let mut loaded_programs_cache = self.loaded_programs_cache.write().unwrap();
         loaded_programs_cache.latest_root_slot = self.slot();
         loaded_programs_cache.latest_root_epoch = self.epoch();
@@ -7776,6 +7784,7 @@ impl Bank {
         debug!("Adding program {} under {:?}", name, program_id);
         self.add_builtin_account(name.as_str(), &program_id, false);
         self.builtin_programs.insert(program_id);
+        log::error!("{}", line!());
         self.loaded_programs_cache
             .write()
             .unwrap()
@@ -8090,6 +8099,7 @@ impl Bank {
                 self.store_account(new_address, &AccountSharedData::default());
 
                 // Unload a program from the bank's cache
+                log::error!("{}", line!());
                 self.loaded_programs_cache
                     .write()
                     .unwrap()

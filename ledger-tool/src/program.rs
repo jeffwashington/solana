@@ -545,6 +545,7 @@ pub fn program(ledger_path: &Path, matches: &ArgMatches<'_>) {
     // Adding `DELAY_VISIBILITY_SLOT_OFFSET` to slots to accommodate for delay visibility of the program
     let mut loaded_programs = LoadedProgramsForTxBatch::new(
         bank.slot() + DELAY_VISIBILITY_SLOT_OFFSET,
+        log::error!("read {}", line!());
         bank.loaded_programs_cache
             .read()
             .unwrap()

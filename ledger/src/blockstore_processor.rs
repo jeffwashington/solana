@@ -1555,6 +1555,7 @@ fn load_frozen_forks(
                 root = new_root_bank.slot();
 
                 leader_schedule_cache.set_root(new_root_bank);
+                log::error!("{}", line!());
                 new_root_bank
                     .loaded_programs_cache
                     .write()

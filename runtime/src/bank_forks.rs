@@ -192,6 +192,7 @@ impl BankForks {
         }));
 
         for bank in bank_forks.read().unwrap().banks.values() {
+            log::error!("{}", line!());
             bank.loaded_programs_cache
                 .write()
                 .unwrap()
@@ -421,6 +422,7 @@ impl BankForks {
 
     pub fn prune_program_cache(&self, root: Slot) {
         if let Some(root_bank) = self.banks.get(&root) {
+            log::error!("{}", line!());
             root_bank
                 .loaded_programs_cache
                 .write()
