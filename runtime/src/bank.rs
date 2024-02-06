@@ -1933,6 +1933,7 @@ impl Bank {
             debug_do_not_add_builtins,
         );
         bank.fill_missing_sysvar_cache_entries();
+        bank.activate_feature(&feature_set::disable_bpf_loader_instructions::id());
 
         // Sanity assertions between bank snapshot and genesis config
         // Consider removing from serializable bank state
