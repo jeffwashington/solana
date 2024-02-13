@@ -20,6 +20,7 @@
 
 #[cfg(feature = "dev-context-only-utils")]
 use qualifier_attr::qualifiers;
+use solana_sdk::rent_collector::RENT_EXEMPT_RENT_EPOCH;
 use {
     crate::{
         account_info::{AccountInfo, StorageLocation},
@@ -8452,6 +8453,9 @@ impl AccountsDb {
         let mut total_data = 0;
         (0..accounts.len()).for_each(|index| {
             let account = accounts.account(index);
+            if account.rent_epoch() != RENT_EXEMPT_RENT_EPOCH {
+                panic!("rent epoch bad: {}", accounts.pubkey(index));
+            }
             total_data += account.data().len();
             stats.update(account);
         });
