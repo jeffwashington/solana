@@ -8454,7 +8454,12 @@ impl AccountsDb {
         (0..accounts.len()).for_each(|index| {
             let account = accounts.account(index);
             if account.rent_epoch() != RENT_EXEMPT_RENT_EPOCH {
-                panic!("rent epoch bad: {}", accounts.pubkey(index));
+                use std::str::FromStr;
+                if &Pubkey::from_str("SysvarEpochRewards1111111111111111111111111").unwrap()
+                    != accounts.pubkey(index)
+                {
+                    panic!("rent epoch bad: {}", accounts.pubkey(index));
+                }
             }
             total_data += account.data().len();
             stats.update(account);
