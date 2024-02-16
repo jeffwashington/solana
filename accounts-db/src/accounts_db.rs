@@ -8457,6 +8457,8 @@ impl AccountsDb {
                 use std::str::FromStr;
                 if &Pubkey::from_str("SysvarEpochRewards1111111111111111111111111").unwrap()
                     != accounts.pubkey(index)
+                    && &Pubkey::from_str("1nc1nerator11111111111111111111111111111111").unwrap()
+                        != accounts.pubkey(index)
                 {
                     panic!("rent epoch bad: {}", accounts.pubkey(index));
                 }
