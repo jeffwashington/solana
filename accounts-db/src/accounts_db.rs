@@ -643,6 +643,7 @@ type StorageSizeAndCountMap = DashMap<AppendVecId, StorageSizeAndCount>;
 
 impl GenerateIndexTimings {
     pub fn report(&self, startup_stats: &StartupStats) {
+        panic!("stop here");
         datapoint_info!(
             "generate_index",
             ("overall_us", self.total_time_us, i64),
