@@ -352,6 +352,26 @@ impl AppendVec {
 
         let (sanitized, num_accounts) = new.sanitize_layout_and_length();
         if !sanitized {
+            let mut offset = 0;
+
+            // This discards allocated accounts immediately after check at each loop iteration.
+            //
+            // This code should not reuse AppendVec.accounts() method as the current form or
+            // extend it to be reused here because it would allow attackers to accumulate
+            // some measurable amount of memory needlessly.
+            let mut num_accounts = 0;
+            while let Some((account, next_offset)) = new.get_account(offset) {
+                if !account.sanitize() {
+                    log::error!("failed to sanitize {offset}");
+                    break;
+                }
+                offset = next_offset;
+                num_accounts += 1;
+            }
+            let aligned_current_len = u64_align!(new.current_len.load(Ordering::Acquire));
+            
+            log::error!("{offset}, {aligned_current_len}, {num_accounts}");
+
             // This info show the failing accountvec file path.  It helps debugging
             // the appendvec data corrupution issues related to recycling.
             return Err(AccountsFileError::AppendVecError(
