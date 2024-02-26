@@ -509,7 +509,11 @@ impl AppendVec {
         let (meta, next): (&StoredMeta, _) = self.get_type(offset)?;
         let (account_meta, next): (&AccountMeta, _) = self.get_type(next)?;
         let (hash, next): (&AccountHash, _) = self.get_type(next)?;
-        let (data, next) = self.get_slice(next, meta.data_len as usize)?;
+        let r = self.get_slice(next, meta.data_len as usize);
+        if r.is_none() {
+            log::error!("asked for data of len: {}", meta.data_len);
+        }
+        let (data, next) = r?;
         let stored_size = next - offset;
         Some((
             StoredAccountMeta::AppendVec(AppendVecStoredAccountMeta {
