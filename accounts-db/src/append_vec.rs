@@ -374,12 +374,15 @@ impl AppendVec {
 
             // This info show the failing accountvec file path.  It helps debugging
             // the appendvec data corrupution issues related to recycling.
-            return Err(AccountsFileError::AppendVecError(
-                AppendVecError::IncorrectLayout(path.as_ref().to_path_buf()),
-            ));
+            //return Err(AccountsFileError::AppendVecError(
+            //    AppendVecError::IncorrectLayout(path.as_ref().to_path_buf()),
+            //));
+            Ok((new, num_accounts))
+        }
+        else {
+            Ok((new, num_accounts))
         }
 
-        Ok((new, num_accounts))
     }
 
     /// Creates an appendvec from file without performing sanitize checks or counting the number of accounts
