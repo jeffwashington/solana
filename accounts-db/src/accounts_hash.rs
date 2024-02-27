@@ -16,6 +16,7 @@ use {
         rent_collector::RentCollector,
         slot_history::Slot,
         sysvar::epoch_schedule::EpochSchedule,
+        timing::AtomicInterval,
     },
     std::{
         borrow::Borrow,
@@ -207,8 +208,22 @@ pub struct HashStats {
     pub sum_ancient_scans_us: AtomicU64,
     pub count_ancient_scans: AtomicU64,
     pub pubkey_bin_search_us: AtomicU64,
+    pub last_time: AtomicU64,
+    pub start_time: AtomicU64,
+    pub number_deduped: AtomicU64,
+    pub total_expected: AtomicU64,
+    pub number_deduped_since_last_time: AtomicU64,
+    pub dedup_threads_active: AtomicU64,
+    pub cycle: AtomicInterval,
 }
 impl HashStats {
+    pub fn new() -> Self {
+        Self {
+            start_time: AtomicU64::new(solana_sdk::timing::timestamp()),
+            ..Self::default()
+        }
+    }
+
     pub fn calc_storage_size_quartiles(&mut self, storages: &[Arc<AccountStorageEntry>]) {
         let mut sum = 0;
         let mut sizes = storages
@@ -1212,6 +1227,7 @@ impl<'a> AccountsHasher<'a> {
             None,
         );
         hash_time.stop();
+        error!("jwash: hash final: {}, {:?}", hash_time.as_us(), ());// this is massive logging: cumulative.cumulative);
         stats.hash_time_total_us += hash_time.as_us();
         (hash, total_lamports)
     }
