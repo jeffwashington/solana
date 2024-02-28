@@ -648,6 +648,9 @@ impl HotStorageWriter {
             .write_owners_block(&self.storage, &owners_table)?;
 
         footer.write_footer_block(&self.storage)?;
+        let file_len = self.storage.0.metadata().unwrap().len();
+        let count = len - skip;
+        log::error!("tiered len: {}, {}, {}", count, file_len, file_len as usize / count);
 
         Ok(stored_infos)
     }

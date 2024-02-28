@@ -14488,6 +14488,39 @@ pub mod tests {
     }
 
     #[test]
+    fn test_hot_storage_size() {
+        solana_logger::setup();
+        let mut count = 100;
+        (0..4).for_each(|i| {
+            count = count * 10;
+
+        let mut accounts_db = AccountsDb::new_single_for_tests();
+        let accounts_db = Arc::new(accounts_db);
+
+        let keys: Vec<Pubkey> = std::iter::repeat_with(Pubkey::new_unique)
+            .take(count)
+            .collect();
+
+        // Store some subset of the keys in slots 0..num_slots
+        let slot = &1;
+        for key in &keys {
+            let space = 0; // 1 byte allows us to track by size
+            accounts_db.store_cached(
+                (
+                    *slot,
+                    &[(key, &AccountSharedData::new(1, space, &Pubkey::default()))][..],
+                ),
+                None,
+            );
+        }
+        accounts_db.add_root(*slot as Slot);
+
+        accounts_db.flush_accounts_cache(true, None);
+    });
+
+    }
+
+    #[test]
     fn test_accounts_db_cache_clean_dead_slots() {
         let num_slots = 10;
         let (accounts_db, keys, mut slots, _) =
