@@ -1352,6 +1352,10 @@ type AccountInfoAccountsIndex = AccountsIndex<AccountInfo, AccountInfo>;
 // This structure handles the load/store of the accounts
 #[derive(Debug)]
 pub struct AccountsDb {
+    smallest1: AtomicU64,
+    smallest2: AtomicU64,
+    smallest3: AtomicU64,
+    large: AtomicU64,
     /// Keeps tracks of index into AppendVec on a per slot basis
     pub accounts_index: AccountInfoAccountsIndex,
 
@@ -2413,6 +2417,10 @@ impl AccountsDb {
 
         AccountsDb {
             create_ancient_storage: CreateAncientStorage::Pack,
+            smallest1: AtomicU64::default(),
+            smallest2: AtomicU64::default(),
+            smallest3: AtomicU64::default(),
+            large: AtomicU64::default(),
             verify_accounts_hash_in_bg: VerifyAccountsHashInBackground::default(),
             active_stats: ActiveStats::default(),
             skip_initial_hash_calc: false,
@@ -8893,7 +8901,15 @@ impl AccountsDb {
         let mut amount_to_top_off_rent = 0;
         let mut stored_size_alive = 0;
 
+        let mut min = u64::MAX;
+
+        let mut all = vec![];
+
         let items = accounts.map(|stored_account| {
+            if stored_account.lamports() != 0 {
+                all.push(stored_account.lamports());
+                min = min.min(stored_account.lamports());
+            }
             stored_size_alive += stored_account.stored_size();
             let pubkey = stored_account.pubkey();
             if secondary {
@@ -8928,6 +8944,33 @@ impl AccountsDb {
         let (dirty_pubkeys, insert_time_us, mut generate_index_results) = self
             .accounts_index
             .insert_new_if_missing_into_primary_index(slot, storage.approx_stored_count(), items);
+
+        let mut really_small = 0;
+        let mut smaller_still = 0;
+        let mut smaller = 0;
+        let mut larger = 0;
+        all.iter().for_each(|l| {
+            let mut l = *l;
+            l = l - min;
+            if l < 134217728/4 {
+                really_small += 1;
+            }
+            if l < 134217728 {
+                smaller_still += 1;
+            }
+            if l < 268435456 {
+                smaller += 1;
+            }
+            else {
+                larger += 1;
+            }
+        });
+        self.smallest1.fetch_add(really_small, Ordering::Relaxed);
+        self.smallest2.fetch_add(smaller_still, Ordering::Relaxed);
+        self.smallest3.fetch_add(smaller, Ordering::Relaxed);
+        self.large.fetch_add(larger, Ordering::Relaxed);
+        log::error!("jw,{really_small},{smaller_still},{},{},{},{}",smaller, larger,smaller*100/(smaller+larger), smaller+larger);
+
 
         if let Some(duplicates_this_slot) = std::mem::take(&mut generate_index_results.duplicates) {
             // there were duplicate pubkeys in this same slot
@@ -9264,6 +9307,13 @@ impl AccountsDb {
         }
 
         self.accounts_index.log_secondary_indexes();
+
+        let really_small = self.smallest1.load( Ordering::Relaxed);
+        let smaller_still = self.smallest2.load(Ordering::Relaxed);
+        let smaller = self.smallest3.load( Ordering::Relaxed);
+        let larger = self.large.load( Ordering::Relaxed);
+        log::error!("final,{really_small},{smaller_still},{},{},{},{}",smaller, larger,smaller*100/(smaller+larger), smaller+larger);
+
 
         IndexGenerationInfo {
             accounts_data_len: accounts_data_len.load(Ordering::Relaxed),
