@@ -1359,6 +1359,8 @@ pub struct AccountsDb {
     zero: AtomicU64,
     system_program: AtomicU64,
     notsystemprogram: AtomicU64,
+    nodata:AtomicU64,
+    sysdata:AtomicU64,
     /// Keeps tracks of index into AppendVec on a per slot basis
     pub accounts_index: AccountInfoAccountsIndex,
 
@@ -2420,6 +2422,8 @@ impl AccountsDb {
 
         AccountsDb {
             create_ancient_storage: CreateAncientStorage::Pack,
+            nodata: AtomicU64::default(),
+            sysdata: AtomicU64::default(),
             smallest1: AtomicU64::default(),
             smallest2: AtomicU64::default(),
             smallest3: AtomicU64::default(),
@@ -8922,9 +8926,15 @@ impl AccountsDb {
             }
             if stored_account.owner() == &Pubkey::default() {
                 self.system_program.fetch_add(1, Ordering::Relaxed);
+                if stored_account.data().len()>0 {
+                    self.sysdata.fetch_add(1, Ordering::Relaxed);
+                }
             }
             else {
                 self.notsystemprogram.fetch_add(1, Ordering::Relaxed);
+                if stored_account.data().len() == 0 {
+                    self.nodata.fetch_add(1, Ordering::Relaxed);
+                }
             }
             stored_size_alive += stored_account.stored_size();
             let pubkey = stored_account.pubkey();
@@ -9331,9 +9341,13 @@ impl AccountsDb {
         let s = self.system_program.load( Ordering::Relaxed);
         let ns = self.notsystemprogram.load( Ordering::Relaxed);
         let z = self.zero.load( Ordering::Relaxed);
+        let nd = self.nodata.load( Ordering::Relaxed);
+        let sysd = self.sysdata.load( Ordering::Relaxed);
         log::error!("final,{really_small},{smaller_still},{},{},{},{}",smaller, larger,smaller*100/(smaller+larger), smaller+larger);
         log::error!("finalns,{s},{ns},{},{}", z, s+ns);
-
+        log::error!("finalns,nodata,{nd}, {},{}", ns,nd*100/ns);
+        log::error!("finalns,sysdata,{sysd}, {},{}", s,sysd*100/s);
+///jw,1110,1122,1124,15,98,1139
 
         IndexGenerationInfo {
             accounts_data_len: accounts_data_len.load(Ordering::Relaxed),
