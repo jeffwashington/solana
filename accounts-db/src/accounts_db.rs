@@ -1356,6 +1356,9 @@ pub struct AccountsDb {
     smallest2: AtomicU64,
     smallest3: AtomicU64,
     large: AtomicU64,
+    zero: AtomicU64,
+    system_program: AtomicU64,
+    notsystemprogram: AtomicU64,
     /// Keeps tracks of index into AppendVec on a per slot basis
     pub accounts_index: AccountInfoAccountsIndex,
 
@@ -2420,6 +2423,10 @@ impl AccountsDb {
             smallest1: AtomicU64::default(),
             smallest2: AtomicU64::default(),
             smallest3: AtomicU64::default(),
+            system_program: AtomicU64::default(),
+            zero: AtomicU64::default(),
+            notsystemprogram: AtomicU64::default(),
+        
             large: AtomicU64::default(),
             verify_accounts_hash_in_bg: VerifyAccountsHashInBackground::default(),
             active_stats: ActiveStats::default(),
@@ -8910,6 +8917,15 @@ impl AccountsDb {
                 all.push(stored_account.lamports());
                 min = min.min(stored_account.lamports());
             }
+            else {
+                self.zero.fetch_add(1,  Ordering::Relaxed);
+            }
+            if stored_account.owner() == &Pubkey::default() {
+                self.system_program.fetch_add(1, Ordering::Relaxed);
+            }
+            else {
+                self.notsystemprogram.fetch_add(1, Ordering::Relaxed);
+            }
             stored_size_alive += stored_account.stored_size();
             let pubkey = stored_account.pubkey();
             if secondary {
@@ -9312,7 +9328,11 @@ impl AccountsDb {
         let smaller_still = self.smallest2.load(Ordering::Relaxed);
         let smaller = self.smallest3.load( Ordering::Relaxed);
         let larger = self.large.load( Ordering::Relaxed);
+        let s = self.system_program.load( Ordering::Relaxed);
+        let ns = self.notsystemprogram.load( Ordering::Relaxed);
+        let z = self.zero.load( Ordering::Relaxed);
         log::error!("final,{really_small},{smaller_still},{},{},{},{}",smaller, larger,smaller*100/(smaller+larger), smaller+larger);
+        log::error!("finalns,{s},{ns},{},{}", z, s+ns);
 
 
         IndexGenerationInfo {
