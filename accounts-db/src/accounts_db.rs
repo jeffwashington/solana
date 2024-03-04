@@ -1355,6 +1355,7 @@ pub struct AccountsDb {
     smallest1: AtomicU64,
     smallest2: AtomicU64,
     smallest3: AtomicU64,
+    pad: Vec<AtomicU64>,
     large: AtomicU64,
     zero: AtomicU64,
     system_program: AtomicU64,
@@ -2427,6 +2428,7 @@ impl AccountsDb {
             smallest1: AtomicU64::default(),
             smallest2: AtomicU64::default(),
             smallest3: AtomicU64::default(),
+            pad: (0..8).map(|_| AtomicU64::default()).collect(),
             system_program: AtomicU64::default(),
             zero: AtomicU64::default(),
             notsystemprogram: AtomicU64::default(),
@@ -8924,6 +8926,8 @@ impl AccountsDb {
             else {
                 self.zero.fetch_add(1,  Ordering::Relaxed);
             }
+            let l = stored_account.data().len();
+            self.pad[l % 8].fetch_add(1, Ordering::Relaxed);
             if stored_account.owner() == &Pubkey::default() {
                 self.system_program.fetch_add(1, Ordering::Relaxed);
                 if stored_account.data().len()>0 {
@@ -9347,6 +9351,7 @@ impl AccountsDb {
         log::error!("finalns,{s},{ns},{},{}", z, s+ns);
         log::error!("finalns,nodata,{nd}, {},{}", ns,nd*100/ns);
         log::error!("finalns,sysdata,{sysd}, {},{}", s,sysd*100/s);
+        log::error!("pads: {:?}", (0..8).map(|x| self.pad[x].load(Ordering::Relaxed)).collect::<Vec<_>>());
 ///jw,1110,1122,1124,15,98,1139
 
         IndexGenerationInfo {
