@@ -319,6 +319,7 @@ impl AccountsDb {
         self.shrink_ancient_stats
             .slots_considered
             .fetch_add(sorted_slots.len() as u64, Ordering::Relaxed);
+        let ln = sorted_slots.len();
         let ancient_slot_infos = self.collect_sort_filter_ancient_slots(sorted_slots, &tuning);
         log::error!("{}", line!());
 
@@ -331,7 +332,7 @@ impl AccountsDb {
                 &ancient_slot_infos.all_infos[..],
             );
 
-            log::error!("{}", line!());
+            log::error!("{}, {}, slots: {}", line!(), accounts_per_storage.len(), ln);
             let mut accounts_to_combine = self.calc_accounts_to_combine(&accounts_per_storage);
         metrics.unpackable_slots_count += accounts_to_combine.unpackable_slots_count;
 
