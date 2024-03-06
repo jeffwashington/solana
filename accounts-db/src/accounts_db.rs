@@ -3792,8 +3792,10 @@ impl AccountsDb {
                         // It would have had a ref to the storage from the initial store, but it will
                         // not exist in the re-written slot. Unref it to keep the index consistent with
                         // rewriting the storage entries.
-                        unrefed_pubkeys.push(pubkey);
-                        result = AccountsIndexScanResult::Unref;
+                        if bin.is_none() {
+                            unrefed_pubkeys.push(pubkey);
+                            result = AccountsIndexScanResult::Unref;
+                        }
                         dead += 1;
                     } else {
                         // Hold onto the index entry arc so that it cannot be flushed.
