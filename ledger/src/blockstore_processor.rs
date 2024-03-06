@@ -928,6 +928,7 @@ pub fn process_blockstore_from_root(
         );
         assert!(bank_forks.active_bank_slots().is_empty());
     }
+    std::thread::sleep(Duration::from_millis(100_000));
 
     Ok(())
 }
