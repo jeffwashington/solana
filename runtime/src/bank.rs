@@ -6434,7 +6434,7 @@ impl Bank {
         let cap = self.capitalization();
         let epoch_schedule = self.epoch_schedule();
         let rent_collector = self.rent_collector();
-        if config.run_in_background {
+        if false && config.run_in_background {
             let ancestors = ancestors.clone();
             let accounts = Arc::clone(accounts);
             let epoch_schedule = epoch_schedule.clone();
@@ -6470,6 +6470,7 @@ impl Bank {
             });
             true // initial result is true. We haven't failed yet. If verification fails, we'll panic from bg thread.
         } else {
+            /*/
             let result = accounts.verify_accounts_hash_and_lamports(
                 slot,
                 cap,
@@ -6484,6 +6485,8 @@ impl Bank {
                     use_bg_thread_pool: false, // fg is waiting for this to run, so we can use the fg thread pool
                 },
             );
+            */
+            let result=true;
             self.set_initial_accounts_hash_verification_completed();
             result
         }

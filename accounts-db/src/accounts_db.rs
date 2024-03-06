@@ -4347,6 +4347,7 @@ impl AccountsDb {
     /// squash those slots into ancient append vecs
     pub fn shrink_ancient_slots(&self, epoch_schedule: &EpochSchedule) {
         if self.ancient_append_vec_offset.is_none() {
+            log::error!("no offset");
             return;
         }
 
@@ -4354,8 +4355,10 @@ impl AccountsDb {
         let can_randomly_shrink = true;
         let sorted_slots = self.get_sorted_potential_ancient_slots(oldest_non_ancient_slot);
         if self.create_ancient_storage == CreateAncientStorage::Append {
+            log::error!("create Append");
             self.combine_ancient_slots(sorted_slots, can_randomly_shrink);
         } else {
+            log::error!("create packed");
             self.combine_ancient_slots_packed(sorted_slots, can_randomly_shrink);
         }
     }
