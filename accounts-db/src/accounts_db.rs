@@ -3153,387 +3153,389 @@ impl AccountsDb {
         last_full_snapshot_slot: Option<Slot>,
         epoch_schedule: &EpochSchedule,
     ) {
-        if self.exhaustively_verify_refcounts {
-            self.exhaustively_verify_refcounts(max_clean_root_inclusive);
-        }
-
-        let _guard = self.active_stats.activate(ActiveStatItem::Clean);
-
-        let ancient_account_cleans = AtomicU64::default();
-
-        let mut measure_all = Measure::start("clean_accounts");
-        let max_clean_root_inclusive = self.max_clean_root(max_clean_root_inclusive);
-
-        self.report_store_stats();
-
-        let mut key_timings = CleanKeyTimings::default();
-        let (mut pubkeys, min_dirty_slot) = self.construct_candidate_clean_keys(
-            max_clean_root_inclusive,
-            is_startup,
-            last_full_snapshot_slot,
-            &mut key_timings,
-            epoch_schedule,
-        );
-
-        let mut sort = Measure::start("sort");
-        if is_startup {
-            pubkeys.par_sort_unstable();
-        } else {
-            self.thread_pool_clean
-                .install(|| pubkeys.par_sort_unstable());
-        }
-        sort.stop();
-
-        let total_keys_count = pubkeys.len();
-        let mut accounts_scan = Measure::start("accounts_scan");
-        let uncleaned_roots = self.accounts_index.clone_uncleaned_roots();
-        let found_not_zero_accum = AtomicU64::new(0);
-        let not_found_on_fork_accum = AtomicU64::new(0);
-        let missing_accum = AtomicU64::new(0);
-        let useful_accum = AtomicU64::new(0);
-
-        // parallel scan the index.
-        let (mut purges_zero_lamports, purges_old_accounts) = {
-            let do_clean_scan = || {
-                pubkeys
-                    .par_chunks(4096)
-                    .map(|pubkeys: &[Pubkey]| {
-                        let mut purges_zero_lamports = HashMap::new();
-                        let mut purges_old_accounts = Vec::new();
-                        let mut found_not_zero = 0;
-                        let mut not_found_on_fork = 0;
-                        let mut missing = 0;
-                        let mut useful = 0;
-                        self.accounts_index.scan(
-                            pubkeys.iter(),
-                            |pubkey, slots_refs, _entry| {
-                                let mut useless = true;
-                                if let Some((slot_list, ref_count)) = slots_refs {
-                                    let index_in_slot_list = self.accounts_index.latest_slot(
-                                        None,
-                                        slot_list,
-                                        max_clean_root_inclusive,
-                                    );
-
-                                    match index_in_slot_list {
-                                        Some(index_in_slot_list) => {
-                                            // found info relative to max_clean_root
-                                            let (slot, account_info) =
-                                                &slot_list[index_in_slot_list];
-                                            if account_info.is_zero_lamport() {
-                                                useless = false;
-                                                purges_zero_lamports.insert(
-                                                    *pubkey,
-                                                    (
-                                                        self.accounts_index.get_rooted_entries(
-                                                            slot_list,
-                                                            max_clean_root_inclusive,
-                                                        ),
-                                                        ref_count,
-                                                    ),
-                                                );
-                                            } else {
-                                                found_not_zero += 1;
-                                            }
-                                            if uncleaned_roots.contains(slot) {
-                                                // Assertion enforced by `accounts_index.get()`, the latest slot
-                                                // will not be greater than the given `max_clean_root`
-                                                if let Some(max_clean_root_inclusive) =
-                                                    max_clean_root_inclusive
-                                                {
-                                                    assert!(slot <= &max_clean_root_inclusive);
-                                                }
-                                                purges_old_accounts.push(*pubkey);
-                                                useless = false;
-                                            }
-                                        }
-                                        None => {
-                                            // This pubkey is in the index but not in a root slot, so clean
-                                            // it up by adding it to the to-be-purged list.
-                                            //
-                                            // Also, this pubkey must have been touched by some slot since
-                                            // it was in the dirty list, so we assume that the slot it was
-                                            // touched in must be unrooted.
-                                            not_found_on_fork += 1;
-                                            useless = false;
-                                            purges_old_accounts.push(*pubkey);
-                                        }
-                                    }
-                                } else {
-                                    missing += 1;
-                                }
-                                if !useless {
-                                    useful += 1;
-                                }
-                                if useless {
-                                    AccountsIndexScanResult::OnlyKeepInMemoryIfDirty
-                                } else {
-                                    AccountsIndexScanResult::KeepInMemory
-                                }
-                            },
-                            None,
-                            false,
-                        );
-                        found_not_zero_accum.fetch_add(found_not_zero, Ordering::Relaxed);
-                        not_found_on_fork_accum.fetch_add(not_found_on_fork, Ordering::Relaxed);
-                        missing_accum.fetch_add(missing, Ordering::Relaxed);
-                        useful_accum.fetch_add(useful, Ordering::Relaxed);
-                        (purges_zero_lamports, purges_old_accounts)
-                    })
-                    .reduce(
-                        || (HashMap::new(), Vec::new()),
-                        |mut m1, m2| {
-                            // Collapse down the hashmaps/vecs into one.
-                            m1.0.extend(m2.0);
-                            m1.1.extend(m2.1);
-                            m1
-                        },
-                    )
-            };
-            if is_startup {
-                do_clean_scan()
-            } else {
-                self.thread_pool_clean.install(do_clean_scan)
+        for _ = 0..5 {
+            if self.exhaustively_verify_refcounts {
+                self.exhaustively_verify_refcounts(max_clean_root_inclusive);
             }
-        };
-        accounts_scan.stop();
 
-        let mut clean_old_rooted = Measure::start("clean_old_roots");
-        let ((purged_account_slots, removed_accounts), mut pubkeys_removed_from_accounts_index) =
-            self.clean_accounts_older_than_root(
-                purges_old_accounts,
+            let _guard = self.active_stats.activate(ActiveStatItem::Clean);
+
+            let ancient_account_cleans = AtomicU64::default();
+
+            let mut measure_all = Measure::start("clean_accounts");
+            let max_clean_root_inclusive = self.max_clean_root(max_clean_root_inclusive);
+
+            self.report_store_stats();
+
+            let mut key_timings = CleanKeyTimings::default();
+            let (mut pubkeys, min_dirty_slot) = self.construct_candidate_clean_keys(
                 max_clean_root_inclusive,
-                &ancient_account_cleans,
+                is_startup,
+                last_full_snapshot_slot,
+                &mut key_timings,
                 epoch_schedule,
             );
 
-        self.do_reset_uncleaned_roots(max_clean_root_inclusive);
-        clean_old_rooted.stop();
-
-        let mut store_counts_time = Measure::start("store_counts");
-
-        // Calculate store counts as if everything was purged
-        // Then purge if we can
-        let mut store_counts: HashMap<Slot, (usize, HashSet<Pubkey>)> = HashMap::new();
-        for (key, (account_infos, ref_count)) in purges_zero_lamports.iter_mut() {
-            if purged_account_slots.contains_key(key) {
-                *ref_count = self.accounts_index.ref_count_from_storage(key);
+            let mut sort = Measure::start("sort");
+            if is_startup {
+                pubkeys.par_sort_unstable();
+            } else {
+                self.thread_pool_clean
+                    .install(|| pubkeys.par_sort_unstable());
             }
-            account_infos.retain(|(slot, account_info)| {
-                let was_slot_purged = purged_account_slots
-                    .get(key)
-                    .map(|slots_removed| slots_removed.contains(slot))
-                    .unwrap_or(false);
-                if was_slot_purged {
-                    // No need to look up the slot storage below if the entire
-                    // slot was purged
-                    return false;
-                }
-                // Check if this update in `slot` to the account with `key` was reclaimed earlier by
-                // `clean_accounts_older_than_root()`
-                let was_reclaimed = removed_accounts
-                    .get(slot)
-                    .map(|store_removed| store_removed.contains(&account_info.offset()))
-                    .unwrap_or(false);
-                if was_reclaimed {
-                    return false;
-                }
-                if let Some(store_count) = store_counts.get_mut(slot) {
-                    store_count.0 -= 1;
-                    store_count.1.insert(*key);
+            sort.stop();
+
+            let total_keys_count = pubkeys.len();
+            let mut accounts_scan = Measure::start("accounts_scan");
+            let uncleaned_roots = self.accounts_index.clone_uncleaned_roots();
+            let found_not_zero_accum = AtomicU64::new(0);
+            let not_found_on_fork_accum = AtomicU64::new(0);
+            let missing_accum = AtomicU64::new(0);
+            let useful_accum = AtomicU64::new(0);
+
+            // parallel scan the index.
+            let (mut purges_zero_lamports, purges_old_accounts) = {
+                let do_clean_scan = || {
+                    pubkeys
+                        .par_chunks(4096)
+                        .map(|pubkeys: &[Pubkey]| {
+                            let mut purges_zero_lamports = HashMap::new();
+                            let mut purges_old_accounts = Vec::new();
+                            let mut found_not_zero = 0;
+                            let mut not_found_on_fork = 0;
+                            let mut missing = 0;
+                            let mut useful = 0;
+                            self.accounts_index.scan(
+                                pubkeys.iter(),
+                                |pubkey, slots_refs, _entry| {
+                                    let mut useless = true;
+                                    if let Some((slot_list, ref_count)) = slots_refs {
+                                        let index_in_slot_list = self.accounts_index.latest_slot(
+                                            None,
+                                            slot_list,
+                                            max_clean_root_inclusive,
+                                        );
+
+                                        match index_in_slot_list {
+                                            Some(index_in_slot_list) => {
+                                                // found info relative to max_clean_root
+                                                let (slot, account_info) =
+                                                    &slot_list[index_in_slot_list];
+                                                if account_info.is_zero_lamport() {
+                                                    useless = false;
+                                                    purges_zero_lamports.insert(
+                                                        *pubkey,
+                                                        (
+                                                            self.accounts_index.get_rooted_entries(
+                                                                slot_list,
+                                                                max_clean_root_inclusive,
+                                                            ),
+                                                            ref_count,
+                                                        ),
+                                                    );
+                                                } else {
+                                                    found_not_zero += 1;
+                                                }
+                                                if uncleaned_roots.contains(slot) {
+                                                    // Assertion enforced by `accounts_index.get()`, the latest slot
+                                                    // will not be greater than the given `max_clean_root`
+                                                    if let Some(max_clean_root_inclusive) =
+                                                        max_clean_root_inclusive
+                                                    {
+                                                        assert!(slot <= &max_clean_root_inclusive);
+                                                    }
+                                                    purges_old_accounts.push(*pubkey);
+                                                    useless = false;
+                                                }
+                                            }
+                                            None => {
+                                                // This pubkey is in the index but not in a root slot, so clean
+                                                // it up by adding it to the to-be-purged list.
+                                                //
+                                                // Also, this pubkey must have been touched by some slot since
+                                                // it was in the dirty list, so we assume that the slot it was
+                                                // touched in must be unrooted.
+                                                not_found_on_fork += 1;
+                                                useless = false;
+                                                purges_old_accounts.push(*pubkey);
+                                            }
+                                        }
+                                    } else {
+                                        missing += 1;
+                                    }
+                                    if !useless {
+                                        useful += 1;
+                                    }
+                                    if useless {
+                                        AccountsIndexScanResult::OnlyKeepInMemoryIfDirty
+                                    } else {
+                                        AccountsIndexScanResult::KeepInMemory
+                                    }
+                                },
+                                None,
+                                false,
+                            );
+                            found_not_zero_accum.fetch_add(found_not_zero, Ordering::Relaxed);
+                            not_found_on_fork_accum.fetch_add(not_found_on_fork, Ordering::Relaxed);
+                            missing_accum.fetch_add(missing, Ordering::Relaxed);
+                            useful_accum.fetch_add(useful, Ordering::Relaxed);
+                            (purges_zero_lamports, purges_old_accounts)
+                        })
+                        .reduce(
+                            || (HashMap::new(), Vec::new()),
+                            |mut m1, m2| {
+                                // Collapse down the hashmaps/vecs into one.
+                                m1.0.extend(m2.0);
+                                m1.1.extend(m2.1);
+                                m1
+                            },
+                        )
+                };
+                if is_startup {
+                    do_clean_scan()
                 } else {
-                    let mut key_set = HashSet::new();
-                    key_set.insert(*key);
-                    assert!(
-                        !account_info.is_cached(),
-                        "The Accounts Cache must be flushed first for this account info. pubkey: {}, slot: {}",
-                        *key,
-                        *slot
-                    );
-                    let count = self
-                        .storage
-                        .get_account_storage_entry(*slot, account_info.store_id())
-                        .map(|store| store.count())
-                        .unwrap()
-                        - 1;
-                    debug!(
-                        "store_counts, inserting slot: {}, store id: {}, count: {}",
-                        slot, account_info.store_id(), count
-                    );
-                    store_counts.insert(*slot, (count, key_set));
+                    self.thread_pool_clean.install(do_clean_scan)
                 }
-                true
-            });
-        }
-        store_counts_time.stop();
+            };
+            accounts_scan.stop();
 
-        let mut calc_deps_time = Measure::start("calc_deps");
-        Self::calc_delete_dependencies(&purges_zero_lamports, &mut store_counts, min_dirty_slot);
-        calc_deps_time.stop();
+            let mut clean_old_rooted = Measure::start("clean_old_roots");
+            let ((purged_account_slots, removed_accounts), mut pubkeys_removed_from_accounts_index) =
+                self.clean_accounts_older_than_root(
+                    purges_old_accounts,
+                    max_clean_root_inclusive,
+                    &ancient_account_cleans,
+                    epoch_schedule,
+                );
 
-        let mut purge_filter = Measure::start("purge_filter");
-        self.filter_zero_lamport_clean_for_incremental_snapshots(
-            max_clean_root_inclusive,
-            last_full_snapshot_slot,
-            &store_counts,
-            &mut purges_zero_lamports,
-        );
-        purge_filter.stop();
+            self.do_reset_uncleaned_roots(max_clean_root_inclusive);
+            clean_old_rooted.stop();
 
-        let mut reclaims_time = Measure::start("reclaims");
-        // Recalculate reclaims with new purge set
-        let pubkey_to_slot_set: Vec<_> = purges_zero_lamports
-            .into_iter()
-            .map(|(key, (slots_list, _ref_count))| {
+            let mut store_counts_time = Measure::start("store_counts");
+
+            // Calculate store counts as if everything was purged
+            // Then purge if we can
+            let mut store_counts: HashMap<Slot, (usize, HashSet<Pubkey>)> = HashMap::new();
+            for (key, (account_infos, ref_count)) in purges_zero_lamports.iter_mut() {
+                if purged_account_slots.contains_key(key) {
+                    *ref_count = self.accounts_index.ref_count_from_storage(key);
+                }
+                account_infos.retain(|(slot, account_info)| {
+                    let was_slot_purged = purged_account_slots
+                        .get(key)
+                        .map(|slots_removed| slots_removed.contains(slot))
+                        .unwrap_or(false);
+                    if was_slot_purged {
+                        // No need to look up the slot storage below if the entire
+                        // slot was purged
+                        return false;
+                    }
+                    // Check if this update in `slot` to the account with `key` was reclaimed earlier by
+                    // `clean_accounts_older_than_root()`
+                    let was_reclaimed = removed_accounts
+                        .get(slot)
+                        .map(|store_removed| store_removed.contains(&account_info.offset()))
+                        .unwrap_or(false);
+                    if was_reclaimed {
+                        return false;
+                    }
+                    if let Some(store_count) = store_counts.get_mut(slot) {
+                        store_count.0 -= 1;
+                        store_count.1.insert(*key);
+                    } else {
+                        let mut key_set = HashSet::new();
+                        key_set.insert(*key);
+                        assert!(
+                            !account_info.is_cached(),
+                            "The Accounts Cache must be flushed first for this account info. pubkey: {}, slot: {}",
+                            *key,
+                            *slot
+                        );
+                        let count = self
+                            .storage
+                            .get_account_storage_entry(*slot, account_info.store_id())
+                            .map(|store| store.count())
+                            .unwrap()
+                            - 1;
+                        debug!(
+                            "store_counts, inserting slot: {}, store id: {}, count: {}",
+                            slot, account_info.store_id(), count
+                        );
+                        store_counts.insert(*slot, (count, key_set));
+                    }
+                    true
+                });
+            }
+            store_counts_time.stop();
+
+            let mut calc_deps_time = Measure::start("calc_deps");
+            Self::calc_delete_dependencies(&purges_zero_lamports, &mut store_counts, min_dirty_slot);
+            calc_deps_time.stop();
+
+            let mut purge_filter = Measure::start("purge_filter");
+            self.filter_zero_lamport_clean_for_incremental_snapshots(
+                max_clean_root_inclusive,
+                last_full_snapshot_slot,
+                &store_counts,
+                &mut purges_zero_lamports,
+            );
+            purge_filter.stop();
+
+            let mut reclaims_time = Measure::start("reclaims");
+            // Recalculate reclaims with new purge set
+            let pubkey_to_slot_set: Vec<_> = purges_zero_lamports
+                .into_iter()
+                .map(|(key, (slots_list, _ref_count))| {
+                    (
+                        key,
+                        slots_list
+                            .into_iter()
+                            .map(|(slot, _)| slot)
+                            .collect::<HashSet<Slot>>(),
+                    )
+                })
+                .collect();
+
+            let (reclaims, pubkeys_removed_from_accounts_index2) =
+                self.purge_keys_exact(pubkey_to_slot_set.iter());
+            pubkeys_removed_from_accounts_index.extend(pubkeys_removed_from_accounts_index2);
+
+            // Don't reset from clean, since the pubkeys in those stores may need to be unref'ed
+            // and those stores may be used for background hashing.
+            let reset_accounts = false;
+            let mut reclaim_result = ReclaimResult::default();
+            self.handle_reclaims(
+                (!reclaims.is_empty()).then(|| reclaims.iter()),
+                None,
+                Some((&self.clean_accounts_stats.purge_stats, &mut reclaim_result)),
+                reset_accounts,
+                &pubkeys_removed_from_accounts_index,
+            );
+
+            reclaims_time.stop();
+            measure_all.stop();
+
+            self.clean_accounts_stats.report();
+            datapoint_info!(
+                "clean_accounts",
+                ("total_us", measure_all.as_us(), i64),
                 (
-                    key,
-                    slots_list
-                        .into_iter()
-                        .map(|(slot, _)| slot)
-                        .collect::<HashSet<Slot>>(),
-                )
-            })
-            .collect();
-
-        let (reclaims, pubkeys_removed_from_accounts_index2) =
-            self.purge_keys_exact(pubkey_to_slot_set.iter());
-        pubkeys_removed_from_accounts_index.extend(pubkeys_removed_from_accounts_index2);
-
-        // Don't reset from clean, since the pubkeys in those stores may need to be unref'ed
-        // and those stores may be used for background hashing.
-        let reset_accounts = false;
-        let mut reclaim_result = ReclaimResult::default();
-        self.handle_reclaims(
-            (!reclaims.is_empty()).then(|| reclaims.iter()),
-            None,
-            Some((&self.clean_accounts_stats.purge_stats, &mut reclaim_result)),
-            reset_accounts,
-            &pubkeys_removed_from_accounts_index,
-        );
-
-        reclaims_time.stop();
-        measure_all.stop();
-
-        self.clean_accounts_stats.report();
-        datapoint_info!(
-            "clean_accounts",
-            ("total_us", measure_all.as_us(), i64),
-            (
-                "collect_delta_keys_us",
-                key_timings.collect_delta_keys_us,
-                i64
-            ),
-            ("oldest_dirty_slot", key_timings.oldest_dirty_slot, i64),
-            (
-                "pubkeys_removed_from_accounts_index",
-                pubkeys_removed_from_accounts_index.len(),
-                i64
-            ),
-            (
-                "dirty_ancient_stores",
-                key_timings.dirty_ancient_stores,
-                i64
-            ),
-            (
-                "dirty_store_processing_us",
-                key_timings.dirty_store_processing_us,
-                i64
-            ),
-            ("accounts_scan", accounts_scan.as_us() as i64, i64),
-            ("clean_old_rooted", clean_old_rooted.as_us() as i64, i64),
-            ("store_counts", store_counts_time.as_us() as i64, i64),
-            ("purge_filter", purge_filter.as_us() as i64, i64),
-            ("calc_deps", calc_deps_time.as_us() as i64, i64),
-            ("reclaims", reclaims_time.as_us() as i64, i64),
-            ("delta_insert_us", key_timings.delta_insert_us, i64),
-            ("delta_key_count", key_timings.delta_key_count, i64),
-            ("dirty_pubkeys_count", key_timings.dirty_pubkeys_count, i64),
-            ("sort_us", sort.as_us(), i64),
-            ("useful_keys", useful_accum.load(Ordering::Relaxed), i64),
-            ("total_keys_count", total_keys_count, i64),
-            (
-                "scan_found_not_zero",
-                found_not_zero_accum.load(Ordering::Relaxed),
-                i64
-            ),
-            (
-                "scan_not_found_on_fork",
-                not_found_on_fork_accum.load(Ordering::Relaxed),
-                i64
-            ),
-            ("scan_missing", missing_accum.load(Ordering::Relaxed), i64),
-            ("uncleaned_roots_len", uncleaned_roots.len(), i64),
-            (
-                "clean_old_root_us",
-                self.clean_accounts_stats
-                    .clean_old_root_us
-                    .swap(0, Ordering::Relaxed),
-                i64
-            ),
-            (
-                "clean_old_root_reclaim_us",
-                self.clean_accounts_stats
-                    .clean_old_root_reclaim_us
-                    .swap(0, Ordering::Relaxed),
-                i64
-            ),
-            (
-                "reset_uncleaned_roots_us",
-                self.clean_accounts_stats
-                    .reset_uncleaned_roots_us
-                    .swap(0, Ordering::Relaxed),
-                i64
-            ),
-            (
-                "remove_dead_accounts_remove_us",
-                self.clean_accounts_stats
-                    .remove_dead_accounts_remove_us
-                    .swap(0, Ordering::Relaxed),
-                i64
-            ),
-            (
-                "remove_dead_accounts_shrink_us",
-                self.clean_accounts_stats
-                    .remove_dead_accounts_shrink_us
-                    .swap(0, Ordering::Relaxed),
-                i64
-            ),
-            (
-                "clean_stored_dead_slots_us",
-                self.clean_accounts_stats
-                    .clean_stored_dead_slots_us
-                    .swap(0, Ordering::Relaxed),
-                i64
-            ),
-            (
-                "roots_added",
-                self.accounts_index.roots_added.swap(0, Ordering::Relaxed),
-                i64
-            ),
-            (
-                "roots_removed",
-                self.accounts_index.roots_removed.swap(0, Ordering::Relaxed),
-                i64
-            ),
-            (
-                "active_scans",
-                self.accounts_index.active_scans.load(Ordering::Relaxed),
-                i64
-            ),
-            (
-                "max_distance_to_min_scan_slot",
-                self.accounts_index
-                    .max_distance_to_min_scan_slot
-                    .swap(0, Ordering::Relaxed),
-                i64
-            ),
-            (
-                "ancient_account_cleans",
-                ancient_account_cleans.load(Ordering::Relaxed),
-                i64
-            ),
-            ("next_store_id", self.next_id.load(Ordering::Relaxed), i64),
-        );
+                    "collect_delta_keys_us",
+                    key_timings.collect_delta_keys_us,
+                    i64
+                ),
+                ("oldest_dirty_slot", key_timings.oldest_dirty_slot, i64),
+                (
+                    "pubkeys_removed_from_accounts_index",
+                    pubkeys_removed_from_accounts_index.len(),
+                    i64
+                ),
+                (
+                    "dirty_ancient_stores",
+                    key_timings.dirty_ancient_stores,
+                    i64
+                ),
+                (
+                    "dirty_store_processing_us",
+                    key_timings.dirty_store_processing_us,
+                    i64
+                ),
+                ("accounts_scan", accounts_scan.as_us() as i64, i64),
+                ("clean_old_rooted", clean_old_rooted.as_us() as i64, i64),
+                ("store_counts", store_counts_time.as_us() as i64, i64),
+                ("purge_filter", purge_filter.as_us() as i64, i64),
+                ("calc_deps", calc_deps_time.as_us() as i64, i64),
+                ("reclaims", reclaims_time.as_us() as i64, i64),
+                ("delta_insert_us", key_timings.delta_insert_us, i64),
+                ("delta_key_count", key_timings.delta_key_count, i64),
+                ("dirty_pubkeys_count", key_timings.dirty_pubkeys_count, i64),
+                ("sort_us", sort.as_us(), i64),
+                ("useful_keys", useful_accum.load(Ordering::Relaxed), i64),
+                ("total_keys_count", total_keys_count, i64),
+                (
+                    "scan_found_not_zero",
+                    found_not_zero_accum.load(Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "scan_not_found_on_fork",
+                    not_found_on_fork_accum.load(Ordering::Relaxed),
+                    i64
+                ),
+                ("scan_missing", missing_accum.load(Ordering::Relaxed), i64),
+                ("uncleaned_roots_len", uncleaned_roots.len(), i64),
+                (
+                    "clean_old_root_us",
+                    self.clean_accounts_stats
+                        .clean_old_root_us
+                        .swap(0, Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "clean_old_root_reclaim_us",
+                    self.clean_accounts_stats
+                        .clean_old_root_reclaim_us
+                        .swap(0, Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "reset_uncleaned_roots_us",
+                    self.clean_accounts_stats
+                        .reset_uncleaned_roots_us
+                        .swap(0, Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "remove_dead_accounts_remove_us",
+                    self.clean_accounts_stats
+                        .remove_dead_accounts_remove_us
+                        .swap(0, Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "remove_dead_accounts_shrink_us",
+                    self.clean_accounts_stats
+                        .remove_dead_accounts_shrink_us
+                        .swap(0, Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "clean_stored_dead_slots_us",
+                    self.clean_accounts_stats
+                        .clean_stored_dead_slots_us
+                        .swap(0, Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "roots_added",
+                    self.accounts_index.roots_added.swap(0, Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "roots_removed",
+                    self.accounts_index.roots_removed.swap(0, Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "active_scans",
+                    self.accounts_index.active_scans.load(Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "max_distance_to_min_scan_slot",
+                    self.accounts_index
+                        .max_distance_to_min_scan_slot
+                        .swap(0, Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "ancient_account_cleans",
+                    ancient_account_cleans.load(Ordering::Relaxed),
+                    i64
+                ),
+                ("next_store_id", self.next_id.load(Ordering::Relaxed), i64),
+            );
+        }
     }
 
     /// Removes the accounts in the input `reclaims` from the tracked "count" of
