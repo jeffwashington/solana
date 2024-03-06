@@ -3153,7 +3153,7 @@ impl AccountsDb {
         last_full_snapshot_slot: Option<Slot>,
         epoch_schedule: &EpochSchedule,
     ) {
-        for _ = 0..5 {
+        for _ in 0..5 {
             if self.exhaustively_verify_refcounts {
                 self.exhaustively_verify_refcounts(max_clean_root_inclusive);
             }
