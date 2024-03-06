@@ -629,7 +629,7 @@ impl AccountsDb {
         let mut accounts_to_combine =
             self.thread_pool_clean.install(|| {
                 let mut result = Vec::default();
-                let divisions = 4;
+                let divisions = 2;
                 let width = self.accounts_index.bins() / divisions;
                 assert_eq!(width * divisions,  self.accounts_index.bins());
                 for bin in 0..divisions {
