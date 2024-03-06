@@ -195,6 +195,10 @@ impl AncientSlotInfos {
                 self.all_infos.truncate(i);
                 break;
             }
+            if ancient_storages_required > 3 {
+                self.all_infos.truncate(i);
+                break;
+            }
         }
     }
 
