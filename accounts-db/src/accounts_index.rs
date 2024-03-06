@@ -1370,6 +1370,35 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
         self.storage.get_startup_remaining_items_to_flush_estimate()
     }
 
+    pub(crate) fn scan2<'a, F, I>(
+        &self,
+        pubkeys: I,
+        mut callback: F,
+    ) where
+        F: FnMut(
+            &'a Pubkey,
+            Option<(&[(Slot, T)], RefCount)>,
+        ),
+        I: Iterator<Item = &'a Pubkey>,
+    {
+        let mut lock = None;
+        let mut last_bin = self.bins(); // too big, won't match
+        pubkeys.into_iter().for_each(|pubkey| {
+            let bin = self.bin_calculator.bin_from_pubkey(pubkey);
+            if bin != last_bin {
+                // cannot re-use lock since next pubkey is in a different bin than previous one
+                lock = Some(&self.account_maps[bin]);
+                last_bin = bin;
+            }
+            // SAFETY: The caller must ensure that if `provide_entry_in_callback` is true, and
+            // if it's possible for `callback` to clone the entry Arc, then it must also add
+            // the entry to the in-mem cache if the entry is made dirty.
+            lock.as_ref().unwrap().scan_internal(pubkey, |entry| {
+                callback(pubkey, entry)
+            });
+        });
+    }
+
     /// Scan AccountsIndex for a given iterator of Pubkeys.
     ///
     /// This fn takes 4 arguments.

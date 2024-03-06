@@ -359,6 +359,54 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
     /// then the disk entry *must* also be added to the in-mem cache.
     ///
     /// Prefer `get_internal_inner()` or `get_internal_cloned()` for safe alternatives.
+    pub(super) fn scan_internal<RT>(
+        &self,
+        pubkey: &K,
+        // return true if item should be added to in_mem cache
+        callback: impl for<'a> FnOnce(Option<(&[(Slot, T)], RefCount)>) -> RT,
+    ) -> RT {
+        self.get_only_in_mem(pubkey, true, |entry| {
+            if let Some(entry) = entry {
+                callback(Some((&entry.slot_list.read().unwrap()[..], entry.ref_count())))
+            } else {
+                // not in cache, look on disk
+                let disk_entry = self.load_from_disk(pubkey); // returns None if not on disk
+                if disk_entry.is_none() {
+                    return callback(None);
+                }
+                let disk_entry = disk_entry.unwrap();
+                let map = self.map_internal.read().unwrap();
+                // look it up again in case it was added in the meantime
+                let result = map.get(pubkey);
+                if let Some(entry) = result {
+                    callback(Some((&entry.slot_list.read().unwrap(), entry.ref_count())))
+                }
+                else {
+                    if disk_entry.0.len() == 1 {
+                        callback(Some((&[(disk_entry.0[0].0, disk_entry.0[0].1.into())], disk_entry.1)))
+                    }
+                    else {
+                        let slot_list = disk_entry.0
+                        .into_iter()
+                        .map(|(slot, info)| (slot, info.into()))
+                        .collect::<Vec<_>>()      ;                  
+                        callback(Some((&slot_list[..], disk_entry.1)))
+                    }
+                }
+            }
+        })
+    }
+
+    /// lookup 'pubkey' in index (in_mem or disk).
+    /// call 'callback' whether found or not
+    ///
+    /// # Safety
+    ///
+    /// If the item is on-disk (and not in-mem), add if the item is/could be made dirty
+    /// *after* `callback` finishes (e.g. the entry Arc is cloned and saved by the caller),
+    /// then the disk entry *must* also be added to the in-mem cache.
+    ///
+    /// Prefer `get_internal_inner()` or `get_internal_cloned()` for safe alternatives.
     pub(super) fn get_internal<RT>(
         &self,
         pubkey: &K,

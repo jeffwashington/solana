@@ -3772,7 +3772,8 @@ impl AccountsDb {
         let mut all_are_zero_lamports = true;
         let mut index_entries_being_shrunk = Vec::with_capacity(accounts.len());
         let bin_calc = &self.accounts_index.bin_calculator;
-        self.accounts_index.scan(
+        let indexes_rescan = Mutex::new(vec![]);
+        self.accounts_index.scan2(
             accounts.iter().filter_map(|account| {
                 let pk = account.pubkey();
                 if let Some(bin) = &bin {
@@ -3786,6 +3787,40 @@ impl AccountsDb {
                 } else {
                     Some(pk)
                 }
+            }),
+            |pubkey, slots_refs| {
+                if let Some((slot_list, ref_count)) = slots_refs {
+                    let index = index.fetch_add(1, Ordering::Relaxed);
+                    let stored_account = &accounts[index];
+                    let is_alive = slot_list.iter().any(|(slot, _acct_info)| {
+                        // if the accounts index contains an entry at this slot, then the append vec we're asking about contains this item and thus, it is alive at this slot
+                        *slot == slot_to_shrink
+                    });
+                    if !is_alive {
+                        // This pubkey was found in the storage, but no longer exists in the index.
+                        // It would have had a ref to the storage from the initial store, but it will
+                        // not exist in the re-written slot. Unref it to keep the index consistent with
+                        // rewriting the storage entries.
+                        if bin.is_none() {
+                            indexes_rescan.lock().unwrap().push(index);
+                        }
+                    } else {
+                        // Hold onto the index entry arc so that it cannot be flushed.
+                        // Since we are shrinking these entries, we need to disambiguate append_vec_ids during this period and those only exist in the in-memory accounts index.
+                        //index_entries_being_shrunk.push(Arc::clone(entry.unwrap()));
+                        all_are_zero_lamports &= stored_account.lamports() == 0;
+                        alive_accounts.add(ref_count, stored_account, slot_list);
+                        alive += 1;
+                    }
+                }
+            },
+        );
+
+        let index = AtomicUsize::default();
+        self.accounts_index.scan(
+            indexes_rescan.into_inner().unwrap().into_iter().map(|index_use| {
+                index.store(index_use, Ordering::Relaxed);
+                accounts[index_use].pubkey()
             }),
             |pubkey, slots_refs, _entry| {
                 let mut result = AccountsIndexScanResult::OnlyKeepInMemoryIfDirty;
