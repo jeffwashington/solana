@@ -632,7 +632,7 @@ impl AccountsDb {
                 let divisions = 128;
                 let width = self.accounts_index.bins() / divisions;
                 assert_eq!(width * divisions,  self.accounts_index.bins());
-                for bin in 0..self.accounts_index.bins()/divisions {
+                for bin in 0..divisions {
                     let bins = (bin * width..(bin + 1) * width);
                     log::error!("bin: {:?}", bins);
                     let this_bin = accounts_per_storage
