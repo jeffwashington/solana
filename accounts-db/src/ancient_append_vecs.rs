@@ -629,8 +629,12 @@ impl AccountsDb {
         let mut accounts_to_combine =
             self.thread_pool_clean.install(|| {
                 let mut result = Vec::default();
-                for bin in 0..self.accounts_index.bins() {
-                    log::error!("bin: {}", bin);
+                let divisions = 128;
+                let width = self.accounts_index.bins() / divisions;
+                assert_eq!(width * divisions,  self.accounts_index.bins());
+                for bin in 0..self.accounts_index.bins()/divisions {
+                    let bins = (bin * width..(bin + 1) * width);
+                    log::error!("bin: {:?}", bins);
                     let this_bin = accounts_per_storage
                         .par_iter()
                         .map(|(info, unique_accounts)| {
@@ -638,7 +642,7 @@ impl AccountsDb {
                                 &info.storage,
                                 unique_accounts,
                                 &self.shrink_ancient_stats.shrink_stats,
-                                Some(bin),
+                                Some(bins.clone()),
                             )
                         })
                         .collect::<Vec<_>>();

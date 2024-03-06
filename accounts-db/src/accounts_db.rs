@@ -3752,7 +3752,7 @@ impl AccountsDb {
         accounts: &'a [StoredAccountMeta<'a>],
         stats: &ShrinkStats,
         slot_to_shrink: Slot,
-        bin: Option<usize>,
+        bin: Option<std::ops::Range<usize>>,
     ) -> LoadAccountsIndexForShrink<'a, T> {
         let count = accounts.len();
         let mut alive_accounts = T::with_capacity(count, slot_to_shrink);
@@ -3767,8 +3767,8 @@ impl AccountsDb {
         self.accounts_index.scan(
             accounts.iter().filter_map(|account| {
                 let pk = account.pubkey();
-                if let Some(bin) = bin {
-                    if bin_calc.bin_from_pubkey(pk) == bin {
+                if let Some(bin) = &bin {
+                    if bin.contains(&bin_calc.bin_from_pubkey(pk)) {
                         Some(pk)
                     } else {
                         // skipped this one
@@ -3865,7 +3865,7 @@ impl AccountsDb {
         store: &'a Arc<AccountStorageEntry>,
         unique_accounts: &'b GetUniqueAccountsResult<'b>,
         stats: &ShrinkStats,
-        bin: Option<usize>,
+        bin: Option<std::ops::Range<usize>>,
     ) -> ShrinkCollect<'b, T> {
         let slot = store.slot();
 
@@ -3893,7 +3893,7 @@ impl AccountsDb {
                         mut unrefed_pubkeys,
                         all_are_zero_lamports,
                         mut index_entries_being_shrunk,
-                    } = self.load_accounts_index_for_shrink(stored_accounts, stats, slot, bin);
+                    } = self.load_accounts_index_for_shrink(stored_accounts, stats, slot, bin.clone());
 
                     // collect
                     alive_accounts_collect
