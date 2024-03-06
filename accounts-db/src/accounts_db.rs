@@ -3777,7 +3777,7 @@ impl AccountsDb {
                     Some(pk)
                 }
             }),
-            |pubkey, slots_refs, entry| {
+            |pubkey, slots_refs, _entry| {
                 let mut result = AccountsIndexScanResult::OnlyKeepInMemoryIfDirty;
                 if let Some((slot_list, ref_count)) = slots_refs {
                     let stored_account = &accounts[index.fetch_add(1, Ordering::Relaxed)];
@@ -3796,7 +3796,7 @@ impl AccountsDb {
                     } else {
                         // Hold onto the index entry arc so that it cannot be flushed.
                         // Since we are shrinking these entries, we need to disambiguate append_vec_ids during this period and those only exist in the in-memory accounts index.
-                        index_entries_being_shrunk.push(Arc::clone(entry.unwrap()));
+                        //index_entries_being_shrunk.push(Arc::clone(entry.unwrap()));
                         all_are_zero_lamports &= stored_account.lamports() == 0;
                         alive_accounts.add(ref_count, stored_account, slot_list);
                         alive += 1;
@@ -3805,7 +3805,7 @@ impl AccountsDb {
                 result
             },
             None,
-            true,
+            false,//true,
         );
         // assert_eq!(index, std::cmp::min(accounts.len(), count));
         stats.alive_accounts.fetch_add(alive, Ordering::Relaxed);
