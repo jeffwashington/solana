@@ -320,18 +320,22 @@ impl AccountsDb {
             .slots_considered
             .fetch_add(sorted_slots.len() as u64, Ordering::Relaxed);
         let ancient_slot_infos = self.collect_sort_filter_ancient_slots(sorted_slots, &tuning);
+        log::error!("{}", line!());
 
         if ancient_slot_infos.all_infos.is_empty() {
             return; // nothing to do
         }
+        log::error!("{}", line!());
         let accounts_per_storage = self
             .get_unique_accounts_from_storage_for_combining_ancient_slots(
                 &ancient_slot_infos.all_infos[..],
             );
 
-        let mut accounts_to_combine = self.calc_accounts_to_combine(&accounts_per_storage);
+            log::error!("{}", line!());
+            let mut accounts_to_combine = self.calc_accounts_to_combine(&accounts_per_storage);
         metrics.unpackable_slots_count += accounts_to_combine.unpackable_slots_count;
 
+        log::error!("{}", line!());
         let mut many_refs_newest = accounts_to_combine
             .accounts_to_combine
             .iter_mut()
@@ -341,11 +345,13 @@ impl AccountsDb {
                 (!newest_alive.accounts.is_empty()).then_some(newest_alive)
             })
             .collect::<Vec<_>>();
+        log::error!("{}", line!());
 
         // Sort highest slot to lowest slot. This way, we will put the multi ref accounts with the highest slots in the highest
         // packed slot.
         many_refs_newest.sort_unstable_by(|a, b| b.slot.cmp(&a.slot));
         metrics.newest_alive_packed_count += many_refs_newest.len();
+        log::error!("{}", line!());
 
         if !Self::many_ref_accounts_can_be_moved(
             &many_refs_newest,
@@ -361,6 +367,7 @@ impl AccountsDb {
             self.addref_accounts_failed_to_shrink_ancient(accounts_to_combine);
             return;
         }
+        log::error!("{}", line!());
 
         // pack the accounts with 1 ref or refs > 1 but the slot we're packing is the highest alive slot for the pubkey.
         // Note the `chain` below combining the 2 types of refs.
@@ -373,6 +380,7 @@ impl AccountsDb {
             ),
             tuning.ideal_storage_size,
         );
+        log::error!("{}", line!());
 
         if pack.len() > accounts_to_combine.target_slots_sorted.len() {
             // Not enough slots to contain the accounts we are trying to pack.
@@ -381,8 +389,10 @@ impl AccountsDb {
             self.addref_accounts_failed_to_shrink_ancient(accounts_to_combine);
             return;
         }
+        log::error!("{}", line!());
 
         let write_ancient_accounts = self.write_packed_storages(&accounts_to_combine, pack);
+        log::error!("{}", line!());
 
         self.finish_combine_ancient_slots_packed_internal(
             accounts_to_combine,
