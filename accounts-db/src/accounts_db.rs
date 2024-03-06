@@ -540,7 +540,7 @@ pub struct AccountsAddRootTiming {
     pub store_us: u64,
 }
 
-const ANCIENT_APPEND_VEC_DEFAULT_OFFSET: Option<i64> = Some(15_000);
+const ANCIENT_APPEND_VEC_DEFAULT_OFFSET: Option<i64> = Some(30_000);
 
 #[derive(Debug, Default, Clone)]
 pub struct AccountsDbConfig {
@@ -1963,6 +1963,7 @@ pub struct ShrinkStats {
     pub(crate) num_slots_shrunk: AtomicUsize,
     storage_read_elapsed: AtomicU64,
     index_read_elapsed: AtomicU64,
+    pub total_index_read_elapsed: AtomicU64,
     create_and_insert_store_elapsed: AtomicU64,
     store_accounts_elapsed: AtomicU64,
     update_index_elapsed: AtomicU64,
@@ -2105,6 +2106,13 @@ impl ShrinkAncientStats {
                 "index_read_elapsed",
                 self.shrink_stats
                     .index_read_elapsed
+                    .swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "total_index_read",
+                self.shrink_stats
+                    .total_index_read_elapsed
                     .swap(0, Ordering::Relaxed) as i64,
                 i64
             ),

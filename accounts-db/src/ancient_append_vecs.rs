@@ -624,12 +624,13 @@ impl AccountsDb {
         let len = accounts_per_storage.len();
         let mut target_slots_sorted = Vec::with_capacity(len);
 
+        let mut m = solana_measure::measure::Measure::start("");
         // `shrink_collect` all accounts in the append vecs we want to combine.
         // This also unrefs all dead accounts in those append vecs.
         let mut accounts_to_combine =
             self.thread_pool_clean.install(|| {
                 let mut result = Vec::default();
-                let divisions = 1;
+                let divisions = 256;
                 let width = self.accounts_index.bins() / divisions;
                 assert_eq!(width * divisions,  self.accounts_index.bins());
                 for bin in 0..divisions {
@@ -711,6 +712,8 @@ impl AccountsDb {
                 }
                 result
             });
+        m.stop();
+        self.shrink_ancient_stats.shrink_stats.total_index_read_elapsed.fetch_add(m.as_us(), Ordering::Relaxed);
 
         let mut remove = Vec::default();
         for (i, (shrink_collect, (info, _unique_accounts))) in accounts_to_combine
