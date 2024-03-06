@@ -630,6 +630,7 @@ impl AccountsDb {
             self.thread_pool_clean.install(|| {
                 let mut result = Vec::default();
                 for bin in 0..self.accounts_index.bins() {
+                    log::error!("bin: {}", bin);
                     let this_bin = accounts_per_storage
                         .par_iter()
                         .map(|(info, unique_accounts)| {
