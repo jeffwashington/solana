@@ -494,7 +494,7 @@ pub(crate) struct ShrinkCollect<'a, T: ShrinkCollectRefs<'a>> {
     pub(crate) all_are_zero_lamports: bool,
     /// index entries that need to be held in memory while shrink is in progress
     /// These aren't read - they are just held so that entries cannot be flushed.
-    pub(crate) index_entries_being_shrunk: Vec<AccountMapEntry<AccountInfo>>,
+    pub(crate) _index_entries_being_shrunk: Vec<AccountMapEntry<AccountInfo>>,
 }
 
 pub const ACCOUNTS_DB_CONFIG_FOR_TESTING: AccountsDbConfig = AccountsDbConfig {
@@ -3905,7 +3905,6 @@ impl AccountsDb {
         accounts: &'a [StoredAccountMeta<'a>],
         stats: &ShrinkStats,
         slot_to_shrink: Slot,
-        bin: Option<usize>,
     ) -> LoadAccountsIndexForShrink<'a, T> {
         let count = accounts.len();
         let mut alive_accounts = T::with_capacity(count, slot_to_shrink);
@@ -3913,29 +3912,15 @@ impl AccountsDb {
 
         let mut alive = 0;
         let mut dead = 0;
-        let index = AtomicUsize::default();
+        let mut index = 0;
         let mut all_are_zero_lamports = true;
         let mut index_entries_being_shrunk = Vec::with_capacity(accounts.len());
-        let bin_calc = &self.accounts_index.bin_calculator;
         self.accounts_index.scan(
-            accounts.iter().filter_map(|account| {
-                let pk = account.pubkey();
-                if let Some(bin) = bin {
-                    if bin_calc.bin_from_pubkey(pk) == bin {
-                        Some(pk)
-                    } else {
-                        // skipped this one
-                        index.fetch_add(1, Ordering::Relaxed);
-                        None
-                    }
-                } else {
-                    Some(pk)
-                }
-            }),
+            accounts.iter().map(|account| account.pubkey()),
             |pubkey, slots_refs, _entry| {
                 let mut result = AccountsIndexScanResult::OnlyKeepInMemoryIfDirty;
                 if let Some((slot_list, ref_count)) = slots_refs {
-                    let stored_account = &accounts[index.fetch_add(1, Ordering::Relaxed)];
+                    let stored_account = &accounts[index];
                     let is_alive = slot_list.iter().any(|(slot, _acct_info)| {
                         // if the accounts index contains an entry at this slot, then the append vec we're asking about contains this item and thus, it is alive at this slot
                         *slot == slot_to_shrink
@@ -3957,6 +3942,7 @@ impl AccountsDb {
                         alive += 1;
                     }
                 }
+                index += 1;
                 result
             },
             None,
@@ -4016,7 +4002,6 @@ impl AccountsDb {
         store: &'a Arc<AccountStorageEntry>,
         unique_accounts: &'b GetUniqueAccountsResult<'b>,
         stats: &ShrinkStats,
-        bin: Option<usize>,
     ) -> ShrinkCollect<'b, T> {
         let slot = store.slot();
 
@@ -4044,7 +4029,7 @@ impl AccountsDb {
                         mut unrefed_pubkeys,
                         all_are_zero_lamports,
                         mut index_entries_being_shrunk,
-                    } = self.load_accounts_index_for_shrink(stored_accounts, stats, slot, bin);
+                    } = self.load_accounts_index_for_shrink(stored_accounts, stats, slot);
 
                     // collect
                     alive_accounts_collect
@@ -4096,7 +4081,7 @@ impl AccountsDb {
             alive_total_bytes,
             total_starting_accounts: len,
             all_are_zero_lamports: all_are_zero_lamports_collect.into_inner().unwrap(),
-            index_entries_being_shrunk: index_entries_being_shrunk_outer.into_inner().unwrap(),
+            _index_entries_being_shrunk: index_entries_being_shrunk_outer.into_inner().unwrap(),
         }
     }
 
@@ -4154,12 +4139,8 @@ impl AccountsDb {
         let unique_accounts =
             self.get_unique_accounts_from_storage_for_shrink(store, &self.shrink_stats);
         debug!("do_shrink_slot_store: slot: {}", slot);
-        let shrink_collect = self.shrink_collect::<AliveAccounts<'_>>(
-            store,
-            &unique_accounts,
-            &self.shrink_stats,
-            None,
-        );
+        let shrink_collect =
+            self.shrink_collect::<AliveAccounts<'_>>(store, &unique_accounts, &self.shrink_stats);
 
         // This shouldn't happen if alive_bytes/approx_stored_count are accurate
         if Self::should_not_shrink(
@@ -4725,7 +4706,6 @@ impl AccountsDb {
             old_storage,
             &unique_accounts,
             &self.shrink_ancient_stats.shrink_stats,
-            None,
         );
 
         // could follow what shrink does more closely
@@ -17219,7 +17199,6 @@ pub mod tests {
                                     &storage,
                                     &unique_accounts,
                                     &ShrinkStats::default(),
-                                    None,
                                 );
                                 let expect_single_opposite_alive_account =
                                     if append_opposite_alive_account {

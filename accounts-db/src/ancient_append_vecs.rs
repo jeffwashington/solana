@@ -694,86 +694,18 @@ impl AccountsDb {
 
         // `shrink_collect` all accounts in the append vecs we want to combine.
         // This also unrefs all dead accounts in those append vecs.
-        let mut accounts_to_combine =
-            self.thread_pool_clean.install(|| {
-                let mut result = Vec::default();
-                for bin in 0..self.accounts_index.bins() {
-                    let this_bin = accounts_per_storage
-                        .par_iter()
-                        .map(|(info, unique_accounts)| {
-                            self.shrink_collect::<ShrinkCollectAliveSeparatedByRefs<'_>>(
-                                &info.storage,
-                                unique_accounts,
-                                &self.shrink_ancient_stats.shrink_stats,
-                                Some(bin),
-                            )
-                        })
-                        .collect::<Vec<_>>();
-                    if result.is_empty() {
-                        result = this_bin;
-                    } else {
-                        // accumulate results from each bin. We need 1 entry per slot
-                        this_bin.into_iter().zip(result.iter_mut()).for_each(
-                            |(mut this_bin, all_bins)| {
-                                all_bins.alive_accounts.many_refs_old_alive.accounts.append(
-                                    &mut this_bin.alive_accounts.many_refs_old_alive.accounts,
-                                );
-                                all_bins.alive_accounts.many_refs_old_alive.bytes +=
-                                    this_bin.alive_accounts.many_refs_old_alive.bytes;
-                                assert_eq!(
-                                    all_bins.alive_accounts.many_refs_old_alive.slot,
-                                    this_bin.alive_accounts.many_refs_old_alive.slot
-                                );
-
-                                all_bins
-                                    .alive_accounts
-                                    .many_refs_this_is_newest_alive
-                                    .accounts
-                                    .append(
-                                        &mut this_bin
-                                            .alive_accounts
-                                            .many_refs_this_is_newest_alive
-                                            .accounts,
-                                    );
-                                all_bins.alive_accounts.many_refs_this_is_newest_alive.bytes +=
-                                    this_bin.alive_accounts.many_refs_this_is_newest_alive.bytes;
-                                assert_eq!(
-                                    all_bins.alive_accounts.many_refs_this_is_newest_alive.slot,
-                                    this_bin.alive_accounts.many_refs_this_is_newest_alive.slot
-                                );
-
-                                all_bins
-                                    .alive_accounts
-                                    .one_ref
-                                    .accounts
-                                    .append(&mut this_bin.alive_accounts.one_ref.accounts);
-                                all_bins.alive_accounts.one_ref.bytes +=
-                                    this_bin.alive_accounts.one_ref.bytes;
-                                all_bins.alive_total_bytes += this_bin.alive_total_bytes;
-                                assert_eq!(
-                                    all_bins.alive_accounts.one_ref.slot,
-                                    this_bin.alive_accounts.one_ref.slot
-                                );
-
-                                // slot, capacity, total_starting_accounts: same for all bins
-                                assert_eq!(all_bins.slot, this_bin.slot);
-                                assert_eq!(all_bins.capacity, this_bin.capacity);
-                                assert_eq!(all_bins.total_starting_accounts, this_bin.total_starting_accounts);
-
-                                all_bins.all_are_zero_lamports = all_bins.all_are_zero_lamports
-                                    && this_bin.all_are_zero_lamports;
-                                all_bins
-                                    .unrefed_pubkeys
-                                    .append(&mut this_bin.unrefed_pubkeys);
-                                all_bins
-                                    .index_entries_being_shrunk
-                                    .append(&mut this_bin.index_entries_being_shrunk);
-                            },
-                        );
-                    }
-                }
-                result
-            });
+        let mut accounts_to_combine = self.thread_pool_clean.install(|| {
+            accounts_per_storage
+                .par_iter()
+                .map(|(info, unique_accounts)| {
+                    self.shrink_collect::<ShrinkCollectAliveSeparatedByRefs<'_>>(
+                        &info.storage,
+                        unique_accounts,
+                        &self.shrink_ancient_stats.shrink_stats,
+                    )
+                })
+                .collect::<Vec<_>>()
+        });
 
         let mut remove = Vec::default();
         for (i, (shrink_collect, (info, _unique_accounts))) in accounts_to_combine
@@ -3454,7 +3386,7 @@ pub mod tests {
                 alive_total_bytes: 0,
                 total_starting_accounts: 0,
                 all_are_zero_lamports: false,
-                index_entries_being_shrunk: Vec::default(),
+                _index_entries_being_shrunk: Vec::default(),
             };
             let accounts_to_combine = AccountsToCombine {
                 accounts_keep_slots: HashMap::default(),
