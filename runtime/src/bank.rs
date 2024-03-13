@@ -6325,7 +6325,7 @@ impl Bank {
             else {
                 (Pubkey::default(), 0)
             };
-            log::info!("dummies: {}, {}, {}, {:?}", self.slot(), all_dummies, count, ancestors_vec.into_iter().rev().collect::<Vec<_>>());
+            // log::info!("dummies: {}, {}, {}, {:?}", self.slot(), all_dummies, count, ancestors_vec.into_iter().rev().collect::<Vec<_>>());
         }
 
         let mut signature_count_buf = [0u8; 8];
