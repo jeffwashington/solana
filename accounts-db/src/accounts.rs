@@ -758,7 +758,7 @@ impl Accounts {
                     i += 1;
                     r
                 });
-                if accounts_to_store.len() <= 3 {
+                if accounts_to_store.len() <= 4 {
                     log::error!(
                         "duplicates creating: {}, original accounts to store: {:?}, num_dup: {}",
                         pks.len(),
@@ -766,9 +766,7 @@ impl Accounts {
                             .iter()
                             .map(|account| (
                                 account.0,
-                                account.1.lamports(),
                                 account.1.owner(),
-                                account.1.data().len()
                             ))
                             .collect::<Vec<_>>(),
                         num_dup
@@ -778,6 +776,7 @@ impl Accounts {
             //log::error!("adding {} dummy accounts, took: {}us, slot: {slot}", pks.len(), us);
             datapoint_info!(
                 "dummy_accounts",
+                ("original_accounts", accounts_to_store.len(), i64),
                 ("count", pks.len(), i64),
                 ("dup_accounts_per_original", num_dup, i64),
                 ("total_us", us, i64),
