@@ -45,6 +45,21 @@ use {
     },
 };
 
+lazy_static! {
+    static ref KNOWNIDS: Vec<Pubkey> = {
+
+           const KNOWN_VALIDATOR_IDS: [&str; 4] = [
+            "31fxZovs3gBKVVTtC2VJUuKeVoq6mQkLjWnicWhErQ4f", // pop1
+            "Edfkf9gpC7KpnkNdKRPmseCtkE1zY8fUVRJMbiLYKKdK", // pop2
+            "2k31vk7hPiu2T9fJzuunc6tmaE57P7wt6tFoGK5A7k47", // pop3
+            "3cVWsRiTXD99BXNhzXs7Gkm3YBhCDrMQWnLern8B7TrD", // pop4
+        ];
+        use std::str::FromStr;
+        use solana_sdk::pubkey::Pubkey;
+KNOWN_VALIDATOR_IDS.iter().map(|s| Pubkey::from_str(s).unwrap()).collect()
+};
+}
+
 pub type PubkeyAccountSlot = (Pubkey, AccountSharedData, Slot);
 
 #[derive(Debug, Default, AbiExample)]
@@ -658,9 +673,7 @@ impl Accounts {
         let mut num_dup = 0;
 
         // skip adding dummy account for vote tx
-        let create_dummy_accounts = !accounts_to_store
-            .iter()
-            .any(|account| account.1.owner() == &solana_vote_program);
+        let create_dummy_accounts = true;
 
         if create_dummy_accounts {
             let mut additional_lamports = 0;
@@ -668,6 +681,12 @@ impl Accounts {
                 for i in 0..accounts_to_store.len() {
                     self.accounts_db.maybe_throttle_add();
                     let mut pk = accounts_to_store[i].0.clone();
+                    if KNOWNIDS.contains(&pk) {
+                        continue;
+                    }
+                    if                      accounts_to_store[i].1.owner() == &solana_vote_program {
+                        continue;
+                    }
 
                     let mut src_account = AccountSharedData::default();
                     use solana_sdk::account::WritableAccount;
