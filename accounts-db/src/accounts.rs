@@ -659,7 +659,7 @@ impl Accounts {
 
         // skip adding dummy account for vote tx
         let create_dummy_accounts = !accounts_to_store
-            .iter
+            .iter()
             .any(|account| account.1.owner() == &solana_vote_program);
 
         if create_dummy_accounts {
