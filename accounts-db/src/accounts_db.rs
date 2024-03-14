@@ -1720,7 +1720,7 @@ struct FlushStats {
     num_purged: usize,
     total_size: u64,
     store_accounts_timing: StoreAccountsTiming,
-    store_elapsed_us: u64,
+    store_accounts_total_us: u64,
 }
 
 impl FlushStats {
@@ -1730,7 +1730,7 @@ impl FlushStats {
         saturating_add_assign!(self.total_size, other.total_size);
         self.store_accounts_timing
             .accumulate(&other.store_accounts_timing);
-        saturating_add_assign!(self.store_elapsed_us, other.store_elapsed_us);
+        saturating_add_assign!(self.store_accounts_total_us, other.store_accounts_total_us);
     }
 }
 
@@ -6129,7 +6129,11 @@ impl AccountsDb {
             ),
             ("account_bytes_saved", account_bytes_saved, i64),
             ("num_accounts_saved", num_accounts_saved, i64),
-            ("store_elapsed_us", flush_stats.store_elapsed_us, i64),
+            (
+                "store_accounts_total_us",
+                flush_stats.store_accounts_total_us,
+                i64
+            ),
             (
                 "update_index_us",
                 flush_stats.store_accounts_timing.update_index_elapsed,
@@ -6270,13 +6274,13 @@ impl AccountsDb {
         );
 
         let mut store_accounts_timing = StoreAccountsTiming::default();
-        let mut store_elapsed_us = 0;
+        let mut store_accounts_total_us = 0;
         if !is_dead_slot {
             // This ensures that all updates are written to an AppendVec, before any
             // updates to the index happen, so anybody that sees a real entry in the index,
             // will be able to find the account in storage
             let flushed_store = self.create_and_insert_store(slot, total_size, "flush_slot_cache");
-            let (store_accounts_timing_inner, store_elapsed_inner_us) = measure_us!(self
+            let (store_accounts_timing_inner, store_accounts_total_inner_us) = measure_us!(self
                 .store_accounts_frozen(
                     (slot, &accounts[..]),
                     Some(hashes),
@@ -6285,7 +6289,7 @@ impl AccountsDb {
                     StoreReclaims::Default,
                 ));
             store_accounts_timing = store_accounts_timing_inner;
-            store_elapsed_us = store_elapsed_inner_us;
+            store_accounts_total_us = store_accounts_total_inner_us;
 
             // If the above sizing function is correct, just one AppendVec is enough to hold
             // all the data for the slot
@@ -6302,7 +6306,7 @@ impl AccountsDb {
             num_purged,
             total_size,
             store_accounts_timing,
-            store_elapsed_us,
+            store_accounts_total_us,
         }
     }
 
