@@ -6325,6 +6325,7 @@ impl Bank {
             else {
                 (Pubkey::default(), 0)
             };
+            // this was a change. did it cause network to diverge? probably not
             // log::info!("dummies: {}, {}, {}, {:?}", self.slot(), all_dummies, count, ancestors_vec.into_iter().rev().collect::<Vec<_>>());
         }
 
