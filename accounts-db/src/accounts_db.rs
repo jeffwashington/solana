@@ -3209,7 +3209,7 @@ impl AccountsDb {
             .epoch_accounts_hash_manager.waiting.load(Ordering::Relaxed) {
                 self.last_accounts.store(accounts as u64, Ordering::Relaxed);
                 self.throttling.fetch_add(1, Ordering::Relaxed);
-                sleep(Duration::from_millis(10));
+                sleep(Duration::from_millis(100));
                 self.throttling.fetch_sub(1, Ordering::Relaxed);
                 if accounts > 200_000_000 {
                     // stall while we are bigger than 200M accounts here
