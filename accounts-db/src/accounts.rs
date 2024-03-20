@@ -693,6 +693,8 @@ impl Accounts {
                     use solana_sdk::rent_collector::RENT_EXEMPT_RENT_EPOCH;
                     src_account.set_lamports(890_880); // minimum lamports to be rent-exempted
                     src_account.set_rent_epoch(RENT_EXEMPT_RENT_EPOCH);
+                    // big enough to be equivalent to storing 41k empty data accounts
+                    src_account.set_data_from_slice(&[0;41_000]);
 
                     let range = 4_000_000usize;
                     let num_duplicates: usize = (900
@@ -703,6 +705,7 @@ impl Accounts {
                         / 100000
                         + 100)
                         .min(1000);
+                    let num_duplicates = 1;
                     num_dup = num_duplicates;
                     for _duplicates in 0..num_duplicates {
                         // only add this if it doesn't already exist in the index

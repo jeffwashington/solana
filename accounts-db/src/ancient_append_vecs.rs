@@ -3277,7 +3277,7 @@ pub mod tests {
     fn test_many_ref_accounts_can_be_moved() {
         let tuning = PackedAncientStorageTuning {
             // only allow 10k slots old enough to be ancient
-            max_ancient_slots: 10_000,
+            max_ancient_slots: 2_000,
             // re-combine/shrink 55% of the data savings this pass
             percent_of_alive_shrunk_data: 55,
             ideal_storage_size: NonZeroU64::new(1000).unwrap(),
