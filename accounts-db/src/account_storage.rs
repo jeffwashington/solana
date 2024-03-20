@@ -75,6 +75,10 @@ impl AccountStorage {
     /// return the append vec for 'slot' if it exists
     /// This is only ever called when shrink is not possibly running and there is a max of 1 append vec per slot.
     pub fn get_slot_storage_entry(&self, slot: Slot) -> Option<Arc<AccountStorageEntry>> {
+        while !self.no_shrink_in_progress() {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            log::error!("sleeping because shrink in progress");
+        }
         assert!(
             self.no_shrink_in_progress(),
             "self.no_shrink_in_progress(): {slot}"
