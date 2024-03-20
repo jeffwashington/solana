@@ -1046,7 +1046,7 @@ impl AccountStorageEntry {
         let tail = AccountsFile::file_name(slot, id);
         let path = Path::new(path).join(tail);
         let accounts = if false {
-            AccountsFile::AppendVec(AppendVec::new(&path, true /* create new */, file_size as usize));
+            AccountsFile::AppendVec(AppendVec::new(&path, true /* create new */, file_size as usize))
         }
         else {
             AccountsFile::TieredHot(TieredStorage::new_writable(&path))
