@@ -1045,7 +1045,7 @@ impl AccountStorageEntry {
     pub fn new(path: &Path, slot: Slot, id: AccountsFileId, file_size: u64) -> Self {
         let tail = AccountsFile::file_name(slot, id);
         let path = Path::new(path).join(tail);
-        let accounts = if true {
+        let accounts = if false {
             AccountsFile::AppendVec(AppendVec::new(&path, true /* create new */, file_size as usize));
         }
         else {
@@ -1065,7 +1065,7 @@ impl AccountStorageEntry {
     pub fn new_for_shrink(path: &Path, slot: Slot, id: AccountsFileId, file_size: u64) -> Self {
         let tail = AccountsFile::file_name(slot, id);
         let path = Path::new(path).join(tail);
-        let accounts = if true {
+        let accounts = if false {
         AccountsFile::AppendVec(AppendVec::new(
             &path,
             true, /* create new */
