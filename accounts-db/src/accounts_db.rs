@@ -2436,7 +2436,7 @@ impl<'a> AppendVecScan for ScanState<'a> {
         // TODO(yhchiang): return Hash::default() in case account hash is None
         // TODO(yhchiang): for write version, need to update the geysor code to
         // sort data based on write version.
-        let hash_is_missing = loaded_hash == AccountHash(Hash::default());
+        let hash_is_missing = true; // for pop, always use calculated hash. saved hashes in oldest append vecs are incorrect, probably due to slot change. used to be: loaded_hash == AccountHash(Hash::default());
         if self.config.check_hash || hash_is_missing {
             let computed_hash = loaded_account.compute_hash(pubkey);
             if hash_is_missing {
