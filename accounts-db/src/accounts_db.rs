@@ -6422,6 +6422,7 @@ impl AccountsDb {
             }
 
             let store_id = storage.append_vec_id();
+            let ln = rvs.as_ref().map(|x| x.len()).unwrap_or_default();
             for (i, stored_account_info) in rvs.unwrap().into_iter().enumerate() {
                 storage.add_account(stored_account_info.size);
 
@@ -6433,6 +6434,7 @@ impl AccountsDb {
                         .unwrap_or_default(),
                 ));
             }
+            assert_eq!(storage.count(), ln);
             // restore the state to available
             storage.set_status(AccountStorageStatus::Available);
         }
