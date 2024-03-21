@@ -1083,6 +1083,24 @@ impl AccountStorageEntry {
         *count_and_status = (count, status);
     }
 
+    fn set_final_status_count_and_size(
+        &self,
+        status: AccountStorageStatus,
+        count: usize,
+        num_bytes: usize,
+    ) {
+        let mut count_and_status = self.count_and_status.lock_write();
+
+        // assert_eq!(
+        //    0,
+        //    self.approx_store_count.fetch_add(count, Ordering::Relaxed);
+        //);
+        self.approx_store_count.fetch_add(count, Ordering::Relaxed);
+        //assert_eq!(0, self.alive_bytes.fetch_add(num_bytes, Ordering::SeqCst));
+        self.alive_bytes.fetch_add(num_bytes, Ordering::SeqCst);
+        *count_and_status = (count, status);
+    }
+
     pub fn status(&self) -> AccountStorageStatus {
         self.count_and_status.read().1
     }
@@ -1125,13 +1143,6 @@ impl AccountStorageEntry {
 
     fn get_stored_account_meta(&self, offset: usize) -> Option<StoredAccountMeta> {
         Some(self.accounts.get_account(offset)?.0)
-    }
-
-    fn add_account(&self, num_bytes: usize) {
-        let mut count_and_status = self.count_and_status.lock_write();
-        *count_and_status = (count_and_status.0 + 1, count_and_status.1);
-        self.approx_store_count.fetch_add(1, Ordering::Relaxed);
-        self.alive_bytes.fetch_add(num_bytes, Ordering::SeqCst);
     }
 
     fn try_available(&self) -> bool {
@@ -5966,7 +5977,7 @@ impl AccountsDb {
                 .append_accounts(accounts_and_meta_to_store, infos.len());
             append_accounts.stop();
             total_append_accounts_us += append_accounts.as_us();
-            if rvs.is_none() {
+            let Some(rvs) = rvs else {
                 storage.set_status(AccountStorageStatus::Full);
 
                 // See if an account overflows the append vecs in the slot.
@@ -5988,13 +5999,14 @@ impl AccountsDb {
                     self.create_and_insert_store(slot, special_store_size, "large create");
                 }
                 continue;
-            }
+            };
 
             let (_, infos_us) = measure_us!({
                 let store_id = storage.append_vec_id();
-                for (i, stored_account_info) in rvs.unwrap().into_iter().enumerate() {
-                    storage.add_account(stored_account_info.size);
-
+                let count = rvs.len();
+                let mut num_bytes = 0;
+                for (i, stored_account_info) in rvs.into_iter().enumerate() {
+                    num_bytes += stored_account_info.size;
                     infos.push(AccountInfo::new(
                         StorageLocation::AppendVec(store_id, stored_account_info.offset),
                         accounts_and_meta_to_store
@@ -6004,7 +6016,11 @@ impl AccountsDb {
                     ));
                 }
                 // restore the state to available
-                storage.set_status(AccountStorageStatus::Available);
+                storage.set_final_status_count_and_size(
+                    AccountStorageStatus::Available,
+                    count,
+                    num_bytes,
+                );
             });
             self.stats
                 .store_collect_infos_us
