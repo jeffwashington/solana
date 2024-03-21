@@ -715,7 +715,6 @@ impl Accounts {
                         pk = Pubkey::from(hasher.result().to_bytes());
                         pks.push((pk, src_account.clone()));
                     }
-                    break;
                 }
 
                 use rayon::iter::IntoParallelRefIterator;
