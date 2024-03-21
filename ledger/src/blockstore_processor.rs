@@ -743,6 +743,7 @@ pub fn test_process_blockstore(
     };
 
     let (bank_forks, leader_schedule_cache, ..) = crate::bank_forks_utils::load_bank_forks(
+        &Pubkey::default(),
         genesis_config,
         blockstore,
         Vec::new(),
@@ -774,6 +775,7 @@ pub fn test_process_blockstore(
 }
 
 pub(crate) fn process_blockstore_for_bank_0(
+    id: &Pubkey,
     genesis_config: &GenesisConfig,
     blockstore: &Blockstore,
     account_paths: Vec<PathBuf>,
@@ -785,6 +787,7 @@ pub(crate) fn process_blockstore_for_bank_0(
 ) -> Arc<RwLock<BankForks>> {
     // Setup bank for slot 0
     let bank0 = Bank::new_with_paths(
+        id,
         genesis_config,
         Arc::new(opts.runtime_config.clone()),
         account_paths,

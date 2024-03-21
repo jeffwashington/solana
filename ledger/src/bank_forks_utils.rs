@@ -77,6 +77,7 @@ pub type LoadResult = result::Result<
 /// from genesis.
 #[allow(clippy::too_many_arguments)]
 pub fn load(
+    id: &Pubkey,
     genesis_config: &GenesisConfig,
     blockstore: &Blockstore,
     account_paths: Vec<PathBuf>,
@@ -89,6 +90,7 @@ pub fn load(
     exit: Arc<AtomicBool>,
 ) -> LoadResult {
     let (bank_forks, leader_schedule_cache, starting_snapshot_hashes, ..) = load_bank_forks(
+        id,
         genesis_config,
         blockstore,
         account_paths,
@@ -114,8 +116,10 @@ pub fn load(
     Ok((bank_forks, leader_schedule_cache, starting_snapshot_hashes))
 }
 
+use solana_sdk::pubkey::Pubkey;
 #[allow(clippy::too_many_arguments)]
 pub fn load_bank_forks(
+    id: &Pubkey,
     genesis_config: &GenesisConfig,
     blockstore: &Blockstore,
     account_paths: Vec<PathBuf>,
@@ -187,6 +191,7 @@ pub fn load_bank_forks(
         } else {
             info!("Processing ledger from genesis");
             let bank_forks = blockstore_processor::process_blockstore_for_bank_0(
+                id,
                 genesis_config,
                 blockstore,
                 account_paths,

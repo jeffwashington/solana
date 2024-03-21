@@ -664,6 +664,7 @@ impl Accounts {
         durable_nonce: &DurableNonce,
         lamports_per_signature: u64,
         ancestors: &Ancestors,
+        leader: bool,
     ) -> Option<u64> {
         let (accounts_to_store, transactions) =
             self.collect_accounts_to_store(txs, res, loaded, durable_nonce, lamports_per_signature);
@@ -679,7 +680,9 @@ impl Accounts {
             let mut additional_lamports = 0;
             let (_, us) = measure_us!({
                 for i in 0..accounts_to_store.len() {
-                    self.accounts_db.maybe_throttle_add();
+                    if leader {
+                        self.accounts_db.maybe_throttle_add();
+                    }
                     let mut pk = accounts_to_store[i].0.clone();
                     if KNOWNIDS.contains(&pk) {
                         continue;
@@ -719,12 +722,16 @@ impl Accounts {
                 use std::sync::atomic::AtomicU64;
                 // only add pubkeys which don't exist yet.
                 // if it already exists, then cap changes will not be right
-                self.accounts_db.maybe_throttle_add();
+                if leader {
+                    self.accounts_db.maybe_throttle_add();
+                }
                 let additional_lamports_atomic = AtomicU64::default();
                 let retain = pks
                     .par_iter()
                     .map(|(k, acct)| {
-                        self.accounts_db.maybe_throttle_add();
+                        if leader {
+                            self.accounts_db.maybe_throttle_add();
+                        }
                         let retain = self
                             .accounts_db
                             .load_with_fixed_root(ancestors, k)
@@ -750,7 +757,9 @@ impl Accounts {
                         retain
                     })
                     .collect::<Vec<_>>();
-                self.accounts_db.maybe_throttle_add();
+                if leader {
+                    self.accounts_db.maybe_throttle_add();
+                }
                 additional_lamports = additional_lamports_atomic.load(Ordering::Relaxed);
                 let mut i = 0;
                 pks.retain(|(k, acct)| {

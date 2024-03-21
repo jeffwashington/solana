@@ -486,6 +486,7 @@ impl PartialEq for Bank {
             return true;
         }
         let Self {
+            id: _,
             skipped_rewrites: _,
             rc: _,
             status_cache: _,
@@ -647,6 +648,8 @@ pub struct Bank {
 
     /// FIFO queue of `recent_blockhash` items
     blockhash_queue: RwLock<BlockhashQueue>,
+
+    pub id: Pubkey,
 
     /// The set of parents including this bank
     pub ancestors: Ancestors,
@@ -929,6 +932,7 @@ pub(super) enum RewardInterval {
 impl Bank {
     fn default_with_accounts(accounts: Accounts) -> Self {
         let mut bank = Self {
+            id: Pubkey::default(),
             skipped_rewrites: Mutex::default(),
             incremental_snapshot_persistence: None,
             rc: BankRc::new(accounts, Slot::default()),
@@ -1011,6 +1015,7 @@ impl Bank {
 
     #[allow(clippy::too_many_arguments)]
     pub fn new_with_paths(
+        id: &Pubkey,
         genesis_config: &GenesisConfig,
         runtime_config: Arc<RuntimeConfig>,
         paths: Vec<PathBuf>,
@@ -1035,6 +1040,7 @@ impl Bank {
         );
         let accounts = Accounts::new(Arc::new(accounts_db));
         let mut bank = Self::default_with_accounts(accounts);
+        bank.id = *id;
         bank.ancestors = Ancestors::from(vec![bank.slot()]);
         bank.transaction_debug_keys = debug_keys;
         bank.runtime_config = runtime_config;
@@ -1239,6 +1245,7 @@ impl Bank {
 
         let accounts_data_size_initial = parent.load_accounts_data_size();
         let mut new = Self {
+            id: parent.id,
             skipped_rewrites: Mutex::default(),
             incremental_snapshot_persistence: None,
             rc,
@@ -1765,6 +1772,7 @@ impl Bank {
         );
         let stakes_accounts_load_duration = now.elapsed();
         let mut bank = Self {
+            id: Pubkey::default(),
             skipped_rewrites: Mutex::default(),
             incremental_snapshot_persistence: fields.incremental_snapshot_persistence,
             rc: bank_rc,
@@ -4913,6 +4921,7 @@ impl Bank {
 
         let mut write_time = Measure::start("write_time");
         let durable_nonce = DurableNonce::from_blockhash(&last_blockhash);
+
         let dummy_lamports = self.rc.accounts.store_cached(
             self.slot(),
             sanitized_txs,
@@ -4921,6 +4930,7 @@ impl Bank {
             &durable_nonce,
             lamports_per_signature,
             &self.ancestors,
+            self.collector_id() == &self.id,
         );
         if let Some(dummy_lamports) = dummy_lamports {
             self.capitalization.fetch_add(dummy_lamports, Relaxed);

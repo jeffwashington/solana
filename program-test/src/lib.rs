@@ -815,6 +815,7 @@ impl ProgramTest {
         debug!("Genesis config: {}", genesis_config);
 
         let mut bank = Bank::new_with_paths(
+            &Pubkey::default(),
             &genesis_config,
             Arc::new(RuntimeConfig {
                 compute_budget: self.compute_max_units.map(|max_units| ComputeBudget {

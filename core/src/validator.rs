@@ -700,6 +700,7 @@ impl Validator {
             pruned_banks_receiver,
             entry_notifier_service,
         ) = load_blockstore(
+            &id,
             config,
             ledger_path,
             exit.clone(),
@@ -1734,6 +1735,7 @@ fn blockstore_options_from_config(config: &ValidatorConfig) -> BlockstoreOptions
 
 #[allow(clippy::type_complexity)]
 fn load_blockstore(
+    id: &Pubkey,
     config: &ValidatorConfig,
     ledger_path: &Path,
     exit: Arc<AtomicBool>,
@@ -1843,6 +1845,7 @@ fn load_blockstore(
 
     let (bank_forks, mut leader_schedule_cache, starting_snapshot_hashes) =
         bank_forks_utils::load_bank_forks(
+            id,
             &genesis_config,
             &blockstore,
             config.account_paths.clone(),
