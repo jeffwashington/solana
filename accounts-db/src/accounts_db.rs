@@ -1420,6 +1420,7 @@ pub struct AccountsStats {
     store_update_index: AtomicU64,
     store_handle_reclaims: AtomicU64,
     store_append_accounts: AtomicU64,
+    store_collect_infos_us: AtomicU64,
     pub stakes_cache_check_and_store_us: AtomicU64,
     store_num_accounts: AtomicU64,
     store_total_data: AtomicU64,
@@ -5989,20 +5990,25 @@ impl AccountsDb {
                 continue;
             }
 
-            let store_id = storage.append_vec_id();
-            for (i, stored_account_info) in rvs.unwrap().into_iter().enumerate() {
-                storage.add_account(stored_account_info.size);
+            let (_, infos_us) = measure_us!({
+                let store_id = storage.append_vec_id();
+                for (i, stored_account_info) in rvs.unwrap().into_iter().enumerate() {
+                    storage.add_account(stored_account_info.size);
 
-                infos.push(AccountInfo::new(
-                    StorageLocation::AppendVec(store_id, stored_account_info.offset),
-                    accounts_and_meta_to_store
-                        .account(i)
-                        .map(|account| account.lamports())
-                        .unwrap_or_default(),
-                ));
-            }
-            // restore the state to available
-            storage.set_status(AccountStorageStatus::Available);
+                    infos.push(AccountInfo::new(
+                        StorageLocation::AppendVec(store_id, stored_account_info.offset),
+                        accounts_and_meta_to_store
+                            .account(i)
+                            .map(|account| account.lamports())
+                            .unwrap_or_default(),
+                    ));
+                }
+                // restore the state to available
+                storage.set_status(AccountStorageStatus::Available);
+            });
+            self.stats
+                .store_collect_infos_us
+                .fetch_add(infos_us, Ordering::Relaxed);
         }
 
         self.stats
@@ -6476,7 +6482,7 @@ impl AccountsDb {
             .calc_stored_meta
             .fetch_add(calc_stored_meta_time.as_us(), Ordering::Relaxed);
 
-        match store_to {
+        let results = match store_to {
             StoreTo::Cache => {
                 let txn_iter: Box<dyn std::iter::Iterator<Item = &Option<&SanitizedTransaction>>> =
                     match transactions {
@@ -6539,7 +6545,9 @@ impl AccountsDb {
                     }
                 }
             }
-        }
+        };
+        self.report_store_timings();
+        results
     }
 
     fn report_store_stats(&self) {
@@ -8287,6 +8295,11 @@ impl AccountsDb {
                 (
                     "append_accounts",
                     self.stats.store_append_accounts.swap(0, Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "store_collect_infos_us",
+                    self.stats.store_collect_infos_us.swap(0, Ordering::Relaxed),
                     i64
                 ),
                 (
