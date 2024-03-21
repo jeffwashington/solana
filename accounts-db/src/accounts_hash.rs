@@ -316,7 +316,7 @@ impl HashStats {
 /// Note this can be saved/loaded during hash calculation to a memory mapped file whose contents are
 /// [CalculateHashIntermediate]
 #[repr(C)]
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Pod, Zeroable)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Pod, Zeroable, PartialOrd)]
 pub struct CalculateHashIntermediate {
     pub hash: AccountHash,
     pub lamports: u64,
@@ -1226,7 +1226,7 @@ pub enum ZeroLamportAccounts {
 
 /// Hash of an account
 #[repr(transparent)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Pod, Zeroable, AbiExample)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Pod, Zeroable, AbiExample, PartialOrd)]
 pub struct AccountHash(pub Hash);
 
 // Ensure the newtype wrapper never changes size from the underlying Hash

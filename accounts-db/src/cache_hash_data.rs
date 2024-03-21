@@ -2,7 +2,7 @@
 #[cfg(test)]
 use crate::pubkey_bins::PubkeyBinCalculator24;
 use {
-    crate::{accounts_hash::CalculateHashIntermediate, cache_hash_data_stats::CacheHashDataStats},
+    crate::{accounts_hash::{CalculateHashIntermediate}, cache_hash_data_stats::CacheHashDataStats},
     bytemuck::{Pod, Zeroable},
     memmap2::MmapMut,
     solana_measure::measure::Measure,
@@ -114,7 +114,7 @@ impl CacheHashDataFile {
         self.get_slice(0)
     }
 
-    #[cfg(test)]
+    //#[cfg(test)]
     /// Populate 'accumulator' from entire contents of the cache file.
     pub fn load_all(
         &self,
@@ -199,12 +199,168 @@ pub(crate) struct CacheHashData {
 
 impl Drop for CacheHashData {
     fn drop(&mut self) {
-        self.delete_old_cache_files();
+        // self.delete_old_cache_files();
         self.stats.report();
     }
 }
 
+type hashentry = (std::string::String, CalculateHashIntermediate);
+
 impl CacheHashData {
+    pub fn compare_two(files: &[&PathBuf; 2]) {
+        let datas = files.into_iter().map(|p| Self::new(p.to_path_buf(), DeletionPolicy::AllUnused)).collect::<Vec<_>>();
+        use {dashmap::DashMap, std::collections::HashMap};
+        let mut one = DashMap::<Pubkey, Vec<hashentry>>::new();
+        let mut two = DashMap::<Pubkey, Vec<hashentry>>::new();
+        let cache_one = &datas[0];
+        use solana_sdk::pubkey::Pubkey;
+        let mut files = cache_one
+            .pre_existing_cache_files
+            .lock()
+            .unwrap()
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>();
+        let vec_size = 65536;
+        use crate::pubkey_bins::PubkeyBinCalculator24;
+        use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+        let bin_calc = PubkeyBinCalculator24::new(65536);
+        use std::str::FromStr;
+        let interesting = Pubkey::from_str("6EnpckMpzS6k3fVMAjDXU8uDzg6zKbGzixAXipHiLiRA").unwrap();
+
+        use log::*;
+        error!("{}{}, {}", file!(), line!(), interesting);
+        files.sort();
+        let cache_two = &datas[1];
+        let mut files2 = cache_two
+            .pre_existing_cache_files
+            .lock()
+            .unwrap()
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>();
+        files2.sort();
+
+        [0, 1].par_iter().for_each(|i| {
+
+            if i == &0 {
+        files.iter().for_each(|file| {
+            //error!("file: {:?}", file);
+            let mut accum = (0..vec_size).map(|_| Vec::default()).collect::<Vec<_>>();
+            let x = cache_one.load(file, &mut accum, 0, &bin_calc);
+            if x.is_err() {
+                error!("failure to load file :{:?}, {:?}", x, file);
+            }
+            accum.into_iter().flatten().for_each(|entry| {
+                let pk = entry.pubkey;
+                let new_one = (format!("{:?}", file), entry);
+                if interesting == pk {
+                    error!("found1: {:?}", new_one);
+                }
+                if let Some(mut current) = one.get_mut(&pk) {
+                    current.push(new_one);
+                } else {
+                    one.insert(pk, vec![new_one]);
+                }
+            });
+        });
+    }
+    else {
+        error!("{}{}", file!(), line!());
+        files2.iter().for_each(|file| {
+            //error!("file2: {:?}", file);
+            let mut accum = (0..vec_size).map(|_| Vec::default()).collect::<Vec<_>>();
+            let x = cache_two.load(file, &mut accum, 0, &bin_calc);
+            if x.is_err() {
+                error!("failure to load file2 :{:?}, {:?}", x, file);
+            }
+            accum.into_iter().flatten().for_each(|entry| {
+                let pk = entry.pubkey;
+                let new_one = (format!("{:?}", file), entry);
+                if interesting == pk {
+                    error!("found2: {:?}", new_one);
+                }
+                if let Some(mut current) = two.get_mut(&pk) {
+                    current.push(new_one);
+                } else {
+                    two.insert(pk, vec![new_one]);
+                }
+            });
+        });
+    }});
+
+        error!(
+            "items in one: {}, two: {}, files in one, two: {}, {}",
+            one.len(),
+            two.len(),
+            files.len(),
+            files2.len()
+        );
+
+        let mut cap1 = 0;
+        let mut cap2 = 0;
+        let mut added1 = 0;
+        let mut added2 = 0;
+        const ZERO_RAW_LAMPORTS_SENTINEL:u64 = 0;
+        error!("draining");
+        for entry in one.iter() {
+            let k = entry.key();
+            let mut v = entry.value().clone();
+            //v.sort_by(Self::sorter);
+            let one = v.last().unwrap();
+            if one.1.lamports != ZERO_RAW_LAMPORTS_SENTINEL && one.1.lamports != 0{
+                cap1 += one.1.lamports;
+                added1 += 1;
+            }
+            if let Some((_, mut entry)) = two.remove(&k) {
+                //entry.sort_by(Self::sorter);
+                let two = entry.last().unwrap();
+                if two.1.lamports != ZERO_RAW_LAMPORTS_SENTINEL && two.1.lamports != 0 {
+                    cap2 += two.1.lamports;
+                    added2 += 1;
+                }
+                if one.1 != two.1 && !((one.1.lamports == ZERO_RAW_LAMPORTS_SENTINEL && two.1.lamports == 0) || (one.1.lamports == 0 && two.1.lamports == ZERO_RAW_LAMPORTS_SENTINEL)) {
+                    error!("values different: {} {:?}, {:?}", k, v, entry);
+                } else {
+                    assert_eq!(one.1.lamports, two.1.lamports);
+                }
+            } else {
+                if one.1.lamports != ZERO_RAW_LAMPORTS_SENTINEL && one.1.lamports != 0 {
+                    error!("in 1, not in 2: {:?}, {:?}", k, v);
+                }
+            }
+        }
+        for entry in two.iter() {
+            let k = entry.key();
+            let mut v = entry.value().clone();
+            //v.sort_by(Self::sorter);
+            let two = v.last().unwrap();
+            if two.1.lamports != ZERO_RAW_LAMPORTS_SENTINEL && two.1.lamports != 0 {
+                added2 += 1;
+                cap2 += two.1.lamports;
+                error!("in 2, not in 1: {:?}, {:?}", k, v);
+            }
+        }
+        panic!(
+            "done with compare, lamports: {}, {}, {}, added: {},{}",
+            cap1,
+            cap2,
+            if cap1 > cap2 {
+                cap1 - cap2
+            } else {
+                cap2 - cap1
+            },
+            added1,
+            added2
+        );
+    }
+
+    fn sorter_unused(a: &hashentry, b: &hashentry) -> std::cmp::Ordering {
+        let slota = a.0.split('.').next().unwrap();
+        let slotb = b.0.split('.').next().unwrap();
+        slota.cmp(&slotb)
+    }
+    
     pub(crate) fn new(cache_dir: PathBuf, deletion_policy: DeletionPolicy) -> CacheHashData {
         std::fs::create_dir_all(&cache_dir).unwrap_or_else(|err| {
             panic!("error creating cache dir {}: {err}", cache_dir.display())
@@ -424,6 +580,33 @@ pub enum DeletionPolicy {
     /// Should be used when calculating incremental accounts hash
     UnusedAtLeast(Slot),
 }
+use crate::pubkey_bins::PubkeyBinCalculator24;
+impl CacheHashData {
+    /// load from 'file_name' into 'accumulator'
+    pub fn load(
+        &self,
+        file_name: impl AsRef<Path>,
+        accumulator: &mut SavedType,
+        start_bin_index: usize,
+        bin_calculator: &PubkeyBinCalculator24,
+    ) -> Result<(), std::io::Error> {
+        let mut m = Measure::start("overall");
+        let cache_file = self.load_map(file_name)?;
+        cache_file.load_all(accumulator, start_bin_index, bin_calculator);
+        m.stop();
+        self.stats.load_us.fetch_add(m.as_us(), Ordering::Relaxed);
+        Ok(())
+    }
+
+    /// map 'file_name' into memory
+    fn load_map(
+        &self,
+        file_name: impl AsRef<Path>,
+    ) -> Result<CacheHashDataFile, std::io::Error> {
+        let reference = self.get_file_reference_to_map_later(file_name)?;
+        reference.map()
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -431,7 +614,7 @@ mod tests {
 
     impl CacheHashData {
         /// load from 'file_name' into 'accumulator'
-        fn load(
+        pub fn load(
             &self,
             file_name: impl AsRef<Path>,
             accumulator: &mut SavedType,
