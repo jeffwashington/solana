@@ -2440,6 +2440,12 @@ impl<'a> AppendVecScan for ScanState<'a> {
         let balance = loaded_account.lamports();
         let mut loaded_hash = loaded_account.loaded_hash();
 
+        use std::str::FromStr;
+        let pk = Pubkey::from_str("GrkKJZYCZrrAZuJbxhJjkSgXP65T6UYCsxZAJ7aGcHhF").unwrap();
+        if pubkey == &pk {
+            log::error!("jw_found: {}, {:?}, {:?}, {}, loaded hash: {:?}", pk, loaded_account.to_account_shared_data(), loaded_account.compute_hash(pubkey), self.current_slot, loaded_account.loaded_hash());
+        }
+
         // TODO(yhchiang): return Hash::default() in case account hash is None
         // TODO(yhchiang): for write version, need to update the geysor code to
         // sort data based on write version.
@@ -3988,7 +3994,13 @@ impl AccountsDb {
     ) -> GetUniqueAccountsResult<'a> {
         let mut stored_accounts: HashMap<Pubkey, StoredAccountMeta> = HashMap::new();
         let capacity = store.capacity();
+        use std::str::FromStr;
+        let pk = Pubkey::from_str("GrkKJZYCZrrAZuJbxhJjkSgXP65T6UYCsxZAJ7aGcHhF").unwrap();
+
         store.accounts.account_iter().for_each(|account| {
+            if account.pubkey() == &pk {
+                log::error!("jw_scanned: {}, {:?}, {:?}, {}, stored hash: {:?}", pk, account.to_account_shared_data(), Self::hash_account(&account, account.pubkey()), store.slot(), account.hash());
+            }
             stored_accounts.insert(*account.pubkey(), account);
         });
 
@@ -6926,8 +6938,15 @@ impl AccountsDb {
     ) -> Vec<AccountInfo> {
         let mut calc_stored_meta_time = Measure::start("calc_stored_meta");
         let slot = accounts.target_slot();
+
+        use std::str::FromStr;
+        let pk = Pubkey::from_str("GrkKJZYCZrrAZuJbxhJjkSgXP65T6UYCsxZAJ7aGcHhF").unwrap();
+
         (0..accounts.len()).for_each(|index| {
             let pubkey = accounts.pubkey(index);
+            if pubkey == &pk {
+                log::error!("jw_writing: {}, {:?}, {:?}, {}", pk, accounts.account(index).to_account_shared_data(), Self::hash_account(accounts.account(index), pubkey), accounts.target_slot());
+            }
             self.read_only_accounts_cache.remove(*pubkey, slot);
         });
         calc_stored_meta_time.stop();
