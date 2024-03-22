@@ -349,6 +349,7 @@ pub(crate) fn fields_from_streams(
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn bank_from_streams<R>(
+    id: &Pubkey,
     serde_style: SerdeStyle,
     snapshot_streams: &mut SnapshotStreams<R>,
     account_paths: &[PathBuf],
@@ -370,6 +371,7 @@ where
 {
     let (bank_fields, accounts_db_fields) = fields_from_streams(serde_style, snapshot_streams)?;
     reconstruct_bank_from_fields(
+        id,
         bank_fields,
         accounts_db_fields,
         genesis_config,
@@ -576,6 +578,7 @@ impl<'a, C> solana_frozen_abi::abi_example::IgnoreAsHelper for SerializableAccou
 
 #[allow(clippy::too_many_arguments)]
 fn reconstruct_bank_from_fields<E>(
+    id: &Pubkey,
     bank_fields: SnapshotBankFields,
     snapshot_accounts_db_fields: SnapshotAccountsDbFields<E>,
     genesis_config: &GenesisConfig,
@@ -625,7 +628,7 @@ where
 
     // if limit_load_slot_count_from_snapshot is set, then we need to side-step some correctness checks beneath this call
     let debug_do_not_add_builtins = limit_load_slot_count_from_snapshot.is_some();
-    let bank = Bank::new_from_fields(
+    let mut bank = Bank::new_from_fields(
         bank_rc,
         genesis_config,
         runtime_config,
@@ -635,6 +638,7 @@ where
         debug_do_not_add_builtins,
         reconstructed_accounts_db_info.accounts_data_len,
     );
+    bank.id = *id;
 
     info!("rent_collector: {:?}", bank.rent_collector());
 

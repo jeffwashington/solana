@@ -178,6 +178,7 @@ pub fn load_bank_forks(
             std::fs::create_dir_all(&snapshot_config.bank_snapshots_dir)
                 .expect("create bank snapshots dir");
             let (bank_forks, starting_snapshot_hashes) = bank_forks_from_snapshot(
+                id,
                 full_snapshot_archive_info,
                 incremental_snapshot_archive_info,
                 genesis_config,
@@ -228,6 +229,7 @@ pub fn load_bank_forks(
 
 #[allow(clippy::too_many_arguments)]
 fn bank_forks_from_snapshot(
+    id: &Pubkey,
     full_snapshot_archive_info: FullSnapshotArchiveInfo,
     incremental_snapshot_archive_info: Option<IncrementalSnapshotArchiveInfo>,
     genesis_config: &GenesisConfig,
@@ -270,6 +272,7 @@ fn bank_forks_from_snapshot(
         snapshot_utils::purge_all_bank_snapshots(&snapshot_config.bank_snapshots_dir);
 
         let (bank, _) = snapshot_bank_utils::bank_from_snapshot_archives(
+            id,
             &account_paths,
             &snapshot_config.bank_snapshots_dir,
             &full_snapshot_archive_info,
@@ -324,6 +327,7 @@ fn bank_forks_from_snapshot(
         }
 
         let (bank, _) = snapshot_bank_utils::bank_from_snapshot_dir(
+            id,
             &account_paths,
             &bank_snapshot,
             genesis_config,

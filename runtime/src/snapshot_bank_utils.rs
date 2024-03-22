@@ -284,6 +284,7 @@ pub fn bank_fields_from_snapshot_archives(
 /// snapshot and an incremental snapshot.
 #[allow(clippy::too_many_arguments)]
 pub fn bank_from_snapshot_archives(
+    id: &Pubkey,
     account_paths: &[PathBuf],
     bank_snapshots_dir: impl AsRef<Path>,
     full_snapshot_archive_info: &FullSnapshotArchiveInfo,
@@ -337,6 +338,7 @@ pub fn bank_from_snapshot_archives(
 
     let mut measure_rebuild = Measure::start("rebuild bank from snapshots");
     let bank = rebuild_bank_from_unarchived_snapshots(
+        id,
         &unarchived_full_snapshot.unpacked_snapshots_dir_and_version,
         unarchived_incremental_snapshot
             .as_ref()
@@ -434,6 +436,7 @@ pub fn bank_from_snapshot_archives(
 /// the highest full snapshot and highest corresponding incremental snapshot, then rebuilds the bank.
 #[allow(clippy::too_many_arguments)]
 pub fn bank_from_latest_snapshot_archives(
+    id: &Pubkey,
     bank_snapshots_dir: impl AsRef<Path>,
     full_snapshot_archives_dir: impl AsRef<Path>,
     incremental_snapshot_archives_dir: impl AsRef<Path>,
@@ -468,6 +471,7 @@ pub fn bank_from_latest_snapshot_archives(
     );
 
     let (bank, _) = bank_from_snapshot_archives(
+        id,
         account_paths,
         bank_snapshots_dir.as_ref(),
         &full_snapshot_archive_info,
@@ -498,6 +502,7 @@ pub fn bank_from_latest_snapshot_archives(
 /// Build bank from a snapshot (a snapshot directory, not a snapshot archive)
 #[allow(clippy::too_many_arguments)]
 pub fn bank_from_snapshot_dir(
+    id: &Pubkey,
     account_paths: &[PathBuf],
     bank_snapshot: &BankSnapshotInfo,
     genesis_config: &GenesisConfig,
@@ -543,6 +548,7 @@ pub fn bank_from_snapshot_dir(
     };
     let (bank, measure_rebuild_bank) = measure!(
         rebuild_bank_from_snapshot(
+            id,
             bank_snapshot,
             account_paths,
             storage_and_next_append_vec_id,
@@ -581,6 +587,7 @@ pub fn bank_from_snapshot_dir(
 /// follow the prototype of fn bank_from_latest_snapshot_archives, implement the from_dir case
 #[allow(clippy::too_many_arguments)]
 pub fn bank_from_latest_snapshot_dir(
+    id: &Pubkey,
     bank_snapshots_dir: impl AsRef<Path>,
     genesis_config: &GenesisConfig,
     runtime_config: &RuntimeConfig,
@@ -600,6 +607,7 @@ pub fn bank_from_latest_snapshot_dir(
     })?;
 
     let (bank, _) = bank_from_snapshot_dir(
+        id,
         account_paths,
         &bank_snapshot,
         genesis_config,
@@ -702,6 +710,7 @@ fn deserialize_status_cache(
 
 #[allow(clippy::too_many_arguments)]
 fn rebuild_bank_from_unarchived_snapshots(
+    id: &Pubkey,
     full_snapshot_unpacked_snapshots_dir_and_version: &UnpackedSnapshotsDirAndVersion,
     incremental_snapshot_unpacked_snapshots_dir_and_version: Option<
         &UnpackedSnapshotsDirAndVersion,
@@ -753,6 +762,7 @@ fn rebuild_bank_from_unarchived_snapshots(
         Ok(
             match incremental_snapshot_version.unwrap_or(full_snapshot_version) {
                 SnapshotVersion::V1_2_0 => bank_from_streams(
+                    id,
                     SerdeStyle::Newer,
                     snapshot_streams,
                     account_paths,
@@ -801,6 +811,7 @@ fn rebuild_bank_from_unarchived_snapshots(
 
 #[allow(clippy::too_many_arguments)]
 fn rebuild_bank_from_snapshot(
+    id: &Pubkey,
     bank_snapshot: &BankSnapshotInfo,
     account_paths: &[PathBuf],
     storage_and_next_append_vec_id: StorageAndNextAccountsFileId,
@@ -828,6 +839,7 @@ fn rebuild_bank_from_snapshot(
 
     let bank = deserialize_snapshot_data_files(&snapshot_root_paths, |snapshot_streams| {
         Ok(bank_from_streams(
+            id,
             SerdeStyle::Newer,
             snapshot_streams,
             account_paths,
