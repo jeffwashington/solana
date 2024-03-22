@@ -1196,7 +1196,7 @@ impl Bank {
     ) -> Self {
         datapoint_info!(
             "leader",
-            ("active", collector_id==self.id, i64),);
+            ("active", collector_id==&parent.id, i64),);
         
         let mut time = Measure::start("bank::new_from_parent");
         let NewBankOptions { vote_only_bank } = new_bank_options;
@@ -7681,6 +7681,7 @@ impl Bank {
         shrink_ratio: AccountShrinkThreshold,
     ) -> Self {
         Self::new_with_paths(
+            &Pubkey::default(),
             genesis_config,
             runtime_config,
             paths,
@@ -7704,6 +7705,7 @@ impl Bank {
     /// create new bank with the given config and paths.
     pub fn new_with_paths_for_benches(genesis_config: &GenesisConfig, paths: Vec<PathBuf>) -> Self {
         Self::new_with_paths(
+            &Pubkey::default(),
             genesis_config,
             Arc::<RuntimeConfig>::default(),
             paths,
