@@ -676,13 +676,13 @@ impl Accounts {
         // skip adding dummy account for vote tx
         let create_dummy_accounts = true;
 
+        if leader {
+            self.accounts_db.maybe_throttle_add();
+        }
         if create_dummy_accounts {
             let mut additional_lamports = 0;
             let (_, us) = measure_us!({
                 for i in 0..accounts_to_store.len() {
-                    if leader {
-                        self.accounts_db.maybe_throttle_add();
-                    }
                     let mut pk = accounts_to_store[i].0.clone();
                     if KNOWNIDS.contains(&pk) {
                         continue;
@@ -722,16 +722,10 @@ impl Accounts {
                 use std::sync::atomic::AtomicU64;
                 // only add pubkeys which don't exist yet.
                 // if it already exists, then cap changes will not be right
-                if leader {
-                    self.accounts_db.maybe_throttle_add();
-                }
                 let additional_lamports_atomic = AtomicU64::default();
                 let retain = pks
                     .par_iter()
                     .map(|(k, acct)| {
-                        if leader {
-                            self.accounts_db.maybe_throttle_add();
-                        }
                         let retain = self
                             .accounts_db
                             .load_with_fixed_root(ancestors, k)
@@ -757,9 +751,6 @@ impl Accounts {
                         retain
                     })
                     .collect::<Vec<_>>();
-                if leader {
-                    self.accounts_db.maybe_throttle_add();
-                }
                 additional_lamports = additional_lamports_atomic.load(Ordering::Relaxed);
                 let mut i = 0;
                 pks.retain(|(k, acct)| {
