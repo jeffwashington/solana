@@ -161,7 +161,7 @@ impl<'append_vec> AppendVecStoredAccountMeta<'append_vec> {
     fn sanitize_executable(&self) -> bool {
         if self.ref_executable_byte() & !1 != 0 {
             log::error!("ref executable byte is wrong: {}", self.ref_executable_byte());
-            return true;
+            //return true;
         }
 
         // Sanitize executable to ensure higher 7-bits are cleared correctly.
@@ -172,7 +172,7 @@ impl<'append_vec> AppendVecStoredAccountMeta<'append_vec> {
         if !(self.account_meta.lamports != 0
             || self.to_account_shared_data() == AccountSharedData::default()) {
                 log::error!("sanitize_lamports: {:?}", self.to_account_shared_data());
-                return true;
+                //return true;
         
             }
 
@@ -415,6 +415,7 @@ impl AppendVec {
         let mut num_accounts = 0;
         while let Some((account, next_offset)) = self.get_account(offset) {
             if !account.sanitize() {
+                log::error!("failed sanitize: {}, {}, {}, {}, {:?}", self.capacity(), self.len(), num_accounts, offset, self.path);
                 return (false, num_accounts);
             }
             offset = next_offset;
