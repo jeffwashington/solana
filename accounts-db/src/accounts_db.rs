@@ -1388,6 +1388,7 @@ pub struct AccountsDb {
     pub last_time: AtomicU64,
     pub last_accounts: AtomicU64,
     pub throttling: AtomicU64,
+    pub throttling_done: AtomicU64,
     /// Keeps tracks of index into AppendVec on a per slot basis
     pub accounts_index: AccountInfoAccountsIndex,
 
@@ -2521,6 +2522,7 @@ impl AccountsDb {
             last_accounts: AtomicU64::default(),
             last_time: AtomicU64::default(),
             throttling: AtomicU64::default(),
+            throttling_done: AtomicU64::default(),
             create_ancient_storage: CreateAncientStorage::Pack,
             verify_accounts_hash_in_bg: VerifyAccountsHashInBackground::default(),
             active_stats: ActiveStats::default(),
@@ -3211,6 +3213,7 @@ impl AccountsDb {
             .epoch_accounts_hash_manager.waiting.load(Ordering::Relaxed) {
                 self.last_accounts.store(accounts as u64, Ordering::Relaxed);
                 self.throttling.fetch_add(1, Ordering::Relaxed);
+                self.throttling_done.fetch_add(1, Ordering::Relaxed);
                 sleep(Duration::from_millis(10));
                 self.throttling.fetch_sub(1, Ordering::Relaxed);
                 if accounts > 200_000_000 {
@@ -7043,6 +7046,7 @@ impl AccountsDb {
             ("total_alive_bytes", total_alive_bytes, i64),
             ("total_alive_ratio", total_alive_ratio, f64),
             ("delays", self.throttling.load(Ordering::Relaxed), i64),
+            ("dummy_throttling_done", self.throttling_done.load(Ordering::Relaxed), i64),
             ("last_num_accounts", self.last_accounts.swap(0, Ordering::Relaxed), i64),
         );
         datapoint_info!(
