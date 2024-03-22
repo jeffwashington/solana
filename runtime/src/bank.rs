@@ -1194,6 +1194,10 @@ impl Bank {
         reward_calc_tracer: Option<impl RewardCalcTracer>,
         new_bank_options: NewBankOptions,
     ) -> Self {
+        datapoint_info!(
+            "leader",
+            ("active", collector_id==self.id, i64),);
+        
         let mut time = Measure::start("bank::new_from_parent");
         let NewBankOptions { vote_only_bank } = new_bank_options;
 
