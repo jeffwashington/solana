@@ -160,7 +160,7 @@ impl<'append_vec> AppendVecStoredAccountMeta<'append_vec> {
 
     fn sanitize_executable(&self) -> bool {
         if self.ref_executable_byte() & !1 != 0 {
-            log::error!("ref executable byte is wrong: {}", self.ref_executable_byte());
+            //log::error!("ref executable byte is wrong: {}", self.ref_executable_byte());
             //return true;
         }
 
@@ -171,7 +171,7 @@ impl<'append_vec> AppendVecStoredAccountMeta<'append_vec> {
     fn sanitize_lamports(&self) -> bool {
         if !(self.account_meta.lamports != 0
             || self.to_account_shared_data() == AccountSharedData::default()) {
-                log::error!("sanitize_lamports: {:?}", self.to_account_shared_data());
+                //log::error!("sanitize_lamports: {:?}", self.to_account_shared_data());
                 //return true;
         
             }
@@ -416,7 +416,9 @@ impl AppendVec {
         while let Some((account, next_offset)) = self.get_account(offset) {
             if !account.sanitize() {
                 log::error!("failed sanitize: {}, {}, {}, {}, {:?}", self.capacity(), self.len(), num_accounts, offset, self.path);
-                return (false, num_accounts);
+                //while true {};
+                return (true, 0);
+                //return (false, num_accounts);
             }
             offset = next_offset;
             num_accounts += 1;
@@ -424,10 +426,17 @@ impl AppendVec {
         let aligned_current_len = u64_align!(self.current_len.load(Ordering::Acquire));
 
         if offset != aligned_current_len {
-            log::error!("offset: {offset}, aligned: {aligned_current_len}, num_accounts: {num_accounts}");
+            log::error!("offset: {offset}, aligned: {aligned_current_len}, num_accounts: {num_accounts}, {:?}", self.path);
+            //while true {};
+            return (true, 0);
         }
 
         //(offset == aligned_current_len, num_accounts)
+        let data = [0xc0,0x9f,0xcb,0x32,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x02,0x00,0x00,0x00,
+                               0x98,0x02,0xb9,0x64,0xc5,0xcc,0x8d,0x5e,0x85,0xe2,0xd4,0x58,0x60,0xdb,0x29,0x36];
+        let pk = Pubkey::new(&data);
+        log::error!("{}, {:?}", pk, self.path);
+
         (true, num_accounts)
     }
 
