@@ -6185,6 +6185,7 @@ impl AccountsDb {
     ) -> Vec<AccountInfo> {
         let mut infos: Vec<AccountInfo> = Vec::with_capacity(accounts_and_meta_to_store.len());
         let mut total_append_accounts_us = 0;
+        let initial_ct = storage.count();
         while infos.len() < accounts_and_meta_to_store.len() {
             let mut append_accounts = Measure::start("append_accounts");
             let rvs = storage
@@ -6222,6 +6223,7 @@ impl AccountsDb {
             }
 
             let store_id = storage.append_vec_id();
+            let count = rvs.as_ref().cloned().unwrap_or_default().len();
             for (i, stored_account_info) in rvs.unwrap().into_iter().enumerate() {
                 storage.add_account(stored_account_info.size);
 
@@ -6233,6 +6235,8 @@ impl AccountsDb {
                         .unwrap_or_default(),
                 ));
             }
+            assert_eq!(storage.accounts.account_iter().count(), count + initial_ct);
+
             // restore the state to available
             storage.set_status(AccountStorageStatus::Available);
         }
