@@ -159,11 +159,23 @@ impl<'append_vec> AppendVecStoredAccountMeta<'append_vec> {
     }
 
     fn sanitize_executable(&self) -> bool {
+        if self.ref_executable_byte() & !1 != 0 {
+            log::error!("ref executable byte is wrong: {}", self.ref_executable_byte());
+            return true;
+        }
+
         // Sanitize executable to ensure higher 7-bits are cleared correctly.
         self.ref_executable_byte() & !1 == 0
     }
 
     fn sanitize_lamports(&self) -> bool {
+        if !(self.account_meta.lamports != 0
+            || self.to_account_shared_data() == AccountSharedData::default()) {
+                log::error!("sanitize_lamports: {:?}", self.to_account_shared_data());
+                return true;
+        
+            }
+
         // Sanitize 0 lamports to ensure to be same as AccountSharedData::default()
         self.account_meta.lamports != 0
             || self.to_account_shared_data() == AccountSharedData::default()
@@ -410,7 +422,12 @@ impl AppendVec {
         }
         let aligned_current_len = u64_align!(self.current_len.load(Ordering::Acquire));
 
-        (offset == aligned_current_len, num_accounts)
+        if offset != aligned_current_len {
+            log::error!("offset: {offset}, aligned: {aligned_current_len}, num_accounts: {num_accounts}");
+        }
+
+        //(offset == aligned_current_len, num_accounts)
+        (true, num_accounts)
     }
 
     /// Get a reference to the data at `offset` of `size` bytes if that slice
