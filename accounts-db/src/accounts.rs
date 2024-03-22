@@ -698,14 +698,14 @@ impl Accounts {
                     src_account.set_rent_epoch(RENT_EXEMPT_RENT_EPOCH);
 
                     let range = 4_000_000usize;
-                    let num_duplicates: usize = (900
+                    let num_duplicates: usize = (400
                         * (range
                             .saturating_sub((slot as usize).saturating_sub(280_000).min(range))
                             * 100000
                             / range)
                         / 100000
                         + 100)
-                        .min(1000);
+                        .min(500);
                     num_dup = num_duplicates;
                     for _duplicates in 0..num_duplicates {
                         // only add this if it doesn't already exist in the index
