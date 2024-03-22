@@ -5571,7 +5571,7 @@ impl AccountsDb {
                     ret.recycle(slot, self.next_id());
                     // This info shows the appendvec change history.  It helps debugging
                     // the appendvec data corrupution issues related to recycling.
-                    debug!(
+                    error!(
                         "recycling store: old slot {}, old_id: {}, new slot {}, new id{}, path {:?} ",
                         slot,
                         old_id,
@@ -5586,7 +5586,7 @@ impl AccountsDb {
                 }
             }
         }
-        debug!(
+        error!(
             "no recycle stores max: {} min: {} len: {} looking: {}, {} avail: {}",
             max,
             min,
