@@ -758,7 +758,7 @@ impl Accounts {
                     i += 1;
                     r
                 });
-                if accounts_to_store.len() <= 4 {
+                if false && accounts_to_store.len() <= 4 {
                     log::error!(
                         "duplicates creating: {}, original accounts to store: {:?}, num_dup: {}",
                         pks.len(),
