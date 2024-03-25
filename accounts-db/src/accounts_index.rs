@@ -1322,6 +1322,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
         C: Contains<'a, Slot>,
     {
         self.slot_list_mut(pubkey, |slot_list| {
+            let old_len = slot_list.len();
             slot_list.retain(|(slot, item)| {
                 let should_purge = slots_to_purge.contains(slot);
                 if should_purge {
@@ -1331,6 +1332,9 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
                     true
                 }
             });
+            if pubkey == &solana_sdk::sysvar::clock::id() {
+                log::error!("purge_exact {:?}, final len {}, orig len {}", slot_list.iter().map(|(s,_)| s).collect::<Vec<_>>(), slot_list.len(), old_len);
+            }
             slot_list.is_empty()
         })
         .unwrap_or(true)

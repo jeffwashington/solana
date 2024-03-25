@@ -3379,6 +3379,9 @@ impl AccountsDb {
                                         max_clean_root_inclusive,
                                     );
 
+                                    if pubkey == &solana_sdk::sysvar::clock::id() {
+                                        log::error!("clock sysvar found in clean: slot_list: {}, {:?}, {:?}, {:?}", slot_list.len(), slot_list.iter().map(|(s,_)| *s).max(), slot_list.iter().map(|(s,_)| *s).min(), max_clean_root_inclusive);
+                                    }
                                     match index_in_slot_list {
                                         Some(index_in_slot_list) => {
                                             // found info relative to max_clean_root
@@ -3487,6 +3490,10 @@ impl AccountsDb {
             if purged_account_slots.contains_key(key) {
                 *ref_count = self.accounts_index.ref_count_from_storage(key);
             }
+            if key == &solana_sdk::sysvar::clock::id() {
+                log::error!("clock sysvar store counts {}", ref_count);
+            }
+
             account_infos.retain(|(slot, account_info)| {
                 let was_slot_purged = purged_account_slots
                     .get(key)
@@ -3590,6 +3597,7 @@ impl AccountsDb {
         self.clean_accounts_stats.report();
         datapoint_info!(
             "clean_accounts",
+            ("max_clean_root_inclusive", max_clean_root_inclusive.unwrap_or(1234567890), i64),
             ("total_us", measure_all.as_us(), i64),
             (
                 "collect_delta_keys_us",
