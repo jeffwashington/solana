@@ -6499,6 +6499,13 @@ fn test_bank_hash_consistency() {
     }
 }
 
+#[test]
+fn cpus() {
+    solana_logger::setup();
+    log::error!("cpus: {}", 
+    num_cpus::get() );
+}
+
 #[ignore]
 #[test]
 fn test_same_program_id_uses_unique_executable_accounts() {
