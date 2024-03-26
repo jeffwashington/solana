@@ -169,6 +169,19 @@ impl ReadOnlyAccountsCache {
         self.stats.evicts.fetch_add(num_evicts, Ordering::Relaxed);
     }
 
+    pub(crate) fn remove_assume_does_not_exist(&self, pubkey: Pubkey, slot: Slot) -> Option<AccountSharedData> {
+        // try with read lock first. assumption is this tuple is not in the dashmap
+        _ = self.cache.get(&(pubkey, slot))?;
+        let (_, entry) = self.cache.remove(&(pubkey, slot))?;
+        // self.queue should be modified only after removing the entry from the
+        // cache, so that this is still safe if another thread writes to the
+        // same key.
+        self.queue.lock().unwrap().remove(entry.index());
+        let account_size = self.account_size(&entry.account);
+        self.data_size.fetch_sub(account_size, Ordering::Relaxed);
+        Some(entry.account)
+    }
+
     pub(crate) fn remove(&self, pubkey: Pubkey, slot: Slot) -> Option<AccountSharedData> {
         let (_, entry) = self.cache.remove(&(pubkey, slot))?;
         // self.queue should be modified only after removing the entry from the

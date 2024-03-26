@@ -6472,7 +6472,7 @@ impl AccountsDb {
         let slot = accounts.target_slot();
         (0..accounts.len()).for_each(|index| {
             let pubkey = accounts.pubkey(index);
-            self.read_only_accounts_cache.remove(*pubkey, slot);
+            self.read_only_accounts_cache.remove_assume_does_not_exist(*pubkey, slot);
         });
         calc_stored_meta_time.stop();
         self.stats
