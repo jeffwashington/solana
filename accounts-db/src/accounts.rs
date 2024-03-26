@@ -773,7 +773,7 @@ impl Accounts {
                     );
                 }
             });
-            //log::error!("adding {} dummy accounts, took: {}us, slot: {slot}", pks.len(), us);
+            log::error!("dummy off {:?} slot: {slot}", accounts_to_store.iter().map(|a| a.0).collect::<Vec<_>>());
             datapoint_info!(
                 "dummy_accounts",
                 ("original_accounts", accounts_to_store.len(), i64),
