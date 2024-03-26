@@ -206,6 +206,9 @@ impl ReadOnlyAccountsCache {
     }
 
     pub(crate) fn remove_assume_does_not_exist(&self, pubkey: Pubkey, slot: Slot) -> Option<AccountSharedData> {
+        if self.highest_slot_stored.load(Ordering::SeqCst) < slot {
+            return None;
+        }
         // try with read lock first. assumption is this tuple is not in the dashmap
         _ = self.cache.get(&(pubkey, slot))?;
         let (_, entry) = self.cache.remove(&(pubkey, slot))?;
