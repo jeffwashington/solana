@@ -270,6 +270,7 @@ pub fn load_and_process_ledger(
     let exit = Arc::new(AtomicBool::new(false));
     let (bank_forks, leader_schedule_cache, starting_snapshot_hashes, ..) =
         bank_forks_utils::load_bank_forks(
+            &Pubkey::default(),
             genesis_config,
             blockstore.as_ref(),
             account_paths,
