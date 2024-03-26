@@ -1821,6 +1821,7 @@ impl Bank {
     ) -> Self {
         let now = Instant::now();
         let ancestors = Ancestors::from(&fields.ancestors);
+        let count = AtomicUsize::default();
         // For backward compatibility, we can only serialize and deserialize
         // Stakes<Delegation> in BankFieldsTo{Serialize,Deserialize}. But Bank
         // caches Stakes<StakeAccount>. Below Stakes<StakeAccount> is obtained
@@ -1830,6 +1831,7 @@ impl Bank {
         log::error!("loading stakes cache");
         bank_rc.accounts.accounts_db.disable_read_cache_updates.store(true, std::sync::atomic::Ordering::Relaxed);
         let stakes = Stakes::new(&fields.stakes, |pubkey| {
+            count.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             let (account, _slot) = bank_rc.accounts.load_with_fixed_root(&ancestors, pubkey)?;
             Some(account)
         })
@@ -1838,7 +1840,7 @@ impl Bank {
             a corrupted snapshot or bugs in cached accounts or accounts-db.",
         );
         bank_rc.accounts.accounts_db.disable_read_cache_updates.store(false, std::sync::atomic::Ordering::Relaxed);
-        log::error!("~loading stakes cache");
+        log::error!("~loading stakes cache, count: {}", count.load(std::sync::atomic::Ordering::Relaxed));
         let stakes_accounts_load_duration = now.elapsed();
         let mut bank = Self {
             skipped_rewrites: Mutex::default(),

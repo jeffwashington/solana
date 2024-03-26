@@ -229,6 +229,7 @@ impl Stakes<StakeAccount> {
     where
         F: Fn(&Pubkey) -> Option<AccountSharedData>,
     {
+        use solana_measure::measure_us;
         let stake_delegations = stakes.stake_delegations.iter().map(|(pubkey, delegation)| {
             let Some(stake_account) = get_account(pubkey) else {
                 return Err(Error::StakeAccountNotFound(*pubkey));
@@ -242,6 +243,8 @@ impl Stakes<StakeAccount> {
                 Err(Error::InvalidDelegation(*pubkey))
             }
         });
+
+let (_, us) = measure_us!({
         // Assert that cached vote accounts are consistent with accounts-db.
         for (pubkey, vote_account) in stakes.vote_accounts.iter() {
             let Some(account) = get_account(pubkey) else {
@@ -253,9 +256,12 @@ impl Stakes<StakeAccount> {
                 return Err(Error::VoteAccountMismatch(*pubkey));
             }
         }
+    });
+    log::error!("votes: {}, {}us", stakes.vote_accounts.len(), us);
         // Assert that all valid vote-accounts referenced in
         // stake delegations are already cached.
-        let voter_pubkeys: HashSet<Pubkey> = stakes
+        let (_, us) = measure_us!({
+            let voter_pubkeys: HashSet<Pubkey> = stakes
             .stake_delegations
             .values()
             .map(|delegation| delegation.voter_pubkey)
@@ -272,9 +278,16 @@ impl Stakes<StakeAccount> {
                 return Err(Error::VoteAccountNotCached(pubkey));
             }
         }
+    });
+    log::error!("stake_delegations: {}, {}us", stakes.vote_accounts.len(), us);
+    use solana_measure::measure::Measure;
+    let mut m = Measure::start("");
+        let stake_delegations: ImHashMap<_,_> = stake_delegations.collect::<Result<_, _>>()?;
+        m.stop();
+        log::error!("stake delegations: {}, {}us", stake_delegations.len(), m.as_us());
         Ok(Self {
             vote_accounts: stakes.vote_accounts.clone(),
-            stake_delegations: stake_delegations.collect::<Result<_, _>>()?,
+            stake_delegations,
             unused: stakes.unused,
             epoch: stakes.epoch,
             stake_history: stakes.stake_history.clone(),
