@@ -141,7 +141,7 @@ impl ReadOnlyAccountsCache {
     }
 
     pub(crate) fn store(&self, pubkey: Pubkey, slot: Slot, account: AccountSharedData) {
-        self.highest_slot_stored.fetch_max(slot, Ordering::AcqRel);
+        self.highest_slot_stored.fetch_max(slot, Ordering::Release);
         let key = (pubkey, slot);
         let account_size = self.account_size(&account);
         let x = self.data_size.fetch_add(account_size, Ordering::Relaxed);
@@ -190,8 +190,12 @@ impl ReadOnlyAccountsCache {
         self.stats.evict_us.fetch_add(us, Ordering::Relaxed);
     }
 
+    pub fn can_slot_be_in_cache(&self, slot: Slot) -> bool {
+        self.highest_slot_stored.load(Ordering::Acquire) >= slot
+    }
+
     pub(crate) fn remove(&self, pubkey: Pubkey, slot: Slot) -> Option<AccountSharedData> {
-        if self.highest_slot_stored.load(Ordering::SeqCst) < slot {
+        if self.highest_slot_stored.load(Ordering::Acquire) < slot {
             return None;
         }
 
@@ -206,7 +210,7 @@ impl ReadOnlyAccountsCache {
     }
 
     pub(crate) fn remove_assume_does_not_exist(&self, pubkey: Pubkey, slot: Slot) -> Option<AccountSharedData> {
-        if self.highest_slot_stored.load(Ordering::SeqCst) < slot {
+        if self.highest_slot_stored.load(Ordering::Acquire) < slot {
             return None;
         }
         // try with read lock first. assumption is this tuple is not in the dashmap

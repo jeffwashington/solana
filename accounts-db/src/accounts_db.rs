@@ -6475,6 +6475,7 @@ impl AccountsDb {
         let mut calc_stored_meta_time = Measure::start("calc_stored_meta");
         let slot = accounts.target_slot();
         let mut m2 = 0;
+        if self.read_only_accounts_cache.can_slot_be_in_cache(accounts.target_slot()) {
         (0..accounts.len()).for_each(|index| {
             let pubkey = accounts.pubkey(index);
             let (_, m) = measure_us!({
@@ -6482,6 +6483,7 @@ impl AccountsDb {
             });
             m2 += m;
         });
+    }
         self.stats.remove_read_only.fetch_add(m2, Ordering::Relaxed);
         let mut m3 = 0;
         (0..accounts.len()).for_each(|index| {
