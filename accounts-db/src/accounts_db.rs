@@ -1418,6 +1418,7 @@ pub struct AccountsStats {
     store_hash_accounts: AtomicU64,
     calc_stored_meta: AtomicU64,
     remove_read_only: AtomicU64,
+    remove_read_only2: AtomicU64,
     store_accounts: AtomicU64,
     store_update_index: AtomicU64,
     store_handle_reclaims: AtomicU64,
@@ -6482,6 +6483,15 @@ impl AccountsDb {
             m2 += m;
         });
         self.stats.remove_read_only.fetch_add(m2, Ordering::Relaxed);
+        let mut m3 = 0;
+        (0..accounts.len()).for_each(|index| {
+            let pubkey = accounts.pubkey(index);
+            let (_, m) = measure_us!({
+                self.read_only_accounts_cache.remove2(*pubkey, slot);
+            });
+            m3 += m;
+        });
+        self.stats.remove_read_only2.fetch_add(m3, Ordering::Relaxed);
         calc_stored_meta_time.stop();
         self.stats
             .calc_stored_meta
@@ -8357,6 +8367,11 @@ impl AccountsDb {
                 (
                     "remove_read_only",
                     self.stats.remove_read_only.load(Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "remove_read_only2",
+                    self.stats.remove_read_only2.load(Ordering::Relaxed),
                     i64
                 ),
                 (
