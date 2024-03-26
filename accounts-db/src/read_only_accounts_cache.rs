@@ -49,11 +49,11 @@ impl ReadOnlyCacheStats {
     }
 
     fn get_and_reset_stats(&self) -> (u64, u64, u64, u64, u64) {
-        let hits = self.hits.swap(0, Ordering::Relaxed);
-        let misses = self.misses.swap(0, Ordering::Relaxed);
-        let evicts = self.evicts.swap(0, Ordering::Relaxed);
+        let hits = self.hits.load(Ordering::Relaxed);
+        let misses = self.misses.load(Ordering::Relaxed);
+        let evicts = self.evicts.load(Ordering::Relaxed);
         let load_us = self.load_us.swap(0, Ordering::Relaxed);
-        let evict_us = self.evict_us.swap(0, Ordering::Relaxed);
+        let evict_us = self.evict_us.load(Ordering::Relaxed);
 
         (hits, misses, evicts, load_us, evict_us)
     }
@@ -61,6 +61,7 @@ impl ReadOnlyCacheStats {
 
 #[derive(Debug)]
 pub(crate) struct ReadOnlyAccountsCache {
+    adds: AtomicUsize,
     cache: DashMap<ReadOnlyCacheKey, ReadOnlyAccountCacheEntry>,
     /// When an item is first entered into the cache, it is added to the end of
     /// the queue. Also each time an entry is looked up from the cache it is
@@ -80,6 +81,7 @@ pub(crate) struct ReadOnlyAccountsCache {
 impl ReadOnlyAccountsCache {
     pub(crate) fn new(max_data_size: usize, ms_to_skip_lru_update: u32) -> Self {
         Self {
+            adds: AtomicUsize::default(),
             max_data_size,
             cache: DashMap::default(),
             queue: Mutex::<IndexList<ReadOnlyCacheKey>>::default(),
@@ -139,7 +141,17 @@ impl ReadOnlyAccountsCache {
     pub(crate) fn store(&self, pubkey: Pubkey, slot: Slot, account: AccountSharedData) {
         let key = (pubkey, slot);
         let account_size = self.account_size(&account);
-        self.data_size.fetch_add(account_size, Ordering::Relaxed);
+        let x = self.data_size.fetch_add(account_size, Ordering::Relaxed);
+        let k = 50_000_000;
+        if x % k >= (x + account_size) % k {
+            log::error!("crossing threshold: {x}, accounts: {}, adds {}", self.cache.len(), self.adds.load(Ordering::Relaxed));
+        }
+        else if self.cache.len() % 50_000 == 0 {
+            log::error!("crossing # accounts threshold: {x}, accounts: {}, adds: {}", self.cache.len(), self.adds.load(Ordering::Relaxed));
+        }
+        if self.adds.fetch_add(1, Ordering::Relaxed) + 1 % 50_000 == 0 {
+            log::error!("crossing # accounts threshold: {x}, accounts: {}, adds: {}", self.cache.len(), self.adds.load(Ordering::Relaxed));
+        }
         // self.queue is modified while holding a reference to the cache entry;
         // so that another thread cannot write to the same key.
         match self.cache.entry(key) {
