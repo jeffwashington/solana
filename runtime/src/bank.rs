@@ -1221,6 +1221,7 @@ impl Bank {
         reward_calc_tracer: Option<impl RewardCalcTracer>,
         new_bank_options: NewBankOptions,
     ) -> Self {
+        log::error!("new_from_parent {}", line!());
         let mut time = Measure::start("bank::new_from_parent");
         let NewBankOptions { vote_only_bank } = new_bank_options;
 
@@ -1505,6 +1506,8 @@ impl Bank {
             .unwrap()
             .stats
             .reset();
+        log::error!("~new_from_parent {}", line!());
+
         new
     }
 
@@ -3732,6 +3735,8 @@ impl Bank {
     }
 
     pub fn freeze(&self) {
+        log::error!("freeze {}", line!());
+
         // This lock prevents any new commits from BankingStage
         // `Consumer::execute_and_commit_transactions_locked()` from
         // coming in after the last tick is observed. This is because in
@@ -3747,16 +3752,22 @@ impl Bank {
         if *hash == Hash::default() {
             // finish up any deferred changes to account state
             self.collect_rent_eagerly();
+            log::error!("freeze {}", line!());
             self.distribute_transaction_fees();
+            log::error!("freeze {}", line!());
             self.distribute_rent_fees();
+            log::error!("freeze {}", line!());
             self.update_slot_history();
+            log::error!("freeze {}", line!());
             self.run_incinerator();
+            log::error!("freeze {}", line!());
 
             // freeze is a one-way trip, idempotent
             self.freeze_started.store(true, Relaxed);
             *hash = self.hash_internal_state();
             self.rc.accounts.accounts_db.mark_slot_frozen(self.slot());
         }
+        log::error!("~freeze {}", line!());
     }
 
     // dangerous; don't use this; this is only needed for ledger-tool's special command

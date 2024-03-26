@@ -143,14 +143,14 @@ impl ReadOnlyAccountsCache {
         let account_size = self.account_size(&account);
         let x = self.data_size.fetch_add(account_size, Ordering::Relaxed);
         let k = 50_000_000;
-        if x % k >= (x + account_size) % k {
-            log::error!("crossing threshold: {x}, accounts: {}, adds {}", self.cache.len(), self.adds.load(Ordering::Relaxed));
+        if x % k >= (x + account_size) % k && x + account_size < 400_000_000 {
+            log::error!("crossing threshold: {x}, accounts: {}, adds {}, {}, {:?}", self.cache.len(), self.adds.load(Ordering::Relaxed), pubkey, account);
         }
         else if self.cache.len() % 50_000 == 0 {
-            log::error!("crossing # accounts threshold: {x}, accounts: {}, adds: {}", self.cache.len(), self.adds.load(Ordering::Relaxed));
+            log::error!("crossing # accounts threshold: {x}, accounts: {}, adds: {}, {}, {:?}", self.cache.len(), self.adds.load(Ordering::Relaxed), pubkey, account);
         }
         if self.adds.fetch_add(1, Ordering::Relaxed) + 1 % 50_000 == 0 {
-            log::error!("crossing # accounts threshold: {x}, accounts: {}, adds: {}", self.cache.len(), self.adds.load(Ordering::Relaxed));
+            log::error!("crossing # accounts threshold: {x}, accounts: {}, adds: {}, {}, {:?}", self.cache.len(), self.adds.load(Ordering::Relaxed), pubkey, account);
         }
         // self.queue is modified while holding a reference to the cache entry;
         // so that another thread cannot write to the same key.
