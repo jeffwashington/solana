@@ -5262,6 +5262,7 @@ impl Bank {
         let mut time_collecting_rent_us = 0;
         let mut time_storing_accounts_us = 0;
         let can_skip_rewrites = self.bank_hash_skips_rent_rewrites();
+        assert!(can_skip_rewrites);
         let test_skip_rewrites_but_include_hash_in_bank_hash = !can_skip_rewrites
             && self
                 .rc
