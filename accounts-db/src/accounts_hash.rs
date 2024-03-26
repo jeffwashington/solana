@@ -791,6 +791,9 @@ impl<'a> AccountsHasher<'a> {
 
     pub fn accumulate_account_hashes(mut hashes: Vec<(Pubkey, AccountHash)>) -> Hash {
         hashes.par_sort_unstable_by(|a, b| a.0.cmp(&b.0));
+        if hashes.len() < 6000 {
+            log::error!("writing pubkeys: {:?}", hashes);
+        }
         Self::compute_merkle_root_loop(hashes, MERKLE_FANOUT, |i| &i.1 .0)
     }
 
