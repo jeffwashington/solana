@@ -8356,7 +8356,7 @@ impl AccountsDb {
                 ),
                 (
                     "remove_read_only",
-                    self.stats.remove_read_only.swap(0, Ordering::Relaxed),
+                    self.stats.remove_read_only.load(Ordering::Relaxed),
                     i64
                 ),
                 (
