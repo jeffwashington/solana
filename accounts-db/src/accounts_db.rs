@@ -1271,6 +1271,7 @@ type AccountInfoAccountsIndex = AccountsIndex<AccountInfo, AccountInfo>;
 // This structure handles the load/store of the accounts
 #[derive(Debug)]
 pub struct AccountsDb {
+    pub disable_read_cache_updates: AtomicBool,
     /// Keeps tracks of index into AppendVec on a per slot basis
     pub accounts_index: AccountInfoAccountsIndex,
 
@@ -2328,6 +2329,7 @@ impl AccountsDb {
             active_stats: ActiveStats::default(),
             skip_initial_hash_calc: false,
             ancient_append_vec_offset: None,
+            disable_read_cache_updates: AtomicBool::default(),
             accounts_index,
             storage: AccountStorage::default(),
             accounts_cache: AccountsCache::default(),
@@ -5349,7 +5351,7 @@ impl AccountsDb {
             return None;
         }
 
-        if !is_cached {
+        if !is_cached && !self.disable_read_cache_updates.load(Ordering::Relaxed) {
             /*
             We show this store into the read-only cache for account 'A' and future loads of 'A' from the read-only cache are
             safe/reflect 'A''s latest state on this fork.

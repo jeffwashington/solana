@@ -1828,6 +1828,7 @@ impl Bank {
         // accounts-db. Note that it is crucial that these accounts are loaded
         // at the right slot and match precisely with serialized Delegations.
         log::error!("loading stakes cache");
+        bank_rc.accounts.accounts_db.disable_read_cache_updates.store(true, std::sync::atomic::Ordering::Relaxed);
         let stakes = Stakes::new(&fields.stakes, |pubkey| {
             let (account, _slot) = bank_rc.accounts.load_with_fixed_root(&ancestors, pubkey)?;
             Some(account)
@@ -1836,6 +1837,7 @@ impl Bank {
             "Stakes cache is inconsistent with accounts-db. This can indicate \
             a corrupted snapshot or bugs in cached accounts or accounts-db.",
         );
+        bank_rc.accounts.accounts_db.disable_read_cache_updates.store(false, std::sync::atomic::Ordering::Relaxed);
         log::error!("~loading stakes cache");
         let stakes_accounts_load_duration = now.elapsed();
         let mut bank = Self {
