@@ -150,7 +150,10 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndexStorage<
     }
 
     fn num_threads() -> usize {
-        std::cmp::max(2, num_cpus::get() / 4)
+        let threads = 
+        std::cmp::max(2, (((num_cpus::get() / 4) as i32) + (rand::random::<i32>() % 11) - 5) as usize);
+        log::error!("using {} bg threads for accounts index", threads);
+        threads
     }
 
     /// allocate BucketMapHolder and InMemAccountsIndex[]
