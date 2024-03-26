@@ -76,11 +76,13 @@ pub(crate) struct ReadOnlyAccountsCache {
 
     // Performance statistics
     stats: ReadOnlyCacheStats,
+    highest_slot_stored: AtomicU64,
 }
 
 impl ReadOnlyAccountsCache {
     pub(crate) fn new(max_data_size: usize, ms_to_skip_lru_update: u32) -> Self {
         Self {
+            highest_slot_stored: AtomicU64::default(),
             adds: AtomicUsize::default(),
             max_data_size,
             cache: DashMap::default(),
@@ -139,6 +141,7 @@ impl ReadOnlyAccountsCache {
     }
 
     pub(crate) fn store(&self, pubkey: Pubkey, slot: Slot, account: AccountSharedData) {
+        self.highest_slot_stored.fetch_max(slot, Ordering::AcqRel);
         let key = (pubkey, slot);
         let account_size = self.account_size(&account);
         let x = self.data_size.fetch_add(account_size, Ordering::Relaxed);
@@ -149,7 +152,7 @@ impl ReadOnlyAccountsCache {
         else if self.cache.len() % 50_000 == 0 {
             log::error!("crossing # accounts threshold: {x}, accounts: {}, adds: {}, {}, {:?}", self.cache.len(), self.adds.load(Ordering::Relaxed), pubkey, account);
         }
-        if self.adds.fetch_add(1, Ordering::Relaxed) + 1 % 50_000 == 0 {
+        if (self.adds.fetch_add(1, Ordering::Relaxed) + 1) % 50_000 == 0 {
             log::error!("crossing # accounts threshold: {x}, accounts: {}, adds: {}, {}, {:?}", self.cache.len(), self.adds.load(Ordering::Relaxed), pubkey, account);
         }
         // self.queue is modified while holding a reference to the cache entry;
@@ -188,6 +191,10 @@ impl ReadOnlyAccountsCache {
     }
 
     pub(crate) fn remove(&self, pubkey: Pubkey, slot: Slot) -> Option<AccountSharedData> {
+        if self.highest_slot_stored.load(Ordering::SeqCst) < slot {
+            return None;
+        }
+
         let (_, entry) = self.cache.remove(&(pubkey, slot))?;
         // self.queue should be modified only after removing the entry from the
         // cache, so that this is still safe if another thread writes to the

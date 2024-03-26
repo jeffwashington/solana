@@ -6487,7 +6487,7 @@ impl AccountsDb {
         (0..accounts.len()).for_each(|index| {
             let pubkey = accounts.pubkey(index);
             let (_, m) = measure_us!({
-                self.read_only_accounts_cache.remove2(*pubkey, slot);
+                self.read_only_accounts_cache.remove_assume_does_not_exist(*pubkey, slot);
             });
             m3 += m;
         });
