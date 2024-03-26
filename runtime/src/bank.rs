@@ -1827,6 +1827,7 @@ impl Bank {
         // from Stakes<Delegation> by reading the full account state from
         // accounts-db. Note that it is crucial that these accounts are loaded
         // at the right slot and match precisely with serialized Delegations.
+        log::error!("loading stakes cache");
         let stakes = Stakes::new(&fields.stakes, |pubkey| {
             let (account, _slot) = bank_rc.accounts.load_with_fixed_root(&ancestors, pubkey)?;
             Some(account)
@@ -1835,6 +1836,7 @@ impl Bank {
             "Stakes cache is inconsistent with accounts-db. This can indicate \
             a corrupted snapshot or bugs in cached accounts or accounts-db.",
         );
+        log::error!("~loading stakes cache");
         let stakes_accounts_load_duration = now.elapsed();
         let mut bank = Self {
             skipped_rewrites: Mutex::default(),
@@ -1901,6 +1903,7 @@ impl Bank {
             // collector_fee_details is not serialized to snapshot
             collector_fee_details: RwLock::new(CollectorFeeDetails::default()),
         };
+        log::error!("bank {}", line!());
 
         bank.transaction_processor = TransactionBatchProcessor::new(
             bank.slot,
@@ -1911,15 +1914,18 @@ impl Bank {
             Arc::new(RwLock::new(ProgramCache::new(fields.slot, fields.epoch))),
         );
 
+        log::error!("bank {}", line!());
         bank.finish_init(
             genesis_config,
             additional_builtins,
             debug_do_not_add_builtins,
         );
+        log::error!("bank {}", line!());
         bank.transaction_processor
             .fill_missing_sysvar_cache_entries(&bank);
         bank.rebuild_skipped_rewrites();
 
+        log::error!("bank {}", line!());
         // Sanity assertions between bank snapshot and genesis config
         // Consider removing from serializable bank state
         // (BankFieldsToSerialize/BankFieldsToDeserialize) and initializing
