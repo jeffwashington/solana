@@ -7054,7 +7054,7 @@ impl AccountsDb {
             ("total_alive_bytes", total_alive_bytes, i64),
             ("total_alive_ratio", total_alive_ratio, f64),
             ("delays", self.throttling.load(Ordering::Relaxed), i64),
-            ("dummy_throttling_done", self.throttling_done.load(Ordering::Relaxed), i64),
+            ("dummy_throttling_done", self.throttling_done.swap(0, Ordering::Relaxed), i64),
             ("last_num_accounts", self.last_accounts.swap(0, Ordering::Relaxed), i64),
         );
         datapoint_info!(
