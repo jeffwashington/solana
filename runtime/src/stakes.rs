@@ -260,13 +260,15 @@ let (_, us) = measure_us!({
     log::error!("votes: {}, {}us", stakes.vote_accounts.len(), us);
         // Assert that all valid vote-accounts referenced in
         // stake delegations are already cached.
-        let (_, us) = measure_us!({
+        let (voter_pubkeys, us2) = measure_us!({
             let voter_pubkeys: HashSet<Pubkey> = stakes
             .stake_delegations
             .values()
             .map(|delegation| delegation.voter_pubkey)
             .filter(|voter_pubkey| stakes.vote_accounts.get(voter_pubkey).is_none())
             .collect();
+        voter_pubkeys});
+        let (_, us) = measure_us!({        
         for pubkey in voter_pubkeys {
             let Some(account) = get_account(&pubkey) else {
                 continue;
@@ -279,7 +281,7 @@ let (_, us) = measure_us!({
             }
         }
     });
-    log::error!("stake_delegations: {}, {}us", stakes.vote_accounts.len(), us);
+    log::error!("stake_delegations: {}, {}us, {}us", stakes.vote_accounts.len(), us2, us);
     use solana_measure::measure::Measure;
     let mut m = Measure::start("");
         let stake_delegations: ImHashMap<_,_> = stake_delegations.collect::<Result<_, _>>()?;

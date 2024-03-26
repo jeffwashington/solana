@@ -198,7 +198,7 @@ impl ReadOnlyAccountsCache {
         Some(entry.account)
     }
 
-    pub(crate) fn remove2(&self, pubkey: Pubkey, slot: Slot) -> Option<AccountSharedData> {
+    pub(crate) fn remove_assume_does_not_exist(&self, pubkey: Pubkey, slot: Slot) -> Option<AccountSharedData> {
         // try with read lock first. assumption is this tuple is not in the dashmap
         _ = self.cache.get(&(pubkey, slot))?;
         let (_, entry) = self.cache.remove(&(pubkey, slot))?;
