@@ -1537,6 +1537,7 @@ pub struct AccountsStats {
     last_store_report: AtomicInterval,
     store_hash_accounts: AtomicU64,
     calc_stored_meta: AtomicU64,
+    remove_read_only: AtomicU64,
     store_accounts: AtomicU64,
     store_update_index: AtomicU64,
     store_handle_reclaims: AtomicU64,
@@ -6940,10 +6941,20 @@ impl AccountsDb {
     ) -> Vec<AccountInfo> {
         let mut calc_stored_meta_time = Measure::start("calc_stored_meta");
         let slot = accounts.target_slot();
+        let mut m2 = 0;
+        if self
+            .read_only_accounts_cache
+            .can_slot_be_in_cache(accounts.target_slot())
+        {
         (0..accounts.len()).for_each(|index| {
             let pubkey = accounts.pubkey(index);
+                let (_, m) = measure_us!({
             self.read_only_accounts_cache.remove(*pubkey, slot);
         });
+                m2 += m;
+            });
+        }
+        self.stats.remove_read_only.fetch_add(m2, Ordering::Relaxed);
         calc_stored_meta_time.stop();
         self.stats
             .calc_stored_meta
@@ -8755,6 +8766,7 @@ impl AccountsDb {
                 read_only_cache_misses,
                 read_only_cache_evicts,
                 read_only_cache_load_us,
+                read_only_cache_evict_us,
             ) = self.read_only_accounts_cache.get_and_reset_stats();
             datapoint_info!(
                 "accounts_db_store_timings",
@@ -8838,8 +8850,18 @@ impl AccountsDb {
                     i64
                 ),
                 (
+                    "read_only_accounts_cache_evict_us",
+                    read_only_cache_evict_us,
+                    i64
+                ),
+                (
                     "calc_stored_meta_us",
                     self.stats.calc_stored_meta.swap(0, Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "remove_read_only",
+                    self.stats.remove_read_only.load(Ordering::Relaxed),
                     i64
                 ),
                 (
