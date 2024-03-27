@@ -177,6 +177,18 @@ impl ReadOnlyAccountsCache {
         self.highest_slot_stored.load(Ordering::Acquire) >= slot
     }
 
+    /// remove entry if it exists.
+    /// Assume the entry does not exist for performance.
+    pub(crate) fn remove_assume_not_present(
+        &self,
+        pubkey: Pubkey,
+        slot: Slot,
+    ) -> Option<AccountSharedData> {
+        // get read lock first to see if the entry exists
+        _ = self.cache.get(&(pubkey, slot))?;
+        self.remove(pubkey, slot)
+    }
+
     pub(crate) fn remove(&self, pubkey: Pubkey, slot: Slot) -> Option<AccountSharedData> {
         let (_, entry) = self.cache.remove(&(pubkey, slot))?;
         // self.queue should be modified only after removing the entry from the
