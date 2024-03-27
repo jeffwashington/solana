@@ -8657,43 +8657,101 @@ impl AccountsDb {
         let mut min = usize::MAX;
         let mut min_i = 0;
         let ct = storage.accounts.account_iter().count();
-        if ct > 1000 {
+        if ct > 100000 {
             let mut results = Vec::default();
             let mut biggest_max = 0;
             let mut i_max = 0;
             let mut i2 = usize::MAX;
+            let mut is = [0,1,2];
+            let mut is_min = is;
+            let r_start: u8 = thread_rng().gen_range(0..32);
             let (_, us) = measure_us!({
-                for i in 0..100000 {
-                    let mut max = 0;
-                    let mut count = (0..ct).map(|_| 0).collect::<Vec<_>>();
-                    for pk in storage.accounts.account_iter().map(|a| a.pubkey()) {
-                        use std::hash::DefaultHasher;
-                        let mut s = DefaultHasher::new();
-                        pk.hash(&mut s);
-                        if i > 0 {
-                            i.hash(&mut s);
+                if true {
+                    let mut advance = false;
+                    for i in 0..100000 {
+                        if advance {
+                            is[2] += 1;
+                            if is[2] == 32 {
+                                is[1] += 1;
+                                if is[1] == 31 {
+                                    is[0] += 1;
+                                    if is[0] == 30 {
+                                        break;
+                                    }
+                                    is[1] = is[0] + 1;
+                                }
+                                is[2] = is[1] + 1;
+                            }
                         }
-                        let h = s.finish() as usize % ct;
-                        let count2 = count[h] + 1;
-                        max = max.max(count2);
-                        if max > min {
+                        advance = true;
+
+                        let mut max = 0;
+                        let mut count = (0..ct).map(|_| 0).collect::<Vec<_>>();
+                        for pk in storage.accounts.account_iter().map(|a| a.pubkey()) {
+                            let pk = pk.as_ref();
+                            let part = |offset| {
+                                let mut i = is[offset] as usize;
+                                i = i + r_start as usize;
+                                let i: usize = i % 32;
+                                pk[i] as usize
+                            };
+                            let h = (part(0)*256*256+part(1)*256+part(2)) % ct;
+                            //let h = s.finish() as usize % ct;
+                            let count2 = count[h] + 1;
+                            max = max.max(count2);
+                            if max > min {
+                                break;
+                            }
+                            count[h as usize] = count2;
+                        }
+                        if max < min {
+                            min_i = i;
+                            min = max;
+                            is_min = is;
+                        }
+                        i_max = i;
+                        if max == 2 {
+                            i2 = i2.min(i);
+                        }
+                        if min == 1 {
                             break;
                         }
-                        count[h as usize] = count2;
+                        biggest_max = biggest_max.max(max);
+                        results.push(max);
                     }
-                    if max < min {
-                        min_i = i;
-                        min = max;
+                } else {
+                    for i in 0..100000 {
+                        let mut max = 0;
+                        let mut count = (0..ct).map(|_| 0).collect::<Vec<_>>();
+                        for pk in storage.accounts.account_iter().map(|a| a.pubkey()) {
+                            use std::hash::DefaultHasher;
+                            let mut s = DefaultHasher::new();
+                            pk.hash(&mut s);
+                            if i > 0 {
+                                i.hash(&mut s);
+                            }
+                            let h = s.finish() as usize % ct;
+                            let count2 = count[h] + 1;
+                            max = max.max(count2);
+                            if max > min {
+                                break;
+                            }
+                            count[h as usize] = count2;
+                        }
+                        if max < min {
+                            min_i = i;
+                            min = max;
+                        }
+                        i_max = i;
+                        if max == 2 {
+                            i2 = i2.min(i);
+                        }
+                        if min == 1 {
+                            break;
+                        }
+                        biggest_max = biggest_max.max(max);
+                        results.push(max);
                     }
-                    i_max = i;
-                    if max == 2 {
-                        i2 = i2.min(i);
-                    }
-                    if min == 1 {
-                        break;
-                    }
-                    biggest_max = biggest_max.max(max);
-                    results.push(max);
                 }
             });
 
@@ -8702,7 +8760,7 @@ impl AccountsDb {
                 hist[*max as usize] += 1;
             });
 
-            log::error!("slot,{slot}, i,{i_max},i found 2 search,{i2},count,{ct}, min, {min}, max,{biggest_max},us,{us}, min_i,{min_i},hist, {:?}", hist.iter().enumerate().filter_map(|(max, count)| {
+            log::error!("slot,{slot}, i,{i_max},i found 2 search,{i2},count,{ct}, min, {min}, max,{biggest_max},us,{us}, min_i,{min_i},is: {is_min:?}, hist, {:?}", hist.iter().enumerate().filter_map(|(max, count)| {
                 if *count > 0 {
                     Some((max, *count))
                 }
