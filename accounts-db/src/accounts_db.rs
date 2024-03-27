@@ -8666,7 +8666,7 @@ impl AccountsDb {
             let mut is_min = is;
             let r_start: u8 = thread_rng().gen_range(0..32);
             let (_, us) = measure_us!({
-                if true {
+                if false {
                     let mut advance = false;
                     for i in 0..100000 {
                         if advance {
