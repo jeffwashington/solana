@@ -225,23 +225,44 @@ impl Stakes<StakeAccount> {
     /// full account state for respective stake pubkeys. get_account function
     /// should return the account at the respective slot where stakes where
     /// cached.
-    pub(crate) fn new<F>(stakes: &Stakes<Delegation>, get_account: F) -> Result<Self, Error>
+    pub(crate) fn new<F>(stakes: Stakes<Delegation>, get_account: F) -> Result<Self, Error>
     where
         F: Fn(&Pubkey) -> Option<AccountSharedData>,
     {
-        let stake_delegations = stakes.stake_delegations.iter().map(|(pubkey, delegation)| {
-            let Some(stake_account) = get_account(pubkey) else {
-                return Err(Error::StakeAccountNotFound(*pubkey));
-            };
-            let stake_account = StakeAccount::try_from(stake_account)?;
-            // Sanity check that the delegation is consistent with what is
-            // stored in the account.
-            if stake_account.delegation() == *delegation {
-                Ok((*pubkey, stake_account))
-            } else {
-                Err(Error::InvalidDelegation(*pubkey))
-            }
-        });
+        let mut voter_pubkeys = HashSet::new();
+        let stake_delegations = stakes
+            .stake_delegations
+            .into_iter()
+            .map(|(pubkey, delegation)| {
+                let Some(stake_account) = get_account(&pubkey) else {
+                    return Err(Error::StakeAccountNotFound(pubkey));
+                };
+
+                // Assert that all valid vote-accounts referenced in
+                // stake delegations are already cached.
+                if stakes.vote_accounts.get(&delegation.voter_pubkey).is_some()
+                    && voter_pubkeys.insert(delegation.voter_pubkey)
+                {
+                    if let Some(account) = get_account(&pubkey) {
+                        if VoteStateVersions::is_correct_size_and_initialized(account.data())
+                            && VoteAccount::try_from(account.clone()).is_ok()
+                        {
+                            error!("vote account not cached: {pubkey}, {account:?}");
+                            return Err(Error::VoteAccountNotCached(pubkey));
+                        }
+                    }
+                }
+
+                let stake_account = StakeAccount::try_from(stake_account)?;
+                // Sanity check that the delegation is consistent with what is
+                // stored in the account.
+                if stake_account.delegation() == delegation {
+                    Ok((pubkey, stake_account))
+                } else {
+                    Err(Error::InvalidDelegation(pubkey))
+                }
+            })
+            .collect::<Result<_, _>>()?;
         // Assert that cached vote accounts are consistent with accounts-db.
         for (pubkey, vote_account) in stakes.vote_accounts.iter() {
             let Some(account) = get_account(pubkey) else {
@@ -253,31 +274,13 @@ impl Stakes<StakeAccount> {
                 return Err(Error::VoteAccountMismatch(*pubkey));
             }
         }
-        // Assert that all valid vote-accounts referenced in
-        // stake delegations are already cached.
-        let voter_pubkeys: HashSet<Pubkey> = stakes
-            .stake_delegations
-            .values()
-            .map(|delegation| delegation.voter_pubkey)
-            .filter(|voter_pubkey| stakes.vote_accounts.get(voter_pubkey).is_none())
-            .collect();
-        for pubkey in voter_pubkeys {
-            let Some(account) = get_account(&pubkey) else {
-                continue;
-            };
-            if VoteStateVersions::is_correct_size_and_initialized(account.data())
-                && VoteAccount::try_from(account.clone()).is_ok()
-            {
-                error!("vote account not cached: {pubkey}, {account:?}");
-                return Err(Error::VoteAccountNotCached(pubkey));
-            }
-        }
+
         Ok(Self {
-            vote_accounts: stakes.vote_accounts.clone(),
-            stake_delegations: stake_delegations.collect::<Result<_, _>>()?,
+            vote_accounts: stakes.vote_accounts,
+            stake_delegations,
             unused: stakes.unused,
             epoch: stakes.epoch,
-            stake_history: stakes.stake_history.clone(),
+            stake_history: stakes.stake_history,
         })
     }
 
