@@ -8654,6 +8654,64 @@ impl AccountsDb {
         }
         let accounts = storage.accounts.account_iter();
 
+        let mut min = usize::MAX;
+        let mut min_i = 0;
+        let ct = storage.accounts.account_iter().count();
+        if ct > 1000 {
+            let mut results = Vec::default();
+            let mut biggest_max = 0;
+            let mut i_max = 0;
+            let mut i2 = usize::MAX;
+            let (_, us) = measure_us!({
+                for i in 0..100000 {
+                    let mut max = 0;
+                    let mut count = (0..ct).map(|_| 0).collect::<Vec<_>>();
+                    for pk in storage.accounts.account_iter().map(|a| a.pubkey()) {
+                        use std::hash::DefaultHasher;
+                        let mut s = DefaultHasher::new();
+                        pk.hash(&mut s);
+                        if i > 0 {
+                            i.hash(&mut s);
+                        }
+                        let h = s.finish() as usize % ct;
+                        let count2 = count[h] + 1;
+                        max = max.max(count2);
+                        if max > min {
+                            break;
+                        }
+                        count[h as usize] = count2;
+                    }
+                    if max < min {
+                        min_i = i;
+                        min = max;
+                    }
+                    i_max = i;
+                    if max == 2 {
+                        i2 = i2.min(i);
+                    }
+                    if min == 1 {
+                        break;
+                    }
+                    biggest_max = biggest_max.max(max);
+                    results.push(max);
+                }
+            });
+
+            let mut hist = (0..=biggest_max).map(|_| 0).collect::<Vec<_>>();
+            results.iter().for_each(|max| {
+                hist[*max as usize] += 1;
+            });
+
+            log::error!("slot,{slot}, i,{i_max},i found 2 search,{i2},count,{ct}, min, {min}, max,{biggest_max},us,{us}, min_i,{min_i},hist, {:?}", hist.iter().enumerate().filter_map(|(max, count)| {
+                if *count > 0 {
+                    Some((max, *count))
+                }
+                else {
+                    None
+                }
+            }).collect::<Vec<_>>());
+        }
+
         let secondary = !self.account_indexes.is_empty();
 
         let mut rent_paying_accounts_by_partition = Vec::default();
