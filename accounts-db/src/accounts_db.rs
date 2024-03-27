@@ -7454,8 +7454,10 @@ impl AccountsDb {
         // deletes the old files that will not be used before creating new ones
         cache_hash_data.delete_old_cache_files();
 
+        // if we do par chunks here, we blow out memory because we init accum on all chunks in parallel and then start allocating data.
+        // into_iter results in a single chunk allocated at a time.
         cache_files
-            .into_par_iter()
+            .into_iter()
             .map(|chunk| {
                 match chunk {
                     ScanAccountStorageResult::CacheFileAlreadyExists(file) => Some(file),
