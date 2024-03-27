@@ -1824,7 +1824,10 @@ impl Bank {
         // from Stakes<Delegation> by reading the full account state from
         // accounts-db. Note that it is crucial that these accounts are loaded
         // at the right slot and match precisely with serialized Delegations.
+        let count = AtomicUsize::default();
+        log::error!("loading stakes cache");
         let stakes = Stakes::new(fields.stakes, |pubkey| {
+            count.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             let (account, _slot) = bank_rc.accounts.load_with_fixed_root(&ancestors, pubkey)?;
             Some(account)
         })
@@ -1832,6 +1835,7 @@ impl Bank {
             "Stakes cache is inconsistent with accounts-db. This can indicate \
             a corrupted snapshot or bugs in cached accounts or accounts-db.",
         );
+        log::error!("~loading stakes cache, count: {}", count.load(std::sync::atomic::Ordering::Relaxed));
         let stakes_accounts_load_duration = now.elapsed();
         let mut bank = Self {
             skipped_rewrites: Mutex::default(),
