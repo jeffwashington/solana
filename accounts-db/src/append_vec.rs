@@ -199,7 +199,7 @@ impl ReadableAccount for AppendVecStoredAccountMeta {
 
 struct AppendVecMap<'a> {
     map: &'a [u8],
-    current_len: AtomicUsize,
+    current_len: &'a AtomicUsize,
     /// The number of bytes available for storing items.
     file_size: u64,
 }
@@ -515,7 +515,7 @@ impl AppendVec {
         let map = binding.as_ref().unwrap();
         let m2 = AppendVecMap {
             map: &map,
-            current_len: AtomicUsize::new(self.current_len.load(Ordering::Relaxed)),
+            current_len: &self.current_len,
             file_size: self.file_size,
         };
         let (meta, next): (&StoredMeta, _) = m2.get_type(offset)?;
@@ -541,7 +541,7 @@ impl AppendVec {
         let map = binding.as_ref().unwrap();
         let m2 = AppendVecMap {
             map: &map,
-            current_len: AtomicUsize::new(self.current_len.load(Ordering::Relaxed)),
+            current_len: &self.current_len,
             file_size: self.file_size,
         };
         // Skip over StoredMeta data in the account
@@ -627,7 +627,7 @@ impl AppendVec {
         let map = binding.as_ref().unwrap();
         let m2 = AppendVecMap {
             map: &map,
-            current_len: AtomicUsize::new(self.current_len.load(Ordering::Relaxed)),
+            current_len: &self.current_len,
             file_size: self.file_size,
         };
 
