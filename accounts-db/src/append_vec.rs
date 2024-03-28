@@ -204,6 +204,7 @@ struct AppendVecMap<'a> {
     file_size: u64,
 }
 
+use std::{sync::RwLock, io::Read};
 /// A thread-safe, file-backed block of memory used to store `Account` instances. Append operations
 /// are serialized such that only one thread updates the internal `append_lock` at a time. No
 /// restrictions are placed on reading. That is, one may read items from one thread while another
@@ -213,10 +214,10 @@ pub struct AppendVec {
     /// The file path where the data is stored.
     path: PathBuf,
 
-    file: Mutex<Option<std::fs::File>>,
+    file: RwLock<Option<std::io::BufReader<std::fs::File>>>,
 
     /// A file-backed block of memory that is used to store the data for each appended item.
-    map: Mutex<Option<MmapMut>>,
+    map: RwLock<Option<MmapMut>>,
 
     /// A lock used to serialize append operations.
     append_lock: Mutex<()>,
@@ -293,8 +294,8 @@ impl AppendVec {
 
         AppendVec {
             path: file,
-            file: Mutex::new(None),
-            map: Mutex::new(Some(map)),
+            file: RwLock::new(None),
+            map: RwLock::new(Some(map)),
             // This mutex forces append to be single threaded, but concurrent with reads
             // See UNSAFE usage in `append_ptr`
             append_lock: Mutex::new(()),
@@ -325,7 +326,7 @@ impl AppendVec {
     }
 
     pub fn flush(&self) -> Result<()> {
-        let m = self.map.lock().unwrap();
+        let m = self.map.read().unwrap();
         if m.is_some() {
             m.as_ref().unwrap().flush()?;
         }
@@ -368,7 +369,7 @@ impl AppendVec {
     }
 
     pub fn release_map(&self) {
-        let mut map = self.map.lock().unwrap();
+        let mut map = self.map.write().unwrap();
         if let Some(map) = std::mem::take(&mut *map) {
             drop(map);
             let data = OpenOptions::new()
@@ -377,7 +378,7 @@ impl AppendVec {
                 .create(false)
                 .open(&self.path).unwrap();
     
-            *self.file.lock().unwrap() = Some(data);
+            *self.file.write().unwrap() = Some(std::io::BufReader::new(data));
         }
     }
 
@@ -421,8 +422,8 @@ impl AppendVec {
 
         Ok(AppendVec {
             path,
-            file: Mutex::default(),
-            map: Mutex::new(Some(map)),
+            file: RwLock::default(),
+            map: RwLock::new(Some(map)),
             append_lock: Mutex::new(()),
             current_len: AtomicUsize::new(current_len),
             file_size,
@@ -525,33 +526,68 @@ impl AppendVec {
     /// the internal buffer. Otherwise return None. Also return the offset of the first byte
     /// after the requested data that falls on a 64-byte boundary.
     pub fn get_account(&self, offset: usize) -> Option<(StoredAccountMeta, usize)> {
-        let binding = self.map.lock().unwrap();
-        let map = binding.as_ref().unwrap();
-        let m2 = AppendVecMap {
-            map: &map,
-            current_len: &self.current_len,
-            file_size: self.file_size,
-        };
-        let (meta, next): (&StoredMeta, _) = m2.get_type(offset)?;
-        let (account_meta, next): (&AccountMeta, _) = m2.get_type(next)?;
-        let (hash, next): (&AccountHash, _) = m2.get_type(next)?;
-        let (data, next) = m2.get_slice(next, meta.data_len as usize)?;
-        let stored_size = next - offset;
-        Some((
-            StoredAccountMeta::AppendVec(AppendVecStoredAccountMeta {
-                meta: *meta,
-                account_meta: *account_meta,
-                data: data.to_vec(),
-                offset,
-                stored_size,
-                hash: *hash,
-            }),
-            next,
-        ))
+        let binding = self.map.read().unwrap();
+
+        if binding.is_some() {
+            let map = binding.as_ref().unwrap();
+            let m2 = AppendVecMap {
+                map: &map,
+                current_len: &self.current_len,
+                file_size: self.file_size,
+            };
+            let (meta, next): (&StoredMeta, _) = m2.get_type(offset)?;
+            let (account_meta, next): (&AccountMeta, _) = m2.get_type(next)?;
+            let (hash, next): (&AccountHash, _) = m2.get_type(next)?;
+            let (data, next) = m2.get_slice(next, meta.data_len as usize)?;
+            let stored_size = next - offset;
+            Some((
+                StoredAccountMeta::AppendVec(AppendVecStoredAccountMeta {
+                    meta: *meta,
+                    account_meta: *account_meta,
+                    data: data.to_vec(),
+                    offset,
+                    stored_size,
+                    hash: *hash,
+                }),
+                next,
+            ))
+        }
+        else {
+            let mut binding = self.file.write().unwrap();
+            let file = binding.as_mut().unwrap();
+            let mut stored_meta = [0u8; std::mem::size_of::<StoredMeta>() + std::mem::size_of::<AccountMeta>()];
+            file.seek(SeekFrom::Start(offset as u64)).unwrap();
+            file.read(&mut stored_meta).unwrap();
+            let m2 = AppendVecMap {
+                map: &stored_meta,
+                current_len: &self.current_len,
+                file_size: self.file_size,
+            };
+            let (meta, next): (&StoredMeta, _) = m2.get_type(0)?;
+            let (account_meta, next): (&AccountMeta, _) = m2.get_type(next)?;
+            // let (hash, next): (&AccountHash, _) = m2.get_type(next)?;
+            let mut data = (0..meta.data_len).map(|_| 0).collect::<Vec<_>>();
+            let start_of_data = offset as u64 + next as u64 + std::mem::size_of::<solana_sdk::hash::Hash>() as u64;
+            file.seek(SeekFrom::Start(start_of_data)).unwrap();
+            file.read(&mut data).unwrap();
+            // let (data, next) = m2.get_slice(next, meta.data_len as usize)?;
+            let stored_size = (start_of_data + meta.data_len) as usize;
+            Some((
+                StoredAccountMeta::AppendVec(AppendVecStoredAccountMeta {
+                    meta: *meta,
+                    account_meta: *account_meta,
+                    data: data.to_vec(),
+                    offset,
+                    stored_size,
+                    hash: AccountHash(solana_sdk::hash::Hash::default()),
+                }),
+                next,
+            ))
+        }
     }
 
     fn get_account_meta(&self, offset: usize) -> Option<AccountMeta> {
-        let binding = self.map.lock().unwrap();
+        let binding = self.map.read().unwrap();
         let map = binding.as_ref().unwrap();
         let m2 = AppendVecMap {
             map: &map,
@@ -637,7 +673,7 @@ impl AppendVec {
     ) -> Option<Vec<StoredAccountInfo>> {
         let _lock = self.append_lock.lock().unwrap();
         let mut offset = self.len();
-        let binding = self.map.lock().unwrap();
+        let binding = self.map.read().unwrap();
         let map = binding.as_ref().unwrap();
         let m2 = AppendVecMap {
             map: &map,
