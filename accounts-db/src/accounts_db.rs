@@ -4062,6 +4062,7 @@ impl AccountsDb {
         if let Some(shrink_in_progress) = shrink_in_progress {
             // shrink is in progress, so 1 new append vec to keep, 1 old one to throw away
             not_retaining_store(shrink_in_progress.old_storage());
+            shrink_in_progress.new_storage().release_map();
             // dropping 'shrink_in_progress' removes the old append vec that was being shrunk from db's storage
         } else if let Some(store) = self.storage.remove(&slot, shrink_can_be_active) {
             // no shrink in progress, so all append vecs in this slot are dead
@@ -6300,7 +6301,9 @@ impl AccountsDb {
 
             // If the above sizing function is correct, just one AppendVec is enough to hold
             // all the data for the slot
-            assert!(self.storage.get_slot_storage_entry(slot).is_some());
+            let s = self.storage.get_slot_storage_entry(slot);
+            assert!(s.is_some());
+            s.unwrap().release_map();
         }
 
         // Remove this slot from the cache, which will to AccountsDb's new readers should look like an

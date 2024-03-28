@@ -413,25 +413,38 @@ impl AppendVec {
             .create(false)
             .open(&path)?;
 
-        let map = unsafe {
-            let result = MmapMut::map_mut(&data);
-            if result.is_err() {
-                // for vm.max_map_count, error is: {code: 12, kind: Other, message: "Cannot allocate memory"}
-                info!("memory map error: {:?}. This may be because vm.max_map_count is not set correctly.", result);
-            }
-            result?
-        };
-        APPEND_VEC_MMAPPED_FILES_OPEN.fetch_add(1, Ordering::Relaxed);
+        if false {
+            let map = unsafe {
+                let result = MmapMut::map_mut(&data);
+                if result.is_err() {
+                    // for vm.max_map_count, error is: {code: 12, kind: Other, message: "Cannot allocate memory"}
+                    info!("memory map error: {:?}. This may be because vm.max_map_count is not set correctly.", result);
+                }
+                result?
+            };
+            APPEND_VEC_MMAPPED_FILES_OPEN.fetch_add(1, Ordering::Relaxed);
 
-        Ok(AppendVec {
-            loads: AtomicUsize::default(),
-            path,
-            file: RwLock::default(),
-            map: RwLock::new(Some(map)),
-            append_lock: Mutex::new(()),
-            current_len: AtomicUsize::new(current_len),
-            file_size,
-        })
+            Ok(AppendVec {
+                loads: AtomicUsize::default(),
+                path,
+                file: RwLock::default(),
+                map: RwLock::new(Some(map)),
+                append_lock: Mutex::new(()),
+                current_len: AtomicUsize::new(current_len),
+                file_size,
+            })
+        }
+        else {
+            Ok(AppendVec {
+                loads: AtomicUsize::default(),
+                path,
+                file: RwLock::new(Some(std::io::BufReader::new(data))),
+                map: RwLock::new(None),
+                append_lock: Mutex::new(()),
+                current_len: AtomicUsize::new(current_len),
+                file_size,
+            })
+        }
     }
 
     fn sanitize_layout_and_length(&self) -> (bool, usize) {
