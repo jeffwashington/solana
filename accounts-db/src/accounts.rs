@@ -690,6 +690,11 @@ impl Accounts {
                     if                      accounts_to_store[i].1.owner() == &solana_vote_program {
                         continue;
                     }
+                    // only create dummies for newly created accounts
+                    // these lamports are what we pass on command line to accounts bench for new accounts
+                    if accounts_to_store[i].1.lamports() > 2039280 {
+                        continue;
+                    }
 
                     let mut src_account = AccountSharedData::default();
                     use solana_sdk::account::WritableAccount;
@@ -753,11 +758,17 @@ impl Accounts {
                     .collect::<Vec<_>>();
                 additional_lamports = additional_lamports_atomic.load(Ordering::Relaxed);
                 let mut i = 0;
+                let pks_orig = pks.len();
                 pks.retain(|(k, acct)| {
                     let r = retain[i];
                     i += 1;
                     r
                 });
+                let pks_retain = pks.len();
+                if pks_orig  - pks_retain >= num_dup {
+                    log::error!("duplicate attempt at dummies for one of: {:?}",accounts_to_store.iter().map(|a| a.0).collect::<Vec<_>>());
+                }
+
                 if false && accounts_to_store.len() <= 4 {
                     log::error!(
                         "duplicates creating: {}, original accounts to store: {:?}, num_dup: {}",
