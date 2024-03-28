@@ -726,10 +726,10 @@ impl Accounts {
                 let retain = pks
                     .par_iter()
                     .map(|(k, acct)| {
-                        let retain = self
+                        // ideally, we would not add these to the in-mem index
+                        let retain = matches!(self
                             .accounts_db
-                            .load_with_fixed_root(ancestors, k)
-                            .is_none();
+                            .accounts_index.get(k, Some(ancestors), None), crate::accounts_index::AccountIndexGetResult::NotFound);
                         if retain {
                             additional_lamports_atomic
                                 .fetch_add(acct.lamports(), Ordering::Relaxed);
