@@ -1274,6 +1274,9 @@ pub struct AccountsDb {
     /// Keeps tracks of index into AppendVec on a per slot basis
     pub accounts_index: AccountInfoAccountsIndex,
 
+    /// if != 0, read cache is not updated on loads
+    disable_read_cache_updates: AtomicU64,
+
     /// Some(offset) iff we want to squash old append vecs together into 'ancient append vecs'
     /// Some(offset) means for slots up to (max_slot - (slots_per_epoch - 'offset')), put them in ancient append vecs
     pub ancient_append_vec_offset: Option<i64>,
@@ -2327,6 +2330,7 @@ impl AccountsDb {
             active_stats: ActiveStats::default(),
             skip_initial_hash_calc: false,
             ancient_append_vec_offset: None,
+            disable_read_cache_updates: AtomicU64::default(),
             accounts_index,
             storage: AccountStorage::default(),
             accounts_cache: AccountsCache::default(),
@@ -5348,7 +5352,7 @@ impl AccountsDb {
             return None;
         }
 
-        if !is_cached {
+        if !is_cached && self.disable_read_cache_updates.load(Ordering::Relaxed) == 0 {
             /*
             We show this store into the read-only cache for account 'A' and future loads of 'A' from the read-only cache are
             safe/reflect 'A''s latest state on this fork.
@@ -8345,6 +8349,20 @@ impl AccountsDb {
                     i64
                 ),
             );
+        }
+    }
+
+    /// pass true to cause loads to NOT populate the read cache.
+    /// Balance true calls with false calls.
+    /// By default, all loads will populate the read cache.
+    /// This cannot be incorrect, it is only a performance penalty at worst.
+    pub fn disable_read_cache_updates(&self, disable: bool) {
+        if disable {
+            self.disable_read_cache_updates
+                .fetch_add(1, Ordering::Relaxed);
+        } else {
+            self.disable_read_cache_updates
+                .fetch_sub(1, Ordering::Relaxed);
         }
     }
 
