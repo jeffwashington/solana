@@ -145,9 +145,9 @@ const SHRINK_COLLECT_CHUNK_SIZE: usize = 50;
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum CreateAncientStorage {
     /// ancient storages are created by appending
-    #[default]
     Append,
     /// ancient storages are created by 1-shot write to pack multiple accounts together more efficiently with new formats
+    #[default]
     Pack,
 }
 
