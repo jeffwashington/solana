@@ -557,10 +557,14 @@ impl AppendVec {
             ))
         }
         else {
+            assert_eq!(offset % 8, 0);
             self.loads.fetch_add(1, Ordering::Relaxed);
             let mut binding = self.file.write().unwrap();
             let file = binding.as_mut().unwrap();
             let mut stored_meta = [0u8; std::mem::size_of::<StoredMeta>() + std::mem::size_of::<AccountMeta>()];
+            if self.file_size < offset as u64 + stored_meta.len() as u64 {
+                return None;
+            }
             file.seek(SeekFrom::Start(offset as u64)).unwrap();
             file.read(&mut stored_meta).unwrap();
             let m2 = AppendVecMap {
@@ -571,12 +575,21 @@ impl AppendVec {
             let (meta, next): (&StoredMeta, _) = m2.get_type(0)?;
             let (account_meta, next): (&AccountMeta, _) = m2.get_type(next)?;
             // let (hash, next): (&AccountHash, _) = m2.get_type(next)?;
+            if meta.data_len > 11_000_000 {
+                panic!("trying to load account at offset {offset}, got data len: {}", meta.data_len);
+            }
             let mut data = (0..meta.data_len).map(|_| 0).collect::<Vec<_>>();
             let start_of_data = offset as u64 + next as u64 + std::mem::size_of::<solana_sdk::hash::Hash>() as u64;
+            if self.file_size < start_of_data + meta.data_len {
+                return None;
+            }
             file.seek(SeekFrom::Start(start_of_data)).unwrap();
             file.read(&mut data).unwrap();
             // let (data, next) = m2.get_slice(next, meta.data_len as usize)?;
-            let stored_size = (start_of_data + meta.data_len) as usize;
+            let stored_size = (start_of_data + u64_align!(meta.data_len as usize) as u64 - offset as u64) as usize;
+            assert_eq!(stored_size % 8, 0);
+            let next = offset + stored_size;
+            //log::error!("size: {}, len: {}", stored_size, meta.data_len);
             Some((
                 StoredAccountMeta::AppendVec(AppendVecStoredAccountMeta {
                     meta: *meta,

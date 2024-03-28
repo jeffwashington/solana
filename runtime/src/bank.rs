@@ -6420,10 +6420,12 @@ impl Bank {
     ///  of the delta of the ledger since the last vote and up to now
     fn hash_internal_state(&self) -> Hash {
         let slot = self.slot();
+        log::error!("{}", line!());
         let ignore = (!self.is_partitioned_rewards_feature_enabled()
             && self.force_partition_rewards_in_first_block_of_epoch())
         .then_some(sysvar::epoch_rewards::id());
-        let accounts_delta_hash = self
+    log::error!("{}", line!());
+    let accounts_delta_hash = self
             .rc
             .accounts
             .accounts_db
@@ -6433,9 +6435,11 @@ impl Bank {
                 self.skipped_rewrites.lock().unwrap().clone(),
             );
 
-        let mut signature_count_buf = [0u8; 8];
+            log::error!("{}", line!());
+            let mut signature_count_buf = [0u8; 8];
         LittleEndian::write_u64(&mut signature_count_buf[..], self.signature_count());
 
+        log::error!("{}", line!());
         let mut hash = hashv(&[
             self.parent_hash.as_ref(),
             accounts_delta_hash.0.as_ref(),
@@ -6443,6 +6447,7 @@ impl Bank {
             self.last_blockhash().as_ref(),
         ]);
 
+        log::error!("{}", line!());
         let epoch_accounts_hash = self.should_include_epoch_accounts_hash().then(|| {
             let epoch_accounts_hash = self.wait_get_epoch_accounts_hash();
             hash = hashv(&[hash.as_ref(), epoch_accounts_hash.as_ref().as_ref()]);
@@ -6459,6 +6464,7 @@ impl Bank {
             warn!("hard fork at slot {slot} by hashing {buf:?}: {hash} => {hard_forked_hash}");
             hash = hard_forked_hash;
         }
+        log::error!("{}", line!());
 
         let bank_hash_stats = self
             .rc
@@ -6661,8 +6667,11 @@ impl Bank {
     #[must_use]
     fn verify_hash(&self) -> bool {
         assert!(self.is_frozen());
+        log::error!("{}", line!());
         let calculated_hash = self.hash_internal_state();
+        log::error!("{}", line!());
         let expected_hash = self.hash();
+        log::error!("{}", line!());
 
         if calculated_hash == expected_hash {
             true

@@ -7385,7 +7385,7 @@ impl AccountsDb {
         storages: &SortedStorages<'_>,
         stats: HashStats,
     ) -> Result<(AccountsHash, u64), AccountsHashVerificationError> {
-        return Ok(((AccountsHash(Hash::default()), 0)));
+        return Ok((AccountsHash(Hash::default()), 0));
         let (accounts_hash, capitalization) = self._calculate_accounts_hash_from_storages(
             config,
             storages,

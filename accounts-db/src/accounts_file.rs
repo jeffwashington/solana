@@ -220,8 +220,17 @@ impl<'a> Iterator for AccountsFileIter<'a> {
     type Item = StoredAccountMeta;
 
     fn next(&mut self) -> Option<Self::Item> {
+        if self.offset < 130 && self.offset > 0 {
+            panic!("offset: {}", self.offset);
+        }
+        //log::error!("next: offset: {}", self.offset);
         if let Some((account, next_offset)) = self.file_entry.get_account(self.offset) {
             self.offset = next_offset;
+            if self.offset < 130 {
+                log::error!("next.offset: {}, size: {}, data len: {}", self.offset, account.stored_size(), account.data_len());
+                panic!("offset: {}", self.offset);
+            }
+    
             Some(account)
         } else {
             None
