@@ -7632,6 +7632,8 @@ impl AccountsDb {
             ScanStorageResult::Stored(stored_result) => stored_result.into_iter().collect(),
         };
 
+        log::error!("found % accounts: {}, {:?}", hashes.len(), hashes);
+
         (hashes, scan.as_us(), accumulate)
     }
 
