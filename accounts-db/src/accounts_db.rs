@@ -9024,11 +9024,8 @@ impl AccountsDb {
                 timings.accounts_data_len_dedup_time_us = accounts_data_len_dedup_timer.as_us();
                 timings.slots_to_clean = uncleaned_roots.len() as u64;
 
-                /*
-                don't clean slots inititially
                 self.accounts_index
                     .add_uncleaned_roots(uncleaned_roots.into_iter());
-                */
                 accounts_data_len.fetch_sub(accounts_data_len_from_duplicates, Ordering::Relaxed);
                 info!(
                     "accounts data len: {}",
