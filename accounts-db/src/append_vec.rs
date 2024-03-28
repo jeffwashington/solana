@@ -216,6 +216,8 @@ pub struct AppendVec {
 
     file: RwLock<Option<std::io::BufReader<std::fs::File>>>,
 
+    loads: AtomicUsize,
+
     /// A file-backed block of memory that is used to store the data for each appended item.
     map: RwLock<Option<MmapMut>>,
 
@@ -293,6 +295,7 @@ impl AppendVec {
         APPEND_VEC_MMAPPED_FILES_OPEN.fetch_add(1, Ordering::Relaxed);
 
         AppendVec {
+            loads: AtomicUsize::default(),
             path: file,
             file: RwLock::new(None),
             map: RwLock::new(Some(map)),
@@ -421,6 +424,7 @@ impl AppendVec {
         APPEND_VEC_MMAPPED_FILES_OPEN.fetch_add(1, Ordering::Relaxed);
 
         Ok(AppendVec {
+            loads: AtomicUsize::default(),
             path,
             file: RwLock::default(),
             map: RwLock::new(Some(map)),
@@ -553,6 +557,7 @@ impl AppendVec {
             ))
         }
         else {
+            self.loads.fetch_add(1, Ordering::Relaxed);
             let mut binding = self.file.write().unwrap();
             let file = binding.as_mut().unwrap();
             let mut stored_meta = [0u8; std::mem::size_of::<StoredMeta>() + std::mem::size_of::<AccountMeta>()];
