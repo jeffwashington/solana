@@ -550,7 +550,7 @@ impl AccountsDb {
     fn get_unique_accounts_from_storage_for_combining_ancient_slots<'a>(
         &self,
         ancient_slots: &'a [SlotInfo],
-    ) -> Vec<(&'a SlotInfo, GetUniqueAccountsResult<'a>)> {
+    ) -> Vec<(&'a SlotInfo, GetUniqueAccountsResult)> {
         let mut accounts_to_combine = Vec::with_capacity(ancient_slots.len());
 
         for info in ancient_slots {
@@ -603,7 +603,7 @@ impl AccountsDb {
     /// 'accounts_per_storage' should be sorted by slot
     fn calc_accounts_to_combine<'a>(
         &self,
-        accounts_per_storage: &'a Vec<(&'a SlotInfo, GetUniqueAccountsResult<'a>)>,
+        accounts_per_storage: &'a Vec<(&'a SlotInfo, GetUniqueAccountsResult)>,
     ) -> AccountsToCombine<'a> {
         let mut accounts_keep_slots = HashMap::default();
         let len = accounts_per_storage.len();
@@ -756,7 +756,7 @@ struct AccountsToCombine<'a> {
 /// intended contents of a packed ancient storage
 struct PackedAncientStorage<'a> {
     /// accounts to move into this storage, along with the slot the accounts are currently stored in
-    accounts: Vec<(Slot, &'a [&'a StoredAccountMeta<'a>])>,
+    accounts: Vec<(Slot, &'a [&'a StoredAccountMeta])>,
     /// total bytes required to hold 'accounts'
     bytes: u64,
 }
@@ -863,7 +863,7 @@ pub enum StorageSelector {
 /// We need 1-2 of these slices constructed based on available bytes and individual account sizes.
 /// The slice arithmetic across both hashes and account data gets messy. So, this struct abstracts that.
 pub struct AccountsToStore<'a> {
-    accounts: &'a [&'a StoredAccountMeta<'a>],
+    accounts: &'a [&'a StoredAccountMeta],
     /// if 'accounts' contains more items than can be contained in the primary storage, then we have to split these accounts.
     /// 'index_first_item_overflow' specifies the index of the first item in 'accounts' that will go into the overflow storage
     index_first_item_overflow: usize,
@@ -879,7 +879,7 @@ impl<'a> AccountsToStore<'a> {
     /// available_bytes: how many bytes remain in the primary storage. Excess accounts will be directed to an overflow storage
     pub fn new(
         mut available_bytes: u64,
-        accounts: &'a [&'a StoredAccountMeta<'a>],
+        accounts: &'a [&'a StoredAccountMeta],
         alive_total_bytes: usize,
         slot: Slot,
     ) -> Self {
@@ -928,7 +928,7 @@ impl<'a> AccountsToStore<'a> {
     }
 
     /// get the accounts to store in the given 'storage'
-    pub fn get(&self, storage: StorageSelector) -> &[&'a StoredAccountMeta<'a>] {
+    pub fn get(&self, storage: StorageSelector) -> &[&'a StoredAccountMeta] {
         let range = match storage {
             StorageSelector::Primary => 0..self.index_first_item_overflow,
             StorageSelector::Overflow => self.index_first_item_overflow..self.accounts.len(),
@@ -1032,7 +1032,7 @@ pub mod tests {
     }
 
     fn unique_to_accounts<'a>(
-        one: impl Iterator<Item = &'a GetUniqueAccountsResult<'a>>,
+        one: impl Iterator<Item = &'a GetUniqueAccountsResult>,
     ) -> Vec<(Pubkey, AccountSharedData)> {
         one.flat_map(|result| {
             result
@@ -1044,8 +1044,8 @@ pub mod tests {
     }
 
     pub(crate) fn compare_all_vec_accounts<'a>(
-        one: impl Iterator<Item = &'a GetUniqueAccountsResult<'a>>,
-        two: impl Iterator<Item = &'a GetUniqueAccountsResult<'a>>,
+        one: impl Iterator<Item = &'a GetUniqueAccountsResult>,
+        two: impl Iterator<Item = &'a GetUniqueAccountsResult>,
     ) {
         compare_all_accounts(&unique_to_accounts(one), &unique_to_accounts(two));
     }

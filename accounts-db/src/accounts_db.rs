@@ -178,7 +178,7 @@ enum ScanAccountStorageResult {
 pub(crate) struct AliveAccounts<'a> {
     /// slot the accounts are currently stored in
     pub(crate) slot: Slot,
-    pub(crate) accounts: Vec<&'a StoredAccountMeta<'a>>,
+    pub(crate) accounts: Vec<&'a StoredAccountMeta>,
     pub(crate) bytes: usize,
 }
 
@@ -218,12 +218,12 @@ pub(crate) trait ShrinkCollectRefs<'a>: Sync + Send {
     fn add(
         &mut self,
         ref_count: u64,
-        account: &'a StoredAccountMeta<'a>,
+        account: &'a StoredAccountMeta,
         slot_list: &[(Slot, AccountInfo)],
     );
     fn len(&self) -> usize;
     fn alive_bytes(&self) -> usize;
-    fn alive_accounts(&self) -> &Vec<&'a StoredAccountMeta<'a>>;
+    fn alive_accounts(&self) -> &Vec<&'a StoredAccountMeta>;
 }
 
 impl<'a> ShrinkCollectRefs<'a> for AliveAccounts<'a> {
@@ -241,7 +241,7 @@ impl<'a> ShrinkCollectRefs<'a> for AliveAccounts<'a> {
     fn add(
         &mut self,
         _ref_count: u64,
-        account: &'a StoredAccountMeta<'a>,
+        account: &'a StoredAccountMeta,
         _slot_list: &[(Slot, AccountInfo)],
     ) {
         self.accounts.push(account);
@@ -253,7 +253,7 @@ impl<'a> ShrinkCollectRefs<'a> for AliveAccounts<'a> {
     fn alive_bytes(&self) -> usize {
         self.bytes
     }
-    fn alive_accounts(&self) -> &Vec<&'a StoredAccountMeta<'a>> {
+    fn alive_accounts(&self) -> &Vec<&'a StoredAccountMeta> {
         &self.accounts
     }
 }
@@ -275,7 +275,7 @@ impl<'a> ShrinkCollectRefs<'a> for ShrinkCollectAliveSeparatedByRefs<'a> {
     fn add(
         &mut self,
         ref_count: u64,
-        account: &'a StoredAccountMeta<'a>,
+        account: &'a StoredAccountMeta,
         slot_list: &[(Slot, AccountInfo)],
     ) {
         let other = if ref_count == 1 {
@@ -306,7 +306,7 @@ impl<'a> ShrinkCollectRefs<'a> for ShrinkCollectAliveSeparatedByRefs<'a> {
             .saturating_add(self.many_refs_old_alive.alive_bytes())
             .saturating_add(self.many_refs_this_is_newest_alive.alive_bytes())
     }
-    fn alive_accounts(&self) -> &Vec<&'a StoredAccountMeta<'a>> {
+    fn alive_accounts(&self) -> &Vec<&'a StoredAccountMeta> {
         unimplemented!("illegal use");
     }
 }
@@ -528,8 +528,8 @@ struct LoadAccountsIndexForShrink<'a, T: ShrinkCollectRefs<'a>> {
     index_entries_being_shrunk: Vec<AccountMapEntry<AccountInfo>>,
 }
 
-pub struct GetUniqueAccountsResult<'a> {
-    pub stored_accounts: Vec<StoredAccountMeta<'a>>,
+pub struct GetUniqueAccountsResult {
+    pub stored_accounts: Vec<StoredAccountMeta>,
     pub capacity: u64,
 }
 
@@ -885,7 +885,7 @@ impl<'a> LoadedAccountAccessor<'a> {
 }
 
 pub enum LoadedAccount<'a> {
-    Stored(StoredAccountMeta<'a>),
+    Stored(StoredAccountMeta),
     Cached(Cow<'a, CachedAccount>),
 }
 
@@ -2181,7 +2181,7 @@ impl solana_frozen_abi::abi_example::AbiExample for AccountsDb {
     }
 }
 
-impl<'a> ZeroLamport for StoredAccountMeta<'a> {
+impl<'a> ZeroLamport for StoredAccountMeta {
     fn is_zero_lamport(&self) -> bool {
         self.lamports() == 0
     }
@@ -3659,7 +3659,7 @@ impl AccountsDb {
     /// return sum of account size for all alive accounts
     fn load_accounts_index_for_shrink<'a, T: ShrinkCollectRefs<'a>>(
         &self,
-        accounts: &'a [StoredAccountMeta<'a>],
+        accounts: &'a [StoredAccountMeta],
         stats: &ShrinkStats,
         slot_to_shrink: Slot,
     ) -> LoadAccountsIndexForShrink<'a, T> {
@@ -3722,7 +3722,7 @@ impl AccountsDb {
     pub fn get_unique_accounts_from_storage<'a>(
         &self,
         store: &'a Arc<AccountStorageEntry>,
-    ) -> GetUniqueAccountsResult<'a> {
+    ) -> GetUniqueAccountsResult {
         let mut stored_accounts: HashMap<Pubkey, StoredAccountMeta> = HashMap::new();
         let capacity = store.capacity();
         store.accounts.account_iter().for_each(|account| {
@@ -3743,7 +3743,7 @@ impl AccountsDb {
         &self,
         store: &'a Arc<AccountStorageEntry>,
         stats: &ShrinkStats,
-    ) -> GetUniqueAccountsResult<'a> {
+    ) -> GetUniqueAccountsResult {
         let (result, storage_read_elapsed_us) =
             measure_us!(self.get_unique_accounts_from_storage(store));
         stats
@@ -3757,7 +3757,7 @@ impl AccountsDb {
     pub(crate) fn shrink_collect<'a: 'b, 'b, T: ShrinkCollectRefs<'b>>(
         &self,
         store: &'a Arc<AccountStorageEntry>,
-        unique_accounts: &'b GetUniqueAccountsResult<'b>,
+        unique_accounts: &'b GetUniqueAccountsResult,
         stats: &ShrinkStats,
     ) -> ShrinkCollect<'b, T> {
         let slot = store.slot();
@@ -4233,7 +4233,7 @@ impl AccountsDb {
     /// returns the pubkeys that are in 'accounts' that are already in 'existing_ancient_pubkeys'
     /// Also updated 'existing_ancient_pubkeys' to include all pubkeys in 'accounts' since they will soon be written into the ancient slot.
     fn get_keys_to_unref_ancient<'a>(
-        accounts: &'a [&StoredAccountMeta<'_>],
+        accounts: &'a [&StoredAccountMeta],
         existing_ancient_pubkeys: &mut HashSet<Pubkey>,
     ) -> HashSet<&'a Pubkey> {
         let mut unref = HashSet::<&Pubkey>::default();
@@ -4255,7 +4255,7 @@ impl AccountsDb {
     /// As a side effect, on exit, 'existing_ancient_pubkeys' will now contain all pubkeys in 'accounts'.
     fn unref_accounts_already_in_storage(
         &self,
-        accounts: &[&StoredAccountMeta<'_>],
+        accounts: &[&StoredAccountMeta],
         existing_ancient_pubkeys: &mut HashSet<Pubkey>,
     ) {
         let unref = Self::get_keys_to_unref_ancient(accounts, existing_ancient_pubkeys);
@@ -6333,7 +6333,7 @@ impl AccountsDb {
         let storage = AccountStorageEntry::new(path, slot, id, size);
 
         // get unique accounts, most recent version by write_version
-        let mut accum = HashMap::<Pubkey, StoredAccountMeta<'_>>::default();
+        let mut accum = HashMap::<Pubkey, StoredAccountMeta>::default();
         slot_stores.iter().for_each(|(_id, store)| {
             store.accounts.account_iter().for_each(|loaded_account| {
                 match accum.entry(*loaded_account.pubkey()) {

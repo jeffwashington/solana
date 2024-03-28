@@ -116,7 +116,7 @@ impl AccountsFile {
     /// Return (account metadata, next_index) pair for the account at the
     /// specified `index` if any.  Otherwise return None.   Also return the
     /// index of the next entry.
-    pub fn get_account(&self, index: usize) -> Option<(StoredAccountMeta<'_>, usize)> {
+    pub fn get_account(&self, index: usize) -> Option<(StoredAccountMeta, usize)> {
         match self {
             Self::AppendVec(av) => av.get_account(index),
             Self::TieredStorage(ts) => ts
@@ -211,7 +211,7 @@ impl<'a> AccountsFileIter<'a> {
 }
 
 impl<'a> Iterator for AccountsFileIter<'a> {
-    type Item = StoredAccountMeta<'a>;
+    type Item = StoredAccountMeta;
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some((account, next_offset)) = self.file_entry.get_account(self.offset) {

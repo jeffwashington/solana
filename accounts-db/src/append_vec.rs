@@ -92,7 +92,7 @@ impl<'append_vec> AppendVecAccountsIter<'append_vec> {
 }
 
 impl<'append_vec> Iterator for AppendVecAccountsIter<'append_vec> {
-    type Item = StoredAccountMeta<'append_vec>;
+    type Item = StoredAccountMeta;
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some((account, next_offset)) = self.append_vec.get_account(self.offset) {
@@ -107,23 +107,23 @@ impl<'append_vec> Iterator for AppendVecAccountsIter<'append_vec> {
 /// References to account data stored elsewhere. Getting an `Account` requires cloning
 /// (see `StoredAccountMeta::clone_account()`).
 #[derive(PartialEq, Eq, Debug)]
-pub struct AppendVecStoredAccountMeta<'append_vec> {
-    pub meta: &'append_vec StoredMeta,
+pub struct AppendVecStoredAccountMeta {
+    pub meta: StoredMeta,
     /// account data
-    pub account_meta: &'append_vec AccountMeta,
-    pub(crate) data: &'append_vec [u8],
+    pub account_meta: AccountMeta,
+    pub(crate) data: Vec<u8>,
     pub(crate) offset: usize,
     pub(crate) stored_size: usize,
-    pub(crate) hash: &'append_vec AccountHash,
+    pub(crate) hash: AccountHash,
 }
 
-impl<'append_vec> AppendVecStoredAccountMeta<'append_vec> {
-    pub fn pubkey(&self) -> &'append_vec Pubkey {
+impl AppendVecStoredAccountMeta {
+    pub fn pubkey(&self) -> &Pubkey {
         &self.meta.pubkey
     }
 
-    pub fn hash(&self) -> &'append_vec AccountHash {
-        self.hash
+    pub fn hash(&self) -> &AccountHash {
+        &self.hash
     }
 
     pub fn stored_size(&self) -> usize {
@@ -134,8 +134,8 @@ impl<'append_vec> AppendVecStoredAccountMeta<'append_vec> {
         self.offset
     }
 
-    pub fn data(&self) -> &'append_vec [u8] {
-        self.data
+    pub fn data(&self) -> &[u8] {
+        &self.data
     }
 
     pub fn data_len(&self) -> u64 {
@@ -147,10 +147,10 @@ impl<'append_vec> AppendVecStoredAccountMeta<'append_vec> {
     }
 
     pub fn meta(&self) -> &StoredMeta {
-        self.meta
+        &self.meta
     }
 
-    pub fn set_meta(&mut self, meta: &'append_vec StoredMeta) {
+    pub fn set_meta(&mut self, meta: StoredMeta) {
         self.meta = meta;
     }
 
@@ -179,14 +179,14 @@ impl<'append_vec> AppendVecStoredAccountMeta<'append_vec> {
     }
 }
 
-impl<'append_vec> ReadableAccount for AppendVecStoredAccountMeta<'append_vec> {
+impl ReadableAccount for AppendVecStoredAccountMeta {
     fn lamports(&self) -> u64 {
         self.account_meta.lamports
     }
-    fn data(&self) -> &'append_vec [u8] {
+    fn data(&self) -> &[u8] {
         self.data()
     }
-    fn owner(&self) -> &'append_vec Pubkey {
+    fn owner(&self) -> &Pubkey {
         &self.account_meta.owner
     }
     fn executable(&self) -> bool {
@@ -525,18 +525,18 @@ impl AppendVec {
         let stored_size = next - offset;
         Some((
             StoredAccountMeta::AppendVec(AppendVecStoredAccountMeta {
-                meta,
-                account_meta,
-                data,
+                meta: *meta,
+                account_meta: *account_meta,
+                data: data.to_vec(),
                 offset,
                 stored_size,
-                hash,
+                hash: *hash,
             }),
             next,
         ))
     }
 
-    fn get_account_meta(&self, offset: usize) -> Option<&AccountMeta> {
+    fn get_account_meta(&self, offset: usize) -> Option<AccountMeta> {
         let binding = self.map.lock().unwrap();
         let map = binding.as_ref().unwrap();
         let m2 = AppendVecMap {
@@ -549,7 +549,7 @@ impl AppendVec {
         // u64_align! does an unchecked add for alignment. Check that it won't cause an overflow.
         offset.checked_add(ALIGN_BOUNDARY_OFFSET - 1)?;
         let (account_meta, _): (&AccountMeta, _) = m2.get_type(u64_align!(offset))?;
-        Some(account_meta)
+        Some(*account_meta)
     }
 
     /// Return Ok(index_of_matching_owner) if the account owner at `offset` is one of the pubkeys in `owners`.
@@ -734,7 +734,7 @@ pub mod tests {
         }
     }
 
-    impl StoredAccountMeta<'_> {
+    impl StoredAccountMeta {
         pub(crate) fn ref_executable_byte(&self) -> &u8 {
             match self {
                 Self::AppendVec(av) => av.ref_executable_byte(),
@@ -744,7 +744,7 @@ pub mod tests {
         }
     }
 
-    impl AppendVecStoredAccountMeta<'_> {
+    impl AppendVecStoredAccountMeta {
         fn set_data_len_unsafe(&self, new_data_len: u64) {
             // UNSAFE: cast away & (= const ref) to &mut to force to mutate append-only (=read-only) AppendVec
             unsafe {

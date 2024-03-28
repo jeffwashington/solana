@@ -68,7 +68,7 @@ impl TieredStorageReader {
     pub fn get_account(
         &self,
         index_offset: IndexOffset,
-    ) -> TieredStorageResult<Option<(StoredAccountMeta<'_>, IndexOffset)>> {
+    ) -> TieredStorageResult<Option<(StoredAccountMeta, IndexOffset)>> {
         match self {
             Self::Hot(hot) => hot.get_account(index_offset),
         }

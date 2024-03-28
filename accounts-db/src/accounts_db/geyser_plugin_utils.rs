@@ -132,7 +132,8 @@ impl AccountsDb {
                 write_version_obsolete: local_write_version,
                 ..*account.meta()
             };
-            account.set_meta(&meta);
+            todo!("");
+            // todo account.set_meta(&meta);
             let mut measure_pure_notify = Measure::start("accountsdb-plugin-notifying-accounts");
             notifier.notify_account_restore_from_snapshot(slot, &account);
             measure_pure_notify.stop();

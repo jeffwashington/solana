@@ -267,24 +267,27 @@ impl TieredAccountMeta for HotAccountMeta {
 
 /// The struct that offers read APIs for accessing a hot account.
 #[derive(PartialEq, Eq, Debug)]
-pub struct HotAccount<'accounts_file, M: TieredAccountMeta> {
+pub struct HotAccount<M: TieredAccountMeta> {
     /// TieredAccountMeta
-    pub meta: &'accounts_file M,
+    pub meta: M,
     /// The address of the account
-    pub address: &'accounts_file Pubkey,
+    pub address: Pubkey,
     /// The address of the account owner
-    pub owner: &'accounts_file Pubkey,
+    pub owner: Pubkey,
     /// The index for accessing the account inside its belonging AccountsFile
     pub index: IndexOffset,
     /// The account block that contains this account.  Note that this account
     /// block may be shared with other accounts.
-    pub account_block: &'accounts_file [u8],
+    //pub account_block: Vec<u8>,
+    pub data: Vec<u8>,
+    pub rent_epoch: Option<Epoch>,
+    pub lamports: u64,
 }
 
-impl<'accounts_file, M: TieredAccountMeta> HotAccount<'accounts_file, M> {
+impl<'accounts_file, M: TieredAccountMeta> HotAccount<M> {
     /// Returns the address of this account.
-    pub fn address(&self) -> &'accounts_file Pubkey {
-        self.address
+    pub fn address(&self) -> &Pubkey {
+        &self.address
     }
 
     /// Returns the index to this account in its AccountsFile.
@@ -293,20 +296,20 @@ impl<'accounts_file, M: TieredAccountMeta> HotAccount<'accounts_file, M> {
     }
 
     /// Returns the data associated to this account.
-    pub fn data(&self) -> &'accounts_file [u8] {
-        self.meta.account_data(self.account_block)
+    pub fn data(&self) -> &[u8] {
+        &self.data
     }
 }
 
-impl<'accounts_file, M: TieredAccountMeta> ReadableAccount for HotAccount<'accounts_file, M> {
+impl<'accounts_file, M: TieredAccountMeta> ReadableAccount for HotAccount<M> {
     /// Returns the balance of the lamports of this account.
     fn lamports(&self) -> u64 {
         self.meta.lamports()
     }
 
     /// Returns the address of the owner of this account.
-    fn owner(&self) -> &'accounts_file Pubkey {
-        self.owner
+    fn owner(&self) -> &Pubkey {
+        &self.owner
     }
 
     /// Returns true if the data associated to this account is executable.
@@ -321,8 +324,7 @@ impl<'accounts_file, M: TieredAccountMeta> ReadableAccount for HotAccount<'accou
     /// For a zero-lamport account, Epoch::default() will be returned to
     /// default states of an AccountSharedData.
     fn rent_epoch(&self) -> Epoch {
-        self.meta
-            .rent_epoch(self.account_block)
+        self.rent_epoch
             .unwrap_or(if self.lamports() != 0 {
                 RENT_EXEMPT_RENT_EPOCH
             } else {
@@ -335,7 +337,7 @@ impl<'accounts_file, M: TieredAccountMeta> ReadableAccount for HotAccount<'accou
     }
 
     /// Returns the data associated to this account.
-    fn data(&self) -> &'accounts_file [u8] {
+    fn data(&self) -> &[u8] {
         self.data()
     }
 }
@@ -512,7 +514,7 @@ impl HotStorageReader {
     pub fn get_account(
         &self,
         index_offset: IndexOffset,
-    ) -> TieredStorageResult<Option<(StoredAccountMeta<'_>, IndexOffset)>> {
+    ) -> TieredStorageResult<Option<(StoredAccountMeta, IndexOffset)>> {
         if index_offset.0 >= self.footer.account_entry_count {
             return Ok(None);
         }
@@ -526,11 +528,13 @@ impl HotStorageReader {
 
         Ok(Some((
             StoredAccountMeta::Hot(HotAccount {
-                meta,
-                address,
-                owner,
+                meta: *meta,
+                address: *address,
+                owner: *owner,
                 index: index_offset,
-                account_block,
+                rent_epoch: meta.rent_epoch(account_block),
+                data: meta.account_data(account_block).to_vec(),
+                lamports: meta.lamports(),
             }),
             IndexOffset(index_offset.0.saturating_add(1)),
         )))

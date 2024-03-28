@@ -46,7 +46,7 @@ pub(super) fn create_test_account(seed: u64) -> (StoredMeta, AccountSharedData) 
 }
 
 pub(super) fn verify_test_account(
-    stored_meta: &StoredAccountMeta<'_>,
+    stored_meta: &StoredAccountMeta,
     account: Option<&impl ReadableAccount>,
     address: &Pubkey,
 ) {
@@ -64,7 +64,7 @@ pub(super) fn verify_test_account(
 }
 
 pub(super) fn verify_test_account_with_footer(
-    stored_meta: &StoredAccountMeta<'_>,
+    stored_meta: &StoredAccountMeta,
     account: Option<&impl ReadableAccount>,
     address: &Pubkey,
     footer: &TieredStorageFooter,

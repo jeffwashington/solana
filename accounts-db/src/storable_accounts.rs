@@ -125,11 +125,11 @@ impl<'a, T: ReadableAccount + Sync> StorableAccounts<'a, T> for (Slot, &'a [&'a 
     }
 }
 
-impl<'a> StorableAccounts<'a, StoredAccountMeta<'a>> for (Slot, &'a [&'a StoredAccountMeta<'a>]) {
+impl<'a> StorableAccounts<'a, StoredAccountMeta> for (Slot, &'a [&'a StoredAccountMeta]) {
     fn pubkey(&self, index: usize) -> &Pubkey {
         self.account(index).pubkey()
     }
-    fn account(&self, index: usize) -> &StoredAccountMeta<'a> {
+    fn account(&self, index: usize) -> &StoredAccountMeta {
         self.1[index]
     }
     fn slot(&self, _index: usize) -> Slot {
@@ -157,7 +157,7 @@ impl<'a> StorableAccounts<'a, StoredAccountMeta<'a>> for (Slot, &'a [&'a StoredA
 pub struct StorableAccountsBySlot<'a> {
     target_slot: Slot,
     /// each element is (source slot, accounts moving FROM source slot)
-    slots_and_accounts: &'a [(Slot, &'a [&'a StoredAccountMeta<'a>])],
+    slots_and_accounts: &'a [(Slot, &'a [&'a StoredAccountMeta])],
 
     /// This is calculated based off slots_and_accounts.
     /// cumulative offset of all account slices prior to this one
@@ -174,7 +174,7 @@ impl<'a> StorableAccountsBySlot<'a> {
     /// each element of slots_and_accounts is (source slot, accounts moving FROM source slot)
     pub fn new(
         target_slot: Slot,
-        slots_and_accounts: &'a [(Slot, &'a [&'a StoredAccountMeta<'a>])],
+        slots_and_accounts: &'a [(Slot, &'a [&'a StoredAccountMeta])],
     ) -> Self {
         let mut cumulative_len = 0usize;
         let mut starting_offsets = Vec::with_capacity(slots_and_accounts.len());
@@ -216,11 +216,11 @@ impl<'a> StorableAccountsBySlot<'a> {
     }
 }
 
-impl<'a> StorableAccounts<'a, StoredAccountMeta<'a>> for StorableAccountsBySlot<'a> {
+impl<'a> StorableAccounts<'a, StoredAccountMeta> for StorableAccountsBySlot<'a> {
     fn pubkey(&self, index: usize) -> &Pubkey {
         self.account(index).pubkey()
     }
-    fn account(&self, index: usize) -> &StoredAccountMeta<'a> {
+    fn account(&self, index: usize) -> &StoredAccountMeta {
         let indexes = self.find_internal_index(index);
         self.slots_and_accounts[indexes.0].1[indexes.1]
     }
@@ -250,13 +250,13 @@ impl<'a> StorableAccounts<'a, StoredAccountMeta<'a>> for StorableAccountsBySlot<
 
 /// this tuple contains a single different source slot that applies to all accounts
 /// accounts are StoredAccountMeta
-impl<'a> StorableAccounts<'a, StoredAccountMeta<'a>>
-    for (Slot, &'a [&'a StoredAccountMeta<'a>], Slot)
+impl<'a> StorableAccounts<'a, StoredAccountMeta>
+    for (Slot, &'a [&'a StoredAccountMeta], Slot)
 {
     fn pubkey(&self, index: usize) -> &Pubkey {
         self.account(index).pubkey()
     }
-    fn account(&self, index: usize) -> &StoredAccountMeta<'a> {
+    fn account(&self, index: usize) -> &StoredAccountMeta {
         self.1[index]
     }
     fn slot(&self, _index: usize) -> Slot {

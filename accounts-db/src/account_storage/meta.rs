@@ -112,20 +112,20 @@ impl<
 /// References to account data stored elsewhere. Getting an `Account` requires cloning
 /// (see `StoredAccountMeta::clone_account()`).
 #[derive(PartialEq, Eq, Debug)]
-pub enum StoredAccountMeta<'storage> {
-    AppendVec(AppendVecStoredAccountMeta<'storage>),
-    Hot(HotAccount<'storage, HotAccountMeta>),
+pub enum StoredAccountMeta {
+    AppendVec(AppendVecStoredAccountMeta),
+    Hot(HotAccount<HotAccountMeta>),
 }
 
-impl<'storage> StoredAccountMeta<'storage> {
-    pub fn pubkey(&self) -> &'storage Pubkey {
+impl StoredAccountMeta {
+    pub fn pubkey(&self) -> &Pubkey {
         match self {
             Self::AppendVec(av) => av.pubkey(),
             Self::Hot(hot) => hot.address(),
         }
     }
 
-    pub fn hash(&self) -> &'storage AccountHash {
+    pub fn hash(&self) -> &AccountHash {
         match self {
             Self::AppendVec(av) => av.hash(),
             // tiered-storage has deprecated the use of AccountHash
@@ -147,7 +147,7 @@ impl<'storage> StoredAccountMeta<'storage> {
         }
     }
 
-    pub fn data(&self) -> &'storage [u8] {
+    pub fn data(&self) -> &[u8] {
         match self {
             Self::AppendVec(av) => av.data(),
             Self::Hot(hot) => hot.data(),
@@ -178,8 +178,8 @@ impl<'storage> StoredAccountMeta<'storage> {
             Self::Hot(_) => unreachable!(),
         }
     }
-
-    pub fn set_meta(&mut self, meta: &'storage StoredMeta) {
+/*
+    pub fn set_meta(&mut self, meta: &StoredMeta) {
         match self {
             Self::AppendVec(av) => av.set_meta(meta),
             // Hot account does not support this API as it does not
@@ -187,6 +187,7 @@ impl<'storage> StoredAccountMeta<'storage> {
             Self::Hot(_) => unreachable!(),
         }
     }
+    */
 
     pub(crate) fn sanitize(&self) -> bool {
         match self {
@@ -197,7 +198,7 @@ impl<'storage> StoredAccountMeta<'storage> {
     }
 }
 
-impl<'storage> ReadableAccount for StoredAccountMeta<'storage> {
+impl ReadableAccount for StoredAccountMeta {
     fn lamports(&self) -> u64 {
         match self {
             Self::AppendVec(av) => av.lamports(),
@@ -233,7 +234,7 @@ impl<'storage> ReadableAccount for StoredAccountMeta<'storage> {
 /// Meta contains enough context to recover the index from storage itself
 /// This struct will be backed by mmaped and snapshotted data files.
 /// So the data layout must be stable and consistent across the entire cluster!
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(C)]
 pub struct StoredMeta {
     /// global write version
@@ -248,7 +249,7 @@ pub struct StoredMeta {
 
 /// This struct will be backed by mmaped and snapshotted data files.
 /// So the data layout must be stable and consistent across the entire cluster!
-#[derive(Serialize, Deserialize, Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[repr(C)]
 pub struct AccountMeta {
     /// lamports in the account
