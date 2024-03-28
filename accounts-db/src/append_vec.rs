@@ -562,7 +562,7 @@ impl AppendVec {
             let mut binding = self.file.write().unwrap();
             let file = binding.as_mut().unwrap();
             let mut stored_meta = [0u8; std::mem::size_of::<StoredMeta>() + std::mem::size_of::<AccountMeta>()];
-            if self.file_size < offset as u64 + stored_meta.len() as u64 {
+            if self.len() < offset + stored_meta.len() {
                 return None;
             }
             file.seek(SeekFrom::Start(offset as u64)).unwrap();
@@ -574,15 +574,16 @@ impl AppendVec {
             };
             let (meta, next): (&StoredMeta, _) = m2.get_type(0)?;
             let (account_meta, next): (&AccountMeta, _) = m2.get_type(next)?;
-            // let (hash, next): (&AccountHash, _) = m2.get_type(next)?;
-            if meta.data_len > 11_000_000 {
-                panic!("trying to load account at offset {offset}, got data len: {}", meta.data_len);
-            }
-            let mut data = (0..meta.data_len).map(|_| 0).collect::<Vec<_>>();
             let start_of_data = offset as u64 + next as u64 + std::mem::size_of::<solana_sdk::hash::Hash>() as u64;
-            if self.file_size < start_of_data + meta.data_len {
+            if self.len() < (start_of_data as usize + meta.data_len as usize) || meta.data_len as usize > self.len() {
                 return None;
             }
+            //assert!(start_of_data as usize + meta.data_len as usize >= start_of_data as usize, "{}, {}, {}", meta.data_len as usize, start_of_data as usize, start_of_data as usize + meta.data_len as usize);
+            // let (hash, next): (&AccountHash, _) = m2.get_type(next)?;
+            if meta.data_len > 11_000_000 {
+                panic!("trying to load account at offset {offset}, got data len: {}, file size: {}, {}, {}", meta.data_len, self.file_size, (start_of_data as usize + meta.data_len as usize), (self.file_size as usize) < (start_of_data as usize + meta.data_len as usize));
+            }
+            let mut data = (0..meta.data_len).map(|_| 0).collect::<Vec<_>>();
             file.seek(SeekFrom::Start(start_of_data)).unwrap();
             file.read(&mut data).unwrap();
             // let (data, next) = m2.get_slice(next, meta.data_len as usize)?;
@@ -606,18 +607,40 @@ impl AppendVec {
 
     fn get_account_meta(&self, offset: usize) -> Option<AccountMeta> {
         let binding = self.map.read().unwrap();
-        let map = binding.as_ref().unwrap();
-        let m2 = AppendVecMap {
-            map: &map,
-            current_len: &self.current_len,
-            file_size: self.file_size,
-        };
+
         // Skip over StoredMeta data in the account
         let offset = offset.checked_add(mem::size_of::<StoredMeta>())?;
         // u64_align! does an unchecked add for alignment. Check that it won't cause an overflow.
         offset.checked_add(ALIGN_BOUNDARY_OFFSET - 1)?;
-        let (account_meta, _): (&AccountMeta, _) = m2.get_type(u64_align!(offset))?;
-        Some(*account_meta)
+        if binding.is_some() {
+            let map = binding.as_ref().unwrap();
+            let m2 = AppendVecMap {
+                map: &map,
+                current_len: &self.current_len,
+                file_size: self.file_size,
+            };
+            let (account_meta, _): (&AccountMeta, _) = m2.get_type(u64_align!(offset))?;
+            Some(*account_meta)
+        }
+        else {
+            self.loads.fetch_add(1, Ordering::Relaxed);
+            let mut binding = self.file.write().unwrap();
+            let file = binding.as_mut().unwrap();
+            if self.file_size < offset as u64 + std::mem::size_of::<AccountMeta>() as u64 {
+                return None;
+            }
+            file.seek(SeekFrom::Start(offset as u64)).unwrap();
+            let mut stored_meta = [0u8; std::mem::size_of::<AccountMeta>()];
+
+            file.read(&mut stored_meta).unwrap();
+            let m2 = AppendVecMap {
+                map: &stored_meta,
+                current_len: &self.current_len,
+                file_size: self.file_size,
+            };
+            let (account_meta, _): (&AccountMeta, _) = m2.get_type(0)?;
+            Some(*account_meta)
+        }
     }
 
     /// Return Ok(index_of_matching_owner) if the account owner at `offset` is one of the pubkeys in `owners`.

@@ -6961,8 +6961,8 @@ impl Bank {
         });
 
         let (verified_accounts, verify_accounts_time_us) = measure_us!({
-            let should_verify_accounts = !self.rc.accounts.accounts_db.skip_initial_hash_calc;
-            if should_verify_accounts && false {
+            let should_verify_accounts = true; // !self.rc.accounts.accounts_db.skip_initial_hash_calc;
+            if should_verify_accounts {
                 info!("Verifying accounts...");
                 let verified = self.verify_accounts_hash(
                     base,
@@ -6970,7 +6970,7 @@ impl Bank {
                         test_hash_calculation,
                         ignore_mismatch: false,
                         require_rooted_bank: false,
-                        run_in_background: true,
+                        run_in_background: false,//true,
                         store_hash_raw_data_for_debug: false,
                     },
                 );

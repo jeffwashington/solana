@@ -832,7 +832,7 @@ impl<'a> AccountsHasher<'a> {
                 accum.lamports_sum = accum
                     .lamports_sum
                     .checked_add(lamports_bin)
-                    .expect("summing capitalization cannot overflow");
+                    .expect(&format!("summing capitalization cannot overflow, {}", accum.hashes_count));
                 accum.hashes_count += hashes_file.count();
                 accum.hashes_files.push(hashes_file);
                 accum
@@ -846,7 +846,7 @@ impl<'a> AccountsHasher<'a> {
                     a.lamports_sum = a
                         .lamports_sum
                         .checked_add(b.lamports_sum)
-                        .expect("summing capitalization cannot overflow");
+                        .expect(&format!("summing capitalization cannot overflow, {}, {}", a.hashes_count, b.hashes_count));
                     a.hashes_count += b.hashes_count;
                     a.hashes_files.append(&mut b.hashes_files);
                     a
