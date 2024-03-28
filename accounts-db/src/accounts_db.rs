@@ -1046,6 +1046,10 @@ impl AccountStorageEntry {
         }
     }
 
+    fn release_map(&self) {
+        self.accounts.release_map();
+    }
+
     pub fn new_existing(
         slot: Slot,
         id: AccountsFileId,
@@ -8727,6 +8731,9 @@ impl AccountsDb {
         if !dirty_pubkeys.is_empty() {
             self.uncleaned_pubkeys.insert(slot, dirty_pubkeys);
         }
+
+        storage.release_map();
+
         SlotIndexGenerationInfo {
             insert_time_us,
             num_accounts: generate_index_results.count as u64,
@@ -9010,8 +9017,11 @@ impl AccountsDb {
                 timings.accounts_data_len_dedup_time_us = accounts_data_len_dedup_timer.as_us();
                 timings.slots_to_clean = uncleaned_roots.len() as u64;
 
+                /*
+                don't clean slots inititially
                 self.accounts_index
                     .add_uncleaned_roots(uncleaned_roots.into_iter());
+                */
                 accounts_data_len.fetch_sub(accounts_data_len_from_duplicates, Ordering::Relaxed);
                 info!(
                     "accounts data len: {}",

@@ -367,6 +367,20 @@ impl AppendVec {
         format!("{slot}.{id}")
     }
 
+    pub fn release_map(&self) {
+        let mut map = self.map.lock().unwrap();
+        if let Some(map) = std::mem::take(&mut *map) {
+            drop(map);
+            let data = OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create(false)
+                .open(&self.path).unwrap();
+    
+            *self.file.lock().unwrap() = Some(data);
+        }
+    }
+
     pub fn new_from_file(path: impl Into<PathBuf>, current_len: usize) -> Result<(Self, usize)> {
         let path = path.into();
         let new = Self::new_from_file_unchecked(path, current_len)?;

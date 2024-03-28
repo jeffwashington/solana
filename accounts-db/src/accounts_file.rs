@@ -58,6 +58,12 @@ pub enum AccountsFile {
 }
 
 impl AccountsFile {
+    pub fn release_map(&self) {
+        match self {
+            Self::AppendVec(av) => av.release_map(),
+            Self::TieredStorage(_) => todo!(""),//Ok(()),
+        }
+    }
     /// Create an AccountsFile instance from the specified path.
     ///
     /// The second element of the returned tuple is the number of accounts in the
