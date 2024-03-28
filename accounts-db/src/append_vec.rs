@@ -197,6 +197,13 @@ impl<'append_vec> ReadableAccount for AppendVecStoredAccountMeta<'append_vec> {
     }
 }
 
+struct AppendVecMap<'a> {
+    map: &'a [u8],
+    current_len: AtomicUsize,
+    /// The number of bytes available for storing items.
+    file_size: u64,
+}
+
 /// A thread-safe, file-backed block of memory used to store `Account` instances. Append operations
 /// are serialized such that only one thread updates the internal `append_lock` at a time. No
 /// restrictions are placed on reading. That is, one may read items from one thread while another
@@ -206,8 +213,10 @@ pub struct AppendVec {
     /// The file path where the data is stored.
     path: PathBuf,
 
+    file: Mutex<Option<std::fs::File>>,
+
     /// A file-backed block of memory that is used to store the data for each appended item.
-    map: MmapMut,
+    map: Mutex<Option<MmapMut>>,
 
     /// A lock used to serialize append operations.
     append_lock: Mutex<()>,
@@ -284,7 +293,8 @@ impl AppendVec {
 
         AppendVec {
             path: file,
-            map,
+            file: Mutex::new(None),
+            map: Mutex::new(Some(map)),
             // This mutex forces append to be single threaded, but concurrent with reads
             // See UNSAFE usage in `append_ptr`
             append_lock: Mutex::new(()),
@@ -315,7 +325,10 @@ impl AppendVec {
     }
 
     pub fn flush(&self) -> Result<()> {
-        self.map.flush()?;
+        let m = self.map.lock().unwrap();
+        if m.is_some() {
+            m.as_ref().unwrap().flush()?;
+        }
         Ok(())
     }
 
@@ -335,7 +348,13 @@ impl AppendVec {
     pub fn len(&self) -> usize {
         self.current_len.load(Ordering::Acquire)
     }
-
+}
+impl<'a> AppendVecMap<'a> {
+    pub fn len(&self) -> usize {
+        self.current_len.load(Ordering::Acquire)
+    }
+}
+impl AppendVec {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
@@ -388,7 +407,8 @@ impl AppendVec {
 
         Ok(AppendVec {
             path,
-            map,
+            file: Mutex::default(),
+            map: Mutex::new(Some(map)),
             append_lock: Mutex::new(()),
             current_len: AtomicUsize::new(current_len),
             file_size,
@@ -415,7 +435,8 @@ impl AppendVec {
 
         (offset == aligned_current_len, num_accounts)
     }
-
+}
+impl<'a> AppendVecMap<'a> {
     /// Get a reference to the data at `offset` of `size` bytes if that slice
     /// doesn't overrun the internal buffer. Otherwise return None.
     /// Also return the offset of the first byte after the requested data that
@@ -484,15 +505,23 @@ impl AppendVec {
         //and the lifetime of the &T is tied to self, which holds the underlying memory map
         Some((unsafe { &*ptr }, next))
     }
-
+}
+impl AppendVec {
     /// Return stored account metadata for the account at `offset` if its data doesn't overrun
     /// the internal buffer. Otherwise return None. Also return the offset of the first byte
     /// after the requested data that falls on a 64-byte boundary.
     pub fn get_account(&self, offset: usize) -> Option<(StoredAccountMeta, usize)> {
-        let (meta, next): (&StoredMeta, _) = self.get_type(offset)?;
-        let (account_meta, next): (&AccountMeta, _) = self.get_type(next)?;
-        let (hash, next): (&AccountHash, _) = self.get_type(next)?;
-        let (data, next) = self.get_slice(next, meta.data_len as usize)?;
+        let binding = self.map.lock().unwrap();
+        let map = binding.as_ref().unwrap();
+        let m2 = AppendVecMap {
+            map: &map,
+            current_len: AtomicUsize::new(self.current_len.load(Ordering::Relaxed)),
+            file_size: self.file_size,
+        };
+        let (meta, next): (&StoredMeta, _) = m2.get_type(offset)?;
+        let (account_meta, next): (&AccountMeta, _) = m2.get_type(next)?;
+        let (hash, next): (&AccountHash, _) = m2.get_type(next)?;
+        let (data, next) = m2.get_slice(next, meta.data_len as usize)?;
         let stored_size = next - offset;
         Some((
             StoredAccountMeta::AppendVec(AppendVecStoredAccountMeta {
@@ -508,11 +537,18 @@ impl AppendVec {
     }
 
     fn get_account_meta(&self, offset: usize) -> Option<&AccountMeta> {
+        let binding = self.map.lock().unwrap();
+        let map = binding.as_ref().unwrap();
+        let m2 = AppendVecMap {
+            map: &map,
+            current_len: AtomicUsize::new(self.current_len.load(Ordering::Relaxed)),
+            file_size: self.file_size,
+        };
         // Skip over StoredMeta data in the account
         let offset = offset.checked_add(mem::size_of::<StoredMeta>())?;
         // u64_align! does an unchecked add for alignment. Check that it won't cause an overflow.
         offset.checked_add(ALIGN_BOUNDARY_OFFSET - 1)?;
-        let (account_meta, _): (&AccountMeta, _) = self.get_type(u64_align!(offset))?;
+        let (account_meta, _): (&AccountMeta, _) = m2.get_type(u64_align!(offset))?;
         Some(account_meta)
     }
 
@@ -587,6 +623,13 @@ impl AppendVec {
     ) -> Option<Vec<StoredAccountInfo>> {
         let _lock = self.append_lock.lock().unwrap();
         let mut offset = self.len();
+        let binding = self.map.lock().unwrap();
+        let map = binding.as_ref().unwrap();
+        let m2 = AppendVecMap {
+            map: &map,
+            current_len: AtomicUsize::new(self.current_len.load(Ordering::Relaxed)),
+            file_size: self.file_size,
+        };
 
         let len = accounts.accounts.len();
         // Here we have `len - skip` number of accounts.  The +1 extra capacity
@@ -626,7 +669,7 @@ impl AppendVec {
                 (hash_ptr, mem::size_of::<AccountHash>()),
                 (data_ptr, data_len),
             ];
-            if let Some(res) = self.append_ptrs_locked(&mut offset, &ptrs) {
+            if let Some(res) = m2.append_ptrs_locked(&mut offset, &ptrs) {
                 offsets.push(res)
             } else {
                 break;
