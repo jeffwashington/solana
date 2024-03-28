@@ -2450,7 +2450,7 @@ impl AccountsDb {
         let test_skip_rewrites_but_include_in_bank_hash = accounts_db_config
             .as_ref()
             .map(|config| config.test_skip_rewrites_but_include_in_bank_hash)
-            .unwrap_or_default();
+            .unwrap_or(true);
 
         let partitioned_epoch_rewards_config: PartitionedEpochRewardsConfig =
             PartitionedEpochRewardsConfig::new(test_partitioned_epoch_rewards);
