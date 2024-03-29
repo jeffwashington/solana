@@ -236,6 +236,14 @@ impl Drop for AppendVec {
     }
 }
 
+/// offsets to help navigate the persisted format of `AppendVec`
+struct AccountOffsets {
+    /// offset to the end of the &[u8] data
+    offset_to_end_of_data: usize,
+    /// offset to the next account. This will be aligned.
+    next_account_offset: usize,
+}
+
 impl AppendVec {
     pub fn new(file: impl Into<PathBuf>, create: bool, size: usize) -> Self {
         let file = file.into();
@@ -550,6 +558,47 @@ impl AppendVec {
 
     pub fn get_path(&self) -> PathBuf {
         self.path.clone()
+    }
+
+    /// help with the math of offsets when navigating the on-disk layout in an AppendVec.
+    /// data is at the end of each account and is variable sized
+    /// the next account is then aligned on a 64 bit boundary.
+    /// With these helpers, we can skip over reading some of the data depending on what the caller wants.
+    fn next_account_offset(start_offset: usize, stored_meta: &StoredMeta) -> AccountOffsets {
+        let next_after_stored_meta = start_offset + std::mem::size_of::<StoredMeta>();
+        let start_of_data = next_after_stored_meta
+            + std::mem::size_of::<AccountMeta>()
+            + std::mem::size_of::<solana_sdk::hash::Hash>();
+        let aligned_data_len = u64_align!(stored_meta.data_len as usize);
+        let next_account_offset = start_of_data + aligned_data_len;
+        let offset_to_end_of_data = start_of_data + stored_meta.data_len as usize;
+
+        AccountOffsets {
+            next_account_offset,
+            offset_to_end_of_data,
+        }
+    }
+
+    /// iterate over all pubkeys and call `callback`.
+    /// This iteration does not deserialize and populate each field in `StoredAccountMeta`.
+    /// `data` is completely ignored, for example.
+    /// Also, no references have to be maintained/returned from an iterator function.
+    /// This fn can operate on a batch of data at once.
+    pub(crate) fn pubkey_iter(&self, mut callback: impl FnMut(&Pubkey)) {
+        let mut offset = 0;
+        loop {
+            let Some((stored_meta, _)) = self.get_type::<StoredMeta>(offset) else {
+                // eof
+                break;
+            };
+            let next = Self::next_account_offset(offset, stored_meta);
+            if next.offset_to_end_of_data > self.len() {
+                // data doesn't fit, so don't include this pubkey
+                break;
+            }
+            callback(&stored_meta.pubkey);
+            offset = next.next_account_offset;
+        }
     }
 
     /// Return iterator for account metadata
