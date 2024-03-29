@@ -315,18 +315,22 @@ impl AccountsDb {
         self.shrink_ancient_stats
             .slots_considered
             .fetch_add(sorted_slots.len() as u64, Ordering::Relaxed);
+        log::error!("{}, {}", line!(), sorted_slots.len());
         let ancient_slot_infos = self.collect_sort_filter_ancient_slots(sorted_slots, &tuning);
 
         if ancient_slot_infos.all_infos.is_empty() {
             return; // nothing to do
         }
+        log::error!("{}, {}", line!(), ancient_slot_infos.all_infos.len());
         let accounts_per_storage = self
             .get_unique_accounts_from_storage_for_combining_ancient_slots(
                 &ancient_slot_infos.all_infos[..],
             );
+        log::error!("{}", line!());
 
         let mut accounts_to_combine = self.calc_accounts_to_combine(&accounts_per_storage);
         metrics.unpackable_slots_count += accounts_to_combine.unpackable_slots_count;
+        log::error!("{}, {}, {}", line!(), accounts_to_combine.accounts_keep_slots.len(), accounts_to_combine.accounts_to_combine.len());
 
         let mut many_refs_newest = accounts_to_combine
             .accounts_to_combine
@@ -337,11 +341,13 @@ impl AccountsDb {
                 (!newest_alive.accounts.is_empty()).then_some(newest_alive)
             })
             .collect::<Vec<_>>();
+        log::error!("{}", line!());
 
         // Sort highest slot to lowest slot. This way, we will put the multi ref accounts with the highest slots in the highest
         // packed slot.
         many_refs_newest.sort_unstable_by(|a, b| b.slot.cmp(&a.slot));
         metrics.newest_alive_packed_count += many_refs_newest.len();
+        log::error!("{}", line!());
 
         if !Self::many_ref_accounts_can_be_moved(
             &many_refs_newest,
@@ -358,6 +364,7 @@ impl AccountsDb {
             return;
         }
 
+        log::error!("{}", line!());
         // pack the accounts with 1 ref or refs > 1 but the slot we're packing is the highest alive slot for the pubkey.
         // Note the `chain` below combining the 2 types of refs.
         let pack = PackedAncientStorage::pack(
@@ -378,13 +385,16 @@ impl AccountsDb {
             return;
         }
 
+        log::error!("{}", line!());
         let write_ancient_accounts = self.write_packed_storages(&accounts_to_combine, pack);
 
+        log::error!("{}", line!());
         self.finish_combine_ancient_slots_packed_internal(
             accounts_to_combine,
             write_ancient_accounts,
             metrics,
         );
+        log::error!("{}", line!());
     }
 
     /// for each account in `unrefed_pubkeys`, in each `accounts_to_combine`, addref
