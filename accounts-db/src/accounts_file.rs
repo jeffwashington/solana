@@ -133,6 +133,18 @@ impl AccountsFile {
         }
     }
 
+    /// Return account for the account at the
+    /// specified `index` if any.  Otherwise return None.
+    pub(crate) fn get_stored_account(
+        &self,
+        index: usize,
+    ) -> Option<solana_sdk::account::AccountSharedData> {
+        match self {
+            Self::AppendVec(av) => av.get_stored_account(index),
+            Self::TieredStorage(_) => unimplemented!(),
+        }
+    }
+
     pub fn account_matches_owners(
         &self,
         offset: usize,
