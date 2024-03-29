@@ -5395,14 +5395,9 @@ impl AccountsDb {
             load_hint,
         )?;
 
-        let was_cached = matches!(account_accessor, LoadedAccountAccessor::Cached(_));
-        //let account2 = account_accessor.check_and_get_loaded_account2();
+        let is_cached = matches!(account_accessor, LoadedAccountAccessor::Cached(_));
+        let account = account_accessor.check_and_get_loaded_account2();
 
-        let loaded_account = account_accessor.check_and_get_loaded_account();
-        assert_eq!(loaded_account.is_cached(), was_cached);
-        let is_cached = loaded_account.is_cached();
-        let account = loaded_account.take_account();
-        //assert_eq!(account2, account);
         if matches!(load_zero_lamports, LoadZeroLamports::None) && account.is_zero_lamport() {
             return None;
         }

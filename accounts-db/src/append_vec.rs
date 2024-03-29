@@ -206,8 +206,8 @@ struct AppendVecMap<'a> {
 
 #[derive(Debug)]
 struct Readers {
-    large: std::io::BufReader<std::fs::File>,
     small: std::io::BufReader<std::fs::File>,
+    raw: std::fs::File,
 }
 
 use std::{io::Read, sync::RwLock};
@@ -389,8 +389,8 @@ impl AppendVec {
                 .unwrap();
 
             *self.file.write().unwrap() = Some(Readers {
+                raw: data.try_clone().unwrap(),
                 small: std::io::BufReader::new(data.try_clone().unwrap()),
-                large: std::io::BufReader::with_capacity(64_000, data),
             });
         }
     }
@@ -448,8 +448,8 @@ impl AppendVec {
                 loads: AtomicUsize::default(),
                 path,
                 file: RwLock::new(Some(Readers {
+                    raw: data.try_clone().unwrap(),
                     small: std::io::BufReader::new(data.try_clone().unwrap()),
-                    large: std::io::BufReader::with_capacity(64_000, data),
                 })),
                 map: RwLock::new(None),
                 append_lock: Mutex::new(()),
@@ -605,46 +605,68 @@ impl AppendVec {
                     )
                 )
             } else {
+                let mut read_buffer = [0u8; 400];
                 assert_eq!(offset % 8, 0);
                 self.loads.fetch_add(1, Ordering::Relaxed);
                 let mut binding = self.file.write().unwrap();
-                let file = &mut binding.as_mut().unwrap().small;
-                let mut stored_meta =
-                    [0u8; std::mem::size_of::<StoredMeta>() + std::mem::size_of::<AccountMeta>()];
-                if self.len() < offset + stored_meta.len() {
+                let size_of_metas = std::mem::size_of::<StoredMeta>() + std::mem::size_of::<AccountMeta>();
+                let file = &mut binding.as_mut().unwrap().raw;
+                if self.len() < offset + size_of_metas {
                     return None;
                 }
+                let bytes_to_read = read_buffer.len().min(self.len() - offset);
                 file.seek(SeekFrom::Start(offset as u64)).unwrap();
-                file.read(&mut stored_meta).unwrap();
+                file.read(&mut read_buffer[..bytes_to_read]).unwrap();
                 let m2 = AppendVecMap {
-                    map: &stored_meta,
+                    map: &read_buffer,
                     current_len: &self.current_len,
                     file_size: self.file_size,
                 };
                 let (meta, next): (&StoredMeta, _) = m2.get_type(0)?;
                 let (account_meta, next): (&AccountMeta, _) = m2.get_type(next)?;
-                let nexts = Self::next_account_offset(offset, meta);
-                let start_of_data =
-                    offset as u64 + next as u64 + std::mem::size_of::<solana_sdk::hash::Hash>() as u64;
-                if self.len() < (start_of_data as usize + meta.data_len as usize)
+                let nexts = Self::next_account_offset(0, meta);
+                if nexts.stored_size <= bytes_to_read {
+                    // we got all data in 1 read
+                    let data = &read_buffer[nexts.start_of_data..nexts.offset_to_end_of_data];
+                    assert_eq!(data.len(), meta.data_len as usize);
+                    return Some(AccountSharedData::create(
+                        account_meta.lamports,
+                        data.to_vec(),
+                        account_meta.owner,
+                        account_meta.executable,
+                        account_meta.rent_epoch,
+                    ));
+                }
+                // we have to read the data separately because data is too large
+                let nexts = Self::next_account_offset(0, meta);
+                if self.len() < (offset + nexts.start_of_data + meta.data_len as usize)
                     || meta.data_len as usize > self.len()
                 {
                     return None;
                 }
-                //assert!(start_of_data as usize + meta.data_len as usize >= start_of_data as usize, "{}, {}, {}", meta.data_len as usize, start_of_data as usize, start_of_data as usize + meta.data_len as usize);
-                // let (hash, next): (&AccountHash, _) = m2.get_type(next)?;
-                if meta.data_len > 11_000_000 {
-                    panic!("trying to load account at offset {offset}, got data len: {}, file size: {}, {}, {}", meta.data_len, self.file_size, (start_of_data as usize + meta.data_len as usize), (self.file_size as usize) < (start_of_data as usize + meta.data_len as usize));
+                let data_got_already = &read_buffer[nexts.start_of_data..bytes_to_read];
+                let mut data = vec![0; meta.data_len as usize];
+                data[..data_got_already.len()].copy_from_slice(data_got_already);
+                file.read(&mut data[data_got_already.len()..]).unwrap();
+
+                let verify = false;
+                if verify {
+                    let mut data2 = vec![0; meta.data_len as usize];
+                    file.seek(SeekFrom::Start((offset + nexts.start_of_data) as u64)).unwrap();
+                    file.read(&mut data2[..]).unwrap();
+                    if data2 != data {
+                        let mut i = 0;
+                        for k in 0..data2.len() {
+                            if data2[k] != data[k] {
+                                log::error!("i where wrong: {k}, data len: {}, bytes to read: {bytes_to_read}, start of data: {}, data_got_already: {}, read remainder: {}", meta.data_len,
+                            nexts.start_of_data, data_got_already.len(), (&mut data[data_got_already.len()..]).len());
+                            break;
+                            }
+                        }
+                    }
+                    assert_eq!(data2, data, "{:?}", (data2.len(), data.len(), offset, nexts.start_of_data, meta.data_len));
                 }
-                let mut data = (0..meta.data_len).map(|_| 0).collect::<Vec<_>>();
-                file.seek(SeekFrom::Start(start_of_data)).unwrap();
-                file.read(&mut data).unwrap();
-                // let (data, next) = m2.get_slice(next, meta.data_len as usize)?;
-                let stored_size = (start_of_data + u64_align!(meta.data_len as usize) as u64
-                    - offset as u64) as usize;
-                assert_eq!(stored_size % 8, 0);
-                let next = offset + stored_size;
-                //log::error!("size: {}, len: {}", stored_size, meta.data_len);
+
                 Some(
                     AccountSharedData::create(
                         account_meta.lamports,
