@@ -139,6 +139,13 @@ impl AccountsFile {
         }
     }
     
+    pub fn get_account_size(&self, index: usize) -> Option<usize> {
+        match self {
+            Self::AppendVec(av) => av.get_account_size(index),
+            Self::TieredStorage(ts) => todo!(""),
+        }
+    }
+    
 
     pub fn account_matches_owners(
         &self,

@@ -7990,8 +7990,7 @@ impl AccountsDb {
                     store.slot(), *slot
                 );
                 let offset = account_info.offset();
-                let account = store.accounts.get_account(offset).unwrap();
-                let stored_size = account.0.stored_size();
+                let stored_size = store.accounts.get_account_size(offset).unwrap();
                 let count = store.remove_account(stored_size, reset_accounts);
                 if count == 0 {
                     self.dirty_stores.insert(*slot, store.clone());

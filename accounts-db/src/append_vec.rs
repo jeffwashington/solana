@@ -580,6 +580,41 @@ impl AppendVec {
         }
     }
 
+    pub fn get_account_size(&self, offset: usize) -> Option<usize> {
+        let binding = self.map.read().unwrap();
+
+        if binding.is_some() {
+            let map = binding.as_ref().unwrap();
+            let m2 = AppendVecMap {
+                map: &map,
+                current_len: &self.current_len,
+                file_size: self.file_size,
+            };
+            let (stored_meta, _): (&StoredMeta, _) = m2.get_type(u64_align!(offset))?;
+            let nexts = Self::next_account_offset(0, stored_meta);
+            Some(nexts.stored_size)
+        } else {
+            self.loads.fetch_add(1, Ordering::Relaxed);
+            let mut binding = self.file.write().unwrap();
+            let file = &mut binding.as_mut().unwrap().small;
+            if self.len() < offset + std::mem::size_of::<StoredMeta>() {
+                return None;
+            }
+            file.seek(SeekFrom::Start(offset as u64)).unwrap();
+            let mut stored_meta = [0u8; std::mem::size_of::<StoredMeta>()];
+
+            file.read(&mut stored_meta).unwrap();
+            let m2 = AppendVecMap {
+                map: &stored_meta,
+                current_len: &self.current_len,
+                file_size: self.file_size,
+            };
+            let (stored_meta, _): (&StoredMeta, _) = m2.get_type(0)?;
+            let nexts = Self::next_account_offset(0, stored_meta);
+            Some(nexts.stored_size)
+        }
+    }
+
     pub fn get_stored_account(&self, offset: usize) -> Option<AccountSharedData> {
             let binding = self.map.read().unwrap();
             use solana_sdk::account::WritableAccount;
