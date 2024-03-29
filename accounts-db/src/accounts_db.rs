@@ -1270,39 +1270,11 @@ struct RemoveUnrootedSlotsSynchronization {
 
 type AccountInfoAccountsIndex = AccountsIndex<AccountInfo, AccountInfo>;
 
-/// When an instance of this exists, the read cache is not updated for account loads.
-/// When all instances are dropped, the read cache is populated for account loads.
-/// By default, all loads will populate the read cache.
-/// This cannot be incorrect, it is only a performance penalty at worst.
-pub struct DisableReadCacheUpdates<'a> {
-    accounts_db: &'a AccountsDb,
-}
-
-impl<'a> DisableReadCacheUpdates<'a> {
-    pub fn new(accounts_db: &'a AccountsDb) -> Self {
-        accounts_db
-            .disable_read_cache_updates_count
-            .fetch_add(1, Ordering::Relaxed);
-        Self { accounts_db }
-    }
-}
-
-impl<'a> Drop for DisableReadCacheUpdates<'a> {
-    fn drop(&mut self) {
-        self.accounts_db
-            .disable_read_cache_updates_count
-            .fetch_sub(1, Ordering::Relaxed);
-    }
-}
-
 // This structure handles the load/store of the accounts
 #[derive(Debug)]
 pub struct AccountsDb {
     /// Keeps tracks of index into AppendVec on a per slot basis
     pub accounts_index: AccountInfoAccountsIndex,
-
-    /// if != 0, read cache is not updated on loads
-    disable_read_cache_updates_count: AtomicU64,
 
     /// Some(offset) iff we want to squash old append vecs together into 'ancient append vecs'
     /// Some(offset) means for slots up to (max_slot - (slots_per_epoch - 'offset')), put them in ancient append vecs
@@ -2357,7 +2329,6 @@ impl AccountsDb {
             active_stats: ActiveStats::default(),
             skip_initial_hash_calc: false,
             ancient_append_vec_offset: None,
-            disable_read_cache_updates_count: AtomicU64::default(),
             accounts_index,
             storage: AccountStorage::default(),
             accounts_cache: AccountsCache::default(),

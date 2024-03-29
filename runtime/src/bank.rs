@@ -72,8 +72,7 @@ use {
         accounts::{AccountAddressFilter, Accounts, PubkeyAccountSlot},
         accounts_db::{
             AccountShrinkThreshold, AccountStorageEntry, AccountsDb, AccountsDbConfig,
-            CalcAccountsHashDataSource, DisableReadCacheUpdates,
-            VerifyAccountsHashAndLamportsConfig,
+            CalcAccountsHashDataSource, VerifyAccountsHashAndLamportsConfig,
         },
         accounts_hash::{
             AccountHash, AccountsHash, CalcAccountsHashConfig, HashStats, IncrementalAccountsHash,
@@ -1831,10 +1830,10 @@ impl Bank {
             let (account, _slot) = bank_rc
                 .accounts
                 .load_with_fixed_root_do_not_populate_read_cache(&ancestors, pubkey)?;
-                Some(account)
-            })
-            .expect(
-                "Stakes cache is inconsistent with accounts-db. This can indicate \
+            Some(account)
+        })
+        .expect(
+            "Stakes cache is inconsistent with accounts-db. This can indicate \
             a corrupted snapshot or bugs in cached accounts or accounts-db.",
         );
         let stakes_accounts_load_duration = now.elapsed();
