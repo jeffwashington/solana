@@ -145,9 +145,9 @@ const SHRINK_COLLECT_CHUNK_SIZE: usize = 50;
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum CreateAncientStorage {
     /// ancient storages are created by appending
-    #[default]
     Append,
     /// ancient storages are created by 1-shot write to pack multiple accounts together more efficiently with new formats
+    #[default]
     Pack,
 }
 
@@ -2446,7 +2446,7 @@ impl AccountsDb {
         let test_skip_rewrites_but_include_in_bank_hash = accounts_db_config
             .as_ref()
             .map(|config| config.test_skip_rewrites_but_include_in_bank_hash)
-            .unwrap_or_default();
+            .unwrap_or(true);
 
         let partitioned_epoch_rewards_config: PartitionedEpochRewardsConfig =
             PartitionedEpochRewardsConfig::new(test_partitioned_epoch_rewards);
@@ -7615,7 +7615,10 @@ impl AccountsDb {
                     Some((*loaded_account.pubkey(), loaded_account.loaded_hash()))
                 },
                 |accum: &DashMap<Pubkey, AccountHash>, loaded_account: LoadedAccount| {
-                    let loaded_hash = loaded_account.loaded_hash();
+                    let mut loaded_hash = loaded_account.loaded_hash();
+                    if loaded_hash == AccountHash(Hash::default()) {
+                        loaded_hash = Self::hash_account(&loaded_account, loaded_account.pubkey())
+                    }
                     accum.insert(*loaded_account.pubkey(), loaded_hash);
                 },
             );
