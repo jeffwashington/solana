@@ -204,7 +204,13 @@ struct AppendVecMap<'a> {
     file_size: u64,
 }
 
-use std::{sync::RwLock, io::Read};
+#[derive(Debug)]
+struct Readers {
+    large: std::io::BufReader<std::fs::File>,
+    small: std::io::BufReader<std::fs::File>,
+}
+
+use std::{io::Read, sync::RwLock};
 /// A thread-safe, file-backed block of memory used to store `Account` instances. Append operations
 /// are serialized such that only one thread updates the internal `append_lock` at a time. No
 /// restrictions are placed on reading. That is, one may read items from one thread while another
@@ -214,7 +220,7 @@ pub struct AppendVec {
     /// The file path where the data is stored.
     path: PathBuf,
 
-    file: RwLock<Option<std::io::BufReader<std::fs::File>>>,
+    file: RwLock<Option<Readers>>,
 
     loads: AtomicUsize,
 
@@ -379,9 +385,13 @@ impl AppendVec {
                 .read(true)
                 .write(true)
                 .create(false)
-                .open(&self.path).unwrap();
-    
-            *self.file.write().unwrap() = Some(std::io::BufReader::new(data));
+                .open(&self.path)
+                .unwrap();
+
+            *self.file.write().unwrap() = Some(Readers {
+                small: std::io::BufReader::new(data.try_clone().unwrap()),
+                large: std::io::BufReader::with_capacity(64_000, data),
+            });
         }
     }
 
@@ -433,12 +443,14 @@ impl AppendVec {
                 current_len: AtomicUsize::new(current_len),
                 file_size,
             })
-        }
-        else {
+        } else {
             Ok(AppendVec {
                 loads: AtomicUsize::default(),
                 path,
-                file: RwLock::new(Some(std::io::BufReader::new(data))),
+                file: RwLock::new(Some(Readers {
+                    small: std::io::BufReader::new(data.try_clone().unwrap()),
+                    large: std::io::BufReader::with_capacity(64_000, data),
+                })),
                 map: RwLock::new(None),
                 append_lock: Mutex::new(()),
                 current_len: AtomicUsize::new(current_len),
@@ -538,7 +550,35 @@ impl<'a> AppendVecMap<'a> {
         Some((unsafe { &*ptr }, next))
     }
 }
+
+struct AccountOffsets {
+    start_of_data: usize,
+    stored_size: usize,
+    next_account_offset: usize,
+    offset_to_end_of_data: usize,
+}
+
 impl AppendVec {
+    fn next_account_offset(
+        start_offset: usize,
+        stored_meta: &StoredMeta,
+        next_after_stored_meta: usize,
+    ) -> AccountOffsets {
+        let start_of_data = next_after_stored_meta
+            + std::mem::size_of::<AccountMeta>()
+            + std::mem::size_of::<solana_sdk::hash::Hash>();
+        let aligned_data_len = u64_align!(stored_meta.data_len as usize);
+        let stored_size = start_of_data + aligned_data_len - start_offset;
+        let next_account_offset = start_of_data + aligned_data_len;
+        let offset_to_end_of_data = start_of_data + stored_meta.data_len as usize;
+
+        AccountOffsets {
+            start_of_data,
+            stored_size,
+            next_account_offset,
+            offset_to_end_of_data,
+        }
+    }
     /// Return stored account metadata for the account at `offset` if its data doesn't overrun
     /// the internal buffer. Otherwise return None. Also return the offset of the first byte
     /// after the requested data that falls on a 64-byte boundary.
@@ -568,13 +608,13 @@ impl AppendVec {
                 }),
                 next,
             ))
-        }
-        else {
+        } else {
             assert_eq!(offset % 8, 0);
             self.loads.fetch_add(1, Ordering::Relaxed);
             let mut binding = self.file.write().unwrap();
-            let file = binding.as_mut().unwrap();
-            let mut stored_meta = [0u8; std::mem::size_of::<StoredMeta>() + std::mem::size_of::<AccountMeta>()];
+            let file = &mut binding.as_mut().unwrap().small;
+            let mut stored_meta =
+                [0u8; std::mem::size_of::<StoredMeta>() + std::mem::size_of::<AccountMeta>()];
             if self.len() < offset + stored_meta.len() {
                 return None;
             }
@@ -587,8 +627,11 @@ impl AppendVec {
             };
             let (meta, next): (&StoredMeta, _) = m2.get_type(0)?;
             let (account_meta, next): (&AccountMeta, _) = m2.get_type(next)?;
-            let start_of_data = offset as u64 + next as u64 + std::mem::size_of::<solana_sdk::hash::Hash>() as u64;
-            if self.len() < (start_of_data as usize + meta.data_len as usize) || meta.data_len as usize > self.len() {
+            let start_of_data =
+                offset as u64 + next as u64 + std::mem::size_of::<solana_sdk::hash::Hash>() as u64;
+            if self.len() < (start_of_data as usize + meta.data_len as usize)
+                || meta.data_len as usize > self.len()
+            {
                 return None;
             }
             //assert!(start_of_data as usize + meta.data_len as usize >= start_of_data as usize, "{}, {}, {}", meta.data_len as usize, start_of_data as usize, start_of_data as usize + meta.data_len as usize);
@@ -600,7 +643,8 @@ impl AppendVec {
             file.seek(SeekFrom::Start(start_of_data)).unwrap();
             file.read(&mut data).unwrap();
             // let (data, next) = m2.get_slice(next, meta.data_len as usize)?;
-            let stored_size = (start_of_data + u64_align!(meta.data_len as usize) as u64 - offset as u64) as usize;
+            let stored_size = (start_of_data + u64_align!(meta.data_len as usize) as u64
+                - offset as u64) as usize;
             assert_eq!(stored_size % 8, 0);
             let next = offset + stored_size;
             //log::error!("size: {}, len: {}", stored_size, meta.data_len);
@@ -634,12 +678,11 @@ impl AppendVec {
             };
             let (account_meta, _): (&AccountMeta, _) = m2.get_type(u64_align!(offset))?;
             Some(*account_meta)
-        }
-        else {
+        } else {
             self.loads.fetch_add(1, Ordering::Relaxed);
             let mut binding = self.file.write().unwrap();
-            let file = binding.as_mut().unwrap();
-            if self.file_size < offset as u64 + std::mem::size_of::<AccountMeta>() as u64 {
+            let file = &mut binding.as_mut().unwrap().small;
+            if self.len() < offset + std::mem::size_of::<AccountMeta>() {
                 return None;
             }
             file.seek(SeekFrom::Start(offset as u64)).unwrap();
@@ -690,6 +733,65 @@ impl AppendVec {
 
     pub fn get_path(&self) -> PathBuf {
         self.path.clone()
+    }
+
+    /// iterate over all pubkeys
+    pub fn pubkey_iter(&self, mut callback: impl FnMut(&Pubkey)) {
+        let binding = self.map.read().unwrap();
+        let mut offset = 0;
+        if binding.is_some() {
+            loop {
+                let map = binding.as_ref().unwrap();
+                let m2 = AppendVecMap {
+                    map: &map,
+                    current_len: &self.current_len,
+                    file_size: self.file_size,
+                };
+                let Some((stored_meta, next)) = m2.get_type::<StoredMeta>(offset) else {
+                    break;
+                };
+                let next = Self::next_account_offset(offset, stored_meta, next);
+                if next.offset_to_end_of_data > self.len() {
+                    // data doesn't fit, so don't include this pubkey
+                    break;
+                }
+                callback(&stored_meta.pubkey);
+                offset = next.next_account_offset;
+            }
+        } else {
+            let mut buf_meta = [0u8; std::mem::size_of::<StoredMeta>()];
+            let mut binding = self.file.write().unwrap();
+            let file = &mut binding.as_mut().unwrap().large;
+            file.seek(SeekFrom::Start(0)).unwrap();
+            loop {
+                if self.len() < offset + buf_meta.len() {
+                    break;
+                }
+
+                file.read(&mut buf_meta).unwrap();
+                let m2: AppendVecMap<'_> = AppendVecMap {
+                    map: &buf_meta,
+                    current_len: &self.current_len,
+                    file_size: self.file_size,
+                };
+                let Some((stored_meta, next)) = m2.get_type::<StoredMeta>(0) else {
+                    break;
+                };
+
+                let next = Self::next_account_offset(offset, stored_meta, next);
+                if next.offset_to_end_of_data > self.len() {
+                    // data doesn't fit, so don't include this pubkey
+                    break;
+                }
+                callback(&stored_meta.pubkey);
+
+                offset = next.next_account_offset;
+                // skip over hash, data, and padding
+                // seek_relative can avoid further reads
+                file.seek_relative((next.stored_size - buf_meta.len()) as i64)
+                    .unwrap();
+            }
+        }
     }
 
     /// Return iterator for account metadata
