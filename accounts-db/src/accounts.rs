@@ -174,6 +174,14 @@ impl Accounts {
         self.load_slow(ancestors, pubkey, LoadHint::FixedMaxRoot)
     }
 
+    pub fn load_with_fixed_root_do_not_populate_read_cache(
+        &self,
+        ancestors: &Ancestors,
+        pubkey: &Pubkey,
+    ) -> Option<(AccountSharedData, Slot)> {
+        self.load_slow(ancestors, pubkey, LoadHint::FixedMaxRootDoNotPopulateReadCache)
+    }
+
     pub fn load_without_fixed_root(
         &self,
         ancestors: &Ancestors,
