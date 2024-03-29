@@ -132,6 +132,13 @@ impl AccountsFile {
                 .map(|(metas, index_offset)| (metas, index_offset.0 as usize)),
         }
     }
+    pub fn get_account_shared_data(&self, index: usize) -> Option<solana_sdk::account::AccountSharedData> {
+        match self {
+            Self::AppendVec(av) => av.get_stored_account(index),
+            Self::TieredStorage(ts) => todo!(""),
+        }
+    }
+    
 
     pub fn account_matches_owners(
         &self,

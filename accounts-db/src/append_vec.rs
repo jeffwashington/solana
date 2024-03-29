@@ -562,8 +562,8 @@ impl AppendVec {
     fn next_account_offset(
         start_offset: usize,
         stored_meta: &StoredMeta,
-        next_after_stored_meta: usize,
     ) -> AccountOffsets {
+        let next_after_stored_meta = start_offset + std::mem::size_of::<StoredMeta>();
         let start_of_data = next_after_stored_meta
             + std::mem::size_of::<AccountMeta>()
             + std::mem::size_of::<solana_sdk::hash::Hash>();
@@ -579,6 +579,84 @@ impl AppendVec {
             offset_to_end_of_data,
         }
     }
+
+    pub fn get_stored_account(&self, offset: usize) -> Option<AccountSharedData> {
+            let binding = self.map.read().unwrap();
+            use solana_sdk::account::WritableAccount;
+            if binding.is_some() {
+                let map = binding.as_ref().unwrap();
+                let m2 = AppendVecMap {
+                    map: &map,
+                    current_len: &self.current_len,
+                    file_size: self.file_size,
+                };
+                let (meta, next): (&StoredMeta, _) = m2.get_type(offset)?;
+                let (account_meta, next): (&AccountMeta, _) = m2.get_type(next)?;
+                let (hash, next): (&AccountHash, _) = m2.get_type(next)?;
+                let (data, next) = m2.get_slice(next, meta.data_len as usize)?;
+                let stored_size = next - offset;
+                Some(
+                    AccountSharedData::create(
+                        account_meta.lamports,
+                        data.to_vec(),
+                        account_meta.owner,
+                        account_meta.executable,
+                        account_meta.rent_epoch,
+                    )
+                )
+            } else {
+                assert_eq!(offset % 8, 0);
+                self.loads.fetch_add(1, Ordering::Relaxed);
+                let mut binding = self.file.write().unwrap();
+                let file = &mut binding.as_mut().unwrap().small;
+                let mut stored_meta =
+                    [0u8; std::mem::size_of::<StoredMeta>() + std::mem::size_of::<AccountMeta>()];
+                if self.len() < offset + stored_meta.len() {
+                    return None;
+                }
+                file.seek(SeekFrom::Start(offset as u64)).unwrap();
+                file.read(&mut stored_meta).unwrap();
+                let m2 = AppendVecMap {
+                    map: &stored_meta,
+                    current_len: &self.current_len,
+                    file_size: self.file_size,
+                };
+                let (meta, next): (&StoredMeta, _) = m2.get_type(0)?;
+                let (account_meta, next): (&AccountMeta, _) = m2.get_type(next)?;
+                let nexts = Self::next_account_offset(offset, meta);
+                let start_of_data =
+                    offset as u64 + next as u64 + std::mem::size_of::<solana_sdk::hash::Hash>() as u64;
+                if self.len() < (start_of_data as usize + meta.data_len as usize)
+                    || meta.data_len as usize > self.len()
+                {
+                    return None;
+                }
+                //assert!(start_of_data as usize + meta.data_len as usize >= start_of_data as usize, "{}, {}, {}", meta.data_len as usize, start_of_data as usize, start_of_data as usize + meta.data_len as usize);
+                // let (hash, next): (&AccountHash, _) = m2.get_type(next)?;
+                if meta.data_len > 11_000_000 {
+                    panic!("trying to load account at offset {offset}, got data len: {}, file size: {}, {}, {}", meta.data_len, self.file_size, (start_of_data as usize + meta.data_len as usize), (self.file_size as usize) < (start_of_data as usize + meta.data_len as usize));
+                }
+                let mut data = (0..meta.data_len).map(|_| 0).collect::<Vec<_>>();
+                file.seek(SeekFrom::Start(start_of_data)).unwrap();
+                file.read(&mut data).unwrap();
+                // let (data, next) = m2.get_slice(next, meta.data_len as usize)?;
+                let stored_size = (start_of_data + u64_align!(meta.data_len as usize) as u64
+                    - offset as u64) as usize;
+                assert_eq!(stored_size % 8, 0);
+                let next = offset + stored_size;
+                //log::error!("size: {}, len: {}", stored_size, meta.data_len);
+                Some(
+                    AccountSharedData::create(
+                        account_meta.lamports,
+                        data.to_vec(),
+                        account_meta.owner,
+                        account_meta.executable,
+                        account_meta.rent_epoch,
+                    )
+                )
+            }
+    }
+
     /// Return stored account metadata for the account at `offset` if its data doesn't overrun
     /// the internal buffer. Otherwise return None. Also return the offset of the first byte
     /// after the requested data that falls on a 64-byte boundary.
@@ -627,6 +705,7 @@ impl AppendVec {
             };
             let (meta, next): (&StoredMeta, _) = m2.get_type(0)?;
             let (account_meta, next): (&AccountMeta, _) = m2.get_type(next)?;
+            let nexts = Self::next_account_offset(offset, meta);
             let start_of_data =
                 offset as u64 + next as u64 + std::mem::size_of::<solana_sdk::hash::Hash>() as u64;
             if self.len() < (start_of_data as usize + meta.data_len as usize)
@@ -750,7 +829,7 @@ impl AppendVec {
                 let Some((stored_meta, next)) = m2.get_type::<StoredMeta>(offset) else {
                     break;
                 };
-                let next = Self::next_account_offset(offset, stored_meta, next);
+                let next = Self::next_account_offset(offset, stored_meta);
                 if next.offset_to_end_of_data > self.len() {
                     // data doesn't fit, so don't include this pubkey
                     break;
@@ -759,37 +838,70 @@ impl AppendVec {
                 offset = next.next_account_offset;
             }
         } else {
+            let mut dummy = [0u8; 9013];
+            let mut dummy_offset = 0;
+            let mut offset_within_dummy = 0;
+            let mut data_remaining = 0;
             let mut buf_meta = [0u8; std::mem::size_of::<StoredMeta>()];
             let mut binding = self.file.write().unwrap();
-            let file = &mut binding.as_mut().unwrap().large;
+            let file = &mut binding.as_mut().unwrap().small;
             file.seek(SeekFrom::Start(0)).unwrap();
             loop {
                 if self.len() < offset + buf_meta.len() {
                     break;
                 }
 
-                file.read(&mut buf_meta).unwrap();
+                if data_remaining < buf_meta.len() {
+                    (0..data_remaining).for_each(|i| {
+                        dummy[i] = dummy[offset_within_dummy + i];
+                    });
+                    let mut amount = dummy.len() - data_remaining;
+                    amount = amount.min(self.len() - dummy_offset);
+                    file.read(&mut dummy[data_remaining..(data_remaining+amount)]).unwrap();
+                    dummy_offset += amount;
+                    data_remaining += amount;
+                    offset_within_dummy = 0;
+                }
+
                 let m2: AppendVecMap<'_> = AppendVecMap {
-                    map: &buf_meta,
+                    map: &dummy[offset_within_dummy..],
                     current_len: &self.current_len,
                     file_size: self.file_size,
                 };
                 let Some((stored_meta, next)) = m2.get_type::<StoredMeta>(0) else {
                     break;
                 };
+                //log::error!("read: {}, offset: {offset}, len: {}, data_len: {}", stored_meta.pubkey, self.len(), stored_meta.data_len);
 
-                let next = Self::next_account_offset(offset, stored_meta, next);
+                let next = Self::next_account_offset(offset, stored_meta);
                 if next.offset_to_end_of_data > self.len() {
                     // data doesn't fit, so don't include this pubkey
                     break;
                 }
                 callback(&stored_meta.pubkey);
 
+                let mut skip = next.stored_size;
+
+                if skip <= data_remaining {
+                    // we've already read the data we want to skip
+                    data_remaining -= skip;
+                    offset_within_dummy += skip;
+                }
+                else {
+                    // we haven't read all the data we want to skip
+                    skip -= data_remaining;
+                    data_remaining = 0;
+                    file.seek(SeekFrom::Current(skip as i64)).unwrap();
+                }
+
                 offset = next.next_account_offset;
                 // skip over hash, data, and padding
                 // seek_relative can avoid further reads
+                /*
+                this resets the internal pos incorrectly when we exhaust the internal buffer
                 file.seek_relative((next.stored_size - buf_meta.len()) as i64)
                     .unwrap();
+                */
             }
         }
     }

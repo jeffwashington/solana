@@ -830,6 +830,31 @@ impl<'a> LoadedAccountAccessor<'a> {
         }
     }
 
+    fn check_and_get_loaded_account2(&mut self) -> AccountSharedData {
+        // all of these following .expect() and .unwrap() are like serious logic errors,
+        // ideal for representing this as rust type system....
+
+        match self {
+            LoadedAccountAccessor::Cached(None) | LoadedAccountAccessor::Stored(None) => {
+                panic!("Should have already been taken care of when creating this LoadedAccountAccessor");
+            }
+            LoadedAccountAccessor::Cached(Some(_cached_account)) => {
+                // Cached(Some(x)) variant always produces `Some` for get_loaded_account() since
+                // it just returns the inner `x` without additional fetches
+                self.get_loaded_account().unwrap().take_account()
+            }
+            LoadedAccountAccessor::Stored(Some(_maybe_storage_entry)) => {
+                // If we do find the storage entry, we can guarantee that the storage entry is
+                // safe to read from because we grabbed a reference to the storage entry while it
+                // was still in the storage map. This means even if the storage entry is removed
+                // from the storage map after we grabbed the storage entry, the recycler should not
+                // reset the storage entry until we drop the reference to the storage entry.
+                self.get_loaded_account2()
+                    .expect("If a storage entry was found in the storage map, it must not have been reset yet")
+            }
+        }
+    }
+
     fn get_loaded_account(&mut self) -> Option<LoadedAccount> {
         match self {
             LoadedAccountAccessor::Cached(cached_account) => {
@@ -848,6 +873,28 @@ impl<'a> LoadedAccountAccessor<'a> {
                         storage_entry
                             .get_stored_account_meta(*offset)
                             .map(LoadedAccount::Stored)
+                    })
+            }
+        }
+    }
+
+    fn get_loaded_account2(&mut self) -> Option<AccountSharedData> {
+        match self {
+            LoadedAccountAccessor::Cached(cached_account) => {
+                let cached_account: Cow<'a, CachedAccount> = cached_account.take().expect(
+                    "Cache flushed/purged should be handled before trying to fetch account",
+                );
+                Some(LoadedAccount::Cached(cached_account).take_account())
+            }
+            LoadedAccountAccessor::Stored(maybe_storage_entry) => {
+                // storage entry may not be present if slot was cleaned up in
+                // between reading the accounts index and calling this function to
+                // get account meta from the storage entry here
+                maybe_storage_entry
+                    .as_ref()
+                    .and_then(|(storage_entry, offset)| {
+                        storage_entry
+                            .get_stored_account(*offset)
                     })
             }
         }
@@ -1129,6 +1176,9 @@ impl AccountStorageEntry {
 
     fn get_stored_account_meta(&self, offset: usize) -> Option<StoredAccountMeta> {
         Some(self.accounts.get_account(offset)?.0)
+    }
+    fn get_stored_account(&self, offset: usize) -> Option<AccountSharedData> {
+        Some(self.accounts.get_account_shared_data(offset)?)
     }
 
     fn add_account(&self, num_bytes: usize) {
@@ -2906,9 +2956,7 @@ impl AccountsDb {
                             dirty_ancient_stores.fetch_add(1, Ordering::Relaxed);
                         }
                         oldest_dirty_slot = oldest_dirty_slot.min(*slot);
-                        store.accounts.account_iter().for_each(|account| {
-                            pubkeys.insert(*account.pubkey());
-                        });
+                        store.accounts.pubkey_iter(|k| {pubkeys.insert(*k);});
                     });
                     oldest_dirty_slot
                 })
@@ -5346,9 +5394,15 @@ impl AccountsDb {
             max_root,
             load_hint,
         )?;
+
+        let was_cached = matches!(account_accessor, LoadedAccountAccessor::Cached(_));
+        //let account2 = account_accessor.check_and_get_loaded_account2();
+
         let loaded_account = account_accessor.check_and_get_loaded_account();
+        assert_eq!(loaded_account.is_cached(), was_cached);
         let is_cached = loaded_account.is_cached();
         let account = loaded_account.take_account();
+        //assert_eq!(account2, account);
         if matches!(load_zero_lamports, LoadZeroLamports::None) && account.is_zero_lamport() {
             return None;
         }
