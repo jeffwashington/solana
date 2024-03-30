@@ -8002,6 +8002,9 @@ impl AccountsDb {
                     .storage
                     .get_slot_storage_entry(*slot)
                 {
+                    let mut m3 = HashMap::new();
+                    m3.insert(3usize, 4usize);
+                    m3.clear();
                     log::error!("slot: {slot}, count: {}", offsets.len());
                     offsets.iter().for_each(|offset| {
                         assert_eq!(
@@ -8010,8 +8013,18 @@ impl AccountsDb {
                             store.slot(), *slot
                         );
                         let stored_size = store.accounts.get_account_size(*offset).unwrap();
+                        m3.insert(*offset, stored_size);
                         store.remove_account(stored_size, reset_accounts);
                     });
+                    let mut offsets_sorted = offsets.iter().cloned().collect::<Vec<_>>();
+                    offsets_sorted.sort_unstable();
+                    let sizes = store.accounts.get_sizes(&offsets_sorted);
+                    let all_sizes = sizes.len();
+                    sizes.into_iter().enumerate().for_each(|(i, s)| {
+                        assert_eq!(s, m3.remove(&offsets_sorted[i]).unwrap());
+                    });
+                    assert!(m3.is_empty(), "{:?}, {}", m3.iter().collect::<Vec<_>>(),all_sizes);
+
                     if store.count() == 0 {
                         self.dirty_stores.insert(*slot, store.clone());
                         dead_slots.lock().unwrap().insert(*slot);

@@ -975,6 +975,100 @@ impl AppendVec {
         }
     }
 
+    pub fn get_sizes(&self, sorted_offsets: &[usize]) -> Vec<usize> {
+        let mut result = Vec::with_capacity(sorted_offsets.len());
+        let binding = self.map.read().unwrap();
+        let mut offset = 0;
+        if binding.is_some() {
+            loop {
+                let map = binding.as_ref().unwrap();
+                let m2 = AppendVecMap {
+                    map: &map,
+                    current_len: &self.current_len,
+                    file_size: self.file_size,
+                };
+                let Some((stored_meta, next)) = m2.get_type::<StoredMeta>(offset) else {
+                    break;
+                };
+                let next = Self::next_account_offset(offset, stored_meta);
+                if next.offset_to_end_of_data > self.len() {
+                    // data doesn't fit, so don't include this pubkey
+                    break;
+                }
+                panic!("");
+                //callback(&stored_meta.pubkey);
+                offset = next.next_account_offset;
+            }
+        } else {
+            let mut dummy = [0u8; 8192];
+            let mut dummy_offset = 0;
+            let mut offset_within_dummy = 0;
+            let mut data_remaining = 0;
+            let mut buf_meta = [0u8; std::mem::size_of::<StoredMeta>()];
+            let mut binding = self.file.write().unwrap();
+            let file = &mut binding.as_mut().unwrap().small;
+            let mut last_offset = 0;
+            for offset in sorted_offsets {
+                let offset = *offset;
+                assert!(offset == 0 && last_offset == 0 || offset > last_offset);
+                if self.len() < offset + buf_meta.len() {
+                    break;
+                }
+
+                let skip = offset - last_offset;
+                if skip <= data_remaining && data_remaining > 0 {
+                    // we've already read the data we want to skip
+                    data_remaining -= skip;
+                    offset_within_dummy += skip;
+                }
+                else {
+                    data_remaining = 0;
+                    dummy_offset = offset;
+                    file.seek(SeekFrom::Start(offset as u64)).unwrap();
+                }
+
+                if data_remaining < buf_meta.len() {
+                    (0..data_remaining).for_each(|i| {
+                        dummy[i] = dummy[offset_within_dummy + i];
+                    });
+                    let mut amount = dummy.len() - data_remaining;
+                    amount = amount.min(self.len() - dummy_offset);
+                    file.read(&mut dummy[data_remaining..(data_remaining+amount)]).unwrap();
+                    dummy_offset += amount;
+                    data_remaining += amount;
+                    offset_within_dummy = 0;
+                }
+
+                let m2: AppendVecMap<'_> = AppendVecMap {
+                    map: &dummy[offset_within_dummy..],
+                    current_len: &self.current_len,
+                    file_size: self.file_size,
+                };
+                let Some((stored_meta, next)) = m2.get_type::<StoredMeta>(0) else {
+                    break;
+                };
+                //log::error!("read: {}, offset: {offset}, len: {}, data_len: {}", stored_meta.pubkey, self.len(), stored_meta.data_len);
+
+                let next = Self::next_account_offset(offset, stored_meta);
+                if next.offset_to_end_of_data > self.len() {
+                    // data doesn't fit, so don't include this pubkey
+                    break;
+                }
+                result.push(next.stored_size);
+
+                last_offset = offset;
+                // skip over hash, data, and padding
+                // seek_relative can avoid further reads
+                /*
+                this resets the internal pos incorrectly when we exhaust the internal buffer
+                file.seek_relative((next.stored_size - buf_meta.len()) as i64)
+                    .unwrap();
+                */
+            }
+        }
+        result
+    }
+
     /// iterate over all pubkeys
     pub fn scan_index(&self, mut callback: impl FnMut(IndexInfoMore)) {
         let binding = self.map.read().unwrap();
