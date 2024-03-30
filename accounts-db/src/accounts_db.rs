@@ -7970,6 +7970,10 @@ impl AccountsDb {
         let mut map = 0;
         let mut measure = Measure::start("remove");
         let mut ct = 0;
+        if let Some(ref mut reclaimed_offsets) = reclaimed_offsets {
+            log::error!("initial reclaimed offsets: {}", reclaimed_offsets.len());
+        }
+
         for (slot, account_info) in reclaims {
             ct += 1;
             // No cached accounts should make it here
@@ -7987,7 +7991,9 @@ impl AccountsDb {
 
             }
         }
+        let mut slots = 0;
         if let Some(ref mut reclaimed_offsets) = reclaimed_offsets {
+            slots = reclaimed_offsets.len();
             reclaimed_offsets.par_iter().for_each(|(slot, offsets)| {
                 if let Some(expected_slot) = expected_slot {
                     assert_eq!(*slot, expected_slot);
@@ -8028,7 +8034,7 @@ impl AccountsDb {
         self.clean_accounts_stats
             .remove_dead_accounts_remove_us
             .fetch_add(measure.as_us(), Ordering::Relaxed);
-        log::error!("{map}us, {} entries", ct);
+        log::error!("{map}us, {} entries, slots: {slots}", ct);
 
         let mut measure = Measure::start("shrink");
         let mut shrink_candidate_slots = self.shrink_candidate_slots.lock().unwrap();
@@ -8739,41 +8745,32 @@ impl AccountsDb {
         let mut amount_to_top_off_rent = 0;
         let mut stored_size_alive = 0;
 
-        let items = accounts.map(|stored_account| {
-            stored_size_alive += stored_account.stored_size();
-            let pubkey = stored_account.pubkey();
+        let mut items = Vec::default();
+        storage.accounts.scan_index(|info| {
+            stored_size_alive += info.size;
+            let pubkey = &info.index_info.pubkey;
             if secondary {
-                self.accounts_index.update_secondary_indexes(
-                    pubkey,
-                    &stored_account,
-                    &self.account_indexes,
-                );
+                panic!("");
             }
-            if !stored_account.is_zero_lamport() {
-                accounts_data_len += stored_account.data().len() as u64;
+            if info.index_info.lamports > 0 {
+                accounts_data_len += info.data_len as u64;
             }
 
-            if let Some(amount_to_top_off_rent_this_account) =
-                Self::stats_for_rent_payers(pubkey, &stored_account, rent_collector)
-            {
-                amount_to_top_off_rent += amount_to_top_off_rent_this_account;
-                num_accounts_rent_paying += 1;
-                // remember this rent-paying account pubkey
-                rent_paying_accounts_by_partition.push(*pubkey);
-            }
-
-            (
-                *pubkey,
-                AccountInfo::new(
-                    StorageLocation::AppendVec(store_id, stored_account.offset()), // will never be cached
-                    stored_account.lamports(),
-                ),
-            )
+            items.push(info.index_info);
         });
 
         let (dirty_pubkeys, insert_time_us, mut generate_index_results) = self
             .accounts_index
-            .insert_new_if_missing_into_primary_index(slot, storage.approx_stored_count(), items);
+            .insert_new_if_missing_into_primary_index(slot, storage.approx_stored_count(), items.into_iter().map(|info| {
+                (
+                    info.pubkey,
+                    AccountInfo::new(
+                        StorageLocation::AppendVec(store_id, info.offset), // will never be cached
+                        info.lamports,
+                    ),
+                )
+  
+            }));
 
         if let Some(duplicates_this_slot) = std::mem::take(&mut generate_index_results.duplicates) {
             // there were duplicate pubkeys in this same slot

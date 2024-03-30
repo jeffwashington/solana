@@ -176,6 +176,14 @@ impl AccountsFile {
         AccountsFileIter::new(self)
     }
 
+    /// Return the path of the underlying account file.
+    pub(crate) fn scan_index(&self, mut callback: impl FnMut(crate::append_vec::IndexInfoMore)) {
+        match self {
+            Self::AppendVec(av) => av.scan_index(callback),
+            Self::TieredStorage(ts) => unimplemented!(),
+        }
+    }
+
     /// iterate over all pubkeys
     pub fn pubkey_iter(&self, callback: impl FnMut(&Pubkey)) {
         match self {

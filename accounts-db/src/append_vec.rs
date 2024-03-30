@@ -976,7 +976,7 @@ impl AppendVec {
     }
 
     /// iterate over all pubkeys
-    pub fn scan_index<'a>(&self, mut callback: impl FnMut(IndexInfoMore)) {
+    pub fn scan_index(&self, mut callback: impl FnMut(IndexInfoMore)) {
         let binding = self.map.read().unwrap();
         let mut offset = 0;
         if binding.is_some() {
@@ -1000,7 +1000,7 @@ impl AppendVec {
                 offset = next.next_account_offset;
             }
         } else {
-            let mut dummy = [0u8; 9013];
+            let mut dummy = [0u8; 65536];
             let mut dummy_offset = 0;
             let mut offset_within_dummy = 0;
             let mut data_remaining = 0;
