@@ -584,7 +584,7 @@ impl AppendVec {
     /// `data` is completely ignored, for example.
     /// Also, no references have to be maintained/returned from an iterator function.
     /// This fn can operate on a batch of data at once.
-    pub(crate) fn pubkey_iter(&self, mut callback: impl FnMut(&Pubkey)) {
+    pub(crate) fn scan_pubkeys(&self, mut callback: impl FnMut(&Pubkey)) {
         let mut offset = 0;
         loop {
             let Some((stored_meta, _)) = self.get_type::<StoredMeta>(offset) else {

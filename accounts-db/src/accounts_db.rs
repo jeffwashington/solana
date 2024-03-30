@@ -2902,7 +2902,7 @@ impl AccountsDb {
                             dirty_ancient_stores.fetch_add(1, Ordering::Relaxed);
                         }
                         oldest_dirty_slot = oldest_dirty_slot.min(*slot);
-                        store.accounts.pubkey_iter(|k| {
+                        store.accounts.scan_pubkeys(|k| {
                             pubkeys.insert(*k);
                         });
                     });
@@ -16667,9 +16667,9 @@ pub mod tests {
                     .account_iter()
                     .map(|account| (*account.pubkey(), account.to_account_shared_data()))
                     .collect::<Vec<_>>();
-                // make sure pubkey_iter results match
+                // make sure scan_pubkeys results match
                 let mut compare = Vec::default();
-                storage.accounts.pubkey_iter(|k| {
+                storage.accounts.scan_pubkeys(|k| {
                     compare.push(*k);
                 });
                 assert_eq!(compare, vec.iter().map(|(k, _)| *k).collect::<Vec<_>>());
