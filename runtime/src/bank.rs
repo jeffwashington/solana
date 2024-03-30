@@ -6961,7 +6961,7 @@ impl Bank {
                         test_hash_calculation,
                         ignore_mismatch: false,
                         require_rooted_bank: false,
-                        run_in_background: false,//true,
+                        run_in_background: true,
                         store_hash_raw_data_for_debug: false,
                     },
                 );

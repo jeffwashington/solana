@@ -8759,6 +8759,8 @@ impl AccountsDb {
         let mut stored_size_alive = 0;
 
         let mut items = Vec::default();
+        let mut offsets = Vec::default();
+        let mut m3 = HashMap::new();
         storage.accounts.scan_index(|info| {
             stored_size_alive += info.size;
             let pubkey = &info.index_info.pubkey;
@@ -8768,9 +8770,18 @@ impl AccountsDb {
             if info.index_info.lamports > 0 {
                 accounts_data_len += info.data_len as u64;
             }
-
+            m3.insert(info.index_info.offset, info.size);
             items.push(info.index_info);
         });
+
+        let mut offsets_sorted = offsets.iter().cloned().collect::<Vec<_>>();
+        offsets_sorted.sort_unstable();
+        let sizes = storage.accounts.get_sizes(&offsets_sorted);
+        let all_sizes = sizes.len();
+        sizes.into_iter().enumerate().for_each(|(i, s)| {
+            assert_eq!(s, m3.remove(&offsets_sorted[i]).unwrap());
+        });
+        assert!(m3.is_empty(), "{:?}, {}", m3.iter().collect::<Vec<_>>(),all_sizes);
 
         let (dirty_pubkeys, insert_time_us, mut generate_index_results) = self
             .accounts_index
@@ -8871,7 +8882,7 @@ impl AccountsDb {
                 // seems to be a good hueristic given varying # cpus for in-mem disk index
                 8
             };
-            let chunk_size = (outer_slots_len / (std::cmp::max(1, threads.saturating_sub(1)))) + 1; // approximately 400k slots in a snapshot
+            let chunk_size = 500_000;//(outer_slots_len / (std::cmp::max(1, threads.saturating_sub(1)))) + 1; // approximately 400k slots in a snapshot
             let mut index_time = Measure::start("index");
             let insertion_time_us = AtomicU64::new(0);
             let rent_paying = AtomicUsize::new(0);
