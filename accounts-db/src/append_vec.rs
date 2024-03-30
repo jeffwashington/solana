@@ -37,7 +37,7 @@ use {
     },
     thiserror::Error,
 };
-
+use std::sync::atomic::AtomicBool;
 pub mod test_utils;
 
 /// size of the fixed sized fields in an append vec
@@ -210,6 +210,7 @@ struct Readers {
     raw: std::fs::File,
 }
 
+use core::panic;
 use std::{io::Read, sync::RwLock};
 /// A thread-safe, file-backed block of memory used to store `Account` instances. Append operations
 /// are serialized such that only one thread updates the internal `append_lock` at a time. No
@@ -217,6 +218,7 @@ use std::{io::Read, sync::RwLock};
 /// is appending new items.
 #[derive(Debug, AbiExample)]
 pub struct AppendVec {
+    done: AtomicBool,
     /// The file path where the data is stored.
     path: PathBuf,
 
@@ -301,6 +303,7 @@ impl AppendVec {
         APPEND_VEC_MMAPPED_FILES_OPEN.fetch_add(1, Ordering::Relaxed);
 
         AppendVec {
+            done: AtomicBool::default(),
             loads: AtomicUsize::default(),
             path: file,
             file: RwLock::new(None),
@@ -435,6 +438,7 @@ impl AppendVec {
             APPEND_VEC_MMAPPED_FILES_OPEN.fetch_add(1, Ordering::Relaxed);
 
             Ok(AppendVec {
+                done: AtomicBool::default(),
                 loads: AtomicUsize::default(),
                 path,
                 file: RwLock::default(),
@@ -445,6 +449,7 @@ impl AppendVec {
             })
         } else {
             Ok(AppendVec {
+                done: AtomicBool::default(),
                 loads: AtomicUsize::default(),
                 path,
                 file: RwLock::new(Some(Readers {
@@ -468,6 +473,7 @@ impl AppendVec {
         // extend it to be reused here because it would allow attackers to accumulate
         // some measurable amount of memory needlessly.
         let mut num_accounts = 0;
+        self.done.store(true, Ordering::Relaxed);
         while let Some((account, next_offset)) = self.get_account(offset) {
             if !account.sanitize() {
                 return (false, num_accounts);
@@ -475,6 +481,8 @@ impl AppendVec {
             offset = next_offset;
             num_accounts += 1;
         }
+        self.done.store(false, Ordering::Relaxed);
+
         let aligned_current_len = u64_align!(self.current_len.load(Ordering::Acquire));
 
         (offset == aligned_current_len, num_accounts)
@@ -796,6 +804,10 @@ impl AppendVec {
             assert_eq!(stored_size % 8, 0);
             let next = offset + stored_size;
             //log::error!("size: {}, len: {}", stored_size, meta.data_len);
+            if !self.done.load(Ordering::Relaxed) {
+                //log::error!("offset2: {}, len: {}, size: {}", offset, self.len(), stored_size);
+            }
+
             Some((
                 StoredAccountMeta::AppendVec(AppendVecStoredAccountMeta {
                     meta: *meta,
@@ -1006,12 +1018,14 @@ impl AppendVec {
             let mut data_remaining = 0;
             let mut buf_meta = [0u8; std::mem::size_of::<StoredMeta>()];
             let mut binding = self.file.write().unwrap();
-            let file = &mut binding.as_mut().unwrap().small;
+            let file = &mut binding.as_mut().unwrap().raw;
             let mut last_offset = 0;
+            //log::error!("{}", sorted_offsets.len());
             for offset in sorted_offsets {
                 let offset = *offset;
                 assert!(offset == 0 && last_offset == 0 || offset > last_offset);
                 if self.len() < offset + buf_meta.len() {
+                    //log::error!("{}", line!());
                     break;
                 }
 
@@ -1022,18 +1036,21 @@ impl AppendVec {
                     offset_within_dummy += skip;
                 }
                 else {
+                    //log::error!("{}", line!());
                     data_remaining = 0;
                     dummy_offset = offset;
                     file.seek(SeekFrom::Start(offset as u64)).unwrap();
                 }
 
                 if data_remaining < buf_meta.len() {
+                    //log::error!("{}, remaining: {data_remaining}, dummy_offset: {dummy_offset}", line!());
                     (0..data_remaining).for_each(|i| {
                         dummy[i] = dummy[offset_within_dummy + i];
                     });
                     let mut amount = dummy.len() - data_remaining;
                     amount = amount.min(self.len() - dummy_offset);
                     file.read(&mut dummy[data_remaining..(data_remaining+amount)]).unwrap();
+                    //log::error!("{}, amount: {amount}, dummy_offet: {dummy_offset}", line!());
                     dummy_offset += amount;
                     data_remaining += amount;
                     offset_within_dummy = 0;
@@ -1045,6 +1062,7 @@ impl AppendVec {
                     file_size: self.file_size,
                 };
                 let Some((stored_meta, next)) = m2.get_type::<StoredMeta>(0) else {
+                    //log::error!("{}", line!());
                     break;
                 };
                 //log::error!("read: {}, offset: {offset}, len: {}, data_len: {}", stored_meta.pubkey, self.len(), stored_meta.data_len);
@@ -1052,8 +1070,10 @@ impl AppendVec {
                 let next = Self::next_account_offset(offset, stored_meta);
                 if next.offset_to_end_of_data > self.len() {
                     // data doesn't fit, so don't include this pubkey
+                    //log::error!("{}. {:?}", line!(), (next.offset_to_end_of_data, stored_meta.data_len, offset));
                     break;
                 }
+                //log::error!("offset : {}, len: {}, size: {}, data_len: {}, pk: {}", offset, self.len(), next.stored_size, stored_meta.data_len, stored_meta.pubkey);
                 result.push(next.stored_size);
 
                 last_offset = offset;
@@ -1133,6 +1153,7 @@ impl AppendVec {
                 //log::error!("read: {}, offset: {offset}, len: {}, data_len: {}", stored_meta.pubkey, self.len(), stored_meta.data_len);
 
                 let next = Self::next_account_offset(offset, stored_meta);
+                //log::error!("offset2: {}, len: {}, size: {}, data_len: {}, {}", offset, self.len(), next.stored_size, stored_meta.data_len, stored_meta.pubkey);                
                 if next.offset_to_end_of_data > self.len() {
                     // data doesn't fit, so don't include this pubkey
                     break;
