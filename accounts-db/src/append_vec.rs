@@ -558,6 +558,18 @@ struct AccountOffsets {
     offset_to_end_of_data: usize,
 }
 
+pub(crate) struct IndexInfoMore {
+    pub size: usize,
+    pub data_len: u64,
+    pub index_info: IndexInfo,
+}
+
+pub(crate) struct IndexInfo {
+    pub offset: usize,
+    pub pubkey: Pubkey,
+    pub lamports: u64,
+}
+
 impl AppendVec {
     fn next_account_offset(
         start_offset: usize,
@@ -936,6 +948,112 @@ impl AppendVec {
                     break;
                 }
                 callback(&stored_meta.pubkey);
+
+                let mut skip = next.stored_size;
+
+                if skip <= data_remaining {
+                    // we've already read the data we want to skip
+                    data_remaining -= skip;
+                    offset_within_dummy += skip;
+                }
+                else {
+                    // we haven't read all the data we want to skip
+                    skip -= data_remaining;
+                    data_remaining = 0;
+                    file.seek(SeekFrom::Current(skip as i64)).unwrap();
+                }
+
+                offset = next.next_account_offset;
+                // skip over hash, data, and padding
+                // seek_relative can avoid further reads
+                /*
+                this resets the internal pos incorrectly when we exhaust the internal buffer
+                file.seek_relative((next.stored_size - buf_meta.len()) as i64)
+                    .unwrap();
+                */
+            }
+        }
+    }
+
+    /// iterate over all pubkeys
+    pub fn scan_index<'a>(&self, mut callback: impl FnMut(IndexInfoMore)) {
+        let binding = self.map.read().unwrap();
+        let mut offset = 0;
+        if binding.is_some() {
+            loop {
+                let map = binding.as_ref().unwrap();
+                let m2 = AppendVecMap {
+                    map: &map,
+                    current_len: &self.current_len,
+                    file_size: self.file_size,
+                };
+                let Some((stored_meta, next)) = m2.get_type::<StoredMeta>(offset) else {
+                    break;
+                };
+                let next = Self::next_account_offset(offset, stored_meta);
+                if next.offset_to_end_of_data > self.len() {
+                    // data doesn't fit, so don't include this pubkey
+                    break;
+                }
+                panic!("");
+                //callback(&stored_meta.pubkey);
+                offset = next.next_account_offset;
+            }
+        } else {
+            let mut dummy = [0u8; 9013];
+            let mut dummy_offset = 0;
+            let mut offset_within_dummy = 0;
+            let mut data_remaining = 0;
+            let mut buf_meta = [0u8; std::mem::size_of::<StoredMeta>() + std::mem::size_of::<AccountMeta>()];
+            let mut binding = self.file.write().unwrap();
+            let file = &mut binding.as_mut().unwrap().small;
+            file.seek(SeekFrom::Start(0)).unwrap();
+            loop {
+                if self.len() < offset + buf_meta.len() {
+                    break;
+                }
+
+                if data_remaining < buf_meta.len() {
+                    (0..data_remaining).for_each(|i| {
+                        dummy[i] = dummy[offset_within_dummy + i];
+                    });
+                    let mut amount = dummy.len() - data_remaining;
+                    amount = amount.min(self.len() - dummy_offset);
+                    file.read(&mut dummy[data_remaining..(data_remaining+amount)]).unwrap();
+                    dummy_offset += amount;
+                    data_remaining += amount;
+                    offset_within_dummy = 0;
+                }
+
+                let m2: AppendVecMap<'_> = AppendVecMap {
+                    map: &dummy[offset_within_dummy..],
+                    current_len: &self.current_len,
+                    file_size: self.file_size,
+                };
+                let Some((stored_meta, next)) = m2.get_type::<StoredMeta>(0) else {
+                    break;
+                };
+                let Some((account_meta, next)) = m2.get_type::<AccountMeta>(next) else {
+                    break;
+                };
+                //log::error!("read: {}, offset: {offset}, len: {}, data_len: {}", stored_meta.pubkey, self.len(), stored_meta.data_len);
+
+                let next = Self::next_account_offset(offset, stored_meta);
+                if next.offset_to_end_of_data > self.len() {
+                    // data doesn't fit, so don't include this pubkey
+                    break;
+                }
+                callback(IndexInfoMore {
+                    index_info: {
+                        IndexInfo {
+                            pubkey: stored_meta.pubkey,
+                            lamports: account_meta.lamports,
+                            offset: offset,
+                        }
+                    },
+                    data_len: stored_meta.data_len,
+                    size: next.stored_size,
+                });
 
                 let mut skip = next.stored_size;
 
