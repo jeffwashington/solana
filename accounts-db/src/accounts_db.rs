@@ -7972,10 +7972,15 @@ impl AccountsDb {
             // No cached accounts should make it here
             assert!(!account_info.is_cached());
             if let Some(ref mut reclaimed_offsets) = reclaimed_offsets {
+                panic!("");
                 reclaimed_offsets
                     .entry(*slot)
                     .or_default()
                     .insert(account_info.offset());
+            }
+            else {
+                panic!("");
+
             }
             if let Some(expected_slot) = expected_slot {
                 assert_eq!(*slot, expected_slot);
