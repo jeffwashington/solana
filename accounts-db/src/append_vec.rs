@@ -20,7 +20,6 @@ use {
     solana_sdk::{
         account::{AccountSharedData, ReadableAccount},
         clock::Slot,
-        hash::Hash,
         pubkey::Pubkey,
         stake_history::Epoch,
     },
@@ -567,10 +566,10 @@ impl AppendVec {
     /// the next account is then aligned on a 64 bit boundary.
     /// With these helpers, we can skip over reading some of the data depending on what the caller wants.
     fn next_account_offset(start_offset: usize, stored_meta: &StoredMeta) -> AccountOffsets {
-        let next_after_stored_meta = start_offset + std::mem::size_of::<StoredMeta>();
-        let start_of_data = next_after_stored_meta
+        let start_of_data = start_offset
+            + std::mem::size_of::<StoredMeta>()
             + std::mem::size_of::<AccountMeta>()
-            + std::mem::size_of::<Hash>();
+            + std::mem::size_of::<AccountHash>();
         let aligned_data_len = u64_align!(stored_meta.data_len as usize);
         let next_account_offset = start_of_data + aligned_data_len;
         let offset_to_end_of_data = start_of_data + stored_meta.data_len as usize;
