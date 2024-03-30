@@ -16668,6 +16668,7 @@ pub mod tests {
                     .map(|account| (*account.pubkey(), account.to_account_shared_data()))
                     .collect::<Vec<_>>();
                 // make sure scan_pubkeys results match
+                // Note that we assume traversals are both in the same order, but this doesn't have to be true.
                 let mut compare = Vec::default();
                 storage.accounts.scan_pubkeys(|k| {
                     compare.push(*k);

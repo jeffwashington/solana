@@ -20,6 +20,7 @@ use {
     solana_sdk::{
         account::{AccountSharedData, ReadableAccount},
         clock::Slot,
+        hash::Hash,
         pubkey::Pubkey,
         stake_history::Epoch,
     },
@@ -197,6 +198,15 @@ impl<'append_vec> ReadableAccount for AppendVecStoredAccountMeta<'append_vec> {
     }
 }
 
+/// offsets to help navigate the persisted format of `AppendVec`
+#[derive(Debug)]
+struct AccountOffsets {
+    /// offset to the end of the &[u8] data
+    offset_to_end_of_data: usize,
+    /// offset to the next account. This will be aligned.
+    next_account_offset: usize,
+}
+
 /// A thread-safe, file-backed block of memory used to store `Account` instances. Append operations
 /// are serialized such that only one thread updates the internal `append_lock` at a time. No
 /// restrictions are placed on reading. That is, one may read items from one thread while another
@@ -234,14 +244,6 @@ impl Drop for AppendVec {
             inc_new_counter_info!("append_vec_drop_fail", 1);
         }
     }
-}
-
-/// offsets to help navigate the persisted format of `AppendVec`
-struct AccountOffsets {
-    /// offset to the end of the &[u8] data
-    offset_to_end_of_data: usize,
-    /// offset to the next account. This will be aligned.
-    next_account_offset: usize,
 }
 
 impl AppendVec {
@@ -568,7 +570,7 @@ impl AppendVec {
         let next_after_stored_meta = start_offset + std::mem::size_of::<StoredMeta>();
         let start_of_data = next_after_stored_meta
             + std::mem::size_of::<AccountMeta>()
-            + std::mem::size_of::<solana_sdk::hash::Hash>();
+            + std::mem::size_of::<Hash>();
         let aligned_data_len = u64_align!(stored_meta.data_len as usize);
         let next_account_offset = start_of_data + aligned_data_len;
         let offset_to_end_of_data = start_of_data + stored_meta.data_len as usize;
