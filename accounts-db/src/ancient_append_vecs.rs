@@ -563,11 +563,17 @@ impl AccountsDb {
     ) -> Vec<(&'a SlotInfo, GetUniqueAccountsResult<'a>)> {
         let mut accounts_to_combine = Vec::with_capacity(ancient_slots.len());
 
+        let mut ct = 0;
+        let mut i = 0;
+
         for info in ancient_slots {
             let unique_accounts = self.get_unique_accounts_from_storage_for_shrink(
                 &info.storage,
                 &self.shrink_ancient_stats.shrink_stats,
             );
+            ct += unique_accounts.stored_accounts.len();
+            log::error!("{i}/{}, accounts: {}", ancient_slots.len(), ct);
+            i += 1;
             accounts_to_combine.push((info, unique_accounts));
         }
 
