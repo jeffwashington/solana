@@ -197,6 +197,24 @@ impl<'append_vec> ReadableAccount for AppendVecStoredAccountMeta<'append_vec> {
     }
 }
 
+/// info from an entry useful for building an index
+pub(crate) struct IndexInfo {
+    /// size of entry
+    pub size: usize,
+    /// len of data vec
+    pub data_len: u64,
+    /// info on the entry
+    pub index_info: IndexInfoInner,
+}
+
+/// info from an entry useful for building an index
+pub(crate) struct IndexInfoInner {
+    /// offset to this entry
+    pub offset: usize,
+    pub pubkey: Pubkey,
+    pub lamports: u64,
+}
+
 /// offsets to help navigate the persisted format of `AppendVec`
 #[derive(Debug)]
 struct AccountOffsets {
@@ -204,6 +222,8 @@ struct AccountOffsets {
     offset_to_end_of_data: usize,
     /// offset to the next account. This will be aligned.
     next_account_offset: usize,
+    /// # of bytes (aligned) to store this account, including variable sized data
+    stored_size: usize,
 }
 
 /// A thread-safe, file-backed block of memory used to store `Account` instances. Append operations
@@ -605,10 +625,44 @@ impl AppendVec {
         let aligned_data_len = u64_align!(stored_meta.data_len as usize);
         let next_account_offset = start_of_data + aligned_data_len;
         let offset_to_end_of_data = start_of_data + stored_meta.data_len as usize;
+        let stored_size = start_of_data + aligned_data_len - start_offset;
 
         AccountOffsets {
             next_account_offset,
             offset_to_end_of_data,
+            stored_size,
+        }
+    }
+
+    /// iterate over all pubkeys
+    pub(crate) fn scan_index(&self, mut callback: impl FnMut(IndexInfo)) {
+        let mut offset = 0;
+        loop {
+            let Some((stored_meta, next)) = self.get_type::<StoredMeta>(offset) else {
+                // eof
+                break;
+            };
+            let Some((account_meta, _)) = self.get_type::<AccountMeta>(next) else {
+                // eof
+                break;
+            };
+            let next = Self::next_account_offset(offset, stored_meta);
+            if next.offset_to_end_of_data > self.len() {
+                // data doesn't fit, so don't include this pubkey
+                break;
+            }
+            callback(IndexInfo {
+                index_info: {
+                    IndexInfoInner {
+                        pubkey: stored_meta.pubkey,
+                        lamports: account_meta.lamports,
+                        offset,
+                    }
+                },
+                data_len: stored_meta.data_len,
+                size: next.stored_size,
+            });
+            offset = next.next_account_offset;
         }
     }
 
