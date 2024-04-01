@@ -8517,18 +8517,23 @@ impl AccountsDb {
         //
         // From 1) and 2) we guarantee passing `no_purge_stats` == None, which is
         // equivalent to asserting there will be no dead slots, is safe.
-        let mut handle_reclaims_time = Measure::start("handle_reclaims");
-        self.handle_reclaims(
-            (!reclaims.is_empty()).then(|| reclaims.iter()),
-            expected_single_dead_slot,
-            None,
-            reset_accounts,
-            &HashSet::default(),
-        );
-        handle_reclaims_time.stop();
-        self.stats
-            .store_handle_reclaims
-            .fetch_add(handle_reclaims_time.as_us(), Ordering::Relaxed);
+        let mut handle_reclaims_time = 0;
+        if reclaim != UpsertReclaim::PopulateReclaims {
+            handle_reclaims_time = Measure::start("handle_reclaims");
+            self.handle_reclaims(
+                (!reclaims.is_empty()).then(|| reclaims.iter()),
+                expected_single_dead_slot,
+                None,
+                reset_accounts,
+                &HashSet::default(),
+            );
+            handle_reclaims_time.stop();
+            self.stats
+                .store_handle_reclaims
+                .fetch_add(handle_reclaims_time.as_us(), Ordering::Relaxed);
+        } else {
+            assert!(reclaims.is_empty());
+        }
 
         StoreAccountsTiming {
             store_accounts_elapsed: store_accounts_time.as_us(),
