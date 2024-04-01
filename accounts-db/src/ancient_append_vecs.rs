@@ -480,6 +480,10 @@ impl AccountsDb {
 
         for slot in &slots {
             if let Some(storage) = self.storage.get_slot_storage_entry(*slot) {
+                if storage.capacity() > 130_000_000 {
+                    // skip storages that are already ancient
+                    continue;
+                }
                 if infos.add(*slot, storage, can_randomly_shrink) {
                     randoms += 1;
                 }
