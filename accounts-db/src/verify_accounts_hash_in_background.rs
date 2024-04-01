@@ -67,7 +67,7 @@ impl VerifyAccountsHashInBackground {
         }
         let result = lock.take().unwrap().join().unwrap();
         if !result {
-            panic!("initial background accounts hash verification failed: {result}");
+            log::error!("initial background accounts hash verification failed: {result}");
         }
         // we never have to check again
         self.verification_complete();
