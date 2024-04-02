@@ -1079,9 +1079,11 @@ pub mod tests {
         truncate_and_test(av, index);
     }
 
+    /// truncate `av` and make sure that we fail to get an account. This verifies that the eof
+    /// code is working correctly.
     fn truncate_and_test(av: AppendVec, index: usize) {
         // truncate the hash, 1 byte at a time
-        let hash = std::mem::size_of::<crate::accounts_hash::AccountsHash>();
+        let hash = std::mem::size_of::<AccountHash>();
         for _ in 0..hash {
             av.current_len.fetch_sub(1, Ordering::Relaxed);
             assert_eq!(av.get_account_test(index), None);
