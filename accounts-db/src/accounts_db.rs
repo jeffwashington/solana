@@ -2625,7 +2625,7 @@ impl AccountsDb {
         self.handle_reclaims(
             (!reclaim_vecs.is_empty()).then(|| reclaim_vecs.iter().flatten()),
             None,
-            Some((&self.clean_accounts_stats.purge_stats, &mut reclaim_result)),
+            (&self.clean_accounts_stats.purge_stats, &mut reclaim_result),
             reset_accounts,
             &pubkeys_removed_from_accounts_index,
         );
@@ -3350,7 +3350,7 @@ impl AccountsDb {
         self.handle_reclaims(
             (!reclaims.is_empty()).then(|| reclaims.iter()),
             None,
-            Some((&self.clean_accounts_stats.purge_stats, &mut reclaim_result)),
+            (&self.clean_accounts_stats.purge_stats, &mut reclaim_result),
             reset_accounts,
             &pubkeys_removed_from_accounts_index,
         );
@@ -3516,27 +3516,20 @@ impl AccountsDb {
         &'a self,
         reclaims: Option<I>,
         expected_single_dead_slot: Option<Slot>,
-        purge_stats_and_reclaim_result: Option<(&PurgeStats, &mut ReclaimResult)>,
+        purge_stats_and_reclaim_result: (&PurgeStats, &mut ReclaimResult),
         reset_accounts: bool,
         pubkeys_removed_from_accounts_index: &PubkeysRemovedFromAccountsIndex,
     ) where
         I: Iterator<Item = &'a (Slot, AccountInfo)>,
     {
         if let Some(reclaims) = reclaims {
-            let (purge_stats, purged_account_slots, reclaimed_offsets) = if let Some((
-                purge_stats,
-                (ref mut purged_account_slots, ref mut reclaimed_offsets),
-            )) =
-                purge_stats_and_reclaim_result
-            {
-                (
-                    Some(purge_stats),
-                    Some(purged_account_slots),
-                    Some(reclaimed_offsets),
-                )
-            } else {
-                (None, None, None)
-            };
+            let (purge_stats, (ref mut purged_account_slots, ref mut reclaimed_offsets)) =
+                purge_stats_and_reclaim_result;
+            let (purge_stats, purged_account_slots, reclaimed_offsets) = (
+                Some(purge_stats),
+                purged_account_slots,
+                reclaimed_offsets,
+            );
 
             let dead_slots = self.remove_dead_accounts(
                 reclaims,
@@ -3648,7 +3641,7 @@ impl AccountsDb {
     fn process_dead_slots(
         &self,
         dead_slots: &IntSet<Slot>,
-        purged_account_slots: Option<&mut AccountSlots>,
+        purged_account_slots: &mut AccountSlots,
         purge_stats: &PurgeStats,
         pubkeys_removed_from_accounts_index: &PubkeysRemovedFromAccountsIndex,
     ) {
@@ -5738,7 +5731,7 @@ impl AccountsDb {
             self.remove_dead_slots_metadata(
                 std::iter::once(&purged_slot),
                 purged_slot_pubkeys,
-                None,
+                &mut AccountSlots::default(),
                 pubkeys_removed_from_accounts_index,
             );
         }
@@ -5791,7 +5784,7 @@ impl AccountsDb {
         self.handle_reclaims(
             (!reclaims.is_empty()).then(|| reclaims.iter()),
             expected_dead_slot,
-            Some((purge_stats, &mut ReclaimResult::default())),
+            (purge_stats, &mut ReclaimResult::default()),
             false,
             &pubkeys_removed_from_accounts_index,
         );
@@ -7889,12 +7882,13 @@ impl AccountsDb {
         &'a self,
         reclaims: I,
         expected_slot: Option<Slot>,
-        mut reclaimed_offsets: Option<&mut SlotOffsets>,
+        reclaimed_offsets: &mut SlotOffsets,
         reset_accounts: bool,
     ) -> IntSet<Slot>
     where
         I: Iterator<Item = &'a (Slot, AccountInfo)>,
     {
+        let mut reclaimed_offsets = Some(reclaimed_offsets);
         assert!(self.storage.no_shrink_in_progress());
 
         let mut dead_slots = IntSet::default();
@@ -7976,7 +7970,7 @@ impl AccountsDb {
         dead_slots_iter: impl Iterator<Item = &'a Slot> + Clone,
         purged_slot_pubkeys: HashSet<(Slot, Pubkey)>,
         // Should only be `Some` for non-cached slots
-        purged_stored_account_slots: Option<&mut AccountSlots>,
+        purged_stored_account_slots: &mut AccountSlots,
         pubkeys_removed_from_accounts_index: &PubkeysRemovedFromAccountsIndex,
     ) {
         let mut measure = Measure::start("remove_dead_slots_metadata-ms");
@@ -8064,18 +8058,16 @@ impl AccountsDb {
         dead_slots_iter: impl Iterator<Item = &'a Slot> + Clone,
         purged_slot_pubkeys: HashSet<(Slot, Pubkey)>,
         // Should only be `Some` for non-cached slots
-        purged_stored_account_slots: Option<&mut AccountSlots>,
+        purged_stored_account_slots: &mut AccountSlots,
         pubkeys_removed_from_accounts_index: &PubkeysRemovedFromAccountsIndex,
     ) {
         let mut accounts_index_root_stats = AccountsIndexRootsStats::default();
         let mut measure = Measure::start("unref_from_storage");
-        if let Some(purged_stored_account_slots) = purged_stored_account_slots {
-            self.unref_accounts(
-                purged_slot_pubkeys,
-                purged_stored_account_slots,
-                pubkeys_removed_from_accounts_index,
-            );
-        }
+        self.unref_accounts(
+            purged_slot_pubkeys,
+            purged_stored_account_slots,
+            pubkeys_removed_from_accounts_index,
+        );
         measure.stop();
         accounts_index_root_stats.clean_unref_from_storage_us += measure.as_us();
 
@@ -8116,7 +8108,7 @@ impl AccountsDb {
     fn clean_stored_dead_slots(
         &self,
         dead_slots: &IntSet<Slot>,
-        purged_account_slots: Option<&mut AccountSlots>,
+        purged_account_slots: &mut AccountSlots,
         pubkeys_removed_from_accounts_index: &PubkeysRemovedFromAccountsIndex,
     ) {
         let mut measure = Measure::start("clean_stored_dead_slots-ms");
@@ -8496,7 +8488,10 @@ impl AccountsDb {
             self.handle_reclaims(
                 (!reclaims.is_empty()).then(|| reclaims.iter()),
                 expected_single_dead_slot,
-                None,
+                (
+                    &PurgeStats::default(),
+                    &mut (HashMap::new(), HashMap::new()),
+                ),
                 reset_accounts,
                 &HashSet::default(),
             );
@@ -12773,7 +12768,7 @@ pub mod tests {
         let accounts = AccountsDb::new_single_for_tests();
         let mut dead_slots = IntSet::default();
         dead_slots.insert(10);
-        accounts.clean_stored_dead_slots(&dead_slots, None, &HashSet::default());
+        accounts.clean_stored_dead_slots(&dead_slots, &mut AccountSlots::default(), &HashSet::default());
     }
 
     #[test]
@@ -14006,7 +14001,12 @@ pub mod tests {
                 [0];
             assert_eq!(account_info.0, slot);
             let reclaims = [account_info];
-            accounts_db.remove_dead_accounts(reclaims.iter(), None, None, true);
+            accounts_db.remove_dead_accounts(
+                reclaims.iter(),
+                None,
+                &mut SlotOffsets::default(),
+                true,
+            );
             let after_size = storage0.alive_bytes.load(Ordering::Acquire);
             assert_eq!(before_size, after_size + account.stored_size());
         }
@@ -15504,7 +15504,7 @@ pub mod tests {
                 self.clean_dead_slots_from_accounts_index(
                     empty_vec.iter(),
                     purged_slot_pubkeys,
-                    Some(purged_stored_account_slots),
+                    purged_stored_account_slots,
                     pubkeys_removed_from_accounts_index,
                 );
             }
