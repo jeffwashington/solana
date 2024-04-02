@@ -81,6 +81,7 @@ impl AncientSlotInfos {
         slot: Slot,
         storage: Arc<AccountStorageEntry>,
         can_randomly_shrink: bool,
+        ideal_size: NonZeroU64,
     ) -> bool {
         let mut was_randomly_shrunk = false;
         let alive_bytes = storage.alive_bytes() as u64;
@@ -107,6 +108,13 @@ impl AncientSlotInfos {
                 // to reduce disk space used
                 saturating_add_assign!(self.total_alive_bytes_shrink, alive_bytes);
                 self.shrink_indexes.push(self.all_infos.len());
+            }
+            else {
+                let already_ideal_size = u64::from(ideal_size) * 80 / 100;
+                if alive_bytes > already_ideal_size {
+                    // do not include this append vec at all. It is already ideal size and not a candidate for shrink.
+                    return was_randomly_shrunk;
+                }
             }
             self.all_infos.push(SlotInfo {
                 slot,
@@ -440,7 +448,7 @@ impl AccountsDb {
         slots: Vec<Slot>,
         tuning: &PackedAncientStorageTuning,
     ) -> AncientSlotInfos {
-        let mut ancient_slot_infos = self.calc_ancient_slot_info(slots, tuning.can_randomly_shrink);
+        let mut ancient_slot_infos = self.calc_ancient_slot_info(slots, tuning.can_randomly_shrink, tuning.ideal_storage_size);
 
         ancient_slot_infos.filter_ancient_slots(tuning);
         ancient_slot_infos
@@ -483,6 +491,7 @@ impl AccountsDb {
         &self,
         slots: Vec<Slot>,
         can_randomly_shrink: bool,
+        ideal_size: NonZeroU64,
     ) -> AncientSlotInfos {
         let len = slots.len();
         let mut infos = AncientSlotInfos {
@@ -494,12 +503,8 @@ impl AccountsDb {
 
         for slot in &slots {
             if let Some(storage) = self.storage.get_slot_storage_entry(*slot) {
-                if storage.capacity() > 130_000_000 {
-                    // skip storages that are already ancient
-                    //continue;
-                }
                 let cap = storage.accounts.capacity();
-                if infos.add(*slot, storage, can_randomly_shrink) {
+                if infos.add(*slot, storage, can_randomly_shrink, ideal_size) {
                     log::error!(
                         "ancient, randomly shrinking: slot: {}, capacity: {}",
                         *slot,
