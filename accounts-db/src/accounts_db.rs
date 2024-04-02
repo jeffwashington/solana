@@ -2625,7 +2625,7 @@ impl AccountsDb {
         self.handle_reclaims(
             (!reclaim_vecs.is_empty()).then(|| reclaim_vecs.iter().flatten()),
             None,
-            Some(&mut reclaim_result),
+            &mut reclaim_result,
             reset_accounts,
             &pubkeys_removed_from_accounts_index,
             HandleReclaims::ProcessDeadSlots(&self.clean_accounts_stats.purge_stats),
@@ -3351,7 +3351,7 @@ impl AccountsDb {
         self.handle_reclaims(
             (!reclaims.is_empty()).then(|| reclaims.iter()),
             None,
-            Some(&mut reclaim_result),
+            &mut reclaim_result,
             reset_accounts,
             &pubkeys_removed_from_accounts_index,
             HandleReclaims::ProcessDeadSlots(&self.clean_accounts_stats.purge_stats),
@@ -3519,7 +3519,7 @@ impl AccountsDb {
         &'a self,
         reclaims: Option<I>,
         expected_single_dead_slot: Option<Slot>,
-        reclaim_result: Option<&mut ReclaimResult>,
+        reclaim_result: &mut ReclaimResult,
         reset_accounts: bool,
         pubkeys_removed_from_accounts_index: &PubkeysRemovedFromAccountsIndex,
         handle_reclaims: HandleReclaims<'a>,
@@ -3527,19 +3527,12 @@ impl AccountsDb {
         I: Iterator<Item = &'a (Slot, AccountInfo)>,
     {
         if let Some(reclaims) = reclaims {
-            let (purged_account_slots, reclaimed_offsets) =
-                if let Some((ref mut purged_account_slots, ref mut reclaimed_offsets)) =
-                    reclaim_result
-                {
-                    (Some(purged_account_slots), Some(reclaimed_offsets))
-                } else {
-                    (None, None)
-                };
+            let (ref mut purged_account_slots, ref mut reclaimed_offsets) = reclaim_result;
 
             let dead_slots = self.remove_dead_accounts(
                 reclaims,
                 expected_single_dead_slot,
-                reclaimed_offsets,
+                Some(reclaimed_offsets),
                 reset_accounts,
             );
 
@@ -3553,7 +3546,7 @@ impl AccountsDb {
 
                 self.process_dead_slots(
                     &dead_slots,
-                    purged_account_slots,
+                    Some(purged_account_slots),
                     purge_stats,
                     pubkeys_removed_from_accounts_index,
                 );
@@ -5789,7 +5782,7 @@ impl AccountsDb {
         self.handle_reclaims(
             (!reclaims.is_empty()).then(|| reclaims.iter()),
             expected_dead_slot,
-            Some(&mut ReclaimResult::default()),
+            &mut ReclaimResult::default(),
             false,
             &pubkeys_removed_from_accounts_index,
             HandleReclaims::ProcessDeadSlots(purge_stats),
@@ -8493,7 +8486,7 @@ impl AccountsDb {
             self.handle_reclaims(
                 (!reclaims.is_empty()).then(|| reclaims.iter()),
                 expected_single_dead_slot,
-                None,
+                &mut (HashMap::new(), HashMap::new()),
                 reset_accounts,
                 &HashSet::default(),
                 // this callsite does NOT process dead slots
