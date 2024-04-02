@@ -8679,13 +8679,11 @@ impl AccountsDb {
             let items = accounts.map(|stored_account| {
                 stored_size_alive += stored_account.stored_size();
                 let pubkey = stored_account.pubkey();
-                if secondary {
-                    self.accounts_index.update_secondary_indexes(
-                        pubkey,
-                        &stored_account,
-                        &self.account_indexes,
-                    );
-                }
+                self.accounts_index.update_secondary_indexes(
+                    pubkey,
+                    &stored_account,
+                    &self.account_indexes,
+                );
                 if !stored_account.is_zero_lamport() {
                     accounts_data_len += stored_account.data().len() as u64;
                 }
