@@ -634,7 +634,8 @@ impl AppendVec {
         }
     }
 
-    /// iterate over all pubkeys
+    /// Iterate over all accounts and call `callback` with `IndexInfo` for each.
+    /// This fn can help generate an index of the data in this storage.
     pub(crate) fn scan_index(&self, mut callback: impl FnMut(IndexInfo)) {
         let mut offset = 0;
         loop {
@@ -648,7 +649,7 @@ impl AppendVec {
             };
             let next = Self::next_account_offset(offset, stored_meta);
             if next.offset_to_end_of_data > self.len() {
-                // data doesn't fit, so don't include this pubkey
+                // data doesn't fit, so don't include this account
                 break;
             }
             callback(IndexInfo {
