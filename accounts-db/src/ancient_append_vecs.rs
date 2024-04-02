@@ -193,13 +193,16 @@ impl AncientSlotInfos {
         log::error!("ancient, total_storages: {total_storages}, low_threshold: {low_threshold}, ideal_storage_size: {ideal_storage_size}, infos: {}", self.all_infos.len());
         let mut i = 0;
         for info in &self.all_infos {
-            // any storages already at 80% of ideal size which aren't shrink candidates should be skipped
-            if !info.should_shrink && info.alive_bytes > 80 * u64::from(ideal_storage_size) / 100 {
-                // i does not advance here
-                continue;
-            }
             saturating_add_assign!(cumulative_bytes, info.alive_bytes);
             let ancient_storages_required = (cumulative_bytes / ideal_storage_size + 1) as usize;
+
+            if ancient_storages_required > 10 {
+                // if we ever get to more than 10 required ancient storages, that is enough to stop for now.
+                // It will take a while to create that many.
+                self.all_infos.truncate(i);
+                break;
+            }
+
             let storages_remaining = total_storages - i - 1;
             log::error!("ancient, required: {ancient_storages_required}, storages_remaining: {storages_remaining}, bytes: {cumulative_bytes}");
 
