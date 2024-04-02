@@ -182,10 +182,12 @@ impl AncientSlotInfos {
         let total_storages = self.all_infos.len();
         let mut cumulative_bytes = 0u64;
         let low_threshold = max_storages * 50 / 100;
+        log::error!("ancient, total_storages: {total_storages}, low_threshold: {low_threshold}, ideal_storage_size: {ideal_storage_size}, infos: {}", self.all_infos.len());
         for (i, info) in self.all_infos.iter().enumerate() {
             saturating_add_assign!(cumulative_bytes, info.alive_bytes);
             let ancient_storages_required = (cumulative_bytes / ideal_storage_size + 1) as usize;
             let storages_remaining = total_storages - i - 1;
+            log::error!("ancient, required: {ancient_storages_required}, storages_remaining: {storages_remaining}, bytes: {cumulative_bytes}");
 
             // if the remaining uncombined storages and the # of resulting
             // combined ancient storages is less than the threshold, then
@@ -482,9 +484,11 @@ impl AccountsDb {
             if let Some(storage) = self.storage.get_slot_storage_entry(*slot) {
                 if storage.capacity() > 130_000_000 {
                     // skip storages that are already ancient
-                    continue;
+                    //continue;
                 }
+                let cap = storage.accounts.capacity();
                 if infos.add(*slot, storage, can_randomly_shrink) {
+                    log::error!("ancient, randomly shrinking: slot: {}, capacity: {}", *slot, cap);
                     randoms += 1;
                 }
             }
@@ -576,7 +580,7 @@ impl AccountsDb {
                 &self.shrink_ancient_stats.shrink_stats,
             );
             ct += unique_accounts.stored_accounts.len();
-            log::error!("{i}/{}, accounts: {}", ancient_slots.len(), ct);
+            log::error!("{i}/{}, accounts: {}, slot: {}, alive: {}, capacity: {}, ratio: {}, should_shrink: {}", ancient_slots.len(), ct, info.slot, info.alive_bytes, info.capacity, info.alive_bytes * 100 / info.capacity, info.should_shrink);
             i += 1;
             accounts_to_combine.push((info, unique_accounts));
         }
