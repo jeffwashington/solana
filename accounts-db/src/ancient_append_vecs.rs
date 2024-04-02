@@ -183,12 +183,19 @@ impl AncientSlotInfos {
         let mut cumulative_bytes = 0u64;
         let low_threshold = max_storages * 50 / 100;
         log::error!("ancient, total_storages: {total_storages}, low_threshold: {low_threshold}, ideal_storage_size: {ideal_storage_size}, infos: {}", self.all_infos.len());
-        for (i, info) in self.all_infos.iter().enumerate() {
+        let mut i = 0;
+        for info in &self.all_infos {
+            // any storages already at 80% of ideal size which aren't shrink candidates should be skipped
+            if !info.should_shrink && info.alive_bytes > 80 * u64::from(ideal_storage_size) / 100 {
+                // i does not advance here
+                continue;
+            }
             saturating_add_assign!(cumulative_bytes, info.alive_bytes);
             let ancient_storages_required = (cumulative_bytes / ideal_storage_size + 1) as usize;
             let storages_remaining = total_storages - i - 1;
             log::error!("ancient, required: {ancient_storages_required}, storages_remaining: {storages_remaining}, bytes: {cumulative_bytes}");
 
+            i += 1;
             // if the remaining uncombined storages and the # of resulting
             // combined ancient storages is less than the threshold, then
             // we've gone too far, so get rid of this entry and all after it.
@@ -332,7 +339,12 @@ impl AccountsDb {
 
         let mut accounts_to_combine = self.calc_accounts_to_combine(&accounts_per_storage);
         metrics.unpackable_slots_count += accounts_to_combine.unpackable_slots_count;
-        log::error!("{}, {}, {}", line!(), accounts_to_combine.accounts_keep_slots.len(), accounts_to_combine.accounts_to_combine.len());
+        log::error!(
+            "{}, {}, {}",
+            line!(),
+            accounts_to_combine.accounts_keep_slots.len(),
+            accounts_to_combine.accounts_to_combine.len()
+        );
 
         let mut many_refs_newest = accounts_to_combine
             .accounts_to_combine
@@ -488,7 +500,11 @@ impl AccountsDb {
                 }
                 let cap = storage.accounts.capacity();
                 if infos.add(*slot, storage, can_randomly_shrink) {
-                    log::error!("ancient, randomly shrinking: slot: {}, capacity: {}", *slot, cap);
+                    log::error!(
+                        "ancient, randomly shrinking: slot: {}, capacity: {}",
+                        *slot,
+                        cap
+                    );
                     randoms += 1;
                 }
             }
