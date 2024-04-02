@@ -8653,7 +8653,7 @@ impl AccountsDb {
         let (dirty_pubkeys, insert_time_us, mut generate_index_results) = if !secondary {
             let mut items_local = Vec::default();
             storage.accounts.scan_index(|info| {
-                stored_size_alive += info.size;
+                stored_size_alive += info.stored_size_aligned;
                 if info.index_info.lamports > 0 {
                     accounts_data_len += info.data_len;
                 }
