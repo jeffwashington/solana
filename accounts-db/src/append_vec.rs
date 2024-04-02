@@ -204,6 +204,7 @@ struct AccountOffsets {
     offset_to_end_of_data: usize,
     /// offset to the next account. This will be aligned.
     next_account_offset: usize,
+    stored_size: usize,
 }
 
 /// A thread-safe, file-backed block of memory used to store `Account` instances. Append operations
@@ -605,11 +606,29 @@ impl AppendVec {
         let aligned_data_len = u64_align!(stored_meta.data_len as usize);
         let next_account_offset = start_of_data + aligned_data_len;
         let offset_to_end_of_data = start_of_data + stored_meta.data_len as usize;
+        let stored_size = start_of_data + aligned_data_len - start_offset;
 
         AccountOffsets {
             next_account_offset,
             offset_to_end_of_data,
+            stored_size,
         }
+    }
+
+    pub fn get_sizes(&self, sorted_offsets: &[usize]) -> Vec<usize> {
+        let mut result = Vec::with_capacity(sorted_offsets.len());
+        for offset in sorted_offsets.iter().cloned() {
+            let Some((stored_meta, _)) = self.get_type::<StoredMeta>(offset) else {
+                break;
+            };
+            let next = Self::next_account_offset(offset, stored_meta);
+            if next.offset_to_end_of_data > self.len() {
+                // data doesn't fit, so don't include
+                break;
+            }
+            result.push(next.stored_size);
+        }
+        result
     }
 
     /// iterate over all pubkeys and call `callback`.
