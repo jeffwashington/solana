@@ -8655,11 +8655,25 @@ impl AccountsDb {
             storage.accounts.scan_index(|info| {
                 stored_size_alive += info.stored_size_aligned;
                 if info.index_info.lamports > 0 {
-                    accounts_data_len += info.data_len;
+                    accounts_data_len += info.index_info.data_len;
                 }
                 items_local.push(info.index_info);
             });
             let items = items_local.into_iter().map(|info| {
+                if let Some(amount_to_top_off_rent_this_account) = Self::stats_for_rent_payers(
+                    &info.pubkey,
+                    info.lamports,
+                    info.data_len as usize,
+                    info.rent_epoch,
+                    info.executable,
+                    rent_collector,
+                ) {
+                    amount_to_top_off_rent += amount_to_top_off_rent_this_account;
+                    num_accounts_rent_paying += 1;
+                    // remember this rent-paying account pubkey
+                    rent_paying_accounts_by_partition.push(info.pubkey);
+                }
+
                 (
                     info.pubkey,
                     AccountInfo::new(
@@ -8688,19 +8702,19 @@ impl AccountsDb {
                     accounts_data_len += stored_account.data().len() as u64;
                 }
 
-            if let Some(amount_to_top_off_rent_this_account) = Self::stats_for_rent_payers(
-                pubkey,
-                stored_account.lamports(),
-                stored_account.data().len(),
-                stored_account.rent_epoch(),
-                stored_account.executable(),
-                rent_collector,
-            ) {
-                amount_to_top_off_rent += amount_to_top_off_rent_this_account;
-                num_accounts_rent_paying += 1;
-                // remember this rent-paying account pubkey
-                rent_paying_accounts_by_partition.push(*pubkey);
-            }
+                if let Some(amount_to_top_off_rent_this_account) = Self::stats_for_rent_payers(
+                    pubkey,
+                    stored_account.lamports(),
+                    stored_account.data().len(),
+                    stored_account.rent_epoch(),
+                    stored_account.executable(),
+                    rent_collector,
+                ) {
+                    amount_to_top_off_rent += amount_to_top_off_rent_this_account;
+                    num_accounts_rent_paying += 1;
+                    // remember this rent-paying account pubkey
+                    rent_paying_accounts_by_partition.push(*pubkey);
+                }
 
                 (
                     *pubkey,

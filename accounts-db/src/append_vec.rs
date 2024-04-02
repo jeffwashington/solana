@@ -202,8 +202,6 @@ pub(crate) struct IndexInfo {
     /// size of entry, aligned to next u64
     /// This matches the return of `get_account`
     pub stored_size_aligned: usize,
-    /// len of data vec
-    pub data_len: u64,
     /// info on the entry
     pub index_info: IndexInfoInner,
 }
@@ -214,6 +212,9 @@ pub(crate) struct IndexInfoInner {
     pub offset: usize,
     pub pubkey: Pubkey,
     pub lamports: u64,
+    pub rent_epoch: Epoch,
+    pub executable: bool,
+    pub data_len: u64,
 }
 
 /// offsets to help navigate the persisted format of `AppendVec`
@@ -655,9 +656,11 @@ impl AppendVec {
                         pubkey: stored_meta.pubkey,
                         lamports: account_meta.lamports,
                         offset,
+                        data_len: stored_meta.data_len,
+                        executable: account_meta.executable,
+                        rent_epoch: account_meta.rent_epoch,
                     }
                 },
-                data_len: stored_meta.data_len,
                 stored_size_aligned: next.stored_size_aligned,
             });
             offset = next.next_account_offset;
