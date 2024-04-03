@@ -3520,12 +3520,10 @@ impl AccountsDb {
     {
         let mut reclaim_result = ReclaimResult::default();
         if let Some(reclaims) = reclaims {
-            let (ref mut purged_account_slots, ref mut reclaimed_offsets) = reclaim_result;
-
             let dead_slots = self.remove_dead_accounts(
                 reclaims,
                 expected_single_dead_slot,
-                Some(reclaimed_offsets),
+                Some(&mut reclaim_result.1),
                 reset_accounts,
             );
 
@@ -3537,9 +3535,8 @@ impl AccountsDb {
                     }
                 }
 
-                self.process_dead_slots(
+                reclaim_result.0 = self.process_dead_slots(
                     &dead_slots,
-                    Some(purged_account_slots),
                     purge_stats,
                     pubkeys_removed_from_accounts_index,
                 );
@@ -3633,17 +3630,17 @@ impl AccountsDb {
     fn process_dead_slots(
         &self,
         dead_slots: &IntSet<Slot>,
-        purged_account_slots: Option<&mut AccountSlots>,
         purge_stats: &PurgeStats,
         pubkeys_removed_from_accounts_index: &PubkeysRemovedFromAccountsIndex,
-    ) {
+    ) -> AccountSlots {
+        let mut purged_account_slots = AccountSlots::default();
         if dead_slots.is_empty() {
-            return;
+            return purged_account_slots;
         }
         let mut clean_dead_slots = Measure::start("reclaims::clean_dead_slots");
         self.clean_stored_dead_slots(
             dead_slots,
-            purged_account_slots,
+            Some(&mut purged_account_slots),
             pubkeys_removed_from_accounts_index,
         );
         clean_dead_slots.stop();
@@ -3668,6 +3665,7 @@ impl AccountsDb {
             purge_removed_slots,
             dead_slots,
         );
+        purged_account_slots
     }
 
     /// load the account index entry for the first `count` items in `accounts`
