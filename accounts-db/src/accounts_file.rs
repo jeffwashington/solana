@@ -186,6 +186,13 @@ impl AccountsFile {
         }
     }
 
+    pub(crate) fn get_account_sizes(&self, sorted_offsets: &[usize]) -> Vec<usize> {
+        match self {
+            Self::AppendVec(av) => av.get_sizes(sorted_offsets),
+            Self::TieredStorage(_) => unimplemented!(),
+        }
+    }
+
     /// iterate over all pubkeys
     pub(crate) fn scan_pubkeys(&self, callback: impl FnMut(&Pubkey)) {
         match self {

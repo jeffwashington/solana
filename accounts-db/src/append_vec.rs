@@ -667,6 +667,23 @@ impl AppendVec {
         }
     }
 
+    /// return size corresponding to each offset in `sorted_offsets` for each valid offset
+    pub fn get_sizes(&self, sorted_offsets: &[usize]) -> Vec<usize> {
+        let mut result = Vec::with_capacity(sorted_offsets.len());
+        for offset in sorted_offsets.iter().cloned() {
+            let Some((stored_meta, _)) = self.get_type::<StoredMeta>(offset) else {
+                break;
+            };
+            let next = Self::next_account_offset(offset, stored_meta);
+            if next.offset_to_end_of_data > self.len() {
+                // data doesn't fit, so don't include
+                break;
+            }
+            result.push(next.stored_size_aligned);
+        }
+        result
+    }
+
     /// iterate over all pubkeys and call `callback`.
     /// This iteration does not deserialize and populate each field in `StoredAccountMeta`.
     /// `data` is completely ignored, for example.
