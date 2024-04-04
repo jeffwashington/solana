@@ -1176,11 +1176,16 @@ impl AccountStorageEntry {
         self.accounts.accounts(0)
     }
 
-    fn remove_account(&self, num_bytes: usize, reset_accounts: bool) -> usize {
+    fn remove_accounts(
+        &self,
+        num_bytes: usize,
+        reset_accounts: bool,
+        num_accounts: usize,
+    ) -> usize {
         let mut count_and_status = self.count_and_status.lock_write();
         let (mut count, mut status) = *count_and_status;
 
-        if count == 1 && status == AccountStorageStatus::Full && reset_accounts {
+        if count == num_accounts && status == AccountStorageStatus::Full && reset_accounts {
             // this case arises when we remove the last account from the
             //  storage, but we've learned from previous write attempts that
             //  the storage is full
@@ -1199,14 +1204,14 @@ impl AccountStorageEntry {
         // Some code path is removing accounts too many; this may result in an
         // unintended reveal of old state for unrelated accounts.
         assert!(
-            count > 0,
+            count >= num_accounts,
             "double remove of account in slot: {}/store: {}!!",
             self.slot(),
             self.append_vec_id(),
         );
 
         self.alive_bytes.fetch_sub(num_bytes, Ordering::SeqCst);
-        count -= 1;
+        count = count.saturating_sub(num_accounts);
         *count_and_status = (count, status);
         count
     }
@@ -7879,40 +7884,57 @@ impl AccountsDb {
             assert_eq!(reclaimed_offsets.len(), 1);
             assert!(reclaimed_offsets.contains_key(&expected_slot));
         }
-
+        let mut total_count_skipped = 0;
+        let mut processed = 0;
+        let mut ous = 0;
         reclaimed_offsets.iter().for_each(|(slot, offsets)| {
+            let mut check_for_shrink = true;
             if let Some(store) = self
                 .storage
                 .get_slot_storage_entry(*slot)
             {
-                let mut offsets = offsets.iter().cloned().collect::<Vec<_>>();
-                offsets.sort_unstable();
                 assert_eq!(
                     *slot, store.slot(),
                     "AccountsDB::accounts_index corrupted. Storage pointed to: {}, expected: {}, should only point to one slot",
                     store.slot(), *slot
                 );
-                offsets.iter().for_each(|offset| {
-                    let account = store.accounts.get_account(*offset).unwrap();
-                    let stored_size = account.0.stored_size();
-                    let count = store.remove_account(stored_size, reset_accounts);
-                    if count == 0 {
-                        self.dirty_stores.insert(*slot, store.clone());
-                        dead_slots.insert(*slot);
-                    } else if Self::is_shrinking_productive(*slot, &store)
-                        && self.is_candidate_for_shrink(&store, false)
-                    {
-                        // Checking that this single storage entry is ready for shrinking,
-                        // should be a sufficient indication that the slot is ready to be shrunk
-                        // because slots should only have one storage entry, namely the one that was
-                        // created by `flush_slot_cache()`.
+                if offsets.len() == store.count() {
+                    total_count_skipped += offsets.len();
+
+                    log::error!("we are removing everything! {slot}, {}, {total_count_skipped} vs {processed}", offsets.len());
+                    store.remove_accounts(store.alive_bytes(), reset_accounts, offsets.len());
+                    self.dirty_stores.insert(*slot, store.clone());
+                    dead_slots.insert(*slot);
+                }
+                else {
+                    let mut offsets = offsets.iter().cloned().collect::<Vec<_>>();
+                    let (_, us) = measure_us!({
+                    offsets.sort_unstable();
+                    });
+                    ous += us;
+                    processed += offsets.len();
+                    offsets.iter().for_each(|offset| {
+                        let account = store.accounts.get_account(*offset).unwrap();
+                        let stored_size = account.0.stored_size();
+                        let count = store.remove_accounts(stored_size, reset_accounts, 1);
+                        if count == 0 {
+                            self.dirty_stores.insert(*slot, store.clone());
+                            dead_slots.insert(*slot);
+                        } else if check_for_shrink && Self::is_shrinking_productive(*slot, &store)
+                            && self.is_candidate_for_shrink(&store, false)
                         {
+                            // Checking that this single storage entry is ready for shrinking,
+                            // should be a sufficient indication that the slot is ready to be shrunk
+                            // because slots should only have one storage entry, namely the one that was
+                            // created by `flush_slot_cache()`.
                             new_shrink_candidates.insert(*slot);
+                            check_for_shrink = false;
                         }
-                    }
-                });
+                    });
+                }
             }
         });
+        log::error!("final result: {total_count_skipped} vs {processed}, overall {ous}us");
         measure.stop();
         self.clean_accounts_stats
             .remove_dead_accounts_remove_us
@@ -12609,7 +12631,7 @@ pub mod tests {
         db.storage
             .get_slot_storage_entry(0)
             .unwrap()
-            .remove_account(0, true);
+            .remove_accounts(0, true, 1);
         assert!(db.get_snapshot_storages(..=after_slot).0.is_empty());
     }
 
@@ -12636,8 +12658,8 @@ pub mod tests {
         accounts.store_for_tests(0, &[(&pubkey, &account)]);
         accounts.add_root_and_flush_write_cache(0);
         let storage_entry = accounts.storage.get_slot_storage_entry(0).unwrap();
-        storage_entry.remove_account(0, true);
-        storage_entry.remove_account(0, true);
+        storage_entry.remove_accounts(0, true, 1);
+        storage_entry.remove_accounts(0, true, 1);
     }
 
     fn do_full_clean_refcount(store1_first: bool, store_size: u64) {
@@ -15067,7 +15089,7 @@ pub mod tests {
         let store = Arc::new(s1);
         store.add_account((3 * PAGE_SIZE as usize) - 1);
         store.add_account(10);
-        store.remove_account(10, false);
+        store.remove_accounts(10, false, 1);
         assert!(AccountsDb::is_shrinking_productive(0, &store));
 
         store.add_account(PAGE_SIZE as usize);
@@ -17203,7 +17225,7 @@ pub mod tests {
         num_bytes: usize,
         reset_accounts: bool,
     ) {
-        storage.remove_account(num_bytes, reset_accounts);
+        storage.remove_accounts(num_bytes, reset_accounts, 1);
     }
 
     pub(crate) fn create_storages_and_update_index_with_customized_account_size_per_slot(
