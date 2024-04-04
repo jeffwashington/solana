@@ -7874,38 +7874,45 @@ impl AccountsDb {
                 .entry(*slot)
                 .or_default()
                 .insert(account_info.offset());
-            if let Some(expected_slot) = expected_slot {
-                assert_eq!(*slot, expected_slot);
-            }
+        }
+        if let Some(expected_slot) = expected_slot {
+            assert_eq!(reclaimed_offsets.len(), 1);
+            assert!(reclaimed_offsets.contains_key(&expected_slot));
+        }
+
+        reclaimed_offsets.iter().for_each(|(slot, offsets)| {
             if let Some(store) = self
                 .storage
-                .get_account_storage_entry(*slot, account_info.store_id())
+                .get_slot_storage_entry(*slot)
             {
+                let mut offsets = offsets.iter().cloned().collect::<Vec<_>>();
+                offsets.sort_unstable();
                 assert_eq!(
                     *slot, store.slot(),
                     "AccountsDB::accounts_index corrupted. Storage pointed to: {}, expected: {}, should only point to one slot",
                     store.slot(), *slot
                 );
-                let offset = account_info.offset();
-                let account = store.accounts.get_account(offset).unwrap();
-                let stored_size = account.0.stored_size();
-                let count = store.remove_account(stored_size, reset_accounts);
-                if count == 0 {
-                    self.dirty_stores.insert(*slot, store.clone());
-                    dead_slots.insert(*slot);
-                } else if Self::is_shrinking_productive(*slot, &store)
-                    && self.is_candidate_for_shrink(&store, false)
-                {
-                    // Checking that this single storage entry is ready for shrinking,
-                    // should be a sufficient indication that the slot is ready to be shrunk
-                    // because slots should only have one storage entry, namely the one that was
-                    // created by `flush_slot_cache()`.
+                offsets.iter().for_each(|offset| {
+                    let account = store.accounts.get_account(*offset).unwrap();
+                    let stored_size = account.0.stored_size();
+                    let count = store.remove_account(stored_size, reset_accounts);
+                    if count == 0 {
+                        self.dirty_stores.insert(*slot, store.clone());
+                        dead_slots.insert(*slot);
+                    } else if Self::is_shrinking_productive(*slot, &store)
+                        && self.is_candidate_for_shrink(&store, false)
                     {
-                        new_shrink_candidates.insert(*slot);
+                        // Checking that this single storage entry is ready for shrinking,
+                        // should be a sufficient indication that the slot is ready to be shrunk
+                        // because slots should only have one storage entry, namely the one that was
+                        // created by `flush_slot_cache()`.
+                        {
+                            new_shrink_candidates.insert(*slot);
+                        }
                     }
-                }
+                });
             }
-        }
+        });
         measure.stop();
         self.clean_accounts_stats
             .remove_dead_accounts_remove_us
