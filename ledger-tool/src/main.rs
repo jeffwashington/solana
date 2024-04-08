@@ -1805,7 +1805,8 @@ fn main() {
                         }
                     }
 
-                    exit_signal.store(true, Ordering::Relaxed);
+                    log::error!("would normally quit here");
+                    //exit_signal.store(true, Ordering::Relaxed);
                     system_monitor_service.join().unwrap();
                 }
                 ("graph", Some(arg_matches)) => {
