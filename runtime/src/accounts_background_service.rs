@@ -694,10 +694,16 @@ impl AccountsBackgroundService {
                             // as any later snapshots that are taken are of
                             // slots >= bank.slot()
                             bank.force_flush_accounts_cache();
+                            if exit.load(Ordering::Relaxed) {
+                                break;
+                            }
                             bank.clean_accounts(last_full_snapshot_slot);
                             last_cleaned_block_height = bank.block_height();
                             // See justification below for why we skip 'shrink' here.
                             if bank.is_startup_verification_complete() {
+                                if exit.load(Ordering::Relaxed) {
+                                    break;
+                                }
                                 bank.shrink_ancient_slots();
                             }
                         }
@@ -709,6 +715,9 @@ impl AccountsBackgroundService {
                         // progress, or (2) could get snapshot storages that were newer than what
                         // was in the snapshot itself.
                         if bank.is_startup_verification_complete() {
+                            if exit.load(Ordering::Relaxed) {
+                                break;
+                            }
                             bank.shrink_candidate_slots();
                         }
                     }
