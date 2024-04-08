@@ -1424,6 +1424,9 @@ pub struct AccountsDb {
     /// debug feature to scan every append vec and verify refcounts are equal
     exhaustively_verify_refcounts: bool,
 
+    /// storage format to use for new storages
+    accounts_file_provider: AccountsFileProvider,
+
     /// this will live here until the feature for partitioned epoch rewards is activated.
     /// At that point, this and other code can be deleted.
     pub partitioned_epoch_rewards_config: PartitionedEpochRewardsConfig,
@@ -2401,6 +2404,7 @@ impl AccountsDb {
             accounts_update_notifier: None,
             log_dead_slots: AtomicBool::new(true),
             exhaustively_verify_refcounts: false,
+            accounts_file_provider: AccountsFileProvider::default(),
             partitioned_epoch_rewards_config: PartitionedEpochRewardsConfig::default(),
             epoch_accounts_hash_manager: EpochAccountsHashManager::new_invalid(),
             test_skip_rewrites_but_include_in_bank_hash: false,
@@ -2543,7 +2547,7 @@ impl AccountsDb {
             slot,
             self.next_id(),
             size,
-            AccountsFileProvider::AppendVec,
+            self.accounts_file_provider,
         )
     }
 
