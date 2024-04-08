@@ -632,24 +632,49 @@ impl AppendVec {
         }
     }
 
-    /// Iterate over all accounts and call `callback` with `IndexInfo` for each.
-    /// This fn can help generate an index of the data in this storage.
-    pub(crate) fn scan_index(&self, mut callback: impl FnMut(IndexInfo)) {
+    // shared fn to iterate all accounts or just the ones at the given `sorted_offsets`
+    fn iterate_accounts(
+        &self,
+        sorted_offsets: Option<&[usize]>,
+        mut callback: impl FnMut(&StoredMeta, &AccountOffsets, usize /* offset of this entry */),
+    ) {
         let mut offset = 0;
+        let mut i = 0;
         loop {
-            let Some((stored_meta, next)) = self.get_type::<StoredMeta>(offset) else {
+            if let Some(sorted_offsets) = sorted_offsets.as_ref() {
+                if i >= sorted_offsets.len() {
+                    break;
+                }
+                offset = sorted_offsets[i];
+                i += 1;
+            }
+            let Some((stored_meta, _)) = self.get_type::<StoredMeta>(offset) else {
                 // eof
                 break;
             };
-            let Some((account_meta, _)) = self.get_type::<AccountMeta>(next) else {
-                // eof
-                break;
-            };
-            let next = Self::next_account_offset(offset, stored_meta);
-            if next.offset_to_end_of_data > self.len() {
+
+            let account_offsets = Self::next_account_offset(offset, stored_meta);
+            if account_offsets.offset_to_end_of_data > self.len() {
                 // data doesn't fit, so don't include this account
                 break;
             }
+
+            callback(stored_meta, &account_offsets, offset);
+
+            // `offset` may be overridden by `offsets`
+            offset = account_offsets.next_account_offset;
+        }
+    }
+
+    /// Iterate over all accounts and call `callback` with `IndexInfo` for each.
+    /// This fn can help generate an index of the data in this storage.
+    pub(crate) fn scan_index(&self, mut callback: impl FnMut(IndexInfo)) {
+        self.iterate_accounts(None, |stored_meta, account_offsets, offset| {
+            let Some((account_meta, _)) =
+                self.get_type::<AccountMeta>(offset + std::mem::size_of::<StoredMeta>())
+            else {
+                panic!("`iterate_accounts` should have verified that this entire account fit");
+            };
             callback(IndexInfo {
                 index_info: {
                     IndexInfoInner {
@@ -661,26 +686,20 @@ impl AppendVec {
                         rent_epoch: account_meta.rent_epoch,
                     }
                 },
-                stored_size_aligned: next.stored_size_aligned,
+                stored_size_aligned: account_offsets.stored_size_aligned,
             });
-            offset = next.next_account_offset;
-        }
+        });
     }
 
     /// for each offset in `sorted_offsets`, get the size of the account. No other information is needed for the account.
-    pub(crate) fn get_sizes(&self, sorted_offsets: &[usize]) -> Vec<usize> {
+    pub(crate) fn get_account_sizes(&self, sorted_offsets: &[usize]) -> Vec<usize> {
         let mut result = Vec::with_capacity(sorted_offsets.len());
-        for offset in sorted_offsets.iter().cloned() {
-            let Some((stored_meta, _)) = self.get_type::<StoredMeta>(offset) else {
-                break;
-            };
-            let next = Self::next_account_offset(offset, stored_meta);
-            if next.offset_to_end_of_data > self.len() {
-                // data doesn't fit, so don't include
-                break;
-            }
-            result.push(next.stored_size_aligned);
-        }
+        self.iterate_accounts(
+            Some(sorted_offsets),
+            |_stored_meta, account_offsets, _offset| {
+                result.push(account_offsets.stored_size_aligned);
+            },
+        );
         result
     }
 
@@ -690,20 +709,9 @@ impl AppendVec {
     /// Also, no references have to be maintained/returned from an iterator function.
     /// This fn can operate on a batch of data at once.
     pub(crate) fn scan_pubkeys(&self, mut callback: impl FnMut(&Pubkey)) {
-        let mut offset = 0;
-        loop {
-            let Some((stored_meta, _)) = self.get_type::<StoredMeta>(offset) else {
-                // eof
-                break;
-            };
-            let next = Self::next_account_offset(offset, stored_meta);
-            if next.offset_to_end_of_data > self.len() {
-                // data doesn't fit, so don't include this pubkey
-                break;
-            }
+        self.iterate_accounts(None, |stored_meta, _account_offsets, _offset| {
             callback(&stored_meta.pubkey);
-            offset = next.next_account_offset;
-        }
+        });
     }
 
     /// Return iterator for account metadata

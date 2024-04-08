@@ -180,7 +180,7 @@ impl AccountsFile {
 
     pub(crate) fn get_account_sizes(&self, sorted_offsets: &[usize]) -> Vec<usize> {
         match self {
-            Self::AppendVec(av) => av.get_sizes(sorted_offsets),
+            Self::AppendVec(av) => av.get_account_sizes(sorted_offsets),
             Self::TieredStorage(_) => unimplemented!(),
         }
     }
