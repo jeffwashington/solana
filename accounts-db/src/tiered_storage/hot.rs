@@ -317,6 +317,11 @@ impl<'accounts_file, M: TieredAccountMeta> HotAccount<'accounts_file, M> {
     pub fn data(&self) -> &'accounts_file [u8] {
         self.meta.account_data(self.account_block)
     }
+
+    /// Returns the approximate stored size of this account.
+    pub fn stored_size(&self) -> usize {
+        stored_size(self.meta.account_data_size(self.account_block))
+    }
 }
 
 impl<'accounts_file, M: TieredAccountMeta> ReadableAccount for HotAccount<'accounts_file, M> {

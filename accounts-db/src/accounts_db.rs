@@ -9712,7 +9712,10 @@ pub mod tests {
             // index entry should only contain a single entry for the pubkey since index cannot hold more than 1 entry per slot
             let entry = db.accounts_index.get_cloned(&pubkey).unwrap();
             assert_eq!(entry.slot_list.read().unwrap().len(), 1);
-            assert_eq!(append_vec.alive_bytes(), expected_alive_bytes);
+            if accounts_file_provider == AccountsFileProvider::AppendVec {
+                // alive bytes doesn't match account size for tiered storage
+                assert_eq!(append_vec.alive_bytes(), expected_alive_bytes);
+            }
             // total # accounts in append vec
             assert_eq!(append_vec.approx_stored_count(), 2);
             // # alive accounts
