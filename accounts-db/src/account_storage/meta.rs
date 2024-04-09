@@ -109,6 +109,31 @@ pub enum StoredAccountMeta<'storage> {
 }
 
 impl<'storage> StoredAccountMeta<'storage> {
+    pub fn lamports(&self) -> u64 {
+        match self {
+            Self::AppendVec(av) => av.lamports(),
+            Self::Hot(hot) => hot.lamports(),
+        }
+    }
+    pub fn owner(&self) -> &Pubkey {
+        match self {
+            Self::AppendVec(av) => av.owner(),
+            Self::Hot(hot) => hot.owner(),
+        }
+    }
+    pub fn executable(&self) -> bool {
+        match self {
+            Self::AppendVec(av) => av.executable(),
+            Self::Hot(hot) => hot.executable(),
+        }
+    }
+    pub fn rent_epoch(&self) -> Epoch {
+        match self {
+            Self::AppendVec(av) => av.rent_epoch(),
+            Self::Hot(hot) => hot.rent_epoch(),
+        }
+    }
+
     pub fn pubkey(&self) -> &'storage Pubkey {
         match self {
             Self::AppendVec(av) => av.pubkey(),
@@ -187,7 +212,7 @@ impl<'storage> StoredAccountMeta<'storage> {
         }
     }
 }
-
+/*
 impl<'storage> ReadableAccount for StoredAccountMeta<'storage> {
     fn lamports(&self) -> u64 {
         match self {
@@ -220,7 +245,7 @@ impl<'storage> ReadableAccount for StoredAccountMeta<'storage> {
         }
     }
 }
-
+*/
 /// Meta contains enough context to recover the index from storage itself
 /// This struct will be backed by mmaped and snapshotted data files.
 /// So the data layout must be stable and consistent across the entire cluster!

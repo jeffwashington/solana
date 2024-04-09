@@ -117,7 +117,7 @@ impl<'a, T: ReadableAccount + Sync> StorableAccounts<'a, T> for (Slot, &'a [&'a 
         self.1.len()
     }
 }
-
+/*
 impl<'a> StorableAccounts<'a, StoredAccountMeta<'a>> for (Slot, &'a [&'a StoredAccountMeta<'a>]) {
     fn pubkey(&self, index: usize) -> &Pubkey {
         self.account(index).pubkey()
@@ -142,7 +142,7 @@ impl<'a> StorableAccounts<'a, StoredAccountMeta<'a>> for (Slot, &'a [&'a StoredA
         self.account(index).hash()
     }
 }
-
+*/
 /// holds slices of accounts being moved FROM a common source slot to 'target_slot'
 pub struct StorableAccountsBySlot<'a> {
     target_slot: Slot,
@@ -205,7 +205,7 @@ impl<'a> StorableAccountsBySlot<'a> {
         panic!("failed");
     }
 }
-
+/*
 impl<'a> StorableAccounts<'a, StoredAccountMeta<'a>> for StorableAccountsBySlot<'a> {
     fn pubkey(&self, index: usize) -> &Pubkey {
         self.account(index).pubkey()
@@ -263,7 +263,7 @@ impl<'a> StorableAccounts<'a, StoredAccountMeta<'a>>
         self.account(index).hash()
     }
 }
-
+*/
 #[cfg(test)]
 pub mod tests {
     use {

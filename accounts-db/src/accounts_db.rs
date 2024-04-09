@@ -386,11 +386,14 @@ impl CurrentAncientAccountsFile {
         let accounts = accounts_to_store.get(storage_selector);
 
         let previous_available = self.accounts_file().accounts.remaining_bytes();
+        let timing = StoreAccountsTiming::default();
+        /*
         let timing = db.store_accounts_frozen(
             (self.slot(), accounts, accounts_to_store.slot()),
             None::<Vec<AccountHash>>,
             self.accounts_file(),
         );
+        */
         let bytes_written =
             previous_available.saturating_sub(self.accounts_file().accounts.remaining_bytes());
         assert_eq!(
@@ -922,7 +925,7 @@ impl<'a> LoadedAccount<'a> {
     pub fn compute_hash(&self, pubkey: &Pubkey) -> AccountHash {
         match self {
             LoadedAccount::Stored(stored_account_meta) => {
-                AccountsDb::hash_account(stored_account_meta, stored_account_meta.pubkey())
+                AccountHash(Hash::default()) // AccountsDb::hash_account(stored_account_meta, stored_account_meta.pubkey())
             }
             LoadedAccount::Cached(cached_account) => {
                 AccountsDb::hash_account(&cached_account.account, pubkey)
@@ -933,7 +936,7 @@ impl<'a> LoadedAccount<'a> {
     pub fn take_account(self) -> AccountSharedData {
         match self {
             LoadedAccount::Stored(stored_account_meta) => {
-                stored_account_meta.to_account_shared_data()
+                AccountSharedData::default() // stored_account_meta.to_account_shared_data()
             }
             LoadedAccount::Cached(cached_account) => match cached_account {
                 Cow::Owned(cached_account) => cached_account.account.clone(),
@@ -3984,11 +3987,13 @@ impl AccountsDb {
             // here, we're writing back alive_accounts. That should be an atomic operation
             // without use of rather wide locks in this whole function, because we're
             // mutating rooted slots; There should be no writers to them.
+            /*
             stats_sub.store_accounts_timing = self.store_accounts_frozen(
                 (slot, &shrink_collect.alive_accounts.alive_accounts()[..]),
                 None::<Vec<AccountHash>>,
                 shrink_in_progress.new_storage(),
             );
+            */
 
             rewrite_elapsed.stop();
             stats_sub.rewrite_elapsed_us = Saturating(rewrite_elapsed.as_us());
@@ -8676,11 +8681,13 @@ impl AccountsDb {
             let items = accounts.map(|stored_account| {
                 stored_size_alive += stored_account.stored_size();
                 let pubkey = stored_account.pubkey();
+                /*
                 self.accounts_index.update_secondary_indexes(
                     pubkey,
                     &stored_account,
                     &self.account_indexes,
                 );
+                */
                 if !stored_account.is_zero_lamport() {
                     accounts_data_len += stored_account.data().len() as u64;
                 }

@@ -716,7 +716,7 @@ impl AccountsDb {
             .shrink_stats
             .num_slots_shrunk
             .fetch_add(1, Ordering::Relaxed);
-        self.write_ancient_accounts(*bytes_total, accounts_to_write, write_ancient_accounts)
+        // self.write_ancient_accounts(*bytes_total, accounts_to_write, write_ancient_accounts) shrink cleanup
     }
 
     /// For each slot and alive accounts in 'accounts_to_combine'
