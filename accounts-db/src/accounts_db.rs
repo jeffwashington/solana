@@ -9663,10 +9663,11 @@ pub mod tests {
         }
     }
 
-    #[test]
-    fn test_generate_index_duplicates_within_slot() {
+    #[test_case(AccountsFileProvider::AppendVec)]
+    #[test_case(AccountsFileProvider::HotStorage)]
+    fn test_generate_index_duplicates_within_slot(accounts_file_provider: AccountsFileProvider) {
         for reverse in [false, true] {
-            let db = AccountsDb::new_single_for_tests();
+            let db = AccountsDb::new_single_for_tests_with_provider(accounts_file_provider);
             let slot0 = 0;
 
             let pubkey = Pubkey::from([1; 32]);
@@ -15348,9 +15349,11 @@ pub mod tests {
     ///     - ensure Account1 *has* been purged
     #[test_case(AccountsFileProvider::AppendVec)]
     #[test_case(AccountsFileProvider::HotStorage)]
-    fn test_clean_accounts_with_last_full_snapshot_slot(file_provider: AccountsFileProvider) {
+    fn test_clean_accounts_with_last_full_snapshot_slot(
+        accounts_file_provider: AccountsFileProvider,
+    ) {
         solana_logger::setup();
-        let accounts_db = AccountsDb::new_single_for_tests_with_provider(file_provider);
+        let accounts_db = AccountsDb::new_single_for_tests_with_provider(accounts_file_provider);
         let pubkey = solana_sdk::pubkey::new_rand();
         let owner = solana_sdk::pubkey::new_rand();
         let space = 0;
