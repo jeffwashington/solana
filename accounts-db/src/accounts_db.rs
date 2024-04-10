@@ -810,7 +810,11 @@ pub enum LoadedAccountAccessor<'a> {
 }
 
 impl<'a> LoadedAccountAccessor<'a> {
-    fn check_and_get_loaded_account_shared_data(&mut self) -> AccountSharedData {
+    fn check_and_get_loaded_account_shared_data(
+        &mut self,
+        db: &AccountsDb,
+        slot: Slot,
+    ) -> AccountSharedData {
         // all of these following .expect() and .unwrap() are like serious logic errors,
         // ideal for representing this as rust type system....
 
@@ -825,7 +829,7 @@ impl<'a> LoadedAccountAccessor<'a> {
                             .get_stored_account(*offset)
                     .expect("If a storage entry was found in the storage map, it must not have been reset yet")
             }
-            _ => self.check_and_get_loaded_account().take_account(),
+            _ => self.check_and_get_loaded_account().take_account(db, slot),
         }
     }
 
@@ -928,7 +932,7 @@ impl<'a> LoadedAccount<'a> {
         }
     }
 
-    pub fn take_account(&self) -> AccountSharedData {
+    pub fn take_account(&self, _db: &AccountsDb, _slot: Slot) -> AccountSharedData {
         match self {
             LoadedAccount::Stored(stored_account_meta) => {
                 stored_account_meta.to_account_shared_data()
@@ -949,7 +953,7 @@ impl<'a> LoadedAccount<'a> {
 
     /// data_len can be calculated without having access to `&data` in future implementations
     pub fn data_len(&self) -> usize {
-        self.data().len()
+        self.data_internal().len()
     }
 
     fn lamports(&self) -> u64 {
@@ -959,25 +963,35 @@ impl<'a> LoadedAccount<'a> {
         }
     }
 
-    fn data(&self) -> &[u8] {
+    fn data_internal(&self) -> &[u8] {
         match self {
             LoadedAccount::Stored(stored_account_meta) => stored_account_meta.data(),
             LoadedAccount::Cached(cached_account) => cached_account.account.data(),
         }
     }
+
+    fn data(&self, _accounts_db: &AccountsDb, _slot: Slot, mut callback: impl FnMut(&[u8])) {
+        let data = match self {
+            LoadedAccount::Stored(stored_account_meta) => stored_account_meta.data(),
+            LoadedAccount::Cached(cached_account) => cached_account.account.data(),
+        };
+        callback(data);
+    }
+
     pub(crate) fn owner(&self) -> &Pubkey {
         match self {
             LoadedAccount::Stored(stored_account_meta) => stored_account_meta.owner(),
             LoadedAccount::Cached(cached_account) => cached_account.account.owner(),
         }
     }
-    fn executable(&self) -> bool {
+
+    pub fn executable(&self) -> bool {
         match self {
             LoadedAccount::Stored(stored_account_meta) => stored_account_meta.executable(),
             LoadedAccount::Cached(cached_account) => cached_account.account.executable(),
         }
     }
-    fn rent_epoch(&self) -> Epoch {
+    pub fn rent_epoch(&self) -> Epoch {
         match self {
             LoadedAccount::Stored(stored_account_meta) => stored_account_meta.rent_epoch(),
             LoadedAccount::Cached(cached_account) => cached_account.account.rent_epoch(),
@@ -2233,6 +2247,7 @@ struct ScanState<'a> {
     range: usize,
     sort_time: Arc<AtomicU64>,
     pubkey_to_bin_index: usize,
+    db: &'a AccountsDb,
 }
 
 impl<'a> AppendVecScan for ScanState<'a> {
@@ -2260,14 +2275,17 @@ impl<'a> AppendVecScan for ScanState<'a> {
 
         let hash_is_missing = loaded_hash == AccountHash(Hash::default());
         if self.config.check_hash || hash_is_missing {
-            let computed_hash = AccountsDb::hash_account_data(
-                loaded_account.lamports(),
-                loaded_account.owner(),
-                loaded_account.executable(),
-                loaded_account.rent_epoch(),
-                loaded_account.data(),
-                loaded_account.pubkey(),
-            );
+            let mut computed_hash = AccountHash(Hash::default());
+            loaded_account.data(self.db, self.current_slot, |data| {
+                computed_hash = AccountsDb::hash_account_data(
+                    loaded_account.lamports(),
+                    loaded_account.owner(),
+                    loaded_account.executable(),
+                    loaded_account.rent_epoch(),
+                    data,
+                    loaded_account.pubkey(),
+                );
+            });
             if hash_is_missing {
                 loaded_hash = computed_hash;
             } else if self.config.check_hash && computed_hash != loaded_hash {
@@ -4733,7 +4751,7 @@ impl AccountsDb {
                 let account_slot = self
                     .get_account_accessor(slot, pubkey, &account_info.storage_location())
                     .get_loaded_account()
-                    .map(|loaded_account| (pubkey, loaded_account.take_account(), slot));
+                    .map(|loaded_account| (pubkey, loaded_account.take_account(self, slot), slot));
                 scan_func(account_slot)
             },
             config,
@@ -4796,7 +4814,7 @@ impl AccountsDb {
                 if let Some(account_slot) = self
                     .get_account_accessor(slot, pubkey, &account_info.storage_location())
                     .get_loaded_account()
-                    .map(|loaded_account| (pubkey, loaded_account.take_account(), slot))
+                    .map(|loaded_account| (pubkey, loaded_account.take_account(self, slot), slot))
                 {
                     scan_func(Some(account_slot))
                 }
@@ -4835,7 +4853,7 @@ impl AccountsDb {
                 let account_slot = self
                     .get_account_accessor(slot, pubkey, &account_info.storage_location())
                     .get_loaded_account()
-                    .map(|loaded_account| (pubkey, loaded_account.take_account(), slot));
+                    .map(|loaded_account| (pubkey, loaded_account.take_account(self, slot), slot));
                 scan_func(account_slot)
             },
             config,
@@ -4904,7 +4922,7 @@ impl AccountsDb {
                     let loaded_account = LoadedAccount::Stored(account);
                     let data = (scan_account_storage_data
                         == ScanAccountStorageData::DataRefForStorage)
-                        .then_some(loaded_account.data());
+                        .then_some(loaded_account.data_internal());
                     storage_scan_func(&retval, &loaded_account, data)
                 });
             }
@@ -5377,7 +5395,7 @@ impl AccountsDb {
         // note that the account being in the cache could be different now than it was previously
         // since the cache could be flushed in between the 2 calls.
         let in_write_cache = matches!(account_accessor, LoadedAccountAccessor::Cached(_));
-        let account = account_accessor.check_and_get_loaded_account_shared_data();
+        let account = account_accessor.check_and_get_loaded_account_shared_data(self, slot);
         if matches!(load_zero_lamports, LoadZeroLamports::None) && account.is_zero_lamport() {
             return None;
         }
@@ -6630,14 +6648,16 @@ impl AccountsDb {
                                             let balance = loaded_account.lamports();
                                             let hash_is_missing = loaded_hash == AccountHash(Hash::default());
                                             if config.check_hash || hash_is_missing {
-                                                let computed_hash = Self::hash_account_data(
+                                                let mut computed_hash = AccountHash(Hash::default());
+                                                loaded_account.data(self, slot, |data| {
+                                                computed_hash = Self::hash_account_data(
                                                     loaded_account.lamports(),
                                                     loaded_account.owner(),
                                                     loaded_account.executable(),
                                                     loaded_account.rent_epoch(),
-                                                    loaded_account.data(),
+data,                                                    
                                                     loaded_account.pubkey(),
-                                                );
+                                                );});
                                                 if hash_is_missing {
                                                     loaded_hash = computed_hash;
                                                 }
@@ -7281,6 +7301,7 @@ impl AccountsDb {
             bin_range,
             sort_time: sort_time.clone(),
             pubkey_to_bin_index: 0,
+            db: self,
         };
 
         let result = self.scan_account_storage_no_bank(
@@ -7585,7 +7606,7 @@ impl AccountsDb {
                     // Cache only has one version per key, don't need to worry about versioning
                     Some((*loaded_account.pubkey(), loaded_account.loaded_hash()))
                 },
-                |accum: &DashMap<Pubkey, AccountHash>, loaded_account: &LoadedAccount, _data| {
+                |accum: &DashMap<Pubkey, AccountHash>, loaded_account: &LoadedAccount, data| {
                     let mut loaded_hash = loaded_account.loaded_hash();
                     if loaded_hash == AccountHash(Hash::default()) {
                         loaded_hash = Self::hash_account_data(
@@ -7593,13 +7614,13 @@ impl AccountsDb {
                             loaded_account.owner(),
                             loaded_account.executable(),
                             loaded_account.rent_epoch(),
-                            loaded_account.data(),
+                            data.unwrap(),
                             loaded_account.pubkey(),
                         )
                     }
                     accum.insert(*loaded_account.pubkey(), loaded_hash);
                 },
-                ScanAccountStorageData::NoData,
+                ScanAccountStorageData::DataRefForStorage,
             );
         scan.stop();
 
@@ -7623,7 +7644,7 @@ impl AccountsDb {
                 Some(PubkeyHashAccount {
                     pubkey: *loaded_account.pubkey(),
                     hash: loaded_account.loaded_hash(),
-                    account: loaded_account.take_account(),
+                    account: loaded_account.take_account(self, slot),
                 })
             },
             |accum: &DashMap<Pubkey, (AccountHash, AccountSharedData)>,
@@ -7632,7 +7653,7 @@ impl AccountsDb {
                 // Storage may have duplicates so only keep the latest version for each key
                 let mut loaded_hash = loaded_account.loaded_hash();
                 let key = *loaded_account.pubkey();
-                let account = loaded_account.take_account();
+                let account = loaded_account.take_account(self, slot);
                 if loaded_hash == AccountHash(Hash::default()) {
                     loaded_hash = Self::hash_account(&account, &key)
                 }

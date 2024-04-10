@@ -208,7 +208,7 @@ impl Accounts {
             slot,
             |loaded_account: &LoadedAccount| {
                 // Cache only has one version per key, don't need to worry about versioning
-                func(loaded_account)
+                func(&loaded_account)
             },
             |accum: &DashMap<Pubkey, B>, loaded_account: &LoadedAccount, _data| {
                 let loaded_account_pubkey = *loaded_account.pubkey();
@@ -240,7 +240,12 @@ impl Accounts {
             program_id
                 .map(|program_id| program_id == stored_account.owner())
                 .unwrap_or(true)
-                .then(|| (*stored_account.pubkey(), stored_account.take_account()))
+                .then(|| {
+                    (
+                        *stored_account.pubkey(),
+                        stored_account.take_account(&self.accounts_db, slot),
+                    )
+                })
         })
     }
 
