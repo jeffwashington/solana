@@ -537,7 +537,7 @@ impl AppendVec {
             next,
         ))
     }
-    pub fn get_account_callback(&self, offset: usize, mut callback: impl FnMut(Option<StoredAccountMeta<'_>>)) {
+    pub fn get_account_callback<'a>(&'a self, offset: usize, mut callback: impl FnMut(Option<StoredAccountMeta<'a>>)) {
         let (meta, next): (&StoredMeta, _) = self.get_type(offset).expect("todo");
         let (account_meta, next): (&AccountMeta, _) = self.get_type(next).expect("todo");
         let (hash, next): (&AccountHash, _) = self.get_type(next).expect("todo");

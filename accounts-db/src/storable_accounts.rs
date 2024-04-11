@@ -228,7 +228,7 @@ impl<'a> StorableAccountsBySlot<'a> {
     pub fn new(
         target_slot: Slot,
         slots_and_accounts: &'a [(Slot, &'a [&'a AccountFromStorage])],
-        db: &AccountsDb,
+        db: &'a AccountsDb,
     ) -> Self {
         let mut cumulative_len = 0usize;
         let mut starting_offsets = Vec::with_capacity(slots_and_accounts.len());
@@ -275,13 +275,15 @@ impl<'a> StorableAccounts<'a, StoredAccountMeta<'a>> for StorableAccountsBySlot<
     fn pubkey(&self, index: usize, mut callback: impl FnMut(&Pubkey)) {
         self.account(index, |account| callback(account.pubkey()))
     }
-    fn account<'b: 'a>(&self, index: usize, mut callback: impl FnMut(&StoredAccountMeta<'b>)) {
+    fn account(&self, index: usize, mut callback: impl FnMut(&StoredAccountMeta<'a>)) {
         let indexes = self.find_internal_index(index);
 
         let account_from_storage = self.slots_and_accounts[indexes.0].1[indexes.1];
         let db = self.db;
         let storage = db.storage.get_slot_storage_entry_shrinking_in_progress_ok(account_from_storage.slot).unwrap();
-        callback(&storage.accounts.get_account(account_from_storage.index_info.offset()).unwrap().0)
+        storage.accounts.get_account_callback(account_from_storage.index_info.offset(), |account| {
+            callback(&account.unwrap())
+        })
     }
     fn slot(&self, index: usize) -> Slot {
         let indexes = self.find_internal_index(index);
