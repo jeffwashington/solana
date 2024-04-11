@@ -137,29 +137,29 @@ const MAX_ACCOUNT_ADDRESS: Pubkey = Pubkey::new_from_array([0xFFu8; 32]);
 
 #[derive(Debug)]
 /// A struct that maintains an address-range using its min and max fields.
-pub struct AccountAddressRange<'a> {
+pub struct AccountAddressRange {
     /// The minimum address observed via update()
-    pub min: &'a Pubkey,
+    pub min: Pubkey,
     /// The maximum address observed via update()
-    pub max: &'a Pubkey,
+    pub max: Pubkey,
 }
 
-impl Default for AccountAddressRange<'_> {
+impl Default for AccountAddressRange {
     fn default() -> Self {
         Self {
-            min: &MAX_ACCOUNT_ADDRESS,
-            max: &MIN_ACCOUNT_ADDRESS,
+            min: MAX_ACCOUNT_ADDRESS,
+            max: MIN_ACCOUNT_ADDRESS,
         }
     }
 }
 
-impl<'a> AccountAddressRange<'a> {
-    pub fn update(&mut self, address: &'a Pubkey) {
-        if *self.min > *address {
-            self.min = address;
+impl AccountAddressRange {
+    pub fn update(&mut self, address: &Pubkey) {
+        if &self.min > address {
+            self.min = *address;
         }
-        if *self.max < *address {
-            self.max = address;
+        if &self.max < address {
+            self.max = *address;
         }
     }
 }

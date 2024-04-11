@@ -72,23 +72,29 @@ impl<
     }
 
     /// get all account fields at 'index'
-    pub fn get(&self, index: usize) -> (Option<&T>, &Pubkey, &AccountHash) {
-        let account = self.accounts.account_default_if_zero_lamport(index);
-        let pubkey = self.accounts.pubkey(index);
-        let hash = if self.accounts.has_hash() {
-            self.accounts.hash(index)
-        } else {
-            let item = self.hashes.as_ref().unwrap();
-            item[index].borrow()
-        };
-        (account, pubkey, hash)
+    pub fn get(&self, index: usize, mut callback: impl FnMut(Option<&T>, &Pubkey, &AccountHash)) {
+        self.accounts
+            .account_default_if_zero_lamport(index, |account| {
+                self.accounts.pubkey(index, |pubkey| {
+                    if self.accounts.has_hash() {
+                        self.accounts.hash(index, |hash| {
+                            callback(account, pubkey, hash);
+                        });
+                    } else {
+                        let item = self.hashes.as_ref().unwrap();
+                        let hash = item[index].borrow();
+                        callback(account, pubkey, hash);
+                    };
+                });
+            });
     }
 
     /// None if account at index has lamports == 0
     /// Otherwise, Some(account)
     /// This is the only way to access the account.
-    pub fn account(&self, index: usize) -> Option<&T> {
-        self.accounts.account_default_if_zero_lamport(index)
+    pub fn account(&self, index: usize, callback: impl FnMut(Option<&T>)) {
+        self.accounts
+            .account_default_if_zero_lamport(index, callback)
     }
 
     /// # accounts to write
@@ -105,6 +111,12 @@ impl<
 /// (see `StoredAccountMeta::clone_account()`).
 #[derive(PartialEq, Eq, Debug)]
 pub enum StoredAccountMeta<'storage> {
+    AppendVec(AppendVecStoredAccountMeta<'storage>),
+    Hot(HotAccount<'storage, HotAccountMeta>),
+}
+
+#[derive(PartialEq, Eq, Debug)]
+pub enum StoredAccountMetaOptionalData<'storage> {
     AppendVec(AppendVecStoredAccountMeta<'storage>),
     Hot(HotAccount<'storage, HotAccountMeta>),
 }

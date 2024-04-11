@@ -10,9 +10,9 @@ use {
 
 /// The in-memory struct for the writing index block.
 #[derive(Debug)]
-pub struct AccountIndexWriterEntry<'a, Offset: AccountOffset> {
+pub struct AccountIndexWriterEntry<Offset: AccountOffset> {
     /// The account address.
-    pub address: &'a Pubkey,
+    pub address: Pubkey,
     /// The offset to the account.
     pub offset: Offset,
 }
@@ -66,7 +66,7 @@ impl IndexBlockFormat {
             Self::AddressesThenOffsets => {
                 let mut bytes_written = 0;
                 for index_entry in index_entries {
-                    bytes_written += file.write_pod(index_entry.address)?;
+                    bytes_written += file.write_pod(&index_entry.address)?;
                 }
                 for index_entry in index_entries {
                     bytes_written += file.write_pod(&index_entry.offset)?;

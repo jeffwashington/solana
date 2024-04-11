@@ -727,47 +727,50 @@ impl HotStorageWriter {
         let total_input_accounts = len - skip;
         let mut stored_infos = Vec::with_capacity(total_input_accounts);
         for i in skip..len {
-            let (account, address, _account_hash) = accounts.get(i);
-            let index_entry = AccountIndexWriterEntry {
-                address,
-                offset: HotAccountOffset::new(cursor)?,
-            };
-            address_range.update(address);
+            accounts.get(i, |account, address, _account_hash| {
+                let index_entry = AccountIndexWriterEntry {
+                    address: *address,
+                    offset: HotAccountOffset::new(cursor).expect("fix"),
+                };
+                address_range.update(address);
 
-            // Obtain necessary fields from the account, or default fields
-            // for a zero-lamport account in the None case.
-            let (lamports, owner, data, executable, rent_epoch) = account
-                .map(|acc| {
-                    (
-                        acc.lamports(),
-                        acc.owner(),
-                        acc.data(),
-                        acc.executable(),
-                        // only persist rent_epoch for those rent-paying accounts
-                        (acc.rent_epoch() != RENT_EXEMPT_RENT_EPOCH).then_some(acc.rent_epoch()),
-                    )
-                })
-                .unwrap_or((0, &OWNER_NO_OWNER, &[], false, None));
-            let owner_offset = owners_table.insert(owner);
-            let stored_size =
-                self.write_account(lamports, owner_offset, data, executable, rent_epoch)?;
-            cursor += stored_size;
+                // Obtain necessary fields from the account, or default fields
+                // for a zero-lamport account in the None case.
+                let (lamports, owner, data, executable, rent_epoch) = account
+                    .map(|acc| {
+                        (
+                            acc.lamports(),
+                            acc.owner(),
+                            acc.data(),
+                            acc.executable(),
+                            // only persist rent_epoch for those rent-paying accounts
+                            (acc.rent_epoch() != RENT_EXEMPT_RENT_EPOCH)
+                                .then_some(acc.rent_epoch()),
+                        )
+                    })
+                    .unwrap_or((0, &OWNER_NO_OWNER, &[], false, None));
+                let owner_offset = owners_table.insert(owner);
+                let stored_size = self
+                    .write_account(lamports, owner_offset, data, executable, rent_epoch)
+                    .expect("fix");
+                cursor += stored_size;
 
-            stored_infos.push(StoredAccountInfo {
-                // Here we pass the IndexOffset as the get_account() API
-                // takes IndexOffset.  Given the account address is also
-                // maintained outside the TieredStorage, a potential optimization
-                // is to store AccountOffset instead, which can further save
-                // one jump from the index block to the accounts block.
-                offset: index.len(),
-                // Here we only include the stored size that the account directly
-                // contribute (i.e., account entry + index entry that include the
-                // account meta, data, optional fields, its address, and AccountOffset).
-                // Storage size from those shared blocks like footer and owners block
-                // is not included.
-                size: stored_size + footer.index_block_format.entry_size::<HotAccountOffset>(),
+                stored_infos.push(StoredAccountInfo {
+                    // Here we pass the IndexOffset as the get_account() API
+                    // takes IndexOffset.  Given the account address is also
+                    // maintained outside the TieredStorage, a potential optimization
+                    // is to store AccountOffset instead, which can further save
+                    // one jump from the index block to the accounts block.
+                    offset: index.len(),
+                    // Here we only include the stored size that the account directly
+                    // contribute (i.e., account entry + index entry that include the
+                    // account meta, data, optional fields, its address, and AccountOffset).
+                    // Storage size from those shared blocks like footer and owners block
+                    // is not included.
+                    size: stored_size + footer.index_block_format.entry_size::<HotAccountOffset>(),
+                });
+                index.push(index_entry);
             });
-            index.push(index_entry);
         }
         footer.account_entry_count = total_input_accounts as u32;
 
@@ -793,8 +796,8 @@ impl HotStorageWriter {
         footer
             .owners_block_format
             .write_owners_block(&mut self.storage, &owners_table)?;
-        footer.min_account_address = *address_range.min;
-        footer.max_account_address = *address_range.max;
+        footer.min_account_address = address_range.min;
+        footer.max_account_address = address_range.max;
         footer.write_footer_block(&mut self.storage)?;
 
         Ok(stored_infos)

@@ -753,40 +753,45 @@ impl AppendVec {
         let offsets_len = len - skip + 1;
         let mut offsets = Vec::with_capacity(offsets_len);
         for i in skip..len {
-            let (account, pubkey, hash) = accounts.get(i);
-            let account_meta = account
-                .map(|account| AccountMeta {
-                    lamports: account.lamports(),
-                    owner: *account.owner(),
-                    rent_epoch: account.rent_epoch(),
-                    executable: account.executable(),
-                })
-                .unwrap_or_default();
+            let mut done = false;
+            accounts.get(i, |account, pubkey, hash| {
+                let account_meta = account
+                    .map(|account| AccountMeta {
+                        lamports: account.lamports(),
+                        owner: *account.owner(),
+                        rent_epoch: account.rent_epoch(),
+                        executable: account.executable(),
+                    })
+                    .unwrap_or_default();
 
-            let stored_meta = StoredMeta {
-                pubkey: *pubkey,
-                data_len: account
-                    .map(|account| account.data().len())
-                    .unwrap_or_default() as u64,
-                write_version_obsolete: 0,
-            };
-            let meta_ptr = &stored_meta as *const StoredMeta;
-            let account_meta_ptr = &account_meta as *const AccountMeta;
-            let data_len = stored_meta.data_len as usize;
-            let data_ptr = account
-                .map(|account| account.data())
-                .unwrap_or_default()
-                .as_ptr();
-            let hash_ptr = bytemuck::bytes_of(hash).as_ptr();
-            let ptrs = [
-                (meta_ptr as *const u8, mem::size_of::<StoredMeta>()),
-                (account_meta_ptr as *const u8, mem::size_of::<AccountMeta>()),
-                (hash_ptr, mem::size_of::<AccountHash>()),
-                (data_ptr, data_len),
-            ];
-            if let Some(res) = self.append_ptrs_locked(&mut offset, &ptrs) {
-                offsets.push(res)
-            } else {
+                let stored_meta = StoredMeta {
+                    pubkey: *pubkey,
+                    data_len: account
+                        .map(|account| account.data().len())
+                        .unwrap_or_default() as u64,
+                    write_version_obsolete: 0,
+                };
+                let meta_ptr = &stored_meta as *const StoredMeta;
+                let account_meta_ptr = &account_meta as *const AccountMeta;
+                let data_len = stored_meta.data_len as usize;
+                let data_ptr = account
+                    .map(|account| account.data())
+                    .unwrap_or_default()
+                    .as_ptr();
+                let hash_ptr = bytemuck::bytes_of(hash).as_ptr();
+                let ptrs = [
+                    (meta_ptr as *const u8, mem::size_of::<StoredMeta>()),
+                    (account_meta_ptr as *const u8, mem::size_of::<AccountMeta>()),
+                    (hash_ptr, mem::size_of::<AccountHash>()),
+                    (data_ptr, data_len),
+                ];
+                if let Some(res) = self.append_ptrs_locked(&mut offset, &ptrs) {
+                    offsets.push(res)
+                } else {
+                    done = true;
+                }
+            });
+            if done {
                 break;
             }
         }

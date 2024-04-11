@@ -5993,23 +5993,24 @@ impl AccountsDb {
                 storage.set_status(AccountStorageStatus::Full);
 
                 // See if an account overflows the append vecs in the slot.
-                let account = accounts_and_meta_to_store.account(infos.len());
-                let data_len = account
-                    .map(|account| account.data().len())
-                    .unwrap_or_default();
-                let data_len = (data_len + STORE_META_OVERHEAD) as u64;
-                if !self.has_space_available(slot, data_len) {
-                    info!(
-                        "write_accounts_to_storage, no space: {}, {}, {}, {}, {}",
-                        storage.accounts.capacity(),
-                        storage.accounts.remaining_bytes(),
-                        data_len,
-                        infos.len(),
-                        accounts_and_meta_to_store.len()
-                    );
-                    let special_store_size = std::cmp::max(data_len * 2, self.file_size);
-                    self.create_and_insert_store(slot, special_store_size, "large create");
-                }
+                accounts_and_meta_to_store.account(infos.len(), |account| {
+                    let data_len = account
+                        .map(|account| account.data().len())
+                        .unwrap_or_default();
+                    let data_len = (data_len + STORE_META_OVERHEAD) as u64;
+                    if !self.has_space_available(slot, data_len) {
+                        info!(
+                            "write_accounts_to_storage, no space: {}, {}, {}, {}, {}",
+                            storage.accounts.capacity(),
+                            storage.accounts.remaining_bytes(),
+                            data_len,
+                            infos.len(),
+                            accounts_and_meta_to_store.len()
+                        );
+                        let special_store_size = std::cmp::max(data_len * 2, self.file_size);
+                        self.create_and_insert_store(slot, special_store_size, "large create");
+                    }
+                });
                 continue;
             }
 
@@ -6017,13 +6018,14 @@ impl AccountsDb {
             for (i, stored_account_info) in rvs.unwrap().into_iter().enumerate() {
                 storage.add_account(stored_account_info.size);
 
-                infos.push(AccountInfo::new(
-                    StorageLocation::AppendVec(store_id, stored_account_info.offset),
-                    accounts_and_meta_to_store
-                        .account(i)
-                        .map(|account| account.lamports())
-                        .unwrap_or_default(),
-                ));
+                accounts_and_meta_to_store.account(i, |account| {
+                    infos.push(AccountInfo::new(
+                        StorageLocation::AppendVec(store_id, stored_account_info.offset),
+                        account
+                            .map(|account| account.lamports())
+                            .unwrap_or_default(),
+                    ));
+                })
             }
             // restore the state to available
             storage.set_status(AccountStorageStatus::Available);
@@ -6400,30 +6402,34 @@ impl AccountsDb {
         txn_iter
             .enumerate()
             .map(|(i, txn)| {
-                let account = accounts_and_meta_to_store
-                    .account_default_if_zero_lamport(i)
-                    .map(|account| account.to_account_shared_data())
-                    .unwrap_or_default();
-                let account_info = AccountInfo::new(StorageLocation::Cached, account.lamports());
+                let mut account_info = AccountInfo::default();
+                accounts_and_meta_to_store.pubkey(i, |pubkey| {
+                    accounts_and_meta_to_store.account_default_if_zero_lamport(i, |account| {
+                        let account = account
+                            .map(|account| account.to_account_shared_data())
+                            .unwrap_or_default();
 
-                self.notify_account_at_accounts_update(
-                    slot,
-                    &account,
-                    txn,
-                    accounts_and_meta_to_store.pubkey(i),
-                    &mut write_version_producer,
-                );
+                        account_info =
+                            AccountInfo::new(StorageLocation::Cached, account.lamports());
 
-                let cached_account =
-                    self.accounts_cache
-                        .store(slot, accounts_and_meta_to_store.pubkey(i), account);
-                // hash this account in the bg
-                match &self.sender_bg_hasher {
-                    Some(ref sender) => {
-                        let _ = sender.send(cached_account);
-                    }
-                    None => (),
-                };
+                        self.notify_account_at_accounts_update(
+                            slot,
+                            &account,
+                            txn,
+                            pubkey,
+                            &mut write_version_producer,
+                        );
+
+                        let cached_account = self.accounts_cache.store(slot, pubkey, account);
+                        // hash this account in the bg
+                        match &self.sender_bg_hasher {
+                            Some(ref sender) => {
+                                let _ = sender.send(cached_account);
+                            }
+                            None => (),
+                        };
+                    });
+                });
                 account_info
             })
             .collect()
@@ -6443,11 +6449,12 @@ impl AccountsDb {
             .can_slot_be_in_cache(accounts.target_slot())
         {
             (0..accounts.len()).for_each(|index| {
-                let pubkey = accounts.pubkey(index);
-                // based on the patterns of how a validator writes accounts, it is almost always the case that there is no read only cache entry
-                // for this pubkey and slot. So, we can give that hint to the `remove` for performance.
-                self.read_only_accounts_cache
-                    .remove_assume_not_present(*pubkey, slot);
+                accounts.pubkey(index, |pubkey| {
+                    // based on the patterns of how a validator writes accounts, it is almost always the case that there is no read only cache entry
+                    // for this pubkey and slot. So, we can give that hint to the `remove` for performance.
+                    self.read_only_accounts_cache
+                        .remove_assume_not_present(*pubkey, slot);
+                })
             });
         }
         calc_stored_meta_time.stop();
@@ -6488,10 +6495,12 @@ impl AccountsDb {
                             let len = accounts.len();
                             let mut hashes = Vec::with_capacity(len);
                             for index in 0..accounts.len() {
-                                let (pubkey, account) =
-                                    (accounts.pubkey(index), accounts.account(index));
-                                let hash = Self::hash_account(account, pubkey);
-                                hashes.push(hash);
+                                accounts.pubkey(index, |pubkey| {
+                                    accounts.account(index, |account| {
+                                        let hash = Self::hash_account(account, pubkey);
+                                        hashes.push(hash);
+                                    })
+                                })
                             }
                             hash_time.stop();
                             self.stats
@@ -7789,19 +7798,23 @@ impl AccountsDb {
 
             (start..end).for_each(|i| {
                 let info = infos[i];
-                let pubkey_account = (accounts.pubkey(i), accounts.account(i));
-                let pubkey = pubkey_account.0;
-                let old_slot = accounts.slot(i);
-                self.accounts_index.upsert(
-                    target_slot,
-                    old_slot,
-                    pubkey,
-                    pubkey_account.1,
-                    &self.account_indexes,
-                    info,
-                    &mut reclaims,
-                    reclaim,
-                );
+                accounts.pubkey(i, |pubkey| {
+                    accounts.account(i, |account| {
+                        let pubkey_account = (pubkey, account);
+                        let pubkey = pubkey_account.0;
+                        let old_slot = accounts.slot(i);
+                        self.accounts_index.upsert(
+                            target_slot,
+                            old_slot,
+                            pubkey,
+                            pubkey_account.1,
+                            &self.account_indexes,
+                            info,
+                            &mut reclaims,
+                            reclaim,
+                        );
+                    })
+                })
             });
             reclaims
         };
@@ -8220,9 +8233,10 @@ impl AccountsDb {
         let mut stats = BankHashStats::default();
         let mut total_data = 0;
         (0..accounts.len()).for_each(|index| {
-            let account = accounts.account(index);
-            total_data += account.data().len();
-            stats.update(account);
+            accounts.account(index, |account| {
+                total_data += account.data().len();
+                stats.update(account);
+            })
         });
 
         self.stats
@@ -9635,11 +9649,11 @@ pub mod tests {
     impl<'a, T: ReadableAccount + Sync> StorableAccounts<'a, T>
         for (Slot, &'a [(&'a Pubkey, &'a T, Slot)])
     {
-        fn pubkey(&self, index: usize) -> &Pubkey {
-            self.1[index].0
+        fn pubkey(&self, index: usize, mut callback: impl FnMut(&Pubkey)) {
+            callback(self.1[index].0)
         }
-        fn account(&self, index: usize) -> &T {
-            self.1[index].1
+        fn account(&self, index: usize, mut callback: impl FnMut(&T)) {
+            callback(self.1[index].1)
         }
         fn slot(&self, index: usize) -> Slot {
             // note that this could be different than 'target_slot()' PER account
