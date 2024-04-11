@@ -551,6 +551,33 @@ impl HotStorageReader {
             IndexOffset(index_offset.0.saturating_add(1)),
         )))
     }
+    /// Returns the account located at the specified index offset.
+    pub fn get_account_callback(
+        &self,
+        index_offset: IndexOffset,
+        mut callback: impl FnMut(Option<StoredAccountMeta<'_>>),
+    ) -> TieredStorageResult<()> {
+        if index_offset.0 >= self.footer.account_entry_count {
+            callback(None);
+            return Ok(());
+        }
+
+        let account_offset = self.get_account_offset(index_offset)?;
+
+        let meta = self.get_account_meta_from_offset(account_offset)?;
+        let address = self.get_account_address(index_offset)?;
+        let owner = self.get_owner_address(meta.owner_offset())?;
+        let account_block = self.get_account_block(account_offset, index_offset)?;
+
+        callback(Some(StoredAccountMeta::Hot(HotAccount {
+            meta,
+            address,
+            owner,
+            index: index_offset,
+            account_block,
+        })));
+        Ok(())
+    }
 
     /// Return a vector of account metadata for each account, starting from
     /// `index_offset`

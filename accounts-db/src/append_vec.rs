@@ -537,6 +537,23 @@ impl AppendVec {
             next,
         ))
     }
+    pub fn get_account_callback(&self, offset: usize, mut callback: impl FnMut(Option<StoredAccountMeta<'_>>)) {
+        let (meta, next): (&StoredMeta, _) = self.get_type(offset).expect("todo");
+        let (account_meta, next): (&AccountMeta, _) = self.get_type(next).expect("todo");
+        let (hash, next): (&AccountHash, _) = self.get_type(next).expect("todo");
+        let (data, next) = self.get_slice(next, meta.data_len as usize).expect("todo");
+        let stored_size = next - offset;
+        callback(
+            Some(StoredAccountMeta::AppendVec(AppendVecStoredAccountMeta {
+                meta,
+                account_meta,
+                data,
+                offset,
+                stored_size,
+                hash,
+            })))
+    }
+    
 
     /// return an `AccountSharedData` for an account at `offset`.
     /// This fn can efficiently return exactly what is needed by a caller.
