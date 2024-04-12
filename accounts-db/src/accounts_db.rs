@@ -6517,7 +6517,7 @@ impl AccountsDb {
                             for index in 0..accounts.len() {
                                 accounts.pubkey(index, |pubkey| {
                                     accounts.account(index, |account| {
-                                        let hash = Self::hash_account(&account, pubkey);
+                                        let hash = Self::hash_account(account, pubkey);
                                         hashes.push(hash);
                                     })
                                 })
@@ -7827,7 +7827,7 @@ impl AccountsDb {
                             target_slot,
                             old_slot,
                             pubkey,
-                            &pubkey_account.1,
+                            pubkey_account.1,
                             &self.account_indexes,
                             info,
                             &mut reclaims,
@@ -8255,7 +8255,7 @@ impl AccountsDb {
         (0..accounts.len()).for_each(|index| {
             accounts.account(index, |account| {
                 total_data += account.data().len();
-                stats.update(&account);
+                stats.update(account);
             })
         });
 
