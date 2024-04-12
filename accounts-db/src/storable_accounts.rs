@@ -1,4 +1,6 @@
 //! trait for abstracting underlying storage of pubkey and account pairs to be written
+use solana_sdk::account::AccountSharedData;
+use solana_sdk::stake_history::Epoch;
 use {
     crate::{
         account_storage::meta::StoredAccountMeta, accounts_db::AccountFromStorage,
@@ -7,9 +9,78 @@ use {
     solana_sdk::{account::ReadableAccount, clock::Slot, pubkey::Pubkey},
 };
 
-trait ReadableWithRef<'a> : ReadableAccount {}
+use crate::accounts_index::ZeroLamport;
+pub struct AccountForStorage<'a> {
+    lamports: u64,
+    /// data held in this account
+    data: &'a [u8],
+    /// the program that owns this account. If executable, the program that loads this account.
+    owner: &'a Pubkey,
+    /// this account's data contains a loaded program (and is now read-only)
+    executable: bool,
+    /// the epoch at which this account will next owe rent
+    rent_epoch: Epoch,
+}
 
-impl<'a> ReadableWithRef<'a> for StoredAccountMeta<'a> {}
+impl<'a> ZeroLamport for AccountForStorage<'a> {
+    fn is_zero_lamport(&self) -> bool {
+        self.lamports() == 0
+    }
+}
+
+impl<'a> ReadableAccount for AccountForStorage<'a> {
+    fn lamports(&self) -> u64 {
+        self.lamports
+    }
+    fn data(&self) -> &[u8] {
+        self.data
+    }
+    fn owner(&self) -> &Pubkey {
+        self.owner
+    }
+    fn executable(&self) -> bool {
+        self.executable
+    }
+    fn rent_epoch(&self) -> Epoch {
+        self.rent_epoch
+    }
+    fn to_account_shared_data(&self) -> AccountSharedData {
+        panic!();
+    }
+}
+
+impl<'a> From<&'a AccountSharedData> for AccountForStorage<'a> {
+    fn from(source: &'a AccountSharedData) -> Self {
+        Self {
+            lamports: source.lamports(),
+            owner: source.owner(),
+            data: source.data(),
+            executable: source.executable(),
+            rent_epoch: source.rent_epoch(),
+        }
+    }
+}
+
+impl<'a> AccountForStorage<'a> {
+    pub fn new_from_stored_account_meta(source: &'a StoredAccountMeta<'a>) -> Self {
+        Self {
+            lamports: source.lamports(),
+            owner: source.owner(),
+            data: source.data(),
+            executable: source.executable(),
+            rent_epoch: source.rent_epoch(),
+        }
+    }
+    pub fn new_from_account_shared_data(source: &'a AccountSharedData) -> Self {
+        Self {
+            lamports: source.lamports(),
+            owner: source.owner(),
+            data: source.data(),
+            executable: source.executable(),
+            rent_epoch: source.rent_epoch(),
+        }
+    }
+}
 
 /// abstract access to pubkey, account, slot, target_slot of either:
 /// a. (slot, &[&Pubkey, &ReadableAccount])
@@ -20,11 +91,11 @@ pub trait StorableAccounts<'a, T: ReadableAccount + Sync>: Sync {
     /// pubkey at 'index'
     fn pubkey(&self, index: usize, callback: impl FnMut(&Pubkey));
     /// account at 'index'
-    fn account(&self, index: usize, callback: impl FnMut(&T));
+    fn account(&self, index: usize, callback: impl for<'b> FnMut(AccountForStorage<'b>));
     /// None if account is zero lamports
     fn account_default_if_zero_lamport(&self, index: usize, mut callback: impl FnMut(Option<&T>)) {
         self.account(index, |account| {
-            callback((account.lamports() != 0).then_some(&account));
+            unimplemented!(); // callback((account.lamports() != 0).then_some((&account));
         });
     }
     // current slot for account at 'index'
@@ -90,7 +161,10 @@ impl<'a, T: ReadableAccount + Sync> StorableAccounts<'a, T> for StorableAccounts
 */
 use crate::accounts_db::AccountsDb;
 
-fn call_it<F>(account: &StoredAccountMeta<'_>, mut callback: impl for<'c,'d> FnMut(&'c StoredAccountMeta)) {
+fn call_it<F>(
+    account: &StoredAccountMeta<'_>,
+    mut callback: impl for<'c, 'd> FnMut(&'c StoredAccountMeta),
+) {
     callback(account);
 }
 
@@ -100,10 +174,13 @@ impl<'a> StorableAccounts<'a, StoredAccountMeta<'a>>
     fn pubkey(&self, index: usize, mut callback: impl FnMut(&Pubkey)) {
         callback(self.1[index].pubkey())
     }
-    fn account(&self, index: usize, mut callback: impl FnMut(&StoredAccountMeta<'a>)) {
+    fn account(&self, index: usize, mut callback: impl for<'b> FnMut(AccountForStorage<'b>)) {
         let account_from_storage = self.1[index];
         let db = self.2;
-        let storage = db.storage.get_slot_storage_entry_shrinking_in_progress_ok(account_from_storage.slot).unwrap();
+        let storage = db
+            .storage
+            .get_slot_storage_entry_shrinking_in_progress_ok(account_from_storage.slot)
+            .unwrap();
         // callback(&storage.accounts.get_account(account_from_storage.index_info.offset()).unwrap().0);
         // callback(storage.accounts.get_account(account_from_storage.index_info.offset()).unwrap().0)
     }
@@ -119,7 +196,7 @@ impl<'a> StorableAccounts<'a, StoredAccountMeta<'a>>
     }
 }
 
-// enum 
+// enum
 
 /// this tuple contains a single different source slot that applies to all accounts
 /// accounts are StoredAccountMeta
@@ -129,11 +206,21 @@ impl<'a> StorableAccounts<'a, StoredAccountMeta<'a>>
     fn pubkey(&self, index: usize, mut callback: impl FnMut(&Pubkey)) {
         callback(self.1[index].pubkey())
     }
-    fn account(&self, index: usize, mut callback: impl FnMut(&StoredAccountMeta<'a>)) {
+    fn account(&self, index: usize, mut callback: impl for<'b> FnMut(AccountForStorage<'b>)) {
         let account_from_storage = self.1[index];
         let db = self.3;
-        let storage = db.storage.get_slot_storage_entry_shrinking_in_progress_ok(account_from_storage.slot).unwrap();
-        callback(&storage.accounts.get_account(account_from_storage.index_info.offset()).unwrap().0)
+        let storage = db
+            .storage
+            .get_slot_storage_entry_shrinking_in_progress_ok(account_from_storage.slot)
+            .unwrap();
+        callback(
+            AccountForStorage::new_from_stored_account_meta(
+            &storage
+                .accounts
+                .get_account(account_from_storage.index_info.offset())
+                .unwrap()
+                .0)
+        )
     }
     fn slot(&self, _index: usize) -> Slot {
         // same other slot for all accounts
@@ -150,17 +237,21 @@ impl<'a> StorableAccounts<'a, StoredAccountMeta<'a>>
     }
     fn hash(&self, index: usize, mut callback: impl FnMut(&AccountHash)) {
         self.account(index, |account| {
-            callback(account.hash());
+            unimplemented!(); // callback(account.hash());
         });
     }
 }
 
-impl<'a, T: ReadableAccount + Sync + Clone> StorableAccounts<'a, T> for (Slot, &'a [(&'a Pubkey, &'a T)]) {
+impl<'a, 'b, T: ReadableAccount + Sync + Clone> StorableAccounts<'a, T>
+    for (Slot, &'a [(&'a Pubkey, &'a T)])
+where
+    AccountForStorage<'a>: From<&'a T>,
+{
     fn pubkey(&self, index: usize, mut callback: impl FnMut(&Pubkey)) {
         callback(self.1[index].0)
     }
-    fn account(&self, index: usize, mut callback: impl FnMut(&T)) {
-        callback(self.1[index].1)
+    fn account(&self, index: usize, mut callback: impl for<'c> FnMut(AccountForStorage<'c>)) {
+        callback((self.1[index].1).into())
     }
     fn slot(&self, _index: usize) -> Slot {
         // per-index slot is not unique per slot when per-account slot is not included in the source data
@@ -287,17 +378,25 @@ impl<'a> StorableAccountsBySlot<'a> {
 
 impl<'a> StorableAccounts<'a, StoredAccountMeta<'a>> for StorableAccountsBySlot<'a> {
     fn pubkey(&self, index: usize, mut callback: impl FnMut(&Pubkey)) {
-        self.account(index, |account| callback(account.pubkey()))
+        let indexes = self.find_internal_index(index);
+
+        let account_from_storage = self.slots_and_accounts[indexes.0].1[indexes.1];
+        callback(account_from_storage.pubkey())
     }
-    fn account(&self, index: usize, mut callback: impl FnMut(&StoredAccountMeta<'a>)) {
+    fn account(&self, index: usize, mut callback: impl for<'b> FnMut(AccountForStorage<'b>)) {
         let indexes = self.find_internal_index(index);
 
         let account_from_storage = self.slots_and_accounts[indexes.0].1[indexes.1];
         let db = self.db;
-        let storage = db.storage.get_slot_storage_entry_shrinking_in_progress_ok(account_from_storage.slot).unwrap();
-        storage.accounts.get_account_callback(account_from_storage.index_info.offset(), |account| {
-            callback(&account.unwrap())
-        })
+        let storage = db
+            .storage
+            .get_slot_storage_entry_shrinking_in_progress_ok(account_from_storage.slot)
+            .unwrap();
+        storage
+            .accounts
+            .get_account_callback(account_from_storage.index_info.offset(), |account| {
+                callback(AccountForStorage::new_from_stored_account_meta(&account.unwrap()))
+            })
     }
     fn slot(&self, index: usize) -> Slot {
         let indexes = self.find_internal_index(index);
@@ -313,10 +412,11 @@ impl<'a> StorableAccounts<'a, StoredAccountMeta<'a>> for StorableAccountsBySlot<
         self.contains_multiple_slots
     }
     fn has_hash(&self) -> bool {
-        true
+        false
     }
     fn hash(&self, index: usize, mut callback: impl FnMut(&AccountHash)) {
-        self.account(index, |account| callback(account.hash()))
+        unimplemented!();
+        // self.account(index, |account| callback(account.hash()))
     }
 }
 /*
