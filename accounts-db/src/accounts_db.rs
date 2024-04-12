@@ -6517,7 +6517,7 @@ impl AccountsDb {
                             for index in 0..accounts.len() {
                                 accounts.pubkey(index, |pubkey| {
                                     accounts.account(index, |account| {
-                                        let hash = Self::hash_account(account, pubkey);
+                                        let hash = Self::hash_account(&account, pubkey);
                                         hashes.push(hash);
                                     })
                                 })
@@ -7827,7 +7827,7 @@ impl AccountsDb {
                             target_slot,
                             old_slot,
                             pubkey,
-                            pubkey_account.1,
+                            &pubkey_account.1,
                             &self.account_indexes,
                             info,
                             &mut reclaims,
@@ -8222,7 +8222,7 @@ impl AccountsDb {
             UpdateIndexThreadSelection::Inline,
         );
     }
-
+/*
     /// Store the account update.
     /// only called by tests
     pub fn store_uncached(&self, slot: Slot, accounts: &[(&Pubkey, &AccountSharedData)]) {
@@ -8235,7 +8235,7 @@ impl AccountsDb {
             UpdateIndexThreadSelection::PoolWithThreshold,
         );
     }
-
+*/
     fn store<'a, T: ReadableAccount + Sync + ZeroLamport + 'a>(
         &self,
         accounts: impl StorableAccounts<'a, T>,
@@ -8255,7 +8255,7 @@ impl AccountsDb {
         (0..accounts.len()).for_each(|index| {
             accounts.account(index, |account| {
                 total_data += account.data().len();
-                stats.update(account);
+                stats.update(&account);
             })
         });
 
@@ -9539,7 +9539,7 @@ pub mod test_utils {
         super::*,
         crate::{accounts::Accounts, append_vec::aligned_stored_size},
     };
-
+/*
     pub fn create_test_accounts(
         accounts: &Accounts,
         pubkeys: &mut Vec<Pubkey>,
@@ -9573,7 +9573,8 @@ pub mod test_utils {
             pubkeys.push(pubkey);
         }
     }
-
+    */
+/*
     // Only used by bench, not safe to call otherwise accounts can conflict with the
     // accounts cache!
     pub fn update_accounts_bench(accounts: &Accounts, pubkeys: &[Pubkey], slot: u64) {
@@ -9583,6 +9584,7 @@ pub mod test_utils {
             accounts.store_slow_uncached(slot, pubkey, &account);
         }
     }
+    */
 }
 
 #[cfg(test)]

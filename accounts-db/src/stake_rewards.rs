@@ -25,8 +25,8 @@ impl<'a> StorableAccounts<'a, AccountSharedData> for (Slot, &'a [StakeReward]) {
     fn pubkey(&self, index: usize, mut callback: impl FnMut(&Pubkey)) {
         callback(&self.1[index].stake_pubkey)
     }
-    fn account(&self, index: usize, mut callback: impl FnMut(&AccountSharedData)) {
-        callback(&self.1[index].stake_account)
+    fn account(&self, index: usize, mut callback: impl FnMut(AccountSharedData)) {
+        callback(self.1[index].stake_account.clone())
     }
     fn slot(&self, _index: usize) -> Slot {
         // per-index slot is not unique per slot when per-account slot is not included in the source data
