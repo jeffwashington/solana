@@ -3,7 +3,7 @@ use {
         account_info::AccountInfo,
         accounts_hash::AccountHash,
         append_vec::AppendVecStoredAccountMeta,
-        storable_accounts::StorableAccounts,
+        storable_accounts::{AccountForStorage, StorableAccounts},
         tiered_storage::hot::{HotAccount, HotAccountMeta},
     },
     solana_sdk::{account::ReadableAccount, hash::Hash, pubkey::Pubkey, stake_history::Epoch},
@@ -72,7 +72,7 @@ impl<
     }
 
     /// get all account fields at 'index'
-    pub fn get(&self, index: usize) -> (Option<&T>, &Pubkey, &AccountHash) {
+    pub fn get(&self, index: usize) -> (Option<AccountForStorage>, &Pubkey, &AccountHash) {
         let account = self.accounts.account_default_if_zero_lamport(index);
         let pubkey = self.accounts.pubkey(index);
         let hash = if self.accounts.has_hash() {
@@ -87,7 +87,7 @@ impl<
     /// None if account at index has lamports == 0
     /// Otherwise, Some(account)
     /// This is the only way to access the account.
-    pub fn account(&self, index: usize) -> Option<&T> {
+    pub fn account(&self, index: usize) -> Option<AccountForStorage<'a>> {
         self.accounts.account_default_if_zero_lamport(index)
     }
 

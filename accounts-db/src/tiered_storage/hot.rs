@@ -737,6 +737,7 @@ impl HotStorageWriter {
             // Obtain necessary fields from the account, or default fields
             // for a zero-lamport account in the None case.
             let (lamports, owner, data, executable, rent_epoch) = account
+                .as_ref()
                 .map(|acc| {
                     (
                         acc.lamports(),
@@ -1472,7 +1473,7 @@ pub mod tests {
                 .unwrap();
 
             let (account, address, _account_hash) = storable_accounts.get(i);
-            verify_test_account(&stored_meta, account, address);
+            verify_test_account(&stored_meta, account.as_ref(), address);
 
             assert_eq!(i + 1, next.0 as usize);
         }
@@ -1490,7 +1491,7 @@ pub mod tests {
                 .unwrap();
 
             let (account, address, _account_hash) = storable_accounts.get(stored_info.offset);
-            verify_test_account(&stored_meta, account, address);
+            verify_test_account(&stored_meta, account.as_ref(), address);
         }
 
         // verify get_accounts
@@ -1499,7 +1500,7 @@ pub mod tests {
         // first, we verify everything
         for (i, stored_meta) in accounts.iter().enumerate() {
             let (account, address, _account_hash) = storable_accounts.get(i);
-            verify_test_account(stored_meta, account, address);
+            verify_test_account(stored_meta, account.as_ref(), address);
         }
 
         // second, we verify various initial position

@@ -774,6 +774,7 @@ impl AppendVec {
             let account_meta_ptr = &account_meta as *const AccountMeta;
             let data_len = stored_meta.data_len as usize;
             let data_ptr = account
+                .as_ref()
                 .map(|account| account.data())
                 .unwrap_or_default()
                 .as_ptr();
@@ -995,7 +996,7 @@ pub mod tests {
         let accounts2 = (slot, &accounts[..]);
         let storable = StorableAccountsWithHashes::new_with_hashes(&accounts2, hashes);
         let get_account = storable.account(0);
-        assert!(accounts_equal(&account, get_account.unwrap()));
+        assert!(accounts_equal(&account, &get_account.unwrap()));
     }
 
     #[test]

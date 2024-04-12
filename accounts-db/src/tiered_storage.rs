@@ -376,7 +376,7 @@ mod tests {
             if let Some(account) = expected_accounts_map.get(stored_meta.pubkey()) {
                 verify_test_account_with_footer(
                     &stored_meta,
-                    *account,
+                    account.as_ref(),
                     stored_meta.pubkey(),
                     footer,
                 );

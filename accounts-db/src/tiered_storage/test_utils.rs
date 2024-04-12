@@ -2,14 +2,9 @@
 //! Helper functions for TieredStorage tests
 use {
     super::footer::TieredStorageFooter,
-    crate::{
-        account_storage::meta::{StoredAccountMeta, StoredMeta},
-        accounts_hash::AccountHash,
-        tiered_storage::owners::OWNER_NO_OWNER,
-    },
+    crate::{account_storage::meta::StoredMeta, tiered_storage::owners::OWNER_NO_OWNER},
     solana_sdk::{
         account::{Account, AccountSharedData, ReadableAccount},
-        hash::Hash,
         pubkey::Pubkey,
         rent_collector::RENT_EXEMPT_RENT_EPOCH,
     },
@@ -46,9 +41,9 @@ pub(super) fn create_test_account(seed: u64) -> (StoredMeta, AccountSharedData) 
 }
 
 pub(super) fn verify_test_account(
-    stored_meta: &StoredAccountMeta<'_>,
+    stored_meta: &impl ReadableAccount,
     account: Option<&impl ReadableAccount>,
-    address: &Pubkey,
+    _address: &Pubkey,
 ) {
     let (lamports, owner, data, executable) = account
         .map(|acc| (acc.lamports(), acc.owner(), acc.data(), acc.executable()))
@@ -59,12 +54,10 @@ pub(super) fn verify_test_account(
     assert_eq!(stored_meta.data(), data);
     assert_eq!(stored_meta.executable(), executable);
     assert_eq!(stored_meta.owner(), owner);
-    assert_eq!(stored_meta.pubkey(), address);
-    assert_eq!(*stored_meta.hash(), AccountHash(Hash::default()));
 }
 
 pub(super) fn verify_test_account_with_footer(
-    stored_meta: &StoredAccountMeta<'_>,
+    stored_meta: &impl ReadableAccount,
     account: Option<&impl ReadableAccount>,
     address: &Pubkey,
     footer: &TieredStorageFooter,

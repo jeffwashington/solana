@@ -1,7 +1,7 @@
 //! Code for stake and vote rewards
 
 use {
-    crate::storable_accounts::StorableAccounts,
+    crate::storable_accounts::{AccountForStorage, StorableAccounts},
     solana_sdk::{
         account::AccountSharedData, clock::Slot, pubkey::Pubkey, reward_info::RewardInfo,
     },
@@ -25,8 +25,8 @@ impl<'a> StorableAccounts<'a, AccountSharedData> for (Slot, &'a [StakeReward]) {
     fn pubkey(&self, index: usize) -> &Pubkey {
         &self.1[index].stake_pubkey
     }
-    fn account(&self, index: usize) -> &AccountSharedData {
-        &self.1[index].stake_account
+    fn account(&self, index: usize) -> AccountForStorage<'a> {
+        (&self.1[index].stake_account).into()
     }
     fn slot(&self, _index: usize) -> Slot {
         // per-index slot is not unique per slot when per-account slot is not included in the source data

@@ -1,8 +1,76 @@
 //! trait for abstracting underlying storage of pubkey and account pairs to be written
+use solana_sdk::account::AccountSharedData;
+use solana_sdk::stake_history::Epoch;
 use {
-    crate::{account_storage::meta::StoredAccountMeta, accounts_hash::AccountHash},
+    crate::{
+        account_storage::meta::StoredAccountMeta, accounts_hash::AccountHash,
+        accounts_index::ZeroLamport,
+    },
     solana_sdk::{account::ReadableAccount, clock::Slot, pubkey::Pubkey},
 };
+
+#[derive(Debug, Copy, Clone)]
+pub enum AccountForStorage<'a> {
+    AccountSharedData(&'a AccountSharedData),
+    StoredAccountMeta(&'a StoredAccountMeta<'a>),
+}
+
+impl<'a> From<&'a AccountSharedData> for AccountForStorage<'a> {
+    fn from(source: &'a AccountSharedData) -> Self {
+        Self::AccountSharedData(source)
+    }
+}
+
+impl<'a> From<&'a StoredAccountMeta<'a>> for AccountForStorage<'a> {
+    fn from(source: &'a StoredAccountMeta<'a>) -> Self {
+        Self::StoredAccountMeta(source)
+    }
+}
+
+impl<'a> ZeroLamport for AccountForStorage<'a> {
+    fn is_zero_lamport(&self) -> bool {
+        self.lamports() == 0
+    }
+}
+
+impl<'a> ReadableAccount for AccountForStorage<'a> {
+    fn lamports(&self) -> u64 {
+        match self {
+            AccountForStorage::AccountSharedData(account) => account.lamports(),
+            AccountForStorage::StoredAccountMeta(account) => account.lamports(),
+        }
+    }
+    fn data(&self) -> &[u8] {
+        match self {
+            AccountForStorage::AccountSharedData(account) => account.data(),
+            AccountForStorage::StoredAccountMeta(account) => account.data(),
+        }
+    }
+    fn owner(&self) -> &Pubkey {
+        match self {
+            AccountForStorage::AccountSharedData(account) => account.owner(),
+            AccountForStorage::StoredAccountMeta(account) => account.owner(),
+        }
+    }
+    fn executable(&self) -> bool {
+        match self {
+            AccountForStorage::AccountSharedData(account) => account.executable(),
+            AccountForStorage::StoredAccountMeta(account) => account.executable(),
+        }
+    }
+    fn rent_epoch(&self) -> Epoch {
+        match self {
+            AccountForStorage::AccountSharedData(account) => account.rent_epoch(),
+            AccountForStorage::StoredAccountMeta(account) => account.rent_epoch(),
+        }
+    }
+    fn to_account_shared_data(&self) -> AccountSharedData {
+        match self {
+            AccountForStorage::AccountSharedData(account) => account.to_account_shared_data(),
+            AccountForStorage::StoredAccountMeta(account) => account.to_account_shared_data(),
+        }
+    }
+}
 
 /// abstract access to pubkey, account, slot, target_slot of either:
 /// a. (slot, &[&Pubkey, &ReadableAccount])
@@ -13,9 +81,9 @@ pub trait StorableAccounts<'a, T: ReadableAccount + Sync>: Sync {
     /// pubkey at 'index'
     fn pubkey(&self, index: usize) -> &Pubkey;
     /// account at 'index'
-    fn account(&self, index: usize) -> &T;
+    fn account(&self, index: usize) -> AccountForStorage<'a>;
     /// None if account is zero lamports
-    fn account_default_if_zero_lamport(&self, index: usize) -> Option<&T> {
+    fn account_default_if_zero_lamport(&self, index: usize) -> Option<AccountForStorage<'a>> {
         let account = self.account(index);
         (account.lamports() != 0).then_some(account)
     }
@@ -61,12 +129,15 @@ pub struct StorableAccountsMovingSlots<'a, T: ReadableAccount + Sync> {
     pub old_slot: Slot,
 }
 
-impl<'a, T: ReadableAccount + Sync> StorableAccounts<'a, T> for StorableAccountsMovingSlots<'a, T> {
+impl<'a, T: ReadableAccount + Sync> StorableAccounts<'a, T> for StorableAccountsMovingSlots<'a, T>
+where
+    AccountForStorage<'a>: From<&'a T>,
+{
     fn pubkey(&self, index: usize) -> &Pubkey {
         self.accounts[index].0
     }
-    fn account(&self, index: usize) -> &T {
-        self.accounts[index].1
+    fn account(&self, index: usize) -> AccountForStorage<'a> {
+        self.accounts[index].1.into()
     }
     fn slot(&self, _index: usize) -> Slot {
         // per-index slot is not unique per slot, but it is different than 'target_slot'
@@ -80,12 +151,16 @@ impl<'a, T: ReadableAccount + Sync> StorableAccounts<'a, T> for StorableAccounts
     }
 }
 
-impl<'a, T: ReadableAccount + Sync> StorableAccounts<'a, T> for (Slot, &'a [(&'a Pubkey, &'a T)]) {
+impl<'a, T: ReadableAccount + Sync> StorableAccounts<'a, T>
+    for (Slot, &'a [(&'a Pubkey, &'a T)])
+where
+    AccountForStorage<'a>: From<&'a T>,
+{
     fn pubkey(&self, index: usize) -> &Pubkey {
         self.1[index].0
     }
-    fn account(&self, index: usize) -> &T {
-        self.1[index].1
+    fn account(&self, index: usize) -> AccountForStorage<'a> {
+        self.1[index].1.into()
     }
     fn slot(&self, _index: usize) -> Slot {
         // per-index slot is not unique per slot when per-account slot is not included in the source data
@@ -98,13 +173,15 @@ impl<'a, T: ReadableAccount + Sync> StorableAccounts<'a, T> for (Slot, &'a [(&'a
         self.1.len()
     }
 }
-
-impl<'a, T: ReadableAccount + Sync> StorableAccounts<'a, T> for (Slot, &'a [&'a (Pubkey, T)]) {
+impl<'a, T: ReadableAccount + Sync> StorableAccounts<'a, T> for (Slot, &'a [&'a (Pubkey, T)])
+where
+    AccountForStorage<'a>: From<&'a T>,
+{
     fn pubkey(&self, index: usize) -> &Pubkey {
         &self.1[index].0
     }
-    fn account(&self, index: usize) -> &T {
-        &self.1[index].1
+    fn account(&self, index: usize) -> AccountForStorage<'a> {
+        (&self.1[index].1).into()
     }
     fn slot(&self, _index: usize) -> Slot {
         // per-index slot is not unique per slot when per-account slot is not included in the source data
@@ -120,10 +197,10 @@ impl<'a, T: ReadableAccount + Sync> StorableAccounts<'a, T> for (Slot, &'a [&'a 
 
 impl<'a> StorableAccounts<'a, StoredAccountMeta<'a>> for (Slot, &'a [&'a StoredAccountMeta<'a>]) {
     fn pubkey(&self, index: usize) -> &Pubkey {
-        self.account(index).pubkey()
+        self.1[index].pubkey()
     }
-    fn account(&self, index: usize) -> &StoredAccountMeta<'a> {
-        self.1[index]
+    fn account(&self, index: usize) -> AccountForStorage<'a> {
+        self.1[index].into()
     }
     fn slot(&self, _index: usize) -> Slot {
         // per-index slot is not unique per slot when per-account slot is not included in the source data
@@ -139,7 +216,7 @@ impl<'a> StorableAccounts<'a, StoredAccountMeta<'a>> for (Slot, &'a [&'a StoredA
         true
     }
     fn hash(&self, index: usize) -> &AccountHash {
-        self.account(index).hash()
+        self.1[index].hash()
     }
 }
 
@@ -208,11 +285,12 @@ impl<'a> StorableAccountsBySlot<'a> {
 
 impl<'a> StorableAccounts<'a, StoredAccountMeta<'a>> for StorableAccountsBySlot<'a> {
     fn pubkey(&self, index: usize) -> &Pubkey {
-        self.account(index).pubkey()
-    }
-    fn account(&self, index: usize) -> &StoredAccountMeta<'a> {
         let indexes = self.find_internal_index(index);
-        self.slots_and_accounts[indexes.0].1[indexes.1]
+        self.slots_and_accounts[indexes.0].1[indexes.1].pubkey()
+    }
+    fn account(&self, index: usize) -> AccountForStorage<'a> {
+        let indexes = self.find_internal_index(index);
+        self.slots_and_accounts[indexes.0].1[indexes.1].into()
     }
     fn slot(&self, index: usize) -> Slot {
         let indexes = self.find_internal_index(index);
@@ -231,7 +309,8 @@ impl<'a> StorableAccounts<'a, StoredAccountMeta<'a>> for StorableAccountsBySlot<
         true
     }
     fn hash(&self, index: usize) -> &AccountHash {
-        self.account(index).hash()
+        let indexes = self.find_internal_index(index);
+        self.slots_and_accounts[indexes.0].1[indexes.1].hash()
     }
 }
 
@@ -241,10 +320,10 @@ impl<'a> StorableAccounts<'a, StoredAccountMeta<'a>>
     for (Slot, &'a [&'a StoredAccountMeta<'a>], Slot)
 {
     fn pubkey(&self, index: usize) -> &Pubkey {
-        self.account(index).pubkey()
+        self.1[index].pubkey()
     }
-    fn account(&self, index: usize) -> &StoredAccountMeta<'a> {
-        self.1[index]
+    fn account(&self, index: usize) -> AccountForStorage<'a> {
+        self.1[index].into()
     }
     fn slot(&self, _index: usize) -> Slot {
         // same other slot for all accounts
@@ -260,7 +339,7 @@ impl<'a> StorableAccounts<'a, StoredAccountMeta<'a>>
         true
     }
     fn hash(&self, index: usize) -> &AccountHash {
-        self.account(index).hash()
+        self.1[index].hash()
     }
 }
 
@@ -291,7 +370,7 @@ pub mod tests {
         assert_eq!(a.is_empty(), b.is_empty());
         (0..a.len()).for_each(|i| {
             assert_eq!(a.pubkey(i), b.pubkey(i));
-            assert!(accounts_equal(a.account(i), b.account(i)));
+            assert!(accounts_equal(&a.account(i), &b.account(i)));
         })
     }
 
@@ -413,7 +492,7 @@ pub mod tests {
                     compare(&test2, &test_moving_slots2);
                     for (i, raw) in raw.iter().enumerate() {
                         assert_eq!(raw.0, *test3.pubkey(i));
-                        assert!(accounts_equal(&raw.1, test3.account(i)));
+                        assert!(accounts_equal(&raw.1, &test3.account(i)));
                         assert_eq!(raw.2, test3.slot(i));
                         assert_eq!(target_slot, test4.slot(i));
                         assert_eq!(target_slot, test2.slot(i));
@@ -514,7 +593,7 @@ pub mod tests {
                         assert_eq!(entries0 != entries, storable.contains_multiple_slots());
                         (0..entries).for_each(|index| {
                             let index = index as usize;
-                            assert_eq!(storable.account(index), &raw2[index]);
+                            assert!(accounts_equal(&storable.account(index), &raw2[index]));
                             assert_eq!(storable.pubkey(index), raw2[index].pubkey());
                             assert_eq!(storable.hash(index), raw2[index].hash());
                             assert_eq!(storable.slot(index), expected_slots[index]);

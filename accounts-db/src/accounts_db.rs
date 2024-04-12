@@ -3724,7 +3724,7 @@ impl AccountsDb {
                         // Hold onto the index entry arc so that it cannot be flushed.
                         // Since we are shrinking these entries, we need to disambiguate append_vec_ids during this period and those only exist in the in-memory accounts index.
                         index_entries_being_shrunk.push(Arc::clone(entry.unwrap()));
-                        all_are_zero_lamports &= stored_account.lamports() == 0;
+                        all_are_zero_lamports &= stored_account.is_zero_lamport();
                         alive_accounts.add(ref_count, stored_account, slot_list);
                         alive += 1;
                     }
@@ -6490,7 +6490,7 @@ impl AccountsDb {
                             for index in 0..accounts.len() {
                                 let (pubkey, account) =
                                     (accounts.pubkey(index), accounts.account(index));
-                                let hash = Self::hash_account(account, pubkey);
+                                let hash = Self::hash_account(&account, pubkey);
                                 hashes.push(hash);
                             }
                             hash_time.stop();
@@ -7796,7 +7796,7 @@ impl AccountsDb {
                     target_slot,
                     old_slot,
                     pubkey,
-                    pubkey_account.1,
+                    &pubkey_account.1,
                     &self.account_indexes,
                     info,
                     &mut reclaims,
@@ -8222,7 +8222,7 @@ impl AccountsDb {
         (0..accounts.len()).for_each(|index| {
             let account = accounts.account(index);
             total_data += account.data().len();
-            stats.update(account);
+            stats.update(&account);
         });
 
         self.stats
@@ -9564,6 +9564,7 @@ pub mod tests {
             ancient_append_vecs,
             append_vec::{test_utils::TempFile, AppendVec, AppendVecStoredAccountMeta},
             cache_hash_data::CacheHashDataFile,
+            storable_accounts::AccountForStorage,
         },
         assert_matches::assert_matches,
         itertools::Itertools,
@@ -9634,12 +9635,14 @@ pub mod tests {
     /// this tuple contains slot info PER account
     impl<'a, T: ReadableAccount + Sync> StorableAccounts<'a, T>
         for (Slot, &'a [(&'a Pubkey, &'a T, Slot)])
+    where
+        AccountForStorage<'a>: From<&'a T>,
     {
         fn pubkey(&self, index: usize) -> &Pubkey {
             self.1[index].0
         }
-        fn account(&self, index: usize) -> &T {
-            self.1[index].1
+        fn account(&self, index: usize) -> AccountForStorage<'a> {
+            self.1[index].1.into()
         }
         fn slot(&self, index: usize) -> Slot {
             // note that this could be different than 'target_slot()' PER account
