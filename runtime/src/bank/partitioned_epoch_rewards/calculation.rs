@@ -243,8 +243,8 @@ impl Bank {
         thread_pool: &ThreadPool,
         metrics: &mut RewardsMetrics,
     ) -> Option<(VoteRewardsAccounts, StakeRewardCalculation)> {
-        let stakes = self.stakes_cache.stakes();
-        let reward_calculate_param = self.get_epoch_reward_calculate_param_info(&stakes);
+        let stakes2 = self.stakes_cache.stakes();
+        let reward_calculate_param = self.get_epoch_reward_calculate_param_info(&stakes2);
 
         self.calculate_reward_points_partitioned(
             &reward_calculate_param,
@@ -508,8 +508,8 @@ mod tests {
         let rewards_metrics = RewardsMetrics::default();
         let expected_rewards = 100_000_000_000;
 
-        let stakes: RwLockReadGuard<Stakes<StakeAccount<Delegation>>> = bank.stakes_cache.stakes();
-        let reward_calculate_param = bank.get_epoch_reward_calculate_param_info(&stakes);
+        let stakes2: RwLockReadGuard<Stakes<StakeAccount<Delegation>>> = bank.stakes_cache.stakes();
+        let reward_calculate_param = bank.get_epoch_reward_calculate_param_info(&stakes2);
 
         let point_value = bank.calculate_reward_points_partitioned(
             &reward_calculate_param,
@@ -534,8 +534,8 @@ mod tests {
         let thread_pool = ThreadPoolBuilder::new().num_threads(1).build().unwrap();
         let rewards_metrics: RewardsMetrics = RewardsMetrics::default();
         let expected_rewards = 100_000_000_000;
-        let stakes: RwLockReadGuard<Stakes<StakeAccount<Delegation>>> = bank.stakes_cache.stakes();
-        let reward_calculate_param = bank.get_epoch_reward_calculate_param_info(&stakes);
+        let stakes2: RwLockReadGuard<Stakes<StakeAccount<Delegation>>> = bank.stakes_cache.stakes();
+        let reward_calculate_param = bank.get_epoch_reward_calculate_param_info(&stakes2);
 
         let point_value = bank.calculate_reward_points_partitioned(
             &reward_calculate_param,
@@ -576,8 +576,8 @@ mod tests {
         let tracer = |_event: &RewardCalculationEvent| {};
         let reward_calc_tracer = Some(tracer);
         let rewarded_epoch = bank.epoch();
-        let stakes: RwLockReadGuard<Stakes<StakeAccount<Delegation>>> = bank.stakes_cache.stakes();
-        let reward_calculate_param = bank.get_epoch_reward_calculate_param_info(&stakes);
+        let stakes2: RwLockReadGuard<Stakes<StakeAccount<Delegation>>> = bank.stakes_cache.stakes();
+        let reward_calculate_param = bank.get_epoch_reward_calculate_param_info(&stakes2);
         let (vote_rewards_accounts, stake_reward_calculation) = bank.calculate_stake_vote_rewards(
             &reward_calculate_param,
             rewarded_epoch,
