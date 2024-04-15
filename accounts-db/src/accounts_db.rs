@@ -19,9 +19,9 @@
 //! commit for each slot entry would be indexed.
 
 mod geyser_plugin_utils;
-
 #[cfg(feature = "dev-context-only-utils")]
 use qualifier_attr::qualifiers;
+
 use {
     crate::{
         account_info::{AccountInfo, StorageLocation},
