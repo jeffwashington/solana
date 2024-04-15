@@ -14,12 +14,12 @@ use {
 /// hold a ref to an account to store. The account could be represented in memory a few different ways
 #[derive(Debug, Copy, Clone)]
 pub enum AccountForStorage<'a> {
-    AccountSharedData(&'a AccountSharedData),
+    AccountSharedData((&'a Pubkey, &'a AccountSharedData)),
     StoredAccountMeta(&'a StoredAccountMeta<'a>),
 }
 
-impl<'a> From<&'a AccountSharedData> for AccountForStorage<'a> {
-    fn from(source: &'a AccountSharedData) -> Self {
+impl<'a> From<(&'a Pubkey, &'a AccountSharedData)> for AccountForStorage<'a> {
+    fn from(source: (&'a Pubkey, &'a AccountSharedData)) -> Self {
         Self::AccountSharedData(source)
     }
 }
@@ -36,49 +36,58 @@ impl<'a> ZeroLamport for AccountForStorage<'a> {
     }
 }
 
+impl<'a> AccountForStorage<'a> {
+    pub(crate) fn pubkey(&self) -> &'a Pubkey {
+        match self {
+            AccountForStorage::AccountSharedData((pubkey, _account)) => pubkey,
+            AccountForStorage::StoredAccountMeta(account) => account.pubkey(),
+        }
+    }
+}
+
 impl<'a> ReadableAccount for AccountForStorage<'a> {
     fn lamports(&self) -> u64 {
         match self {
-            AccountForStorage::AccountSharedData(account) => account.lamports(),
+            AccountForStorage::AccountSharedData((_pubkey, account)) => account.lamports(),
             AccountForStorage::StoredAccountMeta(account) => account.lamports(),
         }
     }
     fn data(&self) -> &[u8] {
         match self {
-            AccountForStorage::AccountSharedData(account) => account.data(),
+            AccountForStorage::AccountSharedData((_pubkey, account)) => account.data(),
             AccountForStorage::StoredAccountMeta(account) => account.data(),
         }
     }
     fn owner(&self) -> &Pubkey {
         match self {
-            AccountForStorage::AccountSharedData(account) => account.owner(),
+            AccountForStorage::AccountSharedData((_pubkey, account)) => account.owner(),
             AccountForStorage::StoredAccountMeta(account) => account.owner(),
         }
     }
     fn executable(&self) -> bool {
         match self {
-            AccountForStorage::AccountSharedData(account) => account.executable(),
+            AccountForStorage::AccountSharedData((_pubkey, account)) => account.executable(),
             AccountForStorage::StoredAccountMeta(account) => account.executable(),
         }
     }
     fn rent_epoch(&self) -> Epoch {
         match self {
-            AccountForStorage::AccountSharedData(account) => account.rent_epoch(),
+            AccountForStorage::AccountSharedData((_pubkey, account)) => account.rent_epoch(),
             AccountForStorage::StoredAccountMeta(account) => account.rent_epoch(),
         }
     }
     fn to_account_shared_data(&self) -> AccountSharedData {
         match self {
-            AccountForStorage::AccountSharedData(account) => account.to_account_shared_data(),
+            AccountForStorage::AccountSharedData((_pubkey, account)) => {
+                account.to_account_shared_data()
+            }
             AccountForStorage::StoredAccountMeta(account) => account.to_account_shared_data(),
         }
     }
 }
 
 lazy_static! {
-    static ref DEFAULT_ACCOUNT_SHARED_DATA: AccountSharedData = AccountSharedData::default();
-    pub static ref DEFAULT_ACCOUNT: AccountForStorage<'static> =
-        AccountForStorage::AccountSharedData(&DEFAULT_ACCOUNT_SHARED_DATA);
+    pub(crate) static ref DEFAULT_ACCOUNT_SHARED_DATA: AccountSharedData = AccountSharedData::default();
 }
 
 /// abstract access to pubkey, account, slot, target_slot of either:
@@ -102,7 +111,8 @@ pub trait StorableAccounts<'a>: Sync {
             callback(if account.lamports() != 0 {
                 account
             } else {
-                *DEFAULT_ACCOUNT
+                // preserve the pubkey, but use a default value for the account
+                AccountForStorage::AccountSharedData((account.pubkey(), &DEFAULT_ACCOUNT_SHARED_DATA))
             })
         })
     }
@@ -150,7 +160,7 @@ pub struct StorableAccountsMovingSlots<'a, T: ReadableAccount + Sync> {
 
 impl<'a, T: ReadableAccount + Sync> StorableAccounts<'a> for StorableAccountsMovingSlots<'a, T>
 where
-    AccountForStorage<'a>: From<&'a T>,
+    AccountForStorage<'a>: From<(&'a Pubkey, &'a T)>,
 {
     fn pubkey(&self, index: usize) -> &Pubkey {
         self.accounts[index].0
@@ -160,7 +170,7 @@ where
         index: usize,
         mut callback: impl FnMut(AccountForStorage<'a>) -> Ret,
     ) -> Ret {
-        callback(self.accounts[index].1.into())
+        callback((self.accounts[index].0, self.accounts[index].1).into())
     }
     fn slot(&self, _index: usize) -> Slot {
         // per-index slot is not unique per slot, but it is different than 'target_slot'
@@ -177,7 +187,7 @@ where
 impl<'a: 'b, 'b, T: ReadableAccount + Sync + 'a> StorableAccounts<'a>
     for (Slot, &'b [(&'a Pubkey, &'a T)])
 where
-    AccountForStorage<'a>: From<&'a T>,
+    AccountForStorage<'a>: From<(&'a Pubkey, &'a T)>,
 {
     fn pubkey(&self, index: usize) -> &Pubkey {
         self.1[index].0
@@ -187,7 +197,7 @@ where
         index: usize,
         mut callback: impl FnMut(AccountForStorage<'a>) -> Ret,
     ) -> Ret {
-        callback(self.1[index].1.into())
+        callback((self.1[index].0, self.1[index].1).into())
     }
     fn slot(&self, _index: usize) -> Slot {
         // per-index slot is not unique per slot when per-account slot is not included in the source data
@@ -202,7 +212,7 @@ where
 }
 impl<'a, T: ReadableAccount + Sync> StorableAccounts<'a> for (Slot, &'a [&'a (Pubkey, T)])
 where
-    AccountForStorage<'a>: From<&'a T>,
+    AccountForStorage<'a>: From<(&'a Pubkey, &'a T)>,
 {
     fn pubkey(&self, index: usize) -> &Pubkey {
         &self.1[index].0
@@ -212,7 +222,7 @@ where
         index: usize,
         mut callback: impl FnMut(AccountForStorage<'a>) -> Ret,
     ) -> Ret {
-        callback((&self.1[index].1).into())
+        callback((&self.1[index].0, &self.1[index].1).into())
     }
     fn slot(&self, _index: usize) -> Slot {
         // per-index slot is not unique per slot when per-account slot is not included in the source data
