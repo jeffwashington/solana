@@ -14,13 +14,13 @@ use {
 /// hold a ref to an account to store. The account could be represented in memory a few different ways
 #[derive(Debug, Copy, Clone)]
 pub enum AccountForStorage<'a> {
-    AccountSharedData((&'a Pubkey, &'a AccountSharedData)),
+    AddressAndAccount((&'a Pubkey, &'a AccountSharedData)),
     StoredAccountMeta(&'a StoredAccountMeta<'a>),
 }
 
 impl<'a> From<(&'a Pubkey, &'a AccountSharedData)> for AccountForStorage<'a> {
     fn from(source: (&'a Pubkey, &'a AccountSharedData)) -> Self {
-        Self::AccountSharedData(source)
+        Self::AddressAndAccount(source)
     }
 }
 
@@ -39,7 +39,7 @@ impl<'a> ZeroLamport for AccountForStorage<'a> {
 impl<'a> AccountForStorage<'a> {
     pub(crate) fn pubkey(&self) -> &'a Pubkey {
         match self {
-            AccountForStorage::AccountSharedData((pubkey, _account)) => pubkey,
+            AccountForStorage::AddressAndAccount((pubkey, _account)) => pubkey,
             AccountForStorage::StoredAccountMeta(account) => account.pubkey(),
         }
     }
@@ -48,37 +48,37 @@ impl<'a> AccountForStorage<'a> {
 impl<'a> ReadableAccount for AccountForStorage<'a> {
     fn lamports(&self) -> u64 {
         match self {
-            AccountForStorage::AccountSharedData((_pubkey, account)) => account.lamports(),
+            AccountForStorage::AddressAndAccount((_pubkey, account)) => account.lamports(),
             AccountForStorage::StoredAccountMeta(account) => account.lamports(),
         }
     }
     fn data(&self) -> &[u8] {
         match self {
-            AccountForStorage::AccountSharedData((_pubkey, account)) => account.data(),
+            AccountForStorage::AddressAndAccount((_pubkey, account)) => account.data(),
             AccountForStorage::StoredAccountMeta(account) => account.data(),
         }
     }
     fn owner(&self) -> &Pubkey {
         match self {
-            AccountForStorage::AccountSharedData((_pubkey, account)) => account.owner(),
+            AccountForStorage::AddressAndAccount((_pubkey, account)) => account.owner(),
             AccountForStorage::StoredAccountMeta(account) => account.owner(),
         }
     }
     fn executable(&self) -> bool {
         match self {
-            AccountForStorage::AccountSharedData((_pubkey, account)) => account.executable(),
+            AccountForStorage::AddressAndAccount((_pubkey, account)) => account.executable(),
             AccountForStorage::StoredAccountMeta(account) => account.executable(),
         }
     }
     fn rent_epoch(&self) -> Epoch {
         match self {
-            AccountForStorage::AccountSharedData((_pubkey, account)) => account.rent_epoch(),
+            AccountForStorage::AddressAndAccount((_pubkey, account)) => account.rent_epoch(),
             AccountForStorage::StoredAccountMeta(account) => account.rent_epoch(),
         }
     }
     fn to_account_shared_data(&self) -> AccountSharedData {
         match self {
-            AccountForStorage::AccountSharedData((_pubkey, account)) => {
+            AccountForStorage::AddressAndAccount((_pubkey, account)) => {
                 account.to_account_shared_data()
             }
             AccountForStorage::StoredAccountMeta(account) => account.to_account_shared_data(),
@@ -112,7 +112,7 @@ pub trait StorableAccounts<'a>: Sync {
                 account
             } else {
                 // preserve the pubkey, but use a default value for the account
-                AccountForStorage::AccountSharedData((
+                AccountForStorage::AddressAndAccount((
                     account.pubkey(),
                     &DEFAULT_ACCOUNT_SHARED_DATA,
                 ))
