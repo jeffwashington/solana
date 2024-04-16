@@ -148,16 +148,12 @@ impl AccountsFile {
             // assumes all offsets are multiple of 8 while TieredStorage uses
             // IndexOffset that is equivalent to AccountInfo::reduced_offset.
             Self::TieredStorage(ts) => ts
-                .reader()
-                .and_then(|reader| {
-                    reader
-                        .get_stored_account_meta_callback(
-                            IndexOffset(AccountInfo::get_reduced_offset(offset)),
-                            callback,
-                        )
-                        .ok()
-                })
-                .flatten(),
+                .reader()?
+                .get_stored_account_meta_callback(
+                    IndexOffset(AccountInfo::get_reduced_offset(offset)),
+                    callback,
+                )
+                .ok()?,
         }
     }
 
