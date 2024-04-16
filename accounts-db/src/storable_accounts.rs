@@ -37,7 +37,7 @@ impl<'a> ZeroLamport for AccountForStorage<'a> {
 }
 
 impl<'a> AccountForStorage<'a> {
-    pub(crate) fn pubkey(&self) -> &'a Pubkey {
+    pub fn pubkey(&self) -> &'a Pubkey {
         match self {
             AccountForStorage::AccountSharedData((pubkey, _account)) => pubkey,
             AccountForStorage::StoredAccountMeta(account) => account.pubkey(),
@@ -87,7 +87,8 @@ impl<'a> ReadableAccount for AccountForStorage<'a> {
 }
 
 lazy_static! {
-    pub(crate) static ref DEFAULT_ACCOUNT_SHARED_DATA: AccountSharedData = AccountSharedData::default();
+    pub(crate) static ref DEFAULT_ACCOUNT_SHARED_DATA: AccountSharedData =
+        AccountSharedData::default();
 }
 
 /// abstract access to pubkey, account, slot, target_slot of either:
@@ -96,8 +97,6 @@ lazy_static! {
 /// This trait avoids having to allocate redundant data when there is a duplicated slot parameter.
 /// All legacy callers do not have a unique slot per account to store.
 pub trait StorableAccounts<'a>: Sync {
-    /// pubkey at 'index'
-    fn pubkey(&self, index: usize) -> &Pubkey;
     /// account at 'index'
     fn account<Ret>(&self, index: usize, callback: impl FnMut(AccountForStorage<'a>) -> Ret)
         -> Ret;
@@ -112,7 +111,10 @@ pub trait StorableAccounts<'a>: Sync {
                 account
             } else {
                 // preserve the pubkey, but use a default value for the account
-                AccountForStorage::AccountSharedData((account.pubkey(), &DEFAULT_ACCOUNT_SHARED_DATA))
+                AccountForStorage::AccountSharedData((
+                    account.pubkey(),
+                    &DEFAULT_ACCOUNT_SHARED_DATA,
+                ))
             })
         })
     }
@@ -162,9 +164,6 @@ impl<'a, T: ReadableAccount + Sync> StorableAccounts<'a> for StorableAccountsMov
 where
     AccountForStorage<'a>: From<(&'a Pubkey, &'a T)>,
 {
-    fn pubkey(&self, index: usize) -> &Pubkey {
-        self.accounts[index].0
-    }
     fn account<Ret>(
         &self,
         index: usize,
@@ -189,9 +188,6 @@ impl<'a: 'b, 'b, T: ReadableAccount + Sync + 'a> StorableAccounts<'a>
 where
     AccountForStorage<'a>: From<(&'a Pubkey, &'a T)>,
 {
-    fn pubkey(&self, index: usize) -> &Pubkey {
-        self.1[index].0
-    }
     fn account<Ret>(
         &self,
         index: usize,
@@ -214,9 +210,6 @@ impl<'a, T: ReadableAccount + Sync> StorableAccounts<'a> for (Slot, &'a [&'a (Pu
 where
     AccountForStorage<'a>: From<(&'a Pubkey, &'a T)>,
 {
-    fn pubkey(&self, index: usize) -> &Pubkey {
-        &self.1[index].0
-    }
     fn account<Ret>(
         &self,
         index: usize,
@@ -237,9 +230,6 @@ where
 }
 
 impl<'a> StorableAccounts<'a> for (Slot, &'a [&'a StoredAccountMeta<'a>]) {
-    fn pubkey(&self, index: usize) -> &Pubkey {
-        self.1[index].pubkey()
-    }
     fn account<Ret>(
         &self,
         index: usize,
@@ -329,10 +319,6 @@ impl<'a> StorableAccountsBySlot<'a> {
 }
 
 impl<'a> StorableAccounts<'a> for StorableAccountsBySlot<'a> {
-    fn pubkey(&self, index: usize) -> &Pubkey {
-        let indexes = self.find_internal_index(index);
-        self.slots_and_accounts[indexes.0].1[indexes.1].pubkey()
-    }
     fn account<Ret>(
         &self,
         index: usize,
@@ -366,9 +352,6 @@ impl<'a> StorableAccounts<'a> for StorableAccountsBySlot<'a> {
 /// this tuple contains a single different source slot that applies to all accounts
 /// accounts are StoredAccountMeta
 impl<'a> StorableAccounts<'a> for (Slot, &'a [&'a StoredAccountMeta<'a>], Slot) {
-    fn pubkey(&self, index: usize) -> &Pubkey {
-        self.1[index].pubkey()
-    }
     fn account<Ret>(
         &self,
         index: usize,
@@ -413,9 +396,9 @@ pub mod tests {
         assert_eq!(a.len(), b.len());
         assert_eq!(a.is_empty(), b.is_empty());
         (0..a.len()).for_each(|i| {
-            assert_eq!(a.pubkey(i), b.pubkey(i));
             b.account(i, |account| {
                 a.account(i, |account_a| {
+                    assert_eq!(account_a.pubkey(), account.pubkey());
                     assert!(accounts_equal(&account_a, &account));
                 });
             });
@@ -539,8 +522,8 @@ pub mod tests {
                     compare(&test2, &test_moving_slots);
                     compare(&test2, &test_moving_slots2);
                     for (i, raw) in raw.iter().enumerate() {
-                        assert_eq!(raw.0, *test3.pubkey(i));
                         test3.account(i, |account| {
+                            assert_eq!(raw.0, *account.pubkey());
                             assert!(accounts_equal(&raw.1, &account));
                         });
                         assert_eq!(raw.2, test3.slot(i));
@@ -645,8 +628,8 @@ pub mod tests {
                             let index = index as usize;
                             storable.account(index, |account| {
                                 assert!(accounts_equal(&account, &raw2[index]));
+                                assert_eq!(account.pubkey(), raw2[index].pubkey());
                             });
-                            assert_eq!(storable.pubkey(index), raw2[index].pubkey());
                             assert_eq!(storable.hash(index), raw2[index].hash());
                             assert_eq!(storable.slot(index), expected_slots[index]);
                         })
