@@ -1364,8 +1364,7 @@ pub mod tests {
                             .iter()
                             .map(|(_slot, accounts)| accounts
                                 .iter()
-                                .map(|account| aligned_stored_size(account.data_len())
-                                    as u64)
+                                .map(|account| aligned_stored_size(account.data_len()) as u64)
                                 .sum::<u64>())
                             .sum::<u64>()
                     );
@@ -1668,7 +1667,7 @@ pub mod tests {
                 .unwrap();
             let account_shared_data_with_2_refs = account_with_2_refs.to_account_shared_data();
             let pk_with_2_refs = account_with_2_refs.pubkey();
-            let mut account_with_1_ref = account_shared_data_with_2_refs.to_account_shared_data();
+            let mut account_with_1_ref = account_shared_data_with_2_refs.clone();
             account_with_1_ref.checked_add_lamports(1).unwrap();
             append_single_account_with_default_hash(
                 &storage,
@@ -1685,7 +1684,7 @@ pub mod tests {
             append_single_account_with_default_hash(
                 &ignored_storage,
                 pk_with_2_refs,
-                &account_shared_data_with_2_refs.to_account_shared_data(),
+                &account_shared_data_with_2_refs,
                 true,
                 Some(&db.accounts_index),
             );
@@ -1822,7 +1821,7 @@ pub mod tests {
                     .first()
                     .unwrap()
                     .to_account_shared_data(),
-                account_shared_data_with_2_refs.to_account_shared_data()
+                account_shared_data_with_2_refs
             );
         }
     }
@@ -1852,7 +1851,7 @@ pub mod tests {
                 .unwrap();
             let account_shared_data_with_2_refs = account_with_2_refs.to_account_shared_data();
             let pk_with_2_refs = account_with_2_refs.pubkey();
-            let mut account_with_1_ref = account_shared_data_with_2_refs.to_account_shared_data();
+            let mut account_with_1_ref = account_shared_data_with_2_refs.clone();
             _ = account_with_1_ref.checked_add_lamports(1);
             append_single_account_with_default_hash(
                 &storage,
@@ -1970,7 +1969,7 @@ pub mod tests {
                     .first()
                     .unwrap()
                     .to_account_shared_data(),
-                account_shared_data_with_2_refs.to_account_shared_data()
+                account_shared_data_with_2_refs
             );
         }
     }
