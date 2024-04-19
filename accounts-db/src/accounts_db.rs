@@ -6662,7 +6662,7 @@ impl AccountsDb {
     where
         S: AppendVecScan,
     {
-        storage.accounts.account_iter().for_each(|account| {
+        storage.accounts.scan_accounts(|account| {
             if scanner.filter(account.pubkey()) {
                 scanner.found_account(&LoadedAccount::Stored(account))
             }
@@ -8610,8 +8610,7 @@ impl AccountsDb {
                     items,
                 )
         } else {
-            let accounts = storage.accounts.account_iter();
-            let items = accounts.map(|stored_account| {
+            storage.accounts.scan_accounts(|stored_account| {
                 stored_size_alive += stored_account.stored_size();
                 let pubkey = stored_account.pubkey();
                 self.accounts_index.update_secondary_indexes(
@@ -8806,7 +8805,7 @@ impl AccountsDb {
                             // verify index matches expected and measure the time to get all items
                             assert!(verify);
                             let mut lookup_time = Measure::start("lookup_time");
-                            for account_info in storage.accounts.account_iter() {
+                            storage.accounts.scan_accounts(|account_info| {
                                 let key = account_info.pubkey();
                                 let index_entry = self.accounts_index.get_cloned(key).unwrap();
                                 let slot_list = index_entry.slot_list.read().unwrap();
@@ -8825,7 +8824,7 @@ impl AccountsDb {
                                     }
                                 }
                                 assert_eq!(1, count);
-                            }
+                            });
                             lookup_time.stop();
                             lookup_time.as_us()
                         };
@@ -9334,16 +9333,13 @@ impl AccountsDb {
     }
 
     pub fn sizes_of_accounts_in_storage_for_tests(&self, slot: Slot) -> Vec<usize> {
-        self.storage
-            .get_slot_storage_entry(slot)
-            .map(|storage| {
-                storage
-                    .accounts
-                    .account_iter()
-                    .map(|account| account.stored_size())
-                    .collect()
-            })
-            .unwrap_or_default()
+        let mut sizes = Vec::default();
+        if let Some(storage) = self.storage.get_slot_storage_entry(slot) {
+            storage.accounts.scan_accounts(|account| {
+                sizes.push(account.stored_size());
+            });
+        }
+        sizes
     }
 
     pub fn ref_count_for_pubkey(&self, pubkey: &Pubkey) -> RefCount {
@@ -17017,7 +17013,7 @@ pub mod tests {
     fn populate_index(db: &AccountsDb, slots: Range<Slot>) {
         slots.into_iter().for_each(|slot| {
             if let Some(storage) = db.get_storage_for_slot(slot) {
-                storage.accounts.account_iter().for_each(|account| {
+                storage.accounts.scan_accounts(|account| {
                     let info = AccountInfo::new(
                         StorageLocation::AppendVec(storage.append_vec_id(), account.offset()),
                         account.lamports(),
