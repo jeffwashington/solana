@@ -5416,7 +5416,8 @@ impl AccountsDb {
             max_root,
             load_hint,
         )?;
-        account_accessor.get_loaded_account(|loaded_account| loaded_account.loaded_hash())
+        account_accessor
+            .check_and_get_loaded_account(|loaded_account| Some(loaded_account.loaded_hash()))
     }
 
     fn get_account_accessor<'a>(
@@ -9061,7 +9062,7 @@ impl AccountsDb {
                             let mut accessor = LoadedAccountAccessor::Stored(
                                 maybe_storage_entry.map(|entry| (entry, account_info.offset())),
                             );
-                            accessor.get_loaded_account(|loaded_account| {
+                            accessor.check_and_get_loaded_account(|loaded_account| {
                                 let data_len = loaded_account.data_len();
                                 accounts_data_len_from_duplicates += data_len;
                                 if let Some(lamports_to_top_off) = Self::stats_for_rent_payers(
