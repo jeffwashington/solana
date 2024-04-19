@@ -3753,7 +3753,7 @@ impl AccountsDb {
     ) -> GetUniqueAccountsResult<'a> {
         let mut stored_accounts: HashMap<Pubkey, StoredAccountMeta> = HashMap::new();
         let capacity = store.capacity();
-        store.accounts.account_iter().for_each(|account| {
+        store.accounts.account_iter2().for_each(|account| {
             stored_accounts.insert(*account.pubkey(), account);
         });
 

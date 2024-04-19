@@ -118,7 +118,7 @@ impl AccountsFile {
     /// Return (account metadata, next_index) pair for the account at the
     /// specified `offset` if any.  Otherwise return None.   Also return the
     /// index of the next entry.
-    pub fn get_stored_account_meta(&self, offset: usize) -> Option<(StoredAccountMeta<'_>, usize)> {
+    pub fn get_stored_account_meta2(&self, offset: usize) -> Option<(StoredAccountMeta<'_>, usize)> {
         match self {
             Self::AppendVec(av) => av.get_stored_account_meta(offset),
             // Note: The conversion here is needed as the AccountsDB currently
@@ -200,8 +200,8 @@ impl AccountsFile {
     }
 
     /// Return iterator for account metadata
-    pub fn account_iter(&self) -> AccountsFileIter {
-        AccountsFileIter::new(self)
+    pub fn account_iter2(&self) -> AccountsFileIter2 {
+        AccountsFileIter2::new(self)
     }
 
     /// Iterate over all accounts and call `callback` with each account.
@@ -310,12 +310,12 @@ impl AccountsFile {
     }
 }
 
-pub struct AccountsFileIter<'a> {
+pub struct AccountsFileIter2<'a> {
     file_entry: &'a AccountsFile,
     offset: usize,
 }
 
-impl<'a> AccountsFileIter<'a> {
+impl<'a> AccountsFileIter2<'a> {
     pub fn new(file_entry: &'a AccountsFile) -> Self {
         Self {
             file_entry,
@@ -324,11 +324,11 @@ impl<'a> AccountsFileIter<'a> {
     }
 }
 
-impl<'a> Iterator for AccountsFileIter<'a> {
+impl<'a> Iterator for AccountsFileIter2<'a> {
     type Item = StoredAccountMeta<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some((account, next_offset)) = self.file_entry.get_stored_account_meta(self.offset) {
+        if let Some((account, next_offset)) = self.file_entry.get_stored_account_meta2(self.offset) {
             self.offset = next_offset;
             Some(account)
         } else {
