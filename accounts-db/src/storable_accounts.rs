@@ -232,6 +232,7 @@ fn callback_that_loads_account<Ret>(
     offset: usize,
     mut callback: impl for<'local> FnMut(AccountForStorage<'local>) -> Ret,
 ) -> Ret {
+    // note we do not use file id here. We just want the normal unshrunk storage for this slot.
     let storage = db
         .storage
         .get_slot_storage_entry_shrinking_in_progress_ok(slot)
@@ -363,8 +364,9 @@ pub mod tests {
         }
     }
 
+    /// this is no longer used. It is very tricky to get these right. There are already tests for this. It is likely worth it to leave this here for a while until everything has settled.
     /// this tuple contains a single different source slot that applies to all accounts
-    /// accounts are StoredAccountMeta
+    /// accounts are AccountFromStorage
     impl<'a> StorableAccounts<'a> for (Slot, &'a [&'a AccountFromStorage], Slot, &AccountsDb) {
         fn account<Ret>(
             &self,
