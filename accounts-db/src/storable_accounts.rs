@@ -236,7 +236,7 @@ fn callback_that_loads_account<Ret>(
     let storage = db
         .storage
         .get_slot_storage_entry_shrinking_in_progress_ok(slot)
-        .unwrap();
+        .expect("source slot has to have a storage to be able to store accounts");
     storage
         .accounts
         .get_stored_account_meta_callback(offset, |account: StoredAccountMeta| {
