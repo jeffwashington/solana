@@ -1294,6 +1294,7 @@ type AccountInfoAccountsIndex = AccountsIndex<AccountInfo, AccountInfo>;
 // This structure handles the load/store of the accounts
 #[derive(Debug)]
 pub struct AccountsDb {
+    pub second_scan: AtomicU64,
     /// Keeps tracks of index into AppendVec on a per slot basis
     pub accounts_index: AccountInfoAccountsIndex,
 
@@ -2342,6 +2343,7 @@ impl AccountsDb {
         const ACCOUNTS_STACK_SIZE: usize = 8 * 1024 * 1024;
 
         AccountsDb {
+            second_scan: AtomicU64::default(),
             create_ancient_storage: CreateAncientStorage::Pack,
             verify_accounts_hash_in_bg: VerifyAccountsHashInBackground::default(),
             active_stats: ActiveStats::default(),
@@ -8571,7 +8573,7 @@ impl AccountsDb {
         let mut amount_to_top_off_rent = 0;
         let mut stored_size_alive = 0;
 
-        let (dirty_pubkeys, insert_time_us, mut generate_index_results) = if !secondary {
+        let (dirty_pubkeys, insert_time_us, mut generate_index_results) = {
             let mut items_local = Vec::default();
             storage.accounts.scan_index(|info| {
                 stored_size_alive += info.stored_size_aligned;
@@ -8609,49 +8611,16 @@ impl AccountsDb {
                     storage.approx_stored_count(),
                     items,
                 )
-        } else {
-            let accounts = storage.accounts.account_iter();
-            let items = accounts.map(|stored_account| {
-                stored_size_alive += stored_account.stored_size();
-                let pubkey = stored_account.pubkey();
-                self.accounts_index.update_secondary_indexes(
-                    pubkey,
-                    &stored_account,
-                    &self.account_indexes,
-                );
-                if !stored_account.is_zero_lamport() {
-                    accounts_data_len += stored_account.data().len() as u64;
-                }
-
-                if let Some(amount_to_top_off_rent_this_account) = Self::stats_for_rent_payers(
-                    pubkey,
-                    stored_account.lamports(),
-                    stored_account.data().len(),
-                    stored_account.rent_epoch(),
-                    stored_account.executable(),
-                    rent_collector,
-                ) {
-                    amount_to_top_off_rent += amount_to_top_off_rent_this_account;
-                    num_accounts_rent_paying += 1;
-                    // remember this rent-paying account pubkey
-                    rent_paying_accounts_by_partition.push(*pubkey);
-                }
-
-                (
-                    *pubkey,
-                    AccountInfo::new(
-                        StorageLocation::AppendVec(store_id, stored_account.offset()), // will never be cached
-                        stored_account.lamports(),
-                    ),
-                )
-            });
-            self.accounts_index
-                .insert_new_if_missing_into_primary_index(
-                    slot,
-                    storage.approx_stored_count(),
-                    items,
-                )
         };
+        let (_, us) = measure_us!({
+            // scan storage a second time to update the secondary index
+            let mut stored_size_alive2 = 0;
+            storage.accounts.scan_accounts(|stored_account| {
+                stored_size_alive2 += stored_account.stored_size();
+                _ = stored_account.pubkey();
+            });
+        });
+        self.second_scan.fetch_add(us, Ordering::Relaxed);
 
         if let Some(duplicates_this_slot) = std::mem::take(&mut generate_index_results.duplicates) {
             // there were duplicate pubkeys in this same slot
@@ -8904,6 +8873,8 @@ impl AccountsDb {
                 total_slots: slots.len() as u64,
                 ..GenerateIndexTimings::default()
             };
+
+            log::error!("time spent: {}", self.second_scan.load(Ordering::Relaxed));
 
             if pass == 0 {
                 #[derive(Debug, Default)]
