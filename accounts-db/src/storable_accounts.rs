@@ -530,6 +530,8 @@ pub mod tests {
                     let source_slot = starting_slot % max_slots;
 
                     let storage = setup_sample_storage(&db, source_slot);
+                    // since we're no longer storing `StoredAccountMeta`, we have to actually store the
+                    // accounts so they can be looked up later in `db`
                     if let Some(offsets) = storage
                         .accounts
                         .append_accounts(&(source_slot, &three[..]), 0)
@@ -672,6 +674,8 @@ pub mod tests {
                                     let range = overall_index..(overall_index + count);
                                     let mut result =
                                         raw2_account_from_storage[range.clone()].to_vec();
+                                    // since we're no longer storing `StoredAccountMeta`, we have to actually store the
+                                    // accounts so they can be looked up later in `db`
                                     let storage = setup_sample_storage(&db, slot);
                                     if let Some(offsets) = storage
                                         .accounts
