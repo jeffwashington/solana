@@ -558,6 +558,9 @@ impl AccountFromStorage {
         self.data_len as usize
     }
     pub fn new(account: &StoredAccountMeta) -> Self {
+        // the id is irrelevant in this account info. This structure is only used DURING shrink operations.
+        // In those cases, there is only 1 append vec id per slot when we read the accounts.
+        // Any value of storage id in account info works fine when we want the 'normal' storage.
         let storage_id = 0;
         AccountFromStorage {
             index_info: AccountInfo::new(
@@ -3801,13 +3804,17 @@ impl AccountsDb {
 
         let stored_accounts = stored_accounts
             .into_iter()
-            .map(|v| AccountFromStorage {
-                index_info: AccountInfo::new(
-                    StorageLocation::AppendVec(0, v.offset()),
-                    v.lamports(),
-                ),
-                pubkey: *v.pubkey(),
-                data_len: v.data_len() as u64,
+            .map(|account| {
+                // file_id is unused and can be anything. We will always be loading whatever storage is in the slot.
+                let file_id = 0;
+                AccountFromStorage {
+                    index_info: AccountInfo::new(
+                        StorageLocation::AppendVec(file_id, account.offset()),
+                        account.lamports(),
+                    ),
+                    pubkey: *account.pubkey(),
+                    data_len: account.data_len() as u64,
+                }
             })
             .collect::<Vec<_>>();
 
