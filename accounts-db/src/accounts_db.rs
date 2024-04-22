@@ -8575,12 +8575,21 @@ impl AccountsDb {
 
         let (dirty_pubkeys, insert_time_us, mut generate_index_results) = {
             let mut items_local = Vec::default();
-            storage.accounts.scan_index(|info| {
-                stored_size_alive += info.stored_size_aligned;
-                if info.index_info.lamports > 0 {
-                    accounts_data_len += info.index_info.data_len;
+            storage.accounts.scan_accounts(|info| {
+                stored_size_alive += info.stored_size();
+                if info.lamports() > 0 {
+                    accounts_data_len += info.data_len() as u64;
                 }
-                items_local.push(info.index_info);
+                use crate::append_vec::IndexInfoInner;
+                let index_info = IndexInfoInner {
+                    offset: info.offset(),
+                    pubkey: *info.pubkey(),
+                    lamports: info.lamports(),
+                    rent_epoch: info.rent_epoch(),
+                    executable: info.executable(),
+                    data_len: info.data_len() as u64,
+                };
+                items_local.push(index_info);
             });
             let items = items_local.into_iter().map(|info| {
                 if let Some(amount_to_top_off_rent_this_account) = Self::stats_for_rent_payers(
@@ -8612,6 +8621,7 @@ impl AccountsDb {
                     items,
                 )
         };
+        /*
         let (_, us) = measure_us!({
             // scan storage a second time to update the secondary index
             let mut stored_size_alive2 = 0;
@@ -8621,6 +8631,7 @@ impl AccountsDb {
             });
         });
         self.second_scan.fetch_add(us, Ordering::Relaxed);
+        */
 
         if let Some(duplicates_this_slot) = std::mem::take(&mut generate_index_results.duplicates) {
             // there were duplicate pubkeys in this same slot
