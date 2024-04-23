@@ -688,7 +688,10 @@ impl AppendVec {
 
     /// Iterate over all accounts and call `callback` with each account.
     #[allow(clippy::blocks_in_conditions)]
-    pub(crate) fn scan_accounts(&self, mut callback: impl for<'local> FnMut(StoredAccountMeta<'local>)) {
+    pub(crate) fn scan_accounts(
+        &self,
+        mut callback: impl for<'local> FnMut(StoredAccountMeta<'local>),
+    ) {
         let mut offset = 0;
         while self
             .get_stored_account_meta_callback(offset, |account| {

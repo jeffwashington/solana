@@ -205,7 +205,10 @@ impl AccountsFile {
     }
 
     /// Iterate over all accounts and call `callback` with each account.
-    pub(crate) fn scan_accounts(&self, callback: impl for<'local> FnMut(StoredAccountMeta<'local>)) {
+    pub(crate) fn scan_accounts(
+        &self,
+        callback: impl for<'local> FnMut(StoredAccountMeta<'local>),
+    ) {
         match self {
             Self::AppendVec(av) => av.scan_accounts(callback),
             Self::TieredStorage(ts) => {
