@@ -266,7 +266,7 @@ impl<'a> StorableAccounts<'a> for StorableAccountsBySlot<'a> {
             .db
             .storage
             .get_slot_storage_entry_shrinking_in_progress_ok(slot)
-            .unwrap();
+            .expect("source slot has to have a storage to be able to store accounts");
         let ret = call_callback(&storage);
         let mut writer = self.cached_storage.write().unwrap();
         writer.slot = slot;
