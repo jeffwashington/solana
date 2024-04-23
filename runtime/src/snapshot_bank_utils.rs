@@ -31,6 +31,7 @@ use {
             AccountShrinkThreshold, AccountStorageEntry, AccountsDbConfig, AtomicAccountsFileId,
             CalcAccountsHashDataSource,
         },
+        accounts_file::StorageAccess,
         accounts_hash::AccountsHash,
         accounts_index::AccountSecondaryIndexes,
         accounts_update_notifier_interface::AccountsUpdateNotifier,
@@ -231,6 +232,7 @@ pub struct BankFromDirTimings {
 pub fn bank_fields_from_snapshot_archives(
     full_snapshot_archives_dir: impl AsRef<Path>,
     incremental_snapshot_archives_dir: impl AsRef<Path>,
+    storage_access: StorageAccess,
 ) -> snapshot_utils::Result<BankFieldsToDeserialize> {
     let full_snapshot_archive_info =
         get_highest_full_snapshot_archive_info(&full_snapshot_archives_dir).ok_or_else(|| {
@@ -253,6 +255,7 @@ pub fn bank_fields_from_snapshot_archives(
             &full_snapshot_archive_info,
             incremental_snapshot_archive_info.as_ref(),
             &account_paths,
+            storage_access,
         )?;
 
     bank_fields_from_snapshots(
@@ -306,6 +309,10 @@ pub fn bank_from_snapshot_archives(
             full_snapshot_archive_info,
             incremental_snapshot_archive_info,
             account_paths,
+            accounts_db_config
+                .as_ref()
+                .map(|config| config.storage_access)
+                .unwrap_or_default(),
         )?;
 
     let mut storage = unarchived_full_snapshot.storage;
@@ -496,6 +503,7 @@ pub fn bank_from_snapshot_dir(
     accounts_db_config: Option<AccountsDbConfig>,
     accounts_update_notifier: Option<AccountsUpdateNotifier>,
     exit: Arc<AtomicBool>,
+    storage_access: StorageAccess,
 ) -> snapshot_utils::Result<(Bank, BankFromDirTimings)> {
     info!(
         "Loading bank from snapshot dir: {}",
@@ -514,7 +522,8 @@ pub fn bank_from_snapshot_dir(
         rebuild_storages_from_snapshot_dir(
             bank_snapshot,
             account_paths,
-            next_append_vec_id.clone()
+            next_append_vec_id.clone(),
+            storage_access,
         )?,
         "rebuild storages from snapshot dir"
     );
@@ -583,7 +592,10 @@ pub fn bank_from_latest_snapshot_dir(
     let bank_snapshot = get_highest_bank_snapshot_post(&bank_snapshots_dir).ok_or_else(|| {
         SnapshotError::NoSnapshotSlotDir(bank_snapshots_dir.as_ref().to_path_buf())
     })?;
-
+    let storage_access = accounts_db_config
+        .as_ref()
+        .map(|config| config.storage_access)
+        .unwrap_or_default();
     let (bank, _) = bank_from_snapshot_dir(
         account_paths,
         &bank_snapshot,
@@ -598,6 +610,7 @@ pub fn bank_from_latest_snapshot_dir(
         accounts_db_config,
         accounts_update_notifier,
         exit,
+        storage_access,
     )?;
 
     Ok(bank)
