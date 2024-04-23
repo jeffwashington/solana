@@ -182,7 +182,7 @@ pub struct StorableAccountsBySlot<'a> {
     len: usize,
     db: &'a AccountsDb,
     /// remember the last storage we looked up for a given slot
-    pub cache_slot_to_storage: RwLock<StorableAccountsCacher>,
+    cached_storage: RwLock<StorableAccountsCacher>,
 }
 
 impl<'a> StorableAccountsBySlot<'a> {
@@ -211,7 +211,7 @@ impl<'a> StorableAccountsBySlot<'a> {
             contains_multiple_slots,
             len: cumulative_len,
             db,
-            cache_slot_to_storage: RwLock::default(),
+            cached_storage: RwLock::default(),
         }
     }
     /// given an overall index for all accounts in self:
@@ -253,7 +253,7 @@ impl<'a> StorableAccounts<'a> for StorableAccountsBySlot<'a> {
                 .expect("account has to exist to be able to store it")
         };
         {
-            let reader = self.cache_slot_to_storage.read().unwrap();
+            let reader = self.cached_storage.read().unwrap();
             if reader.slot == slot {
                 if let Some(storage) = reader.storage.as_ref() {
                     return call_callback(storage);
@@ -268,7 +268,7 @@ impl<'a> StorableAccounts<'a> for StorableAccountsBySlot<'a> {
             .get_slot_storage_entry_shrinking_in_progress_ok(slot)
             .unwrap();
         let ret = call_callback(&storage);
-        let mut writer = self.cache_slot_to_storage.write().unwrap();
+        let mut writer = self.cached_storage.write().unwrap();
         writer.slot = slot;
         writer.storage = Some(storage);
         ret
