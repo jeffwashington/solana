@@ -466,8 +466,8 @@ impl AppendVec {
 
         Ok(AppendVec {
             path,
-            backing: AppendVecFileBacking::MapOnly(map),
-            // backing: AppendVecFileBacking::FileOrMap(RwLock::new(FileOrMMap::Map(map))),
+            // backing: AppendVecFileBacking::MapOnly(map),
+            backing: AppendVecFileBacking::FileOrMap(RwLock::new(FileOrMMap::Map(map))),
             append_lock: Mutex::new(()),
             current_len: AtomicUsize::new(current_len),
             file_size,
