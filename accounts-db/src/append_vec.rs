@@ -482,19 +482,40 @@ impl AppendVec {
         let mut num_accounts = 0;
         let mut matches = true;
         let mut last_offset = 0;
-        log::error!("sanitize: {:?}, len: {}", self.path, self.current_len.load(Ordering::Acquire));
+        log::error!(
+            "sanitize: {:?}, len: {}",
+            self.path,
+            self.current_len.load(Ordering::Acquire)
+        );
 
         let result = self.scan_accounts(|account| {
-            log::error!("{}, {}, {}, {}, {}", self.file_size, account.pubkey(), account.lamports(), account.stored_size(), num_accounts);
+            log::error!(
+                "{}, {}, {}, {}, {}",
+                self.file_size,
+                account.pubkey(),
+                account.lamports(),
+                account.stored_size(),
+                num_accounts
+            );
             if !matches {
                 return;
             }
-            if !account.sanitize() { // 44533-44536
-                log::error!("failed to sanitize, {}, {account:?}, {:?}", num_accounts, self.path);
+            if !account.sanitize() {
+                // 44533-44536
+                log::error!(
+                    "failed to sanitize, {}, {account:?}, {:?}",
+                    num_accounts,
+                    self.path
+                );
                 matches = false;
-                log::error!("{}, {:?}, {:?}", line!(), self.path, (last_offset, self.current_len.load(Ordering::Acquire)));
-                while true {};
-                    return;
+                log::error!(
+                    "{}, {:?}, {:?}",
+                    line!(),
+                    self.path,
+                    (last_offset, self.current_len.load(Ordering::Acquire))
+                );
+                while true {}
+                return;
             }
             last_offset = account.offset() + account.stored_size();
             num_accounts += 1;
@@ -509,9 +530,12 @@ impl AppendVec {
         let aligned_current_len = u64_align!(self.current_len.load(Ordering::Acquire));
 
         if last_offset != aligned_current_len {
-            log::error!("{:?}, {:?}", self.path, (last_offset, aligned_current_len));
-            while true {};
-   
+            log::error!(
+                "{:?}, {:?} STALLING",
+                self.path,
+                (last_offset, aligned_current_len)
+            );
+            while true {}
         }
         assert_eq!(last_offset, aligned_current_len);
 
@@ -660,6 +684,41 @@ impl AppendVec {
         panic!("");
     }
 
+    /// return true on success
+    fn read_buffer(
+        &self,
+        file: &File,
+        start_offset: usize,
+        buffer: &mut [u8],
+    ) -> std::io::Result<usize> {
+        let mut offset = start_offset;
+        let mut start_read = 0;
+        let mut bytes_read = 0;
+        if start_offset >= self.len() {
+            return Ok((0));
+        }
+
+        while start_read < buffer.len() {
+            let bytes_read_this_time = file.read_at(&mut buffer[start_read..], offset as u64)?;
+            if bytes_read_this_time == buffer.len() {
+                bytes_read = bytes_read_this_time;
+                break;
+            }
+            bytes_read += bytes_read_this_time;
+            if bytes_read + start_offset >= self.len() {
+                log::error!("{:?}", (bytes_read, start_offset, self.len(), bytes_read + start_offset));
+                bytes_read -= (bytes_read + start_offset) - self.len();
+                // we've read all there is in the file
+                break;
+            }
+            // more to read. `read_at` returned partial results
+            start_read += bytes_read_this_time;
+            offset += bytes_read_this_time;
+            log::error!("reading more: {:?}", (start_read, buffer.len(), bytes_read, bytes_read_this_time, self.len(), start_offset, offset));
+        }
+        Ok(bytes_read)
+    }
+
     /// calls `callback` with the account located at the specified index offset.
     pub fn get_stored_account_meta_callback<Ret>(
         &self,
@@ -671,36 +730,15 @@ impl AppendVec {
                 log::error!("offset > len: {:?}", (offset, map.len()));
                 return None;
             }
-            if offset >= 46288 {
-                log::error!("{}", line!());
-            }
             let (meta, next): (&StoredMeta, _) = Self::get_type_internal(map, offset)?;
-            if offset >= 46288 {
-                log::error!("{}", line!());
-            }
             let (account_meta, next): (&AccountMeta, _) = Self::get_type_internal(map, next)?;
-            /* if offset >= 46288 */ {
-                let executable_bool: &bool = &account_meta.executable;
-                let executable_bool_ptr = ptr::from_ref(executable_bool);
-                // UNSAFE: Force to interpret mmap-backed bool as u8 to really read the actual memory content
-                let executable_byte: &u8 = unsafe { &*(executable_bool_ptr.cast()) };
-                
-        
-                log::error!("{}, {next}, {}", line!(), executable_byte);
-            }
             let (hash, next): (&AccountHash, _) = Self::get_type_internal(map, next)?;
-            if offset >= 46288 {
-                log::error!("{}, {:?}", line!(), (next, meta.data_len, next + meta.data_len as usize));
-            }
             let (data, next) = Self::get_slice_internal(
                 map,
                 next,
                 meta.data_len as usize,
                 next + meta.data_len as usize,
             )?;
-            if offset >= 46288 {
-                log::error!("{}", line!());
-            }
             let stored_size = next - offset;
             Some(callback(StoredAccountMeta::AppendVec(
                 AppendVecStoredAccountMeta {
@@ -718,20 +756,29 @@ impl AppendVec {
                 let file_or_map = file.read().unwrap();
                 match &file_or_map as &FileOrMMap {
                     FileOrMMap::File(file) => {
+                        log::error!("{}, {offset}, len: {}", line!(), self.len());
                         let mut buf = [0u8; 4096];
-                        if let Ok(bytes_read) = file.read_at(&mut buf, offset as u64) {
+                        if let Ok(bytes_read) = self.read_buffer(file, offset as usize, &mut buf) {
+                            let valid_bytes = &buf[..bytes_read];
+                            log::error!(
+                                "{}, {}, {}, all are zero: {}",
+                                line!(),
+                                bytes_read,
+                                buf.len(),
+                                !buf.iter().take(136).any(|x| x != &0)
+                            );
                             if bytes_read >= STORE_META_OVERHEAD {
                                 let (meta, next): (&StoredMeta, _) =
-                                    Self::get_type_internal(&buf, 0)?;
+                                    Self::get_type_internal(valid_bytes, 0)?;
                                 let (account_meta, next): (&AccountMeta, _) =
-                                    Self::get_type_internal(&buf, next)?;
+                                    Self::get_type_internal(valid_bytes, next)?;
                                 let (hash, mut next): (&AccountHash, _) =
-                                    Self::get_type_internal(&buf, next)?;
+                                    Self::get_type_internal(valid_bytes, next)?;
                                 let data_len = meta.data_len;
                                 if bytes_read - next >= data_len as usize {
                                     // we already read enough data to load this account
                                     let (data, next) = Self::get_slice_internal(
-                                        &buf,
+                                        valid_bytes,
                                         next,
                                         meta.data_len as usize,
                                         next + meta.data_len as usize,
@@ -746,36 +793,39 @@ impl AppendVec {
                                             stored_size,
                                             hash,
                                         });
+                                    log::error!("{}", line!());
                                     return Some(callback(account));
                                 } else {
-                                    let mut buf = (0..data_len).map(|_| 0u8).collect::<Vec<_>>();
-                                    if let Ok(bytes_read) = file.read_at(&mut buf, next as u64) {
-                                        if bytes_read < data_len as usize {
-                                            return None;
-                                        }
-                                    }
-                                    next = 0;
                                     // not enough was read from file to get `data`
-                                    let (data, next) = Self::get_slice_internal(
-                                        &buf,
-                                        next,
-                                        meta.data_len as usize,
-                                        next + meta.data_len as usize,
-                                    )?;
-                                    let stored_size = next;
+                                    if next + (data_len as usize) > self.len() {
+                                        return None;
+                                    }
+                                    assert!(data_len <= 10_000_000, "{}", data_len);
+                                    let mut data = (0..data_len).map(|_| 0u8).collect::<Vec<_>>();
+                                    let Ok(bytes_read) =
+                                        self.read_buffer(file, offset as usize, &mut data)
+                                    else {
+                                        return None;
+                                    };
+                                    log::error!("{}", line!());
+                                    let stored_size = aligned_stored_size(data_len as usize);
                                     let account =
                                         StoredAccountMeta::AppendVec(AppendVecStoredAccountMeta {
                                             meta,
                                             account_meta,
-                                            data,
+                                            data: &data[..],
                                             offset,
                                             stored_size,
                                             hash,
                                         });
+                                    log::error!("{}", line!());
                                     return Some(callback(account));
                                 }
+                            } else {
+                                log::error!("{}", line!());
                             }
                         }
+                        log::error!("{}", line!());
                         return None;
                     }
                     FileOrMMap::Map(map) => with_map(&map[..self.len()]),
@@ -944,15 +994,22 @@ impl AppendVec {
             .get_stored_account_meta_callback(offset, |account| {
                 offset += account.stored_size();
                 if account.is_zero_lamport() && account.pubkey() == &Pubkey::default() {
+                    log::error!(
+                        "zerod: {}, offset: {offset}, account: {:?}",
+                        line!(),
+                        account
+                    );
                     // we passed the last useful account
-                    return false;
+                    // return false;
                 }
 
+                log::error!("{}", line!());
                 callback(account);
                 true
             })
             .unwrap_or_default()
         {}
+        log::error!("{}", line!());
     }
 
     /// for each offset in `sorted_offsets`, get the size of the account. No other information is needed for the account.
