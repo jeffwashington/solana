@@ -40,25 +40,27 @@ fn main() {
     // When the AppendVec is dropped, the backing file will be removed.  We do not want to remove
     // the backing file here in the store-tool, so prevent dropping.
     let store = ManuallyDrop::new(
-        AppendVec::new_from_file_unchecked(file, len).expect("new AppendVec from file"),
+        AppendVec::new_from_file_unchecked(file, len, solana_accounts_db::accounts_file::StorageAccess::MMap).expect("new AppendVec from file"),
     );
     info!("store: len: {} capacity: {}", store.len(), store.capacity());
     let mut num_accounts: usize = 0;
     let mut stored_accounts_len: usize = 0;
-    for account in store.account_iter() {
+    store.scan_accounts(|account| {
         if is_account_zeroed(&account) {
-            break;
+            log::error!("zeroed");
+            return;
         }
         info!(
-            "  account: {:?} lamports: {} data: {} hash: {:?}",
+            "  account: {:?} lamports: {} data: {} hash: {:?}, exe: {}",
             account.pubkey(),
             account.lamports(),
             account.data_len(),
-            account.hash()
+            account.hash(),
+            account.executable(),
         );
         num_accounts = num_accounts.saturating_add(1);
         stored_accounts_len = stored_accounts_len.saturating_add(account.stored_size());
-    }
+    });
     info!(
         "num_accounts: {} stored_accounts_len: {}",
         num_accounts, stored_accounts_len

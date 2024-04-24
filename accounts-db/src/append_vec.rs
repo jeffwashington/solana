@@ -163,6 +163,7 @@ impl<'append_vec> AppendVecStoredAccountMeta<'append_vec> {
     }
 
     fn sanitize_executable(&self) -> bool {
+        // log::error!("exec: {}", self.ref_executable_byte());
         // Sanitize executable to ensure higher 7-bits are cleared correctly.
         self.ref_executable_byte() & !1 == 0
     }
@@ -465,8 +466,8 @@ impl AppendVec {
 
         Ok(AppendVec {
             path,
-            // backing: AppendVecFileBacking::MapOnly(map),
-            backing: AppendVecFileBacking::FileOrMap(RwLock::new(FileOrMMap::Map(map))),
+            backing: AppendVecFileBacking::MapOnly(map),
+            // backing: AppendVecFileBacking::FileOrMap(RwLock::new(FileOrMMap::Map(map))),
             append_lock: Mutex::new(()),
             current_len: AtomicUsize::new(current_len),
             file_size,
@@ -482,23 +483,38 @@ impl AppendVec {
         let mut num_accounts = 0;
         let mut matches = true;
         let mut last_offset = 0;
+        // log::error!("sanitize: {:?}, len: {}", self.path, self.current_len.load(Ordering::Acquire));
+
         let result = self.scan_accounts(|account| {
+            // log::error!("{}, {}, {}, {}, {}", self.file_size, account.pubkey(), account.lamports(), account.stored_size(), num_accounts);
             if !matches {
                 return;
             }
-            if !account.sanitize() {
-                log::error!("failed to sanitize, {}, {account:?}, {:?}", num_accounts, self.path);
+            if !account.sanitize() { // 44533-44536
+                // log::error!("failed to sanitize, {}, {account:?}, {:?}", num_accounts, self.path);
                 matches = false;
-                return;
+                // log::error!("{}, {:?}, {:?}", line!(), self.path, (last_offset, self.current_len.load(Ordering::Acquire)));
+                while true {};
+                    return;
             }
             last_offset = account.offset() + account.stored_size();
             num_accounts += 1;
         });
+        if matches && num_accounts == 88 {
+            // // log::error!("sanitized, {}, {:?}", num_accounts, self.path);
+        }
         if !matches {
-            log::error!("failed to match, {num_accounts}");
+            // // log::error!("failed to match, {num_accounts}");
             return (false, num_accounts);
         }
         let aligned_current_len = u64_align!(self.current_len.load(Ordering::Acquire));
+
+        if last_offset != aligned_current_len {
+            // log::error!("{:?}, {:?}", self.path, (last_offset, aligned_current_len));
+            while true {};
+   
+        }
+        assert_eq!(last_offset, aligned_current_len);
 
         (last_offset == aligned_current_len, num_accounts)
     }
@@ -539,7 +555,8 @@ impl AppendVec {
         size: usize,
         next: usize,
     ) -> Option<(&[u8], usize)> {
-        if offset >= slice.len() || next >= slice.len() {
+        if next > slice.len() {
+            // log::error!("{}, {:?}", line!(), (offset, slice.len(), next));
             return None;
         }
 
@@ -627,6 +644,7 @@ impl AppendVec {
         let size = mem::size_of::<T>();
         let (next, overflow) = offset.overflowing_add(size);
         if overflow || next > slice.len() {
+            // log::error!("{}, {:?}", line!(), (overflow, next, slice.len()));
             return None;
         }
         let (data, next) = Self::get_slice_internal(slice, offset, mem::size_of::<T>(), next)?;
@@ -651,17 +669,39 @@ impl AppendVec {
     ) -> Option<Ret> {
         let mut with_map = |map: &[u8]| {
             if offset >= map.len() {
+                // log::error!("offset > len: {:?}", (offset, map.len()));
                 return None;
             }
+            if offset >= 46288 {
+                // log::error!("{}", line!());
+            }
             let (meta, next): (&StoredMeta, _) = Self::get_type_internal(map, offset)?;
+            if offset >= 46288 {
+                // log::error!("{}", line!());
+            }
             let (account_meta, next): (&AccountMeta, _) = Self::get_type_internal(map, next)?;
+            /* if offset >= 46288 */ {
+                let executable_bool: &bool = &account_meta.executable;
+                let executable_bool_ptr = ptr::from_ref(executable_bool);
+                // UNSAFE: Force to interpret mmap-backed bool as u8 to really read the actual memory content
+                let executable_byte: &u8 = unsafe { &*(executable_bool_ptr.cast()) };
+                
+        
+                // log::error!("{}, {next}, {}", line!(), executable_byte);
+            }
             let (hash, next): (&AccountHash, _) = Self::get_type_internal(map, next)?;
+            if offset >= 46288 {
+                // log::error!("{}, {:?}", line!(), (next, meta.data_len, next + meta.data_len as usize));
+            }
             let (data, next) = Self::get_slice_internal(
                 map,
                 next,
                 meta.data_len as usize,
                 next + meta.data_len as usize,
             )?;
+            if offset >= 46288 {
+                // log::error!("{}", line!());
+            }
             let stored_size = next - offset;
             Some(callback(StoredAccountMeta::AppendVec(
                 AppendVecStoredAccountMeta {
@@ -739,10 +779,10 @@ impl AppendVec {
                         }
                         return None;
                     }
-                    FileOrMMap::Map(map) => with_map(map),
+                    FileOrMMap::Map(map) => with_map(&map[..self.len()]),
                 }
             }
-            AppendVecFileBacking::MapOnly(map) => with_map(map),
+            AppendVecFileBacking::MapOnly(map) => with_map(&map[..self.len()]),
         }
     }
 
@@ -890,19 +930,16 @@ impl AppendVec {
                             }
                         }
                     }
-                    FileOrMMap::Map(map) => using_map(map),
+                    FileOrMMap::Map(map) => using_map(&map[..self.len()]),
                 }
             }
-            AppendVecFileBacking::MapOnly(map) => using_map(map),
+            AppendVecFileBacking::MapOnly(map) => using_map(&map[..self.len()]),
         }
     }
 
     /// Iterate over all accounts and call `callback` with each account.
     #[allow(clippy::blocks_in_conditions)]
-    pub(crate) fn scan_accounts(
-        &self,
-        mut callback: impl for<'local> FnMut(StoredAccountMeta<'local>),
-    ) {
+    pub fn scan_accounts(&self, mut callback: impl for<'a> FnMut(StoredAccountMeta<'a>)) {
         let mut offset = 0;
         while self
             .get_stored_account_meta_callback(offset, |account| {
@@ -934,6 +971,7 @@ impl AppendVec {
                         }
                     }
                     FileOrMMap::Map(map) => {
+                        let map = &map[..self.len()];
                         for &offset in sorted_offsets {
                             let Some((stored_meta, _)) =
                                 Self::get_type_internal::<StoredMeta>(map, offset)
@@ -951,6 +989,7 @@ impl AppendVec {
                 }
             }
             AppendVecFileBacking::MapOnly(map) => {
+                let map = &map[..self.len()];
                 for &offset in sorted_offsets {
                     let Some((stored_meta, _)) = Self::get_type_internal::<StoredMeta>(map, offset)
                     else {
@@ -991,6 +1030,7 @@ impl AppendVec {
                         }
                     },
                     FileOrMMap::Map(map) => {
+                        let map = &map[..self.len()];
                         loop {
                             let Some((stored_meta, _)) =
                                 Self::get_type_internal::<StoredMeta>(map, offset)
@@ -1010,6 +1050,7 @@ impl AppendVec {
                 }
             }
             AppendVecFileBacking::MapOnly(map) => {
+                let map = &map[..self.len()];
                 loop {
                     let Some((stored_meta, _)) = Self::get_type_internal::<StoredMeta>(map, offset)
                     else {
