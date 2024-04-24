@@ -163,7 +163,7 @@ impl<'append_vec> AppendVecStoredAccountMeta<'append_vec> {
     }
 
     fn sanitize_executable(&self) -> bool {
-        // log::error!("exec: {}", self.ref_executable_byte());
+        log::error!("exec: {}", self.ref_executable_byte());
         // Sanitize executable to ensure higher 7-bits are cleared correctly.
         self.ref_executable_byte() & !1 == 0
     }
@@ -483,17 +483,17 @@ impl AppendVec {
         let mut num_accounts = 0;
         let mut matches = true;
         let mut last_offset = 0;
-        // log::error!("sanitize: {:?}, len: {}", self.path, self.current_len.load(Ordering::Acquire));
+        log::error!("sanitize: {:?}, len: {}", self.path, self.current_len.load(Ordering::Acquire));
 
         let result = self.scan_accounts(|account| {
-            // log::error!("{}, {}, {}, {}, {}", self.file_size, account.pubkey(), account.lamports(), account.stored_size(), num_accounts);
+            log::error!("{}, {}, {}, {}, {}", self.file_size, account.pubkey(), account.lamports(), account.stored_size(), num_accounts);
             if !matches {
                 return;
             }
             if !account.sanitize() { // 44533-44536
-                // log::error!("failed to sanitize, {}, {account:?}, {:?}", num_accounts, self.path);
+                log::error!("failed to sanitize, {}, {account:?}, {:?}", num_accounts, self.path);
                 matches = false;
-                // log::error!("{}, {:?}, {:?}", line!(), self.path, (last_offset, self.current_len.load(Ordering::Acquire)));
+                log::error!("{}, {:?}, {:?}", line!(), self.path, (last_offset, self.current_len.load(Ordering::Acquire)));
                 while true {};
                     return;
             }
@@ -501,16 +501,16 @@ impl AppendVec {
             num_accounts += 1;
         });
         if matches && num_accounts == 88 {
-            // // log::error!("sanitized, {}, {:?}", num_accounts, self.path);
+            // log::error!("sanitized, {}, {:?}", num_accounts, self.path);
         }
         if !matches {
-            // // log::error!("failed to match, {num_accounts}");
+            // log::error!("failed to match, {num_accounts}");
             return (false, num_accounts);
         }
         let aligned_current_len = u64_align!(self.current_len.load(Ordering::Acquire));
 
         if last_offset != aligned_current_len {
-            // log::error!("{:?}, {:?}", self.path, (last_offset, aligned_current_len));
+            log::error!("{:?}, {:?}", self.path, (last_offset, aligned_current_len));
             while true {};
    
         }
@@ -556,7 +556,7 @@ impl AppendVec {
         next: usize,
     ) -> Option<(&[u8], usize)> {
         if next > slice.len() {
-            // log::error!("{}, {:?}", line!(), (offset, slice.len(), next));
+            log::error!("{}, {:?}", line!(), (offset, slice.len(), next));
             return None;
         }
 
@@ -644,7 +644,7 @@ impl AppendVec {
         let size = mem::size_of::<T>();
         let (next, overflow) = offset.overflowing_add(size);
         if overflow || next > slice.len() {
-            // log::error!("{}, {:?}", line!(), (overflow, next, slice.len()));
+            log::error!("{}, {:?}", line!(), (overflow, next, slice.len()));
             return None;
         }
         let (data, next) = Self::get_slice_internal(slice, offset, mem::size_of::<T>(), next)?;
@@ -669,15 +669,15 @@ impl AppendVec {
     ) -> Option<Ret> {
         let mut with_map = |map: &[u8]| {
             if offset >= map.len() {
-                // log::error!("offset > len: {:?}", (offset, map.len()));
+                log::error!("offset > len: {:?}", (offset, map.len()));
                 return None;
             }
             if offset >= 46288 {
-                // log::error!("{}", line!());
+                log::error!("{}", line!());
             }
             let (meta, next): (&StoredMeta, _) = Self::get_type_internal(map, offset)?;
             if offset >= 46288 {
-                // log::error!("{}", line!());
+                log::error!("{}", line!());
             }
             let (account_meta, next): (&AccountMeta, _) = Self::get_type_internal(map, next)?;
             /* if offset >= 46288 */ {
@@ -687,11 +687,11 @@ impl AppendVec {
                 let executable_byte: &u8 = unsafe { &*(executable_bool_ptr.cast()) };
                 
         
-                // log::error!("{}, {next}, {}", line!(), executable_byte);
+                log::error!("{}, {next}, {}", line!(), executable_byte);
             }
             let (hash, next): (&AccountHash, _) = Self::get_type_internal(map, next)?;
             if offset >= 46288 {
-                // log::error!("{}, {:?}", line!(), (next, meta.data_len, next + meta.data_len as usize));
+                log::error!("{}, {:?}", line!(), (next, meta.data_len, next + meta.data_len as usize));
             }
             let (data, next) = Self::get_slice_internal(
                 map,
@@ -700,7 +700,7 @@ impl AppendVec {
                 next + meta.data_len as usize,
             )?;
             if offset >= 46288 {
-                // log::error!("{}", line!());
+                log::error!("{}", line!());
             }
             let stored_size = next - offset;
             Some(callback(StoredAccountMeta::AppendVec(
