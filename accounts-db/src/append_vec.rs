@@ -163,7 +163,6 @@ impl<'append_vec> AppendVecStoredAccountMeta<'append_vec> {
     }
 
     fn sanitize_executable(&self) -> bool {
-        log::error!("exec: {}", self.ref_executable_byte());
         // Sanitize executable to ensure higher 7-bits are cleared correctly.
         self.ref_executable_byte() & !1 == 0
     }

@@ -1453,9 +1453,9 @@ fn unarchive_snapshot(
         parallel_divisions,
     );
 
-    let num_rebuilder_threads = num_cpus::get_physical()
+    let num_rebuilder_threads = 1; /* num_cpus::get_physical()
         .saturating_sub(parallel_divisions)
-        .max(1);
+        .max(1); */
     let (version_and_storages, measure_untar) = measure!(
         SnapshotStorageRebuilder::rebuild_storage(
             file_receiver,
@@ -1580,7 +1580,7 @@ pub fn rebuild_storages_from_snapshot_dir(
         account_paths,
     )?;
 
-    let num_rebuilder_threads = num_cpus::get_physical().saturating_sub(1).max(1);
+    let num_rebuilder_threads = 1; // num_cpus::get_physical().saturating_sub(1).max(1);
     let version_and_storages = SnapshotStorageRebuilder::rebuild_storage(
         file_receiver,
         num_rebuilder_threads,
