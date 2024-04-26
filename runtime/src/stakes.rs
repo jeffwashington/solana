@@ -241,6 +241,7 @@ impl Stakes<StakeAccount> {
             // but it does it in background threads, so effectively it's faster.
             .try_fold(ImHashMap::new, |mut map, (pubkey, delegation)| {
                 let Some(stake_account) = get_account(pubkey) else {
+                    log::error!("{}", line!());
                     return Err(Error::StakeAccountNotFound(*pubkey));
                 };
 
@@ -265,6 +266,7 @@ impl Stakes<StakeAccount> {
                     map.insert(*pubkey, stake_account);
                     Ok(map)
                 } else {
+                    log::error!("{}", line!());
                     Err(Error::InvalidDelegation(*pubkey))
                 }
             })
@@ -276,6 +278,7 @@ impl Stakes<StakeAccount> {
         // (sub 2s) improvements.
         for (pubkey, vote_account) in stakes.vote_accounts.iter() {
             let Some(account) = get_account(pubkey) else {
+                log::error!("{}", line!());
                 return Err(Error::VoteAccountNotFound(*pubkey));
             };
             let vote_account = vote_account.account();

@@ -803,7 +803,7 @@ impl AppendVec {
                                     assert!(data_len <= 20_000_000, "{}", data_len);
                                     let mut data = (0..data_len).map(|_| 0u8).collect::<Vec<_>>();
                                     let Ok(bytes_read) =
-                                        self.read_buffer(file, offset as usize, &mut data)
+                                        self.read_buffer(file, offset as usize + next, &mut data)
                                     else {
                                         return None;
                                     };
