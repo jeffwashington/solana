@@ -509,7 +509,7 @@ impl AppendVec {
                 );
                 matches = false;
                 log::error!(
-                    "{}, {:?}, {:?}",
+                    "stalling {}, {:?}, {:?}",
                     line!(),
                     self.path,
                     (last_offset, self.current_len.load(Ordering::Acquire))
@@ -579,7 +579,7 @@ impl AppendVec {
         next: usize,
     ) -> Option<(&[u8], usize)> {
         if next > slice.len() {
-            log::error!("{}, {:?}", line!(), (offset, slice.len(), next));
+            // log::error!("{}, {:?}", line!(), (offset, slice.len(), next));
             return None;
         }
 
@@ -706,7 +706,7 @@ impl AppendVec {
             }
             bytes_read += bytes_read_this_time;
             if bytes_read + start_offset >= self.len() {
-                log::error!("{:?}", (bytes_read, start_offset, self.len(), bytes_read + start_offset));
+                // log::error!("{:?}", (bytes_read, start_offset, self.len(), bytes_read + start_offset));
                 bytes_read -= (bytes_read + start_offset) - self.len();
                 // we've read all there is in the file
                 break;
