@@ -489,14 +489,14 @@ impl AppendVec {
         );
 
         let result = self.scan_accounts(|account| {
-            log::error!(
-                "{}, {}, {}, {}, {}",
-                self.file_size,
-                account.pubkey(),
-                account.lamports(),
-                account.stored_size(),
-                num_accounts
-            );
+     //       log::error!(
+       //         "{}, {}, {}, {}, {}",
+         //       self.file_size,
+     //           account.pubkey(),
+       //         account.lamports(),
+         //       account.stored_size(),
+           //     num_accounts
+         //   );
             if !matches {
                 return;
             }
@@ -756,17 +756,17 @@ impl AppendVec {
                 let file_or_map = file.read().unwrap();
                 match &file_or_map as &FileOrMMap {
                     FileOrMMap::File(file) => {
-                        log::error!("{}, {offset}, len: {}", line!(), self.len());
+//                        log::error!("{}, {offset}, len: {}", line!(), self.len());
                         let mut buf = [0u8; 4096];
                         if let Ok(bytes_read) = self.read_buffer(file, offset as usize, &mut buf) {
                             let valid_bytes = &buf[..bytes_read];
-                            log::error!(
-                                "{}, {}, {}, all are zero: {}",
-                                line!(),
-                                bytes_read,
-                                buf.len(),
-                                !buf.iter().take(136).any(|x| x != &0)
-                            );
+//                            log::error!(
+  //                              "{}, {}, {}, all are zero: {}",
+    //                            line!(),
+      //                          bytes_read,
+        //                        buf.len(),
+          //                      !buf.iter().take(136).any(|x| x != &0)
+            //                );
                             if bytes_read >= STORE_META_OVERHEAD {
                                 let (meta, next): (&StoredMeta, _) =
                                     Self::get_type_internal(valid_bytes, 0)?;
@@ -793,7 +793,7 @@ impl AppendVec {
                                             stored_size,
                                             hash,
                                         });
-                                    log::error!("{}", line!());
+                       //             log::error!("{}", line!());
                                     return Some(callback(account));
                                 } else {
                                     // not enough was read from file to get `data`
@@ -807,7 +807,7 @@ impl AppendVec {
                                     else {
                                         return None;
                                     };
-                                    log::error!("{}", line!());
+                         //           log::error!("{}", line!());
                                     let stored_size = aligned_stored_size(data_len as usize);
                                     let account =
                                         StoredAccountMeta::AppendVec(AppendVecStoredAccountMeta {
@@ -818,7 +818,7 @@ impl AppendVec {
                                             stored_size,
                                             hash,
                                         });
-                                    log::error!("{}", line!());
+                         //           log::error!("{}", line!());
                                     return Some(callback(account));
                                 }
                             } else {
@@ -994,16 +994,16 @@ impl AppendVec {
             .get_stored_account_meta_callback(offset, |account| {
                 offset += account.stored_size();
                 if account.is_zero_lamport() && account.pubkey() == &Pubkey::default() {
-                    log::error!(
-                        "zerod: {}, offset: {offset}, account: {:?}",
-                        line!(),
-                        account
-                    );
+       //             log::error!(
+         //               "zerod: {}, offset: {offset}, account: {:?}",
+           //             line!(),
+             //           account
+               //     );
                     // we passed the last useful account
                     // return false;
                 }
 
-                log::error!("{}", line!());
+//                log::error!("{}", line!());
                 callback(account);
                 true
             })
