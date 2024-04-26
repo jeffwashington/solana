@@ -1580,7 +1580,7 @@ pub fn rebuild_storages_from_snapshot_dir(
         account_paths,
     )?;
 
-    let num_rebuilder_threads = 1; // num_cpus::get_physical().saturating_sub(1).max(1);
+    let num_rebuilder_threads = num_cpus::get_physical().saturating_sub(1).max(1);
     let version_and_storages = SnapshotStorageRebuilder::rebuild_storage(
         file_receiver,
         num_rebuilder_threads,
