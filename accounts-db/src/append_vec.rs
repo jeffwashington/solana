@@ -482,11 +482,11 @@ impl AppendVec {
         let mut num_accounts = 0;
         let mut matches = true;
         let mut last_offset = 0;
-        log::error!(
-            "sanitize: {:?}, len: {}",
-            self.path,
-            self.current_len.load(Ordering::Acquire)
-        );
+    //    log::error!(
+     //       "sanitize: {:?}, len: {}",
+      //      self.path,
+       //     self.current_len.load(Ordering::Acquire)
+      //  );
 
         let result = self.scan_accounts(|account| {
      //       log::error!(
@@ -822,10 +822,10 @@ impl AppendVec {
                                     return Some(callback(account));
                                 }
                             } else {
-                                log::error!("{}", line!());
+                        //        log::error!("{}", line!());
                             }
                         }
-                        log::error!("{}", line!());
+                      //  log::error!("{}", line!());
                         return None;
                     }
                     FileOrMMap::Map(map) => with_map(&map[..self.len()]),
@@ -1009,7 +1009,7 @@ impl AppendVec {
             })
             .unwrap_or_default()
         {}
-        log::error!("{}", line!());
+ //       log::error!("{}", line!());
     }
 
     /// for each offset in `sorted_offsets`, get the size of the account. No other information is needed for the account.
