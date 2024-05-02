@@ -24,7 +24,7 @@ mod tests {
                 get_temp_accounts_paths, AccountShrinkThreshold, AccountStorageEntry, AccountsDb,
                 AtomicAccountsFileId,
             },
-            accounts_file::{AccountsFile, AccountsFileError},
+            accounts_file::{AccountsFile, AccountsFileError, StorageAccess},
             accounts_hash::{AccountsDeltaHash, AccountsHash},
             accounts_index::AccountSecondaryIndexes,
             epoch_accounts_hash::EpochAccountsHash,
@@ -44,12 +44,14 @@ mod tests {
             sync::{Arc, RwLock},
         },
         tempfile::TempDir,
+        test_case::test_case,
     };
 
     /// Simulates the unpacking & storage reconstruction done during snapshot unpacking
     fn copy_append_vecs<P: AsRef<Path>>(
         accounts_db: &AccountsDb,
         output_dir: P,
+        storage_access: StorageAccess,
     ) -> Result<StorageAndNextAccountsFileId, AccountsFileError> {
         let storage_entries = accounts_db.get_snapshot_storages(RangeFull).0;
         let storage: AccountStorageMap = AccountStorageMap::with_capacity(storage_entries.len());
@@ -63,8 +65,11 @@ mod tests {
             std::fs::copy(storage_path, &output_path)?;
 
             // Read new file into append-vec and build new entry
-            let (accounts_file, num_accounts) =
-                AccountsFile::new_from_file(output_path, storage_entry.accounts.len())?;
+            let (accounts_file, num_accounts) = AccountsFile::new_from_file(
+                output_path,
+                storage_entry.accounts.len(),
+                storage_access,
+            )?;
             let new_storage_entry = AccountStorageEntry::new_existing(
                 storage_entry.slot(),
                 storage_entry.append_vec_id(),
@@ -93,6 +98,7 @@ mod tests {
         update_accounts_hash: bool,
         incremental_snapshot_persistence: bool,
         initial_epoch_accounts_hash: bool,
+        storage_access: StorageAccess,
     ) {
         solana_logger::setup();
         let (mut genesis_config, _) = create_genesis_config(500);
@@ -249,8 +255,12 @@ mod tests {
         status_cache.add_root(2);
         // Create a directory to simulate AppendVecs unpackaged from a snapshot tar
         let copied_accounts = TempDir::new().unwrap();
-        let storage_and_next_append_vec_id =
-            copy_append_vecs(&bank2.rc.accounts.accounts_db, copied_accounts.path()).unwrap();
+        let storage_and_next_append_vec_id = copy_append_vecs(
+            &bank2.rc.accounts.accounts_db,
+            copied_accounts.path(),
+            storage_access,
+        )
+        .unwrap();
         let mut snapshot_streams = SnapshotStreams {
             full_snapshot_stream: &mut reader,
             incremental_snapshot_stream: None,
@@ -300,8 +310,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_bank_serialize_newer() {
+    #[test_case(StorageAccess::MMap)]
+    #[test_case(StorageAccess::File)]
+    fn test_bank_serialize_newer(storage_access: StorageAccess) {
         for (reserialize_accounts_hash, update_accounts_hash) in
             [(false, false), (true, false), (true, true)]
         {
@@ -318,6 +329,7 @@ mod tests {
                         update_accounts_hash,
                         incremental_snapshot_persistence,
                         initial_epoch_accounts_hash,
+                        storage_access,
                     )
                 }
             }
@@ -329,8 +341,9 @@ mod tests {
         bank.flush_accounts_cache_slot_for_tests()
     }
 
-    #[test]
-    fn test_extra_fields_eof() {
+    #[test_case(StorageAccess::MMap)]
+    #[test_case(StorageAccess::File)]
+    fn test_extra_fields_eof(storage_access: StorageAccess) {
         solana_logger::setup();
         let (genesis_config, _) = create_genesis_config(500);
 
@@ -463,8 +476,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_blank_extra_fields() {
+    #[test_case(StorageAccess::MMap)]
+    #[test_case(StorageAccess::File)]
+    fn test_blank_extra_fields(storage_access: StorageAccess) {
         solana_logger::setup();
         let (genesis_config, _) = create_genesis_config(500);
 
@@ -506,8 +520,12 @@ mod tests {
         };
         let (_accounts_dir, dbank_paths) = get_temp_accounts_paths(4).unwrap();
         let copied_accounts = TempDir::new().unwrap();
-        let storage_and_next_append_vec_id =
-            copy_append_vecs(&bank.rc.accounts.accounts_db, copied_accounts.path()).unwrap();
+        let storage_and_next_append_vec_id = copy_append_vecs(
+            &bank.rc.accounts.accounts_db,
+            copied_accounts.path(),
+            storage_access,
+        )
+        .unwrap();
         let dbank = crate::serde_snapshot::bank_from_streams(
             SerdeStyle::Newer,
             &mut snapshot_streams,
