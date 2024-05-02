@@ -31,7 +31,7 @@ use {
         accounts_cache::{AccountsCache, CachedAccount, SlotCache},
         accounts_file::{
             AccountsFile, AccountsFileError, AccountsFileProvider, MatchAccountOwnerError,
-            ALIGN_BOUNDARY_OFFSET,
+            StorageAccess, ALIGN_BOUNDARY_OFFSET,
         },
         accounts_hash::{
             AccountHash, AccountsDeltaHash, AccountsHash, AccountsHashKind, AccountsHasher,
@@ -504,6 +504,7 @@ pub const ACCOUNTS_DB_CONFIG_FOR_TESTING: AccountsDbConfig = AccountsDbConfig {
     create_ancient_storage: CreateAncientStorage::Pack,
     test_partitioned_epoch_rewards: TestPartitionedEpochRewards::CompareResults,
     test_skip_rewrites_but_include_in_bank_hash: false,
+    storage_access: StorageAccess::File,
 };
 pub const ACCOUNTS_DB_CONFIG_FOR_BENCHMARKS: AccountsDbConfig = AccountsDbConfig {
     index: Some(ACCOUNTS_INDEX_CONFIG_FOR_BENCHMARKS),
@@ -517,6 +518,7 @@ pub const ACCOUNTS_DB_CONFIG_FOR_BENCHMARKS: AccountsDbConfig = AccountsDbConfig
     create_ancient_storage: CreateAncientStorage::Pack,
     test_partitioned_epoch_rewards: TestPartitionedEpochRewards::None,
     test_skip_rewrites_but_include_in_bank_hash: false,
+    storage_access: StorageAccess::File,
 };
 
 pub type BinnedHashData = Vec<Vec<CalculateHashIntermediate>>;
@@ -603,6 +605,7 @@ pub struct AccountsDbConfig {
     /// how to create ancient storages
     pub create_ancient_storage: CreateAncientStorage,
     pub test_partitioned_epoch_rewards: TestPartitionedEpochRewards,
+    pub storage_access: StorageAccess,
 }
 
 #[cfg(not(test))]
@@ -6369,7 +6372,9 @@ impl AccountsDb {
 
             // If the above sizing function is correct, just one AppendVec is enough to hold
             // all the data for the slot
-            assert!(self.storage.get_slot_storage_entry(slot).is_some());
+            let storage = self.storage.get_slot_storage_entry(slot);
+            assert!(storage.is_some());
+            storage.unwrap().accounts.close_map();
         }
 
         // Remove this slot from the cache, which will to AccountsDb's new readers should look like an
