@@ -774,6 +774,9 @@ impl<'a> AccountsHasher<'a> {
 
     pub fn accumulate_account_hashes(mut hashes: Vec<(Pubkey, AccountHash)>) -> Hash {
         hashes.par_sort_unstable_by(|a, b| a.0.cmp(&b.0));
+        hashes.iter().for_each(|(k, h)| {
+            // log::error!("{k}, {}", h.0);
+        });
         Self::compute_merkle_root_loop(hashes, MERKLE_FANOUT, |i| &i.1 .0)
     }
 

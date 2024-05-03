@@ -503,7 +503,7 @@ impl AppendVec {
         let (hash, next): (&AccountHash, _) = self.get_type(next)?;
         let (data, next) = self.get_slice(next, meta.data_len as usize)?;
         let stored_size = next - offset;
-        Some(callback(StoredAccountMeta::AppendVec(
+        let account = StoredAccountMeta::AppendVec(
             AppendVecStoredAccountMeta {
                 meta,
                 account_meta,
@@ -512,7 +512,12 @@ impl AppendVec {
                 stored_size,
                 hash,
             },
-        )))
+        );
+        use std::str::FromStr;
+        if meta.pubkey == Pubkey::from_str("11joD3PZjfgKDz5mxSZSz18V5u1y6fbdYFFYvkVPj11").unwrap() {
+            log::error!("{}, offset: {offset}, {:?}", account.pubkey(), account);
+        }
+        Some(callback(account))
     }
 
     /// return an `AccountSharedData` for an account at `offset`.

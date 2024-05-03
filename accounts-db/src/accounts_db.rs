@@ -4862,6 +4862,7 @@ impl AccountsDb {
                         (pubkey, loaded_account.take_account(), slot)
                     })
                 {
+                    log::error!("info: {:?}, {:?}", account_info, (account_slot.0, account_slot.1.lamports()));
                     scan_func(Some(account_slot))
                 }
             },
