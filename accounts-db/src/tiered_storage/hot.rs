@@ -643,8 +643,11 @@ impl HotStorageReader {
     }
 
     /// Returns a slice suitable for use when archiving hot storages
-    pub fn data_for_archive(&self) -> &[u8] {
-        self.mmap.as_ref()
+    pub fn data_for_archive<T>(
+        &self,
+        mut callback: impl for<'local> FnMut(&'local [u8]) -> T,
+    ) -> TieredStorageResult<T> {
+        Ok(callback(self.mmap.as_ref()))
     }
 }
 

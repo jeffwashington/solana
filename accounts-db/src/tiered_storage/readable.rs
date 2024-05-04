@@ -145,9 +145,12 @@ impl TieredStorageReader {
     }
 
     /// Returns a slice suitable for use when archiving tiered storages
-    pub fn data_for_archive(&self) -> &[u8] {
+    pub fn data_for_archive<T>(
+        &self,
+        callback: impl for<'local> FnMut(&'local [u8]) -> T,
+    ) -> TieredStorageResult<T> {
         match self {
-            Self::Hot(hot) => hot.data_for_archive(),
+            Self::Hot(hot) => hot.data_for_archive(callback),
         }
     }
 }

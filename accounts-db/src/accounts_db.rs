@@ -4070,6 +4070,8 @@ impl AccountsDb {
             stats_sub.store_accounts_timing =
                 self.store_accounts_frozen(storable_accounts, shrink_in_progress.new_storage());
 
+            shrink_in_progress.new_storage().accounts.close_map();
+
             rewrite_elapsed.stop();
             stats_sub.rewrite_elapsed_us = Saturating(rewrite_elapsed.as_us());
 
@@ -4403,7 +4405,7 @@ impl AccountsDb {
             .slots_considered
             .fetch_add(1, Ordering::Relaxed);
 
-        if is_ancient(accounts) {
+        if is_ancient(accounts) || accounts.capacity() * 100 / get_ancient_append_vec_capacity() > 80 {
             self.shrink_ancient_stats
                 .ancient_scanned
                 .fetch_add(1, Ordering::Relaxed);
@@ -4435,9 +4437,18 @@ impl AccountsDb {
                     .fetch_add(1, Ordering::Relaxed);
                 return true;
             }
-            // this slot is ancient and can become the 'current' ancient for other slots to be squashed into
-            *current_ancient = CurrentAncientAccountsFile::new(slot, Arc::clone(storage));
+            if storage.accounts.can_append() {
+                // this slot is ancient and can become the 'current' ancient for other slots to be squashed into
+                *current_ancient = CurrentAncientAccountsFile::new(slot, Arc::clone(storage));
+            } else {
+                *current_ancient = CurrentAncientAccountsFile::default();
+            }
             return false; // we're done with this slot - this slot IS the ancient append vec
+        }
+        else {
+            log::error!("not ancient. cap: {}, alive: {}, of ancient: {}%, count: {}",
+            accounts.capacity(), storage.alive_bytes(), accounts.capacity() * 100 / get_ancient_append_vec_capacity(), storage.count()
+        );
         }
 
         // otherwise, yes, squash this slot into the current ancient append vec or create one at this slot
@@ -4566,6 +4577,9 @@ impl AccountsDb {
             // Assert: it cannot be the case that we already had an ancient append vec at this slot and
             // yet that ancient append vec does not have room for the accounts stored at this slot currently
             assert_ne!(slot, current_ancient.slot());
+
+            // we filled one up
+            current_ancient.accounts_file().accounts.close_map();
 
             // Now we create an ancient append vec at `slot` to store the overflows.
             let (shrink_in_progress_overflow, time_us) = measure_us!(current_ancient

@@ -11,7 +11,6 @@ use {
     },
     solana_sdk::{account::AccountSharedData, clock::Slot, pubkey::Pubkey},
     std::{
-        io::Read,
         mem,
         path::{Path, PathBuf},
     },
@@ -80,6 +79,15 @@ impl AccountsFile {
     ) -> Result<(Self, usize)> {
         let (av, num_accounts) = AppendVec::new_from_file(path, current_len, storage_access)?;
         Ok((Self::AppendVec(av), num_accounts))
+    }
+
+    pub(crate) fn can_append(&self) -> bool {
+        match self {
+            Self::AppendVec(av) => av.can_append(),
+            Self::TieredStorage(_) => {
+                unimplemented!()
+            }
+        }
     }
 
     pub fn close_map(&self) {
@@ -280,13 +288,16 @@ impl AccountsFile {
     }
 
     /// Returns a Read implementation suitable for use when archiving accounts files
-    pub fn data_for_archive(&self) -> impl Read + '_ {
+    pub fn data_for_archive<T>(&self, callback: impl for<'local> FnMut(&'local [u8]) -> T) -> T {
         match self {
-            Self::AppendVec(av) => av.data_for_archive(),
+            Self::AppendVec(av) => av
+                .data_for_archive(callback)
+                .expect("read must be successful"),
             Self::TieredStorage(ts) => ts
                 .reader()
                 .expect("must be a reader when archiving")
-                .data_for_archive(),
+                .data_for_archive(callback)
+                .expect("read must be successful"),
         }
     }
 }

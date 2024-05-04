@@ -314,7 +314,7 @@ impl AppendVec {
 
         AppendVec {
             path: file,
-            backing: AppendVecFileBacking::MapOnly(map),
+            backing: AppendVecFileBacking::FileOrMap(RwLock::new(FileOrMMap::Map(map))),
             // This mutex forces append to be single threaded, but concurrent with reads
             // See UNSAFE usage in `append_ptr`
             append_lock: Mutex::new(()),
@@ -349,8 +349,8 @@ impl AppendVec {
             AppendVecFileBacking::FileOrMap(file) => {
                 let file_or_map = file.read().unwrap();
                 match &file_or_map as &FileOrMMap {
-                    FileOrMMap::File(file) => {}
-                    FileOrMMap::Map(map) => map.flush()?
+                    FileOrMMap::File(_file) => {}
+                    FileOrMMap::Map(map) => map.flush()?,
                 }
             }
             AppendVecFileBacking::MapOnly(map) => map.flush()?,
@@ -533,21 +533,31 @@ impl AppendVec {
     /// the internal buffer. Then update `offset` to the first byte after the copied data.
     fn append_ptr(&self, offset: &mut usize, src: *const u8, len: usize) {
         let pos = u64_align!(*offset);
+        let mut with_map = |map: &[u8]| {
+            let data = &map[pos..(pos + len)];
+            //UNSAFE: This mut append is safe because only 1 thread can append at a time
+            //Mutex<()> guarantees exclusive write access to the memory occupied in
+            //the range.
+            unsafe {
+                let dst = data.as_ptr() as *mut _;
+                ptr::copy(src, dst, len);
+            };
+            *offset = pos + len;
+        };
         match &self.backing {
-            AppendVecFileBacking::FileOrMap(_file) => {
-                panic!("");
+            AppendVecFileBacking::FileOrMap(file) => {
+                let file_or_map = file.read().unwrap();
+                match &file_or_map as &FileOrMMap {
+                    FileOrMMap::File(_file) => {
+                        unimplemented!();
+                    }
+                    FileOrMMap::Map(map) => {
+                        // log::error!("{}", line!());
+                        with_map(map)
+                    }
+                }
             }
-            AppendVecFileBacking::MapOnly(map) => {
-                let data = &map[pos..(pos + len)];
-                //UNSAFE: This mut append is safe because only 1 thread can append at a time
-                //Mutex<()> guarantees exclusive write access to the memory occupied in
-                //the range.
-                unsafe {
-                    let dst = data.as_ptr() as *mut _;
-                    ptr::copy(src, dst, len);
-                };
-                *offset = pos + len;
-            }
+            AppendVecFileBacking::MapOnly(map) => with_map(map),
         }
     }
 
@@ -609,13 +619,6 @@ impl AppendVec {
         //UNSAFE: The cast is safe because the slice is aligned and fits into the memory
         //and the lifetime of the &T is tied to self, which holds the underlying memory map
         Some((unsafe { &*ptr }, next))
-    }
-
-    /// Return stored account metadata for the account at `offset` if its data doesn't overrun
-    /// the internal buffer. Otherwise return None. Also return the offset of the first byte
-    /// after the requested data that falls on a 64-byte boundary.
-    pub fn get_stored_account_meta(&self, _offset: usize) -> Option<(StoredAccountMeta, usize)> {
-        panic!("");
     }
 
     fn read_more_buffer(
@@ -1229,26 +1232,47 @@ impl AppendVec {
         })
     }
 
+    pub(crate) fn can_append(&self) -> bool {
+        match &self.backing {
+            AppendVecFileBacking::FileOrMap(file) => {
+                let file_or_map = file.write().unwrap();
+                if matches!(&file_or_map as &FileOrMMap, &FileOrMMap::Map(_)) {
+                    true
+                } else {
+                    // can't append to a file
+                    false
+                }
+            }
+            AppendVecFileBacking::MapOnly(_map) => true,
+        }
+    }
+
     pub fn close_map(&self) {
         match &self.backing {
             AppendVecFileBacking::FileOrMap(file) => {
                 let mut file_or_map = file.write().unwrap();
-                if matches!(&file_or_map as &FileOrMMap, &FileOrMMap::Map(_)) {
-                    _ = self.flush();
-                    let data = OpenOptions::new()
-                        .read(true)
-                        .open(&self.path)
-                        .map_err(|e| {
-                            panic!(
-                                "Unable to {} data file {} in current dir({:?}): {:?}",
-                                "open",
-                                self.path.display(),
-                                std::env::current_dir(),
-                                e
-                            );
-                        })
-                        .unwrap();
-                    *file_or_map = FileOrMMap::File(data);
+                match &file_or_map as &FileOrMMap {
+                    FileOrMMap::File(_file) => {
+                        // nothing to do
+                    }
+                    FileOrMMap::Map(map) => {
+                        // have to flush directly instead of self.flush so we don't deadlock
+                        _ = map.flush();
+                        let data = OpenOptions::new()
+                            .read(true)
+                            .open(&self.path)
+                            .map_err(|e| {
+                                panic!(
+                                    "Unable to {} data file {} in current dir({:?}): {:?}",
+                                    "open",
+                                    self.path.display(),
+                                    std::env::current_dir(),
+                                    e
+                                );
+                            })
+                            .unwrap();
+                        *file_or_map = FileOrMMap::File(data);
+                    }
                 }
             }
             // cannot close
@@ -1257,13 +1281,24 @@ impl AppendVec {
     }
 
     /// Returns a slice suitable for use when archiving append vecs
-    pub fn data_for_archive(&self) -> &[u8] {
-        match &self.backing {
-            AppendVecFileBacking::FileOrMap(_file) => {
-                panic!("");
+    pub fn data_for_archive<T>(
+        &self,
+        mut callback: impl for<'local> FnMut(&'local [u8]) -> T,
+    ) -> std::io::Result<T> {
+        Ok(match &self.backing {
+            AppendVecFileBacking::FileOrMap(file) => {
+                let file_or_map = file.read().unwrap();
+                match &file_or_map as &FileOrMMap {
+                    FileOrMMap::File(file) => {
+                        let mut buffer = (0..self.len()).map(|_| 0).collect::<Vec<_>>();
+                        self.read_buffer(file, 0, &mut buffer)?;
+                        callback(&buffer)
+                    }
+                    FileOrMMap::Map(map) => callback(map.as_ref()),
+                }
             }
-            AppendVecFileBacking::MapOnly(map) => map.as_ref(),
-        }
+            AppendVecFileBacking::MapOnly(map) => callback(map.as_ref()),
+        })
     }
 }
 

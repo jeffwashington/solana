@@ -592,6 +592,9 @@ impl AccountsDb {
             if shrink_in_progress.is_none() {
                 dropped_roots.push(slot);
             }
+            if let Some(store) = shrink_in_progress.as_ref().map(|sip| sip.new_storage()) {
+                store.accounts.close_map();
+            }
             self.remove_old_stores_shrink(
                 &shrink_collect,
                 &self.shrink_ancient_stats.shrink_stats,
