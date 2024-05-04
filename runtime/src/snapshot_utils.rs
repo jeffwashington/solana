@@ -829,11 +829,11 @@ pub fn archive_snapshot_package(
                 })?;
                 header.set_size(storage.capacity());
                 header.set_cksum();
-                archive
-                    .append(&header, storage.accounts.data_for_archive())
-                    .map_err(|err| {
+                storage.accounts.data_for_archive(|data| {
+                    archive.append(&header, data).map_err(|err| {
                         E::ArchiveAccountStorageFile(err, storage.path().to_path_buf())
-                    })?;
+                    })
+                })?;
             }
 
             archive.into_inner().map_err(E::FinishArchive)?;
