@@ -2513,7 +2513,7 @@ impl AccountsDb {
         let create_ancient_storage = accounts_db_config
             .as_ref()
             .map(|config| config.create_ancient_storage)
-            .unwrap_or(CreateAncientStorage::Pack);
+            .unwrap_or_default();
 
         let test_partitioned_epoch_rewards = accounts_db_config
             .as_ref()
