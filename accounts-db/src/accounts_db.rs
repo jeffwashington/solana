@@ -5419,7 +5419,22 @@ impl AccountsDb {
         #[cfg(not(test))]
         assert!(max_root.is_none());
         use std::str::FromStr;
-        let pks = ["BbYGH4x3kCwGToZwikbFy4hkPB9myps99h1t2gBpZjeV", "47hEzz83VFR23rLTEeVm9A7eFzjJwjvdupPPmX3cePqF"];
+        let pks = ["BbYGH4x3kCwGToZwikbFy4hkPB9myps99h1t2gBpZjeV", "47hEzz83VFR23rLTEeVm9A7eFzjJwjvdupPPmX3cePqF",
+"YzVsAQbUpSwz7FdR7tJ3CrrVWrbhAAAQShQHNNWPMpu",
+"F4EFyvtLAQxTXsayxDqRjinRK7qayS3qKsVrZpVv6uhk",
+"GWkpocq5EkSv9BMqBKaxEgZxq9i2N3nSReHN9X8H3vUE",
+"EWgELcsXe1ywWeSJVKiTn2HpQjCi3HhyP7BWGH62URZy",
+"BuqEDKUwyAotZuK37V4JYEykZVKY8qo1zKbpfU9gkJMo",
+"9yMwSPk9mrXSN7yDHUuZurAh1sjbJsfpUqjZ7SvVtdco",
+"3RmQB1fJcjp4BvH241GMH814SJhsoEeNJ9ZXFevTKFR6",
+"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+"JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+"6LXutJvKUw8Q5ue2gCgKHQdAN4suWW8awzFVC6XCguFx",
+"GvcNXdSehfNSNyhDVDj27kc459LzFqWozt9CSJywMy6r",
+"D8cy77BBepLMngZx6ZukaTff5hCt1HrWyKk3Hnd9oitf",
+"tro46jTMkb56A3wPepo5HT7JcvX9wFWvR8VaJzgdjEf",
+                ];
         let pks = pks.into_iter().map(|p| Pubkey::from_str(p).unwrap()).collect::<Vec<_>>();
         let mut interesting = false;
         if pks.contains(pubkey) {
@@ -6557,7 +6572,22 @@ impl AccountsDb {
             });
         }
         use std::str::FromStr;
-        let pks = ["BbYGH4x3kCwGToZwikbFy4hkPB9myps99h1t2gBpZjeV", "47hEzz83VFR23rLTEeVm9A7eFzjJwjvdupPPmX3cePqF"];
+        let pks = ["BbYGH4x3kCwGToZwikbFy4hkPB9myps99h1t2gBpZjeV", "47hEzz83VFR23rLTEeVm9A7eFzjJwjvdupPPmX3cePqF",
+        "YzVsAQbUpSwz7FdR7tJ3CrrVWrbhAAAQShQHNNWPMpu",
+        "F4EFyvtLAQxTXsayxDqRjinRK7qayS3qKsVrZpVv6uhk",
+        "GWkpocq5EkSv9BMqBKaxEgZxq9i2N3nSReHN9X8H3vUE",
+        "EWgELcsXe1ywWeSJVKiTn2HpQjCi3HhyP7BWGH62URZy",
+        "BuqEDKUwyAotZuK37V4JYEykZVKY8qo1zKbpfU9gkJMo",
+        "9yMwSPk9mrXSN7yDHUuZurAh1sjbJsfpUqjZ7SvVtdco",
+        "3RmQB1fJcjp4BvH241GMH814SJhsoEeNJ9ZXFevTKFR6",
+        "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+        "6LXutJvKUw8Q5ue2gCgKHQdAN4suWW8awzFVC6XCguFx",
+        "GvcNXdSehfNSNyhDVDj27kc459LzFqWozt9CSJywMy6r",
+        "D8cy77BBepLMngZx6ZukaTff5hCt1HrWyKk3Hnd9oitf",
+        "tro46jTMkb56A3wPepo5HT7JcvX9wFWvR8VaJzgdjEf",
+                ];
         let pks = pks.into_iter().map(|p| Pubkey::from_str(p).unwrap()).collect::<Vec<_>>();
         (0..accounts.len()).for_each(|index| { 
             accounts.account(index, |account| {
