@@ -4466,11 +4466,14 @@ impl AccountsDb {
                 *current_ancient = CurrentAncientAccountsFile::default();
             }
             return false; // we're done with this slot - this slot IS the ancient append vec
-        }
-        else {
-            log::error!("not ancient. cap: {}, alive: {}, of ancient: {}%, count: {}",
-            accounts.capacity(), storage.alive_bytes(), accounts.capacity() * 100 / get_ancient_append_vec_capacity(), storage.count()
-        );
+        } else {
+            log::error!(
+                "not ancient. cap: {}, alive: {}, of ancient: {}%, count: {}",
+                accounts.capacity(),
+                storage.alive_bytes(),
+                accounts.capacity() * 100 / get_ancient_append_vec_capacity(),
+                storage.count()
+            );
         }
 
         // otherwise, yes, squash this slot into the current ancient append vec or create one at this slot
