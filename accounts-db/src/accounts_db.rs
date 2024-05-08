@@ -5418,6 +5418,15 @@ impl AccountsDb {
     ) -> Option<(AccountSharedData, Slot)> {
         #[cfg(not(test))]
         assert!(max_root.is_none());
+        use std::str::FromStr;
+        let pks = ["BbYGH4x3kCwGToZwikbFy4hkPB9myps99h1t2gBpZjeV", "47hEzz83VFR23rLTEeVm9A7eFzjJwjvdupPPmX3cePqF"];
+        let pks = pks.into_iter().map(|p| Pubkey::from_str(p).unwrap()).collect::<Vec<_>>();
+        let mut interesting = false;
+        if pks.contains(pubkey) {
+            interesting = true;
+            log::error!("do_load_with_populate_read_cache: {}", pubkey);
+        }
+
 
         let (slot, storage_location, _maybe_account_accesor) =
             self.read_index_for_accessor_or_load_slow(ancestors, pubkey, max_root, false)?;
@@ -5431,9 +5440,16 @@ impl AccountsDb {
                     if matches!(load_zero_lamports, LoadZeroLamports::None)
                         && account.is_zero_lamport()
                     {
+                        if interesting {
+                            log::error!("zero: {}", pubkey);
+                        }
+            
                         return None;
                     }
-                    return Some((account, slot));
+                    if interesting {
+                        log::error!("found: {}, {}", pubkey, slot);
+                    }
+                return Some((account, slot));
                 }
             }
         } else {
@@ -5461,8 +5477,16 @@ impl AccountsDb {
         let in_write_cache = matches!(account_accessor, LoadedAccountAccessor::Cached(_));
         let account = account_accessor.check_and_get_loaded_account_shared_data();
         if matches!(load_zero_lamports, LoadZeroLamports::None) && account.is_zero_lamport() {
-            return None;
+            if interesting {
+                log::error!("zero: {}", pubkey);
+            }
+    return None;
         }
+
+        if interesting {
+            log::error!("found2: {}, {}", pubkey, slot);
+        }
+
 
         if !in_write_cache && load_hint != LoadHint::FixedMaxRootDoNotPopulateReadCache {
             /*
@@ -6532,6 +6556,17 @@ impl AccountsDb {
                 })
             });
         }
+        use std::str::FromStr;
+        let pks = ["BbYGH4x3kCwGToZwikbFy4hkPB9myps99h1t2gBpZjeV", "47hEzz83VFR23rLTEeVm9A7eFzjJwjvdupPPmX3cePqF"];
+        let pks = pks.into_iter().map(|p| Pubkey::from_str(p).unwrap()).collect::<Vec<_>>();
+        (0..accounts.len()).for_each(|index| { 
+            accounts.account(index, |account| {
+                if pks.contains(account.pubkey()) {
+                    log::error!("store_accounts: {}, slot: {}", account.pubkey(), accounts.target_slot());
+                }
+            });
+        });
+
         calc_stored_meta_time.stop();
         self.stats
             .calc_stored_meta
