@@ -7901,7 +7901,7 @@ impl AccountsDb {
         // appended ancient append vecs should not be shrunk by the normal shrink codepath.
         // It is not possible to identify ancient append vecs when we pack, so no check for ancient when we are not appending.
         let total_bytes = if self.create_ancient_storage == CreateAncientStorage::Append
-            && is_ancient(&store.accounts)
+            && is_ancient(&store.accounts) && !store.accounts.can_append()
         {
             if !allow_shrink_ancient {
                 return false;
