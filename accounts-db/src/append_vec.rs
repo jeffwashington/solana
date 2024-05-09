@@ -342,7 +342,7 @@ impl AppendVec {
     }
 
     pub fn flush(&self) -> Result<()> {
-        self.backing.get(|file_or_map| match file_or_map {
+        self.backing.get(|file_or_mmap| match file_or_mmap {
             InternalFileOrMmap::Mmap(mmap) => Ok(mmap.flush()?),
         })
     }
@@ -453,8 +453,8 @@ impl AppendVec {
         if overflow || next > self.len() {
             return None;
         }
-        self.backing.get(|file_or_map| {
-            match file_or_map {
+        self.backing.get(|file_or_mmap| {
+            match file_or_mmap {
                 InternalFileOrMmap::Mmap(mmap) => {
                     let data = &mmap[offset..next];
                     let next = u64_align!(next);
@@ -474,7 +474,7 @@ impl AppendVec {
     /// the internal buffer. Then update `offset` to the first byte after the copied data.
     fn append_ptr(&self, offset: &mut usize, src: *const u8, len: usize) {
         let pos = u64_align!(*offset);
-        self.backing.get(|file_or_map| match file_or_map {
+        self.backing.get(|file_or_mmap| match file_or_mmap {
             InternalFileOrMmap::Mmap(mmap) => {
                 let data = &mmap[pos..(pos + len)];
                 //UNSAFE: This mut append is safe because only 1 thread can append at a time
