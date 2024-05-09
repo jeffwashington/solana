@@ -4,6 +4,8 @@
 //!
 //! <https://docs.solanalabs.com/implemented-proposals/persistent-account-storage>
 
+#[cfg(unix)]
+use std::os::unix::prelude::FileExt;
 use {
     crate::{
         account_storage::meta::{
@@ -28,7 +30,7 @@ use {
     },
     std::{
         convert::TryFrom,
-        fs::{remove_file, OpenOptions},
+        fs::{remove_file, File, OpenOptions},
         io::{Seek, SeekFrom, Write},
         mem,
         path::{Path, PathBuf},
@@ -792,6 +794,71 @@ impl AppendVec {
     /// Returns a slice suitable for use when archiving append vecs
     pub fn data_for_archive(&self) -> &[u8] {
         self.map.as_ref()
+    }
+
+    #[allow(dead_code)]
+    #[cfg(unix)]
+    /// return # bytes read
+    fn read_buffer(
+        &self,
+        file: &File,
+        start_offset: usize,
+        buffer: &mut [u8],
+    ) -> std::io::Result<usize> {
+        let mut offset = start_offset;
+        let mut start_read = 0;
+        let mut bytes_read = 0;
+        if start_offset >= self.len() {
+            return Ok(0);
+        }
+
+        while start_read < buffer.len() {
+            let bytes_read_this_time = file.read_at(&mut buffer[start_read..], offset as u64)?;
+            if bytes_read_this_time == buffer.len() {
+                bytes_read = bytes_read_this_time;
+                if bytes_read + start_offset >= self.len() {
+                    bytes_read -= (bytes_read + start_offset) - self.len();
+                    // we've read all there is in the file
+                }
+
+                break;
+            }
+            bytes_read += bytes_read_this_time;
+            if bytes_read + start_offset >= self.len() {
+                bytes_read -= (bytes_read + start_offset) - self.len();
+                // we've read all there is in the file
+                break;
+            }
+            // more to read. `read_at` returned partial results
+            start_read += bytes_read_this_time;
+            offset += bytes_read_this_time;
+            log::error!(
+                "reading more: {:?}",
+                (
+                    start_read,
+                    buffer.len(),
+                    bytes_read,
+                    bytes_read_this_time,
+                    self.len(),
+                    start_offset,
+                    offset
+                )
+            );
+        }
+        Ok(bytes_read)
+    }
+
+    #[allow(dead_code)]
+    #[cfg(not(unix))]
+    // this has to be present for non-unix builds to compile
+    fn read_buffer(
+        &self,
+        _file: &File,
+        _start_offset: usize,
+        _buffer: &mut [u8],
+    ) -> std::io::Result<usize> {
+        // note that `unimplemented!()` isn't supported here on some platforms
+        panic!("unimplemented");
     }
 }
 
