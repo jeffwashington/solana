@@ -204,24 +204,24 @@ struct AccountOffsets {
 }
 
 #[derive(Debug)]
-enum InternalFileOrMMap<'a> {
+enum InternalFileOrMmap<'a> {
     /// A file-backed block of memory that is used to store the data for each appended item.
-    Map(&'a MmapMut),
-}
-
-impl AppendVecFileBacking {
-    /// access the backing
-    fn get<T>(&self, mut callback: impl for<'local> FnMut(InternalFileOrMMap<'local>) -> T) -> T {
-        match self {
-            AppendVecFileBacking::MapOnly(map) => callback(InternalFileOrMMap::Map(map)),
-        }
-    }
+    Mmap(&'a MmapMut),
 }
 
 #[derive(Debug, AbiExample)]
 enum AppendVecFileBacking {
     /// A file-backed block of memory that is used to store the data for each appended item.
-    MapOnly(MmapMut),
+    MmapOnly(MmapMut),
+}
+
+impl AppendVecFileBacking {
+    /// access the backing
+    fn get<T>(&self, mut callback: impl for<'local> FnMut(InternalFileOrMmap<'local>) -> T) -> T {
+        match self {
+            AppendVecFileBacking::MmapOnly(mmap) => callback(InternalFileOrMmap::Mmap(mmap)),
+        }
+    }
 }
 
 /// A thread-safe, file-backed block of memory used to store `Account` instances. Append operations
@@ -298,8 +298,8 @@ impl AppendVec {
         data.flush().unwrap();
 
         //UNSAFE: Required to create a Mmap
-        let map = unsafe { MmapMut::map_mut(&data) };
-        let map = map.unwrap_or_else(|e| {
+        let mmap = unsafe { MmapMut::map_mut(&data) };
+        let mmap = mmap.unwrap_or_else(|e| {
             error!(
                 "Failed to map the data file (size: {}): {}.\n
                     Please increase sysctl vm.max_map_count or equivalent for your platform.",
@@ -311,7 +311,7 @@ impl AppendVec {
 
         AppendVec {
             path: file,
-            backing: AppendVecFileBacking::MapOnly(map),
+            backing: AppendVecFileBacking::MmapOnly(mmap),
             // This mutex forces append to be single threaded, but concurrent with reads
             // See UNSAFE usage in `append_ptr`
             append_lock: Mutex::new(()),
@@ -343,7 +343,7 @@ impl AppendVec {
 
     pub fn flush(&self) -> Result<()> {
         self.backing.get(|file_or_map| match file_or_map {
-            InternalFileOrMMap::Map(map) => Ok(map.flush()?),
+            InternalFileOrMmap::Mmap(mmap) => Ok(mmap.flush()?),
         })
     }
 
@@ -400,7 +400,7 @@ impl AppendVec {
             .create(false)
             .open(&path)?;
 
-        let map = unsafe {
+        let mmap = unsafe {
             let result = MmapMut::map_mut(&data);
             if result.is_err() {
                 // for vm.max_map_count, error is: {code: 12, kind: Other, message: "Cannot allocate memory"}
@@ -412,7 +412,7 @@ impl AppendVec {
 
         Ok(AppendVec {
             path,
-            backing: AppendVecFileBacking::MapOnly(map),
+            backing: AppendVecFileBacking::MmapOnly(mmap),
             append_lock: Mutex::new(()),
             current_len: AtomicUsize::new(current_len),
             file_size,
@@ -455,8 +455,8 @@ impl AppendVec {
         }
         self.backing.get(|file_or_map| {
             match file_or_map {
-                InternalFileOrMMap::Map(map) => {
-                    let data = &map[offset..next];
+                InternalFileOrMmap::Mmap(mmap) => {
+                    let data = &mmap[offset..next];
                     let next = u64_align!(next);
 
                     Some((
@@ -475,8 +475,8 @@ impl AppendVec {
     fn append_ptr(&self, offset: &mut usize, src: *const u8, len: usize) {
         let pos = u64_align!(*offset);
         self.backing.get(|file_or_map| match file_or_map {
-            InternalFileOrMMap::Map(map) => {
-                let data = &map[pos..(pos + len)];
+            InternalFileOrMmap::Mmap(mmap) => {
+                let data = &mmap[pos..(pos + len)];
                 //UNSAFE: This mut append is safe because only 1 thread can append at a time
                 //Mutex<()> guarantees exclusive write access to the memory occupied in
                 //the range.
@@ -824,7 +824,7 @@ impl AppendVec {
     /// Returns a slice suitable for use when archiving append vecs
     pub fn data_for_archive(&self) -> &[u8] {
         match &self.backing {
-            AppendVecFileBacking::MapOnly(map) => map.as_ref(),
+            AppendVecFileBacking::MmapOnly(mmap) => mmap.as_ref(),
         }
     }
 }
