@@ -4467,6 +4467,7 @@ impl AccountsDb {
             }
             return false; // we're done with this slot - this slot IS the ancient append vec
         } else {
+            if false {
             log::error!(
                 "not ancient. cap: {}, alive: {}, of ancient: {}%, count: {}",
                 accounts.capacity(),
@@ -4474,6 +4475,7 @@ impl AccountsDb {
                 accounts.capacity() * 100 / get_ancient_append_vec_capacity(),
                 storage.count()
             );
+        }
         }
 
         // otherwise, yes, squash this slot into the current ancient append vec or create one at this slot
