@@ -405,7 +405,7 @@ impl AppendVec {
         })
     }
 
-    pub fn sanitize_layout_and_length(&self) -> (bool, usize) {
+    fn sanitize_layout_and_length(&self) -> (bool, usize) {
         // This discards allocated accounts immediately after check at each loop iteration.
         //
         // This code should not reuse AppendVec.accounts() method as the current form or

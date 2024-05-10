@@ -6388,8 +6388,7 @@ impl AccountsDb {
 
             // If the above sizing function is correct, just one AppendVec is enough to hold
             // all the data for the slot
-            let storage = self.storage.get_slot_storage_entry(slot);
-            assert!(storage.is_some());
+            assert!(self.storage.get_slot_storage_entry(slot).is_some());
         }
 
         // Remove this slot from the cache, which will to AccountsDb's new readers should look like an

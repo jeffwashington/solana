@@ -49,6 +49,13 @@ pub enum MatchAccountOwnerError {
     UnableToLoad,
 }
 
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum StorageAccess {
+    #[default]
+    /// storages should be accessed by Mmap
+    Mmap,
+}
+
 pub type Result<T> = std::result::Result<T, AccountsFileError>;
 
 #[derive(Debug)]
@@ -57,13 +64,6 @@ pub type Result<T> = std::result::Result<T, AccountsFileError>;
 pub enum AccountsFile {
     AppendVec(AppendVec),
     TieredStorage(TieredStorage),
-}
-
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub enum StorageAccess {
-    #[default]
-    /// storages should be accessed by Mmap
-    Mmap,
 }
 
 impl AccountsFile {

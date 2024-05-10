@@ -68,7 +68,7 @@ pub(crate) struct SnapshotStorageRebuilder {
     num_collisions: AtomicUsize,
     /// Rebuild from the snapshot files or archives
     snapshot_from: SnapshotFrom,
-    /// true if all append vecs must be mmapped
+    /// specify how storages are accessed
     storage_access: StorageAccess,
 }
 
