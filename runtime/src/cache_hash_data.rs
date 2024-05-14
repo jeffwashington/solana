@@ -205,10 +205,11 @@ impl CacheHashData {
             //error!("file: {:?}", file);
             let mut accum = (0..vec_size).map(|_| Vec::default()).collect::<Vec<_>>();
             let x = cache_one.load_map(file);
+            log::error!("file1: {}, {:?}", i_file, file);
             if x.is_err() {
                 error!("failure to load file :{:?}", file);
+                return;
             }
-            log::error!("file1: {}, {:?}", i_file, file);
             x.unwrap().load_all(&mut accum, 0, &bin_calc, &mut CacheHashDataStats::default());
             accum.into_iter().flatten().for_each(|entry| {
                 let pk = entry.pubkey;
@@ -234,6 +235,7 @@ impl CacheHashData {
             let x = cache_two.load_map(file);
             if x.is_err() {
                 error!("failure to load file2 :{:?}", file);
+                return;
             }
             x.unwrap().load_all(&mut accum, 0, &bin_calc, &mut CacheHashDataStats::default());
             accum.into_iter().flatten().for_each(|entry| {
