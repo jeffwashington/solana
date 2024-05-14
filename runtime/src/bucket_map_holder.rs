@@ -145,6 +145,8 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> BucketMapHolder<T, U>
         loop {
             self.wait_dirty_or_aged
                 .wait_timeout(Duration::from_millis(self.age_interval_ms()));
+            use log::*;
+            error!("{}{}", file!(), line!());
             if end_age == self.current_age() {
                 break;
             }

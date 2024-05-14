@@ -216,6 +216,10 @@ impl SnapshotStorageRebuilder {
             snapshot_from,
         ));
 
+        let p1 = Path::new("/home/sol/bk_hash_cache_data");
+        let p2 = Path::new("/home/sol/bk_hash_cache_data/failed_calculate_accounts_hash_cache/265656745");
+        crate::cache_hash_data::CacheHashData::compare_two(&[&p1, &p2]);
+
         let thread_pool = rebuilder.build_thread_pool();
 
         if snapshot_from == SnapshotFrom::Archive {

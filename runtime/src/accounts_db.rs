@@ -7584,14 +7584,14 @@ impl AccountsDb {
         slot: Slot,
     ) -> CacheHashData {
         if !config.store_detailed_debug_info_on_failure {
-            CacheHashData::new(accounts_hash_cache_path)
+            CacheHashData::new(&accounts_hash_cache_path)
         } else {
             // this path executes when we are failing with a hash mismatch
             let failed_dir = accounts_hash_cache_path
                 .join("failed_calculate_accounts_hash_cache")
                 .join(slot.to_string());
             let _ = std::fs::remove_dir_all(&failed_dir);
-            CacheHashData::new(failed_dir)
+            CacheHashData::new(&failed_dir)
         }
     }
 
@@ -7709,7 +7709,7 @@ impl AccountsDb {
                     AccountsHashEnum::Incremental(IncrementalAccountsHash(accounts_hash))
                 }
             };
-            info!("calculate_accounts_hash_from_storages: slot: {slot}, {accounts_hash:?}, capitalization: {capitalization}");
+            info!("calculate_accounts_hash_from_storages: slot: {slot}, {accounts_hash:?}, capitalization: {capitalization}, store detailed info: {}", config.store_detailed_debug_info_on_failure);
             Ok((accounts_hash, capitalization))
         };
 
@@ -8975,6 +8975,12 @@ impl AccountsDb {
         verify: bool,
         genesis_config: &GenesisConfig,
     ) -> IndexGenerationInfo {
+
+        let p1 = Path::new("/home/sol/bk_hash_cache_data");
+        let p2 = Path::new("/home/sol/bk_hash_cache_data/failed_calculate_accounts_hash_cache");
+        CacheHashData::compare_two(&[&p1, &p2]);
+        use log::*;error!("{}{}", file!(), line!());
+
         let mut slots = self.storage.all_slots();
         #[allow(clippy::stable_sort_primitive)]
         slots.sort();
