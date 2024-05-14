@@ -158,7 +158,7 @@ impl Drop for CacheHashData {
     }
 }
 
-type hashentry = (std::string::String, CalculateHashIntermediate);
+type hashentry = (usize, solana_sdk::hash::Hash, u64);
 
 impl CacheHashData {
     pub fn compare_two<P: AsRef<Path> + std::fmt::Debug>(files: &[&P; 2]) {
@@ -200,7 +200,7 @@ impl CacheHashData {
         [0, 1].par_iter().for_each(|i| {
 
             if i == &0 {
-        files.iter().for_each(|file| {
+        files.iter().enumerate().for_each(|(i_file, file)| {
             //error!("file: {:?}", file);
             let mut accum = (0..vec_size).map(|_| Vec::default()).collect::<Vec<_>>();
             let x = cache_one.load_map(file);
@@ -210,7 +210,7 @@ impl CacheHashData {
             x.unwrap().load_all(&mut accum, 0, &bin_calc, &mut CacheHashDataStats::default());
             accum.into_iter().flatten().for_each(|entry| {
                 let pk = entry.pubkey;
-                let new_one = (format!("{:?}", file), entry);
+                let new_one = (i_file, entry.hash, entry.lamports);
                 if interesting == pk {
                     error!("found1: {:?}", new_one);
                 }
@@ -224,7 +224,7 @@ impl CacheHashData {
     }
     else {
         error!("{}{}", file!(), line!());
-        files2.iter().for_each(|file| {
+        files2.iter().enumerate().for_each(|(i_file, file)| {
             //error!("file2: {:?}", file);
             let mut accum = (0..vec_size).map(|_| Vec::default()).collect::<Vec<_>>();
             let x = cache_two.load_map(file);
@@ -234,7 +234,7 @@ impl CacheHashData {
             x.unwrap().load_all(&mut accum, 0, &bin_calc, &mut CacheHashDataStats::default());
             accum.into_iter().flatten().for_each(|entry| {
                 let pk = entry.pubkey;
-                let new_one = (format!("{:?}", file), entry);
+                let new_one = (i_file, entry.hash, entry.lamports);
                 if interesting == pk {
                     error!("found2: {:?}", new_one);
                 }
@@ -266,24 +266,24 @@ impl CacheHashData {
             let mut v = entry.value().clone();
             //v.sort_by(Self::sorter);
             let one = v.last().unwrap();
-            if one.1.lamports != ZERO_RAW_LAMPORTS_SENTINEL && one.1.lamports != 0{
-                cap1 += one.1.lamports;
+            if one.2 != ZERO_RAW_LAMPORTS_SENTINEL && one.2 != 0{
+                cap1 += one.2;
                 added1 += 1;
             }
             if let Some((_, mut entry)) = two.remove(&k) {
                 //entry.sort_by(Self::sorter);
                 let two = entry.last().unwrap();
-                if two.1.lamports != ZERO_RAW_LAMPORTS_SENTINEL && two.1.lamports != 0 {
-                    cap2 += two.1.lamports;
+                if two.2 != ZERO_RAW_LAMPORTS_SENTINEL && two.2 != 0 {
+                    cap2 += two.2;
                     added2 += 1;
                 }
-                if one.1 != two.1 && !((one.1.lamports == ZERO_RAW_LAMPORTS_SENTINEL && two.1.lamports == 0) || (one.1.lamports == 0 && two.1.lamports == ZERO_RAW_LAMPORTS_SENTINEL)) {
+                if one.1 != two.1 && !((one.2 == ZERO_RAW_LAMPORTS_SENTINEL && two.2 == 0) || (one.2 == 0 && two.2 == ZERO_RAW_LAMPORTS_SENTINEL)) {
                     error!("values different: {} {:?}, {:?}", k, v, entry);
                 } else {
-                    assert_eq!(one.1.lamports, two.1.lamports);
+                    assert_eq!(one.2, two.2);
                 }
             } else {
-                if one.1.lamports != ZERO_RAW_LAMPORTS_SENTINEL && one.1.lamports != 0 {
+                if one.2 != ZERO_RAW_LAMPORTS_SENTINEL && one.2 != 0 {
                     error!("in 1, not in 2: {:?}, {:?}", k, v);
                 }
             }
@@ -293,9 +293,9 @@ impl CacheHashData {
             let mut v = entry.value().clone();
             //v.sort_by(Self::sorter);
             let two = v.last().unwrap();
-            if two.1.lamports != ZERO_RAW_LAMPORTS_SENTINEL && two.1.lamports != 0 {
+            if two.2 != ZERO_RAW_LAMPORTS_SENTINEL && two.2 != 0 {
                 added2 += 1;
-                cap2 += two.1.lamports;
+                cap2 += two.2;
                 error!("in 2, not in 1: {:?}, {:?}", k, v);
             }
         }
@@ -312,12 +312,14 @@ impl CacheHashData {
             added2
         );
     }
-
+/*
     fn sorter_unused(a: &hashentry, b: &hashentry) -> std::cmp::Ordering {
+        a.0.cmp(&b.0)
+        /*
         let slota = a.0.split('.').next().unwrap();
         let slotb = b.0.split('.').next().unwrap();
-        slota.cmp(&slotb)
-    }
+        slota.cmp(&slotb)*/
+    }*/
 
     fn get_cache_root_path<P: AsRef<Path>>(parent_folder: &P) -> PathBuf {
         //parent_folder.as_ref().join("calculate_accounts_hash_cache")
