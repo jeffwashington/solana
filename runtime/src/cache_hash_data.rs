@@ -164,8 +164,8 @@ impl CacheHashData {
     pub fn compare_two<P: AsRef<Path> + std::fmt::Debug>(files: &[&P; 2]) {
         let datas = files.into_iter().map(|p| Self::new(p)).collect::<Vec<_>>();
         use {dashmap::DashMap, std::collections::HashMap};
-        let mut one = DashMap::<Pubkey, Vec<hashentry>>::new();
-        let mut two = DashMap::<Pubkey, Vec<hashentry>>::new();
+        let mut one = Mutex::new(HashMap::<Pubkey, Vec<hashentry>>::new());
+        let mut two = Mutex::new(HashMap::<Pubkey, Vec<hashentry>>::new());
         let cache_one = &datas[0];
         use solana_sdk::pubkey::Pubkey;
         let mut files = cache_one
@@ -200,6 +200,7 @@ impl CacheHashData {
         [0, 1].par_iter().for_each(|i| {
 
             if i == &0 {
+                    let mut one: std::sync::MutexGuard<'_, HashMap<Pubkey, Vec<(usize, solana_sdk::hash::Hash, u64)>>> = one.lock().unwrap();
         files.iter().enumerate().for_each(|(i_file, file)| {
             //error!("file: {:?}", file);
             let mut accum = (0..vec_size).map(|_| Vec::default()).collect::<Vec<_>>();
@@ -224,6 +225,7 @@ impl CacheHashData {
     }
     else {
         error!("{}{}", file!(), line!());
+        let mut two = two.lock().unwrap();
         files2.iter().enumerate().for_each(|(i_file, file)| {
             //error!("file2: {:?}", file);
             let mut accum = (0..vec_size).map(|_| Vec::default()).collect::<Vec<_>>();
@@ -247,7 +249,9 @@ impl CacheHashData {
         });
     }});
 
-        error!(
+    let mut one = one.into_inner().unwrap();
+    let mut two = two.into_inner().unwrap();
+    error!(
             "items in one: {}, two: {}, files in one, two: {}, {}",
             one.len(),
             two.len(),
@@ -262,15 +266,15 @@ impl CacheHashData {
         let ZERO_RAW_LAMPORTS_SENTINEL = 0;
         error!("draining");
         for entry in one.iter() {
-            let k = entry.key();
-            let mut v = entry.value().clone();
+            let k = entry.0;
+            let mut v = entry.1.clone();
             //v.sort_by(Self::sorter);
             let one = v.last().unwrap();
             if one.2 != ZERO_RAW_LAMPORTS_SENTINEL && one.2 != 0{
                 cap1 += one.2;
                 added1 += 1;
             }
-            if let Some((_, mut entry)) = two.remove(&k) {
+            if let Some(mut entry) = two.remove(&k) {
                 //entry.sort_by(Self::sorter);
                 let two = entry.last().unwrap();
                 if two.2 != ZERO_RAW_LAMPORTS_SENTINEL && two.2 != 0 {
@@ -289,8 +293,8 @@ impl CacheHashData {
             }
         }
         for entry in two.iter() {
-            let k = entry.key();
-            let mut v = entry.value().clone();
+            let k = entry.0;
+            let mut v = entry.1.clone();
             //v.sort_by(Self::sorter);
             let two = v.last().unwrap();
             if two.2 != ZERO_RAW_LAMPORTS_SENTINEL && two.2 != 0 {
