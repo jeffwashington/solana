@@ -6532,6 +6532,40 @@ impl AccountsDb {
                 })
             });
         }
+        use std::str::FromStr;
+        let p = [
+            "3mJQZ4TuomnaiC4DAJfTN8PFTEN3BQbCK2CWQB41nh7R",
+            "3mJQbsEQJdbSoW1HTh4a21r8v3q175ubM9vbMKur44ni",
+            "3mJQbhZrLXisC4MwvUGghKxMyBhj1RDrZh3tS5YZD8qP",
+            "3mJQZtmpUGKynXB6Mni4msFEngD9ayZiWhn5JVfwh8hx",
+            "3mJQbmkyeQnB2PLT3jDQ3ezDJUVSZmsGi4EiWfe2ZC8p",
+            "GPnzkEVS8oqLJmwa7PXZhDeDhSSKuSSMEVH7Y96g8BZZ",
+            "3mJQas63tvfvDUJzc4vMyc22trE4JWKUBY9J8zeCZHGL",
+            "3mJQaPR8W62hPbRrjassWGEbawADPv7SrsChozD8dm2k",
+            "3mJQbGLQYqvCQrgHgLZcW8ewjay2Wrz3Nyy1UNt4n9rT",
+            "3mJQZ7g8T5tdnGYZcpHfrAq7nsHhbpmPUmfJqfFcQjBt",
+            "3mJQZT5VQNmw1rtThC3EBtdbBm9VrVmAsAGZMbqDXxR3",
+            "3mJQXy7rSgkMehE69KjBdbftAw4Zdj3qqv5oCJvBzmrT",
+            "Fswj34obvgsna6HPwAZXggjuNJwpDPKDYVQn9XkHnVBG",
+            "3mJQYmrw3JuPkaZHN3xrb7phs7BDRqJNaN8vbJTuvPLe",
+            "FLmMdMP4Je3pCjCj6nfTu9mGPVsYUsPbubYyCwy1g4nj",
+                    ]
+        .iter()
+        .map(|k| Pubkey::from_str(k).unwrap())
+        .collect::<Vec<_>>();
+        (0..accounts.len()).for_each(|index| {
+            accounts.account(index, |account| {
+                if p.contains(account.pubkey()) {
+                    log::error!(
+                        "writing {}, {}, lamports: {}",
+                        slot,
+                        account.pubkey(),
+                        account.lamports()
+                    );
+                }
+            });
+        });
+
         calc_stored_meta_time.stop();
         self.stats
             .calc_stored_meta
@@ -8660,6 +8694,29 @@ impl AccountsDb {
         }
         let secondary = !self.account_indexes.is_empty();
 
+
+        use std::str::FromStr;
+        let p = [
+            "3mJQZ4TuomnaiC4DAJfTN8PFTEN3BQbCK2CWQB41nh7R",
+            "3mJQbsEQJdbSoW1HTh4a21r8v3q175ubM9vbMKur44ni",
+            "3mJQbhZrLXisC4MwvUGghKxMyBhj1RDrZh3tS5YZD8qP",
+            "3mJQZtmpUGKynXB6Mni4msFEngD9ayZiWhn5JVfwh8hx",
+            "3mJQbmkyeQnB2PLT3jDQ3ezDJUVSZmsGi4EiWfe2ZC8p",
+            "GPnzkEVS8oqLJmwa7PXZhDeDhSSKuSSMEVH7Y96g8BZZ",
+            "3mJQas63tvfvDUJzc4vMyc22trE4JWKUBY9J8zeCZHGL",
+            "3mJQaPR8W62hPbRrjassWGEbawADPv7SrsChozD8dm2k",
+            "3mJQbGLQYqvCQrgHgLZcW8ewjay2Wrz3Nyy1UNt4n9rT",
+            "3mJQZ7g8T5tdnGYZcpHfrAq7nsHhbpmPUmfJqfFcQjBt",
+            "3mJQZT5VQNmw1rtThC3EBtdbBm9VrVmAsAGZMbqDXxR3",
+            "3mJQXy7rSgkMehE69KjBdbftAw4Zdj3qqv5oCJvBzmrT",
+            "Fswj34obvgsna6HPwAZXggjuNJwpDPKDYVQn9XkHnVBG",
+            "3mJQYmrw3JuPkaZHN3xrb7phs7BDRqJNaN8vbJTuvPLe",
+            "FLmMdMP4Je3pCjCj6nfTu9mGPVsYUsPbubYyCwy1g4nj",
+                    ]
+        .iter()
+        .map(|k| Pubkey::from_str(k).unwrap())
+        .collect::<Vec<_>>();
+
         let mut rent_paying_accounts_by_partition = Vec::default();
         let mut accounts_data_len = 0;
         let mut num_accounts_rent_paying = 0;
@@ -8669,6 +8726,14 @@ impl AccountsDb {
         let (dirty_pubkeys, insert_time_us, mut generate_index_results) = {
             let mut items_local = Vec::default();
             storage.accounts.scan_index(|info| {
+                if p.contains(&info.index_info.pubkey) {
+                    log::error!(
+                        "{}, {}, lamports: {}",
+                        slot,
+                        info.index_info.pubkey,
+                        info.index_info.lamports
+                    );
+                }
                 stored_size_alive += info.stored_size_aligned;
                 if info.index_info.lamports > 0 {
                     accounts_data_len += info.index_info.data_len;
