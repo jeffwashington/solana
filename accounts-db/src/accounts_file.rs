@@ -11,7 +11,6 @@ use {
     },
     solana_sdk::{account::AccountSharedData, clock::Slot, pubkey::Pubkey},
     std::{
-        io::Read,
         mem,
         path::{Path, PathBuf},
     },
@@ -51,9 +50,11 @@ pub enum MatchAccountOwnerError {
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum StorageAccess {
-    #[default]
     /// storages should be accessed by Mmap
     Mmap,
+    /// ancient storages are created by 1-shot write to pack multiple accounts together more efficiently with new formats
+    #[default]
+    File,
 }
 
 pub type Result<T> = std::result::Result<T, AccountsFileError>;
@@ -288,13 +289,16 @@ impl AccountsFile {
     }
 
     /// Returns a Read implementation suitable for use when archiving accounts files
-    pub fn data_for_archive(&self) -> impl Read + '_ {
+    pub fn data_for_archive<T>(&self, callback: impl for<'local> FnMut(&'local [u8]) -> T) -> T {
         match self {
-            Self::AppendVec(av) => av.data_for_archive(),
+            Self::AppendVec(av) => av
+                .data_for_archive(callback)
+                .expect("read must be successful"),
             Self::TieredStorage(ts) => ts
                 .reader()
                 .expect("must be a reader when archiving")
-                .data_for_archive(),
+                .data_for_archive(callback)
+                .expect("read must be successful"),
         }
     }
 }

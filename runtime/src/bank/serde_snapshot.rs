@@ -310,6 +310,7 @@ mod tests {
     }
 
     #[test_case(StorageAccess::Mmap)]
+    #[test_case(StorageAccess::File)]
     fn test_bank_serialize_newer(storage_access: StorageAccess) {
         for (reserialize_accounts_hash, update_accounts_hash) in
             [(false, false), (true, false), (true, true)]
@@ -340,6 +341,7 @@ mod tests {
     }
 
     #[test_case(StorageAccess::Mmap)]
+    #[test_case(StorageAccess::File)]
     fn test_extra_fields_eof(storage_access: StorageAccess) {
         solana_logger::setup();
         let (genesis_config, _) = create_genesis_config(500);
@@ -476,6 +478,7 @@ mod tests {
     }
 
     #[test_case(StorageAccess::Mmap)]
+    #[test_case(StorageAccess::File)]
     fn test_blank_extra_fields(storage_access: StorageAccess) {
         solana_logger::setup();
         let (genesis_config, _) = create_genesis_config(500);
