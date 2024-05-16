@@ -114,7 +114,7 @@ impl CacheHashDataFile {
         self.get_slice(0)
     }
 
-    #[cfg(test)]
+    // #[cfg(test)]
     /// Populate 'accumulator' from entire contents of the cache file.
     pub fn load_all(
         &self,
@@ -276,6 +276,148 @@ impl CacheHashData {
         }
     }
 
+    pub fn move_it(&self, file_name: impl AsRef<Path> + std::fmt::Display) -> Option<PathBuf> {
+        let path = self.cache_dir.join(&file_name);
+        let file_name_bk = format!("bk.{}", file_name.to_string());
+        let path_out = self.cache_dir.join(&file_name_bk);
+        if let Ok(_) = std::fs::rename(path, path_out.clone()) {
+            return Some(path_out.to_path_buf().clone());
+        }
+        None
+    }
+
+    pub fn compare(
+        &self,
+        old: impl AsRef<Path> + std::fmt::Debug,
+        file_name: impl AsRef<Path> + std::fmt::Display,
+    ) {
+        use crate::accounts_hash::AccountHash;
+        type hashentry = (usize, AccountHash, u64);
+        use solana_sdk::pubkey::Pubkey;
+        use std::collections::HashMap;
+        use std::str::FromStr;
+        let interesting = Pubkey::from_str("JARQT5Jeb3nXH8vjE1pMiX5RADWshsRyLyDd7V72TjuZ").unwrap();
+
+        let bin_calc = PubkeyBinCalculator24::new(65536);
+
+        let mut one = HashMap::<Pubkey, Vec<hashentry>>::new();
+        let mut two = HashMap::<Pubkey, Vec<hashentry>>::new();
+        let vec_size = 65536;
+
+        let path_new = self.cache_dir.join(&file_name);
+        use std::path::Path;
+        let mut accum = (0..vec_size).map(|_| Vec::default()).collect::<Vec<_>>();
+        let x = self.load_map((old.as_ref()).file_name().unwrap());
+        if x.is_err() {
+            log::error!("failure to load file :{:?}", old);
+            return;
+        }
+        x.unwrap().load_all(&mut accum, 0, &bin_calc);
+        accum.into_iter().flatten().for_each(|entry| {
+            let pk = entry.pubkey;
+            let new_one = (0, entry.hash, entry.lamports);
+            if interesting == pk {
+                log::error!("found1: {:?}", new_one);
+            }
+            if let Some(mut current) = one.get_mut(&pk) {
+                current.push(new_one);
+            } else {
+                one.insert(pk, vec![new_one]);
+            }
+        });
+        let mut accum = (0..vec_size).map(|_| Vec::default()).collect::<Vec<_>>();
+        let x = self.load_map(file_name);
+        if x.is_err() {
+            log::error!("failure to load file :{:?}", old);
+            return;
+        }
+        x.unwrap().load_all(&mut accum, 0, &bin_calc);
+        accum.into_iter().flatten().for_each(|entry| {
+            let pk = entry.pubkey;
+            let new_one = (0, entry.hash, entry.lamports);
+            if interesting == pk {
+                log::error!("found1: {:?}", new_one);
+            }
+            if let Some(mut current) = one.get_mut(&pk) {
+                current.push(new_one);
+            } else {
+                two.insert(pk, vec![new_one]);
+            }
+        });
+
+        log::error!(
+            "items in one: {}, two: {}zs",
+            one.len(),
+            two.len(),
+        );
+
+        let mut cap1 = 0;
+        let mut cap2 = 0;
+        let mut added1 = 0;
+        let mut added2 = 0;
+        let ZERO_RAW_LAMPORTS_SENTINEL = 0;
+        log::error!("draining");
+        let mut fail = false;
+        for entry in one.iter() {
+            let k = entry.0;
+            let mut v = entry.1.clone();
+            //v.sort_by(Self::sorter);
+            let one = v.last().unwrap();
+            if one.2 != ZERO_RAW_LAMPORTS_SENTINEL && one.2 != 0 {
+                cap1 += one.2;
+                added1 += 1;
+            }
+            if let Some(mut entry) = two.remove(&k) {
+                //entry.sort_by(Self::sorter);
+                let two = entry.last().unwrap();
+                if two.2 != ZERO_RAW_LAMPORTS_SENTINEL && two.2 != 0 {
+                    cap2 += two.2;
+                    added2 += 1;
+                }
+                if one.1 != two.1
+                    && !((one.2 == ZERO_RAW_LAMPORTS_SENTINEL && two.2 == 0)
+                        || (one.2 == 0 && two.2 == ZERO_RAW_LAMPORTS_SENTINEL))
+                {
+                    log::error!("values different: {} {:?}, {:?}", k, v, entry);
+                    fail = true;
+                } else {
+                    assert_eq!(one.2, two.2);
+                }
+            } else {
+                if one.2 != ZERO_RAW_LAMPORTS_SENTINEL && one.2 != 0 {
+                    log::error!("in 1, not in 2: {:?}, {:?}", k, v);
+                    fail = true;
+                }
+            }
+        }
+        for entry in two.iter() {
+            let k = entry.0;
+            let mut v = entry.1.clone();
+            //v.sort_by(Self::sorter);
+            let two = v.last().unwrap();
+            if two.2 != ZERO_RAW_LAMPORTS_SENTINEL && two.2 != 0 {
+                added2 += 1;
+                cap2 += two.2;
+                fail = true;
+                log::error!("in 2, not in 1: {:?}, {:?}", k, v);
+            }
+        }
+        if fail {
+            panic!(
+                "done with compare, lamports: {}, {}, {}, added: {},{}",
+                cap1,
+                cap2,
+                if cap1 > cap2 {
+                    cap1 - cap2
+                } else {
+                    cap2 - cap1
+                },
+                added1,
+                added2
+            );
+        }
+    }
+
     /// open a cache hash file, but don't map it.
     /// This allows callers to know a file exists, but preserves the # mmapped files.
     pub(crate) fn get_file_reference_to_map_later(
@@ -411,6 +553,34 @@ fn parse_filename(cache_filename: impl AsRef<Path>) -> Option<ParsedFilename> {
         hash,
     })
 }
+use crate::pubkey_bins::PubkeyBinCalculator24;
+
+impl CacheHashData {
+    /// load from 'file_name' into 'accumulator'
+    fn load(
+        &self,
+        file_name: impl AsRef<Path>,
+        accumulator: &mut SavedType,
+        start_bin_index: usize,
+        bin_calculator: &PubkeyBinCalculator24,
+    ) -> Result<(), std::io::Error> {
+        let mut m = Measure::start("overall");
+        let cache_file = self.load_map(file_name)?;
+        cache_file.load_all(accumulator, start_bin_index, bin_calculator);
+        m.stop();
+        self.stats.load_us.fetch_add(m.as_us(), Ordering::Relaxed);
+        Ok(())
+    }
+
+    /// map 'file_name' into memory
+    pub fn load_map(
+        &self,
+        file_name: impl AsRef<Path>,
+    ) -> Result<CacheHashDataFile, std::io::Error> {
+        let reference = self.get_file_reference_to_map_later(file_name)?;
+        reference.map()
+    }
+}
 
 /// Decides which old cache files to delete
 ///
@@ -447,7 +617,7 @@ mod tests {
         }
 
         /// map 'file_name' into memory
-        fn load_map(
+        pub fn load_map(
             &self,
             file_name: impl AsRef<Path>,
         ) -> Result<CacheHashDataFile, std::io::Error> {

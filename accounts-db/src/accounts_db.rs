@@ -171,7 +171,7 @@ enum ScanAccountStorageResult {
     /// this data has already been scanned and cached
     CacheFileAlreadyExists(CacheHashDataFileReference),
     /// this data needs to be scanned and cached
-    CacheFileNeedsToBeCreated((String, Range<Slot>)),
+    CacheFileNeedsToBeCreated((String, Range<Slot>, Option<PathBuf>)),
 }
 
 #[derive(Default, Debug)]
@@ -7139,6 +7139,11 @@ impl AccountsDb {
                     bin_range.end,
                     hash
                 );
+                let mut old = None;
+                if load_from_cache {
+                    old = cache_hash_data.move_it(&file_name);
+                    load_from_cache = false;
+                }
                 if load_from_cache {
                     if let Ok(mapped_file) =
                         cache_hash_data.get_file_reference_to_map_later(&file_name)
@@ -7153,6 +7158,7 @@ impl AccountsDb {
                 Some(ScanAccountStorageResult::CacheFileNeedsToBeCreated((
                     file_name,
                     range_this_chunk,
+                    old
                 )))
             })
             .collect::<Vec<_>>();
@@ -7191,6 +7197,7 @@ impl AccountsDb {
                     ScanAccountStorageResult::CacheFileNeedsToBeCreated((
                         file_name,
                         range_this_chunk,
+                        old,
                     )) => {
                         let mut scanner = scanner.clone();
                         let mut init_accum = true;
@@ -7228,6 +7235,9 @@ impl AccountsDb {
                                 (!r.is_empty() && r.iter().any(|b| !b.is_empty())).then(|| {
                                     // error if we can't write this
                                     cache_hash_data.save(&file_name, &r).unwrap();
+                                    if let Some(old) = old {
+                                        cache_hash_data.compare(old, &file_name);
+                                    }
                                     cache_hash_data
                                         .get_file_reference_to_map_later(&file_name)
                                         .unwrap()
