@@ -505,7 +505,7 @@ pub const ACCOUNTS_DB_CONFIG_FOR_TESTING: AccountsDbConfig = AccountsDbConfig {
     create_ancient_storage: CreateAncientStorage::Pack,
     test_partitioned_epoch_rewards: TestPartitionedEpochRewards::CompareResults,
     test_skip_rewrites_but_include_in_bank_hash: false,
-    storage_access: StorageAccess::Mmap,
+    storage_access: StorageAccess::File,
 };
 pub const ACCOUNTS_DB_CONFIG_FOR_BENCHMARKS: AccountsDbConfig = AccountsDbConfig {
     index: Some(ACCOUNTS_INDEX_CONFIG_FOR_BENCHMARKS),
@@ -520,7 +520,7 @@ pub const ACCOUNTS_DB_CONFIG_FOR_BENCHMARKS: AccountsDbConfig = AccountsDbConfig
     create_ancient_storage: CreateAncientStorage::Pack,
     test_partitioned_epoch_rewards: TestPartitionedEpochRewards::None,
     test_skip_rewrites_but_include_in_bank_hash: false,
-    storage_access: StorageAccess::Mmap,
+    storage_access: StorageAccess::File,
 };
 
 pub type BinnedHashData = Vec<Vec<CalculateHashIntermediate>>;
@@ -1112,7 +1112,12 @@ impl AccountStorageEntry {
     }
 
     /// open a new instance of the storage that is readonly
-    fn reopen_as_readonly(&self) -> Option<Self> {
+    fn reopen_as_readonly(&self, storage_access: StorageAccess) -> Option<Self> {
+        if storage_access != StorageAccess::File {
+            // if we are only using mmap, then no reason to re-open
+            return None;
+        }
+
         let count_and_status = self.count_and_status.lock_write();
         self.accounts.reopen_as_readonly().map(|accounts| Self {
             id: self.id,
@@ -4216,7 +4221,7 @@ impl AccountsDb {
             .storage
             .get_slot_storage_entry_shrinking_in_progress_ok(slot)
         {
-            if let Some(new_storage) = storage.reopen_as_readonly() {
+            if let Some(new_storage) = storage.reopen_as_readonly(self.storage_access) {
                 // consider here the race condition of tx processing having looked up something in the index,
                 // which could return (slot, append vec id). We want the lookup for the storage to get a storage
                 // that works whether the lookup occurs before or after the replace call here.
@@ -7998,6 +8003,7 @@ impl AccountsDb {
         // It is not possible to identify ancient append vecs when we pack, so no check for ancient when we are not appending.
         let total_bytes = if self.create_ancient_storage == CreateAncientStorage::Append
             && is_ancient(&store.accounts)
+            && store.accounts.can_append()
         {
             store.written_bytes()
         } else {
