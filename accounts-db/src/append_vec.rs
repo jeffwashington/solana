@@ -21,7 +21,7 @@ use {
     log::*,
     memmap2::MmapMut,
     solana_sdk::{
-        account::{AccountSharedData, ReadableAccount, WritableAccount},
+        account::{AccountSharedData, ReadableAccount},
         hash::Hash,
         pubkey::Pubkey,
         stake_history::Epoch,
@@ -550,17 +550,7 @@ impl AppendVec {
     /// return an `AccountSharedData` for an account at `offset`.
     /// This fn can efficiently return exactly what is needed by a caller.
     pub(crate) fn get_account_shared_data(&self, offset: usize) -> Option<AccountSharedData> {
-        let (meta, next) = self.get_type::<StoredMeta>(offset)?;
-        let (account_meta, next) = self.get_type::<AccountMeta>(next)?;
-        let next = next + std::mem::size_of::<AccountHash>();
-        let (data, _next) = self.get_slice(next, meta.data_len as usize)?;
-        Some(AccountSharedData::create(
-            account_meta.lamports,
-            data.to_vec(),
-            account_meta.owner,
-            account_meta.executable,
-            account_meta.rent_epoch,
-        ))
+        self.get_stored_account_meta_callback(offset, |account| account.to_account_shared_data())
     }
 
     /// note this fn can return account meta for an account whose fields have been truncated (ie. if `len` isn't long enough.)
