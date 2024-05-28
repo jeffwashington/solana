@@ -284,6 +284,9 @@ impl AccountsDb {
         target_slots_sorted: &[Slot],
         tuning: &PackedAncientStorageTuning,
     ) -> bool {
+        many_refs_newest.iter().for_each(|aa| {
+            log::error!("{:?}", (aa.slot, aa.accounts.len(), aa.accounts.first().map(|a| a.pubkey())));
+        });
         let alive_bytes = many_refs_newest
             .iter()
             .map(|alive| alive.bytes)
