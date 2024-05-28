@@ -7419,11 +7419,13 @@ impl Bank {
     pub fn verify_snapshot_bank(
         &self,
         test_hash_calculation: bool,
-        skip_shrink: bool,
-        force_clean: bool,
+        mut skip_shrink: bool,
+        mut force_clean: bool,
         last_full_snapshot_slot: Slot,
         base: Option<(Slot, /*capitalization*/ u64)>,
     ) -> bool {
+        skip_shrink = false;
+        force_clean = true;
         let (_, clean_time_us) = measure_us!({
             let should_clean = force_clean || (!skip_shrink && self.slot() > 0);
             if should_clean {
