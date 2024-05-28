@@ -7044,6 +7044,8 @@ impl AccountsDb {
             let storage_file = append_vec.accounts.get_path();
             slot.hash(hasher);
             storage_file.hash(hasher);
+            append_vec.approx_stored_count().hash(hasher);
+            append_vec.accounts.len().hash(hasher);
             let amod = std::fs::metadata(storage_file);
             if amod.is_err() {
                 return false;
