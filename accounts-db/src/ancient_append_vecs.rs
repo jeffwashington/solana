@@ -284,6 +284,9 @@ impl AccountsDb {
         target_slots_sorted: &[Slot],
         tuning: &PackedAncientStorageTuning,
     ) -> bool {
+        many_refs_newest.iter().for_each(|aa| {
+            log::error!("{:?}", (aa.slot, aa.accounts.len(), aa.accounts.first().map(|a| a.pubkey())));
+        });
         let alive_bytes = many_refs_newest
             .iter()
             .map(|alive| alive.bytes)
@@ -294,16 +297,32 @@ impl AccountsDb {
             return true;
         }
         if target_slots_sorted.len() < required_ideal_packed {
+            log::error!("jw: failed len: {}, {}", target_slots_sorted.len(), required_ideal_packed);
             return false;
         }
-        let i_last = target_slots_sorted
+        // `target_slots_sorted` is sorted lowest to highest
+        // `required_ideal_packed` slots are required to be output
+        // We will use the last `required_ideal_packed` slots from `required_ideal_packed` as slot #s for those packed slots.
+        // Calculate the index of the lowest slot number that will be used as an output packed slot.
+        let i_lowest = target_slots_sorted
             .len()
-            .saturating_sub(required_ideal_packed);
+            .saturating_sub(required_ideal_packed)
+            .saturating_sub(1);
 
-        let highest_slot = target_slots_sorted[i_last];
+        let lowest_slot = target_slots_sorted[i_lowest];
         many_refs_newest
             .iter()
-            .all(|many| many.slot <= highest_slot)
+            .all(|many| {
+                if many.slot > lowest_slot {
+                    let slots_big_enough = target_slots_sorted.iter().filter_map(|f| (f >= &many.slot).then_some(true)).count();
+                    log::error!("jw: found many ref acct with slot > lowest_slot: {}, {}, required_ideal_packed: {}, highst: {:?}, total target slots sorted: len: {}, big enough: {slots_big_enough}", many.slot, lowest_slot, required_ideal_packed,
+                target_slots_sorted.last().cloned().unwrap_or_default(), target_slots_sorted.len());
+                }
+                // if this is false, this means a storage at `many.slot` could be being moved to an older slot than `many.slot`.
+                // Since there are multiple refs to accounts in this slot, we could move this alive account to a slot older than an older
+                // instance of this account.
+                many.slot <= lowest_slot
+            })
     }
 
     fn combine_ancient_slots_packed_internal(
@@ -320,12 +339,12 @@ impl AccountsDb {
         if ancient_slot_infos.all_infos.is_empty() {
             return; // nothing to do
         }
-        let accounts_per_storage = self
+        let mut accounts_per_storage = self
             .get_unique_accounts_from_storage_for_combining_ancient_slots(
                 &ancient_slot_infos.all_infos[..],
             );
 
-        let mut accounts_to_combine = self.calc_accounts_to_combine(&accounts_per_storage);
+        let mut accounts_to_combine = self.calc_accounts_to_combine(&mut accounts_per_storage);
         metrics.unpackable_slots_count += accounts_to_combine.unpackable_slots_count;
 
         let mut many_refs_newest = accounts_to_combine
@@ -342,6 +361,7 @@ impl AccountsDb {
         // packed slot.
         many_refs_newest.sort_unstable_by(|a, b| b.slot.cmp(&a.slot));
         metrics.newest_alive_packed_count += many_refs_newest.len();
+        log::error!("jw: many refs newest highest slot: {:?}, lowest: {:?}, len: {}", many_refs_newest.first().map(|f| f.slot), many_refs_newest.last().map(|f| f.slot), many_refs_newest.len());
 
         if !Self::many_ref_accounts_can_be_moved(
             &many_refs_newest,
@@ -354,9 +374,13 @@ impl AccountsDb {
                 accounts_to_combine.target_slots_sorted.last(),
                 many_refs_newest.last().map(|accounts| accounts.slot)
             );
-            self.addref_accounts_failed_to_shrink_ancient(accounts_to_combine);
+            self.addref_accounts_failed_to_shrink_ancient(accounts_to_combine.accounts_to_combine);
+            if self.previous_ancient_pack_failed.swap(true, Ordering::Relaxed) {
+                panic!("no good");
+            }
             return;
         }
+        self.previous_ancient_pack_failed.swap(false, Ordering::Relaxed);
 
         // pack the accounts with 1 ref or refs > 1 but the slot we're packing is the highest alive slot for the pubkey.
         // Note the `chain` below combining the 2 types of refs.
@@ -374,7 +398,7 @@ impl AccountsDb {
             // Not enough slots to contain the accounts we are trying to pack.
             // `shrink_collect` previously unref'd some accounts. We need to addref them
             // to restore the correct state since we failed to combine anything.
-            self.addref_accounts_failed_to_shrink_ancient(accounts_to_combine);
+            self.addref_accounts_failed_to_shrink_ancient(accounts_to_combine.accounts_to_combine);
             return;
         }
 
@@ -388,10 +412,9 @@ impl AccountsDb {
     }
 
     /// for each account in `unrefed_pubkeys`, in each `accounts_to_combine`, addref
-    fn addref_accounts_failed_to_shrink_ancient(&self, accounts_to_combine: AccountsToCombine) {
+    fn addref_accounts_failed_to_shrink_ancient<'a>(&self, accounts_to_combine: Vec<ShrinkCollect<'a, ShrinkCollectAliveSeparatedByRefs<'a>>>) {
         self.thread_pool_clean.install(|| {
             accounts_to_combine
-                .accounts_to_combine
                 .into_par_iter()
                 .for_each(|combine| {
                     self.accounts_index.scan(
@@ -418,7 +441,21 @@ impl AccountsDb {
     ) -> AncientSlotInfos {
         let mut ancient_slot_infos = self.calc_ancient_slot_info(slots, tuning.can_randomly_shrink);
 
+        ancient_slot_infos.all_infos.iter().enumerate().for_each(|(i, ai)| {
+            if ai.slot == 266939489 || ai.slot == 265863227 {
+                log::error!("considering: {}, alive: {}, {}/{}", ai.slot, ai.alive_bytes, i, ancient_slot_infos.all_infos.len());
+            }
+        });
+
         ancient_slot_infos.filter_ancient_slots(tuning);
+
+        ancient_slot_infos.all_infos.iter().enumerate().for_each(|(i, ai)| {
+            if ai.slot == 266939489 || ai.slot == 265863227 {
+                log::error!("considering: {}, alive: {}, {}/{}", ai.slot, ai.alive_bytes, i, ancient_slot_infos.all_infos.len());
+            }
+        });
+        log::error!("done filtering");
+
         ancient_slot_infos
     }
 
@@ -603,8 +640,9 @@ impl AccountsDb {
     /// 'accounts_per_storage' should be sorted by slot
     fn calc_accounts_to_combine<'a>(
         &self,
-        accounts_per_storage: &'a Vec<(&'a SlotInfo, GetUniqueAccountsResult<'a>)>,
+        accounts_per_storage: &'a mut Vec<(&'a SlotInfo, GetUniqueAccountsResult<'a>)>,
     ) -> AccountsToCombine<'a> {
+        accounts_per_storage.sort_by(|a,b| a.0.slot.cmp(&b.0.slot));
         let mut accounts_keep_slots = HashMap::default();
         let len = accounts_per_storage.len();
         let mut target_slots_sorted = Vec::with_capacity(len);
@@ -624,14 +662,28 @@ impl AccountsDb {
                 .collect::<Vec<_>>()
         });
 
+        let skip_difficult = self.previous_ancient_pack_failed.load(Ordering::Relaxed);
+
+        (1..accounts_per_storage.len()).for_each(|i| {
+            assert!(accounts_per_storage[i-1].0.slot < accounts_per_storage[i].0.slot);
+        });
+
         let mut remove = Vec::default();
+        assert_eq!(accounts_to_combine.len(), accounts_per_storage.len());
         for (i, (shrink_collect, (info, _unique_accounts))) in accounts_to_combine
             .iter_mut()
             .zip(accounts_per_storage.iter())
             .enumerate()
         {
+            if skip_difficult && !shrink_collect.alive_accounts.many_refs_this_is_newest_alive.accounts.is_empty() {
+                remove.push(i);
+                log::error!("skip difficult, so get rid of: {}, count: {}", info.slot, shrink_collect.alive_accounts.many_refs_this_is_newest_alive.accounts.len());
+                continue;
+            }
+
             let many_refs_old_alive = &mut shrink_collect.alive_accounts.many_refs_old_alive;
             if !many_refs_old_alive.accounts.is_empty() {
+                /*
                 many_refs_old_alive.accounts.iter().for_each(|account| {
                     // these accounts could indicate clean bugs or low memory conditions where we are forced to flush non-roots
                     log::info!(
@@ -640,6 +692,10 @@ impl AccountsDb {
                         account.pubkey()
                     );
                 });
+                */
+                {//if info.slot == 266939489 || info.slot == 265863227 || info.slot == 268019432 || info.slot == 268019460{                
+                    log::error!("many refs old alive: {}, count: {}, target_slots_sorted: {}, remove: {}, total: {}", info.slot, many_refs_old_alive.accounts.len(), target_slots_sorted.len(), remove.len(), accounts_per_storage.len());
+                }
                 // There are alive accounts with ref_count > 1, where the entry for the account in the index is NOT the highest slot. (`many_refs_old_alive`)
                 // This means this account must remain IN this slot. There could be alive or dead references to this same account in any older slot.
                 // Moving it to a lower slot could move it before an alive or dead entry to this same account.
@@ -657,11 +713,23 @@ impl AccountsDb {
                         .is_empty()
                 {
                     // all accounts in this append vec are alive and have > 1 ref, so nothing to be done for this append vec
+                    log::error!("removing: {}, count: {}", info.slot, many_refs_old_alive.accounts.len());
+                    remove.push(i);
+                    continue;
+                }
+                // once 90% of target slots have been identified, we don't want to try to claim a specific slot we have to use. This could cause this slot
+                // 
+                if target_slots_sorted.len() + remove.len() > accounts_per_storage.len() * 90 / 100 {
+                    log::error!("removing because too few valid slots have been processed so far: {}, count: {}, target_slots_sorted: {}", info.slot, many_refs_old_alive.accounts.len(), target_slots_sorted.len());
                     remove.push(i);
                     continue;
                 }
                 accounts_keep_slots.insert(info.slot, std::mem::take(many_refs_old_alive));
             } else {
+                {//if info.slot == 266939489 || info.slot == 265863227 || info.slot == 268019432 || info.slot == 268019460 {                
+                    log::error!("target_slots_sorted {}", info.slot);
+                }
+
                 // No alive accounts in this slot have a ref_count > 1. So, ALL alive accounts in this slot can be written to any other slot
                 // we find convenient. There is NO other instance of any account to conflict with.
                 target_slots_sorted.push(info.slot);
@@ -669,7 +737,8 @@ impl AccountsDb {
         }
         let unpackable_slots_count = remove.len();
         remove.into_iter().rev().for_each(|i| {
-            accounts_to_combine.remove(i);
+            self.addref_accounts_failed_to_shrink_ancient(
+            vec![accounts_to_combine.remove(i)]);
         });
         target_slots_sorted.sort_unstable();
         AccountsToCombine {

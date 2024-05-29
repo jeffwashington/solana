@@ -147,9 +147,9 @@ const SHRINK_COLLECT_CHUNK_SIZE: usize = 50;
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum CreateAncientStorage {
     /// ancient storages are created by appending
-    #[default]
     Append,
     /// ancient storages are created by 1-shot write to pack multiple accounts together more efficiently with new formats
+    #[default]
     Pack,
 }
 
@@ -1479,6 +1479,9 @@ pub struct AccountsDb {
     /// At that point, this and other code can be deleted.
     pub partitioned_epoch_rewards_config: PartitionedEpochRewardsConfig,
 
+    /// true if the last time ancient pack ran it failed, so pack more conservatively the next time
+    pub(crate) previous_ancient_pack_failed: AtomicBool,
+
     /// the full accounts hash calculation as of a predetermined block height 'N'
     /// to be included in the bank hash at a predetermined block height 'M'
     /// The cadence is once per epoch, all nodes calculate a full accounts hash as of a known slot calculated using 'N'
@@ -2410,6 +2413,7 @@ impl AccountsDb {
         const ACCOUNTS_STACK_SIZE: usize = 8 * 1024 * 1024;
 
         AccountsDb {
+            previous_ancient_pack_failed: AtomicBool::default(),
             create_ancient_storage: CreateAncientStorage::Pack,
             verify_accounts_hash_in_bg: VerifyAccountsHashInBackground::default(),
             active_stats: ActiveStats::default(),
@@ -2525,7 +2529,7 @@ impl AccountsDb {
         let create_ancient_storage = accounts_db_config
             .as_ref()
             .map(|config| config.create_ancient_storage)
-            .unwrap_or(CreateAncientStorage::Append);
+            .unwrap_or(CreateAncientStorage::Pack);
 
         let test_partitioned_epoch_rewards = accounts_db_config
             .as_ref()
@@ -3147,6 +3151,7 @@ impl AccountsDb {
         last_full_snapshot_slot: Option<Slot>,
         epoch_schedule: &EpochSchedule,
     ) {
+        return;
         if self.exhaustively_verify_refcounts {
             self.exhaustively_verify_refcounts(max_clean_root_inclusive);
         }
@@ -8906,9 +8911,15 @@ impl AccountsDb {
         let mut amount_to_top_off_rent = 0;
         let mut stored_size_alive = 0;
 
+        use std::str::FromStr;
+        let pk = Pubkey::from_str("88EDVXDxa6FAUT5pqvCcdqQyc8Dw6kgt6uoHv5kpeDfa").unwrap();
+
         let items = accounts.map(|stored_account| {
             stored_size_alive += stored_account.stored_size();
             let pubkey = stored_account.pubkey();
+            if pk == *pubkey {
+                log::error!("88EDVXDxa6FAUT5pqvCcdqQyc8Dw6kgt6uoHv5kpeDfa: {slot}, lamports: {}", stored_account.lamports());
+            }
             if secondary {
                 self.accounts_index.update_secondary_indexes(
                     pubkey,
@@ -9164,10 +9175,12 @@ impl AccountsDb {
                             let unique_pubkeys_by_bin_inner =
                                 unique_keys.into_iter().collect::<Vec<_>>();
                             // does not matter that this is not ordered by slot
-                            unique_pubkeys_by_bin
-                                .lock()
-                                .unwrap()
-                                .push(unique_pubkeys_by_bin_inner);
+                            if false {
+                                unique_pubkeys_by_bin
+                                    .lock()
+                                    .unwrap()
+                                    .push(unique_pubkeys_by_bin_inner);
+                            }
                         });
                 })
                 .1;
