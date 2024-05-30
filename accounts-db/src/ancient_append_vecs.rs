@@ -669,7 +669,9 @@ impl AccountsDb {
         (1..accounts_per_storage.len()).for_each(|i| {
             assert!(accounts_per_storage[i-1].0.slot < accounts_per_storage[i].0.slot);
         });
-        log::error!("jw: this many last dirty pubkeys: {}", self.last_dirty_pubkeys.read().unwrap().len());
+        log::error!("jw: this many last dirty pubkeys: {}, {:?}", self.last_dirty_pubkeys.read().unwrap().len(), self.last_dirty_pubkeys.read().unwrap().iter().take(5).map(|e| {
+            (*e.key(), e.value().clone())
+        }).collect::<Vec<_>>());
         let mut remove = Vec::default();
         assert_eq!(accounts_to_combine.len(), accounts_per_storage.len());
         for (i, (shrink_collect, (info, _unique_accounts))) in accounts_to_combine
