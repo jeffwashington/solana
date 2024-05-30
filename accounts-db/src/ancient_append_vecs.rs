@@ -681,6 +681,14 @@ impl AccountsDb {
                 continue;
             }
 
+            self.shrink_ancient_stats.pubkeys_marked_for_clean.fetch_add(shrink_collect.alive_accounts.many_refs_old_alive.accounts.len() as u64, Ordering::Relaxed);
+            // if skip_difficult 
+            {
+                shrink_collect.alive_accounts.many_refs_old_alive.accounts.iter().for_each(|a| {
+                    self.uncleaned_pubkeys.entry(info.slot).or_default().push(*a.pubkey());
+                });
+            }
+
             let many_refs_old_alive = &mut shrink_collect.alive_accounts.many_refs_old_alive;
             if !many_refs_old_alive.accounts.is_empty() {
                 /*
