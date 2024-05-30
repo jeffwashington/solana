@@ -2853,12 +2853,31 @@ impl AccountsDb {
         let mut reclaims = Vec::new();
         let mut dead_keys = Vec::new();
 
+        let mut trying = self.last_dirty_pubkeys.read().unwrap();
+
         let mut purge_exact_count = 0;
         let (_, purge_exact_us) = measure_us!(for (pubkey, slots_set) in pubkey_to_slot_set {
             purge_exact_count += 1;
+            let prev_len = reclaims.len();
             let is_empty = self
                 .accounts_index
                 .purge_exact(pubkey, slots_set, &mut reclaims);
+            if let Some(mut e) = trying.get_mut(pubkey) {
+                if prev_len == reclaims.len() {
+                    log::error!("jw: failed to clean: {pubkey}, {:?}", e.value());
+                }
+                let mut remove = Vec::default();
+                reclaims[prev_len..].iter().for_each(|slot| {
+                    e.value_mut().retain(|reclaimed_slot| reclaimed_slot != &slot.0);
+                    if e.value().is_empty() {
+                        remove.push(*pubkey);
+                    }
+                });
+                remove.iter().for_each(|pk| {
+                    trying.remove(pk);
+                });
+            }
+
             if is_empty {
                 dead_keys.push(pubkey);
             }
@@ -3318,6 +3337,7 @@ impl AccountsDb {
 
         let mut store_counts_time = Measure::start("store_counts");
 
+let initial_len =        self.last_dirty_pubkeys.read().unwrap().len();
         // Calculate store counts as if everything was purged
         // Then purge if we can
         let mut store_counts: HashMap<Slot, (usize, HashSet<Pubkey>)> = HashMap::new();
@@ -3403,6 +3423,7 @@ impl AccountsDb {
 
         let (reclaims, pubkeys_removed_from_accounts_index2) =
             self.purge_keys_exact(pubkey_to_slot_set.iter());
+        log::error!("jw: this many left over: {}, removed: {}", self.last_dirty_pubkeys.read().unwrap().len(), initial_len - self.last_dirty_pubkeys.read().unwrap().len());
         pubkeys_removed_from_accounts_index.extend(pubkeys_removed_from_accounts_index2);
 
         // Don't reset from clean, since the pubkeys in those stores may need to be unref'ed
