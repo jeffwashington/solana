@@ -594,6 +594,20 @@ impl AccountsDb {
         metrics.accumulate(&write_ancient_accounts.metrics);
     }
 
+    /// add each pubkey in `alive_accounts` to `uncleaned_pubkeys`.
+    fn clean_old_alive_pubkeys(&self, slot: Slot, alive_accounts: &AliveAccounts<'_>) {
+        self.shrink_ancient_stats
+            .pubkeys_marked_for_clean
+            .fetch_add(alive_accounts.accounts.len() as u64, Ordering::Relaxed);
+
+        alive_accounts.accounts.iter().for_each(|a| {
+            self.uncleaned_pubkeys
+                .entry(slot)
+                .or_default()
+                .push(*a.pubkey());
+        });
+    }
+
     /// given all accounts per ancient slot, in slots that we want to combine together:
     /// 1. Look up each pubkey in the index
     /// 2. separate, by slot, into:
@@ -632,6 +646,10 @@ impl AccountsDb {
         {
             let many_refs_old_alive = &mut shrink_collect.alive_accounts.many_refs_old_alive;
             if !many_refs_old_alive.accounts.is_empty() {
+                // all these pubkeys should have been cleaned but were not.
+                // They may never be cleaned again while the validator is in steady state.
+                // So, make progress by preparing to clean them next time clean runs.
+                self.clean_old_alive_pubkeys(info.slot, many_refs_old_alive);
                 many_refs_old_alive.accounts.iter().for_each(|account| {
                     // these accounts could indicate clean bugs or low memory conditions where we are forced to flush non-roots
                     log::info!(
