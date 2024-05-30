@@ -674,12 +674,16 @@ impl AccountsDb {
         }).collect::<Vec<_>>());
         let mut remove = Vec::default();
         assert_eq!(accounts_to_combine.len(), accounts_per_storage.len());
+        let mut all_old = 0;
+        let mut all_old_zero = 0;
         for (i, (shrink_collect, (info, _unique_accounts))) in accounts_to_combine
             .iter_mut()
             .zip(accounts_per_storage.iter())
             .enumerate()
         {
             if skip_difficult && !shrink_collect.alive_accounts.many_refs_this_is_newest_alive.accounts.is_empty() {
+                all_old += shrink_collect.alive_accounts.many_refs_this_is_newest_alive.accounts.len();
+                all_old_zero += shrink_collect.alive_accounts.many_refs_this_is_newest_alive.accounts.iter().filter(|a| a.is_zero_lamport()).count();
                 remove.push(i);
                 log::error!("skip difficult, so get rid of: {}, count: {}", info.slot, shrink_collect.alive_accounts.many_refs_this_is_newest_alive.accounts.len());
                 continue;
@@ -754,6 +758,7 @@ impl AccountsDb {
                 target_slots_sorted.push(info.slot);
             }
         }
+        log::error!("jw: this many last dirty pubkeys, all old zero: {all_old_zero}/{all_old}");
         let unpackable_slots_count = remove.len();
         remove.into_iter().rev().for_each(|i| {
             self.addref_accounts_failed_to_shrink_ancient(

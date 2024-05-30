@@ -1869,11 +1869,26 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
         reclaims: &mut SlotList<T>,
         max_clean_root_inclusive: Option<Slot>,
     ) -> bool {
+        use std::str::FromStr;
+        let interesting = [
+            "2LksDGnLhgUyF2sgjShCaA75PUiQNjYNvMKJVjZrGSLE",
+            "Bi5WfQ8mbE2wHPe3kcWNby15qJFEq3ib8vBC2o8pv9LY",
+            "Ca8wwgDB3cepdaqAhaESt7hNaytbC8YDv2xQuDodGt4r",
+            "DcBxXJ31FcJa24bWTc1xoYdksoUAhZq5HbWQuh9B6gtg",
+            "Es7SQhzT3V6dtteVkAKuoB4u2c8iiabbFKAknSzgYAVZ",
+            ]
+            ;
+        let interesting = interesting.iter().map(|s| Pubkey::from_str(s).unwrap()).collect::<HashSet<_>>();
+        let int = interesting.contains(pubkey);
+
         let mut is_slot_list_empty = false;
         let missing_in_accounts_index = self
             .slot_list_mut(pubkey, |slot_list| {
                 self.purge_older_root_entries(slot_list, reclaims, max_clean_root_inclusive);
                 is_slot_list_empty = slot_list.is_empty();
+                if int {
+                    log::error!("purge_older_root_entries: {pubkey}, {:?}, max root: {:?}, empty: {is_slot_list_empty}", slot_list, max_clean_root_inclusive);
+                }
             })
             .is_none();
 

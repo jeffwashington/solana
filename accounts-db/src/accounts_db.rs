@@ -3283,6 +3283,10 @@ impl AccountsDb {
                                                     assert!(slot <= &max_clean_root_inclusive);
                                                 }
                                                 purges_old_accounts.push(*pubkey);
+                                                if interesting.contains(pubkey) {
+                                                    log::error!("purges_old_accounts: {pubkey}");
+                                                }
+            
                                                 useless = false;
                                             }
                                         }
@@ -3295,7 +3299,10 @@ impl AccountsDb {
                                             // touched in must be unrooted.
                                             not_found_on_fork += 1;
                                             useless = false;
-                                            purges_old_accounts.push(*pubkey);
+                                            if interesting.contains(pubkey) {
+                                                log::error!("purges_old_accounts2: {pubkey}");
+                                            }
+                                        purges_old_accounts.push(*pubkey);
                                         }
                                     }
                                 } else {
@@ -3359,9 +3366,7 @@ let initial_len =        self.last_dirty_pubkeys.read().unwrap().len();
             if purged_account_slots.contains_key(key) {
                 *ref_count = self.accounts_index.ref_count_from_storage(key);
             }
-            if interesting.contains(key) {
-                log::error!("store loop zero: {key}, rc: {ref_count}, {:?}", account_infos);
-            }
+            let aisbefore = account_infos.clone();
 
             account_infos.retain(|(slot, account_info)| {
                 let was_slot_purged = purged_account_slots
@@ -3408,6 +3413,9 @@ let initial_len =        self.last_dirty_pubkeys.read().unwrap().len();
                 }
                 true
             });
+            if interesting.contains(key) {
+                log::error!("store loop zero: {key}, rc: {ref_count}, bef: {:?}, aft: {:?}, max_clean_root_inclusive: {max_clean_root_inclusive:?}, last_full_snapshot_slot: {last_full_snapshot_slot:?}", aisbefore, account_infos);
+            }
         }
         store_counts_time.stop();
 
@@ -3704,18 +3712,35 @@ let initial_len =        self.last_dirty_pubkeys.read().unwrap().len();
             last_full_snapshot_slot.is_some() || !should_filter_for_incremental_snapshots,
             "if filtering for incremental snapshots, then snapshots should be enabled",
         );
+        use std::str::FromStr;
+        let interesting = [
+            "2LksDGnLhgUyF2sgjShCaA75PUiQNjYNvMKJVjZrGSLE",
+            "Bi5WfQ8mbE2wHPe3kcWNby15qJFEq3ib8vBC2o8pv9LY",
+            "Ca8wwgDB3cepdaqAhaESt7hNaytbC8YDv2xQuDodGt4r",
+            "DcBxXJ31FcJa24bWTc1xoYdksoUAhZq5HbWQuh9B6gtg",
+            "Es7SQhzT3V6dtteVkAKuoB4u2c8iiabbFKAknSzgYAVZ",
+            ]
+            ;
+        let interesting = interesting.iter().map(|s| Pubkey::from_str(s).unwrap()).collect::<HashSet<_>>();
 
         purges_zero_lamports.retain(|pubkey, (slot_account_infos, _ref_count)| {
+            let int = interesting.contains(pubkey);
             // Only keep purges_zero_lamports where the entire history of the account in the root set
             // can be purged. All AppendVecs for those updates are dead.
             for (slot, _account_info) in slot_account_infos.iter() {
                 if let Some(store_count) = store_counts.get(slot) {
                     if store_count.0 != 0 {
+                        if int {
+                            log::error!("not retaining: {pubkey}, store count: {}", store_count.0);
+                        }
                         // one store this pubkey is in is not being removed, so this pubkey cannot be removed at all
                         return false;
                     }
                 } else {
-                    // store is not being removed, so this pubkey cannot be removed at all
+                    if int {
+                        log::error!("not retaining2: {pubkey}");
+                    }
+                // store is not being removed, so this pubkey cannot be removed at all
                     return false;
                 }
             }
@@ -3729,7 +3754,7 @@ let initial_len =        self.last_dirty_pubkeys.read().unwrap().len();
                 .iter()
                 .max_by_key(|(slot, _account_info)| slot);
 
-            slot_account_info_at_highest_slot.map_or(true, |(slot, account_info)| {
+            let r = slot_account_info_at_highest_slot.map_or(true, |(slot, account_info)| {
                 // Do *not* purge zero-lamport accounts if the slot is greater than the last full
                 // snapshot slot.  Since we're `retain`ing the accounts-to-purge, I felt creating
                 // the `cannot_purge` variable made this easier to understand.  Accounts that do
@@ -3742,7 +3767,12 @@ let initial_len =        self.last_dirty_pubkeys.read().unwrap().len();
                         .insert((*slot, *pubkey));
                 }
                 !cannot_purge
-            })
+            });
+            if int {
+                log::error!("retaining: {r} {pubkey}, last full: {last_full_snapshot_slot:?}");
+            }
+
+            r
         });
     }
 

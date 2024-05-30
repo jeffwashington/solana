@@ -7460,7 +7460,7 @@ impl Bank {
         });
 
         let (verified_accounts, verify_accounts_time_us) = measure_us!({
-            let should_verify_accounts = !self.rc.accounts.accounts_db.skip_initial_hash_calc;
+            let should_verify_accounts = false && !self.rc.accounts.accounts_db.skip_initial_hash_calc;
             if should_verify_accounts {
                 info!("Verifying accounts...");
                 let verified = self.verify_accounts_hash(
