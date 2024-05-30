@@ -627,6 +627,40 @@ impl AccountsDb {
         metrics.accumulate(&write_ancient_accounts.metrics);
     }
 
+    /// add each pubkey in `alive_accounts` to `uncleaned_pubkeys`.
+    fn prepare_clean_old_alive_pubkeys(&self, alive_accounts: &AliveAccounts<'_>) {
+        self.shrink_ancient_stats
+            .pubkeys_marked_for_clean
+            .fetch_add(alive_accounts.accounts.len() as u64, Ordering::Relaxed);
+
+        let mut roots = Vec::with_capacity(alive_accounts.accounts.len());
+        // we need to call `add_uncleaned_roots` for all old accounts with the slot of the HIGHEST alive slot. Otherwise, the old rooted entries
+        // are not cleaned for `uncleaned_pubkeys`.
+        // Since we expect all these entries to have slot list len >= 2, they will all be in the in-mem index anyway, so this lookup is very fast.
+        self.accounts_index.scan(
+            alive_accounts.accounts.iter().map(|i| i.pubkey()),
+            |pk, slot_list, _entry| {
+                if let Some((slot_list, _)) = slot_list {
+                    if let Some(index_in_slot_list) =
+                        self.accounts_index.latest_slot(None, slot_list, None)
+                    {
+                        let highest_alive_slot = slot_list[index_in_slot_list].0;
+                        roots.push(highest_alive_slot);
+                        // record the pubkeys that need to be cleaned
+                        self.uncleaned_pubkeys
+                            .entry(highest_alive_slot)
+                            .or_default()
+                            .push(*pk);
+                    }
+                }
+                AccountsIndexScanResult::OnlyKeepInMemoryIfDirty
+            },
+            None,
+            false,
+        );
+        self.accounts_index.add_uncleaned_roots(roots);
+    }
+
     /// given all accounts per ancient slot, in slots that we want to combine together:
     /// 1. Look up each pubkey in the index
     /// 2. separate, by slot, into:
@@ -713,6 +747,11 @@ impl AccountsDb {
             }
 
             if !many_refs_old_alive.accounts.is_empty() {
+                // all these pubkeys should have been cleaned but were not for some reason. This is the account at an older slot.
+                // The account also exists at a newer root. The account at the older slot should not be in the index.
+                // They may never be cleaned again while the validator is in steady state.
+                // So, make progress by cleaning them next time clean runs.
+                self.prepare_clean_old_alive_pubkeys(many_refs_old_alive);
                 many_refs_old_alive.accounts.iter().for_each(|account| {
                     // these accounts could indicate clean bugs or low memory conditions where we are forced to flush non-roots
                     log::info!(
