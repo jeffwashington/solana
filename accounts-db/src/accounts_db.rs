@@ -1487,6 +1487,9 @@ pub struct AccountsDb {
     /// At that point, this and other code can be deleted.
     pub partitioned_epoch_rewards_config: PartitionedEpochRewardsConfig,
 
+    /// true if the last time ancient pack ran it failed, so pack more conservatively the next time to make progress
+    pub(crate) previous_ancient_pack_failed: AtomicBool,
+
     /// the full accounts hash calculation as of a predetermined block height 'N'
     /// to be included in the bank hash at a predetermined block height 'M'
     /// The cadence is once per epoch, all nodes calculate a full accounts hash as of a known slot calculated using 'N'
@@ -2407,6 +2410,7 @@ impl AccountsDb {
         const ACCOUNTS_STACK_SIZE: usize = 8 * 1024 * 1024;
 
         AccountsDb {
+            previous_ancient_pack_failed: AtomicBool::default(),
             create_ancient_storage: CreateAncientStorage::default(),
             verify_accounts_hash_in_bg: VerifyAccountsHashInBackground::default(),
             active_stats: ActiveStats::default(),

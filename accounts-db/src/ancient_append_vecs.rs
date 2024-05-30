@@ -368,8 +368,12 @@ impl AccountsDb {
                 many_refs_newest.last().map(|accounts| accounts.slot)
             );
             self.addref_accounts_failed_to_shrink_ancient(accounts_to_combine.accounts_to_combine);
+            self.previous_ancient_pack_failed
+                .store(true, Ordering::Relaxed);
             return;
         }
+        self.previous_ancient_pack_failed
+            .store(false, Ordering::Relaxed);
 
         // pack the accounts with 1 ref or refs > 1 but the slot we're packing is the highest alive slot for the pubkey.
         // Note the `chain` below combining the 2 types of refs.
@@ -625,6 +629,8 @@ impl AccountsDb {
         let len = accounts_per_storage.len();
         let mut target_slots_sorted = Vec::with_capacity(len);
 
+        let skip_difficult = self.previous_ancient_pack_failed.load(Ordering::Relaxed);
+
         // reverse sort by slot #
         // `shrink_collect` all accounts in the append vecs we want to combine.
         // This also unrefs all dead accounts in those append vecs.
@@ -647,6 +653,17 @@ impl AccountsDb {
             .zip(accounts_per_storage.iter())
             .enumerate()
         {
+            if skip_difficult
+                && !shrink_collect
+                    .alive_accounts
+                    .many_refs_this_is_newest_alive
+                    .accounts
+                    .is_empty()
+            {
+                remove.push(i);
+                continue;
+            }
+
             let many_refs_old_alive = &mut shrink_collect.alive_accounts.many_refs_old_alive;
             if !many_refs_old_alive.accounts.is_empty() {
                 many_refs_old_alive.accounts.iter().for_each(|account| {
@@ -665,13 +682,14 @@ impl AccountsDb {
                 // This would fail the invariant that the highest slot # where an account exists defines the most recent account.
                 // It could be a clean error or a transient condition that will resolve if we encounter this situation.
                 // The count of these accounts per call will be reported by metrics in `unpackable_slots_count`
-                if shrink_collect.unrefed_pubkeys.is_empty()
-                    && shrink_collect.alive_accounts.one_ref.accounts.is_empty()
-                    && shrink_collect
-                        .alive_accounts
-                        .many_refs_this_is_newest_alive
-                        .accounts
-                        .is_empty()
+                if skip_difficult
+                    || shrink_collect.unrefed_pubkeys.is_empty()
+                        && shrink_collect.alive_accounts.one_ref.accounts.is_empty()
+                        && shrink_collect
+                            .alive_accounts
+                            .many_refs_this_is_newest_alive
+                            .accounts
+                            .is_empty()
                 {
                     // all accounts in this append vec are alive and have > 1 ref, so nothing to be done for this append vec
                     remove.push(i);
@@ -686,7 +704,7 @@ impl AccountsDb {
         }
         let unpackable_slots_count = remove.len();
         remove.into_iter().rev().for_each(|i| {
-            accounts_to_combine.remove(i);
+            self.addref_accounts_failed_to_shrink_ancient(vec![accounts_to_combine.remove(i)]);
         });
         target_slots_sorted.sort_unstable();
         AccountsToCombine {
