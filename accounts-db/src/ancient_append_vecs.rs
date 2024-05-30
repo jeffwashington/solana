@@ -365,7 +365,7 @@ impl AccountsDb {
                 accounts_to_combine.target_slots_sorted.last(),
                 many_refs_newest.last().map(|accounts| accounts.slot)
             );
-            self.addref_accounts_failed_to_shrink_ancient(accounts_to_combine);
+            self.addref_accounts_failed_to_shrink_ancient(accounts_to_combine.accounts_to_combine);
             return;
         }
 
@@ -385,7 +385,7 @@ impl AccountsDb {
             // Not enough slots to contain the accounts we are trying to pack.
             // `shrink_collect` previously unref'd some accounts. We need to addref them
             // to restore the correct state since we failed to combine anything.
-            self.addref_accounts_failed_to_shrink_ancient(accounts_to_combine);
+            self.addref_accounts_failed_to_shrink_ancient(accounts_to_combine.accounts_to_combine);
             return;
         }
 
@@ -399,24 +399,24 @@ impl AccountsDb {
     }
 
     /// for each account in `unrefed_pubkeys`, in each `accounts_to_combine`, addref
-    fn addref_accounts_failed_to_shrink_ancient(&self, accounts_to_combine: AccountsToCombine) {
+    fn addref_accounts_failed_to_shrink_ancient<'a>(
+        &self,
+        accounts_to_combine: Vec<ShrinkCollect<'a, ShrinkCollectAliveSeparatedByRefs<'a>>>,
+    ) {
         self.thread_pool_clean.install(|| {
-            accounts_to_combine
-                .accounts_to_combine
-                .into_par_iter()
-                .for_each(|combine| {
-                    self.accounts_index.scan(
-                        combine.unrefed_pubkeys.into_iter(),
-                        |_pubkey, _slots_refs, entry| {
-                            if let Some(entry) = entry {
-                                entry.addref();
-                            }
-                            AccountsIndexScanResult::OnlyKeepInMemoryIfDirty
-                        },
-                        None,
-                        true,
-                    );
-                });
+            accounts_to_combine.into_par_iter().for_each(|combine| {
+                self.accounts_index.scan(
+                    combine.unrefed_pubkeys.into_iter(),
+                    |_pubkey, _slots_refs, entry| {
+                        if let Some(entry) = entry {
+                            entry.addref();
+                        }
+                        AccountsIndexScanResult::OnlyKeepInMemoryIfDirty
+                    },
+                    None,
+                    true,
+                );
+            });
         });
     }
 
@@ -683,7 +683,7 @@ impl AccountsDb {
         }
         let unpackable_slots_count = remove.len();
         remove.into_iter().rev().for_each(|i| {
-            accounts_to_combine.remove(i);
+            self.addref_accounts_failed_to_shrink_ancient(vec![accounts_to_combine.remove(i)]);
         });
         target_slots_sorted.sort_unstable();
         AccountsToCombine {
