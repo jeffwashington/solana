@@ -285,7 +285,14 @@ impl AccountsDb {
         tuning: &PackedAncientStorageTuning,
     ) -> bool {
         many_refs_newest.iter().for_each(|aa| {
-            log::error!("{:?}", (aa.slot, aa.accounts.len(), aa.accounts.first().map(|a| a.pubkey())));
+            log::error!(
+                "{:?}",
+                (
+                    aa.slot,
+                    aa.accounts.len(),
+                    aa.accounts.first().map(|a| a.pubkey())
+                )
+            );
         });
         let alive_bytes = many_refs_newest
             .iter()
@@ -297,7 +304,11 @@ impl AccountsDb {
             return true;
         }
         if target_slots_sorted.len() < required_ideal_packed {
-            log::error!("jw: failed len: {}, {}", target_slots_sorted.len(), required_ideal_packed);
+            log::error!(
+                "jw: failed len: {}, {}",
+                target_slots_sorted.len(),
+                required_ideal_packed
+            );
             return false;
         }
         // `target_slots_sorted` is sorted lowest to highest
@@ -361,7 +372,12 @@ impl AccountsDb {
         // packed slot.
         many_refs_newest.sort_unstable_by(|a, b| b.slot.cmp(&a.slot));
         metrics.newest_alive_packed_count += many_refs_newest.len();
-        log::error!("jw: many refs newest highest slot: {:?}, lowest: {:?}, len: {}", many_refs_newest.first().map(|f| f.slot), many_refs_newest.last().map(|f| f.slot), many_refs_newest.len());
+        log::error!(
+            "jw: many refs newest highest slot: {:?}, lowest: {:?}, len: {}",
+            many_refs_newest.first().map(|f| f.slot),
+            many_refs_newest.last().map(|f| f.slot),
+            many_refs_newest.len()
+        );
 
         if !Self::many_ref_accounts_can_be_moved(
             &many_refs_newest,
@@ -375,12 +391,16 @@ impl AccountsDb {
                 many_refs_newest.last().map(|accounts| accounts.slot)
             );
             self.addref_accounts_failed_to_shrink_ancient(accounts_to_combine.accounts_to_combine);
-            if self.previous_ancient_pack_failed.swap(true, Ordering::Relaxed) {
+            if self
+                .previous_ancient_pack_failed
+                .swap(true, Ordering::Relaxed)
+            {
                 panic!("no good");
             }
             return;
         }
-        self.previous_ancient_pack_failed.swap(false, Ordering::Relaxed);
+        self.previous_ancient_pack_failed
+            .swap(false, Ordering::Relaxed);
 
         // pack the accounts with 1 ref or refs > 1 but the slot we're packing is the highest alive slot for the pubkey.
         // Note the `chain` below combining the 2 types of refs.
@@ -412,23 +432,24 @@ impl AccountsDb {
     }
 
     /// for each account in `unrefed_pubkeys`, in each `accounts_to_combine`, addref
-    fn addref_accounts_failed_to_shrink_ancient<'a>(&self, accounts_to_combine: Vec<ShrinkCollect<'a, ShrinkCollectAliveSeparatedByRefs<'a>>>) {
+    fn addref_accounts_failed_to_shrink_ancient<'a>(
+        &self,
+        accounts_to_combine: Vec<ShrinkCollect<'a, ShrinkCollectAliveSeparatedByRefs<'a>>>,
+    ) {
         self.thread_pool_clean.install(|| {
-            accounts_to_combine
-                .into_par_iter()
-                .for_each(|combine| {
-                    self.accounts_index.scan(
-                        combine.unrefed_pubkeys.into_iter(),
-                        |_pubkey, _slots_refs, entry| {
-                            if let Some(entry) = entry {
-                                entry.addref();
-                            }
-                            AccountsIndexScanResult::OnlyKeepInMemoryIfDirty
-                        },
-                        None,
-                        true,
-                    );
-                });
+            accounts_to_combine.into_par_iter().for_each(|combine| {
+                self.accounts_index.scan(
+                    combine.unrefed_pubkeys.into_iter(),
+                    |_pubkey, _slots_refs, entry| {
+                        if let Some(entry) = entry {
+                            entry.addref();
+                        }
+                        AccountsIndexScanResult::OnlyKeepInMemoryIfDirty
+                    },
+                    None,
+                    true,
+                );
+            });
         });
     }
 
@@ -441,19 +462,39 @@ impl AccountsDb {
     ) -> AncientSlotInfos {
         let mut ancient_slot_infos = self.calc_ancient_slot_info(slots, tuning.can_randomly_shrink);
 
-        ancient_slot_infos.all_infos.iter().enumerate().for_each(|(i, ai)| {
-            if ai.slot == 266939489 || ai.slot == 265863227 {
-                log::error!("considering: {}, alive: {}, {}/{}", ai.slot, ai.alive_bytes, i, ancient_slot_infos.all_infos.len());
-            }
-        });
+        ancient_slot_infos
+            .all_infos
+            .iter()
+            .enumerate()
+            .for_each(|(i, ai)| {
+                if ai.slot == 266939489 || ai.slot == 265863227 {
+                    log::error!(
+                        "considering: {}, alive: {}, {}/{}",
+                        ai.slot,
+                        ai.alive_bytes,
+                        i,
+                        ancient_slot_infos.all_infos.len()
+                    );
+                }
+            });
 
         ancient_slot_infos.filter_ancient_slots(tuning);
 
-        ancient_slot_infos.all_infos.iter().enumerate().for_each(|(i, ai)| {
-            if ai.slot == 266939489 || ai.slot == 265863227 {
-                log::error!("considering: {}, alive: {}, {}/{}", ai.slot, ai.alive_bytes, i, ancient_slot_infos.all_infos.len());
-            }
-        });
+        ancient_slot_infos
+            .all_infos
+            .iter()
+            .enumerate()
+            .for_each(|(i, ai)| {
+                if ai.slot == 266939489 || ai.slot == 265863227 {
+                    log::error!(
+                        "considering: {}, alive: {}, {}/{}",
+                        ai.slot,
+                        ai.alive_bytes,
+                        i,
+                        ancient_slot_infos.all_infos.len()
+                    );
+                }
+            });
         log::error!("done filtering");
 
         ancient_slot_infos
@@ -642,7 +683,7 @@ impl AccountsDb {
         &self,
         accounts_per_storage: &'a mut Vec<(&'a SlotInfo, GetUniqueAccountsResult<'a>)>,
     ) -> AccountsToCombine<'a> {
-        accounts_per_storage.sort_by(|a,b| a.0.slot.cmp(&b.0.slot));
+        accounts_per_storage.sort_by(|a, b| a.0.slot.cmp(&b.0.slot));
         let mut accounts_keep_slots = HashMap::default();
         let len = accounts_per_storage.len();
         let mut target_slots_sorted = Vec::with_capacity(len);
@@ -667,45 +708,136 @@ impl AccountsDb {
         let skip_difficult = self.previous_ancient_pack_failed.load(Ordering::Relaxed);
 
         (1..accounts_per_storage.len()).for_each(|i| {
-            assert!(accounts_per_storage[i-1].0.slot < accounts_per_storage[i].0.slot);
+            assert!(accounts_per_storage[i - 1].0.slot < accounts_per_storage[i].0.slot);
         });
-        log::error!("jw: this many last dirty pubkeys: {}, {:?}", self.last_dirty_pubkeys.read().unwrap().len(), self.last_dirty_pubkeys.read().unwrap().iter().take(5).map(|e| {
-            (*e.key(), e.value().clone())
-        }).collect::<Vec<_>>());
+        log::error!(
+            "jw: this many last dirty pubkeys: {}, {:?}",
+            self.last_dirty_pubkeys.read().unwrap().len(),
+            self.last_dirty_pubkeys
+                .read()
+                .unwrap()
+                .iter()
+                .take(5)
+                .map(|e| { (*e.key(), e.value().clone()) })
+                .collect::<Vec<_>>()
+        );
         let mut remove = Vec::default();
         assert_eq!(accounts_to_combine.len(), accounts_per_storage.len());
         let mut all_old = 0;
         let mut all_old_zero = 0;
+        let mut all_slots = 0;
+        let mut all_slots_removed_old = 0;
+        let mut alive = 0;
+
         for (i, (shrink_collect, (info, _unique_accounts))) in accounts_to_combine
             .iter_mut()
             .zip(accounts_per_storage.iter())
             .enumerate()
         {
-            if skip_difficult && !shrink_collect.alive_accounts.many_refs_this_is_newest_alive.accounts.is_empty() {
-                all_old += shrink_collect.alive_accounts.many_refs_this_is_newest_alive.accounts.len();
-                all_old_zero += shrink_collect.alive_accounts.many_refs_this_is_newest_alive.accounts.iter().filter(|a| a.is_zero_lamport()).count();
+            all_slots += 1;
+            all_old += shrink_collect
+                .alive_accounts
+                .many_refs_this_is_newest_alive
+                .accounts
+                .len();
+            all_old_zero += shrink_collect
+                .alive_accounts
+                .many_refs_this_is_newest_alive
+                .accounts
+                .iter()
+                .filter(|a| a.is_zero_lamport())
+                .count();
+            if skip_difficult
+                && !shrink_collect
+                    .alive_accounts
+                    .many_refs_this_is_newest_alive
+                    .accounts
+                    .is_empty()
+            {
+                all_old += shrink_collect
+                    .alive_accounts
+                    .many_refs_this_is_newest_alive
+                    .accounts
+                    .len();
+                all_old_zero += shrink_collect
+                    .alive_accounts
+                    .many_refs_this_is_newest_alive
+                    .accounts
+                    .iter()
+                    .filter(|a| a.is_zero_lamport())
+                    .count();
                 remove.push(i);
-                log::error!("skip difficult, so get rid of: {}, count: {}", info.slot, shrink_collect.alive_accounts.many_refs_this_is_newest_alive.accounts.len());
+                log::error!(
+                    "skip difficult, so get rid of: {}, count: {}",
+                    info.slot,
+                    shrink_collect
+                        .alive_accounts
+                        .many_refs_this_is_newest_alive
+                        .accounts
+                        .len()
+                );
                 continue;
             }
 
-            self.shrink_ancient_stats.pubkeys_marked_for_clean.fetch_add(shrink_collect.alive_accounts.many_refs_old_alive.accounts.len() as u64, Ordering::Relaxed);
-            // if skip_difficult 
+            self.shrink_ancient_stats
+                .pubkeys_marked_for_clean
+                .fetch_add(
+                    shrink_collect
+                        .alive_accounts
+                        .many_refs_old_alive
+                        .accounts
+                        .len() as u64,
+                    Ordering::Relaxed,
+                );
+            // if skip_difficult
             {
                 let mut trying = self.last_dirty_pubkeys.write().unwrap();
-                shrink_collect.alive_accounts.many_refs_old_alive.accounts.iter().for_each(|a| {
-                    self.uncleaned_pubkeys.entry(info.slot).or_default().push(*a.pubkey());
-                    if let Some(e) = trying.get(a.pubkey()) {
-                        if e.value().contains(&info.slot) {
-                            log::error!("found same pubkey again: {}", a.pubkey());
+                let mut doit = false;
+                shrink_collect
+                    .alive_accounts
+                    .many_refs_old_alive
+                    .accounts
+                    .iter()
+                    .for_each(|a| {
+                        doit = true;
+                        self.uncleaned_pubkeys
+                            .entry(info.slot)
+                            .or_default()
+                            .push(*a.pubkey());
+                        if let Some(e) = trying.get(a.pubkey()) {
+                            if e.value().contains(&info.slot) {
+                                log::error!("found same pubkey again: {}", a.pubkey());
+                            }
                         }
-                    }
-                    trying.entry(*a.pubkey()).or_default().push(info.slot);
-                });
+                        trying.entry(*a.pubkey()).or_default().push(info.slot);
+                    });
+                self.accounts_index.scan(
+                    shrink_collect
+                        .alive_accounts
+                        .many_refs_old_alive
+                        .accounts
+                        .iter()
+                        .map(|i| i.pubkey()),
+                    |_pk, slot_list, _entry| {
+                        if let Some((slot_list, _)) = slot_list {
+                            if let Some(index_in_slot_list) =
+                                self.accounts_index.latest_slot(None, slot_list, None)
+                            {
+                                self.accounts_index.add_uncleaned_roots(
+                                    [slot_list[index_in_slot_list].0].into_iter(),
+                                );
+                            }
+                        }
+                        AccountsIndexScanResult::OnlyKeepInMemoryIfDirty
+                    },
+                    None,
+                    false,
+                );
             }
 
             let many_refs_old_alive = &mut shrink_collect.alive_accounts.many_refs_old_alive;
             if !many_refs_old_alive.accounts.is_empty() {
+                all_slots_removed_old += 1;
                 /*
                 many_refs_old_alive.accounts.iter().for_each(|account| {
                     // these accounts could indicate clean bugs or low memory conditions where we are forced to flush non-roots
@@ -716,7 +848,8 @@ impl AccountsDb {
                     );
                 });
                 */
-                {//if info.slot == 266939489 || info.slot == 265863227 || info.slot == 268019432 || info.slot == 268019460{                
+                {
+                    //if info.slot == 266939489 || info.slot == 265863227 || info.slot == 268019432 || info.slot == 268019460{
                     log::error!("many refs old alive: {}, count: {}, target_slots_sorted: {}, remove: {}, total: {}", info.slot, many_refs_old_alive.accounts.len(), target_slots_sorted.len(), remove.len(), accounts_per_storage.len());
                 }
                 // There are alive accounts with ref_count > 1, where the entry for the account in the index is NOT the highest slot. (`many_refs_old_alive`)
@@ -736,33 +869,48 @@ impl AccountsDb {
                         .is_empty()
                 {
                     // all accounts in this append vec are alive and have > 1 ref, so nothing to be done for this append vec
-                    log::error!("removing: {}, count: {}", info.slot, many_refs_old_alive.accounts.len());
+                    log::error!(
+                        "removing: {}, count: {}",
+                        info.slot,
+                        many_refs_old_alive.accounts.len()
+                    );
                     remove.push(i);
                     continue;
                 }
                 // once 90% of target slots have been identified, we don't want to try to claim a specific slot we have to use. This could cause this slot
-                // 
-                if target_slots_sorted.len() + remove.len() > accounts_per_storage.len() * 90 / 100 {
+                //
+                if target_slots_sorted.len() + remove.len() > accounts_per_storage.len() * 90 / 100
+                {
                     log::error!("removing because too few valid slots have been processed so far: {}, count: {}, target_slots_sorted: {}", info.slot, many_refs_old_alive.accounts.len(), target_slots_sorted.len());
                     remove.push(i);
                     continue;
                 }
+                alive += shrink_collect.alive_total_bytes;
                 accounts_keep_slots.insert(info.slot, std::mem::take(many_refs_old_alive));
             } else {
-                {//if info.slot == 266939489 || info.slot == 265863227 || info.slot == 268019432 || info.slot == 268019460 {                
+                {
+                    //if info.slot == 266939489 || info.slot == 265863227 || info.slot == 268019432 || info.slot == 268019460 {
                     log::error!("target_slots_sorted {}", info.slot);
                 }
+                if !shrink_collect.alive_accounts.many_refs_this_is_newest_alive.accounts.is_empty() && target_slots_sorted.len() + remove.len() > accounts_per_storage.len() * 90 / 100
+                {
+                    log::error!("removing because too few valid slots have been processed so far: {}, count: {}, target_slots_sorted: {}", info.slot, many_refs_old_alive.accounts.len(), target_slots_sorted.len());
+                    remove.push(i);
+                    continue;
+                }
 
+                alive += shrink_collect.alive_total_bytes;
                 // No alive accounts in this slot have a ref_count > 1. So, ALL alive accounts in this slot can be written to any other slot
                 // we find convenient. There is NO other instance of any account to conflict with.
                 target_slots_sorted.push(info.slot);
             }
         }
-        log::error!("jw: this many last dirty pubkeys, all old zero: {all_old_zero}/{all_old}");
+
+        log::error!("jw: this many last dirty pubkeys, all old zero: {all_old_zero}/{all_old}, all_slots: {all_slots}, all_slots_removed_old: {all_slots_removed_old}, alive: {alive}, len: {}, removed: {}, target_slots: {}",
+        accounts_to_combine.len(), remove.len(), target_slots_sorted.len());
         let unpackable_slots_count = remove.len();
         remove.into_iter().rev().for_each(|i| {
-            self.addref_accounts_failed_to_shrink_ancient(
-            vec![accounts_to_combine.remove(i)]);
+            self.addref_accounts_failed_to_shrink_ancient(vec![accounts_to_combine.remove(i)]);
         });
         target_slots_sorted.sort_unstable();
         AccountsToCombine {
