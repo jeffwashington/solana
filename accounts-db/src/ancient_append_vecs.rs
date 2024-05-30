@@ -647,6 +647,8 @@ impl AccountsDb {
         let len = accounts_per_storage.len();
         let mut target_slots_sorted = Vec::with_capacity(len);
 
+        // let old = std::mem::take(&mut *self.last_dirty_pubkeys.write().unwrap());
+
         // `shrink_collect` all accounts in the append vecs we want to combine.
         // This also unrefs all dead accounts in those append vecs.
         let mut accounts_to_combine = self.thread_pool_clean.install(|| {
@@ -684,8 +686,15 @@ impl AccountsDb {
             self.shrink_ancient_stats.pubkeys_marked_for_clean.fetch_add(shrink_collect.alive_accounts.many_refs_old_alive.accounts.len() as u64, Ordering::Relaxed);
             // if skip_difficult 
             {
+                let mut trying = self.last_dirty_pubkeys.write().unwrap();
                 shrink_collect.alive_accounts.many_refs_old_alive.accounts.iter().for_each(|a| {
                     self.uncleaned_pubkeys.entry(info.slot).or_default().push(*a.pubkey());
+                    if let Some(e) = trying.get(a.pubkey()) {
+                        if e.value().contains(&info.slot) {
+                            log::error!("found same pubkey again: {}", a.pubkey());
+                        }
+                    }
+                    trying.entry(*a.pubkey()).or_default().push(info.slot);
                 });
             }
 

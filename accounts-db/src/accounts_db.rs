@@ -1350,6 +1350,7 @@ type AccountInfoAccountsIndex = AccountsIndex<AccountInfo, AccountInfo>;
 // This structure handles the load/store of the accounts
 #[derive(Debug)]
 pub struct AccountsDb {
+    pub last_dirty_pubkeys: RwLock<DashMap<Pubkey, Vec<Slot>>>,
     /// Keeps tracks of index into AppendVec on a per slot basis
     pub accounts_index: AccountInfoAccountsIndex,
 
@@ -2419,6 +2420,7 @@ impl AccountsDb {
         const ACCOUNTS_STACK_SIZE: usize = 8 * 1024 * 1024;
 
         AccountsDb {
+            last_dirty_pubkeys: RwLock::default(),
             previous_ancient_pack_failed: AtomicBool::default(),
             create_ancient_storage: CreateAncientStorage::Pack,
             verify_accounts_hash_in_bg: VerifyAccountsHashInBackground::default(),
