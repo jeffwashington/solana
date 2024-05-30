@@ -2848,7 +2848,7 @@ impl AccountsDb {
         pubkey_to_slot_set: impl Iterator<Item = &'a (Pubkey, C)>,
     ) -> (Vec<(Slot, AccountInfo)>, PubkeysRemovedFromAccountsIndex)
     where
-        C: Contains<'a, Slot>,
+        C: Contains<'a, Slot> + std::fmt::Debug,
     {
         let mut reclaims = Vec::new();
         let mut dead_keys = Vec::new();
@@ -2862,7 +2862,7 @@ impl AccountsDb {
             let is_empty = self
                 .accounts_index
                 .purge_exact(pubkey, slots_set, &mut reclaims);
-            if let Some(mut e) = trying.get_mut(pubkey) {
+                if let Some(mut e) = trying.get_mut(pubkey) {
                 if prev_len == reclaims.len() {
                     log::error!("jw: failed to clean: {pubkey}, {:?}", e.value());
                 }
@@ -3217,6 +3217,10 @@ impl AccountsDb {
         let missing_accum = AtomicU64::new(0);
         let useful_accum = AtomicU64::new(0);
 
+        use std::str::FromStr;
+        let interesting = ["88EDVXDxa6FAUT5pqvCcdqQyc8Dw6kgt6uoHv5kpeDfa"];
+        let interesting = interesting.iter().map(|s| Pubkey::from_str(s).unwrap()).collect::<HashSet<_>>();
+
         // parallel scan the index.
         let (mut purges_zero_lamports, purges_old_accounts) = {
             let do_clean_scan = || {
@@ -3234,6 +3238,9 @@ impl AccountsDb {
                             |pubkey, slots_refs, _entry| {
                                 let mut useless = true;
                                 if let Some((slot_list, ref_count)) = slots_refs {
+                                    if interesting.contains(pubkey) {
+                                        log::error!("found: {pubkey}, rc: {ref_count}, {:?}", slot_list);
+                                    }
                                     let index_in_slot_list = self.accounts_index.latest_slot(
                                         None,
                                         slot_list,
@@ -3345,6 +3352,10 @@ let initial_len =        self.last_dirty_pubkeys.read().unwrap().len();
             if purged_account_slots.contains_key(key) {
                 *ref_count = self.accounts_index.ref_count_from_storage(key);
             }
+            if interesting.contains(key) {
+                log::error!("store loop zero: {key}, rc: {ref_count}, {:?}", account_infos);
+            }
+
             account_infos.retain(|(slot, account_info)| {
                 let was_slot_purged = purged_account_slots
                     .get(key)
@@ -3411,6 +3422,10 @@ let initial_len =        self.last_dirty_pubkeys.read().unwrap().len();
         let pubkey_to_slot_set: Vec<_> = purges_zero_lamports
             .into_iter()
             .map(|(key, (slots_list, _ref_count))| {
+                if interesting.contains(&key) {
+                    log::error!("pubkey_to_slot_set: {key}, rc: {_ref_count}, {:?}", slots_list);
+                }
+    
                 (
                     key,
                     slots_list

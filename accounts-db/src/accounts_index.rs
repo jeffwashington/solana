@@ -1275,9 +1275,16 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
         reclaims: &mut SlotList<T>,
     ) -> bool
     where
-        C: Contains<'a, Slot>,
+        C: Contains<'a, Slot> + std::fmt::Debug,
     {
+        use std::str::FromStr;
+        let interesting = ["88EDVXDxa6FAUT5pqvCcdqQyc8Dw6kgt6uoHv5kpeDfa"];
+        let interesting = interesting.iter().map(|s| Pubkey::from_str(s).unwrap()).collect::<HashSet<_>>();
         self.slot_list_mut(pubkey, |slot_list| {
+            let old = reclaims.len();
+            if interesting.contains(pubkey) {
+                log::error!("purge_exact: {pubkey}, slot: {:?}, slots_to_purge: {:?}", slot_list, slots_to_purge);
+            }
             slot_list.retain(|(slot, item)| {
                 let should_purge = slots_to_purge.contains(slot);
                 if should_purge {
@@ -1287,6 +1294,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
                     true
                 }
             });
+    
             slot_list.is_empty()
         })
         .unwrap_or(true)
