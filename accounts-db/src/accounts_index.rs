@@ -1278,7 +1278,14 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
         C: Contains<'a, Slot> + std::fmt::Debug,
     {
         use std::str::FromStr;
-        let interesting = ["88EDVXDxa6FAUT5pqvCcdqQyc8Dw6kgt6uoHv5kpeDfa"];
+        let interesting = [
+            "2LksDGnLhgUyF2sgjShCaA75PUiQNjYNvMKJVjZrGSLE",
+            "Bi5WfQ8mbE2wHPe3kcWNby15qJFEq3ib8vBC2o8pv9LY",
+            "Ca8wwgDB3cepdaqAhaESt7hNaytbC8YDv2xQuDodGt4r",
+            "DcBxXJ31FcJa24bWTc1xoYdksoUAhZq5HbWQuh9B6gtg",
+            "Es7SQhzT3V6dtteVkAKuoB4u2c8iiabbFKAknSzgYAVZ",
+            ]
+            ;
         let interesting = interesting.iter().map(|s| Pubkey::from_str(s).unwrap()).collect::<HashSet<_>>();
         self.slot_list_mut(pubkey, |slot_list| {
             let old = reclaims.len();

@@ -3218,7 +3218,14 @@ impl AccountsDb {
         let useful_accum = AtomicU64::new(0);
 
         use std::str::FromStr;
-        let interesting = ["88EDVXDxa6FAUT5pqvCcdqQyc8Dw6kgt6uoHv5kpeDfa"];
+        let interesting = [
+            "2LksDGnLhgUyF2sgjShCaA75PUiQNjYNvMKJVjZrGSLE",
+            "Bi5WfQ8mbE2wHPe3kcWNby15qJFEq3ib8vBC2o8pv9LY",
+            "Ca8wwgDB3cepdaqAhaESt7hNaytbC8YDv2xQuDodGt4r",
+            "DcBxXJ31FcJa24bWTc1xoYdksoUAhZq5HbWQuh9B6gtg",
+            "Es7SQhzT3V6dtteVkAKuoB4u2c8iiabbFKAknSzgYAVZ",
+            ]
+            ;
         let interesting = interesting.iter().map(|s| Pubkey::from_str(s).unwrap()).collect::<HashSet<_>>();
 
         // parallel scan the index.
@@ -8940,6 +8947,16 @@ let initial_len =        self.last_dirty_pubkeys.read().unwrap().len();
         rent_collector: &RentCollector,
         storage_info: &StorageSizeAndCountMap,
     ) -> SlotIndexGenerationInfo {
+        use std::str::FromStr;
+        let interesting = [
+            "2LksDGnLhgUyF2sgjShCaA75PUiQNjYNvMKJVjZrGSLE",
+            "Bi5WfQ8mbE2wHPe3kcWNby15qJFEq3ib8vBC2o8pv9LY",
+            "Ca8wwgDB3cepdaqAhaESt7hNaytbC8YDv2xQuDodGt4r",
+            "DcBxXJ31FcJa24bWTc1xoYdksoUAhZq5HbWQuh9B6gtg",
+            "Es7SQhzT3V6dtteVkAKuoB4u2c8iiabbFKAknSzgYAVZ",
+            ]
+            ;
+        let interesting = interesting.iter().map(|s| Pubkey::from_str(s).unwrap()).collect::<HashSet<_>>();
         let mut accounts = storage.accounts.account_iter();
         if accounts.next().is_none() {
             return SlotIndexGenerationInfo::default();
@@ -8954,13 +8971,12 @@ let initial_len =        self.last_dirty_pubkeys.read().unwrap().len();
         let mut amount_to_top_off_rent = 0;
         let mut stored_size_alive = 0;
 
-        use std::str::FromStr;
         let pk = Pubkey::from_str("88EDVXDxa6FAUT5pqvCcdqQyc8Dw6kgt6uoHv5kpeDfa").unwrap();
 
         let items = accounts.map(|stored_account| {
             stored_size_alive += stored_account.stored_size();
             let pubkey = stored_account.pubkey();
-            if pk == *pubkey {
+            if pk == *pubkey || interesting.contains(pubkey) {
                 log::error!("88EDVXDxa6FAUT5pqvCcdqQyc8Dw6kgt6uoHv5kpeDfa: {slot}, lamports: {}", stored_account.lamports());
             }
             if secondary {
