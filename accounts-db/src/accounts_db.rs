@@ -2636,7 +2636,7 @@ impl AccountsDb {
         epoch_schedule: &EpochSchedule,
     ) -> (ReclaimResult, PubkeysRemovedFromAccountsIndex) {
         let pubkeys_removed_from_accounts_index = HashSet::default();
-        if purges.is_empty() {
+                if purges.is_empty() {
             return (
                 ReclaimResult::default(),
                 pubkeys_removed_from_accounts_index,
@@ -3288,6 +3288,11 @@ impl AccountsDb {
                                                 }
             
                                                 useless = false;
+                                            }
+                                            else if interesting.contains(pubkey) {
+                                                if interesting.contains(pubkey) {
+                                                    log::error!("purges_old_accounts, skipping adding to purges_old_accounts: {pubkey}, len: {}, first uncleaned root: {:?}", uncleaned_roots.len(), uncleaned_roots.iter().next());
+                                                }
                                             }
                                         }
                                         None => {
