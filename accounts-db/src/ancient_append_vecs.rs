@@ -811,6 +811,7 @@ impl AccountsDb {
                         }
                         trying.entry(*a.pubkey()).or_default().push(info.slot);
                     });
+                    /*
                 self.accounts_index.scan(
                     shrink_collect
                         .alive_accounts
@@ -832,7 +833,7 @@ impl AccountsDb {
                     },
                     None,
                     false,
-                );
+                );*/
             }
 
             let many_refs_old_alive = &mut shrink_collect.alive_accounts.many_refs_old_alive;
