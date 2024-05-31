@@ -131,7 +131,7 @@ impl AncientSlotInfos {
     fn filter_ancient_slots(&mut self, tuning: &PackedAncientStorageTuning) {
         // figure out which slots to combine
         // 1. should_shrink: largest bytes saved above some cutoff of ratio
-        self.choose_storages_to_shrink(tuning.percent_of_alive_shrunk_data);
+        self.choose_storages_to_shrink(tuning);
         // 2. smallest files so we get the largest number of files to remove
         self.filter_by_smallest_capacity(tuning.max_ancient_slots, tuning.ideal_storage_size);
     }
@@ -148,12 +148,13 @@ impl AncientSlotInfos {
     }
 
     /// clear 'should_shrink' for storages after a cutoff to limit how many storages we shrink
-    fn clear_should_shrink_after_cutoff(&mut self, percent_of_alive_shrunk_data: u64) {
+    fn clear_should_shrink_after_cutoff(&mut self, tuning: &PackedAncientStorageTuning) {
         let mut bytes_to_shrink_due_to_ratio = Saturating(0);
         // shrink enough slots to write 'percent_of_alive_shrunk_data'% of the total alive data
         // from slots that exceeded the shrink threshold.
         // The goal is to limit overall i/o in this pass while making progress.
-        let threshold_bytes = self.total_alive_bytes_shrink.0 * percent_of_alive_shrunk_data / 100;
+        let mut threshold_bytes =
+            self.total_alive_bytes_shrink.0 * tuning.percent_of_alive_shrunk_data / 100;
         for info_index in &self.shrink_indexes {
             let info = &mut self.all_infos[*info_index];
             if bytes_to_shrink_due_to_ratio.0 >= threshold_bytes {
@@ -617,12 +618,14 @@ impl AccountsDb {
     /// 'accounts_per_storage' should be sorted by slot
     fn calc_accounts_to_combine<'a>(
         &self,
-        accounts_per_storage: &'a Vec<(&'a SlotInfo, GetUniqueAccountsResult)>,
+        accounts_per_storage: &'a mut Vec<(&'a SlotInfo, GetUniqueAccountsResult)>,
+        tuning: &PackedAncientStorageTuning,
     ) -> AccountsToCombine<'a> {
         let mut accounts_keep_slots = HashMap::default();
         let len = accounts_per_storage.len();
         let mut target_slots_sorted = Vec::with_capacity(len);
 
+        // reverse sort by slot #
         // `shrink_collect` all accounts in the append vecs we want to combine.
         // This also unrefs all dead accounts in those append vecs.
         let mut accounts_to_combine = self.thread_pool_clean.install(|| {
