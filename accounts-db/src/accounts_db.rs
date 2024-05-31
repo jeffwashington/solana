@@ -3289,10 +3289,23 @@ impl AccountsDb {
             
                                                 useless = false;
                                             }
-                                            else if interesting.contains(pubkey) {
+                                            else {
+                                                let mut entries = self.accounts_index.get_rooted_entries(
+                                                    slot_list,
+                                                    None,
+                                                );
+                                                entries.sort_by(|a,b| a.0.cmp(&b.0));
+                                                if let Some((last_slot, info)) = entries.last() {
+                                                    if info.is_zero_lamport() {
+                                                        log::error!("clean: last zero not marked for clean. slot: {last_slot}, max_clean_root_inclusive: {max_clean_root_inclusive:?}, diff: {}, uncleaned max: {}", max_clean_root_inclusive.map(|m| *last_slot as i64 - m as i64).unwrap_or_default(),
+                                                        uncleaned_roots.iter().max().cloned().unwrap_or_default());
+                                                    }
+                                                }
+                                            if interesting.contains(pubkey) {
                                                 if interesting.contains(pubkey) {
                                                     log::error!("purges_old_accounts, skipping adding to purges_old_accounts: {pubkey}, len: {}, first uncleaned root: {:?}", uncleaned_roots.len(), uncleaned_roots.iter().next());
                                                 }
+                                            }
                                             }
                                         }
                                         None => {
