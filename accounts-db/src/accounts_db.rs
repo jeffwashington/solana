@@ -9040,6 +9040,8 @@ impl AccountsDb {
                 m.stop();
                 index_flush_us = m.as_us();
 
+                let total_dups = AtomicU64::default();
+                let total_zeros = AtomicU64::default();
                 populate_duplicate_keys_us = measure_us!({
                     // this has to happen before visit_duplicate_pubkeys_during_startup below
                     // get duplicate keys from acct idx. We have to wait until we've finished flushing.
@@ -9050,6 +9052,23 @@ impl AccountsDb {
                             let unique_keys =
                                 HashSet::<Pubkey>::from_iter(slot_keys.iter().map(|(_, key)| *key));
                             for (slot, key) in slot_keys {
+                                let ent = self.accounts_index.get_cloned(&key).unwrap();
+                                let mut is_zero = false;
+                                let mut highest = 0;
+                                ent.slot_list
+                                    .read()
+                                    .unwrap()
+                                    .iter()
+                                    .for_each(|(slot, info)| {
+                                        if *slot >= highest {
+                                            highest = *slot;
+                                            is_zero = info.is_zero_lamport();
+                                        }
+                                    });
+                                if is_zero {
+                                    total_zeros.fetch_add(1, Ordering::Relaxed);
+                                }
+                                total_dups.fetch_add(1, Ordering::Relaxed);
                                 self.uncleaned_pubkeys.entry(slot).or_default().push(key);
                             }
                             let unique_pubkeys_by_bin_inner =
@@ -9060,6 +9079,11 @@ impl AccountsDb {
                                 .unwrap()
                                 .push(unique_pubkeys_by_bin_inner);
                         });
+                    log::error!(
+                        "zeros: {}/{}",
+                        total_zeros.load(Ordering::Relaxed),
+                        total_dups.load(Ordering::Relaxed)
+                    );
                 })
                 .1;
             }
