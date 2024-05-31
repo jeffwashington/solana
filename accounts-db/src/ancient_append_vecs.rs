@@ -650,6 +650,12 @@ impl AccountsDb {
         });
         let max_required_slots =
             (total_alive_bytes.load(Ordering::Relaxed) / tuning.ideal_storage_size) + 1;
+        self.shrink_ancient_stats
+            .ideal_count
+            .store(max_required_slots, Ordering::Relaxed);
+        self.shrink_ancient_stats
+            .slots_attempted
+            .store(accounts_per_storage.len() as u64, Ordering::Relaxed);
 
         let mut remove = Vec::default();
         for (i, (shrink_collect, (info, _unique_accounts))) in accounts_to_combine
@@ -657,12 +663,20 @@ impl AccountsDb {
             .zip(accounts_per_storage.iter())
             .enumerate()
         {
-            if !shrink_collect.alive_accounts.many_refs_this_is_newest_alive.accounts.is_empty() && target_slots_sorted.len() <= max_required_slots as usize {
+            if !shrink_collect
+                .alive_accounts
+                .many_refs_this_is_newest_alive
+                .accounts
+                .is_empty()
+                && target_slots_sorted.len() <= max_required_slots as usize
+            {
                 // Some accounts in this storage are the newest ref and have to be moved to a newer slot.
                 // Right now, the logic checks for all many ref newest accounts are at a slot >= the minimum target slot.
                 // We can know that this slot is too near the ideal target slot to move forward in slot #. So, we should skip it and pack it next time.
                 // Note that we sorted slots highest to lowest before running this loop.
-                self.shrink_ancient_stats.many_ref_newest_skipped.fetch_add(1, Ordering::Relaxed);
+                self.shrink_ancient_stats
+                    .many_ref_newest_skipped
+                    .fetch_add(1, Ordering::Relaxed);
                 remove.push(i);
                 continue;
             }
