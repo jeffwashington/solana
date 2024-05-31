@@ -671,6 +671,11 @@ pub struct AccountsIndex<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> {
 }
 
 impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
+    pub fn find_old_uncleaned(&self, maxroot: Slot) {
+        self.account_maps.iter().for_each(|map| {
+            map.find_old_uncleaned(maxroot);
+        });
+    }
     pub fn default_for_tests() -> Self {
         Self::new(Some(ACCOUNTS_INDEX_CONFIG_FOR_TESTING), Arc::default())
     }
