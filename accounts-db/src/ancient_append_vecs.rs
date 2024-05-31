@@ -134,7 +134,7 @@ impl AncientSlotInfos {
     fn filter_ancient_slots(&mut self, tuning: &PackedAncientStorageTuning) {
         // figure out which slots to combine
         // 1. should_shrink: largest bytes saved above some cutoff of ratio
-        self.choose_storages_to_shrink(tuning.percent_of_alive_shrunk_data);
+        self.choose_storages_to_shrink(tuning);
         // 2. smallest files so we get the largest number of files to remove
         self.filter_by_smallest_capacity(tuning.max_ancient_slots, tuning.ideal_storage_size);
     }
@@ -151,21 +151,28 @@ impl AncientSlotInfos {
     }
 
     /// clear 'should_shrink' for storages after a cutoff to limit how many storages we shrink
-    fn clear_should_shrink_after_cutoff(&mut self, percent_of_alive_shrunk_data: u64) {
+    fn clear_should_shrink_after_cutoff(&mut self, tuning: &PackedAncientStorageTuning) {
         let mut bytes_to_shrink_due_to_ratio = Saturating(0);
         // shrink enough slots to write 'percent_of_alive_shrunk_data'% of the total alive data
         // from slots that exceeded the shrink threshold.
         // The goal is to limit overall i/o in this pass while making progress.
-        let threshold_bytes = self.total_alive_bytes_shrink.0 * percent_of_alive_shrunk_data / 100;
+        let mut threshold_bytes =
+            self.total_alive_bytes_shrink.0 * tuning.percent_of_alive_shrunk_data / 100;
+        threshold_bytes = threshold_bytes.min(
+            u64::from(tuning.ideal_storage_size) * 10 * tuning.percent_of_alive_shrunk_data / 100,
+        ); // keep big shrinks from occupying the entire result
         for info_index in &self.shrink_indexes {
             let info = &mut self.all_infos[*info_index];
+            if bytes_to_shrink_due_to_ratio.0 < threshold_bytes {
+                // adding here means we won't include the storage that would exceed the threshold
+                bytes_to_shrink_due_to_ratio += info.alive_bytes;
+            }
+
             if bytes_to_shrink_due_to_ratio.0 >= threshold_bytes {
                 // we exceeded the amount to shrink due to alive ratio, so don't shrink this one just due to 'should_shrink'
                 // It MAY be shrunk based on total capacity still.
                 // Mark it as false for 'should_shrink' so it gets evaluated solely based on # of files.
                 info.should_shrink = false;
-            } else {
-                bytes_to_shrink_due_to_ratio += info.alive_bytes;
             }
         }
     }
@@ -173,12 +180,12 @@ impl AncientSlotInfos {
     /// after this function, only slots that were chosen to shrink are marked with
     /// 'should_shrink'
     /// There are likely more candidates to shrink than will be chosen.
-    fn choose_storages_to_shrink(&mut self, percent_of_alive_shrunk_data: u64) {
+    fn choose_storages_to_shrink(&mut self, tuning: &PackedAncientStorageTuning) {
         // sort the shrink_ratio_slots by most bytes saved to fewest
         // most bytes saved is more valuable to shrink
         self.sort_shrink_indexes_by_bytes_saved();
 
-        self.clear_should_shrink_after_cutoff(percent_of_alive_shrunk_data);
+        self.clear_should_shrink_after_cutoff(tuning);
     }
 
     /// truncate 'all_infos' such that when the remaining entries in
@@ -648,13 +655,10 @@ impl AccountsDb {
                 })
                 .collect::<Vec<_>>()
         });
-        let max_required_slots =
-            (total_alive_bytes.load(Ordering::Relaxed) / tuning.ideal_storage_size) + 1;
+        let total_alive_bytes = total_alive_bytes.load(Ordering::Relaxed);
+        let max_required_slots = (total_alive_bytes / tuning.ideal_storage_size) + 1;
         self.shrink_ancient_stats
-            .ideal_count
-            .store(max_required_slots, Ordering::Relaxed);
-        self.shrink_ancient_stats
-            .slots_attempted
+            .ancient_scanned
             .store(accounts_per_storage.len() as u64, Ordering::Relaxed);
 
         let mut remove = Vec::default();
