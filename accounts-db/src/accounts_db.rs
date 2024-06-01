@@ -3494,6 +3494,10 @@ let initial_len =        self.last_dirty_pubkeys.read().unwrap().len();
             &pubkeys_removed_from_accounts_index,
         );
 
+        if let Some(max) = max_clean_root_inclusive {
+            self.accounts_index.find_old_uncleaned(max);
+        }
+
         reclaims_time.stop();
         measure_all.stop();
 
