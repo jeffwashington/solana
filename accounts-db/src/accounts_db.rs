@@ -3187,6 +3187,7 @@ impl AccountsDb {
         let useful_accum = AtomicU64::new(0);
 
         // parallel scan the index.
+        let count = pubkeys.len();
         let (mut purges_zero_lamports, purges_old_accounts) = {
             let do_clean_scan = || {
                 pubkeys
@@ -3239,6 +3240,21 @@ impl AccountsDb {
                                                 }
                                                 purges_old_accounts.push(*pubkey);
                                                 useless = false;
+                                            }
+                                            else {
+                                                if !uncleaned_roots.is_empty() {
+                                                    let mut entries = self.accounts_index.get_rooted_entries(
+                                                        slot_list,
+                                                        None,
+                                                    );
+                                                    entries.sort_by(|a,b| a.0.cmp(&b.0));
+                                                    if let Some((last_slot, info)) = entries.last() {
+                                                        if info.is_zero_lamport() {
+                                                            log::error!("clean: {pubkey} last zero not marked for clean. slot: {last_slot}, max_clean_root_inclusive: {max_clean_root_inclusive:?}, diff: {}, uncleaned max: {}, count: {count}", max_clean_root_inclusive.map(|m| *last_slot as i64 - m as i64).unwrap_or_default(),
+                                                            uncleaned_roots.iter().max().cloned().unwrap_or_default());
+                                                        }
+                                                    }
+                                                }
                                             }
                                         }
                                         None => {
@@ -3404,6 +3420,12 @@ impl AccountsDb {
             reset_accounts,
             &pubkeys_removed_from_accounts_index,
         );
+
+        if let Some(max) = max_clean_root_inclusive {
+            log::error!("_active find_old_uncleaned=1");
+            self.accounts_index.find_old_uncleaned(max);
+            log::error!("_active find_old_uncleaned=0");
+        }
 
         reclaims_time.stop();
         measure_all.stop();

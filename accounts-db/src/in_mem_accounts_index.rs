@@ -165,6 +165,40 @@ struct FlushScanResult<T> {
 }
 
 impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T, U> {
+    pub fn find_old_uncleaned(&self, maxroot: Slot) {
+        if thread_rng().gen_range(0..10) != 0 {
+            // don't do every bin every time. it takes too long and blows memory.
+            return;
+        }
+        let m = self.map_internal.read().unwrap().iter().map(|(pk, inner)| {
+            (*pk, Arc::clone(inner))
+        }).collect::<Vec<_>>();
+        m.iter().for_each(|(pk, inner)| {
+            if inner.ref_count() > 1 {
+                let l=
+                inner.slot_list.read().unwrap();
+                if l.len() > 1 {
+                    if l.iter().filter(|e| e.0 < maxroot).count() > 1 {
+                        let mut max = 0;
+                        let mut max_info = l[0].1;
+                        l.iter().for_each(|l| {
+                            if l.0 >= maxroot {
+                                return;
+                            }
+                            if l.0 > max {
+                                max = l.0;
+                                max_info = l.1;
+                            }
+                        });
+                        {//if max_info.is_zero_lamport() {
+                            log::error!("found uncleaned: {}, {:?}, max: {}", pk, l, maxroot);
+                        }
+                    }
+                }
+            }
+        });
+    }
+
     pub fn new(storage: &Arc<BucketMapHolder<T, U>>, bin: usize) -> Self {
         let num_ages_to_distribute_flushes = Age::MAX - storage.ages_to_stay_in_cache;
         Self {
