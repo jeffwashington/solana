@@ -663,8 +663,10 @@ impl AccountsDb {
         });
 
         // We want ceiling, so we add 1.
-        // 0 < alive_bytes < `ideal_storage_size`, then `min_resulting_packed_slots` = 0. We obviously require 1 packed slot if we have at 1 alive byte.
-        let min_resulting_packed_slots = alive_bytes / u64::from(tuning.ideal_storage_size) + 1;
+        // 0 < alive_bytes < `ideal_storage_size`, then `min_resulting_packed_slots` = 0.
+        // We obviously require 1 packed slot if we have at 1 alive byte.
+        let min_resulting_packed_slots =
+            alive_bytes.saturating_sub(1) / u64::from(tuning.ideal_storage_size) + 1;
         let mut remove = Vec::default();
         let mut last_slot = None;
         for (i, (shrink_collect, (info, _unique_accounts))) in accounts_to_combine
@@ -1706,16 +1708,17 @@ pub mod tests {
                                     .zip(original_results.into_iter())
                                     .collect::<Vec<_>>();
 
-                                let alive_bytes = 1;
+                                let alive_bytes = num_slots;
                                 let accounts_to_combine = db.calc_accounts_to_combine(
                                     &mut accounts_per_storage,
                                     &default_tuning(),
-                                    alive_bytes,
+                                    alive_bytes as u64,
                                     many_ref_slots,
                                 );
                                 assert_eq!(
                                     accounts_to_combine.accounts_to_combine.len(),
-                                    if !two_refs || many_ref_slots == IncludeManyRefSlots::Include {num_slots} else {0},
+                                    // if we are only trying to pack a single slot of multi-refs, it will succeed
+                                    if !two_refs || many_ref_slots == IncludeManyRefSlots::Include || num_slots == 1 {num_slots} else {0},
                                     "method: {method:?}, num_slots: {num_slots}, two_refs: {two_refs}, many_refs: {many_ref_slots:?}"
                                 );
 
@@ -1728,7 +1731,10 @@ pub mod tests {
                                 // all accounts should be in one_ref and all slots are available as target slots
                                 assert_eq!(
                                     accounts_to_combine.target_slots_sorted,
-                                    if !two_refs || many_ref_slots == IncludeManyRefSlots::Include {
+                                    if !two_refs
+                                        || many_ref_slots == IncludeManyRefSlots::Include
+                                        || num_slots == 1
+                                    {
                                         if unsorted_slots {
                                             slots_vec.iter().cloned().rev().collect::<Vec<_>>()
                                         } else {
