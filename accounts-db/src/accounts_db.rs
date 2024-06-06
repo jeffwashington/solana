@@ -138,7 +138,7 @@ pub const PUBKEY_BINS_FOR_CALCULATING_HASHES: usize = 65536;
 // If this is too big, we don't get enough parallelism of scanning storages.
 // If this is too small, then we produce too many output vectors to iterate.
 // Metrics indicate a sweet spot in the 2.5k-5k range for mnb.
-const MAX_ITEMS_PER_CHUNK: Slot = 2_500;
+const MAX_ITEMS_PER_CHUNK: Slot = 1;
 
 // When getting accounts for shrinking from the index, this is the # of accounts to lookup per thread.
 // This allows us to split up accounts index accesses across multiple threads.
@@ -171,7 +171,7 @@ enum ScanAccountStorageResult {
     /// this data has already been scanned and cached
     CacheFileAlreadyExists(CacheHashDataFileReference),
     /// this data needs to be scanned and cached
-    CacheFileNeedsToBeCreated((String, Range<Slot>)),
+    CacheFileNeedsToBeCreated((String, Range<Slot>, Option<PathBuf>)),
 }
 
 #[derive(Default, Debug)]
@@ -3999,7 +3999,7 @@ impl AccountsDb {
         }
 
         let total_accounts_after_shrink = shrink_collect.alive_accounts.len();
-        debug!(
+        log::error!(
             "shrinking: slot: {}, accounts: ({} => {}) bytes: {} original: {}",
             slot,
             shrink_collect.total_starting_accounts,
@@ -5555,7 +5555,7 @@ impl AccountsDb {
                     ret.recycle(slot, self.next_id());
                     // This info shows the appendvec change history.  It helps debugging
                     // the appendvec data corrupution issues related to recycling.
-                    debug!(
+                    log::error!(
                         "recycling store: old slot {}, old_id: {}, new slot {}, new id{}, path {:?} ",
                         slot,
                         old_id,
@@ -7044,7 +7044,7 @@ impl AccountsDb {
             let storage_file = append_vec.accounts.get_path();
             slot.hash(hasher);
             storage_file.hash(hasher);
-            let amod = std::fs::metadata(storage_file);
+            let amod = std::fs::metadata(storage_file.clone());
             if amod.is_err() {
                 return false;
             }
@@ -7057,6 +7057,8 @@ impl AccountsDb {
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
                 .as_secs();
+            log::error!("hashing: {:?}", (slot, append_vec.written_bytes(), storage_file, amod, append_vec.approx_stored_count(), append_vec.accounts.len()));
+
             amod.hash(hasher);
         }
         // if we made it here, we have hashed info and we should try to load from the cache
@@ -7133,6 +7135,11 @@ impl AccountsDb {
                     bin_range.end,
                     hash
                 );
+                let mut old = None;
+                if load_from_cache {
+                    old = cache_hash_data.move_it(&file_name);
+                    load_from_cache = false;
+                }
                 if load_from_cache {
                     if let Ok(mapped_file) =
                         cache_hash_data.get_file_reference_to_map_later(&file_name)
@@ -7147,6 +7154,7 @@ impl AccountsDb {
                 Some(ScanAccountStorageResult::CacheFileNeedsToBeCreated((
                     file_name,
                     range_this_chunk,
+                    old
                 )))
             })
             .collect::<Vec<_>>();
@@ -7185,6 +7193,7 @@ impl AccountsDb {
                     ScanAccountStorageResult::CacheFileNeedsToBeCreated((
                         file_name,
                         range_this_chunk,
+                        old,
                     )) => {
                         let mut scanner = scanner.clone();
                         let mut init_accum = true;
@@ -7222,6 +7231,17 @@ impl AccountsDb {
                                 (!r.is_empty() && r.iter().any(|b| !b.is_empty())).then(|| {
                                     // error if we can't write this
                                     cache_hash_data.save(&file_name, &r).unwrap();
+                                    if let Some(old) = old {
+                                        if cache_hash_data.compare2(old, &file_name) {
+                                            for i in snapshot_storages.iter_range(&range_this_chunk) {
+                                                log::error!("diff: {:?}, {:?}", file_name, i);
+                                            }
+                                            loop {
+                                                
+                                            }
+                                            panic!("");
+                                        }
+                                    }
                                     cache_hash_data
                                         .get_file_reference_to_map_later(&file_name)
                                         .unwrap()
