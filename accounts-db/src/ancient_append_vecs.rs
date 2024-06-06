@@ -316,6 +316,15 @@ impl AccountsDb {
             .slots_considered
             .fetch_add(sorted_slots.len() as u64, Ordering::Relaxed);
         let ancient_slot_infos = self.collect_sort_filter_ancient_slots(sorted_slots, &tuning);
+        ancient_slot_infos.all_infos.iter().for_each(|info| {
+            log::error!(
+                "packing slot: {}, should_shrink: {}, alive_bytes: {}, # accts: {}",
+                info.slot,
+                info.should_shrink,
+                info.alive_bytes,
+                info.storage.approx_stored_count(),
+            );
+        });
 
         if ancient_slot_infos.all_infos.is_empty() {
             return; // nothing to do
@@ -324,6 +333,13 @@ impl AccountsDb {
             .get_unique_accounts_from_storage_for_combining_ancient_slots(
                 &ancient_slot_infos.all_infos[..],
             );
+        accounts_per_storage.iter().for_each(|aps| {
+            log::error!(
+                "packing slot2: {}, # accounts: {}",
+                aps.0.slot,
+                aps.1.stored_accounts.len(),
+            );
+        });
 
         let mut accounts_to_combine = self.calc_accounts_to_combine(&accounts_per_storage);
         metrics.unpackable_slots_count += accounts_to_combine.unpackable_slots_count;
@@ -377,6 +393,16 @@ impl AccountsDb {
             self.addref_accounts_failed_to_shrink_ancient(accounts_to_combine);
             return;
         }
+
+        log::error!(
+            "packing into: {:?}",
+            accounts_to_combine
+                .target_slots_sorted
+                .iter()
+                .rev()
+                .take(pack.len())
+                .collect::<Vec<_>>()
+        );
 
         let write_ancient_accounts = self.write_packed_storages(&accounts_to_combine, pack);
 
