@@ -12,10 +12,10 @@ pub enum BufferedReaderStatus {
 
 /// read a file a large buffer at a time and provide access to a slice in that buffer
 pub struct BufferedReader<'a> {
-    offset_of_next_read: usize,
+    file_offset_of_next_read: usize,
     buf: Box<[u8]>,
-    valid_bytes: Range<usize>,
-    last_offset: usize,
+    buf_valid_bytes: Range<usize>,
+    file_last_offset: usize,
     read_requirements: Option<usize>,
     file_len_valid: usize,
     file: &'a File,
@@ -34,10 +34,10 @@ impl<'a> BufferedReader<'a> {
     ) -> Self {
         let buffer_size = buffer_size.min(file_len_valid);
         Self {
-            offset_of_next_read: 0,
+            file_offset_of_next_read: 0,
             buf: vec![0; buffer_size].into_boxed_slice(),
-            valid_bytes: 0..0,
-            last_offset: 0,
+            buf_valid_bytes: 0..0,
+            file_last_offset: 0,
             read_requirements: None,
             file_len_valid,
             file,
@@ -49,17 +49,17 @@ impl<'a> BufferedReader<'a> {
         let must_read = self
             .read_requirements
             .unwrap_or(self.default_min_read_requirement);
-        if self.valid_bytes.len() < must_read {
+        if self.buf_valid_bytes.len() < must_read {
             // we haven't used all the bytes we read last time, so adjust the effective offset
-            self.last_offset = self.offset_of_next_read - self.valid_bytes.len();
+            self.file_last_offset = self.file_offset_of_next_read - self.buf_valid_bytes.len();
             read_more_buffer(
                 self.file,
-                &mut self.offset_of_next_read,
+                &mut self.file_offset_of_next_read,
                 &mut self.buf,
-                &mut self.valid_bytes,
+                &mut self.buf_valid_bytes,
                 self.file_len_valid,
             )?;
-            if self.valid_bytes.len() < must_read {
+            if self.buf_valid_bytes.len() < must_read {
                 return Ok(BufferedReaderStatus::Eof);
             }
         }
@@ -69,20 +69,20 @@ impl<'a> BufferedReader<'a> {
     }
     /// return the biggest slice of valid data starting at the current offset
     fn get_data(&'a self) -> ValidSlice<'a> {
-        ValidSlice::new(&self.buf[self.valid_bytes.clone()])
+        ValidSlice::new(&self.buf[self.buf_valid_bytes.clone()])
     }
     /// return offset within `file` of start of read at current offset
     pub fn get_data_and_offset(&'a self) -> (usize, ValidSlice<'a>) {
-        (self.last_offset + self.valid_bytes.start, self.get_data())
+        (self.file_last_offset + self.buf_valid_bytes.start, self.get_data())
     }
     /// advance the offset of where to read next by `delta`
     pub fn advance_offset(&mut self, delta: usize) {
-        if self.valid_bytes.len() >= delta {
-            self.valid_bytes.start += delta;
+        if self.buf_valid_bytes.len() >= delta {
+            self.buf_valid_bytes.start += delta;
         } else {
-            let additional_amount_to_skip = delta - self.valid_bytes.len();
-            self.valid_bytes = 0..0;
-            self.offset_of_next_read += additional_amount_to_skip;
+            let additional_amount_to_skip = delta - self.buf_valid_bytes.len();
+            self.buf_valid_bytes = 0..0;
+            self.file_offset_of_next_read += additional_amount_to_skip;
         }
     }
     /// specify the amount of data required to read next time `read` is called

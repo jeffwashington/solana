@@ -14,8 +14,9 @@ pub fn read_more_buffer(
     valid_bytes: &mut Range<usize>,
     valid_len: usize,
 ) -> std::io::Result<()> {
-    // copy remainder of `valid_bytes` into beginning of `buffer`
-    (0..valid_bytes.len()).for_each(|i| buffer[i] = buffer[i + valid_bytes.start]);
+    // copy remainder of `valid_bytes` into beginning of `buffer`.
+    // These bytes were left over from the last read but weren't enough for the next desired contiguous read chunk.
+    buffer.copy_within(valid_bytes.clone(), 0);
 
     // read the rest of `buffer`
     let bytes_read = read_buffer(file, *offset, &mut buffer[valid_bytes.len()..], valid_len)?;
