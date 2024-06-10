@@ -36,7 +36,7 @@ use {
     },
 };
 
-const INTERVAL_MS: u64 = 100;
+const INTERVAL_MS: u64 = 1000;
 const CLEAN_INTERVAL_BLOCKS: u64 = 100;
 
 pub type SnapshotRequestSender = Sender<SnapshotRequest>;
@@ -301,7 +301,9 @@ impl SnapshotRequestHandler {
         } = snapshot_request;
 
         // we should not rely on the state of this validator until startup verification is complete
+        log::error!("abs: {}", line!());
         assert!(snapshot_root_bank.is_startup_verification_complete());
+        log::error!("abs: {}", line!());
 
         if accounts_package_kind == AccountsPackageKind::Snapshot(SnapshotKind::FullSnapshot) {
             // The latest full snapshot slot is what accounts-db uses to properly handle zero lamport
@@ -333,6 +335,12 @@ impl SnapshotRequestHandler {
         // Ensure all roots <= `self.slot()` have been flushed.
         // Note `max_flush_root` could be larger than self.slot() if there are
         // `> MAX_CACHE_SLOT` cached and rooted slots which triggered earlier flushes.
+        log::error!("abs: {}, {}, {}", line!(), snapshot_root_bank.slot(), snapshot_root_bank
+        .rc
+        .accounts
+        .accounts_db
+        .accounts_cache
+        .fetch_max_flush_root());
         assert!(
             snapshot_root_bank.slot()
                 <= snapshot_root_bank
@@ -344,6 +352,7 @@ impl SnapshotRequestHandler {
         );
         flush_accounts_cache_time.stop();
 
+        log::error!("abs: {}", line!());
         let accounts_hash_for_testing = previous_accounts_hash.map(|previous_accounts_hash| {
             let (this_accounts_hash, capitalization) = snapshot_root_bank
                 .accounts()
@@ -364,18 +373,19 @@ impl SnapshotRequestHandler {
             this_accounts_hash
         });
 
+        log::error!("abs: {}", line!());
         let mut clean_time = Measure::start("clean_time");
         snapshot_root_bank.clean_accounts();
         clean_time.stop();
 
-        let (_, shrink_ancient_time_us) = measure_us!(snapshot_root_bank.shrink_ancient_slots());
-
+        log::error!("abs: {}", line!());
         let mut shrink_time = Measure::start("shrink_time");
         snapshot_root_bank.shrink_candidate_slots();
         shrink_time.stop();
 
         // Snapshot the bank and send over an accounts package
         let mut snapshot_time = Measure::start("snapshot_time");
+        log::error!("abs: {}", line!());
         let snapshot_storages = snapshot_bank_utils::get_snapshot_storages(&snapshot_root_bank);
         let accounts_package = match request_kind {
             SnapshotRequestKind::Snapshot => match &accounts_package_kind {
@@ -407,15 +417,19 @@ impl SnapshotRequestHandler {
                 )
             }
         };
+        log::error!("abs: {}", line!());
         let send_result = self.accounts_package_sender.send(accounts_package);
+        log::error!("abs: {}", line!());
         if let Err(err) = send_result {
             // Sending the accounts package should never fail *unless* we're shutting down.
             let accounts_package = &err.0;
+            log::error!("abs: {}", line!());
             assert!(
                 exit.load(Ordering::Relaxed),
                 "Failed to send accounts package: {err}, {accounts_package:?}"
             );
         }
+        log::error!("abs: {}", line!());
         snapshot_time.stop();
         info!(
             "Handled snapshot request. accounts package kind: {:?}, slot: {}, bank hash: {}",
@@ -438,7 +452,6 @@ impl SnapshotRequestHandler {
             ("snapshot_time", snapshot_time.as_us(), i64),
             ("total_us", total_time.as_us(), i64),
             ("non_snapshot_time_us", non_snapshot_time_us, i64),
-            ("shrink_ancient_time_us", shrink_ancient_time_us, i64),
         );
         Ok(snapshot_root_bank.block_height())
     }
@@ -590,7 +603,7 @@ impl AccountsBackgroundService {
 
                     // Grab the current root bank
                     let bank = bank_forks.read().unwrap().root_bank();
-
+                    log::error!("AccountsBackgroundService: {}", line!());
                     // Purge accounts of any dead slots
                     request_handlers
                         .pruned_banks_request_handler
@@ -606,7 +619,7 @@ impl AccountsBackgroundService {
                         })
                         .unwrap_or_default();
 
-                    // Check to see if there were any requests for snapshotting banks
+                        // Check to see if there were any requests for snapshotting banks
                     // < the current root bank `bank` above.
 
                     // Claim: Any snapshot request for slot `N` found here implies that the last cleanup
@@ -628,6 +641,7 @@ impl AccountsBackgroundService {
                     // snapshot requests.  This is because startup verification and snapshot
                     // request handling can both kick off accounts hash calculations in background
                     // threads, and these must not happen concurrently.
+                    log::error!("AccountsBackgroundService: {}", line!());
                     let snapshot_handle_result = bank
                         .is_startup_verification_complete()
                         .then(|| {
@@ -641,12 +655,14 @@ impl AccountsBackgroundService {
                     if snapshot_handle_result.is_some() {
                         last_snapshot_end_time = Some(Instant::now());
                     }
+                    log::error!("AccountsBackgroundService: {}", line!());
 
                     // Note that the flush will do an internal clean of the
                     // cache up to bank.slot(), so should be safe as long
                     // as any later snapshots that are taken are of
                     // slots >= bank.slot()
                     bank.flush_accounts_cache_if_needed();
+                    log::error!("AccountsBackgroundService: {}", line!());
 
                     if let Some(snapshot_handle_result) = snapshot_handle_result {
                         // Safe, see proof above
@@ -689,7 +705,7 @@ impl AccountsBackgroundService {
                             bank.shrink_candidate_slots();
                         }
                     }
-                    stats.record_and_maybe_submit(start_time.elapsed());
+                    stats.record_and_maybe_submit(start_time.elapsed(), bank.slot());
                     sleep(Duration::from_millis(INTERVAL_MS));
                 }
                 info!("AccountsBackgroundService has stopped");
