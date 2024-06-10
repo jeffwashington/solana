@@ -11,10 +11,12 @@ use {
     },
     dashmap::DashMap,
     log::*,
+    solana_measure::measure_us,
     solana_sdk::{
         account::{AccountSharedData, ReadableAccount},
         address_lookup_table::{self, error::AddressLookupError, state::AddressLookupTable},
         clock::{BankId, Slot},
+        hash::Hasher,
         message::v0::{LoadedAddresses, MessageAddressTableLookup},
         pubkey::Pubkey,
         slot_hashes::SlotHashes,
@@ -32,6 +34,21 @@ use {
         },
     },
 };
+
+lazy_static! {
+    static ref KNOWNIDS: Vec<Pubkey> = {
+
+           const KNOWN_VALIDATOR_IDS: [&str; 4] = [
+            "31fxZovs3gBKVVTtC2VJUuKeVoq6mQkLjWnicWhErQ4f", // pop1
+            "Edfkf9gpC7KpnkNdKRPmseCtkE1zY8fUVRJMbiLYKKdK", // pop2
+            "2k31vk7hPiu2T9fJzuunc6tmaE57P7wt6tFoGK5A7k47", // pop3
+            "3cVWsRiTXD99BXNhzXs7Gkm3YBhCDrMQWnLern8B7TrD", // pop4
+        ];
+        use std::str::FromStr;
+        use solana_sdk::pubkey::Pubkey;
+KNOWN_VALIDATOR_IDS.iter().map(|s| Pubkey::from_str(s).unwrap()).collect()
+};
+}
 
 pub type PubkeyAccountSlot = (Pubkey, AccountSharedData, Slot);
 
@@ -583,13 +600,160 @@ impl Accounts {
     }
 
     /// Store the accounts into the DB
+    /// allow(clippy) needed for various gating flags
+    /// returns additional lamports used to create dummy accounts
+    #[allow(clippy::too_many_arguments)]
+    #[must_use]
     pub fn store_cached<'a>(
         &self,
         accounts: impl StorableAccounts<'a>,
         transactions: &'a [Option<&'a SanitizedTransaction>],
-    ) {
+        ancestors: &'a Ancestors,
+    ) -> Option<u64> {
+        let slot = accounts.target_slot();
+        let mut additional_lamports_result = None;
+        let mut pks = Vec::default();
+        let solana_vote_program: Pubkey = solana_vote_program::id();
+        let mut num_dup = 0;
+
+        // skip adding dummy account for vote tx
+        let create_dummy_accounts = true;
+
+        if create_dummy_accounts {
+            let mut additional_lamports = 0;
+            let (_, us) = measure_us!({
+                for i in 0..accounts.len() {
+                    self.accounts_db.maybe_throttle_add();
+                    let mut pk = accounts.account(i, |a| *a.pubkey());
+                    if KNOWNIDS.contains(&pk) {
+                        continue;
+                    }
+                    if                      accounts.account(i, |a| a.owner() == &solana_vote_program) {
+                        continue;
+                    }
+
+                    let mut src_account = AccountSharedData::default();
+                    use solana_sdk::account::WritableAccount;
+                    use solana_sdk::rent_collector::RENT_EXEMPT_RENT_EPOCH;
+                    src_account.set_lamports(890_880); // minimum lamports to be rent-exempted
+                    src_account.set_rent_epoch(RENT_EXEMPT_RENT_EPOCH);
+
+                    let range = 4_000_000usize;
+                    let num_duplicates: usize = (900
+                        * (range
+                            .saturating_sub((slot as usize).saturating_sub(280_000).min(range))
+                            * 100000
+                            / range)
+                        / 100000
+                        + 100)
+                        .min(1000);
+                    num_dup = num_duplicates;
+                    for _duplicates in 0..num_duplicates {
+                        // only add this if it doesn't already exist in the index
+                        let mut hasher = Hasher::default();
+                        hasher.hash(pk.as_ref());
+                        hasher.hash(&slot.to_be_bytes());
+                        pk = Pubkey::from(hasher.result().to_bytes());
+                        pks.push((pk, src_account.clone()));
+                    }
+                }
+
+                use rayon::iter::IntoParallelRefIterator;
+                use rayon::iter::ParallelIterator;
+                use std::sync::atomic::AtomicU64;
+                // only add pubkeys which don't exist yet.
+                // if it already exists, then cap changes will not be right
+                self.accounts_db.maybe_throttle_add();
+                let additional_lamports_atomic = AtomicU64::default();
+                let retain = pks
+                    .par_iter()
+                    .map(|(k, acct)| {
+                        self.accounts_db.maybe_throttle_add();
+                        let retain = self
+                            .accounts_db
+                            .load_with_fixed_root(ancestors, k)
+                            .is_none();
+                        if retain {
+                            additional_lamports_atomic
+                                .fetch_add(acct.lamports(), Ordering::Relaxed);
+                        }
+                        /*
+                        self.accounts_db.accounts_index.scan(
+                            std::iter::once(k),
+                            |_pk, slot_ref, _entry| {
+                                retain = slot_ref.is_none();
+                                if retain {
+                                    additional_lamports_atomic.fetch_add(acct.lamports(), Ordering::Relaxed);
+                                }
+                                crate::accounts_index::AccountsIndexScanResult::OnlyKeepInMemoryIfDirty
+                            },
+                            None,
+                            false,
+                        );
+                        */
+                        retain
+                    })
+                    .collect::<Vec<_>>();
+                self.accounts_db.maybe_throttle_add();
+                additional_lamports = additional_lamports_atomic.load(Ordering::Relaxed);
+                let mut i = 0;
+                pks.retain(|(k, acct)| {
+                    let r = retain[i];
+                    i += 1;
+                    r
+                });
+                if accounts.len() <= 4 {
+                    log::error!(
+                        "duplicates creating: {}, original accounts to store: {:?}, num_dup: {}",
+                        pks.len(),
+                        (0..accounts.len()).map(|i| accounts.account(i, |account| (
+                                *account.pubkey(),
+                                *account.owner(),
+                            )))
+                            .collect::<Vec<_>>(),
+                        num_dup
+                    );
+                }
+            });
+            //log::error!("adding {} dummy accounts, took: {}us, slot: {slot}", pks.len(), us);
+            datapoint_info!(
+                "dummy_accounts",
+                ("original_accounts", accounts.len(), i64),
+                ("count", pks.len(), i64),
+                ("dup_accounts_per_original", num_dup, i64),
+                ("total_us", us, i64),
+            );
+
+            let additional = pks
+                .iter()
+                .map(|(k, account)| (k, account))
+                .collect::<Vec<_>>();
+            self.accounts_db.store_cached((slot, &additional[..]), None);
+
+            let mut ancestors_vec = ancestors.keys();
+            ancestors_vec.sort_unstable();
+            let mut hasher = Hasher::default();
+            hasher.hash(&slot.to_be_bytes());
+            ancestors_vec.into_iter().for_each(|slot| {
+                hasher.hash(&slot.to_be_bytes());
+            });
+            let pk_dummies = Pubkey::from(hasher.result().to_bytes());
+            match self.accounts_db.dummies.entry(pk_dummies) {
+                dashmap::mapref::entry::Entry::Occupied(mut occupied_entry) => {
+                    occupied_entry
+                        .get_mut()
+                        .extend(pks.into_iter().map(|(k, v)| k));
+                }
+                dashmap::mapref::entry::Entry::Vacant(vacant_entry) => {
+                    vacant_entry.insert(pks.into_iter().map(|(k, v)| k).collect::<Vec<_>>());
+                }
+            }
+
+            additional_lamports_result = Some(additional_lamports);
+        }
         self.accounts_db
             .store_cached_inline_update_index(accounts, Some(transactions));
+        additional_lamports_result
     }
 
     pub fn store_accounts_cached<'a>(&self, accounts: impl StorableAccounts<'a>) {
