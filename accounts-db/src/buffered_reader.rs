@@ -12,13 +12,21 @@ pub enum BufferedReaderStatus {
 
 /// read a file a large buffer at a time and provide access to a slice in that buffer
 pub struct BufferedReader<'a> {
+    /// when we are next asked to read from file, start at this offset
     file_offset_of_next_read: usize,
+    /// the most recently read data. `buf_valid_bytes` specifies the range of `buf` that is valid.
     buf: Box<[u8]>,
+    /// specifies the range of `buf` that contains valid data that has not been used by the caller
     buf_valid_bytes: Range<usize>,
+    /// offset in the file of the `buf_valid_bytes`.`start`
     file_last_offset: usize,
+    /// how many contiguous bytes caller needs
     read_requirements: Option<usize>,
+    /// how many bytes are valid in the file. The file's len may be longer.
     file_len_valid: usize,
+    /// reference to file handle
     file: &'a File,
+    /// we always want at least this many contiguous bytes available or we must read more into the buffer.
     default_min_read_requirement: usize,
 }
 
@@ -73,7 +81,10 @@ impl<'a> BufferedReader<'a> {
     }
     /// return offset within `file` of start of read at current offset
     pub fn get_data_and_offset(&'a self) -> (usize, ValidSlice<'a>) {
-        (self.file_last_offset + self.buf_valid_bytes.start, self.get_data())
+        (
+            self.file_last_offset + self.buf_valid_bytes.start,
+            self.get_data(),
+        )
     }
     /// advance the offset of where to read next by `delta`
     pub fn advance_offset(&mut self, delta: usize) {
