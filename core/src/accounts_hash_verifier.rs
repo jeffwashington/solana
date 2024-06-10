@@ -29,6 +29,8 @@ use {
         },
         thread::{self, Builder, JoinHandle},
         time::Duration,
+        collections::{HashSet, HashMap},
+
     },
 };
 
@@ -52,9 +54,11 @@ impl AccountsHashVerifier {
                 info!("AccountsHashVerifier has started");
                 loop {
                     if exit.load(Ordering::Relaxed) {
+                        log::error!("stop: {}", line!());
                         break;
                     }
 
+                    //log::error!("stop: {}", line!());
                     let Some((
                         accounts_package,
                         num_outstanding_accounts_packages,
@@ -67,6 +71,7 @@ impl AccountsHashVerifier {
                         std::thread::sleep(LOOP_LIMITER);
                         continue;
                     };
+                    log::error!("stop: {}", line!());
                     info!("handling accounts package: {accounts_package:?}");
                     let enqueued_time = accounts_package.enqueued.elapsed();
 
@@ -304,10 +309,11 @@ impl AccountsHashVerifier {
 
         let mut timings = HashStats {
             storage_sort_us,
-            ..HashStats::default()
+            ..HashStats::new()
         };
         timings.calc_storage_size_quartiles(&accounts_package.snapshot_storages);
 
+        log::error!("fail {}", line!());
         let calculate_accounts_hash_config = CalcAccountsHashConfig {
             use_bg_thread_pool: true,
             ancestors: None,
@@ -316,6 +322,7 @@ impl AccountsHashVerifier {
             store_detailed_debug_info_on_failure: false,
         };
 
+        log::error!("fail {}", line!());
         let slot = accounts_package.slot;
         let ((accounts_hash, lamports), measure_hash_us) =
             measure_us!(accounts_package.accounts.accounts_db.update_accounts_hash(
@@ -326,6 +333,11 @@ impl AccountsHashVerifier {
             ));
 
         if accounts_package.expected_capitalization != lamports {
+            log::error!("fail {}", line!());
+            log::error!("cap doesn't match: {}, {}", accounts_package.expected_capitalization, lamports);
+
+            return (accounts_hash, lamports);
+
             // before we assert, run the hash calc again. This helps track down whether it could have been a failure in a race condition possibly with shrink.
             // We could add diagnostics to the hash calc here to produce a per bin cap or something to help narrow down how many pubkeys are different.
             let calculate_accounts_hash_config = CalcAccountsHashConfig {
@@ -351,9 +363,16 @@ impl AccountsHashVerifier {
             );
         }
 
+        log::error!("fail {}", line!());
+        assert_eq!(
+            accounts_package.expected_capitalization, lamports,
+            "accounts hash capitalization mismatch"
+        );
+        log::error!("fail {}", line!());
         if let Some(expected_hash) = accounts_package.accounts_hash_for_testing {
             assert_eq!(expected_hash, accounts_hash);
         };
+        log::error!("fail {}", line!());
 
         datapoint_info!(
             "accounts_hash_verifier",
@@ -411,10 +430,12 @@ impl AccountsHashVerifier {
         accounts_package: &AccountsPackage,
         accounts_hash: AccountsHashKind,
     ) {
+        log::error!("fail {}", line!());
         if accounts_package.package_kind == AccountsPackageKind::EpochAccountsHash {
             let AccountsHashKind::Full(accounts_hash) = accounts_hash else {
                 panic!("EAH requires a full accounts hash!");
             };
+            log::error!("fail: {}", line!());
             info!(
                 "saving epoch accounts hash, slot: {}, hash: {}",
                 accounts_package.slot, accounts_hash.0,
@@ -484,6 +505,7 @@ impl AccountsHashVerifier {
             .unwrap()
             .push(snapshot_package);
     }
+
 
     pub fn join(self) -> thread::Result<()> {
         self.t_accounts_hash_verifier.join()
