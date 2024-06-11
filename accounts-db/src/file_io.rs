@@ -44,16 +44,25 @@ pub fn read_buffer(
     }
 
     while start_read < buffer.len() {
-        let bytes_read_this_time = file.read_at(&mut buffer[start_read..], offset as u64)?;
-        total_bytes_read += bytes_read_this_time;
-        if total_bytes_read + start_offset >= valid_len {
-            total_bytes_read -= (total_bytes_read + start_offset) - valid_len;
-            // we've read all there is in the file
-            break;
+        match file.read_at(&mut buffer[start_read..], offset as u64) {
+            Err(err) => {
+                if err.kind() == std::io::ErrorKind::Interrupted {
+                    continue;
+                }
+                return Err(err);
+            }
+            Ok(bytes_read_this_time) => {
+                total_bytes_read += bytes_read_this_time;
+                if total_bytes_read + start_offset >= valid_len {
+                    total_bytes_read -= (total_bytes_read + start_offset) - valid_len;
+                    // we've read all there is in the file
+                    break;
+                }
+                // There is possibly more to read. `read_at` may have returned partial results, so prepare to loop and read again.
+                start_read += bytes_read_this_time;
+                offset += bytes_read_this_time;
+            }
         }
-        // There is possibly more to read. `read_at` may have returned partial results, so prepare to loop and read again.
-        start_read += bytes_read_this_time;
-        offset += bytes_read_this_time;
     }
     Ok(total_bytes_read)
 }

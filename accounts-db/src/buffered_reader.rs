@@ -1,4 +1,13 @@
 //! File I/O buffered reader for AppendVec
+//! Specialized BufRead-like type for reading account data.
+//!
+//! Callers can use this type to iterate efficiently over append vecs. They can do so by repeatedly
+//! calling read(), advance_offset() and set_required_data_len(account_data_len) once the next account
+//! data length is known.
+//!
+//! Unlike BufRead/BufReader, this type guarnatees that on the next read() after calling
+//! set_required_data_len(len), the whole account data is buffered _linearly_ in memory and available to
+//! be returned.
 use {
     crate::{append_vec::ValidSlice, file_io::read_more_buffer},
     std::{fs::File, ops::Range},

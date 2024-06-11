@@ -27,6 +27,7 @@ use {
         hash::Hash,
         pubkey::Pubkey,
         stake_history::Epoch,
+        system_instruction::MAX_PERMITTED_DATA_LENGTH,
     },
     std::{
         convert::TryFrom,
@@ -231,7 +232,7 @@ enum AppendVecFileBacking {
     /// A file-backed block of memory that is used to store the data for each appended item.
     MmapOnly(MmapOnly),
     /// This was opened as a read only file
-    #[allow(dead_code)]
+    #[cfg_attr(not(unix), allow(dead_code))]
     FileOnly(File),
 }
 
@@ -273,9 +274,16 @@ pub struct AppendVec {
     remove_file_on_drop: AtomicBool,
 }
 
+const PAGE_SIZE: u64 = 4 * 1024;
+fn page_align(size: u64) -> u64 {
+    (size + (PAGE_SIZE - 1)) & !(PAGE_SIZE - 1)
+}
+
 lazy_static! {
     pub static ref APPEND_VEC_MMAPPED_FILES_OPEN: AtomicU64 = AtomicU64::default();
     pub static ref APPEND_VEC_MMAPPED_FILES_DIRTY: AtomicU64 = AtomicU64::default();
+    /// big enough for 3x the largest account size
+    pub static ref SCAN_BUFFER_SIZE: usize = page_align((STORE_META_OVERHEAD as u64 + MAX_PERMITTED_DATA_LENGTH) * 3) as usize;
 }
 
 impl Drop for AppendVec {
@@ -468,7 +476,7 @@ impl AppendVec {
     }
 
     /// Creates an appendvec from file without performing sanitize checks or counting the number of accounts
-    #[allow(unused_variables)]
+    #[cfg_attr(not(unix), allow(unused_variables))]
     pub fn new_from_file_unchecked(
         path: impl Into<PathBuf>,
         current_len: usize,
@@ -691,15 +699,12 @@ impl AppendVec {
                         return Some(callback(account));
                     } else {
                         // not enough was read from file to get `data`
-                        assert!(data_len <= 20_000_000, "{}", data_len);
+                        assert!(data_len <= MAX_PERMITTED_DATA_LENGTH, "{data_len}");
                         let mut data = vec![0u8; data_len as usize];
                         // instead, we could piece together what we already read here. Maybe we just needed 1 more byte.
                         // Note here `next` is a 0-based offset from the beginning of this account.
-                        let Ok(bytes_read) =
-                            read_buffer(file, offset + next, &mut data, self.len())
-                        else {
-                            return None;
-                        };
+                        let bytes_read =
+                            read_buffer(file, offset + next, &mut data, self.len()).ok()?;
                         if bytes_read < data_len as usize {
                             // eof or otherwise couldn't read all the data
                             return None;
@@ -839,7 +844,7 @@ impl AppendVec {
             }
             AppendVecFileBacking::FileOnly(file) => {
                 let mut reader =
-                    BufferedReader::new(1024 * 1024 * 32, self.len(), file, STORE_META_OVERHEAD);
+                    BufferedReader::new(*SCAN_BUFFER_SIZE, self.len(), file, STORE_META_OVERHEAD);
                 while reader.read().ok() == Some(BufferedReaderStatus::Success) {
                     let (offset, bytes_subset) = reader.get_data_and_offset();
                     let (meta, next): (&StoredMeta, _) = Self::get_type(bytes_subset, 0).unwrap();
@@ -888,9 +893,8 @@ impl AppendVec {
                 {}
             }
             AppendVecFileBacking::FileOnly(file) => {
-                // big enough for > 2x the largest account
                 let mut reader =
-                    BufferedReader::new(1024 * 1024 * 32, self.len(), file, STORE_META_OVERHEAD);
+                    BufferedReader::new(*SCAN_BUFFER_SIZE, self.len(), file, STORE_META_OVERHEAD);
                 while reader.read().ok() == Some(BufferedReaderStatus::Success) {
                     let (offset, bytes_subset) = reader.get_data_and_offset();
                     let (meta, next): (&StoredMeta, _) = Self::get_type(bytes_subset, 0).unwrap();
