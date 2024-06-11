@@ -68,3 +68,77 @@ pub fn read_buffer(
 ) -> std::io::Result<usize> {
     panic!("unimplemented");
 }
+
+#[cfg(test)]
+mod tests {
+
+    use {super::*, std::io::Write, tempfile::tempfile};
+
+    #[cfg(unix)]
+    #[test]
+    fn test_read_buffer() {
+        // Setup a sample file with 32 bytes of data
+        let mut sample_file = tempfile().unwrap();
+        let bytes: Vec<u8> = (0..32).collect();
+        sample_file.write_all(&bytes).unwrap();
+
+        // Read all 32 bytes into buffer
+        let mut buffer = [0; 32];
+        let num_bytes_read = read_buffer(&sample_file, 0, &mut buffer, 32).unwrap();
+        assert_eq!(num_bytes_read, 32);
+        assert_eq!(bytes, buffer);
+
+        // Given a 64-byte buffer, it should only read 32 bytes into the buffer
+        let mut buffer = [0; 64];
+        let num_bytes_read = read_buffer(&sample_file, 0, &mut buffer, 32).unwrap();
+        assert_eq!(num_bytes_read, 32);
+        assert_eq!(bytes, buffer[0..32]);
+        assert_eq!(buffer[32..64], [0; 32]);
+
+        // Given the `valid_len` is 16, it should only read 16 bytes into the buffer
+        let mut buffer = [0; 32];
+        let num_bytes_read = read_buffer(&sample_file, 0, &mut buffer, 16).unwrap();
+        assert_eq!(num_bytes_read, 16);
+        assert_eq!(bytes[0..16], buffer[0..16]);
+        // As a side effect of the `read_buffer` the data passed `valid_len` was
+        // read and put into the buffer, though these data should not be
+        // consumed.
+        assert_eq!(buffer[16..32], bytes[16..32]);
+
+        // Given the start offset 8, it should only read 24 bytes into buffer
+        let mut buffer = [0; 32];
+        let num_bytes_read = read_buffer(&sample_file, 8, &mut buffer, 32).unwrap();
+        assert_eq!(num_bytes_read, 24);
+        assert_eq!(buffer[0..24], bytes[8..32]);
+        assert_eq!(buffer[24..32], [0; 8])
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_read_more_buffer() {
+        // Setup a sample file with 32 bytes of data
+        let mut sample_file = tempfile().unwrap();
+        let bytes: Vec<u8> = (0..32).collect();
+        sample_file.write_all(&bytes).unwrap();
+
+        // Should move left-over 8 bytes to and read 24 bytes from file
+        let mut buffer = [0xFFu8; 32];
+        let mut offset = 0;
+        let mut valid_bytes = 24..32;
+        read_more_buffer(&sample_file, &mut offset, &mut buffer, &mut valid_bytes, 32).unwrap();
+        assert_eq!(offset, 24);
+        assert_eq!(valid_bytes, 0..32);
+        assert_eq!(buffer[0..8], [0xFFu8; 8]);
+        assert_eq!(buffer[8..32], bytes[0..24]);
+
+        // Should move left-over 8 bytes to and read 16 bytes from file due to EOF
+        let mut buffer = [0xFFu8; 32];
+        let mut offset = 16;
+        let mut valid_bytes = 24..32;
+        read_more_buffer(&sample_file, &mut offset, &mut buffer, &mut valid_bytes, 32).unwrap();
+        assert_eq!(offset, 32);
+        assert_eq!(valid_bytes, 0..24);
+        assert_eq!(buffer[0..8], [0xFFu8; 8]);
+        assert_eq!(buffer[8..24], bytes[16..32]);
+    }
+}

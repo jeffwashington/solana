@@ -101,3 +101,133 @@ impl<'a> BufferedReader<'a> {
         self.read_requirements = Some(len);
     }
 }
+
+#[cfg(test)]
+mod tests {
+
+    use {super::*, std::io::Write, tempfile::tempfile};
+
+    #[cfg(unix)]
+    #[test]
+    fn test_buffered_reader() {
+        // Setup a sample file with 32 bytes of data
+        let mut sample_file = tempfile().unwrap();
+        let bytes: Vec<u8> = (0..32).collect();
+        sample_file.write_all(&bytes).unwrap();
+
+        // First read 16 bytes to fill buffer
+        let mut reader = BufferedReader::new(16, 32, &sample_file, 8);
+        let result = reader.read().unwrap();
+        assert_eq!(result, BufferedReaderStatus::Success);
+        let (offset, slice) = reader.get_data_and_offset();
+        assert_eq!(offset, 0);
+        assert_eq!(slice.len(), 16);
+        assert_eq!(slice.slice(), &bytes[0..16]);
+
+        // Consume the data and attempt to read next 32 bytes, expect to hit EOF and only read 16 bytes
+        reader.advance_offset(16);
+        reader.set_required_data_len(32);
+        let result = reader.read().unwrap();
+        assert_eq!(result, BufferedReaderStatus::Eof);
+        let (offset, slice) = reader.get_data_and_offset();
+        assert_eq!(offset, 16);
+        assert_eq!(slice.len(), 16);
+        assert_eq!(slice.slice(), &bytes[16..32]);
+
+        // Continue reading should yield EOF and empty slice.
+        reader.advance_offset(16);
+        reader.set_required_data_len(32);
+        let result = reader.read().unwrap();
+        assert_eq!(result, BufferedReaderStatus::Eof);
+        let (offset, slice) = reader.get_data_and_offset();
+        assert_eq!(offset, 32);
+        assert_eq!(slice.len(), 0);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_buffered_reader_with_extra_data_in_file() {
+        // Setup a sample file with 32 bytes of data
+        let mut sample_file = tempfile().unwrap();
+        let bytes: Vec<u8> = (0..32).collect();
+        sample_file.write_all(&bytes).unwrap();
+
+        // Set file valid_len to 30 (i.e. 2 garbage bytes at the end of the file)
+        let valid_len = 30;
+
+        // First read 16 bytes to fill buffer
+        let mut reader = BufferedReader::new(16, valid_len, &sample_file, 8);
+        let result = reader.read().unwrap();
+        assert_eq!(result, BufferedReaderStatus::Success);
+        let (offset, slice) = reader.get_data_and_offset();
+        assert_eq!(offset, 0);
+        assert_eq!(slice.len(), 16);
+        assert_eq!(slice.slice(), &bytes[0..16]);
+
+        // Consume the data and attempt read next 32 bytes, expect to hit `valid_len`, and only read 14 bytes
+        reader.advance_offset(16);
+        reader.set_required_data_len(32);
+        let result = reader.read().unwrap();
+        assert_eq!(result, BufferedReaderStatus::Eof);
+        let (offset, slice) = reader.get_data_and_offset();
+        assert_eq!(offset, 16);
+        assert_eq!(slice.len(), 14);
+        assert_eq!(slice.slice(), &bytes[16..30]);
+
+        // Continue reading should yield EOF and empty slice.
+        reader.advance_offset(14);
+        reader.set_required_data_len(32);
+        let result = reader.read().unwrap();
+        assert_eq!(result, BufferedReaderStatus::Eof);
+        let (offset, slice) = reader.get_data_and_offset();
+        assert_eq!(offset, 30);
+        assert_eq!(slice.len(), 0);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_buffered_reader_partial_consume() {
+        // Setup a sample file with 32 bytes of data
+        let mut sample_file = tempfile().unwrap();
+        let bytes: Vec<u8> = (0..32).collect();
+        sample_file.write_all(&bytes).unwrap();
+
+        // First read 16 bytes to fill buffer
+        let mut reader = BufferedReader::new(16, 32, &sample_file, 8);
+        let result = reader.read().unwrap();
+        assert_eq!(result, BufferedReaderStatus::Success);
+        let (offset, slice) = reader.get_data_and_offset();
+        assert_eq!(offset, 0);
+        assert_eq!(slice.len(), 16);
+        assert_eq!(slice.slice(), &bytes[0..16]);
+
+        // Consume the partial data (8 byte) and attempt to read next 8 bytes
+        reader.advance_offset(8);
+        reader.set_required_data_len(8);
+        let result = reader.read().unwrap();
+        assert_eq!(result, BufferedReaderStatus::Success);
+        let (offset, slice) = reader.get_data_and_offset();
+        assert_eq!(offset, 8);
+        assert_eq!(slice.len(), 8);
+        assert_eq!(slice.slice(), &bytes[8..16]); // no need to read more
+
+        // Continue reading should yield EOF and read the rest 16 bytes.
+        reader.advance_offset(8);
+        reader.set_required_data_len(16);
+        let result = reader.read().unwrap();
+        assert_eq!(result, BufferedReaderStatus::Success);
+        let (offset, slice) = reader.get_data_and_offset();
+        assert_eq!(offset, 16);
+        assert_eq!(slice.len(), 16);
+        assert_eq!(slice.slice(), &bytes[16..32]);
+
+        // Continue reading should yield EOF and empty slice.
+        reader.advance_offset(16);
+        reader.set_required_data_len(32);
+        let result = reader.read().unwrap();
+        assert_eq!(result, BufferedReaderStatus::Eof);
+        let (offset, slice) = reader.get_data_and_offset();
+        assert_eq!(offset, 32);
+        assert_eq!(slice.len(), 0);
+    }
+}
