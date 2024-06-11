@@ -2,7 +2,12 @@
 #[cfg(test)]
 use crate::pubkey_bins::PubkeyBinCalculator24;
 use {
-    crate::{accounts_hash::CalculateHashIntermediate, cache_hash_data_stats::CacheHashDataStats},
+    crate::{
+        accounts_hash::{CalculateHashIntermediate},
+        cache_hash_data_stats::CacheHashDataStats,
+        pubkey_bins::PubkeyBinCalculator24,
+    },
+    log::*,
     memmap2::MmapMut,
     solana_measure::measure::Measure,
     std::{
@@ -35,7 +40,6 @@ impl CacheHashDataFile {
         self.get_slice(0)
     }
 
-    #[cfg(test)]
     /// Populate 'accumulator' from entire contents of the cache file.
     pub(crate) fn load_all(
         &self,
@@ -149,19 +153,203 @@ pub struct CacheHashData {
 
 impl Drop for CacheHashData {
     fn drop(&mut self) {
-        self.delete_old_cache_files();
+        //self.delete_old_cache_files();
         self.stats.lock().unwrap().report();
     }
 }
 
+type hashentry = (usize, solana_sdk::hash::Hash, u64);
+
 impl CacheHashData {
-    pub fn new(cache_dir: PathBuf) -> CacheHashData {
-        std::fs::create_dir_all(&cache_dir).unwrap_or_else(|err| {
-            panic!("error creating cache dir {}: {err}", cache_dir.display())
+    pub fn compare_two<P: AsRef<Path> + std::fmt::Debug>(files: &[&P; 2]) {
+        let datas = files.into_iter().map(|p| Self::new(p)).collect::<Vec<_>>();
+        use {dashmap::DashMap, std::collections::HashMap};
+        let mut one = Mutex::new(HashMap::<Pubkey, Vec<hashentry>>::new());
+        let mut two = Mutex::new(HashMap::<Pubkey, Vec<hashentry>>::new());
+        let cache_one = &datas[0];
+        use solana_sdk::pubkey::Pubkey;
+        let mut files = cache_one
+            .pre_existing_cache_files
+            .lock()
+            .unwrap()
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>();
+        let vec_size = 65536;
+
+        use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+        let bin_calc = PubkeyBinCalculator24::new(65536);
+        use std::str::FromStr;
+        let interesting = Pubkey::from_str("JARQT5Jeb3nXH8vjE1pMiX5RADWshsRyLyDd7V72TjuZ").unwrap();
+        let p1 = crate::accounts_partition::partition_from_pubkey(&interesting, 432_000);
+
+        use log::*;
+        error!("{}{}, p1: {}, {}", file!(), line!(), p1, interesting);
+        files.sort();
+        let cache_two = &datas[1];
+        let mut files2 = cache_two
+            .pre_existing_cache_files
+            .lock()
+            .unwrap()
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>();
+        use log::*;
+        files2.sort();
+
+        [0, 1].par_iter().for_each(|i| {
+
+            if i == &0 {
+                    let mut one: std::sync::MutexGuard<'_, HashMap<Pubkey, Vec<(usize, solana_sdk::hash::Hash, u64)>>> = one.lock().unwrap();
+        files.iter().enumerate().for_each(|(i_file, file)| {
+            //error!("file: {:?}", file);
+            let mut accum = (0..vec_size).map(|_| Vec::default()).collect::<Vec<_>>();
+            let x = cache_one.load_map(file);
+            log::error!("file1: {}, {:?}", i_file, file);
+            if x.is_err() {
+                error!("failure to load file :{:?}", file);
+                return;
+            }
+            x.unwrap().load_all(&mut accum, 0, &bin_calc, &mut CacheHashDataStats::default());
+            accum.into_iter().flatten().for_each(|entry| {
+                let pk = entry.pubkey;
+                if i_file == 81 {
+                    log::error!("found1: {}, {}, {}, {}", i_file, pk, entry.hash, entry.lamports);
+                }
+                let new_one = (i_file, entry.hash, entry.lamports);
+                if interesting == pk {
+                    error!("found1: {:?}", new_one);
+                }
+                if let Some(mut current) = one.get_mut(&pk) {
+                    current.push(new_one);
+                } else {
+                    one.insert(pk, vec![new_one]);
+                }
+            });
         });
+    }
+    else {
+        error!("{}{}", file!(), line!());
+        let mut two = two.lock().unwrap();
+        files2.iter().enumerate().for_each(|(i_file, file)| {
+            log::error!("file2: {}, {:?}", i_file, file);
+            //error!("file2: {:?}", file);
+            let mut accum = (0..vec_size).map(|_| Vec::default()).collect::<Vec<_>>();
+            let x = cache_two.load_map(file);
+            if x.is_err() {
+                error!("failure to load file2 :{:?}", file);
+                return;
+            }
+            x.unwrap().load_all(&mut accum, 0, &bin_calc, &mut CacheHashDataStats::default());
+            accum.into_iter().flatten().for_each(|entry| {
+                let pk = entry.pubkey;
+                if i_file == 81 {
+                    log::error!("found2: {}, {}, {}, {}", i_file, pk, entry.hash, entry.lamports);
+                }
+                let new_one = (i_file, entry.hash, entry.lamports);
+                if interesting == pk {
+                    error!("found2: {:?}", new_one);
+                }
+                if let Some(mut current) = two.get_mut(&pk) {
+                    current.push(new_one);
+                } else {
+                    two.insert(pk, vec![new_one]);
+                }
+            });
+        });
+    }});
+
+    let mut one = one.into_inner().unwrap();
+    let mut two = two.into_inner().unwrap();
+    error!(
+            "items in one: {}, two: {}, files in one, two: {}, {}",
+            one.len(),
+            two.len(),
+            files.len(),
+            files2.len()
+        );
+
+        let mut cap1 = 0;
+        let mut cap2 = 0;
+        let mut added1 = 0;
+        let mut added2 = 0;
+        let ZERO_RAW_LAMPORTS_SENTINEL = 0;
+        error!("draining");
+        for entry in one.iter() {
+            let k = entry.0;
+            let mut v = entry.1.clone();
+            //v.sort_by(Self::sorter);
+            let one = v.last().unwrap();
+            if one.2 != ZERO_RAW_LAMPORTS_SENTINEL && one.2 != 0{
+                cap1 += one.2;
+                added1 += 1;
+            }
+            if let Some(mut entry) = two.remove(&k) {
+                //entry.sort_by(Self::sorter);
+                let two = entry.last().unwrap();
+                if two.2 != ZERO_RAW_LAMPORTS_SENTINEL && two.2 != 0 {
+                    cap2 += two.2;
+                    added2 += 1;
+                }
+                if one.1 != two.1 && !((one.2 == ZERO_RAW_LAMPORTS_SENTINEL && two.2 == 0) || (one.2 == 0 && two.2 == ZERO_RAW_LAMPORTS_SENTINEL)) {
+                    error!("values different: {} {:?}, {:?}", k, v, entry);
+                } else {
+                    assert_eq!(one.2, two.2);
+                }
+            } else {
+                if one.2 != ZERO_RAW_LAMPORTS_SENTINEL && one.2 != 0 {
+                    error!("in 1, not in 2: {:?}, {:?}", k, v);
+                }
+            }
+        }
+        for entry in two.iter() {
+            let k = entry.0;
+            let mut v = entry.1.clone();
+            //v.sort_by(Self::sorter);
+            let two = v.last().unwrap();
+            if two.2 != ZERO_RAW_LAMPORTS_SENTINEL && two.2 != 0 {
+                added2 += 1;
+                cap2 += two.2;
+                error!("in 2, not in 1: {:?}, {:?}", k, v);
+            }
+        }
+        panic!(
+            "done with compare, lamports: {}, {}, {}, added: {},{}",
+            cap1,
+            cap2,
+            if cap1 > cap2 {
+                cap1 - cap2
+            } else {
+                cap2 - cap1
+            },
+            added1,
+            added2
+        );
+    }
+/*
+    fn sorter_unused(a: &hashentry, b: &hashentry) -> std::cmp::Ordering {
+        a.0.cmp(&b.0)
+        /*
+        let slota = a.0.split('.').next().unwrap();
+        let slotb = b.0.split('.').next().unwrap();
+        slota.cmp(&slotb)*/
+    }*/
+
+    fn get_cache_root_path<P: AsRef<Path>>(parent_folder: &P) -> PathBuf {
+        //parent_folder.as_ref().join("calculate_accounts_hash_cache")
+        parent_folder.as_ref().to_path_buf()
+    }
+
+    pub fn new<P: AsRef<Path> + std::fmt::Debug>(parent_folder: &P) -> CacheHashData {
+        let cache_folder = Self::get_cache_root_path(parent_folder);
+
+        std::fs::create_dir_all(cache_folder.clone())
+            .unwrap_or_else(|_| panic!("error creating cache dir: {:?}", cache_folder));
+
+        info!("accounts hash folder: {:?}", cache_folder);
 
         let result = CacheHashData {
-            cache_dir,
+            cache_dir: cache_folder,
             pre_existing_cache_files: Arc::new(Mutex::new(PreExistingCacheFiles::default())),
             stats: Arc::new(Mutex::new(CacheHashDataStats::default())),
         };

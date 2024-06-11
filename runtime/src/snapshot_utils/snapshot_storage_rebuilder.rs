@@ -216,6 +216,10 @@ impl SnapshotStorageRebuilder {
             snapshot_from,
         ));
 
+        let p1 = Path::new("/home/sol/ledger-2024-06-11-capitalization-mismatch/accounts_hash_cache");
+        let p2 = Path::new("/home/sol/ledger-2024-06-11-capitalization-mismatch/accounts_hash_cache/failed_calculate_accounts_hash_cache/271198496");
+        crate::cache_hash_data::CacheHashData::compare_two(&[&p1, &p2]);
+
         let thread_pool = rebuilder.build_thread_pool();
 
         if snapshot_from == SnapshotFrom::Archive {
