@@ -63,9 +63,12 @@ impl<'a> BufferedReader<'a> {
     }
     /// read to make sure we have the minimum amount of data
     pub fn read(&mut self) -> std::io::Result<BufferedReaderStatus> {
-        let must_read = self
-            .read_requirements
-            .unwrap_or(self.default_min_read_requirement);
+        let must_read = if let Some(n) = self.read_requirements {
+            n.max(self.default_min_read_requirement)
+        } else {
+            self.default_min_read_requirement
+        };
+
         if self.buf_valid_bytes.len() < must_read {
             // we haven't used all the bytes we read last time, so adjust the effective offset
             self.file_last_offset = self.file_offset_of_next_read - self.buf_valid_bytes.len();
@@ -153,7 +156,7 @@ mod tests {
         // set_required_data to zero and offset should not change, and slice should be empty.
         reader.set_required_data_len(0);
         let result = reader.read().unwrap();
-        assert_eq!(result, BufferedReaderStatus::Success);
+        assert_eq!(result, BufferedReaderStatus::Eof);
         let (offset, slice) = reader.get_data_and_offset();
         assert_eq!(offset, 32);
         assert_eq!(slice.len(), 0);
