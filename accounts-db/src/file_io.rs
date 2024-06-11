@@ -69,8 +69,7 @@ pub fn read_buffer(
     panic!("unimplemented");
 }
 
-#[cfg(unix)]
-#[cfg(test)]
+#[cfg(all(unix, test))]
 mod tests {
 
     use {super::*, std::io::Write, tempfile::tempfile};

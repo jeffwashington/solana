@@ -102,8 +102,7 @@ impl<'a> BufferedReader<'a> {
     }
 }
 
-#[cfg(unix)]
-#[cfg(test)]
+#[cfg(all(unix, test))]
 mod tests {
     use {super::*, std::io::Write, tempfile::tempfile};
 
@@ -138,6 +137,14 @@ mod tests {
         reader.set_required_data_len(32);
         let result = reader.read().unwrap();
         assert_eq!(result, BufferedReaderStatus::Eof);
+        let (offset, slice) = reader.get_data_and_offset();
+        assert_eq!(offset, 32);
+        assert_eq!(slice.len(), 0);
+
+        // set_required_data to zero and offset should not change, and slice should be empty.
+        reader.set_required_data_len(0);
+        let result = reader.read().unwrap();
+        assert_eq!(result, BufferedReaderStatus::Success);
         let (offset, slice) = reader.get_data_and_offset();
         assert_eq!(offset, 32);
         assert_eq!(slice.len(), 0);
@@ -180,6 +187,24 @@ mod tests {
         let (offset, slice) = reader.get_data_and_offset();
         assert_eq!(offset, 30);
         assert_eq!(slice.len(), 0);
+
+        // Move the offset passed `valid_len`, expect to hit EOF and return empty slice.
+        reader.advance_offset(1);
+        reader.set_required_data_len(8);
+        let result = reader.read().unwrap();
+        assert_eq!(result, BufferedReaderStatus::Eof);
+        let (offset, slice) = reader.get_data_and_offset();
+        assert_eq!(offset, 31);
+        assert_eq!(slice.len(), 0);
+
+        // Move the offset passed file_len, expect to hit EOF and return empty slice.
+        reader.advance_offset(3);
+        reader.set_required_data_len(8);
+        let result = reader.read().unwrap();
+        assert_eq!(result, BufferedReaderStatus::Eof);
+        let (offset, slice) = reader.get_data_and_offset();
+        assert_eq!(offset, 34);
+        assert_eq!(slice.len(), 0);
     }
 
     #[test]
@@ -208,7 +233,7 @@ mod tests {
         assert_eq!(slice.len(), 8);
         assert_eq!(slice.slice(), &bytes[8..16]); // no need to read more
 
-        // Continue reading should yield EOF and read the rest 16 bytes.
+        // Continue reading should succeed and read the rest 16 bytes.
         reader.advance_offset(8);
         reader.set_required_data_len(16);
         let result = reader.read().unwrap();
@@ -226,5 +251,43 @@ mod tests {
         let (offset, slice) = reader.get_data_and_offset();
         assert_eq!(offset, 32);
         assert_eq!(slice.len(), 0);
+    }
+
+    #[test]
+    fn test_buffered_reader_partial_consume_with_move() {
+        // Setup a sample file with 32 bytes of data
+        let mut sample_file = tempfile().unwrap();
+        let bytes: Vec<u8> = (0..32).collect();
+        sample_file.write_all(&bytes).unwrap();
+
+        // First read 16 bytes to fill buffer
+        let mut reader = BufferedReader::new(16, 32, &sample_file, 8);
+        let result = reader.read().unwrap();
+        assert_eq!(result, BufferedReaderStatus::Success);
+        let (offset, slice) = reader.get_data_and_offset();
+        assert_eq!(offset, 0);
+        assert_eq!(slice.len(), 16);
+        assert_eq!(slice.slice(), &bytes[0..16]);
+
+        // Consume the partial data (8 bytes) and attempt to read next 16 bytes
+        // This will move the leftover 8bytes and read next 8 bytes.
+        reader.advance_offset(8);
+        reader.set_required_data_len(16);
+        let result = reader.read().unwrap();
+        assert_eq!(result, BufferedReaderStatus::Success);
+        let (offset, slice) = reader.get_data_and_offset();
+        assert_eq!(offset, 8);
+        assert_eq!(slice.len(), 16);
+        assert_eq!(slice.slice(), &bytes[8..24]);
+
+        // Continue reading should succeed and read the rest 8 bytes.
+        reader.advance_offset(16);
+        reader.set_required_data_len(8);
+        let result = reader.read().unwrap();
+        assert_eq!(result, BufferedReaderStatus::Success);
+        let (offset, slice) = reader.get_data_and_offset();
+        assert_eq!(offset, 24);
+        assert_eq!(slice.len(), 8);
+        assert_eq!(slice.slice(), &bytes[24..32]);
     }
 }
