@@ -1568,6 +1568,56 @@ pub mod tests {
         assert_matches!(result, Err(ref message) if message.to_string().contains("incorrect layout/length/data"));
     }
 
+    #[test]
+    fn test_append_vec_reset() {
+        let file = get_append_vec_path("test_append_vec_reset");
+        let path = &file.path;
+        let av = AppendVec::new(path, true, 1024 * 1024);
+        av.append_account_test(&create_test_account(10)).unwrap();
+
+        assert!(!av.is_empty());
+        av.reset();
+        assert_eq!(av.len(), 0);
+    }
+
+    #[test_case(StorageAccess::Mmap)]
+    #[test_case(StorageAccess::File)]
+    fn test_append_vec_flush(storage_access: StorageAccess) {
+        let file = get_append_vec_path("test_append_vec_flush");
+        let path = &file.path;
+        let accounts_len = {
+            // wrap AppendVec in ManuallyDrop to ensure we do not remove the backing file when dropped
+            let av = ManuallyDrop::new(AppendVec::new(path, true, 1024 * 1024));
+            av.append_account_test(&create_test_account(10)).unwrap();
+            av.len()
+        };
+
+        let (av, num_account) =
+            AppendVec::new_from_file(path, accounts_len, storage_access).unwrap();
+        av.flush().unwrap();
+        assert_eq!(num_account, 1);
+    }
+
+    #[test_case(StorageAccess::Mmap)]
+    #[test_case(StorageAccess::File)]
+    fn test_append_vec_reopen_as_readonly(storage_access: StorageAccess) {
+        let file = get_append_vec_path("test_append_vec_flush");
+        let path = &file.path;
+        let accounts_len = {
+            // wrap AppendVec in ManuallyDrop to ensure we do not remove the backing file when dropped
+            let av = ManuallyDrop::new(AppendVec::new(path, true, 1024 * 1024));
+            av.append_account_test(&create_test_account(10)).unwrap();
+            av.len()
+        };
+        let (av, _) = AppendVec::new_from_file(path, accounts_len, storage_access).unwrap();
+        let reopen = av.reopen_as_readonly();
+        if storage_access == StorageAccess::File {
+            assert!(reopen.is_none());
+        } else {
+            assert!(reopen.is_some());
+        }
+    }
+
     #[test_case(StorageAccess::Mmap)]
     #[test_case(StorageAccess::File)]
     fn test_new_from_file_too_large_data_len(storage_access: StorageAccess) {
