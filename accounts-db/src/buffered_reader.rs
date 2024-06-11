@@ -102,12 +102,11 @@ impl<'a> BufferedReader<'a> {
     }
 }
 
+#[cfg(unix)]
 #[cfg(test)]
 mod tests {
-
     use {super::*, std::io::Write, tempfile::tempfile};
 
-    #[cfg(unix)]
     #[test]
     fn test_buffered_reader() {
         // Setup a sample file with 32 bytes of data
@@ -144,7 +143,6 @@ mod tests {
         assert_eq!(slice.len(), 0);
     }
 
-    #[cfg(unix)]
     #[test]
     fn test_buffered_reader_with_extra_data_in_file() {
         // Setup a sample file with 32 bytes of data
@@ -184,7 +182,6 @@ mod tests {
         assert_eq!(slice.len(), 0);
     }
 
-    #[cfg(unix)]
     #[test]
     fn test_buffered_reader_partial_consume() {
         // Setup a sample file with 32 bytes of data

@@ -69,12 +69,12 @@ pub fn read_buffer(
     panic!("unimplemented");
 }
 
+#[cfg(unix)]
 #[cfg(test)]
 mod tests {
 
     use {super::*, std::io::Write, tempfile::tempfile};
 
-    #[cfg(unix)]
     #[test]
     fn test_read_buffer() {
         // Setup a sample file with 32 bytes of data
@@ -113,7 +113,6 @@ mod tests {
         assert_eq!(buffer[24..32], [0; 8])
     }
 
-    #[cfg(unix)]
     #[test]
     fn test_read_more_buffer() {
         // Setup a sample file with 32 bytes of data
