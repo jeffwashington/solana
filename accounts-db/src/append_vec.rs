@@ -677,7 +677,7 @@ impl AppendVec {
             }
             AppendVecFileBacking::File(file) => {
                 // 4096 was just picked to be a single page size
-                let mut buf = [0u8; 4096];
+                let mut buf = [0u8; PAGE_SIZE as usize];
                 if let Ok(bytes_read) = read_into_buffer(file, offset, &mut buf, self.len()) {
                     let valid_bytes = ValidSlice(&buf[..bytes_read]);
                     let (meta, next): (&StoredMeta, _) = Self::get_type(valid_bytes, 0)?;
