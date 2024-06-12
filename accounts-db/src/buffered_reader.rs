@@ -89,7 +89,7 @@ impl<'a> BufferedReader<'a> {
         ValidSlice::new(&self.buf[self.buf_valid_bytes.clone()])
     }
     /// return offset within `file` of start of read at current offset
-    pub fn get_data_and_offset(&'a self) -> (usize, ValidSlice<'a>) {
+    pub fn get_offset_and_data(&'a self) -> (usize, ValidSlice<'a>) {
         (
             self.file_last_offset + self.buf_valid_bytes.start,
             self.get_data(),
@@ -126,7 +126,7 @@ mod tests {
         let mut reader = BufferedReader::new(16, 32, &sample_file, 8);
         let result = reader.read().unwrap();
         assert_eq!(result, BufferedReaderStatus::Success);
-        let (offset, slice) = reader.get_data_and_offset();
+        let (offset, slice) = reader.get_offset_and_data();
         assert_eq!(offset, 0);
         assert_eq!(slice.len(), 16);
         assert_eq!(slice.slice(), &bytes[0..16]);
@@ -136,7 +136,7 @@ mod tests {
         reader.set_required_data_len(32);
         let result = reader.read().unwrap();
         assert_eq!(result, BufferedReaderStatus::Eof);
-        let (offset, slice) = reader.get_data_and_offset();
+        let (offset, slice) = reader.get_offset_and_data();
         assert_eq!(offset, 16);
         assert_eq!(slice.len(), 16);
         assert_eq!(slice.slice(), &bytes[16..32]);
@@ -146,7 +146,7 @@ mod tests {
         reader.set_required_data_len(32);
         let result = reader.read().unwrap();
         assert_eq!(result, BufferedReaderStatus::Eof);
-        let (offset, slice) = reader.get_data_and_offset();
+        let (offset, slice) = reader.get_offset_and_data();
         assert_eq!(offset, 32);
         assert_eq!(slice.len(), 0);
 
@@ -154,7 +154,7 @@ mod tests {
         reader.set_required_data_len(0);
         let result = reader.read().unwrap();
         assert_eq!(result, BufferedReaderStatus::Success);
-        let (offset, slice) = reader.get_data_and_offset();
+        let (offset, slice) = reader.get_offset_and_data();
         assert_eq!(offset, 32);
         assert_eq!(slice.len(), 0);
     }
@@ -173,7 +173,7 @@ mod tests {
         let mut reader = BufferedReader::new(16, valid_len, &sample_file, 8);
         let result = reader.read().unwrap();
         assert_eq!(result, BufferedReaderStatus::Success);
-        let (offset, slice) = reader.get_data_and_offset();
+        let (offset, slice) = reader.get_offset_and_data();
         assert_eq!(offset, 0);
         assert_eq!(slice.len(), 16);
         assert_eq!(slice.slice(), &bytes[0..16]);
@@ -183,7 +183,7 @@ mod tests {
         reader.set_required_data_len(32);
         let result = reader.read().unwrap();
         assert_eq!(result, BufferedReaderStatus::Eof);
-        let (offset, slice) = reader.get_data_and_offset();
+        let (offset, slice) = reader.get_offset_and_data();
         assert_eq!(offset, 16);
         assert_eq!(slice.len(), 14);
         assert_eq!(slice.slice(), &bytes[16..30]);
@@ -193,7 +193,7 @@ mod tests {
         reader.set_required_data_len(32);
         let result = reader.read().unwrap();
         assert_eq!(result, BufferedReaderStatus::Eof);
-        let (offset, slice) = reader.get_data_and_offset();
+        let (offset, slice) = reader.get_offset_and_data();
         assert_eq!(offset, 30);
         assert_eq!(slice.len(), 0);
 
@@ -202,7 +202,7 @@ mod tests {
         reader.set_required_data_len(8);
         let result = reader.read().unwrap();
         assert_eq!(result, BufferedReaderStatus::Eof);
-        let (offset, slice) = reader.get_data_and_offset();
+        let (offset, slice) = reader.get_offset_and_data();
         assert_eq!(offset, 31);
         assert_eq!(slice.len(), 0);
 
@@ -211,7 +211,7 @@ mod tests {
         reader.set_required_data_len(8);
         let result = reader.read().unwrap();
         assert_eq!(result, BufferedReaderStatus::Eof);
-        let (offset, slice) = reader.get_data_and_offset();
+        let (offset, slice) = reader.get_offset_and_data();
         assert_eq!(offset, 34);
         assert_eq!(slice.len(), 0);
     }
@@ -227,7 +227,7 @@ mod tests {
         let mut reader = BufferedReader::new(16, 32, &sample_file, 8);
         let result = reader.read().unwrap();
         assert_eq!(result, BufferedReaderStatus::Success);
-        let (offset, slice) = reader.get_data_and_offset();
+        let (offset, slice) = reader.get_offset_and_data();
         assert_eq!(offset, 0);
         assert_eq!(slice.len(), 16);
         assert_eq!(slice.slice(), &bytes[0..16]);
@@ -237,7 +237,7 @@ mod tests {
         reader.set_required_data_len(8);
         let result = reader.read().unwrap();
         assert_eq!(result, BufferedReaderStatus::Success);
-        let (offset, slice) = reader.get_data_and_offset();
+        let (offset, slice) = reader.get_offset_and_data();
         assert_eq!(offset, 8);
         assert_eq!(slice.len(), 8);
         assert_eq!(slice.slice(), &bytes[8..16]); // no need to read more
@@ -247,7 +247,7 @@ mod tests {
         reader.set_required_data_len(16);
         let result = reader.read().unwrap();
         assert_eq!(result, BufferedReaderStatus::Success);
-        let (offset, slice) = reader.get_data_and_offset();
+        let (offset, slice) = reader.get_offset_and_data();
         assert_eq!(offset, 16);
         assert_eq!(slice.len(), 16);
         assert_eq!(slice.slice(), &bytes[16..32]);
@@ -257,7 +257,7 @@ mod tests {
         reader.set_required_data_len(32);
         let result = reader.read().unwrap();
         assert_eq!(result, BufferedReaderStatus::Eof);
-        let (offset, slice) = reader.get_data_and_offset();
+        let (offset, slice) = reader.get_offset_and_data();
         assert_eq!(offset, 32);
         assert_eq!(slice.len(), 0);
     }
@@ -273,7 +273,7 @@ mod tests {
         let mut reader = BufferedReader::new(16, 32, &sample_file, 8);
         let result = reader.read().unwrap();
         assert_eq!(result, BufferedReaderStatus::Success);
-        let (offset, slice) = reader.get_data_and_offset();
+        let (offset, slice) = reader.get_offset_and_data();
         assert_eq!(offset, 0);
         assert_eq!(slice.len(), 16);
         assert_eq!(slice.slice(), &bytes[0..16]);
@@ -284,7 +284,7 @@ mod tests {
         reader.set_required_data_len(16);
         let result = reader.read().unwrap();
         assert_eq!(result, BufferedReaderStatus::Success);
-        let (offset, slice) = reader.get_data_and_offset();
+        let (offset, slice) = reader.get_offset_and_data();
         assert_eq!(offset, 8);
         assert_eq!(slice.len(), 16);
         assert_eq!(slice.slice(), &bytes[8..24]);
@@ -294,7 +294,7 @@ mod tests {
         reader.set_required_data_len(8);
         let result = reader.read().unwrap();
         assert_eq!(result, BufferedReaderStatus::Success);
-        let (offset, slice) = reader.get_data_and_offset();
+        let (offset, slice) = reader.get_offset_and_data();
         assert_eq!(offset, 24);
         assert_eq!(slice.len(), 8);
         assert_eq!(slice.slice(), &bytes[24..32]);

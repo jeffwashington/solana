@@ -846,7 +846,7 @@ impl AppendVec {
                 let mut reader =
                     BufferedReader::new(*SCAN_BUFFER_SIZE, self.len(), file, STORE_META_OVERHEAD);
                 while reader.read().ok() == Some(BufferedReaderStatus::Success) {
-                    let (offset, bytes_subset) = reader.get_data_and_offset();
+                    let (offset, bytes_subset) = reader.get_offset_and_data();
                     let (meta, next): (&StoredMeta, _) = Self::get_type(bytes_subset, 0).unwrap();
                     let (account_meta, next): (&AccountMeta, _) =
                         Self::get_type(bytes_subset, next).unwrap();
@@ -896,7 +896,7 @@ impl AppendVec {
                 let mut reader =
                     BufferedReader::new(*SCAN_BUFFER_SIZE, self.len(), file, STORE_META_OVERHEAD);
                 while reader.read().ok() == Some(BufferedReaderStatus::Success) {
-                    let (offset, bytes_subset) = reader.get_data_and_offset();
+                    let (offset, bytes_subset) = reader.get_offset_and_data();
                     let (meta, next): (&StoredMeta, _) = Self::get_type(bytes_subset, 0).unwrap();
                     let (account_meta, next): (&AccountMeta, _) =
                         Self::get_type(bytes_subset, next).unwrap();

@@ -37,14 +37,14 @@ pub fn read_buffer(
     valid_len: usize,
 ) -> std::io::Result<usize> {
     let mut offset = start_offset;
-    let mut start_read = 0;
+    let mut buffer_offset = 0;
     let mut total_bytes_read = 0;
     if start_offset >= valid_len {
         return Ok(0);
     }
 
-    while start_read < buffer.len() {
-        match file.read_at(&mut buffer[start_read..], offset as u64) {
+    while buffer_offset < buffer.len() {
+        match file.read_at(&mut buffer[buffer_offset..], offset as u64) {
             Err(err) => {
                 if err.kind() == std::io::ErrorKind::Interrupted {
                     continue;
@@ -59,7 +59,7 @@ pub fn read_buffer(
                     break;
                 }
                 // There is possibly more to read. `read_at` may have returned partial results, so prepare to loop and read again.
-                start_read += bytes_read_this_time;
+                buffer_offset += bytes_read_this_time;
                 offset += bytes_read_this_time;
             }
         }
