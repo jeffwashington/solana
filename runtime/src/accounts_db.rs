@@ -8833,6 +8833,10 @@ impl AccountsDb {
                     stored_account,
                 },
             )| {
+                if pubkey == Pubkey::default() {
+                    log::error!("{}, {}, {}", pubkey, stored_account.lamports(), slot);
+                }
+
                 if secondary {
                     self.accounts_index.update_secondary_indexes(
                         &pubkey,
