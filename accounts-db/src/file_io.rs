@@ -19,7 +19,7 @@ pub fn read_more_buffer(
     buffer.copy_within(valid_bytes.clone(), 0);
 
     // read the rest of `buffer`
-    let bytes_read = read_buffer(
+    let bytes_read = read_into_buffer(
         file,
         *offset,
         &mut buffer[valid_bytes.len()..],
@@ -35,7 +35,7 @@ pub fn read_more_buffer(
 /// Read, starting at `start_offset`, until `buffer` is full or we read past `valid_file_len`/eof.
 /// `valid_file_len` is # of valid bytes in the file. This may be <= file length.
 /// return # bytes read
-pub fn read_buffer(
+pub fn read_into_buffer(
     file: &File,
     start_offset: usize,
     buffer: &mut [u8],
@@ -74,7 +74,7 @@ pub fn read_buffer(
 
 #[cfg(not(unix))]
 /// this cannot be supported if we're not on unix-os
-pub fn read_buffer(
+pub fn read_into_buffer(
     _file: &File,
     _start_offset: usize,
     _buffer: &mut [u8],
@@ -89,7 +89,7 @@ mod tests {
     use {super::*, std::io::Write, tempfile::tempfile};
 
     #[test]
-    fn test_read_buffer() {
+    fn test_read_into_buffer() {
         // Setup a sample file with 32 bytes of data
         let mut sample_file = tempfile().unwrap();
         let bytes: Vec<u8> = (0..32).collect();
@@ -97,30 +97,30 @@ mod tests {
 
         // Read all 32 bytes into buffer
         let mut buffer = [0; 32];
-        let num_bytes_read = read_buffer(&sample_file, 0, &mut buffer, 32).unwrap();
+        let num_bytes_read = read_into_buffer(&sample_file, 0, &mut buffer, 32).unwrap();
         assert_eq!(num_bytes_read, 32);
         assert_eq!(bytes, buffer);
 
         // Given a 64-byte buffer, it should only read 32 bytes into the buffer
         let mut buffer = [0; 64];
-        let num_bytes_read = read_buffer(&sample_file, 0, &mut buffer, 32).unwrap();
+        let num_bytes_read = read_into_buffer(&sample_file, 0, &mut buffer, 32).unwrap();
         assert_eq!(num_bytes_read, 32);
         assert_eq!(bytes, buffer[0..32]);
         assert_eq!(buffer[32..64], [0; 32]);
 
         // Given the `valid_file_len` is 16, it should only read 16 bytes into the buffer
         let mut buffer = [0; 32];
-        let num_bytes_read = read_buffer(&sample_file, 0, &mut buffer, 16).unwrap();
+        let num_bytes_read = read_into_buffer(&sample_file, 0, &mut buffer, 16).unwrap();
         assert_eq!(num_bytes_read, 16);
         assert_eq!(bytes[0..16], buffer[0..16]);
-        // As a side effect of the `read_buffer` the data passed `valid_file_len` was
+        // As a side effect of the `read_into_buffer` the data passed `valid_file_len` was
         // read and put into the buffer, though these data should not be
         // consumed.
         assert_eq!(buffer[16..32], bytes[16..32]);
 
         // Given the start offset 8, it should only read 24 bytes into buffer
         let mut buffer = [0; 32];
-        let num_bytes_read = read_buffer(&sample_file, 8, &mut buffer, 32).unwrap();
+        let num_bytes_read = read_into_buffer(&sample_file, 8, &mut buffer, 32).unwrap();
         assert_eq!(num_bytes_read, 24);
         assert_eq!(buffer[0..24], bytes[8..32]);
         assert_eq!(buffer[24..32], [0; 8])
