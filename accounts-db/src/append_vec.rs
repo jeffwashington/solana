@@ -275,15 +275,16 @@ pub struct AppendVec {
 }
 
 const PAGE_SIZE: u64 = 4 * 1024;
-fn page_align(size: u64) -> u64 {
+/// big enough for 3x the largest account size
+const SCAN_BUFFER_SIZE: usize =
+    page_align((STORE_META_OVERHEAD as u64 + MAX_PERMITTED_DATA_LENGTH) * 3) as usize;
+const fn page_align(size: u64) -> u64 {
     (size + (PAGE_SIZE - 1)) & !(PAGE_SIZE - 1)
 }
 
 lazy_static! {
     pub static ref APPEND_VEC_MMAPPED_FILES_OPEN: AtomicU64 = AtomicU64::default();
     pub static ref APPEND_VEC_MMAPPED_FILES_DIRTY: AtomicU64 = AtomicU64::default();
-    /// big enough for 3x the largest account size
-    pub static ref SCAN_BUFFER_SIZE: usize = page_align((STORE_META_OVERHEAD as u64 + MAX_PERMITTED_DATA_LENGTH) * 3) as usize;
 }
 
 impl Drop for AppendVec {
@@ -847,7 +848,7 @@ impl AppendVec {
             }
             AppendVecFileBacking::File(file) => {
                 let mut reader =
-                    BufferedReader::new(*SCAN_BUFFER_SIZE, self.len(), file, STORE_META_OVERHEAD);
+                    BufferedReader::new(SCAN_BUFFER_SIZE, self.len(), file, STORE_META_OVERHEAD);
                 while reader.read().ok() == Some(BufferedReaderStatus::Success) {
                     let (offset, bytes_subset) = reader.get_offset_and_data();
                     let (meta, next): (&StoredMeta, _) = Self::get_type(bytes_subset, 0).unwrap();
@@ -897,7 +898,7 @@ impl AppendVec {
             }
             AppendVecFileBacking::File(file) => {
                 let mut reader =
-                    BufferedReader::new(*SCAN_BUFFER_SIZE, self.len(), file, STORE_META_OVERHEAD);
+                    BufferedReader::new(SCAN_BUFFER_SIZE, self.len(), file, STORE_META_OVERHEAD);
                 while reader.read().ok() == Some(BufferedReaderStatus::Success) {
                     let (offset, bytes_subset) = reader.get_offset_and_data();
                     let (meta, next): (&StoredMeta, _) = Self::get_type(bytes_subset, 0).unwrap();
