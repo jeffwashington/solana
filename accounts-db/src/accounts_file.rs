@@ -73,6 +73,12 @@ impl AccountsFile {
         }
     }
 
+    pub fn mmap(&self) -> &[u8] {
+        match self {
+            Self::AppendVec(av) => av.mmap(),
+        }
+    }
+
     pub fn reset(&self) {
         match self {
             Self::AppendVec(av) => av.reset(),

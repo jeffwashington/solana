@@ -116,7 +116,7 @@ use {
 };
 
 const PAGE_SIZE: u64 = 4 * 1024;
-pub(crate) const MAX_RECYCLE_STORES: usize = 1000;
+pub(crate) const MAX_RECYCLE_STORES: usize = 10000;
 // when the accounts write cache exceeds this many bytes, we will flush it
 // this can be specified on the command line, too (--accounts-db-cache-limit-mb)
 const WRITE_CACHE_LIMIT_BYTES_DEFAULT: u64 = 15_000_000_000;
@@ -1278,6 +1278,15 @@ pub const EXPIRATION_TTL_SECONDS: u64 = 1800;
 
 impl RecycleStores {
     fn add_entry(&mut self, new_entry: Arc<AccountStorageEntry>) {
+        let amod = std::fs::metadata(new_entry.accounts.get_path());
+        let amod = amod.unwrap().modified();
+        let amod = amod
+            .unwrap()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        log::error!("add recycle entry: {:?}, mod date: {}, slot: {}, len: {}, capacity: {}, # non-zero: {:?}", new_entry.accounts.get_path(), amod, new_entry.slot(), new_entry.accounts.len(), new_entry.accounts.capacity(), &new_entry.accounts.mmap()[new_entry.accounts.mmap().len().saturating_sub(10)..]);
+
         self.total_bytes += new_entry.capacity();
         self.entries.push((Instant::now(), new_entry))
     }
@@ -1289,6 +1298,14 @@ impl RecycleStores {
     fn add_entries(&mut self, new_entries: Vec<Arc<AccountStorageEntry>>) {
         let now = Instant::now();
         for new_entry in new_entries {
+            let amod = std::fs::metadata(new_entry.accounts.get_path());
+            let amod = amod.unwrap().modified();
+            let amod = amod
+                .unwrap()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+            log::error!("add_entries: {:?}, mod date: {}, slot: {}, len: {}, capacity: {}, # non-zero: {:?}", new_entry.accounts.get_path(), amod, new_entry.slot(), new_entry.accounts.len(), new_entry.accounts.capacity(), &new_entry.accounts.mmap()[new_entry.accounts.mmap().len().saturating_sub(10)..]);
             self.total_bytes += new_entry.capacity();
             self.entries.push((now, new_entry));
         }
@@ -4110,6 +4127,17 @@ impl AccountsDb {
         if let Some(shrink_in_progress) = shrink_in_progress {
             // shrink is in progress, so 1 new append vec to keep, 1 old one to throw away
             not_retaining_store(shrink_in_progress.old_storage());
+
+            let shrunken_store = shrink_in_progress.new_storage();
+            let amod = std::fs::metadata(shrunken_store.accounts.get_path());
+            let amod = amod.unwrap().modified();
+            let amod = amod
+                .unwrap()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+            log::error!("new shrunk storage: {:?}, mod date: {}, slot: {}, len: {}, capacity: {}, # non-zero: {:?}", shrunken_store.accounts.get_path(), amod, slot, shrunken_store.accounts.len(), shrunken_store.accounts.capacity(), shrunken_store.accounts.mmap().iter().take(100000).filter(|x| **x != 0).count());
+
             // dropping 'shrink_in_progress' removes the old append vec that was being shrunk from db's storage
         } else if let Some(store) = self.storage.remove(&slot, shrink_can_be_active) {
             // no shrink in progress, so all append vecs in this slot are dead
@@ -4150,16 +4178,28 @@ impl AccountsDb {
 
     /// return a store that can contain 'aligned_total' bytes
     pub fn get_store_for_shrink(&self, slot: Slot, aligned_total: u64) -> ShrinkInProgress<'_> {
+        let mut recycled = true;
         let shrunken_store = self
-            .try_recycle_store(slot, aligned_total, aligned_total + 1024)
+            .try_recycle_store(slot, aligned_total, aligned_total + 100024)
             .unwrap_or_else(|| {
                 let maybe_shrink_paths = self.shrink_paths.read().unwrap();
                 let (shrink_paths, from) = maybe_shrink_paths
                     .as_ref()
                     .map(|paths| (paths, "shrink-w-path"))
                     .unwrap_or_else(|| (&self.paths, "shrink"));
+                recycled = false;
                 self.create_store(slot, aligned_total, from, shrink_paths)
             });
+        if recycled {
+            let amod = std::fs::metadata(shrunken_store.accounts.get_path());
+            let amod = amod.unwrap().modified();
+            let amod = amod
+                .unwrap()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+            log::error!("recycled: {:?}, mod date: {}, slot: {}, aligned total: {}, capacity: {}, # non-zero: {:?}", shrunken_store.accounts.get_path(), amod, slot, aligned_total, shrunken_store.accounts.capacity(), shrunken_store.accounts.mmap().iter().take(100000).filter(|x| **x != 0).count());
+        }
         self.storage.shrinking_in_progress(slot, shrunken_store)
     }
 

@@ -310,6 +310,10 @@ impl AppendVec {
         Ok(())
     }
 
+    pub fn mmap(&self) -> &[u8] {
+        &self.map
+    }
+
     pub fn reset(&self) {
         // This mutex forces append to be single threaded, but concurrent with reads
         // See UNSAFE usage in `append_ptr`
