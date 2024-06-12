@@ -213,7 +213,7 @@ impl CacheHashData {
             x.unwrap().load_all(&mut accum, 0, &bin_calc, &mut CacheHashDataStats::default());
             accum.into_iter().flatten().for_each(|entry| {
                 let pk = entry.pubkey;
-                if i_file == 81 {
+                if i_file == 90 {
                     log::error!("found1: {}, {}, {}, {}", i_file, pk, entry.hash, entry.lamports);
                 }
                 let new_one = (i_file, entry.hash, entry.lamports);
@@ -243,7 +243,7 @@ impl CacheHashData {
             x.unwrap().load_all(&mut accum, 0, &bin_calc, &mut CacheHashDataStats::default());
             accum.into_iter().flatten().for_each(|entry| {
                 let pk = entry.pubkey;
-                if i_file == 81 {
+                if i_file == 90 {
                     log::error!("found2: {}, {}, {}, {}", i_file, pk, entry.hash, entry.lamports);
                 }
                 let new_one = (i_file, entry.hash, entry.lamports);
