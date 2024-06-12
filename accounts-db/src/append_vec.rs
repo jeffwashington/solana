@@ -679,7 +679,7 @@ impl AppendVec {
             AppendVecFileBacking::File(file) => {
                 // 4096 was just picked to be a single page size
                 let mut buf = [0u8; PAGE_SIZE as usize];
-                if let Ok(bytes_read) = read_into_buffer(file, offset, &mut buf, self.len()) {
+                if let Ok(bytes_read) = read_into_buffer(file, self.len(), offset, &mut buf) {
                     let valid_bytes = ValidSlice(&buf[..bytes_read]);
                     let (meta, next): (&StoredMeta, _) = Self::get_type(valid_bytes, 0)?;
                     let (account_meta, next): (&AccountMeta, _) =
@@ -708,7 +708,7 @@ impl AppendVec {
                         // instead, we could piece together what we already read here. Maybe we just needed 1 more byte.
                         // Note here `next` is a 0-based offset from the beginning of this account.
                         let bytes_read =
-                            read_into_buffer(file, offset + next, &mut data, self.len()).ok()?;
+                            read_into_buffer(file, self.len(), offset + next, &mut data).ok()?;
                         if bytes_read < data_len as usize {
                             // eof or otherwise couldn't read all the data
                             return None;

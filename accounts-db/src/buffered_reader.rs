@@ -72,8 +72,8 @@ impl<'a> BufferedReader<'a> {
             self.file_last_offset = self.file_offset_of_next_read - self.buf_valid_bytes.len();
             read_more_buffer(
                 self.file,
-                &mut self.file_offset_of_next_read,
                 self.file_len_valid,
+                &mut self.file_offset_of_next_read,
                 &mut self.buf,
                 &mut self.buf_valid_bytes,
             )?;
