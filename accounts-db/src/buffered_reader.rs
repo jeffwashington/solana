@@ -68,6 +68,7 @@ impl<'a> BufferedReader<'a> {
             .unwrap_or(self.default_min_read_requirement);
         if self.buf_valid_bytes.len() < must_read {
             // we haven't used all the bytes we read last time, so adjust the effective offset
+            debug_assert!(self.buf_valid_bytes.len() <= self.file_offset_of_next_read);
             self.file_last_offset = self.file_offset_of_next_read - self.buf_valid_bytes.len();
             read_more_buffer(
                 self.file,
