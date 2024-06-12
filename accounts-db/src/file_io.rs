@@ -10,9 +10,9 @@ use std::{fs::File, ops::Range};
 pub fn read_more_buffer(
     file: &File,
     offset: &mut usize,
+    valid_file_len: usize,
     buffer: &mut [u8],
     valid_bytes: &mut Range<usize>,
-    valid_file_len: usize,
 ) -> std::io::Result<()> {
     // copy remainder of `valid_bytes` into beginning of `buffer`.
     // These bytes were left over from the last read but weren't enough for the next desired contiguous read chunk.
@@ -137,7 +137,7 @@ mod tests {
         let mut buffer = [0xFFu8; 32];
         let mut offset = 0;
         let mut valid_bytes = 24..32;
-        read_more_buffer(&sample_file, &mut offset, &mut buffer, &mut valid_bytes, 32).unwrap();
+        read_more_buffer(&sample_file, &mut offset, 32, &mut buffer, &mut valid_bytes).unwrap();
         assert_eq!(offset, 24);
         assert_eq!(valid_bytes, 0..32);
         assert_eq!(buffer[0..8], [0xFFu8; 8]);
@@ -147,7 +147,7 @@ mod tests {
         let mut buffer = [0xFFu8; 32];
         let mut offset = 16;
         let mut valid_bytes = 24..32;
-        read_more_buffer(&sample_file, &mut offset, &mut buffer, &mut valid_bytes, 32).unwrap();
+        read_more_buffer(&sample_file, &mut offset, 32, &mut buffer, &mut valid_bytes).unwrap();
         assert_eq!(offset, 32);
         assert_eq!(valid_bytes, 0..24);
         assert_eq!(buffer[0..8], [0xFFu8; 8]);

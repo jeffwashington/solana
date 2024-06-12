@@ -73,9 +73,9 @@ impl<'a> BufferedReader<'a> {
             read_more_buffer(
                 self.file,
                 &mut self.file_offset_of_next_read,
+                self.file_len_valid,
                 &mut self.buf,
                 &mut self.buf_valid_bytes,
-                self.file_len_valid,
             )?;
             if self.buf_valid_bytes.len() < must_read {
                 return Ok(BufferedReaderStatus::Eof);
