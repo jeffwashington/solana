@@ -6,20 +6,25 @@ use std::{fs::File, ops::Range};
 /// `buffer` contains `valid_bytes` of data at its end.
 /// Move those valid bytes to the beginning of `buffer`, then read from `offset` to fill the rest of `buffer`.
 /// Update `offset` for the next read and update `valid_bytes` to specify valid portion of `buffer`.
-/// `valid_len` is # of valid bytes in the file. This may be <= file length.
+/// `valid_file_len` is # of valid bytes in the file. This may be <= file length.
 pub fn read_more_buffer(
     file: &File,
     offset: &mut usize,
     buffer: &mut [u8],
     valid_bytes: &mut Range<usize>,
-    valid_len: usize,
+    valid_file_len: usize,
 ) -> std::io::Result<()> {
     // copy remainder of `valid_bytes` into beginning of `buffer`.
     // These bytes were left over from the last read but weren't enough for the next desired contiguous read chunk.
     buffer.copy_within(valid_bytes.clone(), 0);
 
     // read the rest of `buffer`
-    let bytes_read = read_buffer(file, *offset, &mut buffer[valid_bytes.len()..], valid_len)?;
+    let bytes_read = read_buffer(
+        file,
+        *offset,
+        &mut buffer[valid_bytes.len()..],
+        valid_file_len,
+    )?;
     *offset += bytes_read;
     *valid_bytes = 0..(valid_bytes.len() + bytes_read);
 
@@ -27,19 +32,19 @@ pub fn read_more_buffer(
 }
 
 #[cfg(unix)]
-/// Read, starting at `start_offset`, until `buffer` is full or we read past `valid_len`/eof.
-/// `valid_len` is # of valid bytes in the file. This may be <= file length.
+/// Read, starting at `start_offset`, until `buffer` is full or we read past `valid_file_len`/eof.
+/// `valid_file_len` is # of valid bytes in the file. This may be <= file length.
 /// return # bytes read
 pub fn read_buffer(
     file: &File,
     start_offset: usize,
     buffer: &mut [u8],
-    valid_len: usize,
+    valid_file_len: usize,
 ) -> std::io::Result<usize> {
     let mut offset = start_offset;
     let mut buffer_offset = 0;
     let mut total_bytes_read = 0;
-    if start_offset >= valid_len {
+    if start_offset >= valid_file_len {
         return Ok(0);
     }
 
@@ -53,8 +58,8 @@ pub fn read_buffer(
             }
             Ok(bytes_read_this_time) => {
                 total_bytes_read += bytes_read_this_time;
-                if total_bytes_read + start_offset >= valid_len {
-                    total_bytes_read -= (total_bytes_read + start_offset) - valid_len;
+                if total_bytes_read + start_offset >= valid_file_len {
+                    total_bytes_read -= (total_bytes_read + start_offset) - valid_file_len;
                     // we've read all there is in the file
                     break;
                 }
@@ -73,7 +78,7 @@ pub fn read_buffer(
     _file: &File,
     _start_offset: usize,
     _buffer: &mut [u8],
-    _valid_len: usize,
+    _valid_file_len: usize,
 ) -> std::io::Result<usize> {
     panic!("unimplemented");
 }
@@ -103,12 +108,12 @@ mod tests {
         assert_eq!(bytes, buffer[0..32]);
         assert_eq!(buffer[32..64], [0; 32]);
 
-        // Given the `valid_len` is 16, it should only read 16 bytes into the buffer
+        // Given the `valid_file_len` is 16, it should only read 16 bytes into the buffer
         let mut buffer = [0; 32];
         let num_bytes_read = read_buffer(&sample_file, 0, &mut buffer, 16).unwrap();
         assert_eq!(num_bytes_read, 16);
         assert_eq!(bytes[0..16], buffer[0..16]);
-        // As a side effect of the `read_buffer` the data passed `valid_len` was
+        // As a side effect of the `read_buffer` the data passed `valid_file_len` was
         // read and put into the buffer, though these data should not be
         // consumed.
         assert_eq!(buffer[16..32], bytes[16..32]);
