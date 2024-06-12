@@ -41,7 +41,7 @@ pub struct BufferedReader<'a> {
 
 impl<'a> BufferedReader<'a> {
     /// `buffer_size`: how much to try to read at a time
-    /// `file_len_valid`: # bytes that are valid in the file, may be less then overall file len
+    /// `file_len_valid`: # bytes that are valid in the file, may be less than overall file len
     /// `default_min_read_requirement`: make sure we always have this much data available if we're asked to read
     pub fn new(
         buffer_size: usize,
