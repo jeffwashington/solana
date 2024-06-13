@@ -1782,24 +1782,22 @@ pub mod tests {
     #[test_case(StorageAccess::Mmap)]
     #[test_case(StorageAccess::File)]
     fn test_get_account_shared_data_from_truncated_file(storage_access: StorageAccess) {
-        const PAGE_SIZE: usize = 4 * 1024;
         let file = get_append_vec_path("test_get_account_shared_data_from_truncated_file");
         let path = &file.path;
 
         {
-            let av = ManuallyDrop::new(AppendVec::new(path, true, 1024 * 1024));
-
             // Set up a test account with data_len larger than PAGE_SIZE (i.e.
             // AppendVec internal buffer size is PAGESIZE).
-            let data_len = 2 * PAGE_SIZE;
-            let account = create_large_test_account(data_len);
+            let data_len: usize = 2 * PAGE_SIZE as usize;
+            let account = create_test_account_with(data_len);
+            // wrap AppendVec in ManuallyDrop to ensure we do not remove the backing file when dropped
+            let av = ManuallyDrop::new(AppendVec::new(path, true, aligned_stored_size(data_len)));
             av.append_account_test(&account).unwrap();
             av.flush().unwrap();
-            av.len();
         }
 
         // Truncate the AppendVec to PAGESIZE. This will cause get_account* to fail to load the account.
-        let truncated_accounts_len = PAGE_SIZE;
+        let truncated_accounts_len: usize = PAGE_SIZE as usize;
         let av = AppendVec::new_from_file_unchecked(path, truncated_accounts_len, storage_access)
             .unwrap();
         let account = av.get_account_shared_data(0);
