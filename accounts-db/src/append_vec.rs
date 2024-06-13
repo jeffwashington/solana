@@ -1778,4 +1778,34 @@ pub mod tests {
         assert_eq!(offset_of!(AccountMeta, executable), 0x30);
         assert_eq!(mem::size_of::<AccountMeta>(), 0x38);
     }
+
+    #[test_case(StorageAccess::Mmap)]
+    #[test_case(StorageAccess::File)]
+    fn test_get_account_shared_data_from_truncated_file(storage_access: StorageAccess) {
+        const PAGE_SIZE: usize = 4 * 1024;
+        let file = get_append_vec_path("test_get_account_shared_data_from_truncated_file");
+        let path = &file.path;
+
+        {
+            let av = ManuallyDrop::new(AppendVec::new(path, true, 1024 * 1024));
+
+            // Set up a test account with data_len larger than PAGE_SIZE (i.e.
+            // AppendVec internal buffer size is PAGESIZE).
+            let data_len = 2 * PAGE_SIZE;
+            let account = create_large_test_account(data_len);
+            av.append_account_test(&account).unwrap();
+            av.flush().unwrap();
+            av.len();
+        }
+
+        // Truncate the AppendVec to PAGESIZE. This will cause get_account* to fail to load the account.
+        let truncated_accounts_len = PAGE_SIZE;
+        let av = AppendVec::new_from_file_unchecked(path, truncated_accounts_len, storage_access)
+            .unwrap();
+        let account = av.get_account_shared_data(0);
+        assert!(account.is_none()); // Expect None to be returned.
+
+        let result = av.get_stored_account_meta_callback(0, |_| true);
+        assert!(result.is_none()); // Expect None to be returned.
+    }
 }
