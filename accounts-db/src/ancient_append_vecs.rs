@@ -27,6 +27,10 @@ use {
     },
 };
 
+/// this many # of highest slot values should be treated as desirable to pack.
+/// This gives us high slots to move packed accounts into.
+const HIGH_SLOT_OFFSET: u64 = 100;
+
 /// ancient packing algorithm tuning per pass
 #[derive(Debug)]
 struct PackedAncientStorageTuning {
@@ -59,7 +63,7 @@ struct SlotInfo {
     should_shrink: bool,
     /// this slot is a high slot #
     /// It is important to include some high slot #s so that we have new slots to try each time pack runs.
-    high_slot: bool,
+    is_high_slot: bool,
 }
 
 /// info for all storages in ancient slots
@@ -86,7 +90,7 @@ impl AncientSlotInfos {
         storage: Arc<AccountStorageEntry>,
         can_randomly_shrink: bool,
         ideal_size: NonZeroU64,
-        high_slot: bool,
+        is_high_slot: bool,
     ) -> bool {
         let mut was_randomly_shrunk = false;
         let alive_bytes = storage.alive_bytes() as u64;
@@ -126,7 +130,7 @@ impl AncientSlotInfos {
                 storage,
                 alive_bytes,
                 should_shrink,
-                high_slot,
+                is_high_slot,
             });
             self.total_alive_bytes += alive_bytes;
         }
@@ -212,8 +216,9 @@ impl AncientSlotInfos {
             // We do not stop including entries until we have dealt with all the high slot #s. This allows the algorithm to continue
             // to make progress each time it is called. There are exceptions that can cause the pack to fail, such as accounts with multiple
             // refs.
-            if !info.high_slot && storages_remaining + ancient_storages_required < low_threshold
-                || ancient_storages_required as u64 > u64::from(tuning.max_resulting_storages)
+            if !info.is_high_slot
+                && (storages_remaining + ancient_storages_required < low_threshold
+                    || ancient_storages_required as u64 > u64::from(tuning.max_resulting_storages))
             {
                 self.all_infos.truncate(i);
                 break;
@@ -243,8 +248,8 @@ impl AncientSlotInfos {
         // 2. 'should_shrink' so we make progress on shrinking ancient storages
         // 3. smallest capacity to largest so that we remove the most slots possible
         self.all_infos.sort_unstable_by(|l, r| {
-            r.high_slot
-                .cmp(&l.high_slot)
+            r.is_high_slot
+                .cmp(&l.is_high_slot)
                 .then_with(|| (r.should_shrink.cmp(&l.should_shrink)))
                 .then_with(|| l.capacity.cmp(&r.capacity))
         });
@@ -511,9 +516,9 @@ impl AccountsDb {
             ..AncientSlotInfos::default()
         };
         let mut randoms = 0;
-        let max_slot = slots.iter().cloned().max().unwrap_or_default();
+        let max_slot = slots.iter().max().cloned().unwrap_or_default();
         // heuristic to include some # of newly eligible ancient slots so that the pack algorithm always makes progress
-        let high_slot_boundary = max_slot.saturating_sub(100);
+        let high_slot_boundary = max_slot.saturating_sub(HIGH_SLOT_OFFSET);
         let is_high_slot = |slot| slot >= high_slot_boundary;
 
         for slot in &slots {
@@ -1130,7 +1135,7 @@ pub mod tests {
         let original_stores = (0..slots)
             .filter_map(|slot| db.storage.get_slot_storage_entry((slot as Slot) + slot1))
             .collect::<Vec<_>>();
-        let high_slot = false;
+        let is_high_slot = false;
         let slot_infos = original_stores
             .iter()
             .map(|storage| SlotInfo {
@@ -1139,7 +1144,7 @@ pub mod tests {
                 capacity: 0,
                 alive_bytes: 0,
                 should_shrink: false,
-                high_slot,
+                is_high_slot,
             })
             .collect();
         (
@@ -2659,7 +2664,7 @@ pub mod tests {
                     capacity: 1,
                     alive_bytes: 1,
                     should_shrink: false,
-                    high_slot: false,
+                    is_high_slot: false,
                 })
                 .collect(),
             shrink_indexes: (0..count).collect(),
@@ -3244,7 +3249,7 @@ pub mod tests {
                 capacity: info1_capacity,
                 alive_bytes: 0,
                 should_shrink: false,
-                high_slot: false,
+                is_high_slot: false,
             };
             let info2 = SlotInfo {
                 storage: storage.clone(),
@@ -3252,7 +3257,7 @@ pub mod tests {
                 capacity: 2,
                 alive_bytes: 1,
                 should_shrink: false,
-                high_slot: false,
+                is_high_slot: false,
             };
             let mut infos = AncientSlotInfos {
                 all_infos: vec![info1, info2],
