@@ -250,7 +250,7 @@ impl AncientSlotInfos {
         self.all_infos.sort_unstable_by(|l, r| {
             r.is_high_slot
                 .cmp(&l.is_high_slot)
-                .then_with(|| (r.should_shrink.cmp(&l.should_shrink)))
+                .then_with(|| r.should_shrink.cmp(&l.should_shrink))
                 .then_with(|| l.capacity.cmp(&r.capacity))
         });
 
