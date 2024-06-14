@@ -1111,12 +1111,13 @@ pub mod tests {
             append_vec::{aligned_stored_size, AppendVec, AppendVecStoredAccountMeta},
             storable_accounts::{tests::build_accounts_from_storage, StorableAccountsBySlot},
         },
+        rand::seq::SliceRandom as _,
         solana_sdk::{
             account::{AccountSharedData, ReadableAccount, WritableAccount},
             hash::Hash,
             pubkey::Pubkey,
         },
-        std::ops::Range,
+        std::{collections::HashSet, ops::Range},
         strum::IntoEnumIterator,
         strum_macros::EnumIter,
     };
@@ -2708,7 +2709,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_filter_by_smaller_capacity_sort() {
+    fn test_filter_by_smallest_capacity_sort() {
         // max is 6
         // 7 storages
         // storage[last] is big enough to cause us to need another storage
@@ -2764,6 +2765,101 @@ pub mod tests {
                 );
             }
         }
+    }
+
+    /// Test that we always include the high slots when filtering which ancient infos to pack
+    ///
+    /// If we have *more* high slots than max resulting storages set in the tuning parameters,
+    /// we should still have all the high slots after calling `filter_by_smallest_capacity().
+    #[test]
+    fn test_filter_by_smallest_capacity_high_slot_more() {
+        let tuning = default_tuning();
+
+        // Ensure we have more storages with high slots than the 'max resulting storages'.
+        let num_high_slots = tuning.max_resulting_storages.get() * 2;
+        let num_ancient_storages = num_high_slots * 3;
+        let mut infos = create_test_infos(num_ancient_storages as usize);
+        infos
+            .all_infos
+            .sort_unstable_by_key(|slot_info| slot_info.slot);
+        infos
+            .all_infos
+            .iter_mut()
+            .rev()
+            .take(num_high_slots as usize)
+            .for_each(|slot_info| {
+                slot_info.is_high_slot = true;
+            });
+        let slots_expected: Vec<_> = infos
+            .all_infos
+            .iter()
+            .filter_map(|slot_info| slot_info.is_high_slot.then_some(slot_info.slot))
+            .collect();
+
+        // shuffle the infos so they actually need to be sorted
+        infos.all_infos.shuffle(&mut thread_rng());
+        infos.filter_by_smallest_capacity(&tuning);
+
+        infos
+            .all_infos
+            .sort_unstable_by_key(|slot_info| slot_info.slot);
+        let slots_actual: Vec<_> = infos
+            .all_infos
+            .iter()
+            .map(|slot_info| slot_info.slot)
+            .collect();
+        assert_eq!(infos.all_infos.len() as u64, num_high_slots);
+        assert_eq!(slots_actual, slots_expected);
+    }
+
+    /// Test that we always include the high slots when filtering which ancient infos to pack
+    ///
+    /// If we have *less* high slots than max resulting storages set in the tuning parameters,
+    /// we should still have all the high slots after calling `filter_by_smallest_capacity().
+    #[test]
+    fn test_filter_by_smallest_capacity_high_slot_less() {
+        let tuning = default_tuning();
+
+        // Ensure we have less storages with high slots than the 'max resulting storages'.
+        let num_high_slots = tuning.max_resulting_storages.get() / 2;
+        let num_ancient_storages = num_high_slots * 5;
+        let mut infos = create_test_infos(num_ancient_storages as usize);
+        infos
+            .all_infos
+            .sort_unstable_by_key(|slot_info| slot_info.slot);
+        infos
+            .all_infos
+            .iter_mut()
+            .rev()
+            .take(num_high_slots as usize)
+            .for_each(|slot_info| {
+                slot_info.is_high_slot = true;
+            });
+        let high_slots: Vec<_> = infos
+            .all_infos
+            .iter()
+            .filter_map(|slot_info| slot_info.is_high_slot.then_some(slot_info.slot))
+            .collect();
+
+        // shuffle the infos so they actually need to be sorted
+        infos.all_infos.shuffle(&mut thread_rng());
+        infos.filter_by_smallest_capacity(&tuning);
+
+        infos
+            .all_infos
+            .sort_unstable_by_key(|slot_info| slot_info.slot);
+        let slots_actual: HashSet<_> = infos
+            .all_infos
+            .iter()
+            .map(|slot_info| slot_info.slot)
+            .collect();
+        assert_eq!(
+            infos.all_infos.len() as u64,
+            tuning.max_resulting_storages.get() - 1,
+        );
+        assert!(high_slots
+            .iter()
+            .all(|high_slot| slots_actual.contains(high_slot)));
     }
 
     fn test(filter: bool, infos: &mut AncientSlotInfos, tuning: &PackedAncientStorageTuning) {
