@@ -6808,6 +6808,20 @@ impl AccountsDb {
             .collect();
         collect.stop();
 
+        use std::io::Write;
+        let dump = if config.store_detailed_debug_info_on_failure {
+            // this path executes when we are failing with a hash mismatch
+            let failed_file = PathBuf::new()
+                .join("~")
+                .join("failed_calculate_accounts_hash_from_index")
+                .join(max_slot.to_string());
+            _ = std::fs::remove_dir_all(&failed_file);
+
+            Some(Mutex::new(std::fs::File::create(failed_file).unwrap()))
+        } else {
+            None
+        };
+
         // Pick a chunk size big enough to allow us to produce output vectors that are smaller than the overall size.
         // We'll also accumulate the lamports within each chunk and fewer chunks results in less contention to accumulate the sum.
         let chunks = crate::accounts_hash::MERKLE_FANOUT.pow(4);
@@ -6851,7 +6865,17 @@ impl AccountsDb {
                                                 );
                                                 loaded_hash = computed_hash;
                                             }
+                                            if let Some(ref lock) = dump {
+                                                writeln!(
+                                                    &mut lock.lock().unwrap(),
+                                                    "{} {} {}",
+                                                    loaded_account.pubkey(),
+                                                    loaded_account.lamports(),
+                                                    loaded_hash.0,
+                                                );
+                                            }
                                             sum += balance as u128;
+
                                             loaded_hash.0
                                         })
                                     },

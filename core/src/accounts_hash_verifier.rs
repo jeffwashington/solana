@@ -333,6 +333,7 @@ impl AccountsHashVerifier {
             let calculate_accounts_hash_config = CalcAccountsHashConfig {
                 // since we're going to assert, use the fg thread pool to go faster
                 use_bg_thread_pool: false,
+                store_detailed_debug_info_on_failure: true,
                 ..calculate_accounts_hash_config
             };
             let result_with_index = accounts_package
