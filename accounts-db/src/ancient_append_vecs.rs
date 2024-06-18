@@ -2821,7 +2821,7 @@ pub mod tests {
 
         // shuffle the infos so they actually need to be sorted
         infos.all_infos.shuffle(&mut thread_rng());
-        infos.filter_by_smallest_capacity(&tuning);
+        infos.filter_by_smallest_capacity(&tuning, &ShrinkAncientStats::default());
 
         infos
             .all_infos
@@ -2866,7 +2866,7 @@ pub mod tests {
 
         // shuffle the infos so they actually need to be sorted
         infos.all_infos.shuffle(&mut thread_rng());
-        infos.filter_by_smallest_capacity(&tuning);
+        infos.filter_by_smallest_capacity(&tuning, &ShrinkAncientStats::default());
 
         infos
             .all_infos
