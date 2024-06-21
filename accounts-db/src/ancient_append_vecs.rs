@@ -440,12 +440,15 @@ impl AccountsDb {
         // pack the accounts with 1 ref or refs > 1 but the slot we're packing is the highest alive slot for the pubkey.
         // Note the `chain` below combining the 2 types of refs.
         let pack = PackedAncientStorage::pack(
-            many_refs_newest.iter().chain(
-                accounts_to_combine
-                    .accounts_to_combine
-                    .iter()
-                    .map(|shrink_collect| &shrink_collect.alive_accounts.one_ref),
-            ),
+            many_refs_newest
+                .iter()
+                .chain(
+                    accounts_to_combine
+                        .accounts_to_combine
+                        .iter()
+                        .map(|shrink_collect| &shrink_collect.alive_accounts.one_ref),
+                )
+                .rev(),
             tuning.ideal_storage_size,
         );
 
