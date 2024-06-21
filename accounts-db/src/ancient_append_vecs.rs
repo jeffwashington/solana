@@ -236,8 +236,7 @@ impl AncientSlotInfos {
             }
             if info.should_shrink {
                 bytes_from_must_shrink += info.alive_bytes;
-            }
-            if info.is_high_slot {
+            } else if info.is_high_slot {
                 bytes_from_newest_storages += info.alive_bytes;
             } else {
                 bytes_from_smallest_storages += info.alive_bytes;
@@ -3747,6 +3746,20 @@ pub mod tests {
             &target_slots_sorted,
             &tuning
         ));
+    }
+
+    #[test]
+    fn testabc() {
+        solana_logger::setup();
+        let abc = 1;
+        let f = format!("{}", 123);
+        let (_, us) = measure_us!({
+            log::error!("her");
+        });
+        log::error!(
+            "abc, {abc}, {:?}, {f}, {us}",
+            ("jeff", 1, vec![2, 3, 4u64], AncientSlotInfos::default())
+        );
     }
 
     #[test]
