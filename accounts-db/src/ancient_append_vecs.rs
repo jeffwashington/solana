@@ -99,7 +99,7 @@ impl AncientSlotInfos {
             let should_shrink = if capacity > 0 {
                 let alive_ratio = alive_bytes * 100 / capacity;
                 alive_ratio < 90
-                    || if can_randomly_shrink && thread_rng().gen_range(0..10000) == 0 {
+                    || if can_randomly_shrink && thread_rng().gen_range(0..1000) == 0 {
                         was_randomly_shrunk = true;
                         true
                     } else {
