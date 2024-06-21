@@ -3749,20 +3749,6 @@ pub mod tests {
     }
 
     #[test]
-    fn testabc() {
-        solana_logger::setup();
-        let abc = 1;
-        let f = format!("{}", 123);
-        let (_, us) = measure_us!({
-            log::error!("her");
-        });
-        log::error!(
-            "abc, {abc}, {:?}, {f}, {us}",
-            ("jeff", 1, vec![2, 3, 4u64], AncientSlotInfos::default())
-        );
-    }
-
-    #[test]
     fn test_addref_accounts_failed_to_shrink_ancient() {
         let db = AccountsDb::new_single_for_tests();
         let empty_account = AccountSharedData::default();
