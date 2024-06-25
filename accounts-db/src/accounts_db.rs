@@ -583,7 +583,7 @@ pub struct AccountsAddRootTiming {
     pub store_us: u64,
 }
 
-const ANCIENT_APPEND_VEC_DEFAULT_OFFSET: Option<i64> = Some(425_000);
+const ANCIENT_APPEND_VEC_DEFAULT_OFFSET: Option<i64> = Some(-10_000);
 
 
 #[derive(Debug, Default, Clone)]
