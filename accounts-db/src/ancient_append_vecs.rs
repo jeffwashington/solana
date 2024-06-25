@@ -98,8 +98,8 @@ impl AncientSlotInfos {
             let capacity = storage.accounts.capacity();
             let should_shrink = if capacity > 0 {
                 let alive_ratio = alive_bytes * 100 / capacity;
-                alive_ratio < 90
-                    || if can_randomly_shrink && thread_rng().gen_range(0..1000) == 0 {
+                alive_ratio < 50
+                    || if can_randomly_shrink && thread_rng().gen_range(0..10000) == 0 {
                         was_randomly_shrunk = true;
                         true
                     } else {
@@ -328,7 +328,7 @@ impl AccountsDb {
             percent_of_alive_shrunk_data: 55,
             ideal_storage_size: NonZeroU64::new(get_ancient_append_vec_capacity()).unwrap(),
             can_randomly_shrink,
-            max_resulting_storages: NonZeroU64::new(10).unwrap(),
+            max_resulting_storages: NonZeroU64::new(100).unwrap(),
         };
 
         let _guard = self.active_stats.activate(ActiveStatItem::SquashAncient);
@@ -1097,7 +1097,7 @@ pub const fn get_ancient_append_vec_capacity() -> u64 {
     // combined into large ancient append vec. Too small size of ancient append vec will result in too many ancient append vec
     // memory mapped files. Too big size will make it difficult to clean and shrink them. Hence, we choose approximately
     // 128MB for the ancient append vec size.
-    const RESULT: u64 = 128 * 1024 * 1024;
+    const RESULT: u64 = 128 * 1024 * 1024 / 10;
 
     use crate::append_vec::MAXIMUM_APPEND_VEC_FILE_SIZE;
     const _: () = assert!(
