@@ -5479,7 +5479,7 @@ impl Bank {
                 self.skipped_rewrites.lock().unwrap().clone(),
             );
 
-        {
+        if false {
             let mut ancestors_vec = self.ancestors.keys();
             ancestors_vec.sort_unstable();
             let mut hasher = solana_sdk::hash::Hasher::default();
