@@ -818,22 +818,24 @@ impl Accounts {
                 .collect::<Vec<_>>();
             self.accounts_db.store_cached((slot, &additional[..]), None);
 
-            let mut ancestors_vec = ancestors.keys();
-            ancestors_vec.sort_unstable();
-            let mut hasher = Hasher::default();
-            hasher.hash(&slot.to_be_bytes());
-            ancestors_vec.into_iter().for_each(|slot| {
+            if false {
+                let mut ancestors_vec = ancestors.keys();
+                ancestors_vec.sort_unstable();
+                let mut hasher = Hasher::default();
                 hasher.hash(&slot.to_be_bytes());
-            });
-            let pk_dummies = Pubkey::from(hasher.result().to_bytes());
-            match self.accounts_db.dummies.entry(pk_dummies) {
-                dashmap::mapref::entry::Entry::Occupied(mut occupied_entry) => {
-                    occupied_entry
-                        .get_mut()
-                        .extend(pks.into_iter().map(|(k, v)| k));
-                }
-                dashmap::mapref::entry::Entry::Vacant(vacant_entry) => {
-                    vacant_entry.insert(pks.into_iter().map(|(k, v)| k).collect::<Vec<_>>());
+                ancestors_vec.into_iter().for_each(|slot| {
+                    hasher.hash(&slot.to_be_bytes());
+                });
+                let pk_dummies = Pubkey::from(hasher.result().to_bytes());
+                match self.accounts_db.dummies.entry(pk_dummies) {
+                    dashmap::mapref::entry::Entry::Occupied(mut occupied_entry) => {
+                        occupied_entry
+                            .get_mut()
+                            .extend(pks.into_iter().map(|(k, v)| k));
+                    }
+                    dashmap::mapref::entry::Entry::Vacant(vacant_entry) => {
+                        vacant_entry.insert(pks.into_iter().map(|(k, v)| k).collect::<Vec<_>>());
+                    }
                 }
             }
 
