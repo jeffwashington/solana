@@ -6811,13 +6811,13 @@ impl AccountsDb {
         use std::io::Write;
         let mut dump = if true || config.store_detailed_debug_info_on_failure {
             // this path executes when we are failing with a hash mismatch
-            let failed_file = PathBuf::new()
-                .join("~")
-                .join("failed_calculate_accounts_hash_from_index")
-                .join(max_slot.to_string());
+            let failed_file = PathBuf::new().join(format!(
+                "failed_calculate_accounts_hash_from_index_{}",
+                max_slot
+            ));
             _ = std::fs::remove_dir_all(&failed_file);
 
-            std::fs::File::create(failed_file).ok()
+            Some(std::fs::File::create(failed_file).unwrap())
         } else {
             None
         };
@@ -17773,6 +17773,19 @@ pub mod tests {
         let dropped_roots = vec![slot0];
         insert_store(&db, entry);
         db.handle_dropped_roots_for_ancient(dropped_roots.into_iter());
+    }
+
+    #[test]
+    fn test_create_file() {
+        // this path executes when we are failing with a hash mismatch
+
+        let failed_file =
+            PathBuf::new().join(format!("failed_calculate_accounts_hash_from_index_{}", 100,));
+        _ = std::fs::remove_dir_all(&failed_file);
+
+        println!("{:?}", failed_file);
+
+        std::fs::File::create(failed_file).unwrap();
     }
 
     #[test]
