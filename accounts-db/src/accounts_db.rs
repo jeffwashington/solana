@@ -6809,7 +6809,7 @@ impl AccountsDb {
         collect.stop();
 
         use std::io::Write;
-        let mut dump = if true || config.store_detailed_debug_info_on_failure {
+        let mut dump = if false { // true || config.store_detailed_debug_info_on_failure {
             // this path executes when we are failing with a hash mismatch
             let failed_file = PathBuf::new().join(format!(
                 "failed_calculate_accounts_hash_from_index_{}",
@@ -6947,7 +6947,7 @@ impl AccountsDb {
         };
 
         let mut scan = Measure::start("scan");
-        let account_hashes: Vec<Vec<Hash>> = if true || config.store_detailed_debug_info_on_failure
+        let account_hashes: Vec<Vec<Hash>> = if false // true || config.store_detailed_debug_info_on_failure
         {
             self.thread_pool_clean
                 .install(get_account_hashes_single_thread)
