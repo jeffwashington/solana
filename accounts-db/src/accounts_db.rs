@@ -6795,6 +6795,7 @@ impl AccountsDb {
         max_slot: Slot,
         config: &CalcAccountsHashConfig<'_>,
     ) -> (AccountsHash, u64) {
+        log::error!("starting calculate_accounts_hash_from_index");
         let mut collect = Measure::start("collect");
         let keys: Vec<_> = self
             .accounts_index
@@ -6970,7 +6971,11 @@ impl AccountsDb {
             ("collect", collect.as_us(), i64),
         );
 
+
+
         let accounts_hash = AccountsHash(accumulated_hash);
+        log::error!("calculate_accounts_hash_from_index: {:?}", (accounts_hash, total_lamports));
+
         (accounts_hash, total_lamports)
     }
 
