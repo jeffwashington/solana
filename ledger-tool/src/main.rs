@@ -2098,7 +2098,7 @@ fn main() {
                     }
 
                     let pre_capitalization = bank.capitalization();
-
+                    log::error!("lt: set cap");
                     bank.set_capitalization();
 
                     let post_capitalization = bank.capitalization();

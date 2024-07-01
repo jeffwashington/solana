@@ -7354,6 +7354,7 @@ impl AccountsDb {
         let (accounts_hash, total_lamports) =
             self.calculate_accounts_hash_from(data_source, slot, &config);
         if debug_verify {
+            log::error!("calculate_accounts_hash_with_verify_from: doing index");
             // calculate the other way (store or non-store) and verify results match.
             let data_source_other = match data_source {
                 CalcAccountsHashDataSource::IndexForTests => CalcAccountsHashDataSource::Storages,
@@ -7628,6 +7629,18 @@ impl AccountsDb {
             stats,
             CalcAccountsHashKind::Full,
         );
+        let config2 = CalcAccountsHashConfig {
+            // now that we've failed, store off the failing contents that produced a bad capitalization
+            store_detailed_debug_info_on_failure: true,
+            ..*config
+        };
+        let (accounts_hash2, capitalization2) = self.calculate_accounts_hash_from_storages(
+            &config2,
+            storages,
+            HashStats::default(),
+            CalcAccountsHashKind::Full,
+        );
+
         let AccountsHashKind::Full(accounts_hash) = accounts_hash else {
             panic!("calculate_accounts_hash_from_storages must return a FullAccountsHash");
         };

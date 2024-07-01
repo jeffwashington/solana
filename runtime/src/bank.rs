@@ -5863,8 +5863,8 @@ impl Bank {
             .accounts_db
             .update_accounts_hash_with_verify_from(
                 // we have to use the index since the slot could be in the write cache still
-                CalcAccountsHashDataSource::IndexForTests,
-                debug_verify,
+                CalcAccountsHashDataSource::Storages,
+                true,
                 self.slot(),
                 &self.ancestors,
                 None,
