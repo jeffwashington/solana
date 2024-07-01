@@ -464,13 +464,14 @@ impl CumulativeOffsets {
         raw.extract(index, start)
     }
 }
-
+use dashmap::DashMap;
 #[derive(Debug)]
 pub struct AccountsHasher<'a> {
     pub zero_lamport_accounts: ZeroLamportAccounts,
     /// The directory where temporary cache files are put
     pub dir_for_temp_cache_files: PathBuf,
     pub(crate) active_stats: &'a ActiveStats,
+    pub latest: &'a DashMap<Pubkey, AccountHash>,
 }
 
 /// Pointer to a specific item in chunked accounts hash slices.
@@ -1165,6 +1166,7 @@ impl<'a> AccountsHasher<'a> {
                     .checked_add(item.lamports)
                     .expect("summing lamports cannot overflow");
                 hashes.write(&item.hash.0);
+                self.latest.insert(*key, item.hash);
             } else {
                 // if lamports == 0, check if they should be included
                 if self.zero_lamport_accounts == ZeroLamportAccounts::Included {
@@ -1173,6 +1175,7 @@ impl<'a> AccountsHasher<'a> {
                     let hash = blake3::hash(bytemuck::bytes_of(&item.pubkey));
                     let hash = Hash::new_from_array(hash.into());
                     hashes.write(&hash);
+                    self.latest.insert(*key, AccountHash(hash));
                 }
             }
 

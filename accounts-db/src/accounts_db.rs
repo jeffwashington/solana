@@ -1361,6 +1361,7 @@ type AccountInfoAccountsIndex = AccountsIndex<AccountInfo, AccountInfo>;
 // This structure handles the load/store of the accounts
 #[derive(Debug)]
 pub struct AccountsDb {
+    pub latest: DashMap<Pubkey, AccountHash>,
     /// Keeps tracks of index into AppendVec on a per slot basis
     pub accounts_index: AccountInfoAccountsIndex,
 
@@ -2455,6 +2456,7 @@ impl AccountsDb {
         const ACCOUNTS_STACK_SIZE: usize = 8 * 1024 * 1024;
 
         AccountsDb {
+            latest: DashMap::default(),
             create_ancient_storage: CreateAncientStorage::default(),
             verify_accounts_hash_in_bg: VerifyAccountsHashInBackground::default(),
             active_stats: ActiveStats::default(),
@@ -6795,6 +6797,7 @@ impl AccountsDb {
         max_slot: Slot,
         config: &CalcAccountsHashConfig<'_>,
     ) -> (AccountsHash, u64) {
+
         log::error!("starting calculate_accounts_hash_from_index");
         let mut collect = Measure::start("collect");
         let keys: Vec<_> = self
@@ -6920,6 +6923,14 @@ impl AccountsDb {
                                                 );
                                                 loaded_hash = computed_hash;
                                             }
+                                            if let Some(other) = self.latest.remove(pubkey) {
+                                                if loaded_hash != other.1 {
+                                                    log::error!("different hash: {pubkey}, lamports: {}, {:?}, disk: {:?}", loaded_account.lamports(), loaded_hash, other.1);
+                                                }
+                                            }
+                                            else {
+                                                log::error!("not found in disk: {pubkey}, {}", loaded_account.lamports());
+                                            }
                                             if let Some(ref mut dump) = dump {
                                                 writeln!(
                                                     dump,
@@ -6946,6 +6957,10 @@ impl AccountsDb {
                 })
                 .collect()
         };
+
+        self.latest.iter().for_each(|v| {
+            log::error!("left over in disk: {:?}", (v.key(), v.value()));
+        });
 
         let mut scan = Measure::start("scan");
         let account_hashes: Vec<Vec<Hash>> = if false // true || config.store_detailed_debug_info_on_failure
@@ -7682,6 +7697,7 @@ impl AccountsDb {
         mut stats: HashStats,
         kind: CalcAccountsHashKind,
     ) -> (AccountsHashKind, u64) {
+        self.latest.clear();
         let total_time = Measure::start("");
         let _guard = self.active_stats.activate(ActiveStatItem::Hash);
         let storages_start_slot = storages.range().start;
@@ -7715,6 +7731,7 @@ impl AccountsDb {
                 zero_lamport_accounts: kind.zero_lamport_accounts(),
                 dir_for_temp_cache_files: transient_accounts_hash_cache_path,
                 active_stats: &self.active_stats,
+                latest: &self.latest,
             };
 
             // get raw data by scanning
