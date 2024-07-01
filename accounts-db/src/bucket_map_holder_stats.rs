@@ -190,6 +190,7 @@ impl BucketMapHolderStats {
         &self,
         storage: &BucketMapHolder<T, U>,
     ) {
+        return;
         let elapsed_ms = self.last_time.elapsed_ms();
         if elapsed_ms < STATS_INTERVAL_MS {
             return;
