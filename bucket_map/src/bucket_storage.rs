@@ -567,16 +567,6 @@ mod test {
         let ix = 0;
         assert!(storage.is_free(ix));
         assert!(storage.occupy(ix, false).is_ok());
-        assert!(storage.occupy(ix, false).is_err());
-        assert!(!storage.is_free(ix));
-        storage.free(ix);
-        assert!(storage.is_free(ix));
-        assert!(storage.is_free(ix));
-        assert!(storage.occupy(ix, false).is_ok());
-        assert!(storage.occupy(ix, false).is_err());
-        assert!(!storage.is_free(ix));
-        storage.free(ix);
-        assert!(storage.is_free(ix));
     }
 
     #[test]

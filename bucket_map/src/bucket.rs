@@ -522,6 +522,7 @@ impl<'b, T: Clone + Copy + PartialEq + std::fmt::Debug + 'static> Bucket<T> {
     ) -> Result<(), BucketMapError> {
         let num_slots = data_len as u64;
         let best_fit_bucket = MultipleSlots::data_bucket_from_num_slots(data_len as u64);
+        // num_slots > 1 becuase we can store num_slots = 0 or num_slots = 1 in the index entry
         let requires_data_bucket = num_slots > 1 || ref_count != 1;
         if requires_data_bucket && self.data.get(best_fit_bucket as usize).is_none() {
             // fail early if the data bucket we need doesn't exist - we don't want the index entry partially allocated
@@ -895,7 +896,6 @@ mod tests {
             let random = 1;
             // with random=1, 6 entries is the most that don't collide on a single hash % cap value.
             for len in 0..7 {
-                log::error!("testing with {len}");
                 // cannot use pubkey [0,0,...] because that matches a zeroed out default file contents.
                 let raw = (0..len)
                     .map(|l| (Pubkey::from([(l + 1) as u8; 32]), v + (l as u64)))
@@ -1221,9 +1221,11 @@ mod tests {
         // This causes it to be skipped.
         let entry = IndexEntryPlaceInBucket::new(ix);
         entry.init(&mut index, &(other.0));
+        entry.set_slot_count_enum_value(&mut index, OccupiedEnum::ZeroSlots);
         let entry = IndexEntryPlaceInBucket::new(ix + 1);
         // sets pubkey value and enum value of ZeroSlots. Leaving it at zero is illegal at startup, so we'll assert when we find this duplicate.
         entry.init(&mut index, &(raw[0].0));
+        entry.set_slot_count_enum_value(&mut index, OccupiedEnum::ZeroSlots);
 
         // since the same key is already in use with a different value, it is a duplicate.
         // But, it is a zero length entry. This is not supported at startup. Startup would have never generated a zero length occupied entry.
