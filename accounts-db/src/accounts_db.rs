@@ -6320,6 +6320,8 @@ impl AccountsDb {
         #[cfg(not(test))]
         assert!(requested_flush_root.is_some());
 
+        log::error!("flush_accounts_cache, force: {force_flush},requested_flush_root: {requested_flush_root:?}, {}", self.should_aggressively_flush_cache());
+
         if !force_flush && !self.should_aggressively_flush_cache() {
             return;
         }
@@ -6538,6 +6540,8 @@ impl AccountsDb {
                 }
             })
             .collect();
+
+        log::error!("flush: {slot}");
 
         let is_dead_slot = accounts.is_empty();
         // Remove the account index entries from earlier roots that are outdated by later roots.
