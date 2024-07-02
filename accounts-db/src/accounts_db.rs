@@ -2385,12 +2385,11 @@ impl<'a> AppendVecScan for ScanState<'a> {
                 loaded_account.pubkey(),
             );
             account_hash = computed_hash;
-
-            use std::str::FromStr;
-            let pk = Pubkey::from_str("BzAVfuiiL8msnonhn7uE3yE7nG2KwHL8od5oBEPjzM4a").unwrap();
-            if pk == *pubkey {
-                log::error!("scan found {pk}, hash: {:?}k, slot: {}", account_hash, self.current_slot);
-            }
+        }
+        use std::str::FromStr;
+        let pk = Pubkey::from_str("BzAVfuiiL8msnonhn7uE3yE7nG2KwHL8od5oBEPjzM4a").unwrap();
+        if pk == *pubkey {
+            log::error!("scan found {pk}, hash: {:?}k, slot: {}", account_hash, self.current_slot);
         }
         let source_item = CalculateHashIntermediate {
             hash: account_hash,
@@ -7662,6 +7661,7 @@ impl AccountsDb {
             let failed_dir = accounts_hash_cache_path
                 .join("failed_calculate_accounts_hash_cache")
                 .join(slot.to_string());
+            log::error!("removing all: {:?}", failed_dir);
             _ = std::fs::remove_dir_all(&failed_dir);
             failed_dir
         };
