@@ -2389,7 +2389,10 @@ impl<'a> AppendVecScan for ScanState<'a> {
         use std::str::FromStr;
         let pk = Pubkey::from_str("BzAVfuiiL8msnonhn7uE3yE7nG2KwHL8od5oBEPjzM4a").unwrap();
         if pk == *pubkey {
-            log::error!("scan found {pk}, hash: {:?}k, slot: {}", account_hash, self.current_slot);
+            log::error!("scan found {pk}, hash: {:?}, slot: {}", account_hash, self.current_slot);
+        }
+        if self.current_slot == 273964561 {
+            log::error!("scan found {pk}, hash: {:?}, slot: {}", account_hash, self.current_slot);
         }
         let source_item = CalculateHashIntermediate {
             hash: account_hash,
@@ -7226,6 +7229,7 @@ impl AccountsDb {
                     bin_range.end,
                     hash
                 );
+                let load_from_cache = false;
                 if load_from_cache {
                     if let Ok(mapped_file) =
                         cache_hash_data.get_file_reference_to_map_later(&file_name)
