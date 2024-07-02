@@ -692,6 +692,7 @@ impl AccountsBackgroundService {
                         if bank.is_startup_verification_complete() {
                             bank.shrink_candidate_slots();
                         }
+                        bank.force_flush_accounts_cache();
                     }
                     stats.record_and_maybe_submit(start_time.elapsed());
                     sleep(Duration::from_millis(INTERVAL_MS));
