@@ -453,15 +453,13 @@ impl AccountsDb {
         // pack the accounts with 1 ref or refs > 1 but the slot we're packing is the highest alive slot for the pubkey.
         // Note the `chain` below combining the 2 types of refs.
         let pack = PackedAncientStorage::pack(
-            many_refs_newest
-                .iter()
-                .chain(
-                    accounts_to_combine
-                        .accounts_to_combine
-                        .iter()
-                        .map(|shrink_collect| &shrink_collect.alive_accounts.one_ref),
-                )
-                .rev(),
+            many_refs_newest.iter().rev().chain(
+                accounts_to_combine
+                    .accounts_to_combine
+                    .iter()
+                    .rev()
+                    .map(|shrink_collect| &shrink_collect.alive_accounts.one_ref),
+            ),
             tuning.ideal_storage_size,
         );
 
@@ -620,8 +618,8 @@ impl AccountsDb {
                 Ordering::Relaxed,
             );
 
-            log::error!("write_one_packed_storages");
-            self.thread_pool_clean.install(|| {
+        log::error!("write_one_packed_storages");
+        self.thread_pool_clean.install(|| {
             packer.par_iter().for_each(|(target_slot, pack)| {
                 let mut write_ancient_accounts_local = WriteAncientAccounts::default();
                 self.write_one_packed_storage(
@@ -757,11 +755,14 @@ impl AccountsDb {
             last_slot = Some(info.slot);
 
             let many_refs_old_alive = &mut shrink_collect.alive_accounts.many_refs_old_alive;
-            log::error!("many_ref_slots: {many_ref_slots:?}, has many ref: {}", !shrink_collect
-            .alive_accounts
-            .many_refs_this_is_newest_alive
-            .accounts
-            .is_empty());
+            log::error!(
+                "many_ref_slots: {many_ref_slots:?}, has many ref: {}",
+                !shrink_collect
+                    .alive_accounts
+                    .many_refs_this_is_newest_alive
+                    .accounts
+                    .is_empty()
+            );
             if many_ref_slots == IncludeManyRefSlots::Skip
                 && !shrink_collect
                     .alive_accounts
