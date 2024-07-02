@@ -1303,7 +1303,9 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
         self.slot_list_mut(pubkey, |slot_list| {
             slot_list.retain(|(slot, item)| {
                 let should_purge = slots_to_purge.contains(slot);
-                log::error!("purge_exact: {}, {}, should_purge: {}", pubkey, slot, should_purge);
+                if add {
+                    log::error!("purge_exact: {}, {}, should_purge: {}", pubkey, slot, should_purge);
+                }
                 if should_purge {
                     reclaims.push((*slot, *item));
                     false
