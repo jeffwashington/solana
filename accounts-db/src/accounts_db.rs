@@ -2389,10 +2389,10 @@ impl<'a> AppendVecScan for ScanState<'a> {
         use std::str::FromStr;
         let pk = Pubkey::from_str("BzAVfuiiL8msnonhn7uE3yE7nG2KwHL8od5oBEPjzM4a").unwrap();
         if pk == *pubkey {
-            log::error!("scan found {pk}, hash: {:?}, slot: {}", account_hash, self.current_slot);
+            log::error!("scan found {pubkey}, hash: {:?}, slot: {}", account_hash, self.current_slot);
         }
         if self.current_slot == 273964561 {
-            log::error!("scan found {pk}, hash: {:?}, slot: {}", account_hash, self.current_slot);
+            log::error!("scan found {pubkey}, hash: {:?}, slot: {}", account_hash, self.current_slot);
         }
         let source_item = CalculateHashIntermediate {
             hash: account_hash,
@@ -9006,7 +9006,10 @@ impl AccountsDb {
             });
             let items = items_local.into_iter().map(|info| {
                 if pk == info.pubkey {
-                    log::error!("gen idx: found {pk}, slot: {slot}, lmaports: {}", info.lamports);
+                    log::error!("gen idx: found {}, slot: {slot}, lmaports: {}", info.pubkey, info.lamports);
+                }
+                if slot == 273964561 {
+                    log::error!("gen idx: found {}, slot: {slot}, lmaports: {}", info.pubkey, info.lamports);
                 }
                 if let Some(amount_to_top_off_rent_this_account) = Self::stats_for_rent_payers(
                     &info.pubkey,
