@@ -1296,9 +1296,14 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
     where
         C: Contains<'a, Slot>,
     {
+        use std::str::FromStr;
+        let pk = Pubkey::from_str("BzAVfuiiL8msnonhn7uE3yE7nG2KwHL8od5oBEPjzM4a").unwrap();
+        let add = pk == *pubkey;
+
         self.slot_list_mut(pubkey, |slot_list| {
             slot_list.retain(|(slot, item)| {
                 let should_purge = slots_to_purge.contains(slot);
+                log::error!("purge_exact: {}, {}, should_purge: {}", pubkey, slot, should_purge);
                 if should_purge {
                     reclaims.push((*slot, *item));
                     false
