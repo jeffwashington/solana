@@ -6904,7 +6904,9 @@ impl AccountsDb {
                                             if d.bin_from_pubkey(pubkey) == 1 {
                                                 if let Some(other) = self.latest.remove(pubkey) {
                                                     if loaded_hash != other.1 {
-                                                        log::error!("different hash: {pubkey}, lamports: {}, {:?}, disk: {:?}, slot: {}, max slot: {max_slot:?},{:?}, is_cached: {}, {}", loaded_account.lamports(), loaded_hash, other.1, slot, index_entry.slot_list.read().unwrap(), loaded_account.is_cached(), account_info.is_cached());
+                                                        let mut slots = index_entry.slot_list.read().unwrap().iter().map(|(slot2, _)| (*slot2, *slot2 as i64 - slot as i64)).collect::<Vec<_>>();
+                                                        slots.sort();
+                                                        log::error!("different hash: {pubkey}, lamports: {}, {:?}, disk: {:?}, slot: {}, max slot: {max_slot:?},{:?}, is_cached: {}, {}", loaded_account.lamports(), loaded_hash, other.1, slot, slots, loaded_account.is_cached(), account_info.is_cached());
                                                     }
                                                 }
                                                 else {
