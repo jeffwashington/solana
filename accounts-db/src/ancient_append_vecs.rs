@@ -423,10 +423,11 @@ impl AccountsDb {
         metrics.newest_alive_packed_count += many_refs_newest.len();
 
         log::error!(
-            "ancient pack: highest available slot: {:?}, lowest required slot: {:?}, target slots: {:?}",
+            "ancient pack: highest available slot: {:?}, lowest required slot: {:?}, target slots: {:?}, many_refs_newest: {:?}",
             accounts_to_combine.target_slots_sorted.last(),
             many_refs_newest.last().map(|accounts| accounts.slot),
             accounts_to_combine.target_slots_sorted,
+            many_refs_newest,
         );
         if !Self::many_ref_accounts_can_be_moved(
             &many_refs_newest,
