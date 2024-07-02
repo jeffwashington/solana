@@ -287,16 +287,28 @@ impl<'a> ShrinkCollectRefs<'a> for ShrinkCollectAliveSeparatedByRefs<'a> {
         account: &'a AccountFromStorage,
         slot_list: &[(Slot, AccountInfo)],
     ) {
+        use std::str::FromStr;
+        let pks = ["Fki2Qw9zLvAxrrNV22nDKbZxQYc31yX1JXFWUZ48keSw",
+        "CC2QJcQ17wpU69VTLtKgnzxpAEhPVHXJwdte81uD6zFx",
+        "AMPauzubiTFrM4a2i55ZRfRPm75WYeFRgp8Fxrevq6t4",
+        "AdwGJFpHEzDgYdBhg8XLBvZ2cUMTu58hbTSyxV3A8jPm",
+        "BANs2zxUTk7GvaNG4TzBaMXJgx26En67FwoMc1BfgiSt",
+        "Huyt8A1rWQqKnjyLLchtTreU2nymXSdcP1GsB9ajzWVN",];
+        let pks = pks.iter().map(|s| Pubkey::from_str(s).unwrap()).collect::<Vec<_>>();
+        let log = pks.contains(account.pubkey());
         let other = if ref_count == 1 {
+            if log { log::error!("one ref: {}, rc: {}, slot list len: {}", account.pubkey(), ref_count, slot_list.len());}
             &mut self.one_ref
         } else if slot_list.len() == 1
             || !slot_list
                 .iter()
                 .any(|(slot_list_slot, _info)| slot_list_slot > &self.many_refs_old_alive.slot)
         {
+            if log { log::error!("many_refs_this_is_newest_alive: {}, rc: {}, slot list len: {}", account.pubkey(), ref_count, slot_list.len());}
             // this entry is alive but is newer than any other slot in the index
             &mut self.many_refs_this_is_newest_alive
         } else {
+            if log { log::error!("many_refs_old_alive: {}, rc: {}, slot list len: {}", account.pubkey(), ref_count, slot_list.len());}
             // This entry is alive but is older than at least one other slot in the index.
             // We would expect clean to get rid of the entry for THIS slot at some point, but clean hasn't done that yet.
             &mut self.many_refs_old_alive

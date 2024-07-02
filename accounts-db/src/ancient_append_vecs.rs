@@ -422,6 +422,12 @@ impl AccountsDb {
         many_refs_newest.sort_unstable_by(|a, b| b.slot.cmp(&a.slot));
         metrics.newest_alive_packed_count += many_refs_newest.len();
 
+        log::error!(
+            "ancient pack: highest available slot: {:?}, lowest required slot: {:?}, target slots: {:?}",
+            accounts_to_combine.target_slots_sorted.last(),
+            many_refs_newest.last().map(|accounts| accounts.slot),
+            accounts_to_combine.target_slots_sorted,
+        );
         if !Self::many_ref_accounts_can_be_moved(
             &many_refs_newest,
             &accounts_to_combine.target_slots_sorted,
@@ -607,7 +613,8 @@ impl AccountsDb {
                 Ordering::Relaxed,
             );
 
-        self.thread_pool_clean.install(|| {
+            log::error!("write_one_packed_storages");
+            self.thread_pool_clean.install(|| {
             packer.par_iter().for_each(|(target_slot, pack)| {
                 let mut write_ancient_accounts_local = WriteAncientAccounts::default();
                 self.write_one_packed_storage(
@@ -627,6 +634,7 @@ impl AccountsDb {
 
         let mut write_ancient_accounts = write_ancient_accounts.into_inner().unwrap();
 
+        log::error!("write_ancient_accounts_to_same_slot_multiple_refs");
         // write new storages where contents were unable to move because ref_count > 1
         self.write_ancient_accounts_to_same_slot_multiple_refs(
             accounts_to_combine.accounts_keep_slots.values(),
