@@ -1149,6 +1149,9 @@ impl<'a> AccountsHasher<'a> {
 
         let mut overall_sum: u64 = 0;
 
+        use std::str::FromStr;
+        let pk = Pubkey::from_str("BzAVfuiiL8msnonhn7uE3yE7nG2KwHL8od5oBEPjzM4a").unwrap();
+
         let d = PubkeyBinCalculator24::new(2);
 
         while let Some(pointer) = working_set.pop() {
@@ -1161,6 +1164,10 @@ impl<'a> AccountsHasher<'a> {
                 &binner,
                 &ItemLocation { key, pointer },
             );
+
+            if pk == *key {
+                log::error!("found: {}, lamports: {}, hash: {:?}", pk, item.lamports, item.hash);
+            }
 
             let add = d.bin_from_pubkey(key) == 1;
             // add lamports and get hash

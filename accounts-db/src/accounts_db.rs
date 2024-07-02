@@ -6700,6 +6700,20 @@ impl AccountsDb {
                 })
             });
         }
+
+        use std::str::FromStr;
+        let pk = Pubkey::from_str("BzAVfuiiL8msnonhn7uE3yE7nG2KwHL8od5oBEPjzM4a").unwrap();
+
+        (0..accounts.len()).for_each(|index| {
+            accounts.account(index, |account| {
+                // based on the patterns of how a validator writes accounts, it is almost always the case that there is no read only cache entry
+                // for this pubkey and slot. So, we can give that hint to the `remove` for performance.
+                if account.pubkey() == &pk {
+                    log::error!("storing: {pk}, lamports: {}, slot: {}", account.lamports(), slot);
+                }
+            })
+        });
+
         calc_stored_meta_time.stop();
         self.stats
             .calc_stored_meta
@@ -6874,7 +6888,7 @@ impl AccountsDb {
                                             if d.bin_from_pubkey(pubkey) == 1 {
                                                 if let Some(other) = self.latest.remove(pubkey) {
                                                     if loaded_hash != other.1 {
-                                                        log::error!("different hash: {pubkey}, lamports: {}, {:?}, disk: {:?}", loaded_account.lamports(), loaded_hash, other.1);
+                                                        log::error!("different hash: {pubkey}, lamports: {}, {:?}, disk: {:?}, slot: {}", loaded_account.lamports(), loaded_hash, other.1, slot);
                                                     }
                                                 }
                                                 else {
@@ -8960,6 +8974,9 @@ impl AccountsDb {
         let mut amount_to_top_off_rent = 0;
         let mut stored_size_alive = 0;
 
+        use std::str::FromStr;
+        let pk = Pubkey::from_str("BzAVfuiiL8msnonhn7uE3yE7nG2KwHL8od5oBEPjzM4a").unwrap();
+
         let (dirty_pubkeys, insert_time_us, mut generate_index_results) = {
             let mut items_local = Vec::default();
             storage.accounts.scan_index(|info| {
@@ -8970,6 +8987,9 @@ impl AccountsDb {
                 items_local.push(info.index_info);
             });
             let items = items_local.into_iter().map(|info| {
+                if pk == info.pubkey {
+                    log::error!("gen idx: found {pk}, slot: {slot}");
+                }
                 if let Some(amount_to_top_off_rent_this_account) = Self::stats_for_rent_payers(
                     &info.pubkey,
                     info.lamports,
