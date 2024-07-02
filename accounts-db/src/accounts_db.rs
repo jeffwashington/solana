@@ -6798,6 +6798,8 @@ impl AccountsDb {
         config: &CalcAccountsHashConfig<'_>,
     ) -> (AccountsHash, u64) {
 
+        let d = PubkeyBinCalculator24::new(2);
+
         log::error!("starting calculate_accounts_hash_from_index");
         let mut collect = Measure::start("collect");
         let keys: Vec<_> = self
@@ -6923,13 +6925,15 @@ impl AccountsDb {
                                                 );
                                                 loaded_hash = computed_hash;
                                             }
-                                            if let Some(other) = self.latest.remove(pubkey) {
-                                                if loaded_hash != other.1 {
-                                                    log::error!("different hash: {pubkey}, lamports: {}, {:?}, disk: {:?}", loaded_account.lamports(), loaded_hash, other.1);
+                                            if d.bin_from_pubkey(pubkey) == 0 {
+                                                if let Some(other) = self.latest.remove(pubkey) {
+                                                    if loaded_hash != other.1 {
+                                                        log::error!("different hash: {pubkey}, lamports: {}, {:?}, disk: {:?}", loaded_account.lamports(), loaded_hash, other.1);
+                                                    }
                                                 }
-                                            }
-                                            else {
-                                                log::error!("not found in disk: {pubkey}, {}", loaded_account.lamports());
+                                                else {
+                                                    log::error!("not found in disk: {pubkey}, {}", loaded_account.lamports());
+                                                }
                                             }
                                             if let Some(ref mut dump) = dump {
                                                 writeln!(

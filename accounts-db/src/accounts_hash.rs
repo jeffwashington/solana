@@ -1149,6 +1149,8 @@ impl<'a> AccountsHasher<'a> {
 
         let mut overall_sum: u64 = 0;
 
+        let d = PubkeyBinCalculator24::new(2);
+
         while let Some(pointer) = working_set.pop() {
             let key = &sorted_data_by_pubkey[pointer.slot_group_index][pointer.offset].pubkey;
 
@@ -1160,13 +1162,14 @@ impl<'a> AccountsHasher<'a> {
                 &ItemLocation { key, pointer },
             );
 
+            let add = d.bin_from_pubkey(key) == 0;
             // add lamports and get hash
             if item.lamports != 0 {
                 overall_sum = overall_sum
                     .checked_add(item.lamports)
                     .expect("summing lamports cannot overflow");
                 hashes.write(&item.hash.0);
-                self.latest.insert(*key, item.hash);
+                if add {self.latest.insert(*key, item.hash);}
             } else {
                 // if lamports == 0, check if they should be included
                 if self.zero_lamport_accounts == ZeroLamportAccounts::Included {
@@ -1175,7 +1178,7 @@ impl<'a> AccountsHasher<'a> {
                     let hash = blake3::hash(bytemuck::bytes_of(&item.pubkey));
                     let hash = Hash::new_from_array(hash.into());
                     hashes.write(&hash);
-                    self.latest.insert(*key, AccountHash(hash));
+                    if add {self.latest.insert(*key, AccountHash(hash));}
                 }
             }
 
