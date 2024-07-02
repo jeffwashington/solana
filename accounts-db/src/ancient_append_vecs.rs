@@ -433,7 +433,7 @@ impl AccountsDb {
             accounts_to_combine.target_slots_sorted.last(),
             many_refs_newest.last().map(|accounts| accounts.slot),
             accounts_to_combine.target_slots_sorted,
-            many_refs_newest,
+            many_refs_newest.iter().map(|accounts| accounts.slot).collect::<Vec<_>>(),
         );
         if !Self::many_ref_accounts_can_be_moved(
             &many_refs_newest,
