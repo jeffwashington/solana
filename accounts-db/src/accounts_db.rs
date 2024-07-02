@@ -6887,6 +6887,8 @@ impl AccountsDb {
                 .collect()
         };
 
+        log::error!("latest: {}", self.latest.len());
+
         let get_account_hashes_single_thread = || {
             keys.chunks(chunks)
                 .map(|pubkeys| {
@@ -6971,6 +6973,8 @@ impl AccountsDb {
             self.thread_pool_clean.install(get_account_hashes)
         };
         scan.stop();
+
+        log::error!("latest after: {}", self.latest.len());
 
         self.latest.iter().for_each(|v| {
             log::error!("left over in disk: {:?}", (v.key(), v.value()));
@@ -7701,6 +7705,7 @@ impl AccountsDb {
         mut stats: HashStats,
         kind: CalcAccountsHashKind,
     ) -> (AccountsHashKind, u64) {
+        log::error!("clearing 'latest'");
         self.latest.clear();
         let total_time = Measure::start("");
         let _guard = self.active_stats.activate(ActiveStatItem::Hash);
