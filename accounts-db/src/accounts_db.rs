@@ -6541,9 +6541,8 @@ impl AccountsDb {
             })
             .collect();
 
-        log::error!("flush: {slot}");
-
         let is_dead_slot = accounts.is_empty();
+        log::error!("flush: {slot}, is_dead_slot: {is_dead_slot}");
         // Remove the account index entries from earlier roots that are outdated by later roots.
         // Safe because queries to the index will be reading updates from later roots.
         self.purge_slot_cache_pubkeys(
