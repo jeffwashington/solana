@@ -2385,6 +2385,12 @@ impl<'a> AppendVecScan for ScanState<'a> {
                 loaded_account.pubkey(),
             );
             account_hash = computed_hash;
+
+            use std::str::FromStr;
+            let pk = Pubkey::from_str("BzAVfuiiL8msnonhn7uE3yE7nG2KwHL8od5oBEPjzM4a").unwrap();
+            if pk == *pubkey {
+                log::error!("scan found {pk}, hash: {:?}k, slot: {}", account_hash, self.current_slot);
+            }
         }
         let source_item = CalculateHashIntermediate {
             hash: account_hash,
