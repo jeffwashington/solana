@@ -1162,7 +1162,7 @@ impl<'a> AccountsHasher<'a> {
                 &ItemLocation { key, pointer },
             );
 
-            let add = d.bin_from_pubkey(key) == 0;
+            let add = d.bin_from_pubkey(key) == 1;
             // add lamports and get hash
             if item.lamports != 0 {
                 overall_sum = overall_sum

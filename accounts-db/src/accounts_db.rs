@@ -6925,7 +6925,7 @@ impl AccountsDb {
                                                 );
                                                 loaded_hash = computed_hash;
                                             }
-                                            if d.bin_from_pubkey(pubkey) == 0 {
+                                            if d.bin_from_pubkey(pubkey) == 1 {
                                                 if let Some(other) = self.latest.remove(pubkey) {
                                                     if loaded_hash != other.1 {
                                                         log::error!("different hash: {pubkey}, lamports: {}, {:?}, disk: {:?}", loaded_account.lamports(), loaded_hash, other.1);
@@ -6962,10 +6962,6 @@ impl AccountsDb {
                 .collect()
         };
 
-        self.latest.iter().for_each(|v| {
-            log::error!("left over in disk: {:?}", (v.key(), v.value()));
-        });
-
         let mut scan = Measure::start("scan");
         let account_hashes: Vec<Vec<Hash>> = if false // true || config.store_detailed_debug_info_on_failure
         {
@@ -6975,6 +6971,10 @@ impl AccountsDb {
             self.thread_pool_clean.install(get_account_hashes)
         };
         scan.stop();
+
+        self.latest.iter().for_each(|v| {
+            log::error!("left over in disk: {:?}", (v.key(), v.value()));
+        });
 
         let total_lamports = *total_lamports.lock().unwrap();
 
