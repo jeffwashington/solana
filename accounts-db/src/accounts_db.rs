@@ -6715,7 +6715,15 @@ impl AccountsDb {
                 // based on the patterns of how a validator writes accounts, it is almost always the case that there is no read only cache entry
                 // for this pubkey and slot. So, we can give that hint to the `remove` for performance.
                 if account.pubkey() == &pk {
-                    log::error!("storing: {pk}, lamports: {}, slot: {}", account.lamports(), slot);
+                    let computed_hash = AccountsDb::hash_account_data(
+                        account.lamports(),
+                        account.owner(),
+                        account.executable(),
+                        account.rent_epoch(),
+                        account.data(),
+                        account.pubkey(),
+                    );                    
+                    log::error!("storing: {pk}, lamports: {}, slot: {}, {computed_hash:?}", account.lamports(), slot);
                 }
             })
         });
@@ -8994,7 +9002,7 @@ impl AccountsDb {
             });
             let items = items_local.into_iter().map(|info| {
                 if pk == info.pubkey {
-                    log::error!("gen idx: found {pk}, slot: {slot}");
+                    log::error!("gen idx: found {pk}, slot: {slot}, lmaports: {}", info.lamports);
                 }
                 if let Some(amount_to_top_off_rent_this_account) = Self::stats_for_rent_payers(
                     &info.pubkey,
