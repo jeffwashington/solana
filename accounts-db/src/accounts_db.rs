@@ -6871,6 +6871,16 @@ impl AccountsDb {
                                                 );
                                                 loaded_hash = computed_hash;
                                             }
+                                            if d.bin_from_pubkey(pubkey) == 1 {
+                                                if let Some(other) = self.latest.remove(pubkey) {
+                                                    if loaded_hash != other.1 {
+                                                        log::error!("different hash: {pubkey}, lamports: {}, {:?}, disk: {:?}", loaded_account.lamports(), loaded_hash, other.1);
+                                                    }
+                                                }
+                                                else {
+                                                    log::error!("not found in disk: {pubkey}, {}", loaded_account.lamports());
+                                                }
+                                            }
                                             sum += balance as u128;
 
                                             loaded_hash.0
