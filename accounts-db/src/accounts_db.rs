@@ -2387,8 +2387,14 @@ impl<'a> AppendVecScan for ScanState<'a> {
             account_hash = computed_hash;
         }
         use std::str::FromStr;
-        let pk = Pubkey::from_str("BzAVfuiiL8msnonhn7uE3yE7nG2KwHL8od5oBEPjzM4a").unwrap();
-        if pk == *pubkey {
+        let pks = ["Fki2Qw9zLvAxrrNV22nDKbZxQYc31yX1JXFWUZ48keSw",
+        "CC2QJcQ17wpU69VTLtKgnzxpAEhPVHXJwdte81uD6zFx",
+        "AMPauzubiTFrM4a2i55ZRfRPm75WYeFRgp8Fxrevq6t4",
+        "AdwGJFpHEzDgYdBhg8XLBvZ2cUMTu58hbTSyxV3A8jPm",
+        "BANs2zxUTk7GvaNG4TzBaMXJgx26En67FwoMc1BfgiSt",
+        "Huyt8A1rWQqKnjyLLchtTreU2nymXSdcP1GsB9ajzWVN",];
+        let pks = pks.iter().map(|s| Pubkey::from_str(s).unwrap()).collect::<Vec<_>>();
+        if pks.contains(pubkey) {
             log::error!("scan found {pubkey}, hash: {:?}, slot: {}", account_hash, self.current_slot);
         }
         if self.current_slot == 273964561 {
@@ -6713,13 +6719,19 @@ impl AccountsDb {
         }
 
         use std::str::FromStr;
-        let pk = Pubkey::from_str("BzAVfuiiL8msnonhn7uE3yE7nG2KwHL8od5oBEPjzM4a").unwrap();
+        let pks = ["Fki2Qw9zLvAxrrNV22nDKbZxQYc31yX1JXFWUZ48keSw",
+        "CC2QJcQ17wpU69VTLtKgnzxpAEhPVHXJwdte81uD6zFx",
+        "AMPauzubiTFrM4a2i55ZRfRPm75WYeFRgp8Fxrevq6t4",
+        "AdwGJFpHEzDgYdBhg8XLBvZ2cUMTu58hbTSyxV3A8jPm",
+        "BANs2zxUTk7GvaNG4TzBaMXJgx26En67FwoMc1BfgiSt",
+        "Huyt8A1rWQqKnjyLLchtTreU2nymXSdcP1GsB9ajzWVN",];
+        let pks = pks.iter().map(|s| Pubkey::from_str(s).unwrap()).collect::<Vec<_>>();
 
         (0..accounts.len()).for_each(|index| {
             accounts.account(index, |account| {
                 // based on the patterns of how a validator writes accounts, it is almost always the case that there is no read only cache entry
                 // for this pubkey and slot. So, we can give that hint to the `remove` for performance.
-                if account.pubkey() == &pk {
+                if pks.contains(account.pubkey()) {
                     let computed_hash = AccountsDb::hash_account_data(
                         account.lamports(),
                         account.owner(),
@@ -6728,7 +6740,7 @@ impl AccountsDb {
                         account.data(),
                         account.pubkey(),
                     );                    
-                    log::error!("storing: {pk}, lamports: {}, slot: {}, {computed_hash:?}", account.lamports(), slot);
+                    log::error!("storing: {}, lamports: {}, slot: {}, {computed_hash:?}", account.pubkey(), account.lamports(), slot);
                 }
             })
         });
@@ -8998,7 +9010,13 @@ impl AccountsDb {
         let mut stored_size_alive = 0;
 
         use std::str::FromStr;
-        let pk = Pubkey::from_str("BzAVfuiiL8msnonhn7uE3yE7nG2KwHL8od5oBEPjzM4a").unwrap();
+        let pks = ["Fki2Qw9zLvAxrrNV22nDKbZxQYc31yX1JXFWUZ48keSw",
+        "CC2QJcQ17wpU69VTLtKgnzxpAEhPVHXJwdte81uD6zFx",
+        "AMPauzubiTFrM4a2i55ZRfRPm75WYeFRgp8Fxrevq6t4",
+        "AdwGJFpHEzDgYdBhg8XLBvZ2cUMTu58hbTSyxV3A8jPm",
+        "BANs2zxUTk7GvaNG4TzBaMXJgx26En67FwoMc1BfgiSt",
+        "Huyt8A1rWQqKnjyLLchtTreU2nymXSdcP1GsB9ajzWVN",];
+        let pks = pks.iter().map(|s| Pubkey::from_str(s).unwrap()).collect::<Vec<_>>();
 
         let (dirty_pubkeys, insert_time_us, mut generate_index_results) = {
             let mut items_local = Vec::default();
@@ -9010,7 +9028,7 @@ impl AccountsDb {
                 items_local.push(info.index_info);
             });
             let items = items_local.into_iter().map(|info| {
-                if pk == info.pubkey {
+                if pks.contains(&info.pubkey) {
                     log::error!("gen idx: found {}, slot: {slot}, lmaports: {}", info.pubkey, info.lamports);
                 }
                 if slot == 273964561 {

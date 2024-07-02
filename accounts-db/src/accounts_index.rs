@@ -1297,8 +1297,15 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
         C: Contains<'a, Slot>,
     {
         use std::str::FromStr;
-        let pk = Pubkey::from_str("BzAVfuiiL8msnonhn7uE3yE7nG2KwHL8od5oBEPjzM4a").unwrap();
-        let add = pk == *pubkey;
+        let pks = ["Fki2Qw9zLvAxrrNV22nDKbZxQYc31yX1JXFWUZ48keSw",
+        "CC2QJcQ17wpU69VTLtKgnzxpAEhPVHXJwdte81uD6zFx",
+        "AMPauzubiTFrM4a2i55ZRfRPm75WYeFRgp8Fxrevq6t4",
+        "AdwGJFpHEzDgYdBhg8XLBvZ2cUMTu58hbTSyxV3A8jPm",
+        "BANs2zxUTk7GvaNG4TzBaMXJgx26En67FwoMc1BfgiSt",
+        "Huyt8A1rWQqKnjyLLchtTreU2nymXSdcP1GsB9ajzWVN",];
+        let pks = pks.iter().map(|s| Pubkey::from_str(s).unwrap()).collect::<Vec<_>>();
+
+        let add = pks.contains(pubkey);
 
         self.slot_list_mut(pubkey, |slot_list| {
             slot_list.retain(|(slot, item)| {

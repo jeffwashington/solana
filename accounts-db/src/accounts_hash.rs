@@ -1150,7 +1150,14 @@ impl<'a> AccountsHasher<'a> {
         let mut overall_sum: u64 = 0;
 
         use std::str::FromStr;
-        let pk = Pubkey::from_str("BzAVfuiiL8msnonhn7uE3yE7nG2KwHL8od5oBEPjzM4a").unwrap();
+        let pks = ["Fki2Qw9zLvAxrrNV22nDKbZxQYc31yX1JXFWUZ48keSw",
+        "CC2QJcQ17wpU69VTLtKgnzxpAEhPVHXJwdte81uD6zFx",
+        "AMPauzubiTFrM4a2i55ZRfRPm75WYeFRgp8Fxrevq6t4",
+        "AdwGJFpHEzDgYdBhg8XLBvZ2cUMTu58hbTSyxV3A8jPm",
+        "BANs2zxUTk7GvaNG4TzBaMXJgx26En67FwoMc1BfgiSt",
+        "Huyt8A1rWQqKnjyLLchtTreU2nymXSdcP1GsB9ajzWVN",];
+        let pks = pks.iter().map(|s| Pubkey::from_str(s).unwrap()).collect::<Vec<_>>();
+
 
         let d = PubkeyBinCalculator24::new(2);
 
@@ -1165,8 +1172,8 @@ impl<'a> AccountsHasher<'a> {
                 &ItemLocation { key, pointer },
             );
 
-            if pk == *key {
-                log::error!("found: {}, lamports: {}, hash: {:?}", pk, item.lamports, item.hash);
+            if pks.contains(key) {
+                log::error!("found: {}, lamports: {}, hash: {:?}", key, item.lamports, item.hash);
             }
 
             let add = d.bin_from_pubkey(key) == 1;
