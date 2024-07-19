@@ -558,6 +558,10 @@ impl<'b, T: Clone + Copy + PartialEq + std::fmt::Debug + 'static> Bucket<T> {
                 if let Some(single_element) = data.next() {
                     OccupiedEnum::OneSlotInIndex(single_element)
                 } else {
+                    self.stats
+                        .index
+                        .index_uses_uncommon_slot_list_len_or_refcount
+                        .store(true, Ordering::Relaxed);
                     OccupiedEnum::ZeroSlots
                 },
             );
@@ -651,6 +655,10 @@ impl<'b, T: Clone + Copy + PartialEq + std::fmt::Debug + 'static> Bucket<T> {
                     &mut self.index,
                     OccupiedEnum::MultipleSlots(&multiple_slots),
                 );
+                self.stats
+                    .index
+                    .index_uses_uncommon_slot_list_len_or_refcount
+                    .store(true, Ordering::Relaxed);
                 success = true;
                 break;
             }

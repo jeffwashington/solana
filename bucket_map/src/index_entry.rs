@@ -118,8 +118,8 @@ impl<T: Copy + PartialEq + 'static> IndexBucketUsingBitVecBits<T> {
     }
     /// turn the tag into bits and store them
     fn set_enum_tag(&mut self, ix: u64, value: OccupiedEnumTag) {
-        let value2 = value as u8;
-        self.set_bits(ix, (value2 & 2) == 2, (value2 & 1) == 1);
+        let value = value as u8;
+        self.set_bits(ix, (value & 2) == 2, (value & 1) == 1);
     }
     /// read the bits and convert them to an enum tag
     fn get_enum_tag(&self, ix: u64) -> OccupiedEnumTag {
@@ -149,7 +149,7 @@ impl<T: Copy + PartialEq + 'static> BucketOccupied for IndexBucketUsingBitVecBit
             // up to 2 bits per element
             // 1 bit per element in the ideal case, so don't allocate the 2nd bits until necessary
             enum_tag_first_bit: BitVec::new_fill(false, capacity.capacity()),
-            enum_tag_second_bit: BitVec::new_fill(false, 0),
+            enum_tag_second_bit: BitVec::new(),
             capacity: capacity.capacity(),
             _phantom: PhantomData,
         }
@@ -307,7 +307,7 @@ pub(crate) union SingleElementOrMultipleSlots<T: Clone + Copy> {
 
 /// just the values for `OccupiedEnum`
 /// This excludes the contents of any enum value.
-#[derive(PartialEq, FromPrimitive, Debug, Clone, Copy)]
+#[derive(PartialEq, FromPrimitive, Debug)]
 #[repr(u8)]
 enum OccupiedEnumTag {
     #[default]
