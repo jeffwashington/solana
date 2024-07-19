@@ -312,9 +312,9 @@ pub(crate) union SingleElementOrMultipleSlots<T: Clone + Copy> {
 enum OccupiedEnumTag {
     #[default]
     Free = 0,
-    ZeroSlots = 1,
+    ZeroSlots = 2,
     /// this should be value 2 so that we can store Free and OneSlotInIndex in only 1 bit. These are the primary states.
-    OneSlotInIndex = 2,
+    OneSlotInIndex = 1,
     MultipleSlots = 3,
 }
 
