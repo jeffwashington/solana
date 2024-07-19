@@ -101,8 +101,10 @@ impl<T: Copy + PartialEq + 'static> IndexBucketUsingBitVecBits<T> {
                 // The first time someone sets the second bit, we have to allocate and check it.
                 return;
             }
+            panic!("");
             self.enum_tag_second_bit = BitVec::new_fill(false, self.capacity);
         }
+        panic!("");
         self.enum_tag_second_bit.set(ix, second);
     }
     /// get the 2 bits (first and second) in `enum_tag`
