@@ -539,11 +539,12 @@ impl<O: BucketOccupied> BucketStorage<O> {
 
 #[cfg(test)]
 mod test {
-    use crate::index_entry::BucketWithHeader;
-
     use {
         super::*,
-        crate::{bucket_storage::BucketOccupied, index_entry::IndexBucket},
+        crate::{
+            bucket_storage::BucketOccupied,
+            index_entry::{BucketWithHeader, IndexBucket},
+        },
         tempfile::tempdir,
     };
 
