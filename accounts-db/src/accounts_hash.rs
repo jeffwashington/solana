@@ -1173,6 +1173,9 @@ impl<'a> AccountsHasher<'a> {
                     .expect("summing lamports cannot overflow");
                 hashes.write(&item.hash.0);
             } else {
+                stats
+                    .num_excluded_zero_lamport_accounts
+                    .fetch_add(1, Ordering::Relaxed);
                 // if lamports == 0, check if they should be included
                 if self.zero_lamport_accounts == ZeroLamportAccounts::Included {
                     // For incremental accounts hash, the hash of a zero lamport account is
@@ -1180,10 +1183,6 @@ impl<'a> AccountsHasher<'a> {
                     let hash = blake3::hash(bytemuck::bytes_of(&item.pubkey));
                     let hash = Hash::new_from_array(hash.into());
                     hashes.write(&hash);
-                } else {
-                    stats
-                        .num_excluded_zero_lamport_accounts
-                        .fetch_add(1, Ordering::Relaxed);
                 }
             }
 
