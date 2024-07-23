@@ -205,6 +205,7 @@ pub struct HashStats {
     pub sum_ancient_scans_us: AtomicU64,
     pub count_ancient_scans: AtomicU64,
     pub pubkey_bin_search_us: AtomicU64,
+    pub zero_lamport_accounts_found: AtomicU64,
 }
 impl HashStats {
     pub fn calc_storage_size_quartiles(&mut self, storages: &[Arc<AccountStorageEntry>]) {
@@ -304,6 +305,11 @@ impl HashStats {
             (
                 "pubkey_bin_search_us",
                 self.pubkey_bin_search_us.load(Ordering::Relaxed),
+                i64
+            ),
+            (
+                "zero_lamport_accounts_found",
+                self.zero_lamport_accounts_found.load(Ordering::Relaxed),
                 i64
             ),
         );
@@ -1173,6 +1179,10 @@ impl<'a> AccountsHasher<'a> {
                     let hash = blake3::hash(bytemuck::bytes_of(&item.pubkey));
                     let hash = Hash::new_from_array(hash.into());
                     hashes.write(&hash);
+                } else {
+                    stats
+                        .zero_lamport_accounts_found
+                        .fetch_add(1, Ordering::Relaxed);
                 }
             }
 
