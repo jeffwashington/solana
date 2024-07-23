@@ -84,7 +84,7 @@ impl BucketOccupied for BucketWithHeader {
 pub struct IndexBucketUsingBitVecBits<T: PartialEq + 'static> {
     /// 2 bits per entry that represent a 4 state enum tag
     pub enum_tag_first_bit: BitVec,
-    /// second will be empty in all healthy cases because in real use, we only use enum values 0 and 1
+    /// second will be empty in all healthy cases because in real use, we only use enum values 0 and 2 (and we use the high bit for first)
     pub enum_tag_second_bit: BitVec,
     /// number of elements allocated
     capacity: u64,
