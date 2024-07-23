@@ -1357,6 +1357,7 @@ type AccountInfoAccountsIndex = AccountsIndex<AccountInfo, AccountInfo>;
 // This structure handles the load/store of the accounts
 #[derive(Debug)]
 pub struct AccountsDb {
+    pub zeros: DashMap<Pubkey, Slot>,
     /// Keeps tracks of index into AppendVec on a per slot basis
     pub accounts_index: AccountInfoAccountsIndex,
 
@@ -2399,6 +2400,7 @@ impl AccountsDb {
         const ACCOUNTS_STACK_SIZE: usize = 8 * 1024 * 1024;
 
         AccountsDb {
+            zeros: DashMap::default(),
             create_ancient_storage: CreateAncientStorage::default(),
             verify_accounts_hash_in_bg: VerifyAccountsHashInBackground::default(),
             active_stats: ActiveStats::default(),
@@ -8548,6 +8550,15 @@ impl AccountsDb {
                     rent_paying_accounts_by_partition.push(info.pubkey);
                 }
 
+                if info.lamports == 0 {
+                    if self.zeros.get(&info.pubkey).is_some() {
+                        self.zeros.insert(info.pubkey, Slot::MAX);
+                    }
+                    else {
+                        self.zeros.insert(info.pubkey, slot);
+                    }
+                }
+
                 (
                     info.pubkey,
                     AccountInfo::new(
@@ -8900,6 +8911,14 @@ impl AccountsDb {
                     accounts_data_len.load(Ordering::Relaxed)
                 );
             }
+
+            let mut x = self.zeros.iter().map(|e| (*e.value(), *e.key())).collect::<Vec<_>>();
+            x.sort();
+            x.iter().for_each(|x| {
+                if x.0 != Slot::MAX {
+                    log::error!("{},{}", max_slot-x.0, x.1);
+                }
+            });
 
             if pass == 0 {
                 // Need to add these last, otherwise older updates will be cleaned
