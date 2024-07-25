@@ -12225,6 +12225,93 @@ pub mod tests {
     }
 
     #[test]
+    fn test_shrink_zero_lamport_clean_alive_later() {
+        solana_logger::setup();
+
+        let accounts = AccountsDb::new_single_for_tests();
+
+        let pubkey_count = 30000;
+        let pubkeys: Vec<_> = (0..5).map(|_| solana_sdk::pubkey::new_rand()).collect();
+        let zero_pubkeys: Vec<_> = (0..pubkey_count)
+            .map(|_| solana_sdk::pubkey::new_rand())
+            .collect();
+
+        let some_lamport = 223;
+        let no_data = 0;
+        let owner = *AccountSharedData::default().owner();
+
+        let account = AccountSharedData::new(some_lamport, no_data, &owner);
+        let zero_account = AccountSharedData::new(0, 0, &owner);
+
+        let mut current_slot = 0;
+
+        current_slot += 1;
+        for pubkey in &pubkeys {
+            accounts.store_for_tests(current_slot, &[(pubkey, &account)]);
+        }
+        for pubkey in &zero_pubkeys {
+            accounts.store_for_tests(current_slot, &[(pubkey, &zero_account)]);
+        }
+
+        accounts.calculate_accounts_delta_hash(current_slot);
+        accounts.add_root_and_flush_write_cache(current_slot);
+
+        let prior_slot = current_slot;
+        current_slot += 1;
+
+        for pubkey in &zero_pubkeys {
+            accounts.store_for_tests(current_slot, &[(pubkey, &account)]);
+        }
+
+        accounts.calculate_accounts_delta_hash(current_slot);
+        accounts.add_root_and_flush_write_cache(current_slot);
+
+        // remove pubkey zero in prior_slot as dead. Then, it will be shrunk away.
+        for pubkey_zero in &zero_pubkeys {
+            accounts
+                .accounts_index
+                .get_and_then(pubkey_zero, |account| {
+                    account
+                        .unwrap()
+                        .slot_list
+                        .write()
+                        .unwrap()
+                        .retain(|(slot, _info)| slot != &prior_slot);
+                    (false, ())
+                });
+            accounts
+                .storage
+                .get_slot_storage_entry(prior_slot)
+                .unwrap()
+                .alive_bytes
+                .fetch_sub(aligned_stored_size(0), Ordering::Relaxed);
+        }
+
+        accounts.shrink_all_slots(false, None, &EpochSchedule::default());
+
+        // after shrinking, all zero lamport dead accounts in prior_slot should be gone.
+        // pubkeys_to_clean should contain all the zero lamport accounts alive in
+        // 'current_slot'
+        assert_eq!(
+            pubkeys.len(),
+            accounts.all_account_count_in_accounts_file(prior_slot)
+        );
+        let mut pubkeys_to_clean = accounts
+            .uncleaned_pubkeys
+            .get(&current_slot)
+            .unwrap()
+            .value()
+            .iter()
+            .cloned()
+            .collect::<HashSet<_>>();
+
+        for pubkey_zero in &zero_pubkeys {
+            assert!(pubkeys_to_clean.remove(pubkey_zero));
+        }
+        assert!(pubkeys_to_clean.is_empty());
+    }
+
+    #[test]
     fn test_select_candidates_by_total_usage_no_candidates() {
         // no input candidates -- none should be selected
         solana_logger::setup();
