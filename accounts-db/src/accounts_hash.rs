@@ -1172,9 +1172,6 @@ impl<'a> AccountsHasher<'a> {
                     .expect("summing lamports cannot overflow");
                 hashes.write(&item.hash.0);
             } else {
-                stats
-                    .num_zero_lamport_accounts
-                    .fetch_add(1, Ordering::Relaxed);
                 // if lamports == 0, check if they should be included
                 if self.zero_lamport_accounts == ZeroLamportAccounts::Included {
                     // For incremental accounts hash, the hash of a zero lamport account is

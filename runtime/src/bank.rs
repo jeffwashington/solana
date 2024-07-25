@@ -1317,6 +1317,26 @@ impl Bank {
             .unwrap()
             .stats
             .reset();
+
+        let now = Instant::now();
+
+        let cleans = parent.rc.accounts.accounts_db.cleans.load(std::sync::atomic::Ordering::Relaxed);
+        let shrinks = parent.rc.accounts.accounts_db.shrinks.load(std::sync::atomic::Ordering::Relaxed);
+        log::error!("waiting on cleans/shrinks");
+        loop {
+            if now.elapsed().as_secs() > 5 {
+                log::error!("waiting on cleans/shrinks: breaking after 5s");
+                break;
+            }
+            if cleans == parent.rc.accounts.accounts_db.cleans.load(std::sync::atomic::Ordering::Relaxed) {
+                continue;
+            }
+            if shrinks == parent.rc.accounts.accounts_db.shrinks.load(std::sync::atomic::Ordering::Relaxed) {
+                continue;
+            }
+            break;
+        }
+
         new
     }
 
@@ -3055,6 +3075,10 @@ impl Bank {
     /// if hash verification failed, a panic will occur
     pub fn is_startup_verification_complete(&self) -> bool {
         self.has_initial_accounts_hash_verification_completed()
+    }
+
+    pub fn set_last_full_snapshot_slot(&self, slot: Slot) {
+        self.rc.accounts.accounts_db.set_last_full_snapshot_slot(slot);
     }
 
     /// This can occur because it completed in the background

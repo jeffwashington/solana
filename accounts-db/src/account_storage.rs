@@ -87,6 +87,7 @@ impl AccountStorage {
         slot: Slot,
         storage: Arc<AccountStorageEntry>,
     ) {
+        log::error!("replace_eq: {}", slot);
         assert_eq!(storage.slot(), slot);
         if let Some(mut existing_storage) = self.map.get_mut(&slot) {
             assert_eq!(slot, existing_storage.value().storage.slot());
@@ -131,6 +132,8 @@ impl AccountStorage {
         slot: &Slot,
         shrink_can_be_active: bool,
     ) -> Option<Arc<AccountStorageEntry>> {
+        log::error!("remove: {}", slot);
+
         assert!(shrink_can_be_active || self.shrink_in_progress_map.is_empty());
         self.map.remove(slot).map(|(_, entry)| entry.storage)
     }
