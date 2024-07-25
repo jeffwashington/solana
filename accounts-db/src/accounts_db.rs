@@ -3276,6 +3276,8 @@ impl AccountsDb {
                                             } else {
                                                 found_not_zero += 1;
                                             }
+                                            // if the highest rooted slot for this pubkey is in the list of uncleaned roots, then we may want to purge it.
+                                            // We may want to remove older slots from the slot list. That's what purges_old_accounts does.
                                             if uncleaned_roots.contains(slot) {
                                                 // Assertion enforced by `accounts_index.get()`, the latest slot
                                                 // will not be greater than the given `max_clean_root`
@@ -3794,6 +3796,17 @@ impl AccountsDb {
                         // not exist in the re-written slot. Unref it to keep the index consistent with
                         // rewriting the storage entries.
                         unrefed_pubkeys.push(pubkey);
+                        if ref_count == 2 && slot_list.len() == 1 {
+                            // this is the last remaining older entry for a zero lamport account. When this account at this slot is shrunk away, the
+                            // zero lamport account that is still alive can be marked dead, removed from the index, and then shrunk away.
+                            let entry = slot_list.first().unwrap();
+                            if entry.1.is_zero_lamport() {
+                                self.add_uncleaned_pubkeys_after_shrink(
+                                    entry.0,
+                                    [*pubkey].into_iter(),
+                                );
+                            }
+                        }
                         result = AccountsIndexScanResult::Unref;
                         dead += 1;
                     } else {
