@@ -5485,7 +5485,7 @@ impl Bank {
         _ = self.verify_accounts_hash(
             None,
             VerifyAccountsHashConfig {
-                test_hash_calculation: false,
+                test_hash_calculation: true,
                 ignore_mismatch: true,
                 require_rooted_bank: false,
                 run_in_background: false,
