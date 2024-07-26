@@ -1938,6 +1938,8 @@ struct CleanAccountsStats {
     remove_dead_accounts_remove_us: AtomicU64,
     remove_dead_accounts_shrink_us: AtomicU64,
     clean_stored_dead_slots_us: AtomicU64,
+    zero_lamport_single_entry_accounts_purge_failed: AtomicU64,
+    zero_lamport_single_entry_accounts_purged: AtomicU64,
 }
 
 impl CleanAccountsStats {
@@ -3591,6 +3593,20 @@ impl AccountsDb {
                 i64
             ),
             ("next_store_id", self.next_id.load(Ordering::Relaxed), i64),
+            (
+                "zero_lamport_single_entry_accounts_purge_failed",
+                self.clean_accounts_stats
+                    .zero_lamport_single_entry_accounts_purge_failed
+                    .swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "zero_lamport_single_entry_accounts_purged",
+                self.clean_accounts_stats
+                    .zero_lamport_single_entry_accounts_purged
+                    .swap(0, Ordering::Relaxed),
+                i64
+            ),
         );
     }
 
@@ -3714,10 +3730,37 @@ impl AccountsDb {
         purges_zero_lamports.retain(|pubkey, (slot_account_infos, ref_count)| {
             // Only keep purges_zero_lamports where the entire history of the account in the root set
             // can be purged. All AppendVecs for those updates are dead.
-            if !(slot_account_infos.len() == 1
+            let mut force_allow_purge = false;
+            if slot_account_infos.len() == 1
                 && slot_account_infos.first().unwrap().1.is_zero_lamport()
-                && ref_count == &1)
+                && ref_count == &1
             {
+                // `ref_count` is modified based on assumptions of what will happen in this active clean. Clean is in the middle of figuring out what will be
+                // dropped. We cannot rely on `ref_count` here. We need to check the actual index. ref_count may really be 2 and we may be hoping to drop the older element from the slot list.
+                // but, if that drop gets cancelled, then we would now resurrect an older version of this account in the index.
+                self.accounts_index.scan(
+                    [pubkey].into_iter(),
+                    |_k, info, _entry| {
+                        if let Some(info) = info {
+                            if info.0.len() == 1 && info.1 == 1 {
+                                force_allow_purge = true;
+                                self.clean_accounts_stats
+                                    .zero_lamport_single_entry_accounts_purged
+                                    .fetch_add(1, Ordering::Relaxed);
+                            }
+                        }
+                        AccountsIndexScanResult::OnlyKeepInMemoryIfDirty
+                    },
+                    None,
+                    false,
+                );
+                if !force_allow_purge {
+                    self.clean_accounts_stats
+                        .zero_lamport_single_entry_accounts_purged
+                        .fetch_add(1, Ordering::Relaxed);
+                }
+            }
+            if !force_allow_purge {
                 for (slot, _account_info) in slot_account_infos.iter() {
                     if let Some(store_count) = store_counts.get(slot) {
                         if store_count.0 != 0 {
@@ -11171,9 +11214,10 @@ pub mod tests {
 
         accounts.clean_accounts_for_tests();
 
-        //Old state behind zero-lamport account is cleaned up
+        // Old state behind zero-lamport account and normal account is cleaned up in slot 0
         assert_eq!(accounts.alive_account_count_in_slot(0), 0);
-        assert_eq!(accounts.alive_account_count_in_slot(1), 2);
+        // zero lamport account can be marked dead in slot 1 since the entry in slot 1 is the only instance in all storages
+        assert_eq!(accounts.alive_account_count_in_slot(1), 1);
     }
 
     #[test]
