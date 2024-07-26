@@ -3300,7 +3300,9 @@ impl AccountsDb {
                                                 {
                                                     assert!(slot <= &max_clean_root_inclusive);
                                                 }
-                                                purges_old_accounts.push(*pubkey);
+                                                if slot_list.len() > 1 {
+                                                    purges_old_accounts.push(*pubkey);
+                                                }
                                                 useless = false;
                                             }
                                         }
@@ -3322,11 +3324,7 @@ impl AccountsDb {
                                 if !useless {
                                     useful += 1;
                                 }
-                                if useless {
-                                    AccountsIndexScanResult::OnlyKeepInMemoryIfDirty
-                                } else {
-                                    AccountsIndexScanResult::KeepInMemory
-                                }
+                                AccountsIndexScanResult::OnlyKeepInMemoryIfDirty
                             },
                             None,
                             false,
@@ -8961,7 +8959,7 @@ impl AccountsDb {
                     Measure::start("handle accounts data len duplicates");
                 let DuplicatePubkeysVisitedInfo {
                     accounts_data_len_from_duplicates,
-                    uncleaned_roots,
+                    mut uncleaned_roots,
                 } = unique_pubkeys_by_bin
                     .par_iter()
                     .fold(
@@ -8996,6 +8994,11 @@ impl AccountsDb {
                 accounts_data_len_dedup_timer.stop();
                 timings.accounts_data_len_dedup_time_us = accounts_data_len_dedup_timer.as_us();
                 timings.slots_to_clean = uncleaned_roots.len() as u64;
+
+                // clean does all roots
+                slots.iter().for_each(|slot| {
+                    uncleaned_roots.insert(*slot);
+                });
 
                 self.accounts_index
                     .add_uncleaned_roots(uncleaned_roots.into_iter());
