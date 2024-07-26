@@ -3033,6 +3033,10 @@ impl Bank {
         self.has_initial_accounts_hash_verification_completed()
     }
 
+    pub fn set_last_full_snapshot_slot(&self, slot: Slot) {
+        self.rc.accounts.accounts_db.set_last_full_snapshot_slot(slot);
+    }
+
     /// This can occur because it completed in the background
     /// or if the verification was run in the foreground.
     pub fn set_startup_verification_complete(&self) {
@@ -5899,6 +5903,8 @@ impl Bank {
         last_full_snapshot_slot: Slot,
         base: Option<(Slot, /*capitalization*/ u64)>,
     ) -> bool {
+        let skip_shrink = false;
+        let force_clean = true;
         let (_, clean_time_us) = measure_us!({
             let should_clean = force_clean || (!skip_shrink && self.slot() > 0);
             if should_clean {

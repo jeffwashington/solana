@@ -861,7 +861,7 @@ pub fn test_process_blockstore(
     )
     .unwrap();
 
-    bg_exit.store(true, Relaxed);
+    // bg_exit.store(true, Relaxed);
     bg_thread.join().unwrap();
 
     (bank_forks, leader_schedule_cache)

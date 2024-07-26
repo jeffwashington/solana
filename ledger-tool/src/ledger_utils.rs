@@ -422,7 +422,7 @@ pub fn load_and_process_ledger(
     })
     .map_err(LoadAndProcessLedgerError::ProcessBlockstoreFromRoot);
 
-    exit.store(true, Ordering::Relaxed);
+    // exit.store(true, Ordering::Relaxed);
     accounts_hash_verifier.join().unwrap();
     if let Some(service) = transaction_status_service {
         service.join().unwrap();

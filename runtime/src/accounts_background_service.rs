@@ -642,7 +642,10 @@ impl AccountsBackgroundService {
                             )
                         })
                         .flatten();
-                    if snapshot_handle_result.is_some() {
+                    if last_full_snapshot_slot.is_some() { 
+                        bank.set_last_full_snapshot_slot(*last_full_snapshot_slot.as_ref().unwrap());
+                    }
+                if snapshot_handle_result.is_some() {
                         last_snapshot_end_time = Some(Instant::now());
                     }
 

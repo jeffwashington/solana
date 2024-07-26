@@ -206,7 +206,7 @@ pub struct HashStats {
     pub sum_ancient_scans_us: AtomicU64,
     pub count_ancient_scans: AtomicU64,
     pub pubkey_bin_search_us: AtomicU64,
-    pub num_zero_lamport_accounts: AtomicU64,
+    pub zero_lamport_accounts_found: AtomicU64,
 }
 impl HashStats {
     pub fn calc_storage_size_quartiles(&mut self, storages: &[Arc<AccountStorageEntry>]) {
@@ -309,8 +309,8 @@ impl HashStats {
                 i64
             ),
             (
-                "num_zero_lamport_accounts",
-                self.num_zero_lamport_accounts.load(Ordering::Relaxed),
+                "zero_lamport_accounts_found",
+                self.zero_lamport_accounts_found.load(Ordering::Relaxed),
                 i64
             ),
         );
@@ -1174,7 +1174,7 @@ impl<'a> AccountsHasher<'a> {
                 hashes.write(&item.hash.0);
             } else {
                 stats
-                    .num_zero_lamport_accounts
+                    .zero_lamport_accounts_found
                     .fetch_add(1, Ordering::Relaxed);
                 // if lamports == 0, check if they should be included
                 if self.zero_lamport_accounts == ZeroLamportAccounts::Included {
@@ -1184,6 +1184,9 @@ impl<'a> AccountsHasher<'a> {
                     let hash = Hash::new_from_array(hash.into());
                     hashes.write(&hash);
                 }
+                stats
+                    .zero_lamport_accounts_found
+                    .fetch_add(1, Ordering::Relaxed);
             }
 
             Self::add_next_item(
