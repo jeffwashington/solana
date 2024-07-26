@@ -3302,6 +3302,13 @@ impl AccountsDb {
                                 let mut useless = true;
                                 if let Some((slot_list, ref_count)) = slot_list_and_ref_count {
                                     // find the highest rooted slot in the slot list
+                                    slot_list.iter().for_each(|(slot, info)| {
+                                        if !info.is_cached() {
+                                            if self.storage.get_account_storage_entry(*slot, info.store_id()).is_none() {
+                                                panic!("Unable to find storage for: {candidate}, {slot}, id: {}, found: {}", info.store_id(), self.storage.get_slot_storage_entry(*slot).map(|s| s.id()).unwrap_or_default());
+                                            }
+                                        }
+                                    });
                                     let index_in_slot_list = self.accounts_index.latest_slot(
                                         None,
                                         slot_list,
