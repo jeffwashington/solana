@@ -67,6 +67,21 @@ impl<'a> AppendVecScan for ScanState<'a> {
         }
     }
     fn found_account(&mut self, loaded_account: &LoadedAccount) {
+        use std::str::FromStr;
+        let pks = ["5YcfMU3zpPU7qLQfUAEReBfoo9sRssCqSRAHtSVQhpCH",
+        "5YwEntu998V1TFZAiMNUcpqtdNwyVHT8T7QSSpJ2hYsr",
+        "5ZTBXQRpKa7TUVeYgC8tXVEFiMaTe77nR1aJcBRdF1Vz",
+        "5bBVSzSLmgvnYSvbjMQJxohuhts4NRWwEUmmnsNkn1zV",
+        "5cNFS6pYJpWqZG17gEqrTNbVYeccPHCGnN24YKmcWdo9",
+        "5cuy7pMhTPhVZN9xuhgSbykRb986siGJb6vnEtkuBrSU",
+        "5cy2VSz4BhtU5jKMVXkMP5J4SZTavkJNaGynj1yusdgE",
+        "5fMwvFVA8z69qdZcFPhm3ywLeGHWEDcr5eWjcGjUavsk",
+        "5fpEQxgxGj4DDybYRTva8wR2Ah6Ge3pLFwx7CDbRTNQP",
+        "5gVEdLrArMAKCMzerWhRxh9HND4VprHPbi38pmsnA7zZ",
+        "5h7rQBrwywCPgCsf43EyFfmPB5JEEz7t6nwQkxPnLbPH",
+        "5i3Qgc67fLyGBSudEEgBgmXQpEiJsqivSMq7oxxoETM9",];
+        let pks = pks.iter().map(|k| Pubkey::from_str(k).unwrap()).collect::<Vec<_>>();
+
         let pubkey = loaded_account.pubkey();
         assert!(self.bin_range.contains(&self.pubkey_to_bin_index)); // get rid of this once we have confidence
 
@@ -81,6 +96,9 @@ impl<'a> AppendVecScan for ScanState<'a> {
         if hash_is_missing {
             let computed_hash = AccountsDb::hash_account(loaded_account, loaded_account.pubkey());
             account_hash = computed_hash;
+        }
+        if pks.contains(pubkey) {
+            log::error!("hash calc scan: {pubkey}, {}, slot: {}", account_hash.0, self.current_slot);
         }
         let source_item = CalculateHashIntermediate {
             hash: account_hash,

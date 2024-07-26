@@ -2875,12 +2875,30 @@ impl AccountsDb {
         let mut reclaims = Vec::new();
         let mut dead_keys = Vec::new();
 
+        use std::str::FromStr;
+        let pks = ["5YcfMU3zpPU7qLQfUAEReBfoo9sRssCqSRAHtSVQhpCH",
+        "5YwEntu998V1TFZAiMNUcpqtdNwyVHT8T7QSSpJ2hYsr",
+        "5ZTBXQRpKa7TUVeYgC8tXVEFiMaTe77nR1aJcBRdF1Vz",
+        "5bBVSzSLmgvnYSvbjMQJxohuhts4NRWwEUmmnsNkn1zV",
+        "5cNFS6pYJpWqZG17gEqrTNbVYeccPHCGnN24YKmcWdo9",
+        "5cuy7pMhTPhVZN9xuhgSbykRb986siGJb6vnEtkuBrSU",
+        "5cy2VSz4BhtU5jKMVXkMP5J4SZTavkJNaGynj1yusdgE",
+        "5fMwvFVA8z69qdZcFPhm3ywLeGHWEDcr5eWjcGjUavsk",
+        "5fpEQxgxGj4DDybYRTva8wR2Ah6Ge3pLFwx7CDbRTNQP",
+        "5gVEdLrArMAKCMzerWhRxh9HND4VprHPbi38pmsnA7zZ",
+        "5h7rQBrwywCPgCsf43EyFfmPB5JEEz7t6nwQkxPnLbPH",
+        "5i3Qgc67fLyGBSudEEgBgmXQpEiJsqivSMq7oxxoETM9",];
+        let pks = pks.iter().map(|k| Pubkey::from_str(k).unwrap()).collect::<Vec<_>>();
+
         let mut purge_exact_count = 0;
         let (_, purge_exact_us) = measure_us!(for (pubkey, slots_set) in pubkey_to_slot_set {
             purge_exact_count += 1;
             let is_empty = self
                 .accounts_index
                 .purge_exact(pubkey, slots_set, &mut reclaims);
+            if pks.contains(pubkey) {
+                log::error!("purge_keys_exact: {pubkey}, empty: {is_empty}");
+            }
             if is_empty {
                 dead_keys.push(pubkey);
             }
@@ -3676,6 +3694,21 @@ impl AccountsDb {
             "if filtering for incremental snapshots, then snapshots should be enabled",
         );
 
+        use std::str::FromStr;
+        let pks = ["5YcfMU3zpPU7qLQfUAEReBfoo9sRssCqSRAHtSVQhpCH",
+        "5YwEntu998V1TFZAiMNUcpqtdNwyVHT8T7QSSpJ2hYsr",
+        "5ZTBXQRpKa7TUVeYgC8tXVEFiMaTe77nR1aJcBRdF1Vz",
+        "5bBVSzSLmgvnYSvbjMQJxohuhts4NRWwEUmmnsNkn1zV",
+        "5cNFS6pYJpWqZG17gEqrTNbVYeccPHCGnN24YKmcWdo9",
+        "5cuy7pMhTPhVZN9xuhgSbykRb986siGJb6vnEtkuBrSU",
+        "5cy2VSz4BhtU5jKMVXkMP5J4SZTavkJNaGynj1yusdgE",
+        "5fMwvFVA8z69qdZcFPhm3ywLeGHWEDcr5eWjcGjUavsk",
+        "5fpEQxgxGj4DDybYRTva8wR2Ah6Ge3pLFwx7CDbRTNQP",
+        "5gVEdLrArMAKCMzerWhRxh9HND4VprHPbi38pmsnA7zZ",
+        "5h7rQBrwywCPgCsf43EyFfmPB5JEEz7t6nwQkxPnLbPH",
+        "5i3Qgc67fLyGBSudEEgBgmXQpEiJsqivSMq7oxxoETM9",];
+        let pks = pks.iter().map(|k| Pubkey::from_str(k).unwrap()).collect::<Vec<_>>();
+
         purges_zero_lamports.retain(|pubkey, (slot_account_infos, ref_count)| {
             // Only keep purges_zero_lamports where the entire history of the account in the root set
             // can be purged. All AppendVecs for those updates are dead.
@@ -3693,6 +3726,11 @@ impl AccountsDb {
                         // store is not being removed, so this pubkey cannot be removed at all
                         return false;
                     }
+                }
+            }
+            else {
+                if pks.contains(pubkey) {
+                    log::error!("allowing us to purge pubkey: {pubkey}, info: {slot_account_infos:?}");
                 }
             }
 
@@ -6677,6 +6715,28 @@ impl AccountsDb {
                 })
             });
         }
+        use std::str::FromStr;
+        let pks = ["5YcfMU3zpPU7qLQfUAEReBfoo9sRssCqSRAHtSVQhpCH",
+        "5YwEntu998V1TFZAiMNUcpqtdNwyVHT8T7QSSpJ2hYsr",
+        "5ZTBXQRpKa7TUVeYgC8tXVEFiMaTe77nR1aJcBRdF1Vz",
+        "5bBVSzSLmgvnYSvbjMQJxohuhts4NRWwEUmmnsNkn1zV",
+        "5cNFS6pYJpWqZG17gEqrTNbVYeccPHCGnN24YKmcWdo9",
+        "5cuy7pMhTPhVZN9xuhgSbykRb986siGJb6vnEtkuBrSU",
+        "5cy2VSz4BhtU5jKMVXkMP5J4SZTavkJNaGynj1yusdgE",
+        "5fMwvFVA8z69qdZcFPhm3ywLeGHWEDcr5eWjcGjUavsk",
+        "5fpEQxgxGj4DDybYRTva8wR2Ah6Ge3pLFwx7CDbRTNQP",
+        "5gVEdLrArMAKCMzerWhRxh9HND4VprHPbi38pmsnA7zZ",
+        "5h7rQBrwywCPgCsf43EyFfmPB5JEEz7t6nwQkxPnLbPH",
+        "5i3Qgc67fLyGBSudEEgBgmXQpEiJsqivSMq7oxxoETM9",];
+        let pks = pks.iter().map(|k| Pubkey::from_str(k).unwrap()).collect::<Vec<_>>();
+        (0..accounts.len()).for_each(|index| {
+            accounts.account(index, |account| {
+                if pks.contains(account.pubkey()) {
+                    log::error!("store: {}, {}, {}, {}", slot, account.pubkey(), account.lamports(), Self::hash_account(&account, account.pubkey()).0);
+                }
+            })
+        });
+
         calc_stored_meta_time.stop();
         self.stats
             .calc_stored_meta
@@ -8551,12 +8611,30 @@ impl AccountsDb {
         let mut amount_to_top_off_rent = 0;
         let mut stored_size_alive = 0;
 
+        use std::str::FromStr;
+        let pks = ["5YcfMU3zpPU7qLQfUAEReBfoo9sRssCqSRAHtSVQhpCH",
+        "5YwEntu998V1TFZAiMNUcpqtdNwyVHT8T7QSSpJ2hYsr",
+        "5ZTBXQRpKa7TUVeYgC8tXVEFiMaTe77nR1aJcBRdF1Vz",
+        "5bBVSzSLmgvnYSvbjMQJxohuhts4NRWwEUmmnsNkn1zV",
+        "5cNFS6pYJpWqZG17gEqrTNbVYeccPHCGnN24YKmcWdo9",
+        "5cuy7pMhTPhVZN9xuhgSbykRb986siGJb6vnEtkuBrSU",
+        "5cy2VSz4BhtU5jKMVXkMP5J4SZTavkJNaGynj1yusdgE",
+        "5fMwvFVA8z69qdZcFPhm3ywLeGHWEDcr5eWjcGjUavsk",
+        "5fpEQxgxGj4DDybYRTva8wR2Ah6Ge3pLFwx7CDbRTNQP",
+        "5gVEdLrArMAKCMzerWhRxh9HND4VprHPbi38pmsnA7zZ",
+        "5h7rQBrwywCPgCsf43EyFfmPB5JEEz7t6nwQkxPnLbPH",
+        "5i3Qgc67fLyGBSudEEgBgmXQpEiJsqivSMq7oxxoETM9",];
+        let pks = pks.iter().map(|k| Pubkey::from_str(k).unwrap()).collect::<Vec<_>>();
+
         let (dirty_pubkeys, insert_time_us, mut generate_index_results) = {
             let mut items_local = Vec::default();
             storage.accounts.scan_index(|info| {
                 stored_size_alive += info.stored_size_aligned;
                 if info.index_info.lamports > 0 {
                     accounts_data_len += info.index_info.data_len;
+                }
+                if pks.contains(&info.index_info.pubkey) {
+                    log::error!("slot: {slot}, {}, {}", info.index_info.pubkey, info.index_info.lamports);
                 }
                 items_local.push(info.index_info);
             });
