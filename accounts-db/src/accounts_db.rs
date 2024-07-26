@@ -10906,8 +10906,7 @@ pub mod tests {
         // Slot 1 should be cleaned, but the clean has no impact
         assert_eq!(accounts.alive_account_count_in_slot(1), 2);
 
-        // zero lamport account, should no longer exist in accounts index
-        // because it has been removed
+        // zero lamport account, should still exist in accounts index
         assert!(accounts
             .accounts_index
             .contains_with(&pubkey_zero, None, None));
