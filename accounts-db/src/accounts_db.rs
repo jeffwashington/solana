@@ -4223,12 +4223,18 @@ impl AccountsDb {
         let shrink_collect =
             self.shrink_collect::<AliveAccounts<'_>>(store, &unique_accounts, &self.shrink_stats);
 
-        // This shouldn't happen if alive_bytes/approx_stored_count are accurate
+        // This shouldn't happen if alive_bytes/approx_stored_count are accurate.
+        // However, it is possible that the remaining alive bytes could be 0. In that case, the whole slot should be marked dead by clean.
         if Self::should_not_shrink(
             shrink_collect.alive_total_bytes as u64,
             shrink_collect.capacity,
-        ) {
-            warn!(
+        ) || shrink_collect.alive_total_bytes == 0
+        {
+            if shrink_collect.alive_total_bytes == 0 {
+                // clean needs to take care of this dead slot
+                self.accounts_index.add_uncleaned_roots([slot].into_iter());
+            }
+            info!(
                 "Unexpected shrink for slot {} alive {} capacity {}, \
                 likely caused by a bug for calculating alive bytes.",
                 slot, shrink_collect.alive_total_bytes, shrink_collect.capacity
@@ -4237,7 +4243,6 @@ impl AccountsDb {
             self.shrink_stats
                 .skipped_shrink
                 .fetch_add(1, Ordering::Relaxed);
-            panic!("");
             self.accounts_index.scan(
                 shrink_collect.unrefed_pubkeys.into_iter(),
                 |pubkey, _slot_refs, entry| {
