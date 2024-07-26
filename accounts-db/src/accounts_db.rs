@@ -2008,6 +2008,8 @@ pub struct ShrinkStats {
     dead_accounts: AtomicU64,
     alive_accounts: AtomicU64,
     accounts_loaded: AtomicU64,
+    alive_bytes_zero_unrefed_pubkeys: AtomicU64,
+    alive_bytes_zero: AtomicU64,
 }
 
 impl ShrinkStats {
@@ -2104,6 +2106,17 @@ impl ShrinkStats {
                 (
                     "accounts_loaded",
                     self.accounts_loaded.swap(0, Ordering::Relaxed) as i64,
+                    i64
+                ),
+                (
+                    "alive_bytes_zero_unrefed_pubkeys",
+                    self.alive_bytes_zero_unrefed_pubkeys
+                        .swap(0, Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "alive_bytes_zero",
+                    self.alive_bytes_zero.swap(0, Ordering::Relaxed),
                     i64
                 ),
             );
@@ -4139,6 +4152,16 @@ impl AccountsDb {
             );
 
             self.reopen_storage_as_readonly_shrinking_in_progress_ok(slot);
+        } else {
+            self.shrink_stats
+                .alive_bytes_zero
+                .fetch_add(1, Ordering::Relaxed);
+            self.shrink_stats
+                .alive_bytes_zero_unrefed_pubkeys
+                .fetch_add(
+                    shrink_collect.unrefed_pubkeys.len() as u64,
+                    Ordering::Relaxed,
+                );
         }
 
         Self::update_shrink_stats(&self.shrink_stats, stats_sub, true);
