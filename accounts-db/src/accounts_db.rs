@@ -3307,7 +3307,7 @@ impl AccountsDb {
                                                     assert!(slot <= &max_clean_root_inclusive);
                                                 }
                                                 if slot_list.len() > 1 {
-                                                    purges_old_accounts.push(*pubkey);
+                                                    purges_old_accounts.push(*candidate);
                                                 }
                                                 useless = false;
                                             }
