@@ -4310,7 +4310,7 @@ impl AccountsDb {
             self.reopen_storage_as_readonly_shrinking_in_progress_ok(slot);
         } else {
             // what should happen here? we may have already unref'd some accounts. this whole slot is apparently dead?
-            panic!("");
+            panic!("no alive bytes: {:?}, unrefd: {}", shrink_collect, shrink_collect.unrefed_pubkeys.len());
         }
 
         Self::update_shrink_stats(&self.shrink_stats, stats_sub, true);
