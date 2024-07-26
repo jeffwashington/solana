@@ -3694,18 +3694,24 @@ impl AccountsDb {
             "if filtering for incremental snapshots, then snapshots should be enabled",
         );
 
-        purges_zero_lamports.retain(|pubkey, (slot_account_infos, _ref_count)| {
-            // Only keep purges_zero_lamports where the entire history of the account in the root set
-            // can be purged. All AppendVecs for those updates are dead.
-            for (slot, _account_info) in slot_account_infos.iter() {
-                if let Some(store_count) = store_counts.get(slot) {
-                    if store_count.0 != 0 {
-                        // one store this pubkey is in is not being removed, so this pubkey cannot be removed at all
+        purges_zero_lamports.retain(|pubkey, (slot_account_infos, ref_count)| {
+            // a zero lamport account with a single ref count and single slot list entry can be removed completely, even if the slot it is in is not being deleted
+            if !(slot_account_infos.len() == 1
+                && slot_account_infos.first().unwrap().1.is_zero_lamport()
+                && ref_count == &1)
+            {
+                // Only keep purges_zero_lamports where the entire history of the account in the root set
+                // can be purged. All AppendVecs for those updates are dead.
+                for (slot, _account_info) in slot_account_infos.iter() {
+                    if let Some(store_count) = store_counts.get(slot) {
+                        if store_count.0 != 0 {
+                            // one store this pubkey is in is not being removed, so this pubkey cannot be removed at all
+                            return false;
+                        }
+                    } else {
+                        // store is not being removed, so this pubkey cannot be removed at all
                         return false;
                     }
-                } else {
-                    // store is not being removed, so this pubkey cannot be removed at all
-                    return false;
                 }
             }
 
@@ -10859,6 +10865,74 @@ pub mod tests {
         // zero lamports, and are not present in any other slot's
         // storage entries
         assert_eq!(accounts.alive_account_count_in_slot(1), 0);
+    }
+
+    #[test]
+    fn test_clean_zero_lamport_single_ref_account() {
+        solana_logger::setup();
+
+        // store a zero and non-zero lamport account
+        // make sure clean marks the ref_count=1, zero lamport account dead and removes pubkey from index completely
+        let accounts = AccountsDb::new_single_for_tests();
+        let pubkey_zero = Pubkey::from([0; 32]);
+        let pubkey2 = Pubkey::from([2; 32]);
+        let account = AccountSharedData::new(1, 0, AccountSharedData::default().owner());
+        let zero_lamport_account =
+            AccountSharedData::new(0, 0, AccountSharedData::default().owner());
+
+        // Store a zero-lamport account and a non-zero lamport account
+        accounts.store_for_tests(
+            1,
+            &[(&pubkey_zero, &zero_lamport_account), (&pubkey2, &account)],
+        );
+
+        // Simulate rooting the zero-lamport account, should be a
+        // candidate for cleaning
+        accounts.calculate_accounts_delta_hash(1);
+        accounts.add_root_and_flush_write_cache(1);
+
+        // Slot 1 should be cleaned, but
+        // zero-lamport account should not be cleaned since last full snapshot root is before slot 1
+        let last_full_snapshot_slot = 0;
+        accounts.clean_accounts(
+            None,
+            false,
+            Some(last_full_snapshot_slot),
+            &EpochSchedule::default(),
+        );
+
+        assert!(accounts.storage.get_slot_storage_entry(1).is_some());
+
+        // Slot 1 should be cleaned, but the clean has no impact
+        assert_eq!(accounts.alive_account_count_in_slot(1), 2);
+
+        // zero lamport account, should no longer exist in accounts index
+        // because it has been removed
+        assert!(accounts
+            .accounts_index
+            .contains_with(&pubkey_zero, None, None));
+        assert!(accounts.accounts_index.contains_with(&pubkey2, None, None));
+
+        // clean with last full snapshot slot = 1, which means we can get rid of zero lamport accounts up to slot 1
+        let last_full_snapshot_slot = 1;
+        accounts.clean_accounts(
+            None,
+            false,
+            Some(last_full_snapshot_slot),
+            &EpochSchedule::default(),
+        );
+
+        assert!(accounts.storage.get_slot_storage_entry(1).is_some());
+
+        // Slot 1 should be cleaned. there is 1 zero lamport account and it should be marked dead.
+        assert_eq!(accounts.alive_account_count_in_slot(1), 1);
+
+        // zero lamport account should no longer exist in accounts index
+        // because it has been marked dead
+        assert!(!accounts
+            .accounts_index
+            .contains_with(&pubkey_zero, None, None));
+        assert!(accounts.accounts_index.contains_with(&pubkey2, None, None));
     }
 
     #[test]
