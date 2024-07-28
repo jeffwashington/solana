@@ -3305,7 +3305,7 @@ impl AccountsDb {
                                     slot_list.iter().for_each(|(slot, info)| {
                                         if !info.is_cached() {
                                             if self.storage.get_account_storage_entry(*slot, info.store_id()).is_none() {
-                                                panic!("Unable to find storage for: {candidate}, {slot}, id: {}, found: {}", info.store_id(), self.storage.get_slot_storage_entry(*slot).map(|s| s.id()).unwrap_or_default());
+                                                panic!("Unable to find storage for: {candidate}, {slot}, id: {}, found: {}, sl: {slot_list:?}", info.store_id(), self.storage.get_slot_storage_entry(*slot).map(|s| s.id()).unwrap_or_default());
                                             }
                                         }
                                     });
@@ -3921,7 +3921,7 @@ impl AccountsDb {
                     } else if stored_account.is_zero_lamport()
                         && last_full_snapshot_slot
                             .map(|last_full_snapshot_slot| last_full_snapshot_slot > slot_to_shrink)
-                            .unwrap_or_default()
+                            .unwrap_or(true)
                         && ref_count == 1
                     {
                         // only do this if our slot is prior to the last full snapshot
@@ -4203,6 +4203,7 @@ impl AccountsDb {
     }
 
     fn do_shrink_slot_store(&self, slot: Slot, store: &Arc<AccountStorageEntry>) {
+        log::error!("do_shrink_slot_store: {slot}");
         if self.accounts_cache.contains(slot) {
             // It is not correct to shrink a slot while it is in the write cache until flush is complete and the slot is removed from the write cache.
             // There can exist a window after a slot is made a root and before the write cache flushing for that slot begins and then completes.
@@ -4320,6 +4321,7 @@ impl AccountsDb {
 
         Self::update_shrink_stats(&self.shrink_stats, stats_sub, true);
         self.shrink_stats.report();
+        log::error!("~do_shrink_slot_store: {slot}");
     }
 
     pub(crate) fn update_shrink_stats(
@@ -4421,7 +4423,7 @@ impl AccountsDb {
     // Reads all accounts in given slot's AppendVecs and filter only to alive,
     // then create a minimum AppendVec filled with the alive.
     fn shrink_slot_forced(&self, slot: Slot) {
-        debug!("shrink_slot_forced: slot: {}", slot);
+        log::error!("shrink_slot_forced: slot: {}", slot);
 
         if let Some(store) = self
             .storage
@@ -6454,6 +6456,7 @@ impl AccountsDb {
         let mut account_bytes_saved = 0;
         let mut num_accounts_saved = 0;
 
+        log::error!("start flush");
         let _guard = self.active_stats.activate(ActiveStatItem::Flush);
 
         // Note even if force_flush is false, we will still flush all roots <= the
