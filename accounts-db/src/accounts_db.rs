@@ -5043,6 +5043,8 @@ impl AccountsDb {
         num_candidates
     }
 
+    /// This is only called at startup from bank when we are being extra careful such as when we downloaded a snapshot.
+    /// Also called from tests.
     pub fn shrink_all_slots(
         &self,
         is_startup: bool,
@@ -5059,7 +5061,17 @@ impl AccountsDb {
             slots.chunks(OUTER_CHUNK_SIZE).for_each(|chunk| {
                 chunk.par_chunks(inner_chunk_size).for_each(|slots| {
                     for slot in slots {
-                        self.shrink_slot_forced(*slot);
+                        // This is called at startup in some conditions after loading from a snapshot.
+                        // We cannot shrink the slot of the bank we are loading. If we do, we could remove zero lamport accounts
+                        // which causes our startup bank hash calculation to fail.
+                        // There should be no reason the highest slot should need to be shrunk since it was the most recent slot written, except for
+                        // zero lamport accounts.
+                        if last_full_snapshot_slot.map(|last_full_snapshot_slot| last_full_snapshot_slot > *slot).unwrap_or(true) {
+                            self.shrink_slot_forced(*slot);
+                        }
+                        else {
+                            log::error!("skipping shrink_slot_forced({slot}) at startup");
+                        }
                     }
                 });
                 if self.dirty_stores.len() > DIRTY_STORES_CLEANING_THRESHOLD {
