@@ -3288,12 +3288,12 @@ impl AccountsDb {
                                                 if slot_list.len() > 1 {
                                                     // no need to purge old accounts if there is only 1 slot in the slot list
                                                     purges_old_accounts.push(*candidate);
+                                                    useless = false;
                                                 } else {
                                                     self.clean_accounts_stats
                                                         .uncleaned_roots_slot_list_1
                                                         .fetch_add(1, Ordering::Relaxed);
                                                 }
-                                                useless = false;
                                             }
                                         }
                                         None => {
