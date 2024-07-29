@@ -312,40 +312,54 @@ fn do_diff_dirs(
         .map_err(|err| format!("failed to get cache files in dir1: {err}"))?;
     let files2 = get_cache_files_in(dir2)
         .map_err(|err| format!("failed to get cache files in dir2: {err}"))?;
+    use rayon::{prelude::*, ThreadPool};
 
     if true {
+        use dashmap::{DashMap, DashSet};
         use solana_accounts_db::accounts_hash::CalculateHashIntermediate;
         use solana_sdk::pubkey::Pubkey;
-        let mut hm1: HashMap<Pubkey, CalculateHashIntermediate> = HashMap::default();
-        let mut hm2: HashMap<Pubkey, CalculateHashIntermediate> = HashMap::default();
-        files1.iter().for_each(|f| {
-            println!("reading: 1: {:?}", f.path);
-            let (reader, header) = open_file(&f.path, false).unwrap();
-            scan_file(reader, header.count, |entry| {
-                hm1.insert(entry.pubkey, entry);
-            }).unwrap();
+        let mut hm1: DashMap<Pubkey, CalculateHashIntermediate> = DashMap::default();
+        let mut hm2: DashMap<Pubkey, CalculateHashIntermediate> = DashMap::default();
 
+        (0..2).into_par_iter().for_each(|i| {
+            if i == 0 {
+                files1.iter().for_each(|f| {
+                    println!("reading: 1: {:?}, {}M", f.path, hm1.len()/1000000);
+                    let (reader, header) = open_file(&f.path, false).unwrap();
+                    scan_file(reader, header.count, |entry| {
+                        hm1.insert(entry.pubkey, entry);
+                    })
+                    .unwrap();
+            });
+            } else {
+                files2.iter().for_each(|f| {
+                    println!("reading: 2: {:?}, {}M", f.path, hm2.len()/1000000);
+                    let (reader, header) = open_file(&f.path, false).unwrap();
+                    scan_file(reader, header.count, |entry| {
+                        hm2.insert(entry.pubkey, entry);
+                    })
+                    .unwrap();
+                });
+            }
         });
-        files2.iter().for_each(|f| {
-            println!("reading: 2: {:?}", f.path);
-            let (reader, header) = open_file(&f.path, false).unwrap();
-            scan_file(reader, header.count, |entry| {
-                hm2.insert(entry.pubkey, entry);
-            }).unwrap();
-
-        });
-        hm1.into_iter().for_each(|(k,v)| {
-            if let Some(h) = hm2.remove(&k) {
-                if h == v {
-                    return;
+        println!("entries in 1/2: {}/{}", hm1.len(), hm2.len());
+        let chunk = 10_000_000_000;
+        let chunks = hm1.len() / chunk + 1;
+        (0..chunks).into_par_iter().for_each(|i| {
+            let skip = i * chunk;
+            hm1.iter().skip(skip).take(chunk).for_each(|e| {
+                if let Some(h) = hm2.remove(e.key()) {
+                    if &h.1 == e.value() {
+                        return;
+                    }
+                    println!("{}, 1: {:?}, 2: {:?}", e.key(), e.value(), h.1);
+                } else {
+                    println!("{}, 1: {:?}, not in 2", e.key(), e.value());
                 }
-                println!("{k}, 1: {v:?}, 2: {h:?}");
-            }
-            else {
-                println!("{k}, 1: {v:?}, not in 2");
-            }
+            });
         });
-        hm2.into_iter().for_each(|(k,v)| {
+        
+        hm2.into_iter().for_each(|(k, v)| {
             println!("{k}, 2: {v:?}, not in 1");
         });
         return Ok(());
