@@ -3739,7 +3739,7 @@ impl AccountsDb {
                 );
                 if !force_allow_purge {
                     self.clean_accounts_stats
-                        .zero_lamport_single_entry_accounts_purged
+                        .zero_lamport_single_entry_accounts_purge_failed
                         .fetch_add(1, Ordering::Relaxed);
                 }
             }
