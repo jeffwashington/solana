@@ -12158,7 +12158,7 @@ pub mod tests {
         let owner = *AccountSharedData::default().owner();
 
         let account = AccountSharedData::new(some_lamport, no_data, &owner);
-        let zero_account = AccountSharedData::new(0, 0, &owner);
+        let zero_account = AccountSharedData::new(0, no_data, &owner);
 
         let mut current_slot = 0;
 
