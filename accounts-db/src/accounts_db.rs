@@ -4826,17 +4826,28 @@ impl AccountsDb {
         num_candidates
     }
 
+    /// This is only called at startup from bank when we are being extra careful such as when we downloaded a snapshot.
+    /// Also called from tests.
+    /// `newest_slot_skip_shrink_inclusive` is used to avoid shrinking the slot we are loading a snapshot from. If we shrink that slot, we affect
+    /// the bank hash calculation verification at startup.
     pub fn shrink_all_slots(
         &self,
         is_startup: bool,
         last_full_snapshot_slot: Option<Slot>,
         epoch_schedule: &EpochSchedule,
+        newest_slot_skip_shrink_inclusive: Option<Slot>,
     ) {
         let _guard = self.active_stats.activate(ActiveStatItem::Shrink);
         const DIRTY_STORES_CLEANING_THRESHOLD: usize = 10_000;
         const OUTER_CHUNK_SIZE: usize = 2000;
+        let mut slots = self.all_slots_in_storage();
+        if let Some(newest_slot_skip_shrink_inclusive) = newest_slot_skip_shrink_inclusive {
+            // at startup, we cannot shrink the slot that we're about to replay and recalculate bank hash for.
+            // That storage's contents are used to verify the bank hash (and accounts delta hash) of the startup slot.
+            slots.retain(|slot| slot < &newest_slot_skip_shrink_inclusive);
+        }
+
         if is_startup {
-            let slots = self.all_slots_in_storage();
             let threads = num_cpus::get();
             let inner_chunk_size = std::cmp::max(OUTER_CHUNK_SIZE / threads, 1);
             slots.chunks(OUTER_CHUNK_SIZE).for_each(|chunk| {
@@ -4850,7 +4861,7 @@ impl AccountsDb {
                 }
             });
         } else {
-            for slot in self.all_slots_in_storage() {
+            for slot in slots {
                 self.shrink_slot_forced(slot);
                 if self.dirty_stores.len() > DIRTY_STORES_CLEANING_THRESHOLD {
                     self.clean_accounts(None, is_startup, last_full_snapshot_slot, epoch_schedule);
@@ -12049,7 +12060,7 @@ pub mod tests {
                 accounts.shrink_candidate_slots(&epoch_schedule);
             }
 
-            accounts.shrink_all_slots(*startup, None, &EpochSchedule::default());
+            accounts.shrink_all_slots(*startup, None, &EpochSchedule::default(), None);
         }
     }
 
@@ -12107,7 +12118,7 @@ pub mod tests {
         );
 
         // Now, do full-shrink.
-        accounts.shrink_all_slots(false, None, &EpochSchedule::default());
+        accounts.shrink_all_slots(false, None, &EpochSchedule::default(), None);
         assert_eq!(
             pubkey_count_after_shrink,
             accounts.all_account_count_in_accounts_file(shrink_slot)
