@@ -3862,17 +3862,6 @@ impl AccountsDb {
                         // not exist in the re-written slot. Unref it to keep the index consistent with
                         // rewriting the storage entries.
                         unrefed_pubkeys.push(pubkey);
-                        if ref_count == 2 && slot_list.len() == 1 {
-                            // this is the last remaining older entry for a zero lamport account. When this account at this slot is shrunk away, the
-                            // zero lamport account that is still alive can be marked dead, removed from the index, and then shrunk away.
-                            let entry = slot_list.first().unwrap();
-                            if entry.1.is_zero_lamport() {
-                                self.add_uncleaned_pubkeys_after_shrink(
-                                    entry.0,
-                                    [*pubkey].into_iter(),
-                                );
-                            }
-                        }
                         result = AccountsIndexScanResult::Unref;
                         dead += 1;
                     } else {
