@@ -7298,6 +7298,9 @@ impl AccountsDb {
         mut stats: HashStats,
         kind: CalcAccountsHashKind,
     ) -> (AccountsHashKind, u64) {
+        if kind == CalcAccountsHashKind::Incremental {
+            panic!("");
+        }
         let total_time = Measure::start("");
         let _guard = self.active_stats.activate(ActiveStatItem::Hash);
         let storages_start_slot = storages.range().start;
