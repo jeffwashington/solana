@@ -3803,7 +3803,7 @@ impl AccountsDb {
                             if entry.1.is_zero_lamport() {
                                 self.add_uncleaned_pubkeys_after_shrink(
                                     entry.0,
-                                    [*pubkey].into_iter(),
+                                    std::iter::once(*pubkey),
                                 );
                             }
                         }
