@@ -5453,6 +5453,7 @@ impl AccountsDb {
         load_hint: LoadHint,
         load_zero_lamports: LoadZeroLamports,
     ) -> Option<(AccountSharedData, Slot)> {
+        let l = 
         self.do_load_with_populate_read_cache(
             ancestors,
             pubkey,
@@ -5460,7 +5461,15 @@ impl AccountsDb {
             load_hint,
             false,
             load_zero_lamports,
-        )
+        );
+
+        if let Some((a,s)) = l.as_ref() {
+            log::error!("load: {pubkey}, {a:?}, {s}");
+        }
+        else {
+            log::error!("failed to load: {pubkey}");
+        }
+        l
     }
 
     /// Load account with `pubkey` and maybe put into read cache.
@@ -7582,6 +7591,11 @@ impl AccountsDb {
         if let Some(ignore) = ignore {
             hashes.retain(|k| k.0 != ignore);
         }
+
+        hashes.par_sort_unstable_by(|a, b| a.0.cmp(&b.0));
+        hashes.iter().for_each(|(k,h)| {
+            log::error!("{k}, {}", h.0);
+        });
 
         let accounts_delta_hash =
             AccountsDeltaHash(AccountsHasher::accumulate_account_hashes(hashes));
