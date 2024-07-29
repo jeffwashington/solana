@@ -5905,6 +5905,7 @@ impl Bank {
     ) -> bool {
         let skip_shrink = false;
         let force_clean = true;
+        self.rc.accounts.accounts_db.set_last_full_snapshot_slot(last_full_snapshot_slot);
         let (_, clean_time_us) = measure_us!({
             let should_clean = force_clean || (!skip_shrink && self.slot() > 0);
             if should_clean {
