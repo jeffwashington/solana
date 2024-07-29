@@ -12201,7 +12201,7 @@ pub mod tests {
                 .get_slot_storage_entry(prior_slot)
                 .unwrap()
                 .alive_bytes
-                .fetch_sub(aligned_stored_size(0), Ordering::Relaxed);
+                .fetch_sub(aligned_stored_size(no_data), Ordering::Relaxed);
         }
 
         accounts.shrink_all_slots(false, None, &EpochSchedule::default());
