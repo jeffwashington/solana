@@ -3747,6 +3747,8 @@ impl AccountsDb {
                                 self.clean_accounts_stats
                                     .zero_lamport_single_entry_accounts_purged
                                     .fetch_add(1, Ordering::Relaxed);
+                                log::error!("force_allow_purge: {pubkey}, slot_list: {slot_account_infos:?}");
+
                             }
                         }
                         AccountsIndexScanResult::OnlyKeepInMemoryIfDirty
@@ -3764,11 +3766,13 @@ impl AccountsDb {
                 for (slot, _account_info) in slot_account_infos.iter() {
                     if let Some(store_count) = store_counts.get(slot) {
                         if store_count.0 != 0 {
+                            log::error!("not purging: {pubkey}");
                             // one store this pubkey is in is not being removed, so this pubkey cannot be removed at all
                             return false;
                         }
                     } else {
                         // store is not being removed, so this pubkey cannot be removed at all
+                        log::error!("not purging2: {pubkey}");
                         return false;
                     }
                 }
@@ -3889,6 +3893,7 @@ impl AccountsDb {
                             // zero lamport account that is still alive can be marked dead, removed from the index, and then shrunk away.
                             let entry = slot_list.first().unwrap();
                             if entry.1.is_zero_lamport() {
+                                log::error!("kicking clean: {pubkey}");
                                 self.add_uncleaned_pubkeys_after_shrink(
                                     entry.0,
                                     [*pubkey].into_iter(),
@@ -4166,6 +4171,7 @@ impl AccountsDb {
                 // clean needs to take care of this dead slot
                 self.accounts_index.add_uncleaned_roots([slot]);
             }
+            panic!("don't shrink");
             info!(
                 "Unexpected shrink for slot {} alive {} capacity {}, \
                 likely caused by a bug for calculating alive bytes.",

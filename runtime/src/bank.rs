@@ -5899,6 +5899,8 @@ impl Bank {
         last_full_snapshot_slot: Slot,
         base: Option<(Slot, /*capitalization*/ u64)>,
     ) -> bool {
+        log::error!("last full: {:?}, slot: {}", last_full_snapshot_slot, self.slot());
+        let last_full_snapshot_slot = self.slot();
         let skip_shrink = false;
         let force_clean = true;
         let (_, clean_time_us) = measure_us!({
@@ -5933,6 +5935,26 @@ impl Bank {
                 info!("Shrinking... Done.");
             } else {
                 info!("Shrinking... Skipped.");
+            }
+        });
+
+        let (_, clean_time_us) = measure_us!({
+            let should_clean = force_clean || (!skip_shrink && self.slot() > 0);
+            if should_clean {
+                info!("Cleaning2...");
+                // We cannot clean past the last full snapshot's slot because we are about to
+                // perform an accounts hash calculation *up to that slot*.  If we cleaned *past*
+                // that slot, then accounts could be removed from older storages, which would
+                // change the accounts hash.
+                self.rc.accounts.accounts_db.clean_accounts(
+                    Some(last_full_snapshot_slot),
+                    true,
+                    Some(last_full_snapshot_slot),
+                    self.epoch_schedule(),
+                );
+                info!("Cleaning... Done.");
+            } else {
+                info!("Cleaning... Skipped.");
             }
         });
 
