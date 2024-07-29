@@ -12162,12 +12162,14 @@ pub mod tests {
 
         let mut current_slot = 0;
 
+        // write some normal accounts plus some accounts that will have zero lamports
         current_slot += 1;
         for pubkey in &pubkeys {
             accounts.store_for_tests(current_slot, &[(pubkey, &account)]);
         }
         for pubkey in &zero_pubkeys {
-            accounts.store_for_tests(current_slot, &[(pubkey, &zero_account)]);
+            // write the accounts that will be zero later into the older slot. These will be marked dead and then shrunk away.
+            accounts.store_for_tests(current_slot, &[(pubkey, &account)]);
         }
 
         accounts.calculate_accounts_delta_hash(current_slot);
@@ -12177,7 +12179,7 @@ pub mod tests {
         current_slot += 1;
 
         for pubkey in &zero_pubkeys {
-            accounts.store_for_tests(current_slot, &[(pubkey, &account)]);
+            accounts.store_for_tests(current_slot, &[(pubkey, &zero_account)]);
         }
 
         accounts.calculate_accounts_delta_hash(current_slot);
@@ -12204,6 +12206,10 @@ pub mod tests {
                 .fetch_sub(aligned_stored_size(no_data), Ordering::Relaxed);
         }
 
+        // running delta hash on each slot marks the keys as needing clean. The point of this test is to check that
+        // `uncleaned_pubkeys` is populated in shrink.
+        accounts.uncleaned_pubkeys.clear();
+
         accounts.shrink_all_slots(false, None, &EpochSchedule::default());
 
         // after shrinking, all zero lamport dead accounts in prior_slot should be gone.
@@ -12213,6 +12219,7 @@ pub mod tests {
             pubkeys.len(),
             accounts.all_account_count_in_accounts_file(prior_slot)
         );
+        // shrink already marks all pubkeys as needing clean in the prior slot
         let mut pubkeys_to_clean = accounts
             .uncleaned_pubkeys
             .get(&current_slot)
@@ -12221,10 +12228,21 @@ pub mod tests {
             .iter()
             .cloned()
             .collect::<HashSet<_>>();
+        // shrinking away the single dead ref to a single alive zero lamport account marks pubkeys in their zero-lamport slot as needing clean
+        let mut pubkeys_to_clean_prior = accounts
+            .uncleaned_pubkeys
+            .get(&prior_slot)
+            .unwrap()
+            .value()
+            .iter()
+            .cloned()
+            .collect::<HashSet<_>>();
 
         for pubkey_zero in &zero_pubkeys {
             assert!(pubkeys_to_clean.remove(pubkey_zero));
+            assert!(pubkeys_to_clean_prior.remove(pubkey_zero));
         }
+        assert!(pubkeys_to_clean_prior.is_empty());
         assert!(pubkeys_to_clean.is_empty());
     }
 
