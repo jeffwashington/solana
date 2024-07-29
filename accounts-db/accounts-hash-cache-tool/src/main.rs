@@ -313,6 +313,44 @@ fn do_diff_dirs(
     let files2 = get_cache_files_in(dir2)
         .map_err(|err| format!("failed to get cache files in dir2: {err}"))?;
 
+    if true {
+        use solana_accounts_db::accounts_hash::CalculateHashIntermediate;
+        use solana_sdk::pubkey::Pubkey;
+        let mut hm1: HashMap<Pubkey, CalculateHashIntermediate> = HashMap::default();
+        let mut hm2: HashMap<Pubkey, CalculateHashIntermediate> = HashMap::default();
+        files1.iter().for_each(|f| {
+            println!("reading: 1: {:?}", f.path);
+            let (reader, header) = open_file(&f.path, false).unwrap();
+            scan_file(reader, header.count, |entry| {
+                hm1.insert(entry.pubkey, entry);
+            }).unwrap();
+
+        });
+        files2.iter().for_each(|f| {
+            println!("reading: 2: {:?}", f.path);
+            let (reader, header) = open_file(&f.path, false).unwrap();
+            scan_file(reader, header.count, |entry| {
+                hm2.insert(entry.pubkey, entry);
+            }).unwrap();
+
+        });
+        hm1.into_iter().for_each(|(k,v)| {
+            if let Some(h) = hm2.remove(&k) {
+                if h == v {
+                    return;
+                }
+                println!("{k}, 1: {v:?}, 2: {h:?}");
+            }
+            else {
+                println!("{k}, 1: {v:?}, not in 2");
+            }
+        });
+        hm2.into_iter().for_each(|(k,v)| {
+            println!("{k}, 2: {v:?}, not in 1");
+        });
+        return Ok(());
+    }
+
     let mut uniques1 = Vec::new();
     let mut uniques2 = Vec::new();
     let mut mismatches = Vec::new();
