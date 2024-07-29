@@ -4189,30 +4189,28 @@ impl AccountsDb {
         );
         let dead_storages_len = dead_storages.len();
 
-        if !shrink_collect.all_are_zero_lamports {
-            stats.purged_zero_lamports.fetch_add(
-                shrink_collect.zero_lamport_alive_pubkeys.len() as u64,
-                Ordering::Relaxed,
-            );
+        stats.purged_zero_lamports.fetch_add(
+            shrink_collect.zero_lamport_alive_pubkeys.len() as u64,
+            Ordering::Relaxed,
+        );
 
-            self.accounts_index.scan(
-                shrink_collect.zero_lamport_alive_pubkeys.iter().cloned(),
-                |_pubkey, _slots_refs, _entry| AccountsIndexScanResult::Unref,
-                Some(AccountsIndexScanResult::Unref),
-                false,
-            );
+        self.accounts_index.scan(
+            shrink_collect.zero_lamport_alive_pubkeys.iter().cloned(),
+            |_pubkey, _slots_refs, _entry| AccountsIndexScanResult::Unref,
+            Some(AccountsIndexScanResult::Unref),
+            false,
+        );
 
-            shrink_collect
-                .zero_lamport_alive_pubkeys
-                .iter()
-                .for_each(|k| {
-                    log::error!(
-                        "purging zero lamport: {k}, from slot: {}",
-                        shrink_collect.slot
-                    );
-                    _ = self.purge_keys_exact([&(**k, shrink_collect.slot)].into_iter());
-                });
-        }
+        shrink_collect
+            .zero_lamport_alive_pubkeys
+            .iter()
+            .for_each(|k| {
+                log::error!(
+                    "purging zero lamport: {k}, from slot: {}",
+                    shrink_collect.slot
+                );
+                _ = self.purge_keys_exact([&(**k, shrink_collect.slot)].into_iter());
+            });
 
         if !shrink_collect.all_are_zero_lamports {
             self.add_uncleaned_pubkeys_after_shrink(
