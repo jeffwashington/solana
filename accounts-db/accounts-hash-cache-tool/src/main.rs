@@ -320,6 +320,8 @@ fn do_diff_dirs(
         use solana_sdk::pubkey::Pubkey;
         let mut hm1: DashMap<Pubkey, CalculateHashIntermediate> = DashMap::default();
         let mut hm2: DashMap<Pubkey, CalculateHashIntermediate> = DashMap::default();
+        let mut not_in_2= Vec::default();
+        let mut diff= Vec::default();
 
         (0..2).into_par_iter().for_each(|i| {
             if i == 0 {
@@ -345,20 +347,34 @@ fn do_diff_dirs(
         println!("entries in 1/2: {}/{}", hm1.len(), hm2.len());
         let chunk = 10_000_000_000;
         let chunks = hm1.len() / chunk + 1;
-        (0..chunks).into_par_iter().for_each(|i| {
+        (0..chunks).into_iter().for_each(|i| {
             let skip = i * chunk;
             hm1.iter().skip(skip).take(chunk).for_each(|e| {
                 if let Some(h) = hm2.remove(e.key()) {
                     if &h.1 == e.value() {
                         return;
                     }
-                    println!("{}, 1: {:?}, 2: {:?}", e.key(), e.value(), h.1);
+                    diff.push(h.1);
+                    // println!("{}, 1: {:?}, 2: {:?}", e.key(), e.value(), h.1);
                 } else {
-                    println!("{}, 1: {:?}, not in 2", e.key(), e.value());
+                    not_in_2.push(*e.key());
+                    // println!("{}, 1: {:?}, not in 2", e.key(), e.value());
                 }
             });
         });
         
+        println!("diff: {}", diff.len());
+        println!("not in 2: {}", not_in_2.len());
+        println!("not in 1: {}", hm2.len());
+
+        diff.iter().for_each(|a| {
+            println!("diff: {:?}", (hm1.get(&a.pubkey).unwrap(), a));
+        });
+
+        not_in_2.iter().for_each(|a| {
+            println!("not_in_2: {:?}", hm1.get(a).unwrap());
+        });
+
         hm2.into_iter().for_each(|(k, v)| {
             println!("{k}, 2: {v:?}, not in 1");
         });
