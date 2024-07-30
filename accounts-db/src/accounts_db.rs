@@ -2672,17 +2672,39 @@ impl AccountsDb {
         let one_epoch_old = self.get_oldest_non_ancient_slot(epoch_schedule);
         let pubkeys_removed_from_accounts_index = Mutex::new(pubkeys_removed_from_accounts_index);
 
+        use std::str::FromStr;
+        let pks = ["5YcfMU3zpPU7qLQfUAEReBfoo9sRssCqSRAHtSVQhpCH",
+        "5YwEntu998V1TFZAiMNUcpqtdNwyVHT8T7QSSpJ2hYsr","hZG9Q624BiwoHXApF1pBjeJTNZCTp19n2FtzCeurbE6","2t8tcKAUSeT93RHc92evndbDx8inwG4mkbxWaw89Sfbk","4LTqBJzhLm7je6M7REBGYRPHqbtR3yfJoovcUja5yWB8","GEg6JvpUqkxC344RaWkdgEMJ5bfzyjsDNvXUzsbZQ3p1","3CByohJdVuu4Ad3PM3V2VZtryU5MFrR3WzTi5CtD5KTq","NP5uNMFsYNVKiqC9CGKcqvd54sbMMLoChR56NdEjpN2",
+        "5ZTBXQRpKa7TUVeYgC8tXVEFiMaTe77nR1aJcBRdF1Vz","FVbQMjtLvuwqcdRZK2oHeKG9pc3S8Jsu1UUMHUoQMxJu",
+        "5bBVSzSLmgvnYSvbjMQJxohuhts4NRWwEUmmnsNkn1zV","HBLWEXQ7XcWXj7XQ6PpXrXcu57GMNniVqiQR24Hk9dQk","EAFoiNqsAq2M72TnLMP16uHDMrtn91eEry5BHoBxDCgc","2LDev8Nqyd3E9MaJb1Bdw98vLn2Nmkfv6ck2UAfFyy6h","HNamHASxdRTMX67JrJ5wp8sGx9YZe98F67Fgubiedy4w","3WypFaLLj2Z2ow1nS7KhApLXCYJNzgPdA1HC7WT8U755","DajUf23tYGpqnBzS36ZUXFuv7Jy5D65giF4tG6FjKpk","BsFhuxeh9ojaRdcAhGugGf5nwZP3eXPo8AoxadhiCZHv","7KBLvuuYZrsH9vAsrhwegp52Lkoq6PK5LAXQm5XJfte2","phAraohtPwJZgKfDip2E3r1xyP6ZcPgFY8MLU96ezdB","8W4DaPJirsngzLGh3ncHEyC5gUJb616HhypcEdJW9qn9",
+        "F59ytZzBSMEA93sKPSexi8ybFJHsxLTFS9VhPeCtSR9K","FSnGRQhCSgwnJWCerbXvSy8jN59bWrj2GyEX7iTaC55a",
+        "5cuy7pMhTPhVZN9xuhgSbykRb986siGJb6vnEtkuBrSU",
+        "5cy2VSz4BhtU5jKMVXkMP5J4SZTavkJNaGynj1yusdgE",
+        "5fMwvFVA8z69qdZcFPhm3ywLeGHWEDcr5eWjcGjUavsk",
+        "5fpEQxgxGj4DDybYRTva8wR2Ah6Ge3pLFwx7CDbRTNQP",
+        "5gVEdLrArMAKCMzerWhRxh9HND4VprHPbi38pmsnA7zZ",
+        "5h7rQBrwywCPgCsf43EyFfmPB5JEEz7t6nwQkxPnLbPH",
+        "5i3Qgc67fLyGBSudEEgBgmXQpEiJsqivSMq7oxxoETM9",];
+        let pks = pks.iter().map(|k| Pubkey::from_str(k).unwrap()).collect::<Vec<_>>();
+
+
         let mut clean_rooted = Measure::start("clean_old_root-ms");
         let reclaim_vecs = purges
             .par_chunks(INDEX_CLEAN_BULK_COUNT)
             .filter_map(|pubkeys: &[Pubkey]| {
                 let mut reclaims = Vec::new();
                 for pubkey in pubkeys {
+                    let mut reclaims2 = Vec::new();
                     let removed_from_index = self.accounts_index.clean_rooted_entries(
                         pubkey,
-                        &mut reclaims,
+                        &mut reclaims2,
                         max_clean_root_inclusive,
                     );
+                    if pks.contains(pubkey) {
+                        log::error!("clean: {pubkey}, reclaims: {reclaims2:?}");
+                    }
+                    reclaims.append(&mut reclaims2);
+                    
                     if removed_from_index {
                         pubkeys_removed_from_accounts_index
                             .lock()
@@ -3210,6 +3232,7 @@ impl AccountsDb {
         last_full_snapshot_slot: Option<Slot>,
         epoch_schedule: &EpochSchedule,
     ) {
+        log::error!("clean: max_clean: {:?}, last_full: {:?}", max_clean_root_inclusive, last_full_snapshot_slot);
         if self.exhaustively_verify_refcounts {
             self.exhaustively_verify_refcounts(max_clean_root_inclusive);
         }
@@ -3231,6 +3254,21 @@ impl AccountsDb {
             &mut key_timings,
             epoch_schedule,
         );
+
+        use std::str::FromStr;
+        let pks = ["5YcfMU3zpPU7qLQfUAEReBfoo9sRssCqSRAHtSVQhpCH",
+        "5YwEntu998V1TFZAiMNUcpqtdNwyVHT8T7QSSpJ2hYsr","hZG9Q624BiwoHXApF1pBjeJTNZCTp19n2FtzCeurbE6","2t8tcKAUSeT93RHc92evndbDx8inwG4mkbxWaw89Sfbk","4LTqBJzhLm7je6M7REBGYRPHqbtR3yfJoovcUja5yWB8","GEg6JvpUqkxC344RaWkdgEMJ5bfzyjsDNvXUzsbZQ3p1","3CByohJdVuu4Ad3PM3V2VZtryU5MFrR3WzTi5CtD5KTq","NP5uNMFsYNVKiqC9CGKcqvd54sbMMLoChR56NdEjpN2",
+        "5ZTBXQRpKa7TUVeYgC8tXVEFiMaTe77nR1aJcBRdF1Vz","FVbQMjtLvuwqcdRZK2oHeKG9pc3S8Jsu1UUMHUoQMxJu",
+        "5bBVSzSLmgvnYSvbjMQJxohuhts4NRWwEUmmnsNkn1zV","HBLWEXQ7XcWXj7XQ6PpXrXcu57GMNniVqiQR24Hk9dQk","EAFoiNqsAq2M72TnLMP16uHDMrtn91eEry5BHoBxDCgc","2LDev8Nqyd3E9MaJb1Bdw98vLn2Nmkfv6ck2UAfFyy6h","HNamHASxdRTMX67JrJ5wp8sGx9YZe98F67Fgubiedy4w","3WypFaLLj2Z2ow1nS7KhApLXCYJNzgPdA1HC7WT8U755","DajUf23tYGpqnBzS36ZUXFuv7Jy5D65giF4tG6FjKpk","BsFhuxeh9ojaRdcAhGugGf5nwZP3eXPo8AoxadhiCZHv","7KBLvuuYZrsH9vAsrhwegp52Lkoq6PK5LAXQm5XJfte2","phAraohtPwJZgKfDip2E3r1xyP6ZcPgFY8MLU96ezdB","8W4DaPJirsngzLGh3ncHEyC5gUJb616HhypcEdJW9qn9",
+        "F59ytZzBSMEA93sKPSexi8ybFJHsxLTFS9VhPeCtSR9K","FSnGRQhCSgwnJWCerbXvSy8jN59bWrj2GyEX7iTaC55a",
+        "5cuy7pMhTPhVZN9xuhgSbykRb986siGJb6vnEtkuBrSU",
+        "5cy2VSz4BhtU5jKMVXkMP5J4SZTavkJNaGynj1yusdgE",
+        "5fMwvFVA8z69qdZcFPhm3ywLeGHWEDcr5eWjcGjUavsk",
+        "5fpEQxgxGj4DDybYRTva8wR2Ah6Ge3pLFwx7CDbRTNQP",
+        "5gVEdLrArMAKCMzerWhRxh9HND4VprHPbi38pmsnA7zZ",
+        "5h7rQBrwywCPgCsf43EyFfmPB5JEEz7t6nwQkxPnLbPH",
+        "5i3Qgc67fLyGBSudEEgBgmXQpEiJsqivSMq7oxxoETM9",];
+        let pks = pks.iter().map(|k| Pubkey::from_str(k).unwrap()).collect::<Vec<_>>();
 
         let mut sort = Measure::start("sort");
         if is_startup {
@@ -3867,6 +3905,21 @@ impl AccountsDb {
         let mut alive_accounts = T::with_capacity(count, slot_to_shrink);
         let mut unrefed_pubkeys = Vec::with_capacity(count);
 
+        use std::str::FromStr;
+        let pks = ["5YcfMU3zpPU7qLQfUAEReBfoo9sRssCqSRAHtSVQhpCH",
+        "5YwEntu998V1TFZAiMNUcpqtdNwyVHT8T7QSSpJ2hYsr","hZG9Q624BiwoHXApF1pBjeJTNZCTp19n2FtzCeurbE6","2t8tcKAUSeT93RHc92evndbDx8inwG4mkbxWaw89Sfbk","4LTqBJzhLm7je6M7REBGYRPHqbtR3yfJoovcUja5yWB8","GEg6JvpUqkxC344RaWkdgEMJ5bfzyjsDNvXUzsbZQ3p1","3CByohJdVuu4Ad3PM3V2VZtryU5MFrR3WzTi5CtD5KTq","NP5uNMFsYNVKiqC9CGKcqvd54sbMMLoChR56NdEjpN2",
+        "5ZTBXQRpKa7TUVeYgC8tXVEFiMaTe77nR1aJcBRdF1Vz","FVbQMjtLvuwqcdRZK2oHeKG9pc3S8Jsu1UUMHUoQMxJu",
+        "5bBVSzSLmgvnYSvbjMQJxohuhts4NRWwEUmmnsNkn1zV","HBLWEXQ7XcWXj7XQ6PpXrXcu57GMNniVqiQR24Hk9dQk","EAFoiNqsAq2M72TnLMP16uHDMrtn91eEry5BHoBxDCgc","2LDev8Nqyd3E9MaJb1Bdw98vLn2Nmkfv6ck2UAfFyy6h","HNamHASxdRTMX67JrJ5wp8sGx9YZe98F67Fgubiedy4w","3WypFaLLj2Z2ow1nS7KhApLXCYJNzgPdA1HC7WT8U755","DajUf23tYGpqnBzS36ZUXFuv7Jy5D65giF4tG6FjKpk","BsFhuxeh9ojaRdcAhGugGf5nwZP3eXPo8AoxadhiCZHv","7KBLvuuYZrsH9vAsrhwegp52Lkoq6PK5LAXQm5XJfte2","phAraohtPwJZgKfDip2E3r1xyP6ZcPgFY8MLU96ezdB","8W4DaPJirsngzLGh3ncHEyC5gUJb616HhypcEdJW9qn9",
+        "F59ytZzBSMEA93sKPSexi8ybFJHsxLTFS9VhPeCtSR9K","FSnGRQhCSgwnJWCerbXvSy8jN59bWrj2GyEX7iTaC55a",
+        "5cuy7pMhTPhVZN9xuhgSbykRb986siGJb6vnEtkuBrSU",
+        "5cy2VSz4BhtU5jKMVXkMP5J4SZTavkJNaGynj1yusdgE",
+        "5fMwvFVA8z69qdZcFPhm3ywLeGHWEDcr5eWjcGjUavsk",
+        "5fpEQxgxGj4DDybYRTva8wR2Ah6Ge3pLFwx7CDbRTNQP",
+        "5gVEdLrArMAKCMzerWhRxh9HND4VprHPbi38pmsnA7zZ",
+        "5h7rQBrwywCPgCsf43EyFfmPB5JEEz7t6nwQkxPnLbPH",
+        "5i3Qgc67fLyGBSudEEgBgmXQpEiJsqivSMq7oxxoETM9",];
+        let pks = pks.iter().map(|k| Pubkey::from_str(k).unwrap()).collect::<Vec<_>>();
+
         let mut alive = 0;
         let mut dead = 0;
         let mut index = 0;
@@ -3882,6 +3935,12 @@ impl AccountsDb {
                         // if the accounts index contains an entry at this slot, then the append vec we're asking about contains this item and thus, it is alive at this slot
                         *slot == slot_to_shrink
                     });
+
+
+                    if pks.contains(pubkey) {
+                        log::error!("collect for shrink: {pubkey}, alive: {alive}, slot: {slot_to_shrink}");
+                    }
+
                     if !is_alive {
                         // This pubkey was found in the storage, but no longer exists in the index.
                         // It would have had a ref to the storage from the initial store, but it will
@@ -3893,7 +3952,11 @@ impl AccountsDb {
                             // zero lamport account that is still alive can be marked dead, removed from the index, and then shrunk away.
                             let entry = slot_list.first().unwrap();
                             if entry.1.is_zero_lamport() {
-                                log::error!("kicking clean: {pubkey}");
+                                if pks.contains(pubkey) {
+                                    log::error!("kicking clean for {pubkey}, slot: {}, slot_to_shrink: {slot_to_shrink}", entry.0);
+                                }
+                                            
+                                // log::error!("kicking clean: {pubkey}");
                                 self.add_uncleaned_pubkeys_after_shrink(
                                     entry.0,
                                     [*pubkey].into_iter(),
@@ -4209,7 +4272,7 @@ impl AccountsDb {
         }
 
         let total_accounts_after_shrink = shrink_collect.alive_accounts.len();
-        debug!(
+        info!(
             "shrinking: slot: {}, accounts: ({} => {}) bytes: {} original: {}",
             slot,
             shrink_collect.total_starting_accounts,
@@ -8693,7 +8756,10 @@ impl AccountsDb {
                     accounts_data_len += info.index_info.data_len;
                 }
                 if pks.contains(&info.index_info.pubkey) {
-                    log::error!("slot: {slot}, {}, {}", info.index_info.pubkey, info.index_info.lamports);
+                    let hash = storage.accounts.get_stored_account_meta_callback(info.index_info.offset, |account| {
+                        Self::hash_account(&account, account.pubkey())
+                    }).unwrap();
+                    log::error!("slot: {slot}, {}, lamports: {}, hash: {}", info.index_info.pubkey, info.index_info.lamports, hash.0);
                 }
                 items_local.push(info.index_info);
             });
