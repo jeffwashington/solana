@@ -2673,18 +2673,7 @@ impl AccountsDb {
         let pubkeys_removed_from_accounts_index = Mutex::new(pubkeys_removed_from_accounts_index);
 
         use std::str::FromStr;
-        let pks = ["5YcfMU3zpPU7qLQfUAEReBfoo9sRssCqSRAHtSVQhpCH",
-        "5YwEntu998V1TFZAiMNUcpqtdNwyVHT8T7QSSpJ2hYsr","hZG9Q624BiwoHXApF1pBjeJTNZCTp19n2FtzCeurbE6","2t8tcKAUSeT93RHc92evndbDx8inwG4mkbxWaw89Sfbk","4LTqBJzhLm7je6M7REBGYRPHqbtR3yfJoovcUja5yWB8","GEg6JvpUqkxC344RaWkdgEMJ5bfzyjsDNvXUzsbZQ3p1","3CByohJdVuu4Ad3PM3V2VZtryU5MFrR3WzTi5CtD5KTq","NP5uNMFsYNVKiqC9CGKcqvd54sbMMLoChR56NdEjpN2",
-        "5ZTBXQRpKa7TUVeYgC8tXVEFiMaTe77nR1aJcBRdF1Vz","FVbQMjtLvuwqcdRZK2oHeKG9pc3S8Jsu1UUMHUoQMxJu",
-        "5bBVSzSLmgvnYSvbjMQJxohuhts4NRWwEUmmnsNkn1zV","HBLWEXQ7XcWXj7XQ6PpXrXcu57GMNniVqiQR24Hk9dQk","EAFoiNqsAq2M72TnLMP16uHDMrtn91eEry5BHoBxDCgc","2LDev8Nqyd3E9MaJb1Bdw98vLn2Nmkfv6ck2UAfFyy6h","HNamHASxdRTMX67JrJ5wp8sGx9YZe98F67Fgubiedy4w","3WypFaLLj2Z2ow1nS7KhApLXCYJNzgPdA1HC7WT8U755","DajUf23tYGpqnBzS36ZUXFuv7Jy5D65giF4tG6FjKpk","BsFhuxeh9ojaRdcAhGugGf5nwZP3eXPo8AoxadhiCZHv","7KBLvuuYZrsH9vAsrhwegp52Lkoq6PK5LAXQm5XJfte2","phAraohtPwJZgKfDip2E3r1xyP6ZcPgFY8MLU96ezdB","8W4DaPJirsngzLGh3ncHEyC5gUJb616HhypcEdJW9qn9",
-        "F59ytZzBSMEA93sKPSexi8ybFJHsxLTFS9VhPeCtSR9K","FSnGRQhCSgwnJWCerbXvSy8jN59bWrj2GyEX7iTaC55a",
-        "5cuy7pMhTPhVZN9xuhgSbykRb986siGJb6vnEtkuBrSU",
-        "5cy2VSz4BhtU5jKMVXkMP5J4SZTavkJNaGynj1yusdgE",
-        "5fMwvFVA8z69qdZcFPhm3ywLeGHWEDcr5eWjcGjUavsk",
-        "5fpEQxgxGj4DDybYRTva8wR2Ah6Ge3pLFwx7CDbRTNQP",
-        "5gVEdLrArMAKCMzerWhRxh9HND4VprHPbi38pmsnA7zZ",
-        "5h7rQBrwywCPgCsf43EyFfmPB5JEEz7t6nwQkxPnLbPH",
-        "5i3Qgc67fLyGBSudEEgBgmXQpEiJsqivSMq7oxxoETM9",];
+        let pks: [&str; 0] = [];
         let pks = pks.iter().map(|k| Pubkey::from_str(k).unwrap()).collect::<Vec<_>>();
 
 
@@ -2900,18 +2889,7 @@ impl AccountsDb {
         let mut dead_keys = Vec::new();
 
         use std::str::FromStr;
-        let pks = ["5YcfMU3zpPU7qLQfUAEReBfoo9sRssCqSRAHtSVQhpCH",
-        "5YwEntu998V1TFZAiMNUcpqtdNwyVHT8T7QSSpJ2hYsr","hZG9Q624BiwoHXApF1pBjeJTNZCTp19n2FtzCeurbE6","2t8tcKAUSeT93RHc92evndbDx8inwG4mkbxWaw89Sfbk","4LTqBJzhLm7je6M7REBGYRPHqbtR3yfJoovcUja5yWB8","GEg6JvpUqkxC344RaWkdgEMJ5bfzyjsDNvXUzsbZQ3p1","3CByohJdVuu4Ad3PM3V2VZtryU5MFrR3WzTi5CtD5KTq","NP5uNMFsYNVKiqC9CGKcqvd54sbMMLoChR56NdEjpN2",
-        "5ZTBXQRpKa7TUVeYgC8tXVEFiMaTe77nR1aJcBRdF1Vz","FVbQMjtLvuwqcdRZK2oHeKG9pc3S8Jsu1UUMHUoQMxJu",
-        "5bBVSzSLmgvnYSvbjMQJxohuhts4NRWwEUmmnsNkn1zV","HBLWEXQ7XcWXj7XQ6PpXrXcu57GMNniVqiQR24Hk9dQk","EAFoiNqsAq2M72TnLMP16uHDMrtn91eEry5BHoBxDCgc","2LDev8Nqyd3E9MaJb1Bdw98vLn2Nmkfv6ck2UAfFyy6h","HNamHASxdRTMX67JrJ5wp8sGx9YZe98F67Fgubiedy4w","3WypFaLLj2Z2ow1nS7KhApLXCYJNzgPdA1HC7WT8U755","DajUf23tYGpqnBzS36ZUXFuv7Jy5D65giF4tG6FjKpk","BsFhuxeh9ojaRdcAhGugGf5nwZP3eXPo8AoxadhiCZHv","7KBLvuuYZrsH9vAsrhwegp52Lkoq6PK5LAXQm5XJfte2","phAraohtPwJZgKfDip2E3r1xyP6ZcPgFY8MLU96ezdB","8W4DaPJirsngzLGh3ncHEyC5gUJb616HhypcEdJW9qn9",
-        "F59ytZzBSMEA93sKPSexi8ybFJHsxLTFS9VhPeCtSR9K","FSnGRQhCSgwnJWCerbXvSy8jN59bWrj2GyEX7iTaC55a",
-        "5cuy7pMhTPhVZN9xuhgSbykRb986siGJb6vnEtkuBrSU",
-        "5cy2VSz4BhtU5jKMVXkMP5J4SZTavkJNaGynj1yusdgE",
-        "5fMwvFVA8z69qdZcFPhm3ywLeGHWEDcr5eWjcGjUavsk",
-        "5fpEQxgxGj4DDybYRTva8wR2Ah6Ge3pLFwx7CDbRTNQP",
-        "5gVEdLrArMAKCMzerWhRxh9HND4VprHPbi38pmsnA7zZ",
-        "5h7rQBrwywCPgCsf43EyFfmPB5JEEz7t6nwQkxPnLbPH",
-        "5i3Qgc67fLyGBSudEEgBgmXQpEiJsqivSMq7oxxoETM9",];
+        let pks: [&str; 0] = [];
         let pks = pks.iter().map(|k| Pubkey::from_str(k).unwrap()).collect::<Vec<_>>();
 
         let mut purge_exact_count = 0;
@@ -3256,18 +3234,7 @@ impl AccountsDb {
         );
 
         use std::str::FromStr;
-        let pks = ["5YcfMU3zpPU7qLQfUAEReBfoo9sRssCqSRAHtSVQhpCH",
-        "5YwEntu998V1TFZAiMNUcpqtdNwyVHT8T7QSSpJ2hYsr","hZG9Q624BiwoHXApF1pBjeJTNZCTp19n2FtzCeurbE6","2t8tcKAUSeT93RHc92evndbDx8inwG4mkbxWaw89Sfbk","4LTqBJzhLm7je6M7REBGYRPHqbtR3yfJoovcUja5yWB8","GEg6JvpUqkxC344RaWkdgEMJ5bfzyjsDNvXUzsbZQ3p1","3CByohJdVuu4Ad3PM3V2VZtryU5MFrR3WzTi5CtD5KTq","NP5uNMFsYNVKiqC9CGKcqvd54sbMMLoChR56NdEjpN2",
-        "5ZTBXQRpKa7TUVeYgC8tXVEFiMaTe77nR1aJcBRdF1Vz","FVbQMjtLvuwqcdRZK2oHeKG9pc3S8Jsu1UUMHUoQMxJu",
-        "5bBVSzSLmgvnYSvbjMQJxohuhts4NRWwEUmmnsNkn1zV","HBLWEXQ7XcWXj7XQ6PpXrXcu57GMNniVqiQR24Hk9dQk","EAFoiNqsAq2M72TnLMP16uHDMrtn91eEry5BHoBxDCgc","2LDev8Nqyd3E9MaJb1Bdw98vLn2Nmkfv6ck2UAfFyy6h","HNamHASxdRTMX67JrJ5wp8sGx9YZe98F67Fgubiedy4w","3WypFaLLj2Z2ow1nS7KhApLXCYJNzgPdA1HC7WT8U755","DajUf23tYGpqnBzS36ZUXFuv7Jy5D65giF4tG6FjKpk","BsFhuxeh9ojaRdcAhGugGf5nwZP3eXPo8AoxadhiCZHv","7KBLvuuYZrsH9vAsrhwegp52Lkoq6PK5LAXQm5XJfte2","phAraohtPwJZgKfDip2E3r1xyP6ZcPgFY8MLU96ezdB","8W4DaPJirsngzLGh3ncHEyC5gUJb616HhypcEdJW9qn9",
-        "F59ytZzBSMEA93sKPSexi8ybFJHsxLTFS9VhPeCtSR9K","FSnGRQhCSgwnJWCerbXvSy8jN59bWrj2GyEX7iTaC55a",
-        "5cuy7pMhTPhVZN9xuhgSbykRb986siGJb6vnEtkuBrSU",
-        "5cy2VSz4BhtU5jKMVXkMP5J4SZTavkJNaGynj1yusdgE",
-        "5fMwvFVA8z69qdZcFPhm3ywLeGHWEDcr5eWjcGjUavsk",
-        "5fpEQxgxGj4DDybYRTva8wR2Ah6Ge3pLFwx7CDbRTNQP",
-        "5gVEdLrArMAKCMzerWhRxh9HND4VprHPbi38pmsnA7zZ",
-        "5h7rQBrwywCPgCsf43EyFfmPB5JEEz7t6nwQkxPnLbPH",
-        "5i3Qgc67fLyGBSudEEgBgmXQpEiJsqivSMq7oxxoETM9",];
+        let pks: [&str; 0] = [];
         let pks = pks.iter().map(|k| Pubkey::from_str(k).unwrap()).collect::<Vec<_>>();
 
         let mut sort = Measure::start("sort");
@@ -3751,18 +3718,7 @@ impl AccountsDb {
         );
 
         use std::str::FromStr;
-        let pks = ["5YcfMU3zpPU7qLQfUAEReBfoo9sRssCqSRAHtSVQhpCH",
-        "5YwEntu998V1TFZAiMNUcpqtdNwyVHT8T7QSSpJ2hYsr","hZG9Q624BiwoHXApF1pBjeJTNZCTp19n2FtzCeurbE6","2t8tcKAUSeT93RHc92evndbDx8inwG4mkbxWaw89Sfbk","4LTqBJzhLm7je6M7REBGYRPHqbtR3yfJoovcUja5yWB8","GEg6JvpUqkxC344RaWkdgEMJ5bfzyjsDNvXUzsbZQ3p1","3CByohJdVuu4Ad3PM3V2VZtryU5MFrR3WzTi5CtD5KTq","NP5uNMFsYNVKiqC9CGKcqvd54sbMMLoChR56NdEjpN2",
-        "5ZTBXQRpKa7TUVeYgC8tXVEFiMaTe77nR1aJcBRdF1Vz","FVbQMjtLvuwqcdRZK2oHeKG9pc3S8Jsu1UUMHUoQMxJu",
-        "5bBVSzSLmgvnYSvbjMQJxohuhts4NRWwEUmmnsNkn1zV","HBLWEXQ7XcWXj7XQ6PpXrXcu57GMNniVqiQR24Hk9dQk","EAFoiNqsAq2M72TnLMP16uHDMrtn91eEry5BHoBxDCgc","2LDev8Nqyd3E9MaJb1Bdw98vLn2Nmkfv6ck2UAfFyy6h","HNamHASxdRTMX67JrJ5wp8sGx9YZe98F67Fgubiedy4w","3WypFaLLj2Z2ow1nS7KhApLXCYJNzgPdA1HC7WT8U755","DajUf23tYGpqnBzS36ZUXFuv7Jy5D65giF4tG6FjKpk","BsFhuxeh9ojaRdcAhGugGf5nwZP3eXPo8AoxadhiCZHv","7KBLvuuYZrsH9vAsrhwegp52Lkoq6PK5LAXQm5XJfte2","phAraohtPwJZgKfDip2E3r1xyP6ZcPgFY8MLU96ezdB","8W4DaPJirsngzLGh3ncHEyC5gUJb616HhypcEdJW9qn9",
-        "F59ytZzBSMEA93sKPSexi8ybFJHsxLTFS9VhPeCtSR9K","FSnGRQhCSgwnJWCerbXvSy8jN59bWrj2GyEX7iTaC55a",
-        "5cuy7pMhTPhVZN9xuhgSbykRb986siGJb6vnEtkuBrSU",
-        "5cy2VSz4BhtU5jKMVXkMP5J4SZTavkJNaGynj1yusdgE",
-        "5fMwvFVA8z69qdZcFPhm3ywLeGHWEDcr5eWjcGjUavsk",
-        "5fpEQxgxGj4DDybYRTva8wR2Ah6Ge3pLFwx7CDbRTNQP",
-        "5gVEdLrArMAKCMzerWhRxh9HND4VprHPbi38pmsnA7zZ",
-        "5h7rQBrwywCPgCsf43EyFfmPB5JEEz7t6nwQkxPnLbPH",
-        "5i3Qgc67fLyGBSudEEgBgmXQpEiJsqivSMq7oxxoETM9",];
+        let pks: [&str; 0] = [];
         let pks = pks.iter().map(|k| Pubkey::from_str(k).unwrap()).collect::<Vec<_>>();
 
         purges_zero_lamports.retain(|pubkey, (slot_account_infos, ref_count)| {
@@ -3906,18 +3862,7 @@ impl AccountsDb {
         let mut unrefed_pubkeys = Vec::with_capacity(count);
 
         use std::str::FromStr;
-        let pks = ["5YcfMU3zpPU7qLQfUAEReBfoo9sRssCqSRAHtSVQhpCH",
-        "5YwEntu998V1TFZAiMNUcpqtdNwyVHT8T7QSSpJ2hYsr","hZG9Q624BiwoHXApF1pBjeJTNZCTp19n2FtzCeurbE6","2t8tcKAUSeT93RHc92evndbDx8inwG4mkbxWaw89Sfbk","4LTqBJzhLm7je6M7REBGYRPHqbtR3yfJoovcUja5yWB8","GEg6JvpUqkxC344RaWkdgEMJ5bfzyjsDNvXUzsbZQ3p1","3CByohJdVuu4Ad3PM3V2VZtryU5MFrR3WzTi5CtD5KTq","NP5uNMFsYNVKiqC9CGKcqvd54sbMMLoChR56NdEjpN2",
-        "5ZTBXQRpKa7TUVeYgC8tXVEFiMaTe77nR1aJcBRdF1Vz","FVbQMjtLvuwqcdRZK2oHeKG9pc3S8Jsu1UUMHUoQMxJu",
-        "5bBVSzSLmgvnYSvbjMQJxohuhts4NRWwEUmmnsNkn1zV","HBLWEXQ7XcWXj7XQ6PpXrXcu57GMNniVqiQR24Hk9dQk","EAFoiNqsAq2M72TnLMP16uHDMrtn91eEry5BHoBxDCgc","2LDev8Nqyd3E9MaJb1Bdw98vLn2Nmkfv6ck2UAfFyy6h","HNamHASxdRTMX67JrJ5wp8sGx9YZe98F67Fgubiedy4w","3WypFaLLj2Z2ow1nS7KhApLXCYJNzgPdA1HC7WT8U755","DajUf23tYGpqnBzS36ZUXFuv7Jy5D65giF4tG6FjKpk","BsFhuxeh9ojaRdcAhGugGf5nwZP3eXPo8AoxadhiCZHv","7KBLvuuYZrsH9vAsrhwegp52Lkoq6PK5LAXQm5XJfte2","phAraohtPwJZgKfDip2E3r1xyP6ZcPgFY8MLU96ezdB","8W4DaPJirsngzLGh3ncHEyC5gUJb616HhypcEdJW9qn9",
-        "F59ytZzBSMEA93sKPSexi8ybFJHsxLTFS9VhPeCtSR9K","FSnGRQhCSgwnJWCerbXvSy8jN59bWrj2GyEX7iTaC55a",
-        "5cuy7pMhTPhVZN9xuhgSbykRb986siGJb6vnEtkuBrSU",
-        "5cy2VSz4BhtU5jKMVXkMP5J4SZTavkJNaGynj1yusdgE",
-        "5fMwvFVA8z69qdZcFPhm3ywLeGHWEDcr5eWjcGjUavsk",
-        "5fpEQxgxGj4DDybYRTva8wR2Ah6Ge3pLFwx7CDbRTNQP",
-        "5gVEdLrArMAKCMzerWhRxh9HND4VprHPbi38pmsnA7zZ",
-        "5h7rQBrwywCPgCsf43EyFfmPB5JEEz7t6nwQkxPnLbPH",
-        "5i3Qgc67fLyGBSudEEgBgmXQpEiJsqivSMq7oxxoETM9",];
+        let pks: [&str; 0] = [];
         let pks = pks.iter().map(|k| Pubkey::from_str(k).unwrap()).collect::<Vec<_>>();
 
         let mut alive = 0;
@@ -6834,18 +6779,7 @@ impl AccountsDb {
             });
         }
         use std::str::FromStr;
-        let pks = ["5YcfMU3zpPU7qLQfUAEReBfoo9sRssCqSRAHtSVQhpCH",
-        "5YwEntu998V1TFZAiMNUcpqtdNwyVHT8T7QSSpJ2hYsr","hZG9Q624BiwoHXApF1pBjeJTNZCTp19n2FtzCeurbE6","2t8tcKAUSeT93RHc92evndbDx8inwG4mkbxWaw89Sfbk","4LTqBJzhLm7je6M7REBGYRPHqbtR3yfJoovcUja5yWB8","GEg6JvpUqkxC344RaWkdgEMJ5bfzyjsDNvXUzsbZQ3p1","3CByohJdVuu4Ad3PM3V2VZtryU5MFrR3WzTi5CtD5KTq","NP5uNMFsYNVKiqC9CGKcqvd54sbMMLoChR56NdEjpN2",
-        "5ZTBXQRpKa7TUVeYgC8tXVEFiMaTe77nR1aJcBRdF1Vz","FVbQMjtLvuwqcdRZK2oHeKG9pc3S8Jsu1UUMHUoQMxJu",
-        "5bBVSzSLmgvnYSvbjMQJxohuhts4NRWwEUmmnsNkn1zV","HBLWEXQ7XcWXj7XQ6PpXrXcu57GMNniVqiQR24Hk9dQk","EAFoiNqsAq2M72TnLMP16uHDMrtn91eEry5BHoBxDCgc","2LDev8Nqyd3E9MaJb1Bdw98vLn2Nmkfv6ck2UAfFyy6h","HNamHASxdRTMX67JrJ5wp8sGx9YZe98F67Fgubiedy4w","3WypFaLLj2Z2ow1nS7KhApLXCYJNzgPdA1HC7WT8U755","DajUf23tYGpqnBzS36ZUXFuv7Jy5D65giF4tG6FjKpk","BsFhuxeh9ojaRdcAhGugGf5nwZP3eXPo8AoxadhiCZHv","7KBLvuuYZrsH9vAsrhwegp52Lkoq6PK5LAXQm5XJfte2","phAraohtPwJZgKfDip2E3r1xyP6ZcPgFY8MLU96ezdB","8W4DaPJirsngzLGh3ncHEyC5gUJb616HhypcEdJW9qn9",
-        "F59ytZzBSMEA93sKPSexi8ybFJHsxLTFS9VhPeCtSR9K","FSnGRQhCSgwnJWCerbXvSy8jN59bWrj2GyEX7iTaC55a",
-        "5cuy7pMhTPhVZN9xuhgSbykRb986siGJb6vnEtkuBrSU",
-        "5cy2VSz4BhtU5jKMVXkMP5J4SZTavkJNaGynj1yusdgE",
-        "5fMwvFVA8z69qdZcFPhm3ywLeGHWEDcr5eWjcGjUavsk",
-        "5fpEQxgxGj4DDybYRTva8wR2Ah6Ge3pLFwx7CDbRTNQP",
-        "5gVEdLrArMAKCMzerWhRxh9HND4VprHPbi38pmsnA7zZ",
-        "5h7rQBrwywCPgCsf43EyFfmPB5JEEz7t6nwQkxPnLbPH",
-        "5i3Qgc67fLyGBSudEEgBgmXQpEiJsqivSMq7oxxoETM9",];
+        let pks: [&str; 0] = [];
         let pks = pks.iter().map(|k| Pubkey::from_str(k).unwrap()).collect::<Vec<_>>();
         (0..accounts.len()).for_each(|index| {
             accounts.account(index, |account| {
@@ -7494,9 +7428,6 @@ impl AccountsDb {
         mut stats: HashStats,
         kind: CalcAccountsHashKind,
     ) -> (AccountsHashKind, u64) {
-        if kind == CalcAccountsHashKind::Incremental {
-            panic!("");
-        }
         let total_time = Measure::start("");
         let _guard = self.active_stats.activate(ActiveStatItem::Hash);
         let storages_start_slot = storages.range().start;
@@ -8734,18 +8665,7 @@ impl AccountsDb {
         let mut stored_size_alive = 0;
 
         use std::str::FromStr;
-        let pks = ["5YcfMU3zpPU7qLQfUAEReBfoo9sRssCqSRAHtSVQhpCH",
-        "5YwEntu998V1TFZAiMNUcpqtdNwyVHT8T7QSSpJ2hYsr","hZG9Q624BiwoHXApF1pBjeJTNZCTp19n2FtzCeurbE6","2t8tcKAUSeT93RHc92evndbDx8inwG4mkbxWaw89Sfbk","4LTqBJzhLm7je6M7REBGYRPHqbtR3yfJoovcUja5yWB8","GEg6JvpUqkxC344RaWkdgEMJ5bfzyjsDNvXUzsbZQ3p1","3CByohJdVuu4Ad3PM3V2VZtryU5MFrR3WzTi5CtD5KTq","NP5uNMFsYNVKiqC9CGKcqvd54sbMMLoChR56NdEjpN2",
-        "5ZTBXQRpKa7TUVeYgC8tXVEFiMaTe77nR1aJcBRdF1Vz","FVbQMjtLvuwqcdRZK2oHeKG9pc3S8Jsu1UUMHUoQMxJu",
-        "5bBVSzSLmgvnYSvbjMQJxohuhts4NRWwEUmmnsNkn1zV","HBLWEXQ7XcWXj7XQ6PpXrXcu57GMNniVqiQR24Hk9dQk","EAFoiNqsAq2M72TnLMP16uHDMrtn91eEry5BHoBxDCgc","2LDev8Nqyd3E9MaJb1Bdw98vLn2Nmkfv6ck2UAfFyy6h","HNamHASxdRTMX67JrJ5wp8sGx9YZe98F67Fgubiedy4w","3WypFaLLj2Z2ow1nS7KhApLXCYJNzgPdA1HC7WT8U755","DajUf23tYGpqnBzS36ZUXFuv7Jy5D65giF4tG6FjKpk","BsFhuxeh9ojaRdcAhGugGf5nwZP3eXPo8AoxadhiCZHv","7KBLvuuYZrsH9vAsrhwegp52Lkoq6PK5LAXQm5XJfte2","phAraohtPwJZgKfDip2E3r1xyP6ZcPgFY8MLU96ezdB","8W4DaPJirsngzLGh3ncHEyC5gUJb616HhypcEdJW9qn9",
-        "F59ytZzBSMEA93sKPSexi8ybFJHsxLTFS9VhPeCtSR9K","FSnGRQhCSgwnJWCerbXvSy8jN59bWrj2GyEX7iTaC55a",
-        "5cuy7pMhTPhVZN9xuhgSbykRb986siGJb6vnEtkuBrSU",
-        "5cy2VSz4BhtU5jKMVXkMP5J4SZTavkJNaGynj1yusdgE",
-        "5fMwvFVA8z69qdZcFPhm3ywLeGHWEDcr5eWjcGjUavsk",
-        "5fpEQxgxGj4DDybYRTva8wR2Ah6Ge3pLFwx7CDbRTNQP",
-        "5gVEdLrArMAKCMzerWhRxh9HND4VprHPbi38pmsnA7zZ",
-        "5h7rQBrwywCPgCsf43EyFfmPB5JEEz7t6nwQkxPnLbPH",
-        "5i3Qgc67fLyGBSudEEgBgmXQpEiJsqivSMq7oxxoETM9",];
+        let pks: [&str; 0] = [];
         let pks = pks.iter().map(|k| Pubkey::from_str(k).unwrap()).collect::<Vec<_>>();
 
         let (dirty_pubkeys, insert_time_us, mut generate_index_results) = {
