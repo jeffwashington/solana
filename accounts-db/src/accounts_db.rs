@@ -2913,19 +2913,26 @@ impl AccountsDb {
         let mut dead_keys = Vec::new();
 
         use std::str::FromStr;
-        let pks = ["5YcfMU3zpPU7qLQfUAEReBfoo9sRssCqSRAHtSVQhpCH",
-        "5YwEntu998V1TFZAiMNUcpqtdNwyVHT8T7QSSpJ2hYsr","Gy3zCpZYdqy2heDxX8PcVVnZ2LVCzQtCBbuM1Zkc43Db","Gy9km4th6eRJMw5U7KcwC469CCHTGbUtu1DcCVh4GKEm",
-        "5ZTBXQRpKa7TUVeYgC8tXVEFiMaTe77nR1aJcBRdF1Vz",
-        "5bBVSzSLmgvnYSvbjMQJxohuhts4NRWwEUmmnsNkn1zV",
-        "5cNFS6pYJpWqZG17gEqrTNbVYeccPHCGnN24YKmcWdo9",
-        "5cuy7pMhTPhVZN9xuhgSbykRb986siGJb6vnEtkuBrSU",
-        "5cy2VSz4BhtU5jKMVXkMP5J4SZTavkJNaGynj1yusdgE",
-        "5fMwvFVA8z69qdZcFPhm3ywLeGHWEDcr5eWjcGjUavsk",
-        "5fpEQxgxGj4DDybYRTva8wR2Ah6Ge3pLFwx7CDbRTNQP",
-        "5gVEdLrArMAKCMzerWhRxh9HND4VprHPbi38pmsnA7zZ",
-        "5h7rQBrwywCPgCsf43EyFfmPB5JEEz7t6nwQkxPnLbPH",
-        "5i3Qgc67fLyGBSudEEgBgmXQpEiJsqivSMq7oxxoETM9",];
-        let pks = pks.iter().map(|k| Pubkey::from_str(k).unwrap()).collect::<Vec<_>>();
+        let pks = [
+            "5YcfMU3zpPU7qLQfUAEReBfoo9sRssCqSRAHtSVQhpCH",
+            "5YwEntu998V1TFZAiMNUcpqtdNwyVHT8T7QSSpJ2hYsr",
+            "Gy3zCpZYdqy2heDxX8PcVVnZ2LVCzQtCBbuM1Zkc43Db",
+            "Gy9km4th6eRJMw5U7KcwC469CCHTGbUtu1DcCVh4GKEm",
+            "5ZTBXQRpKa7TUVeYgC8tXVEFiMaTe77nR1aJcBRdF1Vz",
+            "5bBVSzSLmgvnYSvbjMQJxohuhts4NRWwEUmmnsNkn1zV",
+            "5cNFS6pYJpWqZG17gEqrTNbVYeccPHCGnN24YKmcWdo9",
+            "5cuy7pMhTPhVZN9xuhgSbykRb986siGJb6vnEtkuBrSU",
+            "5cy2VSz4BhtU5jKMVXkMP5J4SZTavkJNaGynj1yusdgE",
+            "5fMwvFVA8z69qdZcFPhm3ywLeGHWEDcr5eWjcGjUavsk",
+            "5fpEQxgxGj4DDybYRTva8wR2Ah6Ge3pLFwx7CDbRTNQP",
+            "5gVEdLrArMAKCMzerWhRxh9HND4VprHPbi38pmsnA7zZ",
+            "5h7rQBrwywCPgCsf43EyFfmPB5JEEz7t6nwQkxPnLbPH",
+            "5i3Qgc67fLyGBSudEEgBgmXQpEiJsqivSMq7oxxoETM9",
+        ];
+        let pks = pks
+            .iter()
+            .map(|k| Pubkey::from_str(k).unwrap())
+            .collect::<Vec<_>>();
 
         let mut purge_exact_count = 0;
         let (_, purge_exact_us) = measure_us!(for (pubkey, slots_set) in pubkey_to_slot_set {
@@ -3802,19 +3809,26 @@ impl AccountsDb {
         );
 
         use std::str::FromStr;
-        let pks = ["5YcfMU3zpPU7qLQfUAEReBfoo9sRssCqSRAHtSVQhpCH",
-        "5YwEntu998V1TFZAiMNUcpqtdNwyVHT8T7QSSpJ2hYsr","Gy3zCpZYdqy2heDxX8PcVVnZ2LVCzQtCBbuM1Zkc43Db","Gy9km4th6eRJMw5U7KcwC469CCHTGbUtu1DcCVh4GKEm",
-        "5ZTBXQRpKa7TUVeYgC8tXVEFiMaTe77nR1aJcBRdF1Vz",
-        "5bBVSzSLmgvnYSvbjMQJxohuhts4NRWwEUmmnsNkn1zV",
-        "5cNFS6pYJpWqZG17gEqrTNbVYeccPHCGnN24YKmcWdo9",
-        "5cuy7pMhTPhVZN9xuhgSbykRb986siGJb6vnEtkuBrSU",
-        "5cy2VSz4BhtU5jKMVXkMP5J4SZTavkJNaGynj1yusdgE",
-        "5fMwvFVA8z69qdZcFPhm3ywLeGHWEDcr5eWjcGjUavsk",
-        "5fpEQxgxGj4DDybYRTva8wR2Ah6Ge3pLFwx7CDbRTNQP",
-        "5gVEdLrArMAKCMzerWhRxh9HND4VprHPbi38pmsnA7zZ",
-        "5h7rQBrwywCPgCsf43EyFfmPB5JEEz7t6nwQkxPnLbPH",
-        "5i3Qgc67fLyGBSudEEgBgmXQpEiJsqivSMq7oxxoETM9",];
-        let pks = pks.iter().map(|k| Pubkey::from_str(k).unwrap()).collect::<Vec<_>>();
+        let pks = [
+            "5YcfMU3zpPU7qLQfUAEReBfoo9sRssCqSRAHtSVQhpCH",
+            "5YwEntu998V1TFZAiMNUcpqtdNwyVHT8T7QSSpJ2hYsr",
+            "Gy3zCpZYdqy2heDxX8PcVVnZ2LVCzQtCBbuM1Zkc43Db",
+            "Gy9km4th6eRJMw5U7KcwC469CCHTGbUtu1DcCVh4GKEm",
+            "5ZTBXQRpKa7TUVeYgC8tXVEFiMaTe77nR1aJcBRdF1Vz",
+            "5bBVSzSLmgvnYSvbjMQJxohuhts4NRWwEUmmnsNkn1zV",
+            "5cNFS6pYJpWqZG17gEqrTNbVYeccPHCGnN24YKmcWdo9",
+            "5cuy7pMhTPhVZN9xuhgSbykRb986siGJb6vnEtkuBrSU",
+            "5cy2VSz4BhtU5jKMVXkMP5J4SZTavkJNaGynj1yusdgE",
+            "5fMwvFVA8z69qdZcFPhm3ywLeGHWEDcr5eWjcGjUavsk",
+            "5fpEQxgxGj4DDybYRTva8wR2Ah6Ge3pLFwx7CDbRTNQP",
+            "5gVEdLrArMAKCMzerWhRxh9HND4VprHPbi38pmsnA7zZ",
+            "5h7rQBrwywCPgCsf43EyFfmPB5JEEz7t6nwQkxPnLbPH",
+            "5i3Qgc67fLyGBSudEEgBgmXQpEiJsqivSMq7oxxoETM9",
+        ];
+        let pks = pks
+            .iter()
+            .map(|k| Pubkey::from_str(k).unwrap())
+            .collect::<Vec<_>>();
 
         purges_zero_lamports.retain(|pubkey, (slot_account_infos, ref_count)| {
             // Only keep purges_zero_lamports where the entire history of the account in the root set
@@ -4347,7 +4361,11 @@ impl AccountsDb {
             self.reopen_storage_as_readonly_shrinking_in_progress_ok(slot);
         } else {
             // what should happen here? we may have already unref'd some accounts. this whole slot is apparently dead?
-            panic!("no alive bytes: {:?}, unrefd: {}", shrink_collect, shrink_collect.unrefed_pubkeys.len());
+            panic!(
+                "no alive bytes: {:?}, unrefd: {}",
+                shrink_collect,
+                shrink_collect.unrefed_pubkeys.len()
+            );
         }
 
         Self::update_shrink_stats(&self.shrink_stats, stats_sub, true);
@@ -5007,7 +5025,9 @@ impl AccountsDb {
             return 0;
         }
 
-        let _guard = self.active_stats.activate(ActiveStatItem::Shrink);
+        let _guard = (!shrink_slots.is_empty()).then_some(|| {
+            self.active_stats.activate(ActiveStatItem::Shrink)
+        });
 
         let mut measure_shrink_all_candidates = Measure::start("shrink_all_candidate_slots-ms");
         let num_candidates = shrink_slots.len();
@@ -5064,10 +5084,12 @@ impl AccountsDb {
                         // which causes our startup bank hash calculation to fail.
                         // There should be no reason the highest slot should need to be shrunk since it was the most recent slot written, except for
                         // zero lamport accounts.
-                        if last_full_snapshot_slot.map(|last_full_snapshot_slot| last_full_snapshot_slot > *slot).unwrap_or(true) {
+                        if last_full_snapshot_slot
+                            .map(|last_full_snapshot_slot| last_full_snapshot_slot > *slot)
+                            .unwrap_or(true)
+                        {
                             self.shrink_slot_forced(*slot);
-                        }
-                        else {
+                        } else {
                             log::error!("skipping shrink_slot_forced({slot}) at startup");
                         }
                     }
@@ -6879,23 +6901,36 @@ impl AccountsDb {
             });
         }
         use std::str::FromStr;
-        let pks = ["5YcfMU3zpPU7qLQfUAEReBfoo9sRssCqSRAHtSVQhpCH",
-        "5YwEntu998V1TFZAiMNUcpqtdNwyVHT8T7QSSpJ2hYsr","Gy3zCpZYdqy2heDxX8PcVVnZ2LVCzQtCBbuM1Zkc43Db","Gy9km4th6eRJMw5U7KcwC469CCHTGbUtu1DcCVh4GKEm",
-        "5ZTBXQRpKa7TUVeYgC8tXVEFiMaTe77nR1aJcBRdF1Vz",
-        "5bBVSzSLmgvnYSvbjMQJxohuhts4NRWwEUmmnsNkn1zV",
-        "5cNFS6pYJpWqZG17gEqrTNbVYeccPHCGnN24YKmcWdo9",
-        "5cuy7pMhTPhVZN9xuhgSbykRb986siGJb6vnEtkuBrSU",
-        "5cy2VSz4BhtU5jKMVXkMP5J4SZTavkJNaGynj1yusdgE",
-        "5fMwvFVA8z69qdZcFPhm3ywLeGHWEDcr5eWjcGjUavsk",
-        "5fpEQxgxGj4DDybYRTva8wR2Ah6Ge3pLFwx7CDbRTNQP",
-        "5gVEdLrArMAKCMzerWhRxh9HND4VprHPbi38pmsnA7zZ",
-        "5h7rQBrwywCPgCsf43EyFfmPB5JEEz7t6nwQkxPnLbPH",
-        "5i3Qgc67fLyGBSudEEgBgmXQpEiJsqivSMq7oxxoETM9",];
-        let pks = pks.iter().map(|k| Pubkey::from_str(k).unwrap()).collect::<Vec<_>>();
+        let pks = [
+            "5YcfMU3zpPU7qLQfUAEReBfoo9sRssCqSRAHtSVQhpCH",
+            "5YwEntu998V1TFZAiMNUcpqtdNwyVHT8T7QSSpJ2hYsr",
+            "Gy3zCpZYdqy2heDxX8PcVVnZ2LVCzQtCBbuM1Zkc43Db",
+            "Gy9km4th6eRJMw5U7KcwC469CCHTGbUtu1DcCVh4GKEm",
+            "5ZTBXQRpKa7TUVeYgC8tXVEFiMaTe77nR1aJcBRdF1Vz",
+            "5bBVSzSLmgvnYSvbjMQJxohuhts4NRWwEUmmnsNkn1zV",
+            "5cNFS6pYJpWqZG17gEqrTNbVYeccPHCGnN24YKmcWdo9",
+            "5cuy7pMhTPhVZN9xuhgSbykRb986siGJb6vnEtkuBrSU",
+            "5cy2VSz4BhtU5jKMVXkMP5J4SZTavkJNaGynj1yusdgE",
+            "5fMwvFVA8z69qdZcFPhm3ywLeGHWEDcr5eWjcGjUavsk",
+            "5fpEQxgxGj4DDybYRTva8wR2Ah6Ge3pLFwx7CDbRTNQP",
+            "5gVEdLrArMAKCMzerWhRxh9HND4VprHPbi38pmsnA7zZ",
+            "5h7rQBrwywCPgCsf43EyFfmPB5JEEz7t6nwQkxPnLbPH",
+            "5i3Qgc67fLyGBSudEEgBgmXQpEiJsqivSMq7oxxoETM9",
+        ];
+        let pks = pks
+            .iter()
+            .map(|k| Pubkey::from_str(k).unwrap())
+            .collect::<Vec<_>>();
         (0..accounts.len()).for_each(|index| {
             accounts.account(index, |account| {
                 if pks.contains(account.pubkey()) {
-                    log::error!("store: {}, {}, {}, {}", slot, account.pubkey(), account.lamports(), Self::hash_account(&account, account.pubkey()).0);
+                    log::error!(
+                        "store: {}, {}, {}, {}",
+                        slot,
+                        account.pubkey(),
+                        account.lamports(),
+                        Self::hash_account(&account, account.pubkey()).0
+                    );
                 }
             })
         });
@@ -8774,19 +8809,26 @@ impl AccountsDb {
         let mut stored_size_alive = 0;
 
         use std::str::FromStr;
-        let pks = ["5YcfMU3zpPU7qLQfUAEReBfoo9sRssCqSRAHtSVQhpCH",
-        "5YwEntu998V1TFZAiMNUcpqtdNwyVHT8T7QSSpJ2hYsr","Gy3zCpZYdqy2heDxX8PcVVnZ2LVCzQtCBbuM1Zkc43Db","Gy9km4th6eRJMw5U7KcwC469CCHTGbUtu1DcCVh4GKEm",
-        "5ZTBXQRpKa7TUVeYgC8tXVEFiMaTe77nR1aJcBRdF1Vz",
-        "5bBVSzSLmgvnYSvbjMQJxohuhts4NRWwEUmmnsNkn1zV",
-        "5cNFS6pYJpWqZG17gEqrTNbVYeccPHCGnN24YKmcWdo9",
-        "5cuy7pMhTPhVZN9xuhgSbykRb986siGJb6vnEtkuBrSU",
-        "5cy2VSz4BhtU5jKMVXkMP5J4SZTavkJNaGynj1yusdgE",
-        "5fMwvFVA8z69qdZcFPhm3ywLeGHWEDcr5eWjcGjUavsk",
-        "5fpEQxgxGj4DDybYRTva8wR2Ah6Ge3pLFwx7CDbRTNQP",
-        "5gVEdLrArMAKCMzerWhRxh9HND4VprHPbi38pmsnA7zZ",
-        "5h7rQBrwywCPgCsf43EyFfmPB5JEEz7t6nwQkxPnLbPH",
-        "5i3Qgc67fLyGBSudEEgBgmXQpEiJsqivSMq7oxxoETM9",];
-        let pks = pks.iter().map(|k| Pubkey::from_str(k).unwrap()).collect::<Vec<_>>();
+        let pks = [
+            "5YcfMU3zpPU7qLQfUAEReBfoo9sRssCqSRAHtSVQhpCH",
+            "5YwEntu998V1TFZAiMNUcpqtdNwyVHT8T7QSSpJ2hYsr",
+            "Gy3zCpZYdqy2heDxX8PcVVnZ2LVCzQtCBbuM1Zkc43Db",
+            "Gy9km4th6eRJMw5U7KcwC469CCHTGbUtu1DcCVh4GKEm",
+            "5ZTBXQRpKa7TUVeYgC8tXVEFiMaTe77nR1aJcBRdF1Vz",
+            "5bBVSzSLmgvnYSvbjMQJxohuhts4NRWwEUmmnsNkn1zV",
+            "5cNFS6pYJpWqZG17gEqrTNbVYeccPHCGnN24YKmcWdo9",
+            "5cuy7pMhTPhVZN9xuhgSbykRb986siGJb6vnEtkuBrSU",
+            "5cy2VSz4BhtU5jKMVXkMP5J4SZTavkJNaGynj1yusdgE",
+            "5fMwvFVA8z69qdZcFPhm3ywLeGHWEDcr5eWjcGjUavsk",
+            "5fpEQxgxGj4DDybYRTva8wR2Ah6Ge3pLFwx7CDbRTNQP",
+            "5gVEdLrArMAKCMzerWhRxh9HND4VprHPbi38pmsnA7zZ",
+            "5h7rQBrwywCPgCsf43EyFfmPB5JEEz7t6nwQkxPnLbPH",
+            "5i3Qgc67fLyGBSudEEgBgmXQpEiJsqivSMq7oxxoETM9",
+        ];
+        let pks = pks
+            .iter()
+            .map(|k| Pubkey::from_str(k).unwrap())
+            .collect::<Vec<_>>();
 
         let (dirty_pubkeys, insert_time_us, mut generate_index_results) = {
             let mut items_local = Vec::default();
@@ -8796,7 +8838,11 @@ impl AccountsDb {
                     accounts_data_len += info.index_info.data_len;
                 }
                 if pks.contains(&info.index_info.pubkey) {
-                    log::error!("slot: {slot}, {}, {}", info.index_info.pubkey, info.index_info.lamports);
+                    log::error!(
+                        "slot: {slot}, {}, {}",
+                        info.index_info.pubkey,
+                        info.index_info.lamports
+                    );
                 }
                 items_local.push(info.index_info);
             });
