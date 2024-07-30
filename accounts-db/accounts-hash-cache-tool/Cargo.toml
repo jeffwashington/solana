@@ -13,8 +13,11 @@ edition = { workspace = true }
 ahash = { workspace = true }
 bytemuck = { workspace = true }
 clap = { workspace = true }
+dashmap = { workspace = true, features = ["rayon", "raw-api"] }
 memmap2 = { workspace = true }
+rayon = { workspace = true }
 solana-accounts-db = { workspace = true }
+solana-sdk = { workspace = true }
 solana-version = { workspace = true }
 
 [features]
