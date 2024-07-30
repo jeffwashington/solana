@@ -3781,7 +3781,7 @@ impl AccountsDb {
                     |_k, info, _entry| {
                         if let Some(info) = info {
                             if info.0.len() == 1 && info.1 == 1 {
-                                // force_allow_purge = true;
+                                force_allow_purge = true;
                                 self.clean_accounts_stats
                                     .zero_lamport_single_entry_accounts_purged
                                     .fetch_add(1, Ordering::Relaxed);
