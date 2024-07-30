@@ -7508,6 +7508,7 @@ impl AccountsDb {
                 }
             };
             info!("calculate_accounts_hash_from_storages: slot: {slot}, {accounts_hash:?}, capitalization: {capitalization}");
+            panic!("done");
             (accounts_hash, capitalization)
         };
 
