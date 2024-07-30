@@ -5900,7 +5900,6 @@ impl Bank {
         base: Option<(Slot, /*capitalization*/ u64)>,
     ) -> bool {
         log::error!("last full: {:?}, slot: {}", last_full_snapshot_slot, self.slot());
-        let last_full_snapshot_slot = self.slot();
         let skip_shrink = false;
         let force_clean = true;
         let (_, clean_time_us) = measure_us!({
