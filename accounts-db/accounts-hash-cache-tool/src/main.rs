@@ -368,11 +368,11 @@ fn do_diff_dirs(
         println!("not in 1: {}", hm2.len());
 
         diff.iter().for_each(|a| {
-            println!("diff: {:?}", (hm1.get(&a.pubkey).unwrap(), a));
+            println!("diff: {:?}", (hm1.get(&a.pubkey).unwrap().value(), a));
         });
 
-        not_in_2.iter().for_each(|a| {
-            println!("not_in_2: {:?}", hm1.get(a).unwrap());
+        not_in_2.into_iter().for_each(|a| {
+            println!("not_in_2: {:?}", hm1.get(&a).unwrap().value());
         });
 
         hm2.into_iter().for_each(|(k, v)| {
