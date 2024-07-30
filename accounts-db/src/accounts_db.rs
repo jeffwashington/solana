@@ -3938,7 +3938,7 @@ impl AccountsDb {
 
 
                     if pks.contains(pubkey) {
-                        log::error!("collect for shrink: {pubkey}, alive: {alive}, slot: {slot_to_shrink}");
+                        log::error!("collect for shrink: {pubkey}, alive: {is_alive}, slot: {slot_to_shrink}");
                     }
 
                     if !is_alive {
