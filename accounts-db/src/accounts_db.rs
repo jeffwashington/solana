@@ -4962,14 +4962,14 @@ impl AccountsDb {
                     }
                 });
                 if self.dirty_stores.len() > DIRTY_STORES_CLEANING_THRESHOLD {
-                    self.clean_accounts(None, is_startup, last_full_snapshot_slot, epoch_schedule);
+                    self.clean_accounts(last_full_snapshot_slot, is_startup, last_full_snapshot_slot, epoch_schedule);
                 }
             });
         } else {
             for slot in self.all_slots_in_storage() {
                 self.shrink_slot_forced(slot);
                 if self.dirty_stores.len() > DIRTY_STORES_CLEANING_THRESHOLD {
-                    self.clean_accounts(None, is_startup, last_full_snapshot_slot, epoch_schedule);
+                    self.clean_accounts(last_full_snapshot_slot, is_startup, last_full_snapshot_slot, epoch_schedule);
                 }
             }
         }
