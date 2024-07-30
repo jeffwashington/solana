@@ -5482,7 +5482,7 @@ impl Bank {
     /// Used by ledger tool to run a final hash calculation once all ledger replay has completed.
     /// This should not be called by validator code.
     pub fn run_final_hash_calc(&self, on_halt_store_hash_raw_data_for_debug: bool) {
-        self.wait_for_initial_accounts_hash_verification_completed_for_tests();
+        // self.wait_for_initial_accounts_hash_verification_completed_for_tests();
         panic!("");
 
         self.force_flush_accounts_cache();
