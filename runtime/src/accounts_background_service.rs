@@ -697,7 +697,8 @@ impl AccountsBackgroundService {
                         }
                     }
                     stats.record_and_maybe_submit(start_time.elapsed());
-                    sleep(Duration::from_millis(INTERVAL_MS));
+                    let (_, m) = measure_us!({sleep(Duration::from_millis(INTERVAL_MS));});
+                    log::error!("sleep: {}", m);
                 }
                 info!("AccountsBackgroundService has stopped");
             })
