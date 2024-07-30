@@ -4177,18 +4177,6 @@ impl AccountsDb {
         shrink_in_progress: Option<ShrinkInProgress>,
         shrink_can_be_active: bool,
     ) {
-        let mut time = Measure::start("remove_old_stores_shrink");
-        // Purge old, overwritten storage entries
-        let dead_storages = self.mark_dirty_dead_stores(
-            shrink_collect.slot,
-            // If all accounts are zero lamports, then we want to mark the entire OLD append vec as dirty.
-            // otherwise, we'll call 'add_uncleaned_pubkeys_after_shrink' just on the unref'd keys below.
-            shrink_collect.all_are_zero_lamports,
-            shrink_in_progress,
-            shrink_can_be_active,
-        );
-        let dead_storages_len = dead_storages.len();
-
         stats.purged_zero_lamports.fetch_add(
             shrink_collect.zero_lamport_alive_pubkeys.len() as u64,
             Ordering::Relaxed,
@@ -4211,6 +4199,18 @@ impl AccountsDb {
                 );
                 _ = self.purge_keys_exact([&(**k, shrink_collect.slot)].into_iter());
             });
+
+        let mut time = Measure::start("remove_old_stores_shrink");
+        // Purge old, overwritten storage entries
+        let dead_storages = self.mark_dirty_dead_stores(
+            shrink_collect.slot,
+            // If all accounts are zero lamports, then we want to mark the entire OLD append vec as dirty.
+            // otherwise, we'll call 'add_uncleaned_pubkeys_after_shrink' just on the unref'd keys below.
+            shrink_collect.all_are_zero_lamports,
+            shrink_in_progress,
+            shrink_can_be_active,
+        );
+        let dead_storages_len = dead_storages.len();
 
         if !shrink_collect.all_are_zero_lamports {
             self.add_uncleaned_pubkeys_after_shrink(
