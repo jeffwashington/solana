@@ -7422,6 +7422,7 @@ impl AccountsDb {
         } else {
             scan_and_hash()
         };
+        panic!("done");
         stats.total_us = total_time.end_as_us();
         stats.log();
         result
