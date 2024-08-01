@@ -475,6 +475,7 @@ pub(crate) struct ShrinkCollect<'a, T: ShrinkCollectRefs<'a>> {
     pub(crate) slot: Slot,
     pub(crate) capacity: u64,
     pub(crate) unrefed_pubkeys: Vec<&'a Pubkey>,
+    pub(crate) zero_lamport_alive_pubkeys: Vec<&'a Pubkey>,
     pub(crate) alive_accounts: T,
     /// total size in storage of all alive accounts
     pub(crate) alive_total_bytes: usize,
@@ -524,6 +525,8 @@ struct LoadAccountsIndexForShrink<'a, T: ShrinkCollectRefs<'a>> {
     alive_accounts: T,
     /// pubkeys that were unref'd in the accounts index because they were dead
     unrefed_pubkeys: Vec<&'a Pubkey>,
+    /// pubkeys that are the last remaining zero lamport instance of an account
+    zero_lamport_alive_pubkeys: Vec<&'a Pubkey>,
     /// true if all alive accounts are zero lamport accounts
     all_are_zero_lamports: bool,
     /// index entries we need to hold onto to keep them from getting flushed
@@ -2011,6 +2014,7 @@ pub struct ShrinkStats {
     dead_accounts: AtomicU64,
     alive_accounts: AtomicU64,
     accounts_loaded: AtomicU64,
+    purged_zero_lamports: AtomicU64,
 }
 
 impl ShrinkStats {
@@ -2107,6 +2111,11 @@ impl ShrinkStats {
                 (
                     "accounts_loaded",
                     self.accounts_loaded.swap(0, Ordering::Relaxed) as i64,
+                    i64
+                ),
+                (
+                    "purged_zero_lamports_count",
+                    self.purged_zero_lamports.swap(0, Ordering::Relaxed),
                     i64
                 ),
             );
@@ -2307,6 +2316,13 @@ impl ShrinkAncientStats {
             (
                 "many_refs_old_alive",
                 self.many_refs_old_alive.swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "purged_zero_lamports_count",
+                self.shrink_stats
+                    .purged_zero_lamports
+                    .swap(0, Ordering::Relaxed),
                 i64
             ),
         );
@@ -3793,12 +3809,14 @@ impl AccountsDb {
         let count = accounts.len();
         let mut alive_accounts = T::with_capacity(count, slot_to_shrink);
         let mut unrefed_pubkeys = Vec::with_capacity(count);
+        let mut zero_lamport_alive_pubkeys = Vec::with_capacity(count);
 
         let mut alive = 0;
         let mut dead = 0;
         let mut index = 0;
         let mut all_are_zero_lamports = true;
         let mut index_entries_being_shrunk = Vec::with_capacity(accounts.len());
+        let last_full_snapshot_slot = self.last_full_snapshot_slot();
         self.accounts_index.scan(
             accounts.iter().map(|account| account.pubkey()),
             |pubkey, slots_refs, entry| {
@@ -3817,6 +3835,19 @@ impl AccountsDb {
                         unrefed_pubkeys.push(pubkey);
                         result = AccountsIndexScanResult::Unref;
                         dead += 1;
+                    } else if stored_account.is_zero_lamport()
+                        && last_full_snapshot_slot
+                            .map(|last_full_snapshot_slot| last_full_snapshot_slot > slot_to_shrink)
+                            .unwrap_or(true)
+                        && ref_count == 1
+                    {
+                        // only do this if our slot is prior to the last full snapshot
+                        // we found a zero lamport account that is the only instance of this account. We can delete it completely.
+                        zero_lamport_alive_pubkeys.push(pubkey);
+                        self.add_uncleaned_pubkeys_after_shrink(
+                            slot_to_shrink,
+                            [*pubkey].into_iter(),
+                        );
                     } else {
                         // Hold onto the index entry arc so that it cannot be flushed.
                         // Since we are shrinking these entries, we need to disambiguate storage ids during this period and those only exist in the in-memory accounts index.
@@ -3839,6 +3870,7 @@ impl AccountsDb {
         LoadAccountsIndexForShrink {
             alive_accounts,
             unrefed_pubkeys,
+            zero_lamport_alive_pubkeys,
             all_are_zero_lamports,
             index_entries_being_shrunk,
         }
@@ -3939,6 +3971,7 @@ impl AccountsDb {
         let len = stored_accounts.len();
         let alive_accounts_collect = Mutex::new(T::with_capacity(len, slot));
         let unrefed_pubkeys_collect = Mutex::new(Vec::with_capacity(len));
+        let zero_lamport_alive_pubkeys_collect = Mutex::new(Vec::with_capacity(len));
         stats
             .accounts_loaded
             .fetch_add(len as u64, Ordering::Relaxed);
@@ -3955,6 +3988,7 @@ impl AccountsDb {
                         alive_accounts,
                         mut unrefed_pubkeys,
                         all_are_zero_lamports,
+                        mut zero_lamport_alive_pubkeys,
                         mut index_entries_being_shrunk,
                     } = self.load_accounts_index_for_shrink(stored_accounts, stats, slot);
 
@@ -3967,6 +4001,10 @@ impl AccountsDb {
                         .lock()
                         .unwrap()
                         .append(&mut unrefed_pubkeys);
+                    zero_lamport_alive_pubkeys_collect
+                        .lock()
+                        .unwrap()
+                        .append(&mut zero_lamport_alive_pubkeys);
                     index_entries_being_shrunk_outer
                         .lock()
                         .unwrap()
@@ -3979,6 +4017,7 @@ impl AccountsDb {
 
         let alive_accounts = alive_accounts_collect.into_inner().unwrap();
         let unrefed_pubkeys = unrefed_pubkeys_collect.into_inner().unwrap();
+        let zero_lamport_alive_pubkeys = zero_lamport_alive_pubkeys_collect.into_inner().unwrap();
 
         index_read_elapsed.stop();
         stats
@@ -4002,6 +4041,7 @@ impl AccountsDb {
             slot,
             capacity: *capacity,
             unrefed_pubkeys,
+            zero_lamport_alive_pubkeys,
             alive_accounts,
             alive_total_bytes,
             total_starting_accounts: len,
@@ -4030,6 +4070,25 @@ impl AccountsDb {
             shrink_can_be_active,
         );
         let dead_storages_len = dead_storages.len();
+
+        stats.purged_zero_lamports.fetch_add(
+            shrink_collect.zero_lamport_alive_pubkeys.len() as u64,
+            Ordering::Relaxed,
+        );
+
+        self.accounts_index.scan(
+            shrink_collect.zero_lamport_alive_pubkeys.iter().cloned(),
+            |_pubkey, _slots_refs, _entry| AccountsIndexScanResult::Unref,
+            Some(AccountsIndexScanResult::Unref),
+            false,
+        );
+
+        shrink_collect
+            .zero_lamport_alive_pubkeys
+            .iter()
+            .for_each(|k| {
+                _ = self.purge_keys_exact([&(**k, shrink_collect.slot)].into_iter());
+            });
 
         if !shrink_collect.all_are_zero_lamports {
             self.add_uncleaned_pubkeys_after_shrink(
@@ -7778,10 +7837,11 @@ impl AccountsDb {
 
         if Self::should_not_shrink(alive_bytes, total_bytes) {
             trace!(
-                "shrink_slot_forced ({}): not able to shrink at all: alive/stored: {} ({}b / {}b) save: {}",
+                "shrink_slot_forced ({}): not able to shrink at all: alive/stored: {}/{} ({}b / {}b) save: {}",
                 slot,
                 alive_count,
                 stored_count,
+                alive_bytes,
                 total_bytes,
                 total_bytes.saturating_sub(alive_bytes),
             );
@@ -10880,6 +10940,57 @@ pub mod tests {
         // zero lamports, and are not present in any other slot's
         // storage entries
         assert_eq!(accounts.alive_account_count_in_slot(1), 0);
+    }
+
+    #[test]
+    fn test_shrink_zero_lamport_single_ref_account() {
+        solana_logger::setup();
+
+        // store a zero and non-zero lamport account
+        // make sure clean marks the ref_count=1, zero lamport account dead and removes pubkey from index completely
+        let accounts = AccountsDb::new_single_for_tests();
+        let pubkey_zero = Pubkey::from([1; 32]);
+        let pubkey2 = Pubkey::from([2; 32]);
+        let account = AccountSharedData::new(1, 0, AccountSharedData::default().owner());
+        let zero_lamport_account =
+            AccountSharedData::new(0, 0, AccountSharedData::default().owner());
+
+        // Store a zero-lamport account and a non-zero lamport account
+        accounts.store_for_tests(
+            1,
+            &[(&pubkey_zero, &zero_lamport_account), (&pubkey2, &account)],
+        );
+
+        // Simulate rooting the zero-lamport account, should be a
+        // candidate for cleaning
+        accounts.calculate_accounts_delta_hash(1);
+        accounts.add_root_and_flush_write_cache(1);
+
+        // for testing, we need to cause shrink to think this will be productive.
+        // The zero lamport account isn't dead, but it can become dead inside shrink.
+        accounts
+            .storage
+            .get_slot_storage_entry(1)
+            .unwrap()
+            .alive_bytes
+            .fetch_sub(aligned_stored_size(0), Ordering::Relaxed);
+
+        // Slot 1 should be cleaned, but
+        // zero-lamport account should not be cleaned since last full snapshot root is before slot 1
+        accounts.shrink_slot_forced(1);
+
+        assert!(accounts.storage.get_slot_storage_entry(1).is_some());
+
+        // the zero lamport account should be marked as dead
+        assert_eq!(accounts.alive_account_count_in_slot(1), 1);
+
+        // zero lamport account should be dead in the index
+        assert!(!accounts
+            .accounts_index
+            .contains_with(&pubkey_zero, None, None));
+        // other account should still be alive
+        assert!(accounts.accounts_index.contains_with(&pubkey2, None, None));
+        assert!(accounts.storage.get_slot_storage_entry(1).is_some());
     }
 
     #[test]
@@ -15908,6 +16019,8 @@ pub mod tests {
                                 debug!("space: {space}, lamports: {lamports}, alive: {alive}, account_count: {account_count}, append_opposite_alive_account: {append_opposite_alive_account}, append_opposite_zero_lamport_account: {append_opposite_zero_lamport_account}, normal_account_count: {normal_account_count}");
                                 let db = AccountsDb::new_single_for_tests();
                                 let slot5 = 5;
+                                // don't do special zero lamport account handling
+                                db.set_last_full_snapshot_slot(0);
                                 let mut account = AccountSharedData::new(
                                     lamports,
                                     space,
