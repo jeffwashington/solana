@@ -87,6 +87,7 @@ impl AccountStorage {
         slot: Slot,
         storage: Arc<AccountStorageEntry>,
     ) {
+        log::error!("replace_eq: {}", slot);
         assert_eq!(storage.slot(), slot);
         if let Some(mut existing_storage) = self.map.get_mut(&slot) {
             assert_eq!(slot, existing_storage.value().storage.slot());
@@ -131,6 +132,8 @@ impl AccountStorage {
         slot: &Slot,
         shrink_can_be_active: bool,
     ) -> Option<Arc<AccountStorageEntry>> {
+        log::error!("remove: {}", slot);
+
         assert!(shrink_can_be_active || self.shrink_in_progress_map.is_empty());
         self.map.remove(slot).map(|(_, entry)| entry.storage)
     }
@@ -241,6 +244,7 @@ pub struct ShrinkInProgress<'a> {
 /// called when the shrink is no longer in progress. This means we can release the old append vec and update the map of slot -> append vec
 impl<'a> Drop for ShrinkInProgress<'a> {
     fn drop(&mut self) {
+        log::error!("shrink in progress drop: {}, {}, {}", self.slot, self.new_storage().id(), self.old_storage().id());
         assert_eq!(
             self.storage
                 .map

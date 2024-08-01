@@ -3264,6 +3264,13 @@ impl AccountsDb {
                                 let mut useless = true;
                                 if let Some((slot_list, ref_count)) = slot_list_and_ref_count {
                                     // find the highest rooted slot in the slot list
+                                    slot_list.iter().for_each(|(slot, info)| {
+                                        if !info.is_cached() {
+                                            if self.storage.get_account_storage_entry(*slot, info.store_id()).is_none() {
+                                                panic!("Unable to find storage for: {candidate}, {slot}, id: {}, found: {}, sl: {slot_list:?}", info.store_id(), self.storage.get_slot_storage_entry(*slot).map(|s| s.id()).unwrap_or_default());
+                                            }
+                                        }
+                                    });
                                     let index_in_slot_list = self.accounts_index.latest_slot(
                                         None,
                                         slot_list,
@@ -3293,6 +3300,8 @@ impl AccountsDb {
                                             } else {
                                                 found_not_zero += 1;
                                             }
+                                            // if the highest rooted slot for this pubkey is in the list of uncleaned roots, then we may want to purge it.
+                                            // We may want to remove older slots from the slot list. That's what purges_old_accounts does.
                                             if uncleaned_roots.contains(slot) {
                                                 // Assertion enforced by `accounts_index.get()`, the latest slot
                                                 // will not be greater than the given `max_clean_root`
@@ -3357,6 +3366,18 @@ impl AccountsDb {
                 self.thread_pool_clean.install(do_clean_scan)
             }
         };
+
+        log::error!(
+            "purges zero: {}, old: {}, total in hash map: {}, pks: {}",
+            purges_zero_lamports.len(),
+            purges_old_accounts.len(),
+            purges_zero_lamports
+                .iter()
+                .map(|v| v.1 .0.len())
+                .sum::<usize>(),
+            candidates.len()
+        );
+
         accounts_scan.stop();
 
         let mut clean_old_rooted = Measure::start("clean_old_roots");
@@ -3411,11 +3432,15 @@ impl AccountsDb {
                         *pubkey,
                         *slot
                     );
+                    let s = format!("expected to find a storage for slot: {slot} but did not, key: {pubkey}, id: {}", account_info.store_id());
                     let count = self
                         .storage
                         .get_account_storage_entry(*slot, account_info.store_id())
                         .map(|store| store.count())
-                        .unwrap()
+                        .unwrap_or_else(|| {
+                            log::error!("could get storage: {}", self.storage.get_slot_storage_entry(*slot).map(|s| s.id()).unwrap_or(u32::MAX));
+                            panic!("{}", s);
+                        })
                         - 1;
                     debug!(
                         "store_counts, inserting slot: {}, store id: {}, count: {}",
@@ -4087,6 +4112,10 @@ impl AccountsDb {
             .zero_lamport_alive_pubkeys
             .iter()
             .for_each(|k| {
+                log::error!(
+                    "purging zero lamport: {k}, from slot: {}",
+                    shrink_collect.slot
+                );
                 _ = self.purge_keys_exact([&(**k, shrink_collect.slot)].into_iter());
             });
 
@@ -4112,6 +4141,7 @@ impl AccountsDb {
     }
 
     fn do_shrink_slot_store(&self, slot: Slot, store: &Arc<AccountStorageEntry>) {
+        log::error!("do_shrink_slot_store: {slot}");
         if self.accounts_cache.contains(slot) {
             // It is not correct to shrink a slot while it is in the write cache until flush is complete and the slot is removed from the write cache.
             // There can exist a window after a slot is made a root and before the write cache flushing for that slot begins and then completes.
@@ -4224,6 +4254,7 @@ impl AccountsDb {
 
         Self::update_shrink_stats(&self.shrink_stats, stats_sub, true);
         self.shrink_stats.report();
+        log::error!("~do_shrink_slot_store: {slot}");
     }
 
     pub(crate) fn update_shrink_stats(
@@ -4325,7 +4356,7 @@ impl AccountsDb {
     // Reads all accounts in given slot's AppendVecs and filter only to alive,
     // then create a minimum AppendVec filled with the alive.
     fn shrink_slot_forced(&self, slot: Slot) {
-        debug!("shrink_slot_forced: slot: {}", slot);
+        log::error!("shrink_slot_forced: slot: {}", slot);
 
         if let Some(store) = self
             .storage
@@ -4672,6 +4703,7 @@ impl AccountsDb {
         ancient_slot_pubkeys: &mut AncientSlotPubkeys,
         dropped_roots: &mut Vec<Slot>,
     ) {
+        panic!("");
         let unique_accounts = self.get_unique_accounts_from_storage_for_shrink(
             old_storage,
             &self.shrink_ancient_stats.shrink_stats,
@@ -6378,6 +6410,7 @@ impl AccountsDb {
         let mut account_bytes_saved = 0;
         let mut num_accounts_saved = 0;
 
+        log::error!("start flush");
         let _guard = self.active_stats.activate(ActiveStatItem::Flush);
 
         // Note even if force_flush is false, we will still flush all roots <= the
@@ -8664,6 +8697,10 @@ impl AccountsDb {
                     rent_paying_accounts_by_partition.push(info.pubkey);
                 }
 
+                if slot == 278822593 && info.lamports == 0 {
+                    log::error!("slot: {slot}, k: {}", info.pubkey);
+                }
+
                 (
                     info.pubkey,
                     AccountInfo::new(
@@ -8748,6 +8785,15 @@ impl AccountsDb {
             slots.truncate(limit); // get rid of the newer slots and keep just the older
         }
         let max_slot = slots.last().cloned().unwrap_or_default();
+        slots.iter().for_each(|slot| {
+            if false && max_slot - slot > 432000 {
+                log::error!(
+                    "we have slot: {}, which is {} behind max",
+                    slot,
+                    max_slot - slot
+                );
+            }
+        });
         let schedule = &genesis_config.epoch_schedule;
         let rent_collector = RentCollector::new(
             schedule.get_epoch(max_slot),
