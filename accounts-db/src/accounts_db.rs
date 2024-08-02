@@ -3144,9 +3144,8 @@ impl AccountsDb {
                 return;
             }
             if let Some(storage) = self.storage.get_slot_storage_entry(slot) {
-                storage.accounts.scan_accounts(|account| {
-                    let pk = account.pubkey();
-                    match pubkey_refcount.entry(*pk) {
+                storage.accounts.scan_index(|account| {
+                    match pubkey_refcount.entry(account.index_info.pubkey) {
                         dashmap::mapref::entry::Entry::Occupied(mut occupied_entry) => {
                             if !occupied_entry.get().iter().any(|s| s == &slot) {
                                 occupied_entry.get_mut().push(slot);
@@ -3179,7 +3178,7 @@ impl AccountsDb {
                                     let slot_list = index_entry.slot_list.read().unwrap();
                                     let num_too_new = slot_list
                                         .iter()
-                                        .filter(|(slot, _)| slot > &max_slot_inclusive)
+                                        .filter(|(slot, info)| slot > &max_slot_inclusive && !info.is_cached())
                                         .count();
 
                                     if ((index_entry.ref_count() as usize) - num_too_new) > entry.value().len() {
