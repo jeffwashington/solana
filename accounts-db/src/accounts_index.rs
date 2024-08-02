@@ -302,13 +302,24 @@ impl<T: IndexValue> AccountMapEntryInner<T> {
 
     /// decrement the ref count
     /// return true if the old refcount was already 0. This indicates an under refcounting error in the system.
-    pub fn unref(&self) -> bool {
+    pub fn unref_skip(&self) -> bool {
         let previous = self.ref_count.fetch_sub(1, Ordering::Release);
         self.set_dirty(true);
         if previous == 0 {
             inc_new_counter_info!("accounts_index-deref_from_0", 1);
         }
         previous == 0
+    }
+
+    /// decrement the ref count
+    /// return true if the old refcount was already 0. This indicates an under refcounting error in the system.
+    pub fn unref2(&self) -> bool {
+        let previous = self.ref_count.fetch_sub(1, Ordering::Release);
+        self.set_dirty(true);
+        if previous == 0 {
+            inc_new_counter_info!("accounts_index-deref_from_0", 1);
+        }
+        previous == 1
     }
 
     pub fn dirty(&self) -> bool {
@@ -1440,8 +1451,8 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
                         };
                         cache = match result {
                             AccountsIndexScanResult::Unref => {
-                                if locked_entry.unref() {
-                                    info!("scan: refcount of item already at 0: {pubkey}");
+                                if locked_entry.unref2() {
+                                    info!("scan: refcount of item goes to 0: {pubkey}, {:?}", entry.unwrap().slot_list.read().unwrap());
                                 }
                                 true
                             }
