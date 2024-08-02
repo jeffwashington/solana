@@ -312,6 +312,106 @@ fn do_diff_dirs(
         .map_err(|err| format!("failed to get cache files in dir1: {err}"))?;
     let files2 = get_cache_files_in(dir2)
         .map_err(|err| format!("failed to get cache files in dir2: {err}"))?;
+    use rayon::{prelude::*, ThreadPool};
+
+    if true {
+        use dashmap::{DashMap, DashSet};
+        use solana_accounts_db::accounts_hash::CalculateHashIntermediate;
+        use solana_accounts_db::pubkey_bins::PubkeyBinCalculator24;
+        use solana_sdk::pubkey::Pubkey;
+        use std::sync::RwLock;
+        let bins = 8192;
+        let binner = PubkeyBinCalculator24::new(bins);
+        let mut hm1: Vec<RwLock<HashMap<Pubkey, CalculateHashIntermediate>>> =
+            (0..bins).map(|_| RwLock::default()).collect();
+        let mut hm2: Vec<RwLock<HashMap<Pubkey, CalculateHashIntermediate>>> =
+            (0..bins).map(|_| RwLock::default()).collect();
+        let mut not_in_2 = RwLock::new(Vec::default());
+        let mut diff = RwLock::new(Vec::default());
+
+        (0..2).into_par_iter().for_each(|i| {
+            if i == 0 {
+                files1.iter().for_each(|f| {
+                    println!("reading: 1: {:?}, {}M", f.path, hm1.len() / 1000000);
+                    let (reader, header) = open_file(&f.path, false).unwrap();
+                    scan_file(reader, header.count, |entry| {
+                        hm1[binner.bin_from_pubkey(&entry.pubkey)]
+                            .write()
+                            .unwrap()
+                            .insert(entry.pubkey, entry);
+                    })
+                    .unwrap();
+                });
+            } else {
+                files2.iter().for_each(|f| {
+                    println!("reading: 2: {:?}, {}M", f.path, hm2.len() / 1000000);
+                    let (reader, header) = open_file(&f.path, false).unwrap();
+                    scan_file(reader, header.count, |entry| {
+                        hm2[binner.bin_from_pubkey(&entry.pubkey)]
+                            .write()
+                            .unwrap()
+                            .insert(entry.pubkey, entry);
+                    })
+                    .unwrap();
+                });
+            }
+        });
+        println!("entries in 1/2: {}/{}", hm1.len(), hm2.len());
+        (0..bins).into_par_iter().for_each(|bin| {
+            let mut hm2 = hm2[bin].write().unwrap();
+            hm1[bin].read().unwrap().iter().for_each(|e| {
+                if let Some(h) = hm2.remove(&e.0) {
+                    if &h == e.1 {
+                        return;
+                    }
+                    diff.write().unwrap().push(h);
+                    // println!("{}, 1: {:?}, 2: {:?}", e.key(), e.value(), h.1);
+                } else {
+                    not_in_2.write().unwrap().push(*e.0);
+                    // println!("{}, 1: {:?}, not in 2", e.key(), e.value());
+                }
+            });
+        });
+
+        println!("diff: {}", diff.read().unwrap().len());
+        println!("not in 2: {}", not_in_2.read().unwrap().len());
+        println!(
+            "not in 1: {}",
+            hm2.iter().map(|x| x.read().unwrap().len()).sum::<usize>()
+        );
+
+        diff.read().unwrap().iter().for_each(|a| {
+            println!(
+                "diff: {:?}",
+                (
+                    hm1[binner.bin_from_pubkey(&a.pubkey)]
+                        .read()
+                        .unwrap()
+                        .get(&a.pubkey)
+                        .unwrap(),
+                    a
+                )
+            );
+        });
+
+        not_in_2.read().unwrap().iter().for_each(|a| {
+            println!(
+                "not_in_2: {:?}",
+                hm1[binner.bin_from_pubkey(a)]
+                    .read()
+                    .unwrap()
+                    .get(a)
+                    .unwrap()
+            );
+        });
+
+        hm2.iter().for_each(|hm2| {
+            hm2.read().unwrap().iter().for_each(|(k, v)| {
+                println!("{k}, 2: {v:?}, not in 1");
+            });
+        });
+        return Ok(());
+    }
 
     let mut uniques1 = Vec::new();
     let mut uniques2 = Vec::new();

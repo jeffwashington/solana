@@ -70,6 +70,10 @@ impl<'a> AppendVecScan for ScanState<'a> {
         }
     }
     fn found_account(&mut self, loaded_account: &LoadedAccount) {
+        use std::str::FromStr;
+        let pks = ["CmpasLRjNfsJHauipaDF6V9thsohvgdBccRmbYqdEJW7","3teNwB76chJnL45eHtq8XZcRTGYTyZEkVxH73xe44nYm","BdknRgZ2cDuNEn512ZeygAirkLoGHYQJGyoKU5VtHKf5","2PgthLEHqeA9XaL9NBB3VtEXAbojqwkrrc4CuHdbwp3G","8WLo1vWWsZ9fTpZ3TH3mEp14g86erZN9sB1ewwA7TPkQ",];
+        let pks = pks.iter().map(|k| Pubkey::from_str(k).unwrap()).collect::<Vec<_>>();
+
         let pubkey = loaded_account.pubkey();
         assert!(self.bin_range.contains(&self.pubkey_to_bin_index)); // get rid of this once we have confidence
 
@@ -91,6 +95,9 @@ impl<'a> AppendVecScan for ScanState<'a> {
                 .fetch_add(1, Ordering::Relaxed);
         }
 
+        if pks.contains(pubkey) {
+            log::error!("hash calc scan: {pubkey}, {}, slot: {}", account_hash.0, self.current_slot);
+        }
         let source_item = CalculateHashIntermediate {
             hash: account_hash,
             lamports: balance,
