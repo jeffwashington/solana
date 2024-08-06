@@ -11067,6 +11067,7 @@ pub mod tests {
     #[test]
     fn test_shrink_zero_lamport_single_ref_account() {
         solana_logger::setup();
+        // note that 'None' checks the case based on the default value of `latest_full_snapshot_slot` in `AccountsDb`
         for latest_full_snapshot_slot in [None, Some(0), Some(1), Some(2)] {
             // store a zero and non-zero lamport account
             // make sure clean marks the ref_count=1, zero lamport account dead and removes pubkey from index completely
@@ -11101,8 +11102,7 @@ pub mod tests {
                 accounts.set_latest_full_snapshot_slot(latest_full_snapshot_slot);
             }
 
-            // Slot 1 should be cleaned, but
-            // zero-lamport account should not be cleaned since latest_full_snapshot_slot is before slot 1
+            // Shrink the slot. The behavior on the zero lamport account will depend on `latest_full_snapshot_slot`.
             accounts.shrink_slot_forced(slot);
 
             assert!(
