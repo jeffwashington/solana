@@ -335,7 +335,7 @@ impl AccountsDb {
             percent_of_alive_shrunk_data: 55,
             ideal_storage_size: NonZeroU64::new(get_ancient_append_vec_capacity()).unwrap(),
             can_randomly_shrink,
-            max_resulting_storages: NonZeroU64::new(40).unwrap(),
+            max_resulting_storages: NonZeroU64::new(10).unwrap(),
         };
 
         let _guard = self.active_stats.activate(ActiveStatItem::SquashAncient);
