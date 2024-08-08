@@ -81,7 +81,7 @@ impl<'a> AppendVecScan for ScanState<'a> {
         let mut account_hash = loaded_account.loaded_hash();
 
         let hash_is_missing = account_hash == AccountHash(Hash::default());
-        if hash_is_missing {
+        if hash_is_missing || true {
             let computed_hash = AccountsDb::hash_account(loaded_account, loaded_account.pubkey());
             account_hash = computed_hash;
         }
