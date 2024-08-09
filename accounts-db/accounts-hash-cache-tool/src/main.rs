@@ -1,3 +1,5 @@
+use solana_program::example_mocks::solana_sdk::signature::Signer;
+
 use {
     ahash::{HashMap, RandomState},
     bytemuck::Zeroable as _,
@@ -145,7 +147,7 @@ fn cmd_diff_files(
 ) -> Result<(), String> {
     let path1 = value_t_or_exit!(subcommand_matches, "path1", String);
     let path2 = value_t_or_exit!(subcommand_matches, "path2", String);
-    do_diff_files(path1, path2)
+    do_diff_files(path1, path2, false).map(|_| ())
 }
 
 fn cmd_diff_dirs(
@@ -170,7 +172,8 @@ fn do_inspect(file: impl AsRef<Path>, force: bool) -> Result<(), String> {
     let mut count = Saturating(0);
     scan_file(reader, header.count, |entry| {
         println!(
-            "{count:count_width$}: pubkey: {:44}, hash: {:44}, lamports: {}",
+            "pubkey: {:44}, hash: {:44}, lamports: {}",
+            // "{count:count_width$}: pubkey: {:44}, hash: {:44}, lamports: {}",
             entry.pubkey.to_string(),
             entry.hash.0.to_string(),
             entry.lamports,
@@ -182,7 +185,280 @@ fn do_inspect(file: impl AsRef<Path>, force: bool) -> Result<(), String> {
     Ok(())
 }
 
-fn do_diff_files(file1: impl AsRef<Path>, file2: impl AsRef<Path>) -> Result<(), String> {
+fn def() -> CacheHashDataFileEntry {
+    use solana_program::hash::Hash;
+    CacheHashDataFileEntry {
+        hash: AccountHash(Hash::default()),
+        lamports: 0,
+        pubkey: Pubkey::default(),
+    }
+}
+
+fn do_diff_files(
+    file1: impl AsRef<Path>,
+    file2: impl AsRef<Path>,
+    new_way: bool,
+) -> Result<(u64, usize), String> {
+    let mut sum = 0;
+    if new_way {
+        use std::str::FromStr;
+        let pks = [
+            "8Axdq2mvrJgxGoGD2W4FjmGiTx9etRzGVWm2eds3Wsf",
+            "8Axnk9vGsPU4s2DSDSeLsTtWztuKTmcHJmzHchZ463V",
+        ];
+        let pks = pks
+            .iter()
+            .map(|s| Pubkey::from_str(s).unwrap())
+            .collect::<Vec<_>>();
+        let force = false; // skipping sanity checks is not supported when extracting entries
+        let (mmap, header) = mmap_file(&file1, force)
+            .map_err(|err| {
+                format!(
+                    "failed to open accounts hash cache file '{}': {err}",
+                    file1.as_ref().display(),
+                )
+            })
+            .unwrap();
+        let (mmap2, header2) = mmap_file(&file2, force)
+            .map_err(|err| {
+                format!(
+                    "failed to open accounts hash cache file '{}': {err}",
+                    file2.as_ref().display(),
+                )
+            })
+            .unwrap();
+
+        const SIZE_OF_ENTRY: usize = size_of::<CacheHashDataFileEntry>();
+        let bytes = &mmap[size_of::<CacheHashDataFileHeader>()..];
+        let bytes2 = &mmap[size_of::<CacheHashDataFileHeader>()..];
+
+        if false {
+            if header.count == header2.count && bytes.len() == bytes2.len() {
+                println!(
+                    "{:?}: count: {}, len: {} - same_non_zero {:?}",
+                    file1.as_ref().display(),
+                    header.count,
+                    bytes.len(),
+                    file2.as_ref().display(),
+                );
+            } else {
+                println!(
+                    "{:?}: count: {}, len: {}",
+                    file1.as_ref().display(),
+                    header.count,
+                    bytes.len(),
+                );
+                println!(
+                    "{:?}: count: {}, len: {}",
+                    file2.as_ref().display(),
+                    header2.count,
+                    bytes2.len(),
+                );
+            }
+        }
+
+        let mut num_entries = Saturating(0);
+        let mut num_entries2 = Saturating(0);
+        let mut i = 0;
+        let mut i2 = 0;
+        let def = def();
+        let mut lhs = &def;
+        let mut rhs = &def;
+        let capitalization1 = u64::MAX;
+        let lamports_width = (capitalization1 as f64).log10().ceil() as usize;
+
+        let mut diff = 0;
+        let mut same_non_zero = 0;
+        let mut onlyright = 0;
+        let mut onlyright2 = 0;
+        let mut onlyleft = 0;
+        let mut lefts = 0;
+        let mut rights = 0;
+        let mut lefts_zero = 0;
+        let mut rights_zero = 0;
+        let log = false;
+
+        let mut i_last = usize::MAX;
+        let mut i2_last = usize::MAX;
+
+        let mut empty0 = false;
+        let mut empty1 = false;
+        loop {
+            if i != i_last {
+                if (i + 1) * SIZE_OF_ENTRY <= bytes.len() {
+                    let next: &CacheHashDataFileEntry =
+                        bytemuck::from_bytes(&bytes[i * SIZE_OF_ENTRY..(i + 1) * SIZE_OF_ENTRY]);
+                    if (i + 2) * SIZE_OF_ENTRY <= bytes.len() {
+                        let next2: &CacheHashDataFileEntry = bytemuck::from_bytes(
+                            &bytes[(i + 1) * SIZE_OF_ENTRY..(i + 2) * SIZE_OF_ENTRY],
+                        );
+                        if next2.pubkey == next.pubkey {
+                            // next pubkey is same_non_zero, so skip this one
+                            i += 1;
+                            continue;
+                        }
+                    }
+                    lefts += 1;
+                    lhs = next;
+                    if lhs == &def {
+                        lefts_zero += 1;
+                    }
+                } else {
+                    empty0 = true;
+                }
+                i_last = i;
+            }
+            if i2 != i2_last {
+                if (i2 + 1) * SIZE_OF_ENTRY <= bytes2.len() {
+                    let next: &CacheHashDataFileEntry = bytemuck::from_bytes(
+                        &bytes2[i2 * SIZE_OF_ENTRY..(i2 + 1) * SIZE_OF_ENTRY][..],
+                    );
+                    if (i2 + 2) * SIZE_OF_ENTRY <= bytes2.len() {
+                        let next2: &CacheHashDataFileEntry = bytemuck::from_bytes(
+                            &bytes2[(i2 + 1) * SIZE_OF_ENTRY..(i2 + 2) * SIZE_OF_ENTRY][..],
+                        );
+                        if next2.pubkey == next.pubkey {
+                            // next pubkey is same_non_zero, so skip this one
+                            i2 += 1;
+                            continue;
+                        }
+                    }
+                    rhs = next;
+                    if rhs == &def {
+                        rights_zero += 1;
+                    }
+                } else {
+                    empty1 = true;
+                }
+                rights += 1;
+                i2_last = i2;
+            }
+            if empty0 && empty1 {
+                break;
+            }
+
+            if pks.contains(&lhs.pubkey) {
+                println!(
+                    "pubkey: {:44}, hash: {:44}, lamports: {:lamports_width$} {:?}",
+                    lhs.pubkey.to_string(),
+                    lhs.hash.0.to_string(),
+                    lhs.lamports,
+                    file1.as_ref().display(),
+                );
+            }
+            if pks.contains(&rhs.pubkey) {
+                println!(
+                    "pubkey: {:44}, hash: {:44}, lamports: {:lamports_width$} {:?}",
+                    rhs.pubkey.to_string(),
+                    rhs.hash.0.to_string(),
+                    rhs.lamports,
+                    file2.as_ref().display(),
+                );
+            }
+
+            if empty0 {
+                onlyright += 1;
+                onlyright2 += 1;
+                if log {
+                    println!(
+                    "pubkey: {:44}, hash: {:44}, lamports: {:lamports_width$} only in right, {:?}",
+                    rhs.pubkey.to_string(),
+                    rhs.hash.0.to_string(),
+                    rhs.lamports,
+                    file2.as_ref().display(),
+                );
+                }
+                i2 += 1;
+                continue;
+            } else if empty1 {
+                onlyleft += 1;
+                if log {
+                    println!(
+                    "pubkey: {:44}, hash: {:44}, lamports: {:lamports_width$} only in left, {:?}",
+                    lhs.pubkey.to_string(),
+                    lhs.hash.0.to_string(),
+                    lhs.lamports,
+                    file1.as_ref().display(),
+                );
+                }
+                i += 1;
+                continue;
+            }
+            if lhs != rhs {
+                if lhs.pubkey < rhs.pubkey {
+                    onlyleft += 1;
+                    if log {
+                        println!(
+                    "pubkey: {:44}, hash: {:44}, lamports: {:lamports_width$} only in left, {:?}",
+                    lhs.pubkey.to_string(),
+                    lhs.hash.0.to_string(),
+                    lhs.lamports,
+                    file1.as_ref().display(),
+                );
+                    }
+                    i += 1;
+                    continue;
+                }
+                if lhs.pubkey > rhs.pubkey {
+                    onlyright += 1;
+                    if log {
+                        println!(
+                    "pubkey: {:44}, hash: {:44}, lamports: {:lamports_width$} only in right, {:?}",
+                    rhs.pubkey.to_string(),
+                    rhs.hash.0.to_string(),
+                    rhs.lamports,
+                    file2.as_ref().display(),
+                );
+                    }
+                    i2 += 1;
+                    continue;
+                }
+                diff += 1;
+                if log {
+                    println!(
+                        "pubkey: {:44}, hash: {:44}, lamports: {:lamports_width$}, {:?}",
+                        lhs.pubkey.to_string(),
+                        lhs.hash.0.to_string(),
+                        lhs.lamports,
+                        file1.as_ref().display()
+                    );
+                    println!(
+                        "pubkey: {:44}, hash: {:44}, lamports: {:lamports_width$}, {:?}",
+                        rhs.pubkey.to_string(),
+                        rhs.hash.0.to_string(),
+                        rhs.lamports,
+                        file2.as_ref().display(),
+                    );
+                }
+            } else {
+                sum += lhs.lamports;
+                if lhs.lamports != 0 {
+                    same_non_zero += 1;
+                }
+            }
+            i += 1;
+            i2 += 1;
+        }
+
+        if onlyleft > 0 || onlyright > 0 || diff > 0 || true {
+            println!(
+            "onlyleft/r: {onlyleft}/{onlyright}, diff: {diff}, totals: left/r: {}/{}, bytes: {},{}, same_non_zero: {}({}%), lefts/rs: {},{}, lr zeros: {}/{} {:?}, {:?}, diffs: {}",
+            header.count, header2.count,
+            bytes.len(), bytes2.len(),
+            same_non_zero,
+            same_non_zero * 100 / header.count,
+            lefts,
+            rights,
+            lefts_zero,rights_zero,
+            file1.as_ref().display(),
+            file2.as_ref().display(),
+            onlyleft > 0 || onlyright > 0 || diff > 0
+        );
+        }
+
+        return Ok((sum, same_non_zero));
+    }
+
     let LatestEntriesInfo {
         latest_entries: entries1,
         capitalization: capitalization1,
@@ -282,7 +558,118 @@ fn do_diff_files(file1: impl AsRef<Path>, file2: impl AsRef<Path>) -> Result<(),
             );
             println!(
                 "{i:count_width$}: file 2: {:44}, hash: {:44}, lamports: {:lamports_width$}",
-                "(same)".to_string(),
+                "(same_non_zero)".to_string(),
+                rhs.hash.0.to_string(),
+                rhs.lamports,
+            );
+        }
+    }
+
+    Ok((0, 0))
+}
+
+fn do_diff_files_old(file1: impl AsRef<Path>, file2: impl AsRef<Path>) -> Result<(), String> {
+    let LatestEntriesInfo {
+        latest_entries: entries1,
+        capitalization: capitalization1,
+    } = extract_latest_entries_in(&file1)
+        .map_err(|err| format!("failed to extract entries from file 1: {err}"))?;
+    let LatestEntriesInfo {
+        latest_entries: entries2,
+        capitalization: capitalization2,
+    } = extract_latest_entries_in(&file2)
+        .map_err(|err| format!("failed to extract entries from file 2: {err}"))?;
+
+    let num_accounts1 = entries1.len();
+    let num_accounts2 = entries2.len();
+    let num_accounts_width = {
+        let width1 = (num_accounts1 as f64).log10().ceil() as usize;
+        let width2 = (num_accounts2 as f64).log10().ceil() as usize;
+        cmp::max(width1, width2)
+    };
+    let lamports_width = {
+        let width1 = (capitalization1 as f64).log10().ceil() as usize;
+        let width2 = (capitalization2 as f64).log10().ceil() as usize;
+        cmp::max(width1, width2)
+    };
+    println!("File 1: number of accounts: {num_accounts1:num_accounts_width$}, capitalization: {capitalization1:lamports_width$} lamports");
+    println!("File 2: number of accounts: {num_accounts2:num_accounts_width$}, capitalization: {capitalization2:lamports_width$} lamports");
+
+    // compute the differences between the files
+    let do_compute = |lhs: &HashMap<_, (_, _)>, rhs: &HashMap<_, (_, _)>| {
+        let mut unique_entries = Vec::new();
+        let mut mismatch_entries = Vec::new();
+        for (lhs_key, lhs_value) in lhs.iter() {
+            if let Some(rhs_value) = rhs.get(lhs_key) {
+                if lhs_value != rhs_value {
+                    mismatch_entries.push((
+                        CacheHashDataFileEntry {
+                            hash: lhs_value.0,
+                            lamports: lhs_value.1,
+                            pubkey: *lhs_key,
+                        },
+                        CacheHashDataFileEntry {
+                            hash: rhs_value.0,
+                            lamports: rhs_value.1,
+                            pubkey: *lhs_key,
+                        },
+                    ));
+                }
+            } else {
+                unique_entries.push(CacheHashDataFileEntry {
+                    hash: lhs_value.0,
+                    lamports: lhs_value.1,
+                    pubkey: *lhs_key,
+                });
+            }
+        }
+        unique_entries.sort_unstable_by(|a, b| a.pubkey.cmp(&b.pubkey));
+        mismatch_entries.sort_unstable_by(|a, b| a.0.pubkey.cmp(&b.0.pubkey));
+        (unique_entries, mismatch_entries)
+    };
+    let (unique_entries1, mismatch_entries) = do_compute(&entries1, &entries2);
+    let (unique_entries2, _) = do_compute(&entries2, &entries1);
+
+    // display the unique entries in each file
+    let do_print = |entries: &[CacheHashDataFileEntry]| {
+        let count_width = (entries.len() as f64).log10().ceil() as usize;
+        if entries.is_empty() {
+            println!("(none)");
+        } else {
+            let mut total_lamports = Saturating(0);
+            for (i, entry) in entries.iter().enumerate() {
+                total_lamports += entry.lamports;
+                println!(
+                    // "{i:count_width$}: pubkey: {:44}, hash: {:44}, lamports: {:lamports_width$}",
+                    "pubkey: {:44}, hash: {:44}, lamports: {:lamports_width$}",
+                    entry.pubkey.to_string(),
+                    entry.hash.0.to_string(),
+                    entry.lamports,
+                );
+            }
+            println!("total lamports: {}", total_lamports.0);
+        }
+    };
+    println!("Unique entries in file 1:");
+    do_print(&unique_entries1);
+    println!("Unique entries in file 2:");
+    do_print(&unique_entries2);
+
+    println!("Mismatch values:");
+    let count_width = (mismatch_entries.len() as f64).log10().ceil() as usize;
+    if mismatch_entries.is_empty() {
+        println!("(none)");
+    } else {
+        for (i, (lhs, rhs)) in mismatch_entries.iter().enumerate() {
+            println!(
+                "{i:count_width$}: pubkey: {:44}, hash: {:44}, lamports: {:lamports_width$}",
+                lhs.pubkey.to_string(),
+                lhs.hash.0.to_string(),
+                lhs.lamports,
+            );
+            println!(
+                "{i:count_width$}: file 2: {:44}, hash: {:44}, lamports: {:lamports_width$}",
+                "(same_non_zero)".to_string(),
                 rhs.hash.0.to_string(),
                 rhs.lamports,
             );
@@ -412,6 +799,7 @@ fn do_diff_dirs(
     do_print(&uniques2);
 
     println!("Mismatch files:");
+    use rayon::iter::ParallelIterator;
     let count_width = (mismatches.len() as f64).log10().ceil() as usize;
     if mismatches.is_empty() {
         println!("(none)");
@@ -423,17 +811,35 @@ fn do_diff_dirs(
                 file2.path.display(),
             );
         }
+        use rayon::iter::IntoParallelRefIterator;
+        let uniques1_iter = uniques1.iter().map(|c| (*c,*c)).collect::<Vec<_>>();
+        let myiter = mismatches.iter().chain(uniques1_iter.iter()).collect::<Vec<_>>();
         if then_diff_files {
-            for (file1, file2) in &mismatches {
-                println!(
-                    "Differences between '{}' and '{}':",
-                    file1.path.display(),
-                    file2.path.display(),
-                );
-                if let Err(err) = do_diff_files(&file1.path, &file2.path) {
-                    eprintln!("Error: failed to diff files: {err}");
-                }
-            }
+            let sum = myiter
+                .par_iter()
+                .map(|(file1, file2)| {
+                    /* println!(
+                        "Differences between '{}' and '{}':",
+                        file1.path.display(),
+                        file2.path.display(),
+                    ); */
+                    let res = do_diff_files(&file1.path, &file2.path, true);
+                    if let Err(err) = res {
+                        eprintln!("Error: failed to diff files: {err}");
+                        (0, 0)
+                    } else {
+                        res.unwrap()
+                    }
+                })
+                .collect::<Vec<_>>();
+            let mut cap = 0;
+            let mut count = 0;
+            sum.iter().for_each(|(c, n)| {
+                cap += c;
+                count += n;
+            });
+
+            println!("cap: {}, accounts: {}", cap, count);
         }
     }
 
