@@ -194,6 +194,280 @@ fn def() -> CacheHashDataFileEntry {
     }
 }
 
+fn do_full(
+    left_maps: &[&[u8]],
+    right_maps: &[&[u8]],
+    binner: &PubkeyBinCalculator24,
+    bin: usize,
+) -> (u64, usize) {
+    let lens = [left_maps.len(), right_maps.len()];
+    let vecs = left_maps.len().max(right_maps.len());
+    let mut last_idxs = vec![vec![usize::MAX; vecs]; 2];
+    let mut idxs = vec![vec![0; vecs]; 2];
+    let def = def();
+    let mut vals = vec![vec![&def; vecs]; 2];
+    let mut lhs = &def;
+    let mut rhs = &def;
+    let mut advanced = false;
+    const SIZE_OF_ENTRY: usize = size_of::<CacheHashDataFileEntry>();
+    let mut done = vec![vec![false; vecs]; 2];
+
+    let mut diff = 0;
+    let mut same_non_zero = 0;
+    let mut onlyright = 0;
+    let mut onlyright2 = 0;
+    let mut onlyleft = 0;
+    let mut lefts = 0;
+    let mut rights = 0;
+    let mut lefts_zero = 0;
+    let mut rights_zero = 0;
+    let mut sum = 0;
+    let mut pk_last = None;
+    use std::str::FromStr;
+    let pks = [
+        "6VXb718iF8zYwhic7PeSaZ25GS9wFHyRJZ3c6xtFR6yi",
+    ];
+    let pks = pks
+        .iter()
+        .map(|s| Pubkey::from_str(s).unwrap())
+        .collect::<Vec<_>>();
+    'outer: loop {
+        // load everything into vals
+        for left_right in 0..2 {
+            for outer_i in 0..vecs {
+                let i = idxs[left_right][outer_i];
+                if last_idxs[left_right][outer_i] == i {
+                    // this idx didn't change
+                    continue;
+                }
+                if done[left_right][outer_i] {
+                    last_idxs[left_right][outer_i] = i;
+                    continue;
+                }
+                if lens[left_right] <= outer_i {
+                    // this map doesn't exist
+                    done[left_right][outer_i] = true;
+                    continue;
+                }
+                let bytes = if left_right == 0 {
+                    left_maps[outer_i]
+                } else {
+                    right_maps[outer_i]
+                };
+                if (i + 1) * SIZE_OF_ENTRY <= bytes.len() {
+                    let next: &CacheHashDataFileEntry =
+                        bytemuck::from_bytes(&bytes[i * SIZE_OF_ENTRY..(i + 1) * SIZE_OF_ENTRY]);
+                    if pks.contains(&next.pubkey) {
+                        println!("{:?}, {:?}, len: {}, size: {}, calc: {}", (left_right, outer_i, i), next, bytes.len(), SIZE_OF_ENTRY, (i + 1) * SIZE_OF_ENTRY);
+                    }
+                    if (i + 2) * SIZE_OF_ENTRY <= bytes.len() {
+                        let next2: &CacheHashDataFileEntry = bytemuck::from_bytes(
+                            &bytes[(i + 1) * SIZE_OF_ENTRY..(i + 2) * SIZE_OF_ENTRY],
+                        );
+                        if next2.pubkey == next.pubkey {
+                                    // next pubkey is same_non_zero, so skip this one
+                            idxs[left_right][outer_i] += 1;
+                            continue 'outer;
+                        }
+                    }
+                    let this_bin = binner.bin_from_pubkey(&next.pubkey);
+                    if this_bin < bin {
+                        loop {
+                            idxs[left_right][outer_i] += 1;
+                            let i = idxs[left_right][outer_i];
+                            if (i + 1) * SIZE_OF_ENTRY <= bytes.len() {
+                                let next: &CacheHashDataFileEntry = bytemuck::from_bytes(
+                                    &bytes[i * SIZE_OF_ENTRY..(i + 1) * SIZE_OF_ENTRY],
+                                );
+                                let this_bin = binner.bin_from_pubkey(&next.pubkey);
+                                if this_bin >= bin {
+                                    continue 'outer;
+                                }
+                            } else {
+                                done[left_right][outer_i] = true;
+                                continue 'outer;
+                            }
+                        }
+                    }
+                    let this_bin = binner.bin_from_pubkey(&next.pubkey);
+                    if this_bin > bin {
+                        done[left_right][outer_i] = true;
+                        continue 'outer;
+                    }
+                    vals[left_right][outer_i] = next;
+                    last_idxs[left_right][outer_i] = i;
+                } else {
+                    done[left_right][outer_i] = true;
+                }
+            }
+        }
+        let mut lowest_pk_idx = [None; 2];
+        for left_right in 0..2 {
+            let mut lowest_i = None;
+            let mut lowest: Option<&Pubkey> = None;
+            for outer_i in 0..vecs {
+                if done[left_right][outer_i] {
+                    continue;
+                }
+                let current = vals[left_right][outer_i];
+                if let Some(lowest) = lowest.as_ref() {
+                    if &current.pubkey <= lowest {
+                        // this one becomes the latest, lowest pubkey
+                    } else {
+                        continue; // this outer_i is not the lowest pubkey
+                    }
+                }
+                lowest = Some(&current.pubkey);
+                lowest_i = Some(outer_i);
+            }
+
+            if lowest_i.is_some() {
+                for outer_i in 0..*lowest_i.as_ref().unwrap() {
+                    if done[left_right][outer_i] {
+                        continue;
+                    }
+                    let current = vals[left_right][outer_i];
+                    if Some(&current.pubkey) == lowest {
+                        // this is an earlier version of the lowest account, advance it
+                        idxs[left_right][outer_i] += 1;
+                    }
+                }
+            }
+
+            lowest_pk_idx[left_right] = lowest_i;
+        }
+        if lowest_pk_idx[0].is_none() && lowest_pk_idx[0].is_none() {
+            break;
+        }
+        let capitalization1 = u64::MAX;
+        let lamports_width = (capitalization1 as f64).log10().ceil() as usize;
+        let log = true;
+
+        if lowest_pk_idx[0].is_none() {
+            let left_right = 1;
+            let lowest_pk_idx = lowest_pk_idx[left_right].unwrap();
+            let rhs = vals[left_right][lowest_pk_idx];
+            onlyright += 1;
+            if log {
+                println!(
+                    "pubkey: {:44}, hash: {:44}, lamports: {:lamports_width$} only in right",
+                    rhs.pubkey.to_string(),
+                    rhs.hash.0.to_string(),
+                    rhs.lamports,
+                );
+            }
+            idxs[left_right][lowest_pk_idx] += 1;
+            continue;
+        }
+        if lowest_pk_idx[1].is_none() {
+            let left_right = 0;
+            let lowest_pk_idx = lowest_pk_idx[left_right].unwrap();
+            let rhs = vals[left_right][lowest_pk_idx];
+            onlyleft += 1;
+            if log {
+                println!(
+                    "pubkey: {:44}, hash: {:44}, lamports: {:lamports_width$} only in left",
+                    rhs.pubkey.to_string(),
+                    rhs.hash.0.to_string(),
+                    rhs.lamports,
+                );
+            }
+            idxs[left_right][lowest_pk_idx] += 1;
+            continue;
+        }
+        let lhs = vals[0][lowest_pk_idx[0].unwrap()];
+        let rhs = vals[1][lowest_pk_idx[1].unwrap()];
+
+        if lhs != rhs {
+            if lhs.pubkey < rhs.pubkey {
+                let left_right = 0;
+                let lowest_pk_idx = lowest_pk_idx[left_right].unwrap();
+                onlyleft += 1;
+                if log {
+                    println!(
+                        "pubkey: {:44}, hash: {:44}, lamports: {:lamports_width$} only in left",
+                        lhs.pubkey.to_string(),
+                        lhs.hash.0.to_string(),
+                        lhs.lamports,
+                    );
+                }
+                idxs[0][lowest_pk_idx] += 1;
+                continue;
+            }
+            if lhs.pubkey > rhs.pubkey {
+                let left_right = 1;
+                let lowest_pk_idx = lowest_pk_idx[left_right].unwrap();
+                onlyright += 1;
+                if log {
+                    println!(
+                        "pubkey: {:44}, hash: {:44}, lamports: {:lamports_width$} only in right",
+                        rhs.pubkey.to_string(),
+                        rhs.hash.0.to_string(),
+                        rhs.lamports,
+                    );
+                }
+                idxs[1][lowest_pk_idx] += 1;
+                continue;
+            }
+            diff += 1;
+            if log {
+                println!(
+                    "pubkey: {:44}, hash: {:44}, lamports: {:lamports_width$}, left",
+                    lhs.pubkey.to_string(),
+                    lhs.hash.0.to_string(),
+                    lhs.lamports,
+                );
+                println!(
+                    "pubkey: {:44}, hash: {:44}, lamports: {:lamports_width$}, right",
+                    rhs.pubkey.to_string(),
+                    rhs.hash.0.to_string(),
+                    rhs.lamports,
+                );
+            }
+        } else {
+            if same_non_zero % 1000000 == 0 {
+                // println!("accounts: {same_non_zero}, cap: {sum}");
+            }
+            if false {
+                println!(
+                    "{bin}, pubkey: {:44}, hash: {:44}, lamports: {:lamports_width$}",
+                    rhs.pubkey.to_string(),
+                    rhs.hash.0.to_string(),
+                    rhs.lamports,
+                );
+            }
+            let sum_old = sum;
+            sum += lhs.lamports;
+            if sum < sum_old {
+                panic!("{}, {}, {}", lhs.lamports, sum, sum_old);
+            }
+            if lhs.lamports != 0 {
+                same_non_zero += 1;
+            }
+        }
+        let this_bin = binner.bin_from_pubkey(&lhs.pubkey);
+        assert_eq!(this_bin, bin);
+        assert_ne!(pk_last, Some(&lhs.pubkey), "{lhs:?}");
+        pk_last = Some(&lhs.pubkey);
+        // advance both
+        (0..2).for_each(|left_right| {
+            idxs[left_right][lowest_pk_idx[left_right].unwrap()] += 1;
+        });
+    }
+
+    if onlyleft > 0 || onlyright > 0 || diff > 0 || true {
+        println!(
+        "bin: {bin}, onlyleft/r: {onlyleft}/{onlyright}, diff: {diff}, same_non_zero: {}, lefts/rs: {},{}, lr zeros: {}/{} diffs: {}",
+        same_non_zero,
+        lefts,
+        rights,
+        lefts_zero,rights_zero,
+        onlyleft > 0 || onlyright > 0 || diff > 0
+    );
+    }
+    (sum, same_non_zero)
+}
+
 fn do_diff_files(
     file1: impl AsRef<Path>,
     file2: impl AsRef<Path>,
@@ -203,8 +477,7 @@ fn do_diff_files(
     if new_way {
         use std::str::FromStr;
         let pks = [
-            "8Axdq2mvrJgxGoGD2W4FjmGiTx9etRzGVWm2eds3Wsf",
-            "8Axnk9vGsPU4s2DSDSeLsTtWztuKTmcHJmzHchZ463V",
+            "6VXb718iF8zYwhic7PeSaZ25GS9wFHyRJZ3c6xtFR6yi",
         ];
         let pks = pks
             .iter()
@@ -812,34 +1085,184 @@ fn do_diff_dirs(
             );
         }
         use rayon::iter::IntoParallelRefIterator;
-        let uniques1_iter = uniques1.iter().map(|c| (*c,*c)).collect::<Vec<_>>();
-        let myiter = mismatches.iter().chain(uniques1_iter.iter()).collect::<Vec<_>>();
-        if then_diff_files {
-            let sum = myiter
-                .par_iter()
-                .map(|(file1, file2)| {
-                    /* println!(
-                        "Differences between '{}' and '{}':",
-                        file1.path.display(),
-                        file2.path.display(),
-                    ); */
-                    let res = do_diff_files(&file1.path, &file2.path, true);
-                    if let Err(err) = res {
-                        eprintln!("Error: failed to diff files: {err}");
-                        (0, 0)
-                    } else {
-                        res.unwrap()
-                    }
-                })
-                .collect::<Vec<_>>();
-            let mut cap = 0;
-            let mut count = 0;
-            sum.iter().for_each(|(c, n)| {
-                cap += c;
-                count += n;
-            });
 
-            println!("cap: {}, accounts: {}", cap, count);
+        if then_diff_files {
+            if true {
+                let mut left_maps = mismatches
+                    .iter()
+                    .map(|(a, b)| *a)
+                    .chain(uniques1.into_iter())
+                    .collect::<Vec<_>>();
+                let mut right_maps = mismatches
+                    .iter()
+                    .map(|(a, b)| *b)
+                    .chain(uniques2.into_iter())
+                    .collect::<Vec<_>>();
+                left_maps.sort_by(|a, b| {
+                    let a = a
+                        .path
+                        .file_name()
+                        .unwrap()
+                        .to_str()
+                        .unwrap()
+                        .split(".")
+                        .collect::<Vec<_>>()
+                        .first()
+                        .unwrap()
+                        .parse::<usize>()
+                        .unwrap();
+                    let b = b
+                        .path
+                        .file_name()
+                        .unwrap()
+                        .to_str()
+                        .unwrap()
+                        .split(".")
+                        .collect::<Vec<_>>()
+                        .first()
+                        .unwrap()
+                        .parse::<usize>()
+                        .unwrap();
+                    a.cmp(&b)
+                });
+                right_maps.sort_by(|a, b| {
+                    let a = a
+                        .path
+                        .file_name()
+                        .unwrap()
+                        .to_str()
+                        .unwrap()
+                        .split(".")
+                        .collect::<Vec<_>>()
+                        .first()
+                        .unwrap()
+                        .parse::<usize>()
+                        .unwrap();
+                    let b = b
+                        .path
+                        .file_name()
+                        .unwrap()
+                        .to_str()
+                        .unwrap()
+                        .split(".")
+                        .collect::<Vec<_>>()
+                        .first()
+                        .unwrap()
+                        .parse::<usize>()
+                        .unwrap();
+                    a.cmp(&b)
+                });
+                let force = false; // skipping sanity checks is not supported when extracting entries
+
+                let left_maps = left_maps
+                    .iter()
+                    .map(|p| {
+                        println!("{}", p.path.file_name().unwrap().to_str().unwrap());
+                        mmap_file(&p.path, force)
+                            .map_err(|err| {
+                                format!(
+                                    "failed to open accounts hash cache file '{}': {err}",
+                                    p.path.display(),
+                                )
+                            })
+                            .unwrap()
+                    })
+                    .collect::<Vec<_>>();
+                let right_maps = right_maps
+                    .iter()
+                    .map(|p| {
+                        mmap_file(&p.path, force)
+                            .map_err(|err| {
+                                format!(
+                                    "failed to open accounts hash cache file '{}': {err}",
+                                    p.path.display(),
+                                )
+                            })
+                            .unwrap()
+                    })
+                    .collect::<Vec<_>>();
+                let left_maps2 = left_maps
+                    .iter()
+                    .map(|(mmap, header)| {
+                        const SIZE_OF_ENTRY: usize = size_of::<CacheHashDataFileHeader>();
+
+                        &mmap[SIZE_OF_ENTRY..][..header.count * size_of::<CacheHashDataFileEntry>()]
+                    })
+                    .collect::<Vec<_>>();
+                let right_maps2 = right_maps
+                    .iter()
+                    .map(|(mmap, header)| {
+                        const SIZE_OF_ENTRY: usize = size_of::<CacheHashDataFileHeader>();
+
+                        &mmap[SIZE_OF_ENTRY..][..header.count * size_of::<CacheHashDataFileEntry>()]
+                    })
+                    .collect::<Vec<_>>();
+
+                if true {
+                    use rayon::iter::IntoParallelIterator;
+                    let bins = 64 * 16 * 16 * 16 * 16;// 1336914,1624074240,1823
+                    let bin_range = (1336914 * 1)..(1336915*1);
+                    let binner = PubkeyBinCalculator24::new(bins);
+                    let sum = bin_range.clone()
+                        .into_par_iter()
+                        .map(|bin| {
+                            /* println!(
+                                "Differences between '{}' and '{}':",
+                                file1.path.display(),
+                                file2.path.display(),
+                            ); */
+                            do_full(&left_maps2, &right_maps2, &binner, bin)
+                        })
+                        .collect::<Vec<_>>();
+                    sum.iter().enumerate().for_each(|(i, (cap, count))| {
+                        println!("{},{cap},{count}", i + bin_range.start);
+                    });
+                    let mut cap = 0;
+                    let mut count = 0;
+                    sum.iter().for_each(|(c, n)| {
+                        cap += c;
+                        count += n;
+                    });
+
+                    println!("cap: {}, accounts: {}", cap, count);
+                } else {
+                    let bins = 1;
+                    let binner = PubkeyBinCalculator24::new(bins);
+                    let (cap, count) = do_full(&left_maps2, &right_maps2, &binner, bins);
+                    println!("cap: {}, accounts: {}", cap, count);
+                }
+            } else {
+                let uniques1_iter = uniques1.iter().map(|c| (*c, *c)).collect::<Vec<_>>();
+                let myiter = mismatches
+                    .iter()
+                    .chain(uniques1_iter.iter())
+                    .collect::<Vec<_>>();
+                let sum = myiter
+                    .par_iter()
+                    .map(|(file1, file2)| {
+                        /* println!(
+                            "Differences between '{}' and '{}':",
+                            file1.path.display(),
+                            file2.path.display(),
+                        ); */
+                        let res = do_diff_files(&file1.path, &file2.path, true);
+                        if let Err(err) = res {
+                            eprintln!("Error: failed to diff files: {err}");
+                            (0, 0)
+                        } else {
+                            res.unwrap()
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                let mut cap = 0;
+                let mut count = 0;
+                sum.iter().for_each(|(c, n)| {
+                    cap += c;
+                    count += n;
+                });
+
+                println!("cap: {}, accounts: {}", cap, count);
+            }
         }
     }
 
