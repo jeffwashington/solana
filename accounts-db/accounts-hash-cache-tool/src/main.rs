@@ -1200,8 +1200,8 @@ fn do_diff_dirs(
 
                 if true {
                     use rayon::iter::IntoParallelIterator;
-                    let bins = 64 * 16 * 16 * 16 * 16;// 1336914,1624074240,1823
-                    let bin_range = (1336914 * 1)..(1336915*1);
+                    let bins = 64;// 1336914,1624074240,1823
+                    let bin_range = (0)..(bins);
                     let binner = PubkeyBinCalculator24::new(bins);
                     let sum = bin_range.clone()
                         .into_par_iter()

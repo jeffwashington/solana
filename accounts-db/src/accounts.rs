@@ -622,12 +622,39 @@ impl Accounts {
         // skip adding dummy account for vote tx
         let create_dummy_accounts = true;
 
+        use std::str::FromStr;
+        let pksinteresting = ["6VXb718iF8zYwhic7PeSaZ25GS9wFHyRJZ3c6xtFR6yi",
+        "6VXb7LyYs2CvpErM2nF4hXvH1Lw9sa7JZWdDtAd3uwka",
+        "6VXb7SnBkwguSnE4ooPzCSK6R8CT2JxaX8bVwoHySb1y",
+        "6VXb9U3zHtNWSSaziKFHXuWnLydFeAHQYxwXhkV42h29",
+        "6VXbAEfzDpthaRBVNKZtFQy6LnZQqCCF8zRjaXUCyUNu",
+        "6VXbDPb9W6rvoVXMtEEKHr9PraD3Jk7EC31VnshnYamQ",
+        "6VXbHZtJnkk8z3GjnFv7oe6iJcU8UVAqa4qfn9JJtJF1",
+        "6VXbJcau1hipG7eLQkMNzmYM6fgEhkqNgqAkc6ppM9Dx",
+        "6VXbJcfT4A2UXk16LuEZK2kA3fQtgnGFxbCc4FGaQ8f4",
+        "6VXbWwAbBuuVYw7RdyXLhKcRvRuuQXGYj14U1EmXCWPP",
+        "6VXbXf6rJ5CxUDUV96BSYgEKNTMpwTbaiqsvkbpCtoGj",
+        "6VXbYUKt8KpNqUG1PzscUVG8fZGzgbb3nfXs3E4LcSof",
+        "6VXba7TAcvFairDAjfqNxjDysZ5wA8BB7hpfETPbqZZG",
+        "6VXbak6BJRWgrbNU1AZXYKYccKxRuEieJFhUXA4T9k2J",
+        "6VXbfXyhEfb7Lwi6R6sAtjEQfS51547JoW16ZLKW8dDF",
+        "6VXbgEkqSsc7KAJsrvfAk87ywBkJjutBTYj72CZPr6vF",
+        "6VXbgkJVxBUPNV9cK5Arrcoh3SsELnPTKRhmB7jDNq2a",
+        "6VXbiXpUoUD7JjozXhiQkTo5ydxXqThzQoyQcRLjYVVF",
+        "6VXbiwa5uWvSDCNn7Cz7bx7rWZQBq3fLCaqEYmW7nRGV",
+        "6VXbjYUeZ1qjeLvx5BvoGbJmrQTe1ahKnRRKLr5hBJBx",
+        "6VXbk5ZYHQdraXbDZ5LimkL2g1qQL2qUhBHBP9inhByS",];
+        let pksinteresting = pksinteresting.iter().map(|s| Pubkey::from_str(s).unwrap()).collect::<Vec<_>>();
+
         if create_dummy_accounts {
             let mut additional_lamports = 0;
             let (_, us) = measure_us!({
                 for i in 0..accounts.len() {
                     self.accounts_db.maybe_throttle_add();
                     let mut pk = accounts.account(i, |a| *a.pubkey());
+                    if pksinteresting.contains(&pk) {
+                        log::error!("considering: {pk}, {}", accounts.target_slot())
+                    }
                     if KNOWNIDS.contains(&pk) {
                         continue;
                     }
@@ -676,6 +703,10 @@ impl Accounts {
                             .accounts_db
                             .load_with_fixed_root(ancestors, k)
                             .is_none();
+                        if pksinteresting.contains(&k) {
+                            log::error!("retain: {k}, {}: {retain}", accounts.target_slot())
+                        }
+    
                         if retain {
                             additional_lamports_atomic
                                 .fetch_add(acct.lamports(), Ordering::Relaxed);

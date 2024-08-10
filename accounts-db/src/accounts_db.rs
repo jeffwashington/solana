@@ -56,7 +56,11 @@ use {
         ancient_append_vecs::{
             get_ancient_append_vec_capacity, is_ancient, AccountsToStore, StorageSelector,
         },
-        append_vec::{aligned_stored_size, APPEND_VEC_MMAPPED_FILES_DIRTY, APPEND_VEC_MMAPPED_FILES_OPEN, APPEND_VEC_MMAPPED_FILES_OPENED,APPEND_VEC_MMAPPED_FILES_CLOSED, STORE_META_OVERHEAD, APPEND_VEC_OPEN_AS_FILE_IO},
+        append_vec::{
+            aligned_stored_size, APPEND_VEC_MMAPPED_FILES_CLOSED, APPEND_VEC_MMAPPED_FILES_DIRTY,
+            APPEND_VEC_MMAPPED_FILES_OPEN, APPEND_VEC_MMAPPED_FILES_OPENED,
+            APPEND_VEC_OPEN_AS_FILE_IO, STORE_META_OVERHEAD,
+        },
         cache_hash_data::{CacheHashData, DeletionPolicy as CacheHashDeletionPolicy},
         contains::Contains,
         epoch_accounts_hash::EpochAccountsHashManager,
@@ -584,7 +588,6 @@ pub struct AccountsAddRootTiming {
 }
 
 const ANCIENT_APPEND_VEC_DEFAULT_OFFSET: Option<i64> = Some(-10_000);
-
 
 #[derive(Debug, Default, Clone)]
 pub struct AccountsDbConfig {
@@ -1370,7 +1373,7 @@ type AccountInfoAccountsIndex = AccountsIndex<AccountInfo, AccountInfo>;
 // This structure handles the load/store of the accounts
 #[derive(Debug)]
 pub struct AccountsDb {
-    pub dummies: DashMap<Pubkey, Vec<Pubkey>>,    
+    pub dummies: DashMap<Pubkey, Vec<Pubkey>>,
     /// Keeps tracks of index into AppendVec on a per slot basis
     pub accounts_index: AccountInfoAccountsIndex,
 
@@ -1656,10 +1659,10 @@ impl PurgeStats {
                     self.num_keys_removed_from_index.swap(0, Ordering::Relaxed) as i64,
                     i64
                 ),
-
                 (
                     "remove_dead_slots_metadata_us",
-                    self.remove_dead_slots_metadata_us.swap(0, Ordering::Relaxed) as i64,
+                    self.remove_dead_slots_metadata_us
+                        .swap(0, Ordering::Relaxed) as i64,
                     i64
                 ),
             );
@@ -3007,7 +3010,10 @@ impl AccountsDb {
 
     fn max_clean_root(&self, proposed_clean_root: Option<Slot>) -> Option<Slot> {
         if self.accounts_index.min_ongoing_scan_root().is_some() {
-            log::error!("max_clean_root is: {:?}", self.accounts_index.min_ongoing_scan_root());
+            log::error!(
+                "max_clean_root is: {:?}",
+                self.accounts_index.min_ongoing_scan_root()
+            );
         }
         match (
             self.accounts_index.min_ongoing_scan_root(),
@@ -3118,16 +3124,21 @@ impl AccountsDb {
         let mut min_dirty_slot = None::<u64>;
         let previous_len = self.dirty_stores.len();
         let (_, us) = measure_us!({
-        self.dirty_stores.retain(|slot, store| {
-            if *slot > max_slot_inclusive {
-                true
-            } else {
-                min_dirty_slot = min_dirty_slot.map(|min| min.min(*slot)).or(Some(*slot));
-                dirty_stores.push((*slot, store.clone()));
-                false
-            }
-        });});
-        error!("jwash: construct_candidate_clean_keys: dirty stores: {}, prev len: {}, us: {us}", dirty_stores.len(), previous_len);
+            self.dirty_stores.retain(|slot, store| {
+                if *slot > max_slot_inclusive {
+                    true
+                } else {
+                    min_dirty_slot = min_dirty_slot.map(|min| min.min(*slot)).or(Some(*slot));
+                    dirty_stores.push((*slot, store.clone()));
+                    false
+                }
+            });
+        });
+        error!(
+            "jwash: construct_candidate_clean_keys: dirty stores: {}, prev len: {}, us: {us}",
+            dirty_stores.len(),
+            previous_len
+        );
         let dirty_stores_len = dirty_stores.len();
         let num_bins = self.accounts_index.bins();
         let candidates: Box<_> =
@@ -3165,21 +3176,19 @@ impl AccountsDb {
                 .unwrap_or(&max_slot_inclusive.saturating_add(1));
         };
         let (_, us) = measure_us!({
-        if is_startup {
-            // Free to consume all the cores during startup
-            dirty_store_routine();
-        } else {
-            self.thread_pool_clean.install(|| {
+            if is_startup {
+                // Free to consume all the cores during startup
                 dirty_store_routine();
-            });
-        }});
+            } else {
+                self.thread_pool_clean.install(|| {
+                    dirty_store_routine();
+                });
+            }
+        });
         timings.dirty_pubkeys_count = Self::count_pubkeys(&candidates);
         error!(
             "jwash: dirty_stores.len: {} pubkeys.len: {}, us: {}, startup: {}",
-            dirty_stores_len,
-            timings.dirty_pubkeys_count,
-            us,
-            is_startup,
+            dirty_stores_len, timings.dirty_pubkeys_count, us, is_startup,
         );
         dirty_store_processing_time.stop();
         timings.dirty_store_processing_us += dirty_store_processing_time.as_us();
@@ -3229,9 +3238,20 @@ impl AccountsDb {
     pub fn maybe_throttle_add(&self) {
         let now = solana_sdk::timing::timestamp();
         loop {
-            let accounts = self.accounts_index.account_maps.first().unwrap().stats().count_in_mem.load(Ordering::Relaxed);
-            if accounts > 100_000_000 || self
-            .epoch_accounts_hash_manager.waiting.load(Ordering::Relaxed) {
+            let accounts = self
+                .accounts_index
+                .account_maps
+                .first()
+                .unwrap()
+                .stats()
+                .count_in_mem
+                .load(Ordering::Relaxed);
+            if accounts > 100_000_000
+                || self
+                    .epoch_accounts_hash_manager
+                    .waiting
+                    .load(Ordering::Relaxed)
+            {
                 sleep(Duration::from_millis(10));
                 if accounts > 200_000_000 {
                     // stall while we are bigger than 200M accounts here
@@ -3490,7 +3510,7 @@ impl AccountsDb {
                 epoch_schedule,
             );
 
-            log::error!("clean_accounts: {}", line!());
+        log::error!("clean_accounts: {}", line!());
         self.do_reset_uncleaned_roots(max_clean_root_inclusive);
         clean_old_rooted.stop();
 
@@ -3974,6 +3994,30 @@ impl AccountsDb {
         let mut unrefed_pubkeys = Vec::with_capacity(count);
         let mut zero_lamport_single_ref_pubkeys = Vec::with_capacity(count);
 
+        use std::str::FromStr;
+        let pksinteresting = ["6VXb718iF8zYwhic7PeSaZ25GS9wFHyRJZ3c6xtFR6yi",
+        "6VXb7LyYs2CvpErM2nF4hXvH1Lw9sa7JZWdDtAd3uwka",
+        "6VXb7SnBkwguSnE4ooPzCSK6R8CT2JxaX8bVwoHySb1y",
+        "6VXb9U3zHtNWSSaziKFHXuWnLydFeAHQYxwXhkV42h29",
+        "6VXbAEfzDpthaRBVNKZtFQy6LnZQqCCF8zRjaXUCyUNu",
+        "6VXbDPb9W6rvoVXMtEEKHr9PraD3Jk7EC31VnshnYamQ",
+        "6VXbHZtJnkk8z3GjnFv7oe6iJcU8UVAqa4qfn9JJtJF1",
+        "6VXbJcau1hipG7eLQkMNzmYM6fgEhkqNgqAkc6ppM9Dx",
+        "6VXbJcfT4A2UXk16LuEZK2kA3fQtgnGFxbCc4FGaQ8f4",
+        "6VXbWwAbBuuVYw7RdyXLhKcRvRuuQXGYj14U1EmXCWPP",
+        "6VXbXf6rJ5CxUDUV96BSYgEKNTMpwTbaiqsvkbpCtoGj",
+        "6VXbYUKt8KpNqUG1PzscUVG8fZGzgbb3nfXs3E4LcSof",
+        "6VXba7TAcvFairDAjfqNxjDysZ5wA8BB7hpfETPbqZZG",
+        "6VXbak6BJRWgrbNU1AZXYKYccKxRuEieJFhUXA4T9k2J",
+        "6VXbfXyhEfb7Lwi6R6sAtjEQfS51547JoW16ZLKW8dDF",
+        "6VXbgEkqSsc7KAJsrvfAk87ywBkJjutBTYj72CZPr6vF",
+        "6VXbgkJVxBUPNV9cK5Arrcoh3SsELnPTKRhmB7jDNq2a",
+        "6VXbiXpUoUD7JjozXhiQkTo5ydxXqThzQoyQcRLjYVVF",
+        "6VXbiwa5uWvSDCNn7Cz7bx7rWZQBq3fLCaqEYmW7nRGV",
+        "6VXbjYUeZ1qjeLvx5BvoGbJmrQTe1ahKnRRKLr5hBJBx",
+        "6VXbk5ZYHQdraXbDZ5LimkL2g1qQL2qUhBHBP9inhByS",];
+        let pksinteresting = pksinteresting.iter().map(|s| Pubkey::from_str(s).unwrap()).collect::<Vec<_>>();
+
         let mut alive = 0;
         let mut dead = 0;
         let mut index = 0;
@@ -3990,6 +4034,9 @@ impl AccountsDb {
                         // if the accounts index contains an entry at this slot, then the append vec we're asking about contains this item and thus, it is alive at this slot
                         *slot == slot_to_shrink
                     });
+                    if pksinteresting.contains(pubkey) {
+                        log::error!("shrinking found {}, {}, alive: {alive}, {slots_refs:?}", pubkey, slot_to_shrink);
+                    }
                     if !is_alive {
                         // This pubkey was found in the storage, but no longer exists in the index.
                         // It would have had a ref to the storage from the initial store, but it will
@@ -4026,7 +4073,7 @@ impl AccountsDb {
                 result
             },
             None,
-            false,//true,
+            false, //true,
         );
         // assert_eq!(index, std::cmp::min(accounts.len(), count));
         stats.alive_accounts.fetch_add(alive, Ordering::Relaxed);
@@ -6245,8 +6292,11 @@ impl AccountsDb {
             .get_slot_storage_entry_shrinking_in_progress_ok(purged_slot)
             .is_none());
         let num_purged_keys = pubkey_to_slot_set.len();
-        let ((reclaims, _), purge_keys_us) = measure_us!(self.purge_keys_exact(pubkey_to_slot_set.iter()));
-        self.external_purge_slots_stats.purge_keys_exact_us.fetch_add(purge_keys_us, Ordering::Relaxed);
+        let ((reclaims, _), purge_keys_us) =
+            measure_us!(self.purge_keys_exact(pubkey_to_slot_set.iter()));
+        self.external_purge_slots_stats
+            .purge_keys_exact_us
+            .fetch_add(purge_keys_us, Ordering::Relaxed);
         assert_eq!(reclaims.len(), num_purged_keys);
         if is_dead {
             let (_, us) = measure_us!(self.remove_dead_slots_metadata(
@@ -6255,7 +6305,9 @@ impl AccountsDb {
                 None,
                 pubkeys_removed_from_accounts_index,
             ));
-            self.external_purge_slots_stats.remove_dead_slots_metadata_us.fetch_add(us, Ordering::Relaxed);
+            self.external_purge_slots_stats
+                .remove_dead_slots_metadata_us
+                .fetch_add(us, Ordering::Relaxed);
         }
     }
 
@@ -6730,22 +6782,10 @@ impl AccountsDb {
         if requested_flush_root.is_some() {
             datapoint_info!(
                 "force_flush",
-                (
-                    "requested_flush_root",
-                    requested_flush_root.unwrap(),
-                    i64
-                ),
+                ("requested_flush_root", requested_flush_root.unwrap(), i64),
             );
-        }
-        else {
-            datapoint_info!(
-                "force_flush",
-                (
-                    "requested_flush_root_none",
-                    1,
-                    i64
-                ),
-            );
+        } else {
+            datapoint_info!("force_flush", ("requested_flush_root_none", 1, i64),);
         }
 
         // Always flush up to `requested_flush_root`, which is necessary for things like snapshotting.
@@ -6985,6 +7025,31 @@ impl AccountsDb {
         transactions: Option<&[Option<&'a SanitizedTransaction>]>,
     ) -> Vec<AccountInfo> {
         let mut calc_stored_meta_time = Measure::start("calc_stored_meta");
+        
+        use std::str::FromStr;
+        let pks = ["6VXb718iF8zYwhic7PeSaZ25GS9wFHyRJZ3c6xtFR6yi",
+        "6VXb7LyYs2CvpErM2nF4hXvH1Lw9sa7JZWdDtAd3uwka",
+        "6VXb7SnBkwguSnE4ooPzCSK6R8CT2JxaX8bVwoHySb1y",
+        "6VXb9U3zHtNWSSaziKFHXuWnLydFeAHQYxwXhkV42h29",
+        "6VXbAEfzDpthaRBVNKZtFQy6LnZQqCCF8zRjaXUCyUNu",
+        "6VXbDPb9W6rvoVXMtEEKHr9PraD3Jk7EC31VnshnYamQ",
+        "6VXbHZtJnkk8z3GjnFv7oe6iJcU8UVAqa4qfn9JJtJF1",
+        "6VXbJcau1hipG7eLQkMNzmYM6fgEhkqNgqAkc6ppM9Dx",
+        "6VXbJcfT4A2UXk16LuEZK2kA3fQtgnGFxbCc4FGaQ8f4",
+        "6VXbWwAbBuuVYw7RdyXLhKcRvRuuQXGYj14U1EmXCWPP",
+        "6VXbXf6rJ5CxUDUV96BSYgEKNTMpwTbaiqsvkbpCtoGj",
+        "6VXbYUKt8KpNqUG1PzscUVG8fZGzgbb3nfXs3E4LcSof",
+        "6VXba7TAcvFairDAjfqNxjDysZ5wA8BB7hpfETPbqZZG",
+        "6VXbak6BJRWgrbNU1AZXYKYccKxRuEieJFhUXA4T9k2J",
+        "6VXbfXyhEfb7Lwi6R6sAtjEQfS51547JoW16ZLKW8dDF",
+        "6VXbgEkqSsc7KAJsrvfAk87ywBkJjutBTYj72CZPr6vF",
+        "6VXbgkJVxBUPNV9cK5Arrcoh3SsELnPTKRhmB7jDNq2a",
+        "6VXbiXpUoUD7JjozXhiQkTo5ydxXqThzQoyQcRLjYVVF",
+        "6VXbiwa5uWvSDCNn7Cz7bx7rWZQBq3fLCaqEYmW7nRGV",
+        "6VXbjYUeZ1qjeLvx5BvoGbJmrQTe1ahKnRRKLr5hBJBx",
+        "6VXbk5ZYHQdraXbDZ5LimkL2g1qQL2qUhBHBP9inhByS",];
+        let pks = pks.iter().map(|s| Pubkey::from_str(s).unwrap()).collect::<Vec<_>>();
+
         let slot = accounts.target_slot();
         if self
             .read_only_accounts_cache
@@ -6999,6 +7064,14 @@ impl AccountsDb {
                 })
             });
         }
+        (0..accounts.len()).for_each(|index| {
+            accounts.account(index, |account| {
+                if pks.contains(account.pubkey()) {
+                    log::error!("store: {}, {}", account.pubkey(), accounts.target_slot());
+                }
+            });
+        });
+
         calc_stored_meta_time.stop();
         self.stats
             .calc_stored_meta
@@ -8335,7 +8408,8 @@ impl AccountsDb {
         if self.log_dead_slots.load(Ordering::Relaxed) {
             info!(
                 "remove_dead_slots_metadata: {} dead slots, first: {:?}",
-                dead_slots.len(), dead_slots.first()
+                dead_slots.len(),
+                dead_slots.first()
             );
             trace!("remove_dead_slots_metadata: dead_slots: {:?}", dead_slots);
         }
@@ -8878,6 +8952,30 @@ impl AccountsDb {
         }
         let secondary = !self.account_indexes.is_empty();
 
+        use std::str::FromStr;
+        let pks = ["6VXb718iF8zYwhic7PeSaZ25GS9wFHyRJZ3c6xtFR6yi",
+        "6VXb7LyYs2CvpErM2nF4hXvH1Lw9sa7JZWdDtAd3uwka",
+        "6VXb7SnBkwguSnE4ooPzCSK6R8CT2JxaX8bVwoHySb1y",
+        "6VXb9U3zHtNWSSaziKFHXuWnLydFeAHQYxwXhkV42h29",
+        "6VXbAEfzDpthaRBVNKZtFQy6LnZQqCCF8zRjaXUCyUNu",
+        "6VXbDPb9W6rvoVXMtEEKHr9PraD3Jk7EC31VnshnYamQ",
+        "6VXbHZtJnkk8z3GjnFv7oe6iJcU8UVAqa4qfn9JJtJF1",
+        "6VXbJcau1hipG7eLQkMNzmYM6fgEhkqNgqAkc6ppM9Dx",
+        "6VXbJcfT4A2UXk16LuEZK2kA3fQtgnGFxbCc4FGaQ8f4",
+        "6VXbWwAbBuuVYw7RdyXLhKcRvRuuQXGYj14U1EmXCWPP",
+        "6VXbXf6rJ5CxUDUV96BSYgEKNTMpwTbaiqsvkbpCtoGj",
+        "6VXbYUKt8KpNqUG1PzscUVG8fZGzgbb3nfXs3E4LcSof",
+        "6VXba7TAcvFairDAjfqNxjDysZ5wA8BB7hpfETPbqZZG",
+        "6VXbak6BJRWgrbNU1AZXYKYccKxRuEieJFhUXA4T9k2J",
+        "6VXbfXyhEfb7Lwi6R6sAtjEQfS51547JoW16ZLKW8dDF",
+        "6VXbgEkqSsc7KAJsrvfAk87ywBkJjutBTYj72CZPr6vF",
+        "6VXbgkJVxBUPNV9cK5Arrcoh3SsELnPTKRhmB7jDNq2a",
+        "6VXbiXpUoUD7JjozXhiQkTo5ydxXqThzQoyQcRLjYVVF",
+        "6VXbiwa5uWvSDCNn7Cz7bx7rWZQBq3fLCaqEYmW7nRGV",
+        "6VXbjYUeZ1qjeLvx5BvoGbJmrQTe1ahKnRRKLr5hBJBx",
+        "6VXbk5ZYHQdraXbDZ5LimkL2g1qQL2qUhBHBP9inhByS",];
+        let pks = pks.iter().map(|s| Pubkey::from_str(s).unwrap()).collect::<Vec<_>>();
+
         let mut rent_paying_accounts_by_partition = Vec::default();
         let mut accounts_data_len = 0;
         let mut num_accounts_rent_paying = 0;
@@ -8894,6 +8992,9 @@ impl AccountsDb {
                 items_local.push(info.index_info);
             });
             let items = items_local.into_iter().map(|info| {
+                if pks.contains(&info.pubkey) {
+                    log::error!("gen_index: {}, {}", info.pubkey, slot);
+                }
                 if let Some(amount_to_top_off_rent_this_account) = Self::stats_for_rent_payers(
                     &info.pubkey,
                     info.lamports,
