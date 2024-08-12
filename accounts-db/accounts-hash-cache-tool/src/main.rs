@@ -225,7 +225,7 @@ fn do_full(
     let mut pk_last = None;
     use std::str::FromStr;
     let pks = [
-        "6VXb718iF8zYwhic7PeSaZ25GS9wFHyRJZ3c6xtFR6yi",
+        "6VXb718iF8zYwhic7PeSaZ25GS9wFHyRJZ3c6xtFR6yi","Emy35pWKG6XSzB1LeQ3xsLabJaN3e2irN3moz8YCqoWM","6euHG3kXsQwwrUYVWjVL9SLsdwsa4w83bXAcgYFYA6xu","Emy35pWKG6XSzB1LeQ3xsLabJaN3e2irN3moz8YCqoWM","6euHG3kXsQwwrUYVWjVL9SLsdwsa4w83bXAcgYFYA6xu",
     ];
     let pks = pks
         .iter()
@@ -348,6 +348,7 @@ fn do_full(
             let lowest_pk_idx = lowest_pk_idx[left_right].unwrap();
             let rhs = vals[left_right][lowest_pk_idx];
             onlyright += 1;
+            sum += rhs.lamports;
             if log {
                 println!(
                     "pubkey: {:44}, hash: {:44}, lamports: {:lamports_width$} only in right",
@@ -364,12 +365,13 @@ fn do_full(
             let lowest_pk_idx = lowest_pk_idx[left_right].unwrap();
             let rhs = vals[left_right][lowest_pk_idx];
             onlyleft += 1;
+            sum += lhs.lamports;
             if log {
                 println!(
                     "pubkey: {:44}, hash: {:44}, lamports: {:lamports_width$} only in left",
-                    rhs.pubkey.to_string(),
-                    rhs.hash.0.to_string(),
-                    rhs.lamports,
+                    lhs.pubkey.to_string(),
+                    lhs.hash.0.to_string(),
+                    lhs.lamports,
                 );
             }
             idxs[left_right][lowest_pk_idx] += 1;
@@ -477,7 +479,7 @@ fn do_diff_files(
     if new_way {
         use std::str::FromStr;
         let pks = [
-            "6VXb718iF8zYwhic7PeSaZ25GS9wFHyRJZ3c6xtFR6yi",
+            "6VXb718iF8zYwhic7PeSaZ25GS9wFHyRJZ3c6xtFR6yi","Emy35pWKG6XSzB1LeQ3xsLabJaN3e2irN3moz8YCqoWM","6euHG3kXsQwwrUYVWjVL9SLsdwsa4w83bXAcgYFYA6xu",
         ];
         let pks = pks
             .iter()
