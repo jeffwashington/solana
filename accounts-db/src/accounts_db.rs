@@ -3281,6 +3281,11 @@ impl AccountsDb {
         let missing_accum = AtomicU64::new(0);
         let useful_accum = AtomicU64::new(0);
 
+        let kept  = AtomicU64::new(0);
+        let dropped = AtomicU64::new(0);
+        let sl  = AtomicU64::new(0);
+        let sp = AtomicU64::new(0);
+
         // parallel scan the index.
         let do_clean_scan = || {
             candidates.par_iter().for_each(|candidates_bin| {
@@ -3316,6 +3321,7 @@ impl AccountsDb {
                                             // The latest one is zero lamports. We may be able to purge it.
                                             // Add all the rooted entries that contain this pubkey.
                                             // We know the highest rooted entry is zero lamports.
+                                            sl.fetch_add(1, Ordering::Relaxed);
                                             candidate_info.slot_list =
                                                 self.accounts_index.get_rooted_entries(
                                                     slot_list,
@@ -3335,6 +3341,7 @@ impl AccountsDb {
                                             }
                                             if slot_list.len() > 1 {
                                                 // no need to purge old accounts if there is only 1 slot in the slot list
+                                                sp.fetch_add(1, Ordering::Relaxed);
                                                 candidate_info.should_purge = true;
                                                 purges_old_accounts_local += 1;
                                                 useless = false;
@@ -3369,7 +3376,14 @@ impl AccountsDb {
                         None,
                         false,
                     );
-                    !candidate_info.slot_list.is_empty() || candidate_info.should_purge
+                    let retain = !candidate_info.slot_list.is_empty() || candidate_info.should_purge;
+                    if retain {
+                        kept.fetch_add(1, Ordering::Relaxed);
+                    }
+                    else {
+                        dropped.fetch_add(1, Ordering::Relaxed);
+                    }
+                    retain
                 });
                 found_not_zero_accum.fetch_add(found_not_zero, Ordering::Relaxed);
                 not_found_on_fork_accum.fetch_add(not_found_on_fork, Ordering::Relaxed);
@@ -3383,6 +3397,7 @@ impl AccountsDb {
         } else {
             self.thread_pool_clean.install(do_clean_scan);
         }
+        panic!("kept: {}, dropped: {}, num: {num_candidates}, sl: {}, should_purge: {}", kept.load(Ordering::Relaxed), dropped.load(Ordering::Relaxed),  sl.load(Ordering::Relaxed), sp.load(Ordering::Relaxed));
 
         accounts_scan.stop();
 
