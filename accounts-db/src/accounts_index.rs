@@ -79,6 +79,14 @@ pub(crate) struct GenerateIndexResult<T: IndexValue> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// which accounts `scan` should load from disk
+pub enum ScanFilter {
+    All,
+    /// abnormal = ref_count != 1 or slot list.len() != 1
+    OnlyAbnormal,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 /// how accounts index 'upsert' should handle reclaims
 pub enum UpsertReclaim {
     /// previous entry for this slot in the index is expected to be cached, so irrelevant to reclaims
@@ -1405,6 +1413,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
         mut callback: F,
         avoid_callback_result: Option<AccountsIndexScanResult>,
         provide_entry_in_callback: bool,
+        filter: ScanFilter,
     ) where
         F: FnMut(
             &'a Pubkey,
@@ -1422,10 +1431,8 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
                 lock = Some(&self.account_maps[bin]);
                 last_bin = bin;
             }
-            // SAFETY: The caller must ensure that if `provide_entry_in_callback` is true, and
-            // if it's possible for `callback` to clone the entry Arc, then it must also add
-            // the entry to the in-mem cache if the entry is made dirty.
-            lock.as_ref().unwrap().get_internal(pubkey, |entry| {
+
+            let mut internal_callback  = |entry: Option<&AccountMapEntry<T>>| {
                 let mut cache = false;
                 match entry {
                     Some(locked_entry) => {
@@ -1455,7 +1462,30 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
                     }
                 }
                 (cache, ())
-            });
+            };
+
+            let mut filter = filter;
+            if filter == ScanFilter::OnlyAbnormal && lock.as_ref().unwrap().has_written_abnormal_accounts_to_disk() {
+                // we cannot trust just what is in memory because the index ran out of mem and had to flush things to disk
+                filter = ScanFilter::All;
+            }
+
+            match filter {
+                ScanFilter::All => {
+                    // SAFETY: The caller must ensure that if `provide_entry_in_callback` is true, and
+                    // if it's possible for `callback` to clone the entry Arc, then it must also add
+                    // the entry to the in-mem cache if the entry is made dirty.
+                    lock.as_ref().unwrap().get_internal(pubkey, internal_callback);
+                }
+                ScanFilter::OnlyAbnormal => {
+                    // SAFETY: The caller must ensure that if `provide_entry_in_callback` is true, and
+                    // if it's possible for `callback` to clone the entry Arc, then it must also add
+                    // the entry to the in-mem cache if the entry is made dirty.
+                    lock.as_ref().unwrap().get_only_in_mem(pubkey, false, |entry| {
+                        internal_callback(entry).0
+                    });
+                }
+            }
         });
     }
 

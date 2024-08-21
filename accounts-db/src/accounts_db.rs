@@ -44,8 +44,8 @@ use {
         accounts_index::{
             in_mem_accounts_index::StartupStats, AccountMapEntry, AccountSecondaryIndexes,
             AccountsIndex, AccountsIndexConfig, AccountsIndexRootsStats, AccountsIndexScanResult,
-            DiskIndexValue, IndexKey, IndexValue, IsCached, RefCount, ScanConfig, ScanResult,
-            SlotList, UpsertReclaim, ZeroLamport, ACCOUNTS_INDEX_CONFIG_FOR_BENCHMARKS,
+            DiskIndexValue, IndexKey, IndexValue, IsCached, RefCount, ScanConfig, ScanFilter,
+            ScanResult, SlotList, UpsertReclaim, ZeroLamport, ACCOUNTS_INDEX_CONFIG_FOR_BENCHMARKS,
             ACCOUNTS_INDEX_CONFIG_FOR_TESTING,
         },
         accounts_index_storage::Startup,
@@ -2028,6 +2028,8 @@ pub struct ShrinkStats {
     skipped_shrink: AtomicU64,
     dead_accounts: AtomicU64,
     alive_accounts: AtomicU64,
+    index_scan_returned_none: AtomicU64,
+    index_scan_did_not_return_none: AtomicU64,
     accounts_loaded: AtomicU64,
     purged_zero_lamports: AtomicU64,
 }
@@ -2040,6 +2042,17 @@ impl ShrinkStats {
                 (
                     "num_slots_shrunk",
                     self.num_slots_shrunk.swap(0, Ordering::Relaxed) as i64,
+                    i64
+                ),
+                (
+                    "index_scan_returned_none",
+                    self.index_scan_returned_none.swap(0, Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "index_scan_did_not_return_none",
+                    self.index_scan_did_not_return_none
+                        .swap(0, Ordering::Relaxed),
                     i64
                 ),
                 (
@@ -2147,6 +2160,20 @@ impl ShrinkAncientStats {
                 self.shrink_stats
                     .num_slots_shrunk
                     .swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "index_scan_returned_none",
+                self.shrink_stats
+                    .index_scan_returned_none
+                    .swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "index_scan_did_not_return_none",
+                self.shrink_stats
+                    .index_scan_did_not_return_none
+                    .swap(0, Ordering::Relaxed),
                 i64
             ),
             (
@@ -3371,6 +3398,7 @@ impl AccountsDb {
                             },
                             None,
                             false,
+                            ScanFilter::All,
                         );
                     });
                 found_not_zero_accum.fetch_add(found_not_zero, Ordering::Relaxed);
@@ -3891,8 +3919,12 @@ impl AccountsDb {
             accounts.iter().map(|account| account.pubkey()),
             |pubkey, slots_refs, entry| {
                 let mut result = AccountsIndexScanResult::OnlyKeepInMemoryIfDirty;
+                let stored_account = &accounts[index];
                 if let Some((slot_list, ref_count)) = slots_refs {
-                    let stored_account = &accounts[index];
+                    stats
+                        .index_scan_did_not_return_none
+                        .fetch_add(1, Ordering::Relaxed);
+
                     let is_alive = slot_list.iter().any(|(slot, _acct_info)| {
                         // if the accounts index contains an entry at this slot, then the append vec we're asking about contains this item and thus, it is alive at this slot
                         *slot == slot_to_shrink
@@ -3923,9 +3955,41 @@ impl AccountsDb {
                     } else {
                         // Hold onto the index entry arc so that it cannot be flushed.
                         // Since we are shrinking these entries, we need to disambiguate storage ids during this period and those only exist in the in-memory accounts index.
-                        index_entries_being_shrunk.push(Arc::clone(entry.unwrap()));
                         all_are_zero_lamports &= stored_account.is_zero_lamport();
                         alive_accounts.add(ref_count, stored_account, slot_list);
+                        alive += 1;
+                    }
+                } else {
+                    stats
+                        .index_scan_returned_none
+                        .fetch_add(1, Ordering::Relaxed);
+                    // getting None here means the account is 'normal' and was written to disk. This means it must have ref_count=1 and
+                    // slot_list.len() = 1. This means it must be alive in this slot. This is by far the most common case.
+                    // Note that we could get Some(...) here if the account is in the in mem index because it is hot.
+                    // Note this could also mean the account isn't on disk either. That would indicate a bug in accounts db.
+                    // Account is alive.
+                    let ref_count = 1;
+                    let slot_list = [(slot_to_shrink, AccountInfo::default())];
+                    if stored_account.is_zero_lamport()
+                        && ref_count == 1
+                        && latest_full_snapshot_slot
+                            .map(|latest_full_snapshot_slot| {
+                                latest_full_snapshot_slot >= slot_to_shrink
+                            })
+                            .unwrap_or(true)
+                    {
+                        // only do this if our slot is prior to the latest full snapshot
+                        // we found a zero lamport account that is the only instance of this account. We can delete it completely.
+                        zero_lamport_single_ref_pubkeys.push(pubkey);
+                        self.add_uncleaned_pubkeys_after_shrink(
+                            slot_to_shrink,
+                            [*pubkey].into_iter(),
+                        );
+                    } else {
+                        // Hold onto the index entry arc so that it cannot be flushed.
+                        // Since we are shrinking these entries, we need to disambiguate storage ids during this period and those only exist in the in-memory accounts index.
+                        all_are_zero_lamports &= stored_account.is_zero_lamport();
+                        alive_accounts.add(ref_count, stored_account, &slot_list);
                         alive += 1;
                     }
                 }
@@ -3934,6 +3998,7 @@ impl AccountsDb {
             },
             None,
             true,
+            ScanFilter::OnlyAbnormal,
         );
         assert_eq!(index, std::cmp::min(accounts.len(), count));
         stats.alive_accounts.fetch_add(alive, Ordering::Relaxed);
@@ -4152,6 +4217,7 @@ impl AccountsDb {
             |_pubkey, _slots_refs, _entry| AccountsIndexScanResult::Unref,
             Some(AccountsIndexScanResult::Unref),
             false,
+            ScanFilter::All,
         );
 
         zero_lamport_single_ref_pubkeys.iter().for_each(|k| {
@@ -4277,6 +4343,7 @@ impl AccountsDb {
                 },
                 None,
                 true,
+                ScanFilter::All,
             );
             return;
         }
@@ -8126,6 +8193,7 @@ impl AccountsDb {
                     },
                     Some(AccountsIndexScanResult::Unref),
                     false,
+                    ScanFilter::All,
                 )
             });
         });
@@ -9227,6 +9295,7 @@ impl AccountsDb {
             },
             None,
             false,
+            ScanFilter::All,
         );
         timings
             .rent_paying

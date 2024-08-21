@@ -13,7 +13,7 @@ use {
             ShrinkCollectAliveSeparatedByRefs, ShrinkStatsSub,
         },
         accounts_file::AccountsFile,
-        accounts_index::AccountsIndexScanResult,
+        accounts_index::{AccountsIndexScanResult, ScanFilter},
         active_stats::ActiveStatItem,
         storable_accounts::{StorableAccounts, StorableAccountsBySlot},
     },
@@ -331,7 +331,7 @@ impl AccountsDb {
     ) {
         let tuning = PackedAncientStorageTuning {
             // only allow 10k slots old enough to be ancient
-            max_ancient_slots: 10_000,
+            max_ancient_slots: 100,
             // re-combine/shrink 55% of the data savings this pass
             percent_of_alive_shrunk_data: 55,
             ideal_storage_size: NonZeroU64::new(get_ancient_append_vec_capacity()).unwrap(),
@@ -501,6 +501,7 @@ impl AccountsDb {
                     },
                     None,
                     true,
+                    ScanFilter::All,
                 );
             });
         });
