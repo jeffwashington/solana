@@ -1959,6 +1959,7 @@ struct CleanAccountsStats {
     remove_dead_accounts_shrink_us: AtomicU64,
     clean_stored_dead_slots_us: AtomicU64,
     uncleaned_roots_slot_list_1: AtomicU64,
+    get_account_sizes_us:  AtomicU64,
 }
 
 impl CleanAccountsStats {
@@ -3608,6 +3609,14 @@ impl AccountsDb {
                     .swap(0, Ordering::Relaxed),
                 i64
             ),
+            (
+                "get_account_sizes_us",
+                self.clean_accounts_stats
+                    .get_account_sizes_us
+                    .swap(0, Ordering::Relaxed),
+                i64
+            ),
+            
             (
                 "clean_old_root_us",
                 self.clean_accounts_stats
@@ -8088,6 +8097,7 @@ impl AccountsDb {
                     dead_slots.insert(*slot);
                 }
                 else {
+                    let (_, us) = measure_us!({
                     let mut offsets = offsets.iter().cloned().collect::<Vec<_>>();
                     // sort so offsets are in order. This improves efficiency of loading the accounts.
                     offsets.sort_unstable();
@@ -8101,7 +8111,11 @@ impl AccountsDb {
                         // because slots should only have one storage entry, namely the one that was
                         // created by `flush_slot_cache()`.
                         new_shrink_candidates.insert(*slot);
-                    }
+                    }});
+                    self.clean_accounts_stats
+                    .get_account_sizes_us
+                    .fetch_add(us, Ordering::Relaxed);
+        
                 }
             }
         });
