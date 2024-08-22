@@ -3612,7 +3612,7 @@ impl AccountsDb {
             (
                 "get_account_sizes_us",
                 self.clean_accounts_stats
-                    .get_account_sizes_us
+                    .uncleaned_roots_slot_list_1
                     .swap(0, Ordering::Relaxed),
                 i64
             ),
@@ -3922,11 +3922,11 @@ impl AccountsDb {
         let mut dead = 0;
         let mut index = 0;
         let mut all_are_zero_lamports = true;
-        let mut index_entries_being_shrunk = Vec::with_capacity(accounts.len());
+        let index_entries_being_shrunk = Vec::with_capacity(accounts.len());
         let latest_full_snapshot_slot = self.latest_full_snapshot_slot();
         self.accounts_index.scan(
             accounts.iter().map(|account| account.pubkey()),
-            |pubkey, slots_refs, entry| {
+            |pubkey, slots_refs, _entry| {
                 let mut result = AccountsIndexScanResult::OnlyKeepInMemoryIfDirty;
                 let stored_account = &accounts[index];
                 if let Some((slot_list, ref_count)) = slots_refs {

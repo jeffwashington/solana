@@ -688,6 +688,9 @@ pub struct AccountsIndex<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> {
 
     /// populated at generate_index time - accounts that could possibly be rent paying
     pub rent_paying_accounts_by_partition: OnceLock<RentPayingAccountsByPartition>,
+
+    /// if we're scanning with OnlyAbnormal, then verify that the index is as we expect it to be.
+    verify_only_abnormal_scan: bool,
 }
 
 impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
@@ -723,6 +726,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
             active_scans: AtomicUsize::default(),
             max_distance_to_min_scan_slot: AtomicU64::default(),
             rent_paying_accounts_by_partition: OnceLock::default(),
+            verify_only_abnormal_scan: true,
         }
     }
 
@@ -1481,9 +1485,19 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
                     // SAFETY: The caller must ensure that if `provide_entry_in_callback` is true, and
                     // if it's possible for `callback` to clone the entry Arc, then it must also add
                     // the entry to the in-mem cache if the entry is made dirty.
-                    lock.as_ref().unwrap().get_only_in_mem(pubkey, false, |entry| {
-                        internal_callback(entry).0
+                    let found = lock.as_ref().unwrap().get_only_in_mem(pubkey, false, |entry| {
+                        internal_callback(entry);
+                        entry.is_some()
                     });
+                    if !found && self.verify_only_abnormal_scan {
+                        lock.as_ref().unwrap().get_internal(pubkey, |entry| {
+                            assert!(entry.is_some(), "{pubkey}, entry: {entry:?}");
+                            let entry = entry.unwrap();
+                            assert_eq!(entry.ref_count(), 1, "{pubkey}");
+                            assert_eq!(entry.slot_list.read().unwrap().len(), 1, "{pubkey}");
+                            (false, ())
+                        });
+                    }
                 }
             }
         });
