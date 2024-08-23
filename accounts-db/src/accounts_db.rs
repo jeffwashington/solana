@@ -9023,7 +9023,7 @@ impl AccountsDb {
             // outer vec is accounts index bin (determined by pubkey value)
             // inner vec is the pubkeys within that bin that are present in > 1 slot
             let unique_pubkeys_by_bin = Mutex::new(Vec::<Vec<Pubkey>>::default());
-            panic!("");
+            // panic!("");
             if pass == 0 {
                 // tell accounts index we are done adding the initial accounts at startup
                 let mut m = Measure::start("accounts_index_idle_us");
@@ -9041,7 +9041,17 @@ impl AccountsDb {
                             let unique_keys =
                                 HashSet::<Pubkey>::from_iter(slot_keys.iter().map(|(_, key)| *key));
                             for (slot, key) in slot_keys {
-                                log::error!("duplicate key,{key},{slot}");
+                                let mut found = false;
+                                self.storage.get_slot_storage_entry(slot).unwrap().accounts.scan_index(|i| {
+                                    if i.index_info.pubkey == key {
+                                        found = true;
+                                        log::error!("duplicate key,{key},{slot},{}", i.stored_size_aligned);
+                                    }
+                                });
+                                if !found {
+                                    log::error!("duplicate key,{key},{slot},{}", u64::MAX);
+                                }
+
                                 self.uncleaned_pubkeys.entry(slot).or_default().push(key);
                             }
                             let unique_pubkeys_by_bin_inner =
