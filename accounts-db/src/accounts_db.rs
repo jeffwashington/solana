@@ -8817,6 +8817,8 @@ impl AccountsDb {
             });
         }
 
+        let dl = accounts_data_len;
+
         if let Some(duplicates_this_slot) = std::mem::take(&mut generate_index_results.duplicates) {
             // there were duplicate pubkeys in this same slot
             // Some were not inserted. This means some info like stored data is off.
@@ -8850,6 +8852,7 @@ impl AccountsDb {
         if !dirty_pubkeys.is_empty() {
             self.uncleaned_pubkeys.insert(slot, dirty_pubkeys);
         }
+        log::error!("storage,{slot},{dl}");
         SlotIndexGenerationInfo {
             insert_time_us,
             num_accounts: generate_index_results.count as u64,
@@ -9020,6 +9023,7 @@ impl AccountsDb {
             // outer vec is accounts index bin (determined by pubkey value)
             // inner vec is the pubkeys within that bin that are present in > 1 slot
             let unique_pubkeys_by_bin = Mutex::new(Vec::<Vec<Pubkey>>::default());
+            panic!("");
             if pass == 0 {
                 // tell accounts index we are done adding the initial accounts at startup
                 let mut m = Measure::start("accounts_index_idle_us");
