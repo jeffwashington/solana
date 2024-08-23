@@ -8761,6 +8761,7 @@ impl AccountsDb {
 
         let mut rent_paying_accounts_by_partition = Vec::default();
         let mut accounts_data_len = 0;
+        let mut account_storage_len = 0;
         let mut num_accounts_rent_paying = 0;
         let mut amount_to_top_off_rent = 0;
         let mut stored_size_alive = 0;
@@ -8772,6 +8773,7 @@ impl AccountsDb {
                 if info.index_info.lamports > 0 {
                     accounts_data_len += info.index_info.data_len;
                 }
+                account_storage_len += aligned_stored_size(info.index_info.data_len as usize);
                 items_local.push(info.index_info);
             });
             let items = items_local.into_iter().map(|info| {
@@ -8852,7 +8854,7 @@ impl AccountsDb {
         if !dirty_pubkeys.is_empty() {
             self.uncleaned_pubkeys.insert(slot, dirty_pubkeys);
         }
-        log::error!("storage,{slot},{dl}");
+        // log::error!("storage,{slot},{account_storage_len}");
         SlotIndexGenerationInfo {
             insert_time_us,
             num_accounts: generate_index_results.count as u64,
@@ -9023,6 +9025,8 @@ impl AccountsDb {
             // outer vec is accounts index bin (determined by pubkey value)
             // inner vec is the pubkeys within that bin that are present in > 1 slot
             let unique_pubkeys_by_bin = Mutex::new(Vec::<Vec<Pubkey>>::default());
+            let dead_bytes : DashMap<Slot, usize> = DashMap::default();
+            let offsets : DashMap<Slot, HashSet<Pubkey>> = DashMap::default();
             // panic!("");
             if pass == 0 {
                 // tell accounts index we are done adding the initial accounts at startup
@@ -9041,18 +9045,8 @@ impl AccountsDb {
                             let unique_keys =
                                 HashSet::<Pubkey>::from_iter(slot_keys.iter().map(|(_, key)| *key));
                             for (slot, key) in slot_keys {
-                                let mut found = false;
-                                self.storage.get_slot_storage_entry(slot).unwrap().accounts.scan_index(|i| {
-                                    if i.index_info.pubkey == key {
-                                        found = true;
-                                        log::error!("duplicate key,{key},{slot},{}", i.stored_size_aligned);
-                                    }
-                                });
-                                if !found {
-                                    log::error!("duplicate key,{key},{slot},{}", u64::MAX);
-                                }
-
-                                self.uncleaned_pubkeys.entry(slot).or_default().push(key);
+                                offsets.entry(slot).or_default().insert(key);
+                                // self.uncleaned_pubkeys.entry(slot).or_default().push(key);
                             }
                             let unique_pubkeys_by_bin_inner =
                                 unique_keys.into_iter().collect::<Vec<_>>();
@@ -9065,7 +9059,7 @@ impl AccountsDb {
                 })
                 .1;
             }
-            panic!("done");
+
             let unique_pubkeys_by_bin = unique_pubkeys_by_bin.into_inner().unwrap();
 
             let mut timings = GenerateIndexTimings {
@@ -9166,6 +9160,41 @@ impl AccountsDb {
 
                 self.set_storage_count_and_alive_bytes(storage_info, &mut timings);
             }
+
+            offsets.iter().for_each(|r| {
+                let slot = *r.key();
+                self.storage.get_slot_storage_entry(slot).unwrap().accounts.scan_index(|i| {
+                    if r.value().contains(&i.index_info.pubkey) {
+                        *dead_bytes.entry(slot).or_default() += i.stored_size_aligned;
+                    }
+                });
+            });
+
+            let mut dead_bytes_total = 0;
+            dead_bytes.iter().for_each(|r| {
+                let (slot, dead) = (*r.key(), *r.value());
+                dead_bytes_total += dead;
+                let len = self.storage.get_slot_storage_entry(slot).unwrap().accounts.len();
+                let alive = self.storage.get_slot_storage_entry(slot).unwrap().alive_bytes();
+                log::error!("result,{slot},{alive},{dead},{},{len},{},{}", (alive - dead) * 100 / alive, self.storage.get_slot_storage_entry(slot).unwrap().approx_stored_count(),offsets.get(&slot).unwrap().len());
+            });
+            dead_bytes.iter().for_each(|r| {
+                let (slot, dead) = (*r.key(), *r.value());
+                let len = self.storage.get_slot_storage_entry(slot).unwrap().accounts.len();
+                let alive = self.storage.get_slot_storage_entry(slot).unwrap().alive_bytes();
+                if dead > len && len < 2000 {
+                    let mut pks = offsets.get(&slot).unwrap().clone();
+                    
+                    self.storage.get_slot_storage_entry(slot).unwrap().accounts.scan_index(|i| {
+                        log::error!("{}, {}, {},{}",  pks.remove(&i.index_info.pubkey),i.index_info.pubkey, i.stored_size_aligned,i.index_info.data_len);
+                    });
+                    log::error!("pks, {slot},{alive},{dead},{},{}", pks.len(), self.storage.get_slot_storage_entry(slot).unwrap().approx_stored_count());
+                }
+            });
+            log::error!("sleeping, dead_bytes_total: {dead_bytes_total}");
+            loop {sleep(Duration::from_millis(10));}
+
+
             total_time.stop();
             timings.total_time_us = total_time.as_us();
             timings.report(self.accounts_index.get_startup_stats());
