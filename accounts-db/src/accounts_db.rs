@@ -1266,7 +1266,12 @@ impl AccountStorageEntry {
             self.id(),
         );
 
-        self.alive_bytes.fetch_sub(num_bytes, Ordering::SeqCst);
+        let old = self.alive_bytes.fetch_sub(num_bytes, Ordering::SeqCst);
+        if old < num_bytes {
+            // this could happen because of alignment
+            log::error!("remove_accounts,{},{},{},{},{},{}", self.slot(),old,num_bytes,num_accounts, num_bytes - old,count);
+            self.alive_bytes.store(0, Ordering::Release);
+        }
         count = count.saturating_sub(num_accounts);
         *count_and_status = (count, status);
         count
@@ -1478,7 +1483,7 @@ pub struct AccountsDb {
     /// Set of stores which are recently rooted or had accounts removed
     /// such that potentially a 0-lamport account update could be present which
     /// means we can remove the account from the index entirely.
-    dirty_stores: DashMap<Slot, Arc<AccountStorageEntry>>,
+    pub(crate) dirty_stores: DashMap<Slot, Arc<AccountStorageEntry>>,
 
     /// Zero-lamport accounts that are *not* purged during clean because they need to stay alive
     /// for incremental snapshot support.
@@ -1956,6 +1961,7 @@ struct CleanAccountsStats {
     clean_old_root_reclaim_us: AtomicU64,
     reset_uncleaned_roots_us: AtomicU64,
     remove_dead_accounts_remove_us: AtomicU64,
+    too_many_dead_bytes: AtomicU64,
     remove_dead_accounts_shrink_us: AtomicU64,
     clean_stored_dead_slots_us: AtomicU64,
     uncleaned_roots_slot_list_1: AtomicU64,
@@ -1985,6 +1991,7 @@ pub(crate) struct ShrinkAncientStats {
     pub(crate) many_refs_old_alive: AtomicU64,
     pub(crate) slots_eligible_to_shrink: AtomicU64,
     pub(crate) total_dead_bytes: AtomicU64,
+    pub(crate) none_alive_slots: AtomicU64,
 }
 
 #[derive(Debug, Default)]
@@ -2287,6 +2294,11 @@ impl ShrinkAncientStats {
             (
                 "total_dead_bytes",
                 self.total_dead_bytes.swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "none_alive_slots",
+                self.none_alive_slots.swap(0, Ordering::Relaxed),
                 i64
             ),
             (
@@ -3611,6 +3623,14 @@ impl AccountsDb {
                 "reset_uncleaned_roots_us",
                 self.clean_accounts_stats
                     .reset_uncleaned_roots_us
+                    .swap(0, Ordering::Relaxed),
+                i64
+            ),
+            
+            (
+                "too_many_dead_bytes",
+                self.clean_accounts_stats
+                    .too_many_dead_bytes
                     .swap(0, Ordering::Relaxed),
                 i64
             ),
@@ -8047,6 +8067,10 @@ impl AccountsDb {
                     // sort so offsets are in order. This improves efficiency of loading the accounts.
                     offsets.sort_unstable();
                     let dead_bytes = store.accounts.get_account_sizes(&offsets).iter().sum();
+                    if dead_bytes > store.alive_bytes() {
+                        self.clean_accounts_stats.too_many_dead_bytes.fetch_add(1, Ordering::Relaxed);
+                        log::error!("too many dead bytes: {}, {}, {}, diff: {}, store count: {}, removed accounts: {}", store.slot(), dead_bytes, store.alive_bytes(), dead_bytes-store.alive_bytes(), offsets.len(), store.count());
+                    }
                     store.remove_accounts(dead_bytes, reset_accounts, offsets.len());
                     if Self::is_shrinking_productive(*slot, &store)
                         && self.is_candidate_for_shrink(&store)
@@ -9192,7 +9216,7 @@ impl AccountsDb {
                 }
             });
             log::error!("sleeping, dead_bytes_total: {dead_bytes_total}");
-            loop {sleep(Duration::from_millis(10));}
+            // loop {sleep(Duration::from_millis(10));}
 
 
             total_time.stop();

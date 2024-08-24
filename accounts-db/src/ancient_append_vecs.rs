@@ -572,6 +572,10 @@ impl AccountsDb {
 
         for slot in &slots {
             if let Some(storage) = self.storage.get_slot_storage_entry(*slot) {
+                if storage.alive_bytes() == 0 {
+                    self.shrink_ancient_stats.none_alive_slots.fetch_add(1, Ordering::Relaxed);
+                    self.dirty_stores.insert(*slot, Arc::clone(&storage));
+                }
                 if infos.add(
                     *slot,
                     storage,
