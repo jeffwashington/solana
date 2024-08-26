@@ -684,6 +684,7 @@ impl BankForks {
     /// Determine if this bank should request an epoch accounts hash
     #[must_use]
     fn should_request_epoch_accounts_hash(&self, bank: &Bank) -> bool {
+        return false; // disable sending an EAH request
         if !epoch_accounts_hash_utils::is_enabled_this_epoch(bank) {
             return false;
         }
