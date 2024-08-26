@@ -326,9 +326,22 @@ impl AccountsDb {
     /// Trying to reduce # roots and storages (one per root) required to store all the data in ancient slots
     pub(crate) fn combine_ancient_slots_packed(
         &self,
-        sorted_slots: Vec<Slot>,
+        mut sorted_slots: Vec<Slot>,
         can_randomly_shrink: bool,
     ) {
+        sorted_slots.retain(|s| {
+            if s == &285293246 {
+                log::error!("skipping slot in ancient pack: {s}");
+                false
+            }
+            else if s == &285293657 {
+                log::error!("including: {s} in ancient pack");
+                true
+            }
+            else {
+                true
+            }
+        });
         let tuning = PackedAncientStorageTuning {
             // only allow 10k slots old enough to be ancient
             max_ancient_slots: 10_000,

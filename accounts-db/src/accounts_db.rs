@@ -3923,7 +3923,7 @@ impl AccountsDb {
                         *slot == slot_to_shrink
                     });
                     if pks.contains(pubkey) || slot_to_shrink == 285293657 {
-                        log::error!("{}, {}, {}, alive: {alive}, rc: {ref_count}", pubkey, slot_to_shrink, line!());
+                        log::error!("{}, {}, {}, alive: {is_alive}, rc: {ref_count}", pubkey, slot_to_shrink, line!());
                     }
                     if !is_alive {
                         // This pubkey was found in the storage, but no longer exists in the index.
@@ -6896,6 +6896,18 @@ impl AccountsDb {
                 })
             });
         }
+
+        use std::str::FromStr;
+        let pks = ["hagGZB38EJLUfZDfWe2FZ5zTc6KahjKbAL3DyrPeU8B"];
+        let pks = pks.iter().map(|s| Pubkey::from_str(s).unwrap()).collect::<Vec<_>>();
+        (0..accounts.len()).for_each(|index| {
+            accounts.account(index, |account| {
+                if pks.contains(account.pubkey()) {
+                    log::error!("store: {}, {}", account.pubkey(), accounts.target_slot());
+                }
+            });
+        });
+
         calc_stored_meta_time.stop();
         self.stats
             .calc_stored_meta

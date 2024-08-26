@@ -129,9 +129,6 @@ impl<'b, T: Clone + Copy + PartialEq + std::fmt::Debug + 'static> Bucket<T> {
     ) -> Self {
         let reuse_path = std::mem::take(&mut restartable_bucket.path);
         let elem_size = NonZeroU64::new(std::mem::size_of::<IndexEntry<T>>() as u64).unwrap();
-        use std::str::FromStr;
-        let pks = ["hagGZB38EJLUfZDfWe2FZ5zTc6KahjKbAL3DyrPeU8B"];
-        let pks = pks.iter().map(|s| Pubkey::from_str(s).unwrap()).collect::<Vec<_>>();
 
         let (index, random, reused_file_at_startup) = reuse_path
             .and_then(|path| {
@@ -208,7 +205,7 @@ impl<'b, T: Clone + Copy + PartialEq + std::fmt::Debug + 'static> Bucket<T> {
             let ix = IndexEntryPlaceInBucket::new(ii);
             let key = ix.key(&self.index);
             if range.map(|r| r.contains(key)).unwrap_or(true) {
-                let (v, ref_count) = ix.read_value(&self.index, &self.data);
+                let (v, ref_count) = ix.read_value2(&self.index, &self.data);
                 result.push(BucketItem {
                     pubkey: *key,
                     ref_count,
@@ -321,7 +318,7 @@ impl<'b, T: Clone + Copy + PartialEq + std::fmt::Debug + 'static> Bucket<T> {
     pub(crate) fn read_value(&self, key: &Pubkey) -> Option<(&[T], RefCount)> {
         //debug!("READ_VALUE: {:?}", key);
         let (elem, _) = self.find_index_entry(key)?;
-        Some(elem.read_value(&self.index, &self.data))
+        Some(elem.read_value2(&self.index, &self.data))
     }
 
     /// for each item in `items`, get the hash value when hashed with `random`.
@@ -426,14 +423,14 @@ impl<'b, T: Clone + Copy + PartialEq + std::fmt::Debug + 'static> Bucket<T> {
                 let ix_index = (ix_entry_raw + search) % cap;
                 let elem = IndexEntryPlaceInBucket::new(ix_index);
                 if pks.contains(elem.key(index)) {
-                    log::error!("{}, {:?}", elem.key(index), elem.read_value(index, data_buckets));
+                    log::error!("{}, {:?}", elem.key(index), elem.read_value_look(index, data_buckets));
                 }
                 match elem.occupy_if_matches(index, v, k) {
                     OccupyIfMatches::SuccessfulInit => {}
                     OccupyIfMatches::FoundDuplicate => {
                         // pubkey is same, and it is occupied, so we found a duplicate
                         let (v_existing, _ref_count_existing) =
-                            elem.read_value(index, data_buckets);
+                            elem.read_value2(index, data_buckets);
                         // someone is already allocated with this pubkey, so we found a duplicate
                         duplicates.push((ix, *v_existing.first().unwrap()));
                     }
@@ -510,7 +507,7 @@ impl<'b, T: Clone + Copy + PartialEq + std::fmt::Debug + 'static> Bucket<T> {
                     // occupied, see if the key already exists here
                     if elem.key(index) == k {
                         let (v_existing, _ref_count_existing) =
-                            elem.read_value(index, data_buckets);
+                            elem.read_value2(index, data_buckets);
                         duplicates.push((i, *v_existing.first().unwrap()));
                         continue 'outer; // this 'insertion' is completed: found a duplicate entry
                     }

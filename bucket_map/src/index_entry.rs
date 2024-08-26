@@ -360,6 +360,26 @@ impl<T: Copy + PartialEq + 'static> IndexEntryPlaceInBucket<T> {
         }
     }
 
+    pub(crate) fn get_slot_count_enum_look<'a>(
+        &self,
+        index_bucket: &'a BucketStorage<IndexBucket<T>>,
+    ) -> OccupiedEnum<'a, T> {
+        let enum_tag = index_bucket.contents.get_enum_tag(self.ix);
+        let index_entry = index_bucket.get::<IndexEntry<T>>(self.ix);
+        match enum_tag {
+            OccupiedEnumTag::Free => unsafe {
+                OccupiedEnum::OneSlotInIndex(&index_entry.contents.single_element)
+            },
+            OccupiedEnumTag::ZeroSlots => OccupiedEnum::ZeroSlots,
+            OccupiedEnumTag::OneSlotInIndex => unsafe {
+                OccupiedEnum::OneSlotInIndex(&index_entry.contents.single_element)
+            },
+            OccupiedEnumTag::MultipleSlots => unsafe {
+                OccupiedEnum::MultipleSlots(&index_entry.contents.multiple_slots)
+            },
+        }
+    }
+
     /// return Some(MultipleSlots) if this item's data is stored in the data file
     pub(crate) fn get_multiple_slots_mut<'a>(
         &self,
@@ -438,7 +458,40 @@ impl<T: Copy + PartialEq + 'static> IndexEntryPlaceInBucket<T> {
         }
     }
 
-    pub(crate) fn read_value<'a>(
+    pub(crate) fn read_value_look<'a>(
+        &self,
+        index_bucket: &'a BucketStorage<IndexBucket<T>>,
+        data_buckets: &'a [BucketStorage<DataBucket>],
+    ) -> (&'a [T], RefCount) {
+        let mut ref_count = 1;
+        let slot_list = match self.get_slot_count_enum_look(index_bucket) {
+            OccupiedEnum::ZeroSlots => {
+                // num_slots is 0. This means empty slot list and ref_count=1
+                &[]
+            }
+            OccupiedEnum::OneSlotInIndex(single_element) => {
+                // only element is stored in the index entry
+                std::slice::from_ref(single_element)
+            }
+            OccupiedEnum::MultipleSlots(multiple_slots) => {
+                // slot list and ref_count are in data file
+                let data_bucket_ix =
+                    MultipleSlots::data_bucket_from_num_slots(multiple_slots.num_slots);
+                let data_bucket = &data_buckets[data_bucket_ix as usize];
+                let loc = multiple_slots.data_loc(data_bucket);
+                assert!(!data_bucket.is_free(loc));
+
+                ref_count = MultipleSlots::ref_count(data_bucket, loc);
+                data_bucket.get_slice::<T>(loc, multiple_slots.num_slots, IncludeHeader::NoHeader)
+            }
+            _ => {
+                panic!("trying to read data from a free entry");
+            }
+        };
+        (slot_list, ref_count)
+    }
+
+    pub(crate) fn read_value2<'a>(
         &self,
         index_bucket: &'a BucketStorage<IndexBucket<T>>,
         data_buckets: &'a [BucketStorage<DataBucket>],
