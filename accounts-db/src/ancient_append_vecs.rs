@@ -32,6 +32,19 @@ use {
 /// This gives us high slots to move packed accounts into.
 const HIGH_SLOT_OFFSET: u64 = 100;
 
+#[derive(Debug)]
+pub(crate) struct PackedAncientOldLargeTuning {
+    old_slot_max_inclusive: Slot,
+    large_storage_bytes: u64,
+}
+
+#[derive(Debug)]
+pub(crate) enum PackedAncientStorageSelection {
+    OldLarge(PackedAncientOldLargeTuning),
+    NewSmall(PackedAncientOldLargeTuning),
+    All,
+}
+
 /// ancient packing algorithm tuning per pass
 #[derive(Debug)]
 struct PackedAncientStorageTuning {
@@ -47,6 +60,7 @@ struct PackedAncientStorageTuning {
     can_randomly_shrink: bool,
     /// limit the max # of output storages to prevent packing from running too long
     max_resulting_storages: NonZeroU64,
+    selection: PackedAncientStorageSelection,
 }
 
 /// info about a storage eligible to be combined into an ancient append vec.
@@ -82,6 +96,12 @@ struct AncientSlotInfos {
     total_alive_bytes: Saturating<u64>,
 }
 
+impl PackedAncientOldLargeTuning {
+    fn is_old_or_large(&self, slot: Slot, storage: &AccountStorageEntry) -> bool {
+        slot <= self.old_slot_max_inclusive || storage.capacity() >= self.large_storage_bytes
+    }
+}
+
 impl AncientSlotInfos {
     /// add info for 'storage'
     /// return true if item was randomly shrunk
@@ -89,18 +109,30 @@ impl AncientSlotInfos {
         &mut self,
         slot: Slot,
         storage: Arc<AccountStorageEntry>,
-        can_randomly_shrink: bool,
-        ideal_size: NonZeroU64,
+        tuning: &PackedAncientStorageTuning,
         is_high_slot: bool,
     ) -> bool {
         let mut was_randomly_shrunk = false;
         let alive_bytes = storage.alive_bytes() as u64;
         if alive_bytes > 0 {
+            match &tuning.selection {
+                PackedAncientStorageSelection::All => {}
+                PackedAncientStorageSelection::NewSmall(boundary) => {
+                    if boundary.is_old_or_large(slot, &storage) {
+                        return false;
+                    }
+                }
+                PackedAncientStorageSelection::OldLarge(boundary) => {
+                    if !boundary.is_old_or_large(slot, &storage) {
+                        return false;
+                    }
+                }
+            }
             let capacity = storage.accounts.capacity();
             let should_shrink = if capacity > 0 {
                 let alive_ratio = alive_bytes * 100 / capacity;
                 alive_ratio < 90
-                    || if can_randomly_shrink && thread_rng().gen_range(0..10000) == 0 {
+                    || if tuning.can_randomly_shrink && thread_rng().gen_range(0..10000) == 0 {
                         was_randomly_shrunk = true;
                         true
                     } else {
@@ -119,7 +151,7 @@ impl AncientSlotInfos {
                 self.total_alive_bytes_shrink += alive_bytes;
                 self.shrink_indexes.push(self.all_infos.len());
             } else {
-                let already_ideal_size = u64::from(ideal_size) * 80 / 100;
+                let already_ideal_size = u64::from(tuning.ideal_storage_size) * 80 / 100;
                 if alive_bytes > already_ideal_size {
                     // do not include this append vec at all. It is already ideal size and not a candidate for shrink.
                     return was_randomly_shrunk;
@@ -319,6 +351,15 @@ enum IncludeManyRefSlots {
 }
 
 impl AccountsDb {
+    fn get_old_large(newest_ancient_slot: Slot) -> PackedAncientOldLargeTuning {
+        PackedAncientOldLargeTuning {
+            // an account staying alive for 1M slots is a cut-off for 'really cold'
+            old_slot_max_inclusive: newest_ancient_slot.saturating_sub(1_000_000),
+            // 90% of an ideal storage size means we previously thought this account was 'really cold'
+            large_storage_bytes: get_ancient_append_vec_capacity() * 90 / 100,
+        }
+    }
+
     /// Combine account data from storages in 'sorted_slots' into packed storages.
     /// This keeps us from accumulating storages for each slot older than an epoch.
     /// After this function the number of alive roots is <= # alive roots when it was called.
@@ -329,14 +370,21 @@ impl AccountsDb {
         sorted_slots: Vec<Slot>,
         can_randomly_shrink: bool,
     ) {
+        let smaller_multiplier = NonZeroU64::new(10).unwrap();
         let tuning = PackedAncientStorageTuning {
             // only allow 10k slots old enough to be ancient
-            max_ancient_slots: 10_000,
+            max_ancient_slots: 9_000,
             // re-combine/shrink 55% of the data savings this pass
             percent_of_alive_shrunk_data: 55,
-            ideal_storage_size: NonZeroU64::new(get_ancient_append_vec_capacity()).unwrap(),
+            ideal_storage_size: NonZeroU64::new(
+                get_ancient_append_vec_capacity() / smaller_multiplier,
+            )
+            .unwrap(),
             can_randomly_shrink,
-            max_resulting_storages: NonZeroU64::new(10).unwrap(),
+            max_resulting_storages: NonZeroU64::new(10 * smaller_multiplier.get()).unwrap(),
+            selection: PackedAncientStorageSelection::NewSmall(Self::get_old_large(
+                sorted_slots.last().cloned().unwrap_or_default(),
+            )),
         };
 
         let _guard = self.active_stats.activate(ActiveStatItem::SquashAncient);
@@ -344,8 +392,8 @@ impl AccountsDb {
         let mut stats_sub = ShrinkStatsSub::default();
 
         let (_, total_us) = measure_us!(self.combine_ancient_slots_packed_internal(
-            sorted_slots,
-            tuning,
+            sorted_slots.clone(),
+            &tuning,
             &mut stats_sub
         ));
 
@@ -354,7 +402,46 @@ impl AccountsDb {
             .total_us
             .fetch_add(total_us, Ordering::Relaxed);
 
-        self.shrink_ancient_stats.report();
+        self.shrink_ancient_stats.report(&tuning.selection);
+
+        self.combine_ancient_slots_packed_large_old(sorted_slots, false);
+    }
+
+    pub(crate) fn combine_ancient_slots_packed_large_old(
+        &self,
+        sorted_slots: Vec<Slot>,
+        can_randomly_shrink: bool,
+    ) {
+        let tuning = PackedAncientStorageTuning {
+            // only allow 10k slots old enough to be ancient
+            max_ancient_slots: 1_000,
+            // re-combine/shrink 55% of the data savings this pass
+            percent_of_alive_shrunk_data: 55,
+            ideal_storage_size: NonZeroU64::new(get_ancient_append_vec_capacity()).unwrap(),
+            can_randomly_shrink,
+            // re-pack below 90% ratio, so max of 9
+            max_resulting_storages: NonZeroU64::new(9).unwrap(),
+            selection: PackedAncientStorageSelection::OldLarge(Self::get_old_large(
+                sorted_slots.last().cloned().unwrap_or_default(),
+            )),
+        };
+
+        let _guard = self.active_stats.activate(ActiveStatItem::SquashAncient);
+
+        let mut stats_sub = ShrinkStatsSub::default();
+
+        let (_, total_us) = measure_us!(self.combine_ancient_slots_packed_internal(
+            sorted_slots,
+            &tuning,
+            &mut stats_sub
+        ));
+
+        Self::update_shrink_stats(&self.shrink_ancient_stats.shrink_stats, stats_sub, false);
+        self.shrink_ancient_stats
+            .total_us
+            .fetch_add(total_us, Ordering::Relaxed);
+
+        self.shrink_ancient_stats.report(&tuning.selection);
     }
 
     /// return false if `many_refs_newest` accounts cannot be moved into `target_slots_sorted`.
@@ -391,12 +478,9 @@ impl AccountsDb {
     fn combine_ancient_slots_packed_internal(
         &self,
         sorted_slots: Vec<Slot>,
-        tuning: PackedAncientStorageTuning,
+        tuning: &PackedAncientStorageTuning,
         metrics: &mut ShrinkStatsSub,
     ) {
-        self.shrink_ancient_stats
-            .slots_considered
-            .fetch_add(sorted_slots.len() as u64, Ordering::Relaxed);
         let ancient_slot_infos = self.collect_sort_filter_ancient_slots(sorted_slots, &tuning);
 
         if ancient_slot_infos.all_infos.is_empty() {
@@ -513,11 +597,7 @@ impl AccountsDb {
         slots: Vec<Slot>,
         tuning: &PackedAncientStorageTuning,
     ) -> AncientSlotInfos {
-        let mut ancient_slot_infos = self.calc_ancient_slot_info(
-            slots,
-            tuning.can_randomly_shrink,
-            tuning.ideal_storage_size,
-        );
+        let mut ancient_slot_infos = self.calc_ancient_slot_info(slots, tuning);
 
         ancient_slot_infos.filter_ancient_slots(tuning, &self.shrink_ancient_stats);
         ancient_slot_infos
@@ -555,8 +635,7 @@ impl AccountsDb {
     fn calc_ancient_slot_info(
         &self,
         slots: Vec<Slot>,
-        can_randomly_shrink: bool,
-        ideal_size: NonZeroU64,
+        tuning: &PackedAncientStorageTuning,
     ) -> AncientSlotInfos {
         let len = slots.len();
         let mut infos = AncientSlotInfos {
@@ -567,22 +646,20 @@ impl AccountsDb {
         let mut randoms = 0;
         let max_slot = slots.iter().max().cloned().unwrap_or_default();
         // heuristic to include some # of newly eligible ancient slots so that the pack algorithm always makes progress
+        // Note that if we're old_large, there will be no 'high slot offset' accounts.
         let high_slot_boundary = max_slot.saturating_sub(HIGH_SLOT_OFFSET);
         let is_high_slot = |slot| slot >= high_slot_boundary;
 
         for slot in &slots {
             if let Some(storage) = self.storage.get_slot_storage_entry(*slot) {
-                if infos.add(
-                    *slot,
-                    storage,
-                    can_randomly_shrink,
-                    ideal_size,
-                    is_high_slot(*slot),
-                ) {
+                if infos.add(*slot, storage, tuning, is_high_slot(*slot)) {
                     randoms += 1;
                 }
             }
         }
+        self.shrink_ancient_stats
+            .slots_considered
+            .fetch_add(slots.len() as u64, Ordering::Relaxed);
         let mut total_dead_bytes = 0;
         let should_shrink_count = infos
             .all_infos

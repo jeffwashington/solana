@@ -54,7 +54,8 @@ use {
         active_stats::{ActiveStatItem, ActiveStats},
         ancestors::Ancestors,
         ancient_append_vecs::{
-            get_ancient_append_vec_capacity, is_ancient, AccountsToStore, StorageSelector,
+            get_ancient_append_vec_capacity, is_ancient, AccountsToStore,
+            PackedAncientStorageSelection, StorageSelector,
         },
         append_vec::{
             aligned_stored_size, APPEND_VEC_MMAPPED_FILES_DIRTY, APPEND_VEC_MMAPPED_FILES_OPEN,
@@ -2146,9 +2147,13 @@ impl ShrinkStats {
 }
 
 impl ShrinkAncientStats {
-    pub(crate) fn report(&self) {
+    pub(crate) fn report(&self, selection: &PackedAncientStorageSelection) {
         datapoint_info!(
-            "shrink_ancient_stats",
+            match &selection {
+                PackedAncientStorageSelection::All => "shrink_ancient_stats",
+                PackedAncientStorageSelection::OldLarge(_) => "shrink_ancient_stats_old_large",
+                PackedAncientStorageSelection::NewSmall(_) => "shrink_ancient_stats_new_small",
+            },
             (
                 "num_slots_shrunk",
                 self.shrink_stats
@@ -4791,7 +4796,8 @@ impl AccountsDb {
         // only log when we moved some accounts to ancient append vecs or we've exceeded 100ms
         // results will continue to accumulate otherwise
         if guard.is_some() || self.shrink_ancient_stats.total_us.load(Ordering::Relaxed) > 100_000 {
-            self.shrink_ancient_stats.report();
+            self.shrink_ancient_stats
+                .report(&PackedAncientStorageSelection::All);
         }
     }
 
