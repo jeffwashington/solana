@@ -44,8 +44,8 @@ use {
         accounts_index::{
             in_mem_accounts_index::StartupStats, AccountMapEntry, AccountSecondaryIndexes,
             AccountsIndex, AccountsIndexConfig, AccountsIndexRootsStats, AccountsIndexScanResult,
-            DiskIndexValue, IndexKey, IndexValue, IsCached, RefCount, ScanConfig, ScanResult,
-            SlotList, UpsertReclaim, ZeroLamport, ACCOUNTS_INDEX_CONFIG_FOR_BENCHMARKS,
+            DiskIndexValue, IndexKey, IndexValue, IsCached, RefCount, ScanConfig, ScanFilter,
+            ScanResult, SlotList, UpsertReclaim, ZeroLamport, ACCOUNTS_INDEX_CONFIG_FOR_BENCHMARKS,
             ACCOUNTS_INDEX_CONFIG_FOR_TESTING,
         },
         accounts_index_storage::Startup,
@@ -502,6 +502,7 @@ pub const ACCOUNTS_DB_CONFIG_FOR_TESTING: AccountsDbConfig = AccountsDbConfig {
     test_partitioned_epoch_rewards: TestPartitionedEpochRewards::CompareResults,
     test_skip_rewrites_but_include_in_bank_hash: false,
     storage_access: StorageAccess::Mmap,
+    scan_filter_for_shrinking: ScanFilter::All,
 };
 pub const ACCOUNTS_DB_CONFIG_FOR_BENCHMARKS: AccountsDbConfig = AccountsDbConfig {
     index: Some(ACCOUNTS_INDEX_CONFIG_FOR_BENCHMARKS),
@@ -517,6 +518,7 @@ pub const ACCOUNTS_DB_CONFIG_FOR_BENCHMARKS: AccountsDbConfig = AccountsDbConfig
     test_partitioned_epoch_rewards: TestPartitionedEpochRewards::None,
     test_skip_rewrites_but_include_in_bank_hash: false,
     storage_access: StorageAccess::Mmap,
+    scan_filter_for_shrinking: ScanFilter::All,
 };
 
 pub type BinnedHashData = Vec<Vec<CalculateHashIntermediate>>;
@@ -610,6 +612,7 @@ pub struct AccountsDbConfig {
     pub create_ancient_storage: CreateAncientStorage,
     pub test_partitioned_epoch_rewards: TestPartitionedEpochRewards,
     pub storage_access: StorageAccess,
+    pub scan_filter_for_shrinking: ScanFilter,
 }
 
 #[cfg(not(test))]
@@ -1504,6 +1507,9 @@ pub struct AccountsDb {
     /// method to use for accessing storages
     storage_access: StorageAccess,
 
+    /// index scan filtering for shrinking
+    scan_filter_for_shrinking: ScanFilter,
+
     /// this will live here until the feature for partitioned epoch rewards is activated.
     /// At that point, this and other code can be deleted.
     pub partitioned_epoch_rewards_config: PartitionedEpochRewardsConfig,
@@ -2029,6 +2035,8 @@ pub struct ShrinkStats {
     skipped_shrink: AtomicU64,
     dead_accounts: AtomicU64,
     alive_accounts: AtomicU64,
+    index_scan_returned_none: AtomicU64,
+    index_scan_returned_some: AtomicU64,
     accounts_loaded: AtomicU64,
     purged_zero_lamports: AtomicU64,
     accounts_not_found_in_index: AtomicU64,
@@ -2042,6 +2050,16 @@ impl ShrinkStats {
                 (
                     "num_slots_shrunk",
                     self.num_slots_shrunk.swap(0, Ordering::Relaxed) as i64,
+                    i64
+                ),
+                (
+                    "index_scan_returned_none",
+                    self.index_scan_returned_none.swap(0, Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "index_scan_returned_some",
+                    self.index_scan_returned_some.swap(0, Ordering::Relaxed),
                     i64
                 ),
                 (
@@ -2154,6 +2172,20 @@ impl ShrinkAncientStats {
                 self.shrink_stats
                     .num_slots_shrunk
                     .swap(0, Ordering::Relaxed) as i64,
+                i64
+            ),
+            (
+                "index_scan_returned_none",
+                self.shrink_stats
+                    .index_scan_returned_none
+                    .swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "index_scan_returned_some",
+                self.shrink_stats
+                    .index_scan_returned_some
+                    .swap(0, Ordering::Relaxed),
                 i64
             ),
             (
@@ -2506,6 +2538,7 @@ impl AccountsDb {
             exhaustively_verify_refcounts: false,
             accounts_file_provider: AccountsFileProvider::default(),
             storage_access: StorageAccess::default(),
+            scan_filter_for_shrinking: ScanFilter::default(),
             partitioned_epoch_rewards_config: PartitionedEpochRewardsConfig::default(),
             epoch_accounts_hash_manager: EpochAccountsHashManager::new_invalid(),
             test_skip_rewrites_but_include_in_bank_hash: false,
@@ -2612,6 +2645,11 @@ impl AccountsDb {
             .map(|config| config.storage_access)
             .unwrap_or_default();
 
+        let scan_filter_for_shrinking = accounts_db_config
+            .as_ref()
+            .map(|config| config.scan_filter_for_shrinking)
+            .unwrap_or_default();
+
         let paths_is_empty = paths.is_empty();
         let mut new = Self {
             paths,
@@ -2634,6 +2672,7 @@ impl AccountsDb {
             exhaustively_verify_refcounts,
             test_skip_rewrites_but_include_in_bank_hash,
             storage_access,
+            scan_filter_for_shrinking,
             ..Self::default_with_accounts_index(
                 accounts_index,
                 base_working_path,
@@ -3385,6 +3424,7 @@ impl AccountsDb {
                             },
                             None,
                             false,
+                            ScanFilter::All,
                         );
                     });
                 found_not_zero_accum.fetch_add(found_not_zero, Ordering::Relaxed);
@@ -3906,14 +3946,18 @@ impl AccountsDb {
         let mut dead = 0;
         let mut index = 0;
         let mut all_are_zero_lamports = true;
-        let mut index_entries_being_shrunk = Vec::with_capacity(accounts.len());
+        let index_entries_being_shrunk = Vec::with_capacity(accounts.len());
         let latest_full_snapshot_slot = self.latest_full_snapshot_slot();
         self.accounts_index.scan(
             accounts.iter().map(|account| account.pubkey()),
-            |pubkey, slots_refs, entry| {
+            |pubkey, slots_refs, _entry| {
                 let mut result = AccountsIndexScanResult::OnlyKeepInMemoryIfDirty;
+                let stored_account = &accounts[index];
                 if let Some((slot_list, ref_count)) = slots_refs {
-                    let stored_account = &accounts[index];
+                    stats
+                        .index_scan_returned_some
+                        .fetch_add(1, Ordering::Relaxed);
+
                     let is_alive = slot_list.iter().any(|(slot, _acct_info)| {
                         // if the accounts index contains an entry at this slot, then the append vec we're asking about contains this item and thus, it is alive at this slot
                         *slot == slot_to_shrink
@@ -3944,21 +3988,50 @@ impl AccountsDb {
                     } else {
                         // Hold onto the index entry arc so that it cannot be flushed.
                         // Since we are shrinking these entries, we need to disambiguate storage ids during this period and those only exist in the in-memory accounts index.
-                        index_entries_being_shrunk.push(Arc::clone(entry.unwrap()));
                         all_are_zero_lamports &= stored_account.is_zero_lamport();
                         alive_accounts.add(ref_count, stored_account, slot_list);
                         alive += 1;
                     }
                 } else {
                     stats
-                        .accounts_not_found_in_index
+                        .index_scan_returned_none
                         .fetch_add(1, Ordering::Relaxed);
+                    // getting None here means the account is 'normal' and was written to disk. This means it must have ref_count=1 and
+                    // slot_list.len() = 1. This means it must be alive in this slot. This is by far the most common case.
+                    // Note that we could get Some(...) here if the account is in the in mem index because it is hot.
+                    // Note this could also mean the account isn't on disk either. That would indicate a bug in accounts db.
+                    // Account is alive.
+                    let ref_count = 1;
+                    let slot_list = [(slot_to_shrink, AccountInfo::default())];
+                    if stored_account.is_zero_lamport()
+                        && ref_count == 1
+                        && latest_full_snapshot_slot
+                            .map(|latest_full_snapshot_slot| {
+                                latest_full_snapshot_slot >= slot_to_shrink
+                            })
+                            .unwrap_or(true)
+                    {
+                        // only do this if our slot is prior to the latest full snapshot
+                        // we found a zero lamport account that is the only instance of this account. We can delete it completely.
+                        zero_lamport_single_ref_pubkeys.push(pubkey);
+                        self.add_uncleaned_pubkeys_after_shrink(
+                            slot_to_shrink,
+                            [*pubkey].into_iter(),
+                        );
+                    } else {
+                        // Hold onto the index entry arc so that it cannot be flushed.
+                        // Since we are shrinking these entries, we need to disambiguate storage ids during this period and those only exist in the in-memory accounts index.
+                        all_are_zero_lamports &= stored_account.is_zero_lamport();
+                        alive_accounts.add(ref_count, stored_account, &slot_list);
+                        alive += 1;
+                    }
                 }
                 index += 1;
                 result
             },
             None,
             true,
+            self.scan_filter_for_shrinking,
         );
         assert_eq!(index, std::cmp::min(accounts.len(), count));
         stats.alive_accounts.fetch_add(alive, Ordering::Relaxed);
@@ -4182,6 +4255,7 @@ impl AccountsDb {
             |_pubkey, _slots_refs, _entry| AccountsIndexScanResult::Unref,
             Some(AccountsIndexScanResult::Unref),
             false,
+            ScanFilter::All,
         );
 
         zero_lamport_single_ref_pubkeys.iter().for_each(|k| {
@@ -4307,6 +4381,7 @@ impl AccountsDb {
                 },
                 None,
                 true,
+                ScanFilter::All,
             );
             return;
         }
@@ -8161,6 +8236,7 @@ impl AccountsDb {
                     },
                     Some(AccountsIndexScanResult::Unref),
                     false,
+                    ScanFilter::All,
                 )
             });
         });
@@ -9262,6 +9338,7 @@ impl AccountsDb {
             },
             None,
             false,
+            ScanFilter::All,
         );
         timings
             .rent_paying
@@ -16472,9 +16549,13 @@ pub mod tests {
 
     #[test]
     fn test_combine_ancient_slots_simple() {
-        for alive in [false, true] {
-            _ = get_one_ancient_append_vec_and_others(alive, 0);
-        }
+        // We used to test 'alive = false' with the old shrinking algorithm, but
+        // not any more with the new shrinking algorithm. 'alive = false' means
+        // that we will have account entries that's in the storages but not in
+        // accounts-db index. This violate the assumption in accounts-db, which
+        // the new shrinking algorithm now depends on. Therefore, we don't test
+        // 'alive = false'.
+        _ = get_one_ancient_append_vec_and_others(true, 0);
     }
 
     fn get_all_accounts_from_storages<'a>(
@@ -16879,8 +16960,15 @@ pub mod tests {
         solana_logger::setup();
         // combine 2-4 slots into a single ancient append vec
         for num_normal_slots in 1..3 {
-            // but some slots contain only dead accounts
-            for dead_accounts in 0..=num_normal_slots {
+            // We used to test dead_accounts for [0..=num_normal_slots]. This
+            // works with old shrinking algorithm, but no longer works with the
+            // new shrinking algorithm. The new shrinking algorithm requires
+            // that there should be no accounts entries, which are in the
+            // storage but not in the accounts-db index. And we expect that this
+            // assumption to be held by accounts-db. Therefore, we don't test
+            // dead_accounts anymore.  By setting dead_accounts to 0, we
+            // effectively skip dead_accounts removal in this test.
+            for dead_accounts in [0] {
                 let mut originals = Vec::default();
                 // ancient_slot: contains ancient append vec
                 // ancient_slot + 1: contains normal append vec with 1 alive account
