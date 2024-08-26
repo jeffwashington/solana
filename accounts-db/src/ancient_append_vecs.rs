@@ -95,6 +95,13 @@ impl AncientSlotInfos {
     ) -> bool {
         let mut was_randomly_shrunk = false;
         let alive_bytes = storage.alive_bytes() as u64;
+        if slot == 285293657 || slot == 285293246 {
+            log::error!(
+                "collect: {slot}, alive: {}, cap: {}",
+                alive_bytes,
+                storage.accounts.capacity()
+            );
+        }
         if alive_bytes > 0 {
             let capacity = storage.accounts.capacity();
             let should_shrink = if capacity > 0 {
@@ -333,12 +340,10 @@ impl AccountsDb {
             if s == &285293246 {
                 log::error!("skipping slot in ancient pack: {s}");
                 false
-            }
-            else if s == &285293657 {
+            } else if s == &285293657 {
                 log::error!("including: {s} in ancient pack");
                 true
-            }
-            else {
+            } else {
                 true
             }
         });
@@ -420,10 +425,14 @@ impl AccountsDb {
                 &ancient_slot_infos.all_infos[..],
             );
 
+        let min_resulting_packed_slots =
+            ancient_slot_infos.total_alive_bytes_shrink.0.saturating_sub(1) / u64::from(tuning.ideal_storage_size) + 1;
+        log::error!("min required: {}, bytes: {}", min_resulting_packed_slots, ancient_slot_infos.total_alive_bytes_shrink.0);
+
+
         let mut accounts_to_combine = self.calc_accounts_to_combine(
             &mut accounts_per_storage,
             &tuning,
-            ancient_slot_infos.total_alive_bytes_shrink.0,
             IncludeManyRefSlots::Skip,
         );
         metrics.unpackable_slots_count += accounts_to_combine.unpackable_slots_count;
@@ -754,9 +763,13 @@ impl AccountsDb {
         &self,
         accounts_per_storage: &'a mut Vec<(&'a SlotInfo, GetUniqueAccountsResult)>,
         tuning: &PackedAncientStorageTuning,
-        alive_bytes: u64,
         mut many_ref_slots: IncludeManyRefSlots,
     ) -> AccountsToCombine<'a> {
+        let alive_bytes = accounts_per_storage
+            .iter()
+            .map(|a| a.0.alive_bytes)
+            .sum::<u64>();
+
         // reverse sort by slot #
         accounts_per_storage.sort_unstable_by(|a, b| b.0.slot.cmp(&a.0.slot));
         let mut accounts_keep_slots = HashMap::default();
@@ -767,7 +780,8 @@ impl AccountsDb {
         // This also unrefs all dead accounts in those append vecs.
         let mut accounts_to_combine = self.thread_pool_clean.install(|| {
             accounts_per_storage
-                .par_iter()
+                .iter()
+                .rev()
                 .map(|(info, unique_accounts)| {
                     self.shrink_collect::<ShrinkCollectAliveSeparatedByRefs<'_>>(
                         &info.storage,
@@ -825,6 +839,13 @@ impl AccountsDb {
                     self.shrink_ancient_stats
                         .many_ref_slots_skipped
                         .fetch_add(1, Ordering::Relaxed);
+                    log::error!(
+                        "skipping {}, slots so far: {:?}, many ref slots: {}, required: {}",
+                        info.slot,
+                        target_slots_sorted,
+                        target_slots_sorted.len(),
+                        required_packed_slots
+                    );
                     remove.push(i);
                     continue;
                 }
@@ -869,6 +890,7 @@ impl AccountsDb {
         }
         let unpackable_slots_count = remove.len();
         remove.into_iter().rev().for_each(|i| {
+            log::error!("removing: {i}, {}", accounts_to_combine[i].slot);
             self.addref_accounts_failed_to_shrink_ancient(vec![accounts_to_combine.remove(i)]);
         });
         target_slots_sorted.sort_unstable();

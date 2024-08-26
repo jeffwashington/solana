@@ -462,7 +462,22 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
         let entry = map.entry(pubkey);
         m.stop();
         let found = matches!(entry, Entry::Occupied(_));
+        use std::str::FromStr;
+        let pks = ["hagGZB38EJLUfZDfWe2FZ5zTc6KahjKbAL3DyrPeU8B", "wWF4AChrPQ3fC4KfEBMF8MDBetAYBLcD4YmYDgp9SHn"];
+        let pks = pks.iter().map(|s| Pubkey::from_str(s).unwrap()).collect::<Vec<_>>();
+        if pks.contains(&pubkey) {
+            log::error!("remove if slot list empty: {pubkey}, {entry:?}");
+        }
+
         let result = self.remove_if_slot_list_empty_entry(entry);
+
+        let pks = ["hagGZB38EJLUfZDfWe2FZ5zTc6KahjKbAL3DyrPeU8B", "wWF4AChrPQ3fC4KfEBMF8MDBetAYBLcD4YmYDgp9SHn"];
+        let pks = pks.iter().map(|s| Pubkey::from_str(s).unwrap()).collect::<Vec<_>>();
+
+        if pks.contains(&pubkey) {
+            log::error!("remove if slot list empty: {pubkey}, {result:?}");
+        }
+
         drop(map);
 
         self.update_entry_stats(m, found);
@@ -1193,6 +1208,11 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
             mut evictions_random,
         } = self.flush_scan(current_age, startup, flush_guard, ages_flushing_now);
 
+        use std::str::FromStr;
+        let pks = ["hagGZB38EJLUfZDfWe2FZ5zTc6KahjKbAL3DyrPeU8B", "wWF4AChrPQ3fC4KfEBMF8MDBetAYBLcD4YmYDgp9SHn"];
+        let pks = pks.iter().map(|s| Pubkey::from_str(s).unwrap()).collect::<Vec<_>>();
+
+
         // write to disk outside in-mem map read lock
         {
             let mut evictions_age = Vec::with_capacity(evictions_age_possible.len());
@@ -1213,6 +1233,9 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
                         let mut slot_list = None;
                         if !is_random {
                             let mut mse = Measure::start("flush_should_evict");
+                            if pks.contains(&k) {
+                                log::error!("should evict: {k}, {v:?}");
+                            }
                             let (evict_for_age, slot_list_temp) = self.should_evict_from_mem(
                                 current_age,
                                 &v,

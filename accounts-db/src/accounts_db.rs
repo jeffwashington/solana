@@ -3909,7 +3909,7 @@ impl AccountsDb {
         let mut index_entries_being_shrunk = Vec::with_capacity(accounts.len());
         let latest_full_snapshot_slot = self.latest_full_snapshot_slot();
         use std::str::FromStr;
-        let pks = ["hagGZB38EJLUfZDfWe2FZ5zTc6KahjKbAL3DyrPeU8B"];
+        let pks = ["hagGZB38EJLUfZDfWe2FZ5zTc6KahjKbAL3DyrPeU8B", "wWF4AChrPQ3fC4KfEBMF8MDBetAYBLcD4YmYDgp9SHn"];
         let pks = pks.iter().map(|s| Pubkey::from_str(s).unwrap()).collect::<Vec<_>>();
 
         self.accounts_index.scan(
@@ -3923,7 +3923,7 @@ impl AccountsDb {
                         *slot == slot_to_shrink
                     });
                     if pks.contains(pubkey) || slot_to_shrink == 285293657 {
-                        log::error!("{}, {}, {}, alive: {is_alive}, rc: {ref_count}", pubkey, slot_to_shrink, line!());
+                        log::error!("{}, {}, {}, alive: {is_alive}, rc: {ref_count}, zero: {}", pubkey, slot_to_shrink, line!(), stored_account.is_zero_lamport());
                     }
                     if !is_alive {
                         // This pubkey was found in the storage, but no longer exists in the index.
@@ -6897,8 +6897,11 @@ impl AccountsDb {
             });
         }
 
+        if accounts.target_slot() == 285293657 {
+            log::error!("storing to: {}", accounts.target_slot());
+        }
         use std::str::FromStr;
-        let pks = ["hagGZB38EJLUfZDfWe2FZ5zTc6KahjKbAL3DyrPeU8B"];
+        let pks = ["hagGZB38EJLUfZDfWe2FZ5zTc6KahjKbAL3DyrPeU8B","wWF4AChrPQ3fC4KfEBMF8MDBetAYBLcD4YmYDgp9SHn"];
         let pks = pks.iter().map(|s| Pubkey::from_str(s).unwrap()).collect::<Vec<_>>();
         (0..accounts.len()).for_each(|index| {
             accounts.account(index, |account| {
@@ -8794,6 +8797,10 @@ impl AccountsDb {
         use std::str::FromStr;
         let pks = ["hagGZB38EJLUfZDfWe2FZ5zTc6KahjKbAL3DyrPeU8B"];
         let pks = pks.iter().map(|s| Pubkey::from_str(s).unwrap()).collect::<Vec<_>>();
+
+        if slot == 285293246 || slot == 285293657 {
+            log::error!("index loading: {slot}, id: {}", storage.id());
+        }
 
         let mut rent_paying_accounts_by_partition = Vec::default();
         let mut accounts_data_len = 0;
