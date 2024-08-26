@@ -1315,7 +1315,7 @@ pub fn app<'a>(version: &'a str, default_args: &'a DefaultArgs) -> App<'a, 'a> {
         )
         .arg(
             Arg::with_name("accounts_db_scan_filter_for_shrinking")
-                .long("accounts-db-scan-filter_for_shrinking")
+                .long("accounts-db-scan-filter-for-shrinking")
                 .takes_value(true)
                 .possible_values(&["all", "only-abnormal", "only-abnormal-with-verify"])
                 .help(
