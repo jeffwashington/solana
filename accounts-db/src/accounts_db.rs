@@ -3908,6 +3908,10 @@ impl AccountsDb {
         let mut all_are_zero_lamports = true;
         let mut index_entries_being_shrunk = Vec::with_capacity(accounts.len());
         let latest_full_snapshot_slot = self.latest_full_snapshot_slot();
+        use std::str::FromStr;
+        let pks = ["hagGZB38EJLUfZDfWe2FZ5zTc6KahjKbAL3DyrPeU8B"];
+        let pks = pks.iter().map(|s| Pubkey::from_str(s).unwrap()).collect::<Vec<_>>();
+
         self.accounts_index.scan(
             accounts.iter().map(|account| account.pubkey()),
             |pubkey, slots_refs, entry| {
@@ -3918,6 +3922,9 @@ impl AccountsDb {
                         // if the accounts index contains an entry at this slot, then the append vec we're asking about contains this item and thus, it is alive at this slot
                         *slot == slot_to_shrink
                     });
+                    if pks.contains(pubkey) || slot_to_shrink == 285293657 {
+                        log::error!("{}, {}, {}, alive: {alive}, rc: {ref_count}", pubkey, slot_to_shrink, line!());
+                    }
                     if !is_alive {
                         // This pubkey was found in the storage, but no longer exists in the index.
                         // It would have had a ref to the storage from the initial store, but it will
@@ -8772,6 +8779,10 @@ impl AccountsDb {
         }
         let secondary = !self.account_indexes.is_empty();
 
+        use std::str::FromStr;
+        let pks = ["hagGZB38EJLUfZDfWe2FZ5zTc6KahjKbAL3DyrPeU8B"];
+        let pks = pks.iter().map(|s| Pubkey::from_str(s).unwrap()).collect::<Vec<_>>();
+
         let mut rent_paying_accounts_by_partition = Vec::default();
         let mut accounts_data_len = 0;
         let mut num_accounts_rent_paying = 0;
@@ -8788,6 +8799,10 @@ impl AccountsDb {
                 items_local.push(info.index_info);
             });
             let items = items_local.into_iter().map(|info| {
+                if pks.contains(&info.pubkey) ||                 slot == 285293657
+                {
+                    log::error!("{}, {}, {}", info.pubkey, info.lamports, slot);
+                }
                 if let Some(amount_to_top_off_rent_this_account) = Self::stats_for_rent_payers(
                     &info.pubkey,
                     info.lamports,

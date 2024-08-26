@@ -129,6 +129,10 @@ impl<'b, T: Clone + Copy + PartialEq + std::fmt::Debug + 'static> Bucket<T> {
     ) -> Self {
         let reuse_path = std::mem::take(&mut restartable_bucket.path);
         let elem_size = NonZeroU64::new(std::mem::size_of::<IndexEntry<T>>() as u64).unwrap();
+        use std::str::FromStr;
+        let pks = ["hagGZB38EJLUfZDfWe2FZ5zTc6KahjKbAL3DyrPeU8B"];
+        let pks = pks.iter().map(|s| Pubkey::from_str(s).unwrap()).collect::<Vec<_>>();
+
         let (index, random, reused_file_at_startup) = reuse_path
             .and_then(|path| {
                 // try to re-use the file this bucket was using last time we were running
@@ -141,6 +145,7 @@ impl<'b, T: Clone + Copy + PartialEq + std::fmt::Debug + 'static> Bucket<T> {
                         count.clone(),
                     )
                     .map(|index| (index, random, true /* true = reused file */));
+
                     if result.is_none() {
                         // we couldn't re-use it, so delete it
                         _ = fs::remove_file(path);
@@ -405,6 +410,10 @@ impl<'b, T: Clone + Copy + PartialEq + std::fmt::Debug + 'static> Bucket<T> {
         reverse_sorted_entries: &mut Vec<(u64, usize)>,
         duplicates: &mut Vec<(usize, T)>,
     ) {
+        use std::str::FromStr;
+        let pks = ["hagGZB38EJLUfZDfWe2FZ5zTc6KahjKbAL3DyrPeU8B"];
+        let pks = pks.iter().map(|s| Pubkey::from_str(s).unwrap()).collect::<Vec<_>>();
+
         let max_search = index.max_search();
         let cap = index.capacity();
         let search_end = max_search.min(cap);
@@ -416,6 +425,9 @@ impl<'b, T: Clone + Copy + PartialEq + std::fmt::Debug + 'static> Bucket<T> {
             for search in 0..search_end {
                 let ix_index = (ix_entry_raw + search) % cap;
                 let elem = IndexEntryPlaceInBucket::new(ix_index);
+                if pks.contains(elem.key(index)) {
+                    log::error!("{}, {:?}", elem.key(index), elem.read_value(index, data_buckets));
+                }
                 match elem.occupy_if_matches(index, v, k) {
                     OccupyIfMatches::SuccessfulInit => {}
                     OccupyIfMatches::FoundDuplicate => {
