@@ -394,6 +394,7 @@ impl AccountsDb {
             return true;
         }
         if target_slots_sorted.len() < required_ideal_packed {
+            log::error!("fail: {},{}", target_slots_sorted.len(), required_ideal_packed);
             return false;
         }
         let i_last = target_slots_sorted
@@ -403,7 +404,13 @@ impl AccountsDb {
         let highest_slot = target_slots_sorted[i_last];
         many_refs_newest
             .iter()
-            .all(|many| many.slot <= highest_slot)
+            .all(|many| {
+                let r = many.slot <= highest_slot;
+                if !r {
+                    log::error!("fail2: {},{}",  many.slot, highest_slot);
+                }
+                r
+            })
     }
 
     fn combine_ancient_slots_packed_internal(
@@ -412,9 +419,6 @@ impl AccountsDb {
         tuning: PackedAncientStorageTuning,
         metrics: &mut ShrinkStatsSub,
     ) {
-        self.shrink_ancient_stats
-            .slots_considered
-            .fetch_add(sorted_slots.len() as u64, Ordering::Relaxed);
         let ancient_slot_infos = self.collect_sort_filter_ancient_slots(sorted_slots, &tuning);
 
         if ancient_slot_infos.all_infos.is_empty() {
@@ -605,6 +609,10 @@ impl AccountsDb {
                 }
             }
         }
+        self.shrink_ancient_stats
+            .slots_considered
+            .fetch_add(infos.all_infos.len() as u64, Ordering::Relaxed);
+
         let mut total_dead_bytes = 0;
         let should_shrink_count = infos
             .all_infos
@@ -793,6 +801,7 @@ impl AccountsDb {
                 })
                 .collect::<Vec<_>>()
         });
+        let mut accounts_to_combine = accounts_to_combine.into_iter().rev().collect::<Vec<_>>();
 
         let mut many_refs_old_alive_count = 0;
 
@@ -804,7 +813,7 @@ impl AccountsDb {
         let mut remove = Vec::default();
         let mut last_slot = None;
         for (i, (shrink_collect, (info, _unique_accounts))) in accounts_to_combine
-            .iter_mut().rev()
+            .iter_mut()
             .zip(accounts_per_storage.iter())
             .enumerate()
         {
@@ -815,7 +824,7 @@ impl AccountsDb {
             last_slot = Some(info.slot);
 
             if 285293246 == info.slot {
-                log::error!("force skipping: {}", info.slot);
+                log::error!("force skipping: {i}, {}", info.slot);
                 remove.push(i);
                 continue;
             }
