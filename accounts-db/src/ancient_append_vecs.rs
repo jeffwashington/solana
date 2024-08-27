@@ -747,7 +747,6 @@ impl AccountsDb {
             .map(|a| a.0.alive_bytes)
             .sum::<u64>();
 
-        log::error!("alive bytes: {}", alive_bytes);
         // reverse sort by slot #
         accounts_per_storage.sort_unstable_by(|a, b| b.0.slot.cmp(&a.0.slot));
         let mut accounts_keep_slots = HashMap::default();
