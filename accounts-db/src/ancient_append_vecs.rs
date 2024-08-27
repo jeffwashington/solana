@@ -339,7 +339,7 @@ impl AccountsDb {
         sorted_slots.retain(|s| {
             if s == &285293246 {
                 log::error!("skipping slot in ancient pack: {s}");
-                false
+                true
             } else if s == &285293657 {
                 log::error!("including: {s} in ancient pack");
                 true
