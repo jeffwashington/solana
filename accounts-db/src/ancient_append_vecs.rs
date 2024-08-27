@@ -776,6 +776,8 @@ impl AccountsDb {
         let len = accounts_per_storage.len();
         let mut target_slots_sorted = Vec::with_capacity(len);
 
+        assert!(accounts_per_storage.first().unwrap().0.slot >= accounts_per_storage.last().unwrap().0.slot, "{:?}", accounts_per_storage.iter().map(|a| a.0.slot).collect::<Vec<_>>());
+
         // `shrink_collect` all accounts in the append vecs we want to combine.
         // This also unrefs all dead accounts in those append vecs.
         let mut accounts_to_combine = self.thread_pool_clean.install(|| {
@@ -802,7 +804,7 @@ impl AccountsDb {
         let mut remove = Vec::default();
         let mut last_slot = None;
         for (i, (shrink_collect, (info, _unique_accounts))) in accounts_to_combine
-            .iter_mut()
+            .iter_mut().rev()
             .zip(accounts_per_storage.iter())
             .enumerate()
         {
@@ -811,6 +813,12 @@ impl AccountsDb {
                 assert!(last_slot > info.slot);
             }
             last_slot = Some(info.slot);
+
+            if 285293246 == info.slot {
+                log::error!("force skipping: {}", info.slot);
+                remove.push(i);
+                continue;
+            }
 
             let many_refs_old_alive = &mut shrink_collect.alive_accounts.many_refs_old_alive;
             if many_ref_slots == IncludeManyRefSlots::Skip

@@ -3941,7 +3941,10 @@ impl AccountsDb {
                             })
                             .unwrap_or(true)
                     {
-                        // only do this if our slot is prior to the latest full snapshot
+                        if pks.contains(pubkey) || slot_to_shrink == 285293657 {
+                            log::error!("zero lamport single ref: {}, {}, {}, alive: {is_alive}, rc: {ref_count}, zero: {}", pubkey, slot_to_shrink, line!(), stored_account.is_zero_lamport());
+                        }
+                            // only do this if our slot is prior to the latest full snapshot
                         // we found a zero lamport account that is the only instance of this account. We can delete it completely.
                         zero_lamport_single_ref_pubkeys.push(pubkey);
                         self.add_uncleaned_pubkeys_after_shrink(
@@ -6906,7 +6909,7 @@ impl AccountsDb {
         (0..accounts.len()).for_each(|index| {
             accounts.account(index, |account| {
                 if pks.contains(account.pubkey()) {
-                    log::error!("store: {}, {}", account.pubkey(), accounts.target_slot());
+                    log::error!("store: {}, {}, {}, {}", account.pubkey(), accounts.target_slot(), account.lamports(), accounts.slot(index));
                 }
             });
         });
