@@ -8063,8 +8063,14 @@ impl AccountsDb {
                         // sort so offsets are in order. This improves efficiency of loading the accounts.
                         offsets.sort_unstable();
                         let dead_bytes = store.accounts.get_account_sizes(&offsets).iter().sum();
-                        store.remove_accounts(dead_bytes, reset_accounts, offsets.len());
-                        if Self::is_shrinking_productive(*slot, &store)
+                        let count = store.remove_accounts(dead_bytes, reset_accounts, offsets.len());
+                        if count == 0 {
+                            // this should not happen unless this code is called concurrently from multiple threads.
+                            // but the check above for offsets.len() == store.count() is not atomic. `remove_accounts` is atomic
+                            // and this behavior is correct whatever the case.
+                            self.dirty_stores.insert(*slot, store.clone());
+                            dead_slots.insert(*slot);
+                        } else if Self::is_shrinking_productive(*slot, &store)
                             && self.is_candidate_for_shrink(&store)
                         {
                             // Checking that this single storage entry is ready for shrinking,
