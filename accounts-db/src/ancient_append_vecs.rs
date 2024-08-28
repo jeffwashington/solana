@@ -3877,7 +3877,6 @@ pub mod tests {
                 alive_total_bytes: 0,
                 total_starting_accounts: 0,
                 all_are_zero_lamports: false,
-                _index_entries_being_shrunk: Vec::default(),
             };
             let accounts_to_combine = AccountsToCombine {
                 accounts_keep_slots: HashMap::default(),

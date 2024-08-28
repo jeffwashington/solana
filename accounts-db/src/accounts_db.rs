@@ -483,9 +483,6 @@ pub(crate) struct ShrinkCollect<'a, T: ShrinkCollectRefs<'a>> {
     pub(crate) total_starting_accounts: usize,
     /// true if all alive accounts are zero lamports
     pub(crate) all_are_zero_lamports: bool,
-    /// index entries that need to be held in memory while shrink is in progress
-    /// These aren't read - they are just held so that entries cannot be flushed.
-    pub(crate) _index_entries_being_shrunk: Vec<AccountMapEntry<AccountInfo>>,
 }
 
 pub const ACCOUNTS_DB_CONFIG_FOR_TESTING: AccountsDbConfig = AccountsDbConfig {
@@ -532,8 +529,6 @@ struct LoadAccountsIndexForShrink<'a, T: ShrinkCollectRefs<'a>> {
     zero_lamport_single_ref_pubkeys: Vec<&'a Pubkey>,
     /// true if all alive accounts are zero lamport accounts
     all_are_zero_lamports: bool,
-    /// index entries we need to hold onto to keep them from getting flushed
-    index_entries_being_shrunk: Vec<AccountMapEntry<AccountInfo>>,
 }
 
 /// reference an account found during scanning a storage. This is a byval struct to replace
@@ -3948,7 +3943,6 @@ impl AccountsDb {
         let mut index_scan_returned_some_count = 0;
         let mut index_scan_returned_none_count = 0;
         let mut all_are_zero_lamports = true;
-        let index_entries_being_shrunk = Vec::with_capacity(accounts.len());
         let latest_full_snapshot_slot = self.latest_full_snapshot_slot();
         self.accounts_index.scan(
             accounts.iter().map(|account| account.pubkey()),
@@ -4016,8 +4010,6 @@ impl AccountsDb {
                             [*pubkey].into_iter(),
                         );
                     } else {
-                        // Hold onto the index entry arc so that it cannot be flushed.
-                        // Since we are shrinking these entries, we need to disambiguate storage ids during this period and those only exist in the in-memory accounts index.
                         all_are_zero_lamports &= stored_account.is_zero_lamport();
                         alive_accounts.add(ref_count, stored_account, &slot_list);
                         alive += 1;
@@ -4045,7 +4037,6 @@ impl AccountsDb {
             unrefed_pubkeys,
             zero_lamport_single_ref_pubkeys,
             all_are_zero_lamports,
-            index_entries_being_shrunk,
         }
     }
 
@@ -4157,7 +4148,6 @@ impl AccountsDb {
             .num_duplicated_accounts
             .fetch_add(*num_duplicated_accounts as u64, Ordering::Relaxed);
         let all_are_zero_lamports_collect = Mutex::new(true);
-        let index_entries_being_shrunk_outer = Mutex::new(Vec::default());
         self.thread_pool_clean.install(|| {
             stored_accounts
                 .par_chunks(SHRINK_COLLECT_CHUNK_SIZE)
@@ -4167,7 +4157,6 @@ impl AccountsDb {
                         mut unrefed_pubkeys,
                         all_are_zero_lamports,
                         mut zero_lamport_single_ref_pubkeys,
-                        mut index_entries_being_shrunk,
                     } = self.load_accounts_index_for_shrink(stored_accounts, stats, slot);
 
                     // collect
@@ -4183,10 +4172,6 @@ impl AccountsDb {
                         .lock()
                         .unwrap()
                         .append(&mut zero_lamport_single_ref_pubkeys);
-                    index_entries_being_shrunk_outer
-                        .lock()
-                        .unwrap()
-                        .append(&mut index_entries_being_shrunk);
                     if !all_are_zero_lamports {
                         *all_are_zero_lamports_collect.lock().unwrap() = false;
                     }
@@ -4226,7 +4211,6 @@ impl AccountsDb {
             alive_total_bytes,
             total_starting_accounts: len,
             all_are_zero_lamports: all_are_zero_lamports_collect.into_inner().unwrap(),
-            _index_entries_being_shrunk: index_entries_being_shrunk_outer.into_inner().unwrap(),
         }
     }
 
