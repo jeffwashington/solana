@@ -637,6 +637,8 @@ pub enum AccountsIndexScanResult {
     KeepInMemory,
     /// reduce refcount by 1
     Unref,
+    /// reduce refcount by 1 and assert that ref_count = 0
+    UnrefAssert0,
 }
 
 #[derive(Debug)]
@@ -1441,6 +1443,13 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
                         };
                         cache = match result {
                             AccountsIndexScanResult::Unref => {
+                                if locked_entry.unref() {
+                                    info!("scan: refcount of item already at 0: {pubkey}");
+                                }
+                                true
+                            }
+                            AccountsIndexScanResult::UnrefAssert0 => {
+                                assert_eq!(locked_entry.ref_count(), 1);
                                 if locked_entry.unref() {
                                     info!("scan: refcount of item already at 0: {pubkey}");
                                 }

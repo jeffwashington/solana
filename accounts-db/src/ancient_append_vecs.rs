@@ -788,7 +788,7 @@ impl AccountsDb {
 
         // `shrink_collect` all accounts in the append vecs we want to combine.
         // This also unrefs all dead accounts in those append vecs.
-        let mut accounts_to_combine = self.thread_pool_clean.install(|| {
+        let accounts_to_combine = self.thread_pool_clean.install(|| {
             accounts_per_storage
                 .iter()
                 .rev()
