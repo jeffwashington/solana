@@ -4258,7 +4258,7 @@ impl AccountsDb {
         self.accounts_index.scan(
             zero_lamport_single_ref_pubkeys.iter().cloned(),
             |_pubkey, _slots_refs, _entry| AccountsIndexScanResult::Unref,
-            Some(AccountsIndexScanResult::Unref),
+            Some(AccountsIndexScanResult::UnrefAssert0),
             false,
             ScanFilter::All,
         );
