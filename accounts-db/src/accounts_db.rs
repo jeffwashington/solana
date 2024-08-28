@@ -2991,7 +2991,9 @@ impl AccountsDb {
             result,
             -((epoch_schedule.slots_per_epoch as i64).saturating_sub(1)),
         );
-        result.min(max_root_inclusive)
+        let result = result.min(max_root_inclusive);
+        log::error!("oldest non ancient slot: {result}, max root: {max_root_inclusive}, diff: {}, offset: {:?}", max_root_inclusive.saturating_sub(result), self.ancient_append_vec_offset);
+        result
     }
 
     /// Collect all the uncleaned slots, up to a max slot
