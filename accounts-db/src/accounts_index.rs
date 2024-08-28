@@ -311,14 +311,15 @@ impl<T: IndexValue> AccountMapEntryInner<T> {
     }
 
     /// decrement the ref count
-    /// return true if the old refcount was already 0. This indicates an under refcounting error in the system.
-    pub fn unref(&self) -> bool {
+    /// return the refcount prior to subtracting 1
+    /// 0 indicates an under refcounting error in the system.
+    pub fn unref(&self) -> RefCount {
         let previous = self.ref_count.fetch_sub(1, Ordering::Release);
         self.set_dirty(true);
         if previous == 0 {
             inc_new_counter_info!("accounts_index-deref_from_0", 1);
         }
-        previous == 0
+        previous
     }
 
     pub fn dirty(&self) -> bool {
@@ -647,6 +648,8 @@ pub enum AccountsIndexScanResult {
     KeepInMemory,
     /// reduce refcount by 1
     Unref,
+    /// reduce refcount by 1 and assert that ref_count = 0
+    UnrefAssert0,
 }
 
 #[derive(Debug)]
@@ -1450,9 +1453,13 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
                         };
                         cache = match result {
                             AccountsIndexScanResult::Unref => {
-                                if locked_entry.unref() {
+                                if locked_entry.unref() == 0 {
                                     info!("scan: refcount of item already at 0: {pubkey}");
                                 }
+                                true
+                            }
+                            AccountsIndexScanResult::UnrefAssert0 => {
+                                assert_eq!(locked_entry.unref(), 1);
                                 true
                             }
                             AccountsIndexScanResult::KeepInMemory => true,
@@ -4072,9 +4079,9 @@ pub mod tests {
             assert!(map.get_internal_inner(&key, |entry| {
                 // check refcount BEFORE the unref
                 assert_eq!(u64::from(!expected), entry.unwrap().ref_count());
-                // first time, ref count was at 1, we can unref once. Unref should return false.
-                // second time, ref count was at 0, it is an error to unref. Unref should return true
-                assert_eq!(expected, entry.unwrap().unref());
+                // first time, ref count was at 1, we can unref once. Unref should return 1.
+                // second time, ref count was at 0, it is an error to unref. Unref should return 0
+                assert_eq!(u64::from(!expected), entry.unwrap().unref());
                 // check refcount AFTER the unref
                 assert_eq!(
                     if expected {
