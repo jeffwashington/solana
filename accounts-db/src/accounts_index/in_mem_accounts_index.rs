@@ -421,6 +421,7 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
                     occupied.get().slot_list.read().unwrap().is_empty(),
                 );
                 if result {
+                    assert_eq!(occupied.get().ref_count(), 0);
                     // note there is a potential race here that has existed.
                     // if someone else holds the arc,
                     //  then they think the item is still in the index and can make modifications.
