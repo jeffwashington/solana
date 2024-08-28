@@ -659,7 +659,7 @@ impl AccountsDb {
         }
         self.shrink_ancient_stats
             .slots_considered
-            .fetch_add(infos.len() as u64, Ordering::Relaxed);
+            .fetch_add(infos.all_infos.len() as u64, Ordering::Relaxed);
         let mut total_dead_bytes = 0;
         let should_shrink_count = infos
             .all_infos
