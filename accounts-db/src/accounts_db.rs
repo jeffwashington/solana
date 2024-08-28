@@ -3945,6 +3945,8 @@ impl AccountsDb {
         let mut alive = 0;
         let mut dead = 0;
         let mut index = 0;
+        let mut index_scan_returned_some_count = 0;
+        let mut index_scan_returned_none_count = 0;
         let mut all_are_zero_lamports = true;
         let index_entries_being_shrunk = Vec::with_capacity(accounts.len());
         let latest_full_snapshot_slot = self.latest_full_snapshot_slot();
@@ -3954,10 +3956,7 @@ impl AccountsDb {
                 let mut result = AccountsIndexScanResult::OnlyKeepInMemoryIfDirty;
                 let stored_account = &accounts[index];
                 if let Some((slot_list, ref_count)) = slots_refs {
-                    stats
-                        .index_scan_returned_some
-                        .fetch_add(1, Ordering::Relaxed);
-
+                    index_scan_returned_some_count += 1;
                     let is_alive = slot_list.iter().any(|(slot, _acct_info)| {
                         // if the accounts index contains an entry at this slot, then the append vec we're asking about contains this item and thus, it is alive at this slot
                         *slot == slot_to_shrink
@@ -3993,9 +3992,7 @@ impl AccountsDb {
                         alive += 1;
                     }
                 } else {
-                    stats
-                        .index_scan_returned_none
-                        .fetch_add(1, Ordering::Relaxed);
+                    index_scan_returned_none_count += 1;
                     // getting None here means the account is 'normal' and was written to disk. This means it must have ref_count=1 and
                     // slot_list.len() = 1. This means it must be alive in this slot. This is by far the most common case.
                     // Note that we could get Some(...) here if the account is in the in mem index because it is hot.
@@ -4034,6 +4031,12 @@ impl AccountsDb {
             self.scan_filter_for_shrinking,
         );
         assert_eq!(index, std::cmp::min(accounts.len(), count));
+        stats
+            .index_scan_returned_some
+            .fetch_add(index_scan_returned_some_count, Ordering::Relaxed);
+        stats
+            .index_scan_returned_none
+            .fetch_add(index_scan_returned_none_count, Ordering::Relaxed);
         stats.alive_accounts.fetch_add(alive, Ordering::Relaxed);
         stats.dead_accounts.fetch_add(dead, Ordering::Relaxed);
 
