@@ -1466,17 +1466,6 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
                 (cache, ())
             };
 
-            let mut filter = filter;
-            if filter == ScanFilter::OnlyAbnormal
-                && lock
-                    .as_ref()
-                    .unwrap()
-                    .has_written_abnormal_accounts_to_disk()
-            {
-                // we cannot trust just what is in memory because the index ran out of mem and had to flush things to disk
-                filter = ScanFilter::All;
-            }
-
             match filter {
                 ScanFilter::All => {
                     // SAFETY: The caller must ensure that if `provide_entry_in_callback` is true, and

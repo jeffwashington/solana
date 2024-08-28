@@ -124,10 +124,6 @@ pub struct InMemAccountsIndex<T: IndexValue, U: DiskIndexValue + From<T> + Into<
 
     /// stats related to starting up
     pub(crate) startup_stats: Arc<StartupStats>,
-
-    /// set if we ever exceed the budget and might write abnormal accounts to disk
-    /// abnormal account means ref_count != 1 or slot_list.len() != 1
-    has_written_abnormal_accounts_to_disk: AtomicBool,
 }
 
 impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> Debug for InMemAccountsIndex<T, U> {
@@ -195,7 +191,6 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
             ),
             num_ages_to_distribute_flushes,
             startup_stats: Arc::clone(&storage.startup_stats),
-            has_written_abnormal_accounts_to_disk: AtomicBool::default(),
         }
     }
 
@@ -1424,11 +1419,6 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> InMemAccountsIndex<T,
         self.stats().sub_mem_count(self.bin, evicted);
         Self::update_stat(&self.stats().flush_entries_evicted_from_mem, evicted as u64);
         Self::update_stat(&self.stats().failed_to_evict, failed as u64);
-    }
-
-    pub(crate) fn has_written_abnormal_accounts_to_disk(&self) -> bool {
-        self.has_written_abnormal_accounts_to_disk
-            .load(Ordering::Acquire)
     }
 
     pub fn stats(&self) -> &BucketMapHolderStats {
