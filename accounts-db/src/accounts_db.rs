@@ -1991,6 +1991,7 @@ pub(crate) struct ShrinkAncientStats {
     pub(crate) many_refs_old_alive: AtomicU64,
     pub(crate) slots_eligible_to_shrink: AtomicU64,
     pub(crate) total_dead_bytes: AtomicU64,
+    pub(crate) slot: AtomicU64,
     pub(crate) total_alive_bytes: AtomicU64,
 }
 
@@ -2321,6 +2322,11 @@ impl ShrinkAncientStats {
             (
                 "slots_eligible_to_shrink",
                 self.slots_eligible_to_shrink.swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "slot",
+                self.slot.swap(0, Ordering::Relaxed),
                 i64
             ),
             (
@@ -3599,6 +3605,7 @@ impl AccountsDb {
         self.clean_accounts_stats.report();
         datapoint_info!(
             "clean_accounts",
+            ("slot", max_clean_root_inclusive.unwrap_or_default(), i64),
             ("total_us", measure_all.as_us(), i64),
             (
                 "collect_delta_keys_us",
