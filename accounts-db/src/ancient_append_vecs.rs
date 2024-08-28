@@ -354,7 +354,7 @@ impl AccountsDb {
     fn get_old_large(newest_ancient_slot: Slot) -> PackedAncientOldLargeTuning {
         PackedAncientOldLargeTuning {
             // an account staying alive for 1M slots is a cut-off for 'really cold'
-            old_slot_max_inclusive: newest_ancient_slot.saturating_sub(600_000), // seems like 1M would be better. Maybe longer?
+            old_slot_max_inclusive: newest_ancient_slot.saturating_sub(100_000), // seems like 1M would be better. Maybe longer?
             // 90% of an ideal storage size means we previously thought this account was 'really cold'
             large_storage_bytes: get_ancient_append_vec_capacity() * 90 / 100,
         }
@@ -659,7 +659,7 @@ impl AccountsDb {
         }
         self.shrink_ancient_stats
             .slots_considered
-            .fetch_add(slots.len() as u64, Ordering::Relaxed);
+            .fetch_add(infos.len() as u64, Ordering::Relaxed);
         let mut total_dead_bytes = 0;
         let should_shrink_count = infos
             .all_infos
