@@ -1958,6 +1958,7 @@ struct CleanAccountsStats {
     clean_stored_dead_slots_us: AtomicU64,
     uncleaned_roots_slot_list_1: AtomicU64,
     get_account_sizes_us: AtomicU64,
+    slots_cleaned: AtomicU64,
 }
 
 impl CleanAccountsStats {
@@ -3594,6 +3595,13 @@ impl AccountsDb {
                 "get_account_sizes_us",
                 self.clean_accounts_stats
                     .get_account_sizes_us
+                    .swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
+                "slots_cleaned",
+                self.clean_accounts_stats
+                    .slots_cleaned
                     .swap(0, Ordering::Relaxed),
                 i64
             ),
@@ -8029,6 +8037,10 @@ impl AccountsDb {
             assert_eq!(reclaimed_offsets.len(), 1);
             assert!(reclaimed_offsets.contains_key(&expected_slot));
         }
+
+        self.clean_accounts_stats
+            .slots_cleaned
+            .fetch_add(reclaimed_offsets.len() as u64, Ordering::Relaxed);
 
         reclaimed_offsets.iter().for_each(|(slot, offsets)| {
             if let Some(store) = self
