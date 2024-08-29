@@ -499,7 +499,7 @@ pub const ACCOUNTS_DB_CONFIG_FOR_TESTING: AccountsDbConfig = AccountsDbConfig {
     test_partitioned_epoch_rewards: TestPartitionedEpochRewards::CompareResults,
     test_skip_rewrites_but_include_in_bank_hash: false,
     storage_access: StorageAccess::Mmap,
-    scan_filter_for_shrinking: ScanFilter::All,
+    scan_filter_for_shrinking: ScanFilter::OnlyAbnormalWithVerify,
 };
 pub const ACCOUNTS_DB_CONFIG_FOR_BENCHMARKS: AccountsDbConfig = AccountsDbConfig {
     index: Some(ACCOUNTS_INDEX_CONFIG_FOR_BENCHMARKS),
@@ -515,7 +515,7 @@ pub const ACCOUNTS_DB_CONFIG_FOR_BENCHMARKS: AccountsDbConfig = AccountsDbConfig
     test_partitioned_epoch_rewards: TestPartitionedEpochRewards::None,
     test_skip_rewrites_but_include_in_bank_hash: false,
     storage_access: StorageAccess::Mmap,
-    scan_filter_for_shrinking: ScanFilter::All,
+    scan_filter_for_shrinking: ScanFilter::OnlyAbnormalWithVerify,
 };
 
 pub type BinnedHashData = Vec<Vec<CalculateHashIntermediate>>;
