@@ -11066,6 +11066,35 @@ pub mod tests {
     }
 
     #[test]
+    #[should_panic]
+
+    fn test_remove_zero_lamport_multi_ref_accounts_panic() {
+        let accounts = AccountsDb::new_single_for_tests();
+        let pubkey_zero = Pubkey::from([1; 32]);
+        let one_lamport_account =
+            AccountSharedData::new(1, 0, AccountSharedData::default().owner());
+
+        let zero_lamport_account =
+            AccountSharedData::new(0, 0, AccountSharedData::default().owner());
+        let slot = 1;
+
+        accounts.store_for_tests(slot, &[(&pubkey_zero, &one_lamport_account)]);
+        accounts.calculate_accounts_delta_hash(slot);
+        accounts.add_root_and_flush_write_cache(slot);
+
+        accounts.store_for_tests(slot + 1, &[(&pubkey_zero, &zero_lamport_account)]);
+        accounts.calculate_accounts_delta_hash(slot + 1);
+        accounts.add_root_and_flush_write_cache(slot + 1);
+
+        // This should panic because there are ref for pubkey_zero.
+        accounts.remove_zero_lamport_single_ref_accounts_after_shrink(
+            &[&pubkey_zero],
+            slot,
+            &ShrinkStats::default(),
+        );
+    }
+
+    #[test]
     fn test_remove_zero_lamport_single_ref_accounts_after_shrink() {
         for pass in 0..3 {
             let accounts = AccountsDb::new_single_for_tests();
