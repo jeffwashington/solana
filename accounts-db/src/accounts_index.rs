@@ -648,7 +648,7 @@ pub enum AccountsIndexScanResult {
     KeepInMemory,
     /// reduce refcount by 1
     Unref,
-    /// reduce refcount by 1 and assert that ref_count = 0
+    /// reduce refcount by 1 and assert that ref_count = 0 after unref
     UnrefAssert0,
 }
 

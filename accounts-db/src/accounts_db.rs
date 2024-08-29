@@ -11152,7 +11152,6 @@ pub mod tests {
 
     #[test]
     #[should_panic]
-
     fn test_remove_zero_lamport_multi_ref_accounts_panic() {
         let accounts = AccountsDb::new_single_for_tests();
         let pubkey_zero = Pubkey::from([1; 32]);
@@ -11224,7 +11223,8 @@ pub mod tests {
                 (false, ())
             });
 
-            let zero_lamport_single_ref_pubkeys = [&pubkey_zero];
+            let zero_lamport_single_ref_pubkeys =
+                if pass < 2 { vec![&pubkey_zero] } else { vec![] };
             accounts.remove_zero_lamport_single_ref_accounts_after_shrink(
                 &zero_lamport_single_ref_pubkeys,
                 slot,
@@ -11232,31 +11232,58 @@ pub mod tests {
             );
 
             accounts.accounts_index.get_and_then(&pubkey_zero, |entry| {
-                if pass == 0 {
-                    // should not exist in index at all
-                    assert!(entry.is_none(), "{pass}");
-                } else {
-                    // alive only in slot + 1
-                    assert_eq!(entry.unwrap().slot_list.read().unwrap().len(), 1);
-                    assert_eq!(
-                        entry
+                match pass {
+                    0 => {
+                        // should not exist in index at all
+                        assert!(entry.is_none(), "{pass}");
+                    }
+                    1 => {
+                        // alive only in slot + 1
+                        assert_eq!(entry.unwrap().slot_list.read().unwrap().len(), 1);
+                        assert_eq!(
+                            entry
+                                .unwrap()
+                                .slot_list
+                                .read()
+                                .unwrap()
+                                .first()
+                                .map(|(s, _)| s)
+                                .cloned()
+                                .unwrap(),
+                            slot + 1
+                        );
+                        let expected_ref_count = 0;
+                        assert_eq!(
+                            entry.map(|e| e.ref_count()),
+                            Some(expected_ref_count),
+                            "{pass}"
+                        );
+                    }
+                    2 => {
+                        // alive in both slot, slot + 1
+                        assert_eq!(entry.unwrap().slot_list.read().unwrap().len(), 2);
+
+                        let slots = entry
                             .unwrap()
                             .slot_list
                             .read()
                             .unwrap()
-                            .first()
+                            .iter()
                             .map(|(s, _)| s)
                             .cloned()
-                            .unwrap(),
-                        slot + 1
-                    );
-                    // refcount = 1 if we flushed the write cache for slot + 1
-                    let expected_ref_count = if pass < 2 { 0 } else { 1 };
-                    assert_eq!(
-                        entry.map(|e| e.ref_count()),
-                        Some(expected_ref_count),
-                        "{pass}"
-                    );
+                            .collect::<Vec<_>>();
+                        assert_eq!(slots, vec![slot, slot + 1]);
+                        // refcount = 1 if we flushed the write cache for slot + 1
+                        let expected_ref_count = 2;
+                        assert_eq!(
+                            entry.map(|e| e.ref_count()),
+                            Some(expected_ref_count),
+                            "{pass}"
+                        );
+                    }
+                    _ => {
+                        panic!("Shouldn't reach here.")
+                    }
                 }
                 (false, ())
             });
