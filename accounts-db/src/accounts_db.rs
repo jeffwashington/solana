@@ -11085,7 +11085,7 @@ pub mod tests {
         accounts.calculate_accounts_delta_hash(slot + 1);
         accounts.add_root_and_flush_write_cache(slot + 1);
 
-        // This should panic because there are ref for pubkey_zero.
+        // This should panic because there are 2 refs for pubkey_zero.
         accounts.remove_zero_lamport_single_ref_accounts_after_shrink(
             &[&pubkey_zero],
             slot,
