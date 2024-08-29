@@ -4574,7 +4574,6 @@ impl AccountsDb {
         &self,
         shrink_slots: &ShrinkCandidates,
         shrink_ratio: f64,
-        oldest_non_ancient_slot: Option<Slot>,
     ) -> (IntMap<Slot, Arc<AccountStorageEntry>>, ShrinkCandidates) {
         struct StoreUsageInfo {
             slot: Slot,
@@ -4588,13 +4587,6 @@ impl AccountsDb {
         let mut total_bytes: u64 = 0;
         let mut total_candidate_stores: usize = 0;
         for slot in shrink_slots {
-            if oldest_non_ancient_slot
-                .map(|oldest_non_ancient_slot| slot < &oldest_non_ancient_slot)
-                .unwrap_or_default()
-            {
-                // this slot will be 'shrunk' by ancient code
-                continue;
-            }
             let Some(store) = self.storage.get_slot_storage_entry(*slot) else {
                 continue;
             };
@@ -5058,8 +5050,7 @@ impl AccountsDb {
         uncleaned_pubkeys.extend(pubkeys);
     }
 
-    pub fn shrink_candidate_slots(&self, epoch_schedule: &EpochSchedule) -> usize {
-        let oldest_non_ancient_slot = self.get_oldest_non_ancient_slot(epoch_schedule);
+    pub fn shrink_candidate_slots(&self, _epoch_schedule: &EpochSchedule) -> usize {
 
         let shrink_candidates_slots =
             std::mem::take(&mut *self.shrink_candidate_slots.lock().unwrap());
@@ -5070,8 +5061,6 @@ impl AccountsDb {
                     .select_candidates_by_total_usage(
                         &shrink_candidates_slots,
                         shrink_ratio,
-                        self.ancient_append_vec_offset
-                            .map(|_| oldest_non_ancient_slot),
                     );
                 (shrink_slots, Some(shrink_slots_next_batch))
             } else {
