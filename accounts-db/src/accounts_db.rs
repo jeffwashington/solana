@@ -3949,21 +3949,8 @@ impl AccountsDb {
             |pubkey, slots_refs, _entry| {
                 let mut result = AccountsIndexScanResult::OnlyKeepInMemoryIfDirty;
                 let stored_account = &accounts[index];
-                if let Some((slot_list, ref_count)) = slots_refs {
-                    index_scan_returned_some_count += 1;
-                    let is_alive = slot_list.iter().any(|(slot, _acct_info)| {
-                        // if the accounts index contains an entry at this slot, then the append vec we're asking about contains this item and thus, it is alive at this slot
-                        *slot == slot_to_shrink
-                    });
-                    if !is_alive {
-                        // This pubkey was found in the storage, but no longer exists in the index.
-                        // It would have had a ref to the storage from the initial store, but it will
-                        // not exist in the re-written slot. Unref it to keep the index consistent with
-                        // rewriting the storage entries.
-                        unrefed_pubkeys.push(pubkey);
-                        result = AccountsIndexScanResult::Unref;
-                        dead += 1;
-                    } else if stored_account.is_zero_lamport()
+                let mut do_populate_accounts_for_shrink = |ref_count, slot_list| {
+                    if stored_account.is_zero_lamport()
                         && ref_count == 1
                         && latest_full_snapshot_slot
                             .map(|latest_full_snapshot_slot| {
@@ -3983,6 +3970,25 @@ impl AccountsDb {
                         alive_accounts.add(ref_count, stored_account, slot_list);
                         alive += 1;
                     }
+                };
+                if let Some((slot_list, ref_count)) = slots_refs {
+                    index_scan_returned_some_count += 1;
+                    let is_alive = slot_list.iter().any(|(slot, _acct_info)| {
+                        // if the accounts index contains an entry at this slot, then the append vec we're asking about contains this item and thus, it is alive at this slot
+                        *slot == slot_to_shrink
+                    });
+
+                    if !is_alive {
+                        // This pubkey was found in the storage, but no longer exists in the index.
+                        // It would have had a ref to the storage from the initial store, but it will
+                        // not exist in the re-written slot. Unref it to keep the index consistent with
+                        // rewriting the storage entries.
+                        unrefed_pubkeys.push(pubkey);
+                        result = AccountsIndexScanResult::Unref;
+                        dead += 1;
+                    } else {
+                        do_populate_accounts_for_shrink(ref_count, slot_list);
+                    }
                 } else {
                     index_scan_returned_none_count += 1;
                     // getting None here means the account is 'normal' and was written to disk. This means it must have ref_count=1 and
@@ -3992,26 +3998,7 @@ impl AccountsDb {
                     // Account is alive.
                     let ref_count = 1;
                     let slot_list = [(slot_to_shrink, AccountInfo::default())];
-                    if stored_account.is_zero_lamport()
-                        && ref_count == 1
-                        && latest_full_snapshot_slot
-                            .map(|latest_full_snapshot_slot| {
-                                latest_full_snapshot_slot >= slot_to_shrink
-                            })
-                            .unwrap_or(true)
-                    {
-                        // only do this if our slot is prior to the latest full snapshot
-                        // we found a zero lamport account that is the only instance of this account. We can delete it completely.
-                        zero_lamport_single_ref_pubkeys.push(pubkey);
-                        self.add_uncleaned_pubkeys_after_shrink(
-                            slot_to_shrink,
-                            [*pubkey].into_iter(),
-                        );
-                    } else {
-                        all_are_zero_lamports &= stored_account.is_zero_lamport();
-                        alive_accounts.add(ref_count, stored_account, &slot_list);
-                        alive += 1;
-                    }
+                    do_populate_accounts_for_shrink(ref_count, &slot_list);
                 }
                 index += 1;
                 result
