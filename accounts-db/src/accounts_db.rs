@@ -3967,7 +3967,6 @@ impl AccountsDb {
         self.accounts_index.scan(
             accounts.iter().map(|account| account.pubkey()),
             |pubkey, slots_refs, _entry| {
-                let mut result = AccountsIndexScanResult::OnlyKeepInMemoryIfDirty;
                 let stored_account = &accounts[index];
                 let mut do_populate_accounts_for_shrink = |ref_count, slot_list| {
                     if stored_account.is_zero_lamport()
@@ -4004,7 +4003,6 @@ impl AccountsDb {
                         // not exist in the re-written slot. Unref it to keep the index consistent with
                         // rewriting the storage entries.
                         unrefed_pubkeys.push(pubkey);
-                        result = AccountsIndexScanResult::Unref;
                         dead += 1;
                     } else {
                         do_populate_accounts_for_shrink(ref_count, slot_list);
@@ -4021,7 +4019,7 @@ impl AccountsDb {
                     do_populate_accounts_for_shrink(ref_count, &slot_list);
                 }
                 index += 1;
-                result
+                AccountsIndexScanResult::OnlyKeepInMemoryIfDirty
             },
             None,
             false,
@@ -4309,6 +4307,35 @@ impl AccountsDb {
             .fetch_add(time.as_us(), Ordering::Relaxed);
     }
 
+    pub(crate) fn unref_shrunk_dead_accounts<'a>(
+        &self,
+        unrefed_pubkeys: impl Iterator<Item = &'a Pubkey>,
+        slot: Slot,
+    ) {
+        self.accounts_index.scan(
+            unrefed_pubkeys,
+            |pubkey, slot_refs, _entry| {
+                // pubkeys in `unrefed_pubkeys` were unref'd in `shrink_collect` above under the assumption that we would shrink everything.
+                // Since shrink is not occurring, we need to addref the pubkeys to get the system back to the prior state since the account still exists at this slot.
+                if slot_refs.is_none() {
+                    // We also expect that the accounts index must contain an
+                    // entry for `pubkey`. Log a warning for now. In future,
+                    // we will panic when this happens.
+                    warn!("pubkey {pubkey} in slot {slot} was NOT found in accounts index during shrink");
+                    datapoint_warn!(
+                        "accounts_db-shink_pubkey_missing_from_index",
+                        ("store_slot", slot, i64),
+                        ("pubkey", pubkey.to_string(), String),
+                    )
+                }
+                AccountsIndexScanResult::Unref
+            },
+            None,
+            false,
+            ScanFilter::All,
+        );
+    }
+
     fn do_shrink_slot_store(&self, slot: Slot, store: &Arc<AccountStorageEntry>) {
         if self.accounts_cache.contains(slot) {
             // It is not correct to shrink a slot while it is in the write cache until flush is complete and the slot is removed from the write cache.
@@ -4341,42 +4368,23 @@ impl AccountsDb {
                 // clean needs to take care of this dead slot
                 self.accounts_index.add_uncleaned_roots([slot]);
             }
-            info!(
-                "Unexpected shrink for slot {} alive {} capacity {}, \
-                likely caused by a bug for calculating alive bytes.",
-                slot, shrink_collect.alive_total_bytes, shrink_collect.capacity
-            );
+            if !shrink_collect.all_are_zero_lamports {
+                // if all are zero lamports, then we expect that we would like to mark the whole slot dead, but we cannot. That's clean's job.
+                info!(
+                    "Unexpected shrink for slot {} alive {} capacity {}, \
+                    likely caused by a bug for calculating alive bytes. All alive bytes are zero: {}, {}",
+                    slot, shrink_collect.alive_total_bytes, shrink_collect.capacity,
+                    store.alive_bytes(), shrink_collect.zero_lamport_single_ref_pubkeys.len() * aligned_stored_size(0),
+                );
+            }
 
             self.shrink_stats
                 .skipped_shrink
                 .fetch_add(1, Ordering::Relaxed);
-
-            self.accounts_index.scan(
-                shrink_collect.unrefed_pubkeys.into_iter(),
-                |pubkey, _slot_refs, entry| {
-                    // pubkeys in `unrefed_pubkeys` were unref'd in `shrink_collect` above under the assumption that we would shrink everything.
-                    // Since shrink is not occurring, we need to addref the pubkeys to get the system back to the prior state since the account still exists at this slot.
-                    if let Some(entry) = entry {
-                        entry.addref();
-                    } else {
-                        // We also expect that the accounts index must contain an
-                        // entry for `pubkey`. Log a warning for now. In future,
-                        // we will panic when this happens.
-                        warn!("pubkey {pubkey} in slot {slot} was NOT found in accounts index during shrink");
-                        datapoint_warn!(
-                            "accounts_db-shink_pubkey_missing_from_index",
-                            ("store_slot", slot, i64),
-                            ("pubkey", pubkey.to_string(), String),
-                        )
-                    }
-                    AccountsIndexScanResult::OnlyKeepInMemoryIfDirty
-                },
-                None,
-                true,
-                ScanFilter::All,
-            );
             return;
         }
+
+        self.unref_shrunk_dead_accounts(shrink_collect.unrefed_pubkeys.iter().cloned(), slot);
 
         let total_accounts_after_shrink = shrink_collect.alive_accounts.len();
         debug!(
