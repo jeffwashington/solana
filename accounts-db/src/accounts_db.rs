@@ -8785,6 +8785,9 @@ impl AccountsDb {
                     // remember this rent-paying account pubkey
                     rent_paying_accounts_by_partition.push(info.pubkey);
                 }
+                if slot + 432_000 < 286748894 {
+                    log::error!("ancient: {slot}, {}, {}", info.pubkey, info.lamports);
+                }
 
                 (
                     info.pubkey,
@@ -9034,6 +9037,13 @@ impl AccountsDb {
                             let unique_keys =
                                 HashSet::<Pubkey>::from_iter(slot_keys.iter().map(|(_, key)| *key));
                             for (slot, key) in slot_keys {
+                                if slot + 432_000 < 286748894 {
+                                    log::error!("dup ancient: {slot}, {}", key);
+                                }
+                                else {
+                                    log::error!("dup non ancient: {slot}, {}", key);
+                                }
+                
                                 self.uncleaned_pubkeys.entry(slot).or_default().push(key);
                             }
                             let unique_pubkeys_by_bin_inner =
