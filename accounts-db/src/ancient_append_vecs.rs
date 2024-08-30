@@ -13,12 +13,11 @@ use {
             ShrinkCollectAliveSeparatedByRefs, ShrinkStatsSub,
         },
         accounts_file::AccountsFile,
-        accounts_index::{AccountsIndexScanResult, ScanFilter},
         active_stats::ActiveStatItem,
         storable_accounts::{StorableAccounts, StorableAccountsBySlot},
     },
     rand::{thread_rng, Rng},
-    rayon::prelude::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator},
+    rayon::prelude::{IntoParallelRefIterator, ParallelIterator},
     solana_measure::measure_us,
     solana_sdk::clock::Slot,
     std::{
@@ -394,7 +393,10 @@ impl AccountsDb {
         tuning: PackedAncientStorageTuning,
         metrics: &mut ShrinkStatsSub,
     ) {
-        self.shrink_ancient_stats.slot.store(sorted_slots.first().cloned().unwrap_or_default(), Ordering::Relaxed);
+        self.shrink_ancient_stats.slot.store(
+            sorted_slots.first().cloned().unwrap_or_default(),
+            Ordering::Relaxed,
+        );
         self.shrink_ancient_stats
             .slots_considered
             .fetch_add(sorted_slots.len() as u64, Ordering::Relaxed);
@@ -441,7 +443,6 @@ impl AccountsDb {
                 accounts_to_combine.target_slots_sorted.last(),
                 many_refs_newest.last().map(|accounts| accounts.slot)
             );
-            self.addref_accounts_failed_to_shrink_ancient(accounts_to_combine.accounts_to_combine);
             return;
         }
 
@@ -469,11 +470,18 @@ impl AccountsDb {
 
         if pack.len() > accounts_to_combine.target_slots_sorted.len() {
             // Not enough slots to contain the accounts we are trying to pack.
-            // `shrink_collect` previously unref'd some accounts. We need to addref them
-            // to restore the correct state since we failed to combine anything.
-            self.addref_accounts_failed_to_shrink_ancient(accounts_to_combine.accounts_to_combine);
             return;
         }
+
+        accounts_to_combine
+            .accounts_to_combine
+            .iter()
+            .for_each(|combine| {
+                self.unref_shrunk_dead_accounts(
+                    combine.unrefed_pubkeys.iter().cloned(),
+                    combine.slot,
+                );
+            });
 
         let write_ancient_accounts = self.write_packed_storages(&accounts_to_combine, pack);
 
@@ -482,29 +490,6 @@ impl AccountsDb {
             write_ancient_accounts,
             metrics,
         );
-    }
-
-    /// for each account in `unrefed_pubkeys`, in each `accounts_to_combine`, addref
-    fn addref_accounts_failed_to_shrink_ancient<'a>(
-        &self,
-        accounts_to_combine: Vec<ShrinkCollect<'a, ShrinkCollectAliveSeparatedByRefs<'a>>>,
-    ) {
-        self.thread_pool_clean.install(|| {
-            accounts_to_combine.into_par_iter().for_each(|combine| {
-                self.accounts_index.scan(
-                    combine.unrefed_pubkeys.into_iter(),
-                    |_pubkey, _slots_refs, entry| {
-                        if let Some(entry) = entry {
-                            entry.addref();
-                        }
-                        AccountsIndexScanResult::OnlyKeepInMemoryIfDirty
-                    },
-                    None,
-                    true,
-                    ScanFilter::All,
-                );
-            });
-        });
     }
 
     /// calculate all storage info for the storages in slots
@@ -859,9 +844,6 @@ impl AccountsDb {
             }
         }
         let unpackable_slots_count = remove.len();
-        remove.into_iter().rev().for_each(|i| {
-            self.addref_accounts_failed_to_shrink_ancient(vec![accounts_to_combine.remove(i)]);
-        });
         target_slots_sorted.sort_unstable();
         self.shrink_ancient_stats
             .slots_cannot_move_count
