@@ -4503,6 +4503,7 @@ impl AccountsDb {
                 shrink_slots.insert(slot);
             }
         }
+        inc_new_counter_info!("shrink_pended_stores-count", pended_counts);
 
         datapoint_info!(
             "shrink_candidate_slots",

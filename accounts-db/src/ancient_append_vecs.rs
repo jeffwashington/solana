@@ -422,7 +422,7 @@ impl AccountsDb {
         self.shrink_ancient_stats
             .slots_considered
             .fetch_add(sorted_slots.len() as u64, Ordering::Relaxed);
-        let mut ancient_slot_infos = self.collect_sort_filter_ancient_slots(sorted_slots, &tuning);
+        let mut ancient_slot_infos = self.collect_sort_filter_ancient_slots(sorted_slots, &mut tuning);
 
         std::mem::swap(
             &mut *self.best_ancient_slots_to_shrink.write().unwrap(),
