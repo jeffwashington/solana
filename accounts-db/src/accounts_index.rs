@@ -1463,7 +1463,12 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
                                 true
                             }
                             AccountsIndexScanResult::UnrefAssert0 => {
-                                assert_eq!(locked_entry.unref(), 1);
+                                assert_eq!(
+                                    locked_entry.unref(),
+                                    1,
+                                    "{pubkey}, {:?}",
+                                    locked_entry.slot_list.read().unwrap()
+                                );
                                 true
                             }
                             AccountsIndexScanResult::KeepInMemory => true,
