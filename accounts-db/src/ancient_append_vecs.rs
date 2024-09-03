@@ -1183,6 +1183,7 @@ pub mod tests {
             accounts_file::StorageAccess,
             accounts_hash::AccountHash,
             accounts_index::UpsertReclaim,
+            accounts_index::{AccountsIndexScanResult, ScanFilter},
             append_vec::{
                 aligned_stored_size, AppendVec, AppendVecStoredAccountMeta,
                 MAXIMUM_APPEND_VEC_FILE_SIZE,
@@ -3812,7 +3813,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_addref_accounts_failed_to_shrink_ancient() {
+    fn test_shrink_ancient_expected_unref() {
         let db = AccountsDb::new_single_for_tests();
         let empty_account = AccountSharedData::default();
         for count in 0..3 {
@@ -3820,7 +3821,8 @@ pub mod tests {
                 .map(|_| solana_sdk::pubkey::new_rand())
                 .collect::<Vec<_>>();
             // how many of `many_ref_accounts` should be found in the index with ref_count=1
-            let mut expected_ref_counts = HashMap::<Pubkey, u64>::default();
+            let mut expected_ref_counts_before_unref = HashMap::<Pubkey, u64>::default();
+            let mut expected_ref_counts_after_unref = HashMap::<Pubkey, u64>::default();
 
             unrefed_pubkeys.iter().for_each(|k| {
                 for slot in 0..2 {
@@ -3836,8 +3838,8 @@ pub mod tests {
                         UpsertReclaim::IgnoreReclaims,
                     );
                 }
-                // set to 2 initially, made part of `unrefed_pubkeys`, expect it to be addref'd to 3
-                expected_ref_counts.insert(*k, 3);
+                expected_ref_counts_before_unref.insert(*k, 2);
+                expected_ref_counts_after_unref.insert(*k, 1);
             });
 
             let shrink_collect = ShrinkCollect::<ShrinkCollectAliveSeparatedByRefs> {
@@ -3857,17 +3859,34 @@ pub mod tests {
                 total_starting_accounts: 0,
                 all_are_zero_lamports: false,
             };
-            let accounts_to_combine = AccountsToCombine {
-                accounts_keep_slots: HashMap::default(),
-                accounts_to_combine: vec![shrink_collect],
-                target_slots_sorted: Vec::default(),
-                unpackable_slots_count: 0,
-            };
-            db.addref_accounts_failed_to_shrink_ancient(accounts_to_combine.accounts_to_combine);
+
+            // Assert ref_counts before unref.
             db.accounts_index.scan(
-                unrefed_pubkeys.iter(),
+                shrink_collect.unrefed_pubkeys.iter().cloned(),
                 |k, slot_refs, _entry| {
-                    assert_eq!(expected_ref_counts.remove(k).unwrap(), slot_refs.unwrap().1);
+                    assert_eq!(
+                        expected_ref_counts_before_unref.remove(k).unwrap(),
+                        slot_refs.unwrap().1
+                    );
+                    AccountsIndexScanResult::OnlyKeepInMemoryIfDirty
+                },
+                None,
+                false,
+                ScanFilter::All,
+            );
+            assert!(expected_ref_counts_before_unref.is_empty());
+
+            // unref ref_counts
+            db.unref_shrunk_dead_accounts(shrink_collect.unrefed_pubkeys.iter().cloned(), 0);
+
+            // Assert ref_counts after unref
+            db.accounts_index.scan(
+                shrink_collect.unrefed_pubkeys.iter().cloned(),
+                |k, slot_refs, _entry| {
+                    assert_eq!(
+                        expected_ref_counts_after_unref.remove(k).unwrap(),
+                        slot_refs.unwrap().1
+                    );
                     AccountsIndexScanResult::OnlyKeepInMemoryIfDirty
                 },
                 None,
@@ -3875,7 +3894,7 @@ pub mod tests {
                 ScanFilter::All,
             );
             // should have removed all of them
-            assert!(expected_ref_counts.is_empty());
+            assert!(expected_ref_counts_after_unref.is_empty());
         }
     }
 
