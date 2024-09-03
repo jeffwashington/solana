@@ -4316,7 +4316,6 @@ impl AccountsDb {
             unrefed_pubkeys,
             |pubkey, slot_refs, _entry| {
                 // pubkeys in `unrefed_pubkeys` were unref'd in `shrink_collect` above under the assumption that we would shrink everything.
-                // Since shrink is not occurring, we need to addref the pubkeys to get the system back to the prior state since the account still exists at this slot.
                 if slot_refs.is_none() {
                     // We also expect that the accounts index must contain an
                     // entry for `pubkey`. Log a warning for now. In future,
