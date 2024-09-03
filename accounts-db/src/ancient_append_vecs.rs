@@ -1189,8 +1189,7 @@ pub mod tests {
             },
             accounts_file::StorageAccess,
             accounts_hash::AccountHash,
-            accounts_index::UpsertReclaim,
-            accounts_index::{AccountsIndexScanResult, ScanFilter},
+            accounts_index::{AccountsIndexScanResult, ScanFilter, UpsertReclaim},
             append_vec::{
                 aligned_stored_size, AppendVec, AppendVecStoredAccountMeta,
                 MAXIMUM_APPEND_VEC_FILE_SIZE,
