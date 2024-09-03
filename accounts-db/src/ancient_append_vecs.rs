@@ -1752,13 +1752,7 @@ pub mod tests {
                             &tuning,
                             many_ref_slots,
                         );
-                        let mut expected_accounts_to_combine = num_slots;
-                        if two_refs && many_ref_slots == IncludeManyRefSlots::Skip && num_slots > 2
-                        {
-                            // We require more than 1 target slot. Since all slots have multi refs, we find no slots we can use as target slots.
-                            // Thus, nothing can be packed.
-                            expected_accounts_to_combine = 0;
-                        }
+                        let expected_accounts_to_combine = num_slots;
                         (0..accounts_to_combine
                             .target_slots_sorted
                             .len()
