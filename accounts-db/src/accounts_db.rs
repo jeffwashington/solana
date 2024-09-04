@@ -2322,6 +2322,11 @@ impl ShrinkAncientStats {
                 i64
             ),
             (
+                "total_alive_bytes",
+                self.total_alive_bytes.swap(0, Ordering::Relaxed),
+                i64
+            ),
+            (
                 "slots_considered",
                 self.slots_considered.swap(0, Ordering::Relaxed) as i64,
                 i64
