@@ -350,7 +350,8 @@ impl AccountsDb {
             percent_of_alive_shrunk_data: 0,
             ideal_storage_size: NonZeroU64::new(get_ancient_append_vec_capacity()).unwrap(),
             can_randomly_shrink,
-            max_resulting_storages: NonZeroU64::new(10).unwrap(),
+            // 3 new ancient storages per call. Too many causes big spikes of cpu and disk usage. 1 might be ok.
+            max_resulting_storages: NonZeroU64::new(3).unwrap(),
         };
 
         let _guard = self.active_stats.activate(ActiveStatItem::SquashAncient);
