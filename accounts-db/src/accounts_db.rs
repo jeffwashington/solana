@@ -11158,9 +11158,7 @@ pub mod tests {
     }
 
     #[test]
-    #[should_panic(
-        expected = "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi, [(1, AccountInfo { store_id: 0, account_offset_and_flags: AccountOffsetAndFlags { packed_offset_and_flags: PackedOffsetAndFlags { offset_reduced: 0, is_zero_lamport: false } } }), (2, AccountInfo { store_id: 1, account_offset_and_flags: AccountOffsetAndFlags { packed_offset_and_flags: PackedOffsetAndFlags { offset_reduced: 0, is_zero_lamport: true } } })]"
-    )]
+    #[should_panic(expected = "ref count expected to be zero")]
     fn test_remove_zero_lamport_multi_ref_accounts_panic() {
         let accounts = AccountsDb::new_single_for_tests();
         let pubkey_zero = Pubkey::from([1; 32]);

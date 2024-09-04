@@ -1468,18 +1468,19 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
                                 assert_eq!(
                                     locked_entry.unref(),
                                     1,
-                                    "{pubkey}, {:?}",
-                                    locked_entry.slot_list.read().unwrap()
+                                    "ref count expected to be zero, but is {}! {pubkey}, {:?}",
+                                    locked_entry.ref_count(),
+                                    locked_entry.slot_list.read().unwrap(),
                                 );
                                 true
                             }
                             AccountsIndexScanResult::UnrefLog0 => {
                                 let old_ref = locked_entry.unref();
                                 if old_ref != 1 {
-                                    info!("Unexpected unref {pubkey} with {old_ref} {:?}, expect ref to be 1", locked_entry.slot_list.read().unwrap());
+                                    info!("Unexpected unref {pubkey} with {old_ref} {:?}, expect old_ref to be 1", locked_entry.slot_list.read().unwrap());
                                     datapoint_warn!(
                                         "accounts_db-unexpected-unref-zero",
-                                        ("ref", old_ref, i64),
+                                        ("old_ref", old_ref, i64),
                                         ("pubkey", pubkey.to_string(), String),
                                     );
                                 }
