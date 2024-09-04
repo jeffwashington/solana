@@ -650,7 +650,7 @@ pub enum AccountsIndexScanResult {
     Unref,
     /// reduce refcount by 1 and assert that ref_count = 0 after unref
     UnrefAssert0,
-    /// reduce refcount by 1 and log if ref_count = 0 after unref
+    /// reduce refcount by 1 and log if ref_count != 0 after unref
     UnrefLog0,
 }
 
