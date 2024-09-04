@@ -737,14 +737,11 @@ impl AccountsDb {
         let mut target_slots_sorted = Vec::with_capacity(len);
 
         // `shrink_collect` all accounts in the append vecs we want to combine.
-        // The following comments are no longer correct?
-        // --This also unrefs all dead accounts in those append vecs.
-        // --This needs to serially iterate largest to smallest slot so that we unref older dead slots after we have visited the newer alive slots.
         // We are no longer doing eager unref in shrink_collect. Therefore, we will no longer need to iter them serially?
         // There is a subtle difference for zero lamport accounts, which can lead to having more multi-refs than before?
         // Consider account X in both slot x, and x+1 and x+2.
         // With eager unref, we will only collect `one_ref`` X at slot x+2 after shrink.
-        // While without eager unref, we will collect X at `multi-ref` after shrink.
+        // Without eager unref, we will collect X at `multi-ref` after shrink.
         // Packing multi-ref is less efficient than `one_ref``. But it might be ok - in next round of clean, hopefully, it can turn this from multi-ref into one-ref.
         let mut accounts_to_combine = accounts_per_storage
             .iter()
