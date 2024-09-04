@@ -3954,7 +3954,7 @@ impl AccountsDb {
     ) -> LoadAccountsIndexForShrink<'a, T> {
         let count = accounts.len();
         let mut alive_accounts = T::with_capacity(count, slot_to_shrink);
-        let mut unrefed_pubkeys = Vec::with_capacity(count);
+        let mut pubkeys_to_unref = Vec::with_capacity(count);
         let mut zero_lamport_single_ref_pubkeys = Vec::with_capacity(count);
 
         let mut alive = 0;
@@ -4002,7 +4002,7 @@ impl AccountsDb {
                         // It would have had a ref to the storage from the initial store, but it will
                         // not exist in the re-written slot. Unref it to keep the index consistent with
                         // rewriting the storage entries.
-                        unrefed_pubkeys.push(pubkey);
+                        pubkeys_to_unref.push(pubkey);
                         dead += 1;
                     } else {
                         do_populate_accounts_for_shrink(ref_count, slot_list);
@@ -4037,7 +4037,7 @@ impl AccountsDb {
 
         LoadAccountsIndexForShrink {
             alive_accounts,
-            unrefed_pubkeys,
+            unrefed_pubkeys: pubkeys_to_unref,
             zero_lamport_single_ref_pubkeys,
             all_are_zero_lamports,
         }
