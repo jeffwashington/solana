@@ -12612,7 +12612,7 @@ pub mod tests {
         let db = AccountsDb::new_single_for_tests();
 
         let (selected_candidates, next_candidates) =
-            db.select_candidates_by_total_usage(&candidates, DEFAULT_ACCOUNTS_SHRINK_RATIO, None);
+            db.select_candidates_by_total_usage(&candidates, DEFAULT_ACCOUNTS_SHRINK_RATIO);
 
         assert_eq!(0, selected_candidates.len());
         assert_eq!(0, next_candidates.len());
@@ -12674,7 +12674,7 @@ pub mod tests {
         // to the candidates list for next round.
         let target_alive_ratio = 0.6;
         let (selected_candidates, next_candidates) =
-            db.select_candidates_by_total_usage(&candidates, target_alive_ratio, None);
+            db.select_candidates_by_total_usage(&candidates, target_alive_ratio);
         assert_eq!(1, selected_candidates.len());
         assert!(selected_candidates.contains(&store1_slot));
         assert_eq!(1, next_candidates.len());
@@ -12734,7 +12734,7 @@ pub mod tests {
         // Set the target ratio to default (0.8), both store1 and store2 must be selected and store3 is ignored.
         let target_alive_ratio = DEFAULT_ACCOUNTS_SHRINK_RATIO;
         let (selected_candidates, next_candidates) =
-            db.select_candidates_by_total_usage(&candidates, target_alive_ratio, None);
+            db.select_candidates_by_total_usage(&candidates, target_alive_ratio);
         assert_eq!(2, selected_candidates.len());
         assert!(selected_candidates.contains(&store1_slot));
         assert!(selected_candidates.contains(&store2_slot));
@@ -12779,34 +12779,14 @@ pub mod tests {
             .store(store_file_size as usize / 2, Ordering::Release);
         candidates.insert(store2_slot);
 
-        for newest_ancient_slot in [None, Some(store1_slot), Some(store2_slot)] {
-            // Set the target ratio to default (0.8), both stores from the two different slots must be selected.
-            let target_alive_ratio = DEFAULT_ACCOUNTS_SHRINK_RATIO;
-            let (selected_candidates, next_candidates) = db.select_candidates_by_total_usage(
-                &candidates,
-                target_alive_ratio,
-                newest_ancient_slot.map(|newest_ancient_slot| newest_ancient_slot + 1),
-            );
-            assert_eq!(
-                if newest_ancient_slot == Some(store1_slot) {
-                    1
-                } else if newest_ancient_slot == Some(store2_slot) {
-                    0
-                } else {
-                    2
-                },
-                selected_candidates.len()
-            );
-            assert_eq!(
-                newest_ancient_slot.is_none(),
-                selected_candidates.contains(&store1_slot)
-            );
-
-            if newest_ancient_slot != Some(store2_slot) {
-                assert!(selected_candidates.contains(&store2_slot));
-            }
-            assert_eq!(0, next_candidates.len());
-        }
+        // Set the target ratio to default (0.8), both stores from the two different slots must be selected.
+        let target_alive_ratio = DEFAULT_ACCOUNTS_SHRINK_RATIO;
+        let (selected_candidates, next_candidates) =
+            db.select_candidates_by_total_usage(&candidates, target_alive_ratio);
+        assert_eq!(2, selected_candidates.len());
+        assert!(selected_candidates.contains(&store1_slot));
+        assert!(selected_candidates.contains(&store2_slot));
+        assert_eq!(0, next_candidates.len());
     }
 
     const UPSERT_POPULATE_RECLAIMS: UpsertReclaim = UpsertReclaim::PopulateReclaims;
