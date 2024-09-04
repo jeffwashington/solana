@@ -4247,6 +4247,7 @@ impl AccountsDb {
         zero_lamport_single_ref_pubkeys: &[&Pubkey],
         slot: Slot,
         stats: &ShrinkStats,
+        do_assert: bool,
     ) {
         stats.purged_zero_lamports.fetch_add(
             zero_lamport_single_ref_pubkeys.len() as u64,
@@ -4255,10 +4256,15 @@ impl AccountsDb {
 
         // we have to unref before we `purge_keys_exact`. Otherwise, we could race with the foreground with tx processing
         // reviving this index entry and then we'd unref the revived version, which is a refcount bug.
+
         self.accounts_index.scan(
             zero_lamport_single_ref_pubkeys.iter().cloned(),
             |_pubkey, _slots_refs, _entry| AccountsIndexScanResult::Unref,
-            Some(AccountsIndexScanResult::UnrefAssert0),
+            if do_assert {
+                Some(AccountsIndexScanResult::UnrefAssert0)
+            } else {
+                Some(AccountsIndexScanResult::UnrefLog0)
+            },
             false,
             ScanFilter::All,
         );
@@ -4286,6 +4292,7 @@ impl AccountsDb {
             &shrink_collect.zero_lamport_single_ref_pubkeys,
             shrink_collect.slot,
             stats,
+            false,
         );
 
         // Purge old, overwritten storage entries
@@ -11177,6 +11184,7 @@ pub mod tests {
             &[&pubkey_zero],
             slot,
             &ShrinkStats::default(),
+            true,
         );
     }
 
@@ -11231,6 +11239,7 @@ pub mod tests {
                 &zero_lamport_single_ref_pubkeys,
                 slot,
                 &ShrinkStats::default(),
+                true,
             );
 
             accounts.accounts_index.get_and_then(&pubkey_zero, |entry| {

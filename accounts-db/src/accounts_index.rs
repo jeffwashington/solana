@@ -650,6 +650,8 @@ pub enum AccountsIndexScanResult {
     Unref,
     /// reduce refcount by 1 and assert that ref_count = 0 after unref
     UnrefAssert0,
+    /// reduce refcount by 1 and log if ref_count = 0 after unref
+    UnrefLog0,
 }
 
 #[derive(Debug)]
@@ -1469,6 +1471,18 @@ impl<T: IndexValue, U: DiskIndexValue + From<T> + Into<T>> AccountsIndex<T, U> {
                                     "{pubkey}, {:?}",
                                     locked_entry.slot_list.read().unwrap()
                                 );
+                                true
+                            }
+                            AccountsIndexScanResult::UnrefLog0 => {
+                                let old_ref = locked_entry.unref();
+                                if old_ref != 1 {
+                                    info!("Unexpected unref {pubkey} with {old_ref} {:?}, expect ref to be 1", locked_entry.slot_list.read().unwrap());
+                                    datapoint_warn!(
+                                        "accounts_db-unexpected-unref-zero",
+                                        ("ref", old_ref, i64),
+                                        ("pubkey", pubkey.to_string(), String),
+                                    );
+                                }
                                 true
                             }
                             AccountsIndexScanResult::KeepInMemory => true,
