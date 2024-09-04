@@ -5081,11 +5081,7 @@ impl AccountsDb {
             shrink_slots
                 .into_par_iter()
                 .for_each(|(slot, slot_shrink_candidate)| {
-                    if self
-                        .ancient_append_vec_offset
-                        .map(|_| slot < oldest_non_ancient_slot)
-                        .unwrap_or_default()
-                    {
+                    if self.ancient_append_vec_offset.is_some() && slot < oldest_non_ancient_slot {
                         self.shrink_stats
                             .shrinking_ancient
                             .fetch_add(1, Ordering::Relaxed);
