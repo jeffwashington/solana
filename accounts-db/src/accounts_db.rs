@@ -524,8 +524,9 @@ pub type BinnedHashData = Vec<Vec<CalculateHashIntermediate>>;
 struct LoadAccountsIndexForShrink<'a, T: ShrinkCollectRefs<'a>> {
     /// all alive accounts
     alive_accounts: T,
-    /// pubkeys that were unref'd in the accounts index because they were dead
-    unrefed_pubkeys: Vec<&'a Pubkey>,
+    /// pubkeys that are going to be unref'd in the accounts index after we are
+    /// done with shrinking, because they are dead
+    pubkeys_to_unref: Vec<&'a Pubkey>,
     /// pubkeys that are the last remaining zero lamport instance of an account
     zero_lamport_single_ref_pubkeys: Vec<&'a Pubkey>,
     /// true if all alive accounts are zero lamport accounts
@@ -4037,7 +4038,7 @@ impl AccountsDb {
 
         LoadAccountsIndexForShrink {
             alive_accounts,
-            unrefed_pubkeys: pubkeys_to_unref,
+            pubkeys_to_unref,
             zero_lamport_single_ref_pubkeys,
             all_are_zero_lamports,
         }
@@ -4157,7 +4158,7 @@ impl AccountsDb {
                 .for_each(|stored_accounts| {
                     let LoadAccountsIndexForShrink {
                         alive_accounts,
-                        mut unrefed_pubkeys,
+                        pubkeys_to_unref: mut unrefed_pubkeys,
                         all_are_zero_lamports,
                         mut zero_lamport_single_ref_pubkeys,
                     } = self.load_accounts_index_for_shrink(stored_accounts, stats, slot);
