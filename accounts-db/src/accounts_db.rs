@@ -11151,7 +11151,9 @@ pub mod tests {
     }
 
     #[test]
-    #[should_panic]
+    #[should_panic(
+        expected = "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi, [(1, AccountInfo { store_id: 0, account_offset_and_flags: AccountOffsetAndFlags { packed_offset_and_flags: PackedOffsetAndFlags { offset_reduced: 0, is_zero_lamport: false } } }), (2, AccountInfo { store_id: 1, account_offset_and_flags: AccountOffsetAndFlags { packed_offset_and_flags: PackedOffsetAndFlags { offset_reduced: 0, is_zero_lamport: true } } })]"
+    )]
     fn test_remove_zero_lamport_multi_ref_accounts_panic() {
         let accounts = AccountsDb::new_single_for_tests();
         let pubkey_zero = Pubkey::from([1; 32]);
@@ -11273,7 +11275,6 @@ pub mod tests {
                             .cloned()
                             .collect::<Vec<_>>();
                         assert_eq!(slots, vec![slot, slot + 1]);
-                        // refcount = 1 if we flushed the write cache for slot + 1
                         let expected_ref_count = 2;
                         assert_eq!(
                             entry.map(|e| e.ref_count()),
@@ -11282,7 +11283,7 @@ pub mod tests {
                         );
                     }
                     _ => {
-                        panic!("Shouldn't reach here.")
+                        unreachable!("Shouldn't reach here.")
                     }
                 }
                 (false, ())
