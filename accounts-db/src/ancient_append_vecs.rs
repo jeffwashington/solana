@@ -96,18 +96,8 @@ impl AncientSlotInfos {
         is_high_slot: bool,
         db: &AccountsDb,
     ) -> bool {
-        let slots = [
-            287302120,
-287344734,
-287344738,
-287332411,
-        ];
-
         let mut was_randomly_shrunk = false;
         let alive_bytes = storage.alive_bytes() as u64;
-        if slots.contains(&slot) {
-            log::error!("ancient.add? slot: {slot}, alive: {alive_bytes}, cap: {}, count: {}", storage.capacity(), storage.approx_stored_count());
-        }
         if alive_bytes > 0 {
             let capacity = storage.accounts.capacity();
             let should_shrink = if capacity > 0 {
@@ -254,7 +244,6 @@ impl AncientSlotInfos {
                 div_ceil(cumulative_bytes.0, tuning.ideal_storage_size) as usize;
             let storages_remaining = total_storages - i - 1;
 
-
             // if the remaining uncombined storages and the # of resulting
             // combined ancient storages are less than the threshold, then
             // we've gone too far, so get rid of this entry and all after it.
@@ -265,7 +254,8 @@ impl AncientSlotInfos {
             // We do not stop including entries until we have dealt with all the high slot #s. This allows the algorithm to continue
             // to make progress each time it is called. There are exceptions that can cause the pack to fail, such as accounts with multiple
             // refs.
-            if !info.is_high_slot && smallest_included > MIN_SMALLEST_INCLUDED_COUNT
+            if !info.is_high_slot
+                && smallest_included > MIN_SMALLEST_INCLUDED_COUNT
                 && (storages_remaining + ancient_storages_required < low_threshold
                     || ancient_storages_required as u64 > u64::from(tuning.max_resulting_storages))
             {
@@ -439,9 +429,10 @@ impl AccountsDb {
         mut tuning: PackedAncientStorageTuning,
         metrics: &mut ShrinkStatsSub,
     ) {
-        log::error!("first/last: {:?}", (
-            sorted_slots.first(), sorted_slots.last()
-        ));
+        log::error!(
+            "first/last: {:?}",
+            (sorted_slots.first(), sorted_slots.last())
+        );
         self.shrink_ancient_stats
             .slots_considered
             .fetch_add(sorted_slots.len() as u64, Ordering::Relaxed);
