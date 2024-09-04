@@ -4367,11 +4367,10 @@ impl AccountsDb {
                 self.accounts_index.add_uncleaned_roots([slot]);
             }
             info!(
-                    "Unexpected shrink for slot {} alive {} capacity {}, \
-                    likely caused by a bug for calculating alive bytes. All alive bytes are zero: {}, {}",
-                    slot, shrink_collect.alive_total_bytes, shrink_collect.capacity,
-                    store.alive_bytes(), shrink_collect.zero_lamport_single_ref_pubkeys.len() * aligned_stored_size(0),
-                );
+                "Unexpected shrink for slot {} alive {} capacity {}, \
+                likely caused by a bug for calculating alive bytes.",
+                slot, shrink_collect.alive_total_bytes, shrink_collect.capacity
+            );
 
             self.shrink_stats
                 .skipped_shrink
