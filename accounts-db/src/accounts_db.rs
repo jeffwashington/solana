@@ -2040,7 +2040,7 @@ pub struct ShrinkStats {
     accounts_loaded: AtomicU64,
     purged_zero_lamports: AtomicU64,
     accounts_not_found_in_index: AtomicU64,
-    shrinking_ancient: AtomicU64,
+    num_ancient_slots_shrunk: AtomicU64,
 }
 
 impl ShrinkStats {
@@ -2155,8 +2155,8 @@ impl ShrinkStats {
                     i64
                 ),
                 (
-                    "shrinking_ancient",
-                    self.shrinking_ancient.swap(0, Ordering::Relaxed),
+                    "num_ancient_slots_shrunk",
+                    self.num_ancient_slots_shrunk.swap(0, Ordering::Relaxed),
                     i64
                 ),
                 (
@@ -5083,7 +5083,7 @@ impl AccountsDb {
                 .for_each(|(slot, slot_shrink_candidate)| {
                     if self.ancient_append_vec_offset.is_some() && slot < oldest_non_ancient_slot {
                         self.shrink_stats
-                            .shrinking_ancient
+                            .num_ancient_slots_shrunk
                             .fetch_add(1, Ordering::Relaxed);
                     }
                     let mut measure = Measure::start("shrink_candidate_slots-ms");
