@@ -4054,7 +4054,8 @@ impl AccountsDb {
 
                         // If we are marking something dead, and the only remaining alive account is zero lamport, then make that zero lamport slot ready to be cleaned.
                         // If that slot happens to only contain zero lamport accounts, the whole slot will go away
-                        if slot_list.len() == 1 {
+                        if slot_list.len() == 1 && ref_count == 2 {
+                            // probably should have this check after we unref
                             // should we also check for ref counts here?
                             if let Some((slot_alive, acct_info)) = slot_list.first() {
                                 if acct_info.is_zero_lamport() && !acct_info.is_cached() {
