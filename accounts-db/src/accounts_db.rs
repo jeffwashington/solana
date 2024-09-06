@@ -2048,6 +2048,8 @@ pub struct ShrinkStats {
     purged_zero_lamports: AtomicU64,
     accounts_not_found_in_index: AtomicU64,
     num_ancient_slots_shrunk: AtomicU64,
+    ancient_slots_added_to_shrink: AtomicU64,
+    ancient_bytes_added_to_shrink: AtomicU64,
 }
 
 impl ShrinkStats {
@@ -2055,6 +2057,16 @@ impl ShrinkStats {
         if self.last_report.should_update(1000) {
             datapoint_info!(
                 "shrink_stats",
+                (
+                    "ancient_slots_added_to_shrink",
+                    self.ancient_slots_added_to_shrink.swap(0, Ordering::Relaxed) as i64,
+                    i64
+                ),
+                (
+                    "ancient_bytes_added_to_shrink",
+                    self.ancient_bytes_added_to_shrink.swap(0, Ordering::Relaxed) as i64,
+                    i64
+                ),
                 (
                     "num_slots_shrunk",
                     self.num_slots_shrunk.swap(0, Ordering::Relaxed) as i64,
@@ -5127,7 +5139,9 @@ impl AccountsDb {
                     }
                     *capacity = 0;
                     added += 1;
+                    self.shrink_stats.ancient_bytes_added_to_shrink.fetch_add(store.alive_bytes() as u64, Ordering::Relaxed);
                     shrink_slots.insert(*slot, store);
+
                     if shrink_slots.len() >= limit {
                         break;
                     }
@@ -5135,6 +5149,7 @@ impl AccountsDb {
             }
         }
         log::error!("added: {added}, {}, avail: {num_found}", shrink_slots.len());
+        self.shrink_stats.ancient_slots_added_to_shrink.fetch_add(added, Ordering::Relaxed);
 
         if shrink_slots.is_empty()
             && shrink_slots_next_batch
