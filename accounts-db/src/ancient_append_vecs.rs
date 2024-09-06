@@ -596,7 +596,7 @@ impl AccountsDb {
         let max_slot = slots.iter().max().cloned().unwrap_or_default();
         // heuristic to include some # of newly eligible ancient slots so that the pack algorithm always makes progress
         let high_slot_boundary = max_slot.saturating_sub(HIGH_SLOT_OFFSET);
-        let is_high_slot = |slot| slot >= high_slot_boundary;
+        let is_high_slot = |slot| false; // nothign is high slot slot >= high_slot_boundary;
 
         for slot in &slots {
             if let Some(storage) = self.storage.get_slot_storage_entry(*slot) {
