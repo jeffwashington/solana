@@ -124,7 +124,6 @@ fn calc(info: &[(usize, usize)], bin_widths: Vec<usize>) {
     eprintln!("max size {}", bin_all.max_size);
     eprintln!("avg size {}", bin_all.avg);
     eprintln!("bin width {}", bins[0].slot_max - bins[0].slot_min);
-    eprintln!("");
 
     for i in 0..bins.len() {
         if i > 0 && bins[i - 1].slot_max != bins[i].slot_min {
