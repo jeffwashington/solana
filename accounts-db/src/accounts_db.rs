@@ -5113,7 +5113,7 @@ impl AccountsDb {
             }
         };
 
-        let mut limit = 10;
+        let mut limit = 2;
         let mut added = 0;
         if shrink_slots.len() >= limit {
             limit = shrink_slots.len() + 1;
@@ -5160,7 +5160,7 @@ impl AccountsDb {
             return 0;
         }
 
-        let _guard = (!shrink_slots.is_empty())
+        let mut _guard = (!shrink_slots.is_empty())
             .then_some(|| self.active_stats.activate(ActiveStatItem::Shrink));
 
         let mut measure_shrink_all_candidates = Measure::start("shrink_all_candidate_slots-ms");
@@ -5196,7 +5196,7 @@ impl AccountsDb {
             }
         }
         inc_new_counter_info!("shrink_pended_stores-count", pended_counts);
-
+        _ = std::mem::take(&mut _guard);
         num_candidates
     }
 
