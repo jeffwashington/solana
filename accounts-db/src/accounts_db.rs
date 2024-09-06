@@ -1091,6 +1091,10 @@ pub struct AccountStorageEntry {
     approx_store_count: AtomicUsize,
 
     alive_bytes: AtomicUsize,
+
+    /// offsets to accounts that are zero lamport single ref stored in this storage.
+    /// These are still alive. But, shrink will be able to remove them.
+    zero_lamport_single_ref_offsets: RwLock<IntSet<usize>>,
 }
 
 impl AccountStorageEntry {
@@ -1112,6 +1116,7 @@ impl AccountStorageEntry {
             count_and_status: SeqLock::new((0, AccountStorageStatus::Available)),
             approx_store_count: AtomicUsize::new(0),
             alive_bytes: AtomicUsize::new(0),
+            zero_lamport_single_ref_offsets: RwLock::default(),
         }
     }
 
@@ -1130,6 +1135,7 @@ impl AccountStorageEntry {
             approx_store_count: AtomicUsize::new(self.approx_stored_count()),
             alive_bytes: AtomicUsize::new(self.alive_bytes()),
             accounts,
+            zero_lamport_single_ref_offsets: RwLock::default(),
         })
     }
 
@@ -1146,6 +1152,7 @@ impl AccountStorageEntry {
             count_and_status: SeqLock::new((0, AccountStorageStatus::Available)),
             approx_store_count: AtomicUsize::new(num_accounts),
             alive_bytes: AtomicUsize::new(0),
+            zero_lamport_single_ref_offsets: RwLock::default(),
         }
     }
 
@@ -2042,7 +2049,9 @@ pub struct ShrinkStats {
     purged_zero_lamports: AtomicU64,
     accounts_not_found_in_index: AtomicU64,
     num_ancient_slots_shrunk: AtomicU64,
-    adding_slots_to_clean: AtomicU64,
+    adding_dead_slots_to_clean: AtomicU64,
+    adding_shrink_slots_from_zeros: AtomicU64,
+    marking_zero_dead_accounts: AtomicU64,
 }
 
 impl ShrinkStats {
@@ -2167,8 +2176,18 @@ impl ShrinkStats {
                     i64
                 ),
                 (
-                    "adding_slots_to_clean",
-                    self.adding_slots_to_clean.swap(0, Ordering::Relaxed),
+                    "adding_dead_slots_to_clean",
+                    self.adding_dead_slots_to_clean.swap(0, Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "adding_shrink_slots_from_zeros",
+                    self.adding_shrink_slots_from_zeros.swap(0, Ordering::Relaxed),
+                    i64
+                ),
+                (
+                    "marking_zero_dead_accounts",
+                    self.marking_zero_dead_accounts.swap(0, Ordering::Relaxed),
                     i64
                 ),
             );
@@ -2406,13 +2425,6 @@ impl ShrinkAncientStats {
                 "accounts_not_found_in_index",
                 self.shrink_stats
                     .accounts_not_found_in_index
-                    .swap(0, Ordering::Relaxed),
-                i64
-            ),
-            (
-                "adding_slots_to_clean",
-                self.shrink_stats
-                    .adding_slots_to_clean
                     .swap(0, Ordering::Relaxed),
                 i64
             ),
@@ -4042,14 +4054,16 @@ impl AccountsDb {
 
                         // If we are marking something dead, and the only remaining alive account is zero lamport, then make that zero lamport slot ready to be cleaned.
                         // If that slot happens to only contain zero lamport accounts, the whole slot will go away
-                        if slot_list.len() == 1 // should we also check for ref counts here?
-                            && slot_list
-                                .iter()
-                                .all(|(_slot, acct_info)| acct_info.is_zero_lamport())
-                        {
-                            adding_slots_to_clean += 1;
-                            self.accounts_index
-                                .add_uncleaned_roots(slot_list.iter().map(|(slot, _)| *slot));
+                        if slot_list.len() == 1 {
+                            // should we also check for ref counts here?
+                            if let Some((slot_alive, acct_info)) = slot_list.first() {
+                                if acct_info.is_zero_lamport() && !acct_info.is_cached() {
+                                    self.zero_lamport_single_ref_found(
+                                        *slot_alive,
+                                        acct_info.offset(),
+                                    );
+                                }
+                            }
                         }
                     } else {
                         do_populate_accounts_for_shrink(ref_count, slot_list);
@@ -4081,9 +4095,6 @@ impl AccountsDb {
             .fetch_add(index_scan_returned_none_count, Ordering::Relaxed);
         stats.alive_accounts.fetch_add(alive, Ordering::Relaxed);
         stats.dead_accounts.fetch_add(dead, Ordering::Relaxed);
-        stats
-            .adding_slots_to_clean
-            .fetch_add(adding_slots_to_clean, Ordering::Relaxed);
 
         LoadAccountsIndexForShrink {
             alive_accounts,
@@ -4389,6 +4400,37 @@ impl AccountsDb {
             false,
             ScanFilter::All,
         );
+    }
+
+    pub(crate) fn zero_lamport_single_ref_found(&self, slot: Slot, offset: usize) {
+        if let Some(store) = self.storage.get_slot_storage_entry(slot) {
+            let mut zero_lamport_single_ref_offsets =
+                store.zero_lamport_single_ref_offsets.write().unwrap();
+            if zero_lamport_single_ref_offsets.insert(offset) {
+                // this wasn't previously marked as zero lamport single ref
+                if zero_lamport_single_ref_offsets.len() == store.count() {
+                    // all accounts in this storage can be dead
+                    self.accounts_index.add_uncleaned_roots([slot].into_iter());
+                    self.shrink_stats
+                        .adding_dead_slots_to_clean
+                        .fetch_add(1, Ordering::Relaxed);
+                } else {
+                    if Self::is_shrinking_productive(slot, &store)
+                        && self.is_candidate_for_shrink(&store)
+                    {
+                        // this store might be eligible for shrinking now
+                        self.shrink_candidate_slots.lock().unwrap().insert(slot);
+                        self.shrink_stats
+                            .adding_shrink_slots_from_zeros
+                            .fetch_add(1, Ordering::Relaxed);
+                    } else {
+                        self.shrink_stats
+                            .marking_zero_dead_accounts
+                            .fetch_add(1, Ordering::Relaxed);
+                    }
+                }
+            }
+        }
     }
 
     fn do_shrink_slot_store(&self, slot: Slot, store: &Arc<AccountStorageEntry>) {
@@ -8072,7 +8114,14 @@ impl AccountsDb {
         let alive_bytes = store.alive_bytes() as u64;
         let total_bytes = store.capacity();
 
-        if Self::should_not_shrink(alive_bytes, total_bytes) {
+        let zero_lamport_dead_bytes = store.accounts.dead_bytes_due_to_zero_lamport_single_ref(
+            store.zero_lamport_single_ref_offsets.read().unwrap().len(),
+        );
+
+        if Self::should_not_shrink(
+            alive_bytes.saturating_sub(zero_lamport_dead_bytes as u64),
+            total_bytes,
+        ) {
             trace!(
                 "shrink_slot_forced ({}): not able to shrink at all: alive/stored: {}/{} ({}b / {}b) save: {}",
                 slot,
@@ -8099,12 +8148,17 @@ impl AccountsDb {
         } else {
             store.capacity()
         };
+
+        let zero_lamport_dead_bytes = store.accounts.dead_bytes_due_to_zero_lamport_single_ref(
+            store.zero_lamport_single_ref_offsets.read().unwrap().len(),
+        );
+
+        let alive_bytes = store.alive_bytes().saturating_sub(zero_lamport_dead_bytes) as u64;
+
         match self.shrink_ratio {
-            AccountShrinkThreshold::TotalSpace { shrink_ratio: _ } => {
-                (store.alive_bytes() as u64) < total_bytes
-            }
+            AccountShrinkThreshold::TotalSpace { shrink_ratio: _ } => alive_bytes < total_bytes,
             AccountShrinkThreshold::IndividualStore { shrink_ratio } => {
-                (store.alive_bytes() as f64 / total_bytes as f64) < shrink_ratio
+                (alive_bytes as f64 / total_bytes as f64) < shrink_ratio
             }
         }
     }
