@@ -115,7 +115,7 @@ impl AncientSlotInfos {
                     db.shrink_candidate_slots.lock().unwrap().insert(slot);
                 }
                 candidate_for_shrink
-                    || if can_randomly_shrink && thread_rng().gen_range(0..80000) == 0 {
+                    || if can_randomly_shrink && thread_rng().gen_range(0..400000) == 0 {
                         was_randomly_shrunk = true;
                         true
                     } else {
