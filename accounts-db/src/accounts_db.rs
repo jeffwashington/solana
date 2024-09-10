@@ -2849,6 +2849,8 @@ impl AccountsDb {
         // do not match the criteria of deleting all appendvecs which contain them
         // then increment their storage count.
         let mut already_counted = IntSet::default();
+        let max = store_counts.iter().map(|(k,v)| *k).max().unwrap();
+        let old = max - 432_000;
         for (bin_index, bin) in candidates.iter().enumerate() {
             let bin = bin.read().unwrap();
             for (
@@ -2874,6 +2876,14 @@ impl AccountsDb {
                             if count == 0 {
                                 // this store CAN be removed
                                 continue;
+                            }
+                            if slot < &old {
+                                log::error!("not deleting: {slot} because count: {count}");
+                            }
+                        }
+                        else {
+                            if slot < &old {
+                                log::error!("not deleting: {slot}: not found");
                             }
                         }
                         // One of the pubkeys in the store has account info to a store whose store count is not going to zero.
@@ -3162,6 +3172,7 @@ impl AccountsDb {
                     dirty_store_chunk.iter().for_each(|(slot, store)| {
                         if slot < &oldest_non_ancient_slot {
                             dirty_ancient_stores.fetch_add(1, Ordering::Relaxed);
+                            log::error!("adding ancient store: {}", slot);
                         }
                         oldest_dirty_slot = oldest_dirty_slot.min(*slot);
                         store.accounts.scan_pubkeys(insert_pubkey);
@@ -8869,6 +8880,7 @@ impl AccountsDb {
                 // this whole slot can likely be marked dead and dropped. Clean has to determine that. There could be an older non-zero account for any of these zero lamport accounts.
                 self.dirty_stores.insert(slot, Arc::clone(storage));
                 self.accounts_index.add_uncleaned_roots([slot].into_iter());
+                log::error!("adding store to dirty and uncleaned: {slot}");
             }
             let items = items_local.into_iter().map(|info| {
                 if let Some(amount_to_top_off_rent_this_account) = Self::stats_for_rent_payers(
