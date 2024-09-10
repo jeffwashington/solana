@@ -8863,8 +8863,9 @@ impl AccountsDb {
                 items_local.push(info.index_info);
             });
             if all_accounts_are_zero_lamports {
+                // this whole slot can likely be marked dead and dropped. Clean has to determine that. There could be an older non-zero account for any of these zero lamport accounts.
                 self.dirty_stores.insert(slot, Arc::clone(storage));
-                log::error!("all zeros: {slot}");
+                self.accounts_index.add_uncleaned_roots([slot].into_iter());
             }
             let items = items_local.into_iter().map(|info| {
                 if let Some(amount_to_top_off_rent_this_account) = Self::stats_for_rent_payers(
