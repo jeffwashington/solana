@@ -2811,6 +2811,7 @@ impl AccountsDb {
         // and those stores may be used for background hashing.
         let reset_accounts = false;
 
+        log::error!("jw: clean_accounts_older_than_root");
         let reclaim_result = self.handle_reclaims(
             (!reclaim_vecs.is_empty()).then(|| reclaim_vecs.iter().flatten()),
             None,
@@ -2850,7 +2851,8 @@ impl AccountsDb {
         // then increment their storage count.
         let mut already_counted = IntSet::default();
         let max = store_counts.iter().map(|(k,v)| *k).max().unwrap();
-        let old = max - 432_000;
+        let old = max - 500_000;
+        let mut hs = HashSet::<Slot>::default();
         for (bin_index, bin) in candidates.iter().enumerate() {
             let bin = bin.read().unwrap();
             for (
@@ -2882,7 +2884,7 @@ impl AccountsDb {
                             }
                         }
                         else {
-                            if slot < &old {
+                            if slot < &old && hs.insert(*slot) {
                                 log::error!("not deleting: {slot}: not found");
                             }
                         }
@@ -2920,11 +2922,11 @@ impl AccountsDb {
                 }
                 while !pending_stores.is_empty() {
                     let slot = pending_stores.iter().next().cloned().unwrap();
-                    if Some(slot) == min_slot {
+                    if slot < old {
                         if let Some(failed_slot) = failed_slot.take() {
                             info!("calc_delete_dependencies, oldest slot is not able to be deleted because of {pubkey} in slot {failed_slot}");
                         } else {
-                            info!("calc_delete_dependencies, oldest slot is not able to be deleted because of {pubkey}, slot list len: {}, ref count: {ref_count}", slot_list.len());
+                            info!("calc_delete_dependencies, oldest slot is not able to be deleted because of {pubkey}, slot list len: {}, ref count: {ref_count}, slot: {}", slot_list.len(), slot);
                         }
                     }
 
@@ -3138,10 +3140,18 @@ impl AccountsDb {
         let max_slot_inclusive =
             max_clean_root_inclusive.unwrap_or_else(|| self.accounts_index.max_root_inclusive());
         let mut dirty_stores = Vec::with_capacity(self.dirty_stores.len());
+
+        use std::str::FromStr;
+        let pks = ["4TyEWyw7fNnFHqTFpdLbMtBcdSfpDcVoDnQnvRV5Ljn3","12XnLwfggLHdq6cswGufg6PcE1zzACCgFocgpC6AV8JX",];
+        let pks = pks.iter().map(|s| Pubkey::from_str(s).unwrap()).collect::<Vec<_>>();
+
         // find the oldest dirty slot
         // we'll add logging if that append vec cannot be marked dead
         let mut min_dirty_slot = None::<u64>;
         self.dirty_stores.retain(|slot, store| {
+            if slot == &276499184 {
+                log::error!("found dirty store: {slot}, max: {max_slot_inclusive}");
+            }
             if *slot > max_slot_inclusive {
                 true
             } else {
@@ -3158,6 +3168,9 @@ impl AccountsDb {
                 .collect();
 
         let insert_pubkey = |pubkey: &Pubkey| {
+            if pks            .contains(pubkey) {
+                log::error!("inserting: {pubkey}");
+            }
             let index = self.accounts_index.bin_calculator.bin_from_pubkey(pubkey);
             let mut candidates_bin = candidates[index].write().unwrap();
             candidates_bin.insert(*pubkey, CleaningInfo::default());
@@ -3170,6 +3183,10 @@ impl AccountsDb {
                 .map(|dirty_store_chunk| {
                     let mut oldest_dirty_slot = max_slot_inclusive.saturating_add(1);
                     dirty_store_chunk.iter().for_each(|(slot, store)| {
+                        if slot == &276499184 {
+                            log::error!("scanning pubkeys: {slot}");
+                        }
+            
                         if slot < &oldest_non_ancient_slot {
                             dirty_ancient_stores.fetch_add(1, Ordering::Relaxed);
                             log::error!("adding ancient store: {}", slot);
@@ -3360,7 +3377,11 @@ impl AccountsDb {
         let not_found_on_fork_accum = AtomicU64::new(0);
         let missing_accum = AtomicU64::new(0);
         let useful_accum = AtomicU64::new(0);
+        use std::str::FromStr;
+        let pks = ["4TyEWyw7fNnFHqTFpdLbMtBcdSfpDcVoDnQnvRV5Ljn3","12XnLwfggLHdq6cswGufg6PcE1zzACCgFocgpC6AV8JX",];
+        let pks = pks.iter().map(|s| Pubkey::from_str(s).unwrap()).collect::<Vec<_>>();
 
+        log::error!("jw: clean scan");
         // parallel scan the index.
         let do_clean_scan = || {
             candidates.par_iter().for_each(|candidates_bin| {
@@ -3377,6 +3398,10 @@ impl AccountsDb {
                 candidates_bin
                     .iter_mut()
                     .for_each(|(candidate_pubkey, candidate_info)| {
+
+                        if pks.contains(candidate_pubkey) {
+                            log::error!("looking for: {candidate_pubkey}");
+                        }
                         self.accounts_index.scan(
                             [*candidate_pubkey].iter(),
                             |_candidate_pubkey, slot_list_and_ref_count, _entry| {
@@ -3394,7 +3419,7 @@ impl AccountsDb {
                                             // found info relative to max_clean_root
                                             let (slot, account_info) =
                                                 &slot_list[index_in_slot_list];
-                                            if account_info.is_zero_lamport() {
+                                                                    if account_info.is_zero_lamport() {
                                                 useless = false;
                                                 // The latest one is zero lamports. We may be able to purge it.
                                                 // Add all the rooted entries that contain this pubkey.
@@ -3405,6 +3430,9 @@ impl AccountsDb {
                                                         max_clean_root_inclusive,
                                                     );
                                                 candidate_info.ref_count = ref_count;
+                                                if pks.contains(candidate_pubkey) {
+                                                    log::error!("{candidate_pubkey}, zero: {}, slot: {}, {:?}, {ref_count}", account_info.is_zero_lamport(), slot, candidate_info.slot_list);
+                                                }
                                             } else {
                                                 found_not_zero += 1;
                                             }
@@ -3469,6 +3497,8 @@ impl AccountsDb {
 
         accounts_scan.stop();
 
+        log::error!("jw: clean_accounts_older_than_root");
+
         let mut clean_old_rooted = Measure::start("clean_old_roots");
         let ((purged_account_slots, removed_accounts), mut pubkeys_removed_from_accounts_index) =
             self.clean_accounts_older_than_root(
@@ -3482,6 +3512,14 @@ impl AccountsDb {
         clean_old_rooted.stop();
 
         let mut store_counts_time = Measure::start("store_counts");
+
+        let mut old = 0;
+        let mcr = max_clean_root_inclusive.as_ref().unwrap();
+        old = mcr - 500_000;
+    
+
+        let pks = ["4TyEWyw7fNnFHqTFpdLbMtBcdSfpDcVoDnQnvRV5Ljn3","12XnLwfggLHdq6cswGufg6PcE1zzACCgFocgpC6AV8JX",];
+        let pks = pks.iter().map(|s| Pubkey::from_str(s).unwrap()).collect::<Vec<_>>();
 
         // Calculate store counts as if everything was purged
         // Then purge if we can
@@ -3497,10 +3535,16 @@ impl AccountsDb {
             ) in candidates_bin.write().unwrap().iter_mut()
             {
                 if slot_list.is_empty() {
+                    if pks.contains(pubkey) {
+                        log::error!("empty slot list {pubkey}");
+                    }
                     continue; // seems simpler than filtering. `candidates` contains all the pubkeys we original started with
                 }
                 if purged_account_slots.contains_key(pubkey) {
                     *ref_count = self.accounts_index.ref_count_from_storage(pubkey);
+                }
+                if pks.contains(pubkey) {
+                    log::error!("checking {pubkey}, {slot_list:?}, rc: {ref_count}");
                 }
                 slot_list.retain(|(slot, account_info)| {
                     let was_slot_purged = purged_account_slots
@@ -3510,6 +3554,9 @@ impl AccountsDb {
                     if was_slot_purged {
                         // No need to look up the slot storage below if the entire
                         // slot was purged
+                        if pks.contains(pubkey) {
+                            log::error!("slot was purged {pubkey}");
+                        }
                         return false;
                     }
                     // Check if this update in `slot` to the account with `key` was reclaimed earlier by
@@ -3519,6 +3566,9 @@ impl AccountsDb {
                         .map(|store_removed| store_removed.contains(&account_info.offset()))
                         .unwrap_or(false);
                     if was_reclaimed {
+                        if pks.contains(pubkey) {
+                            log::error!("was reclaimed {pubkey}, {slot}, offset: {}", account_info.offset());
+                        }
                         return false;
                     }
                     if let Some(store_count) = store_counts.get_mut(slot) {
@@ -3544,6 +3594,9 @@ impl AccountsDb {
                             slot, account_info.store_id(), count
                         );
                         store_counts.insert(*slot, (count, key_set));
+                        if *slot < old {
+                            log::error!("adding store count: {}", slot);
+                        }
                     }
                     true
                 });
@@ -3554,6 +3607,12 @@ impl AccountsDb {
         let mut calc_deps_time = Measure::start("calc_deps");
         self.calc_delete_dependencies(&candidates, &mut store_counts, min_dirty_slot);
         calc_deps_time.stop();
+
+        store_counts.iter().for_each(|(k, count)| {
+            if k < &old {
+                log::error!("a {}, {}, {}", k, count.0, count.1.len());
+            }
+        });
 
         let mut purge_filter = Measure::start("purge_filter");
         self.filter_zero_lamport_clean_for_incremental_snapshots(
@@ -3580,7 +3639,13 @@ impl AccountsDb {
                         *pubkey,
                         slot_list
                             .iter()
-                            .map(|(slot, _)| *slot)
+                            .map(|(slot, _)| {
+                                if *slot < old {
+                                    log::error!("purge key: {}, {}", pubkey, slot);
+                                }
+                                *slot
+                            }
+                            )
                             .collect::<HashSet<Slot>>(),
                     ))
                 })
@@ -3595,7 +3660,7 @@ impl AccountsDb {
         // Don't reset from clean, since the pubkeys in those stores may need to be unref'ed
         // and those stores may be used for background hashing.
         let reset_accounts = false;
-        self.handle_reclaims(
+        let r = self.handle_reclaims(
             (!reclaims.is_empty()).then(|| reclaims.iter()),
             None,
             reset_accounts,
@@ -6317,6 +6382,7 @@ impl AccountsDb {
         let mut handle_reclaims_elapsed = Measure::start("handle_reclaims_elapsed");
         // Slot should be dead after removing all its account entries
         let expected_dead_slot = Some(remove_slot);
+        log::error!("jw: purge_slot_storage");
         self.handle_reclaims(
             (!reclaims.is_empty()).then(|| reclaims.iter()),
             expected_dead_slot,
@@ -8130,12 +8196,19 @@ impl AccountsDb {
                     store.slot(), *slot
                 );
                 if offsets.len() == store.count() {
+                    log::error!("dead slot: {}", slot);
                     // all remaining alive accounts in the storage are being removed, so the entire storage/slot is dead
                     store.remove_accounts(store.alive_bytes(), reset_accounts, offsets.len());
                     self.dirty_stores.insert(*slot, store.clone());
                     dead_slots.insert(*slot);
                 }
                 else {
+                    log::error!("not dead slot: {}, count: {}, offsets: {}", slot, store.count(), offsets.len());
+                    if slot == &274678788 || slot == &276499184 {
+                        let mut o = offsets.iter().collect::<Vec<_>>();
+                        o.sort();
+                        log::error!("{slot}, {:?}", o);
+                    }
                     // not all accounts are being removed, so figure out sizes of accounts we are removing and update the alive bytes and alive account count
                     let (_, us) = measure_us!({
                         let mut offsets = offsets.iter().cloned().collect::<Vec<_>>();
@@ -8882,6 +8955,10 @@ impl AccountsDb {
                 self.accounts_index.add_uncleaned_roots([slot].into_iter());
                 log::error!("adding store to dirty and uncleaned: {slot}");
             }
+            use std::str::FromStr;
+            let pks = ["4TyEWyw7fNnFHqTFpdLbMtBcdSfpDcVoDnQnvRV5Ljn3","12XnLwfggLHdq6cswGufg6PcE1zzACCgFocgpC6AV8JX",];
+            let pks = pks.iter().map(|s| Pubkey::from_str(s).unwrap()).collect::<Vec<_>>();
+
             let items = items_local.into_iter().map(|info| {
                 if let Some(amount_to_top_off_rent_this_account) = Self::stats_for_rent_payers(
                     &info.pubkey,
@@ -8895,6 +8972,10 @@ impl AccountsDb {
                     num_accounts_rent_paying += 1;
                     // remember this rent-paying account pubkey
                     rent_paying_accounts_by_partition.push(info.pubkey);
+                }
+
+                if pks.contains(&info.pubkey) {
+                    log::error!("found: {}, slot: {}, offset: {}", info.pubkey, slot, info.offset);
                 }
 
                 (

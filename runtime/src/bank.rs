@@ -5749,6 +5749,7 @@ impl Bank {
         latest_full_snapshot_slot: Slot,
         base: Option<(Slot, /*capitalization*/ u64)>,
     ) -> bool {
+        let force_clean = true;
         let (_, clean_time_us) = measure_us!({
             let should_clean = force_clean || (!skip_shrink && self.slot() > 0);
             if should_clean {
@@ -5767,6 +5768,8 @@ impl Bank {
                 info!("Cleaning... Skipped.");
             }
         });
+
+        loop {}
 
         let (_, shrink_time_us) = measure_us!({
             let should_shrink = !skip_shrink && self.slot() > 0;
