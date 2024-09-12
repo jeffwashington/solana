@@ -1409,6 +1409,8 @@ pub struct AccountsDb {
     /// Set of shrinkable stores organized by map of slot to storage id
     pub shrink_candidate_slots: Mutex<ShrinkCandidates>,
 
+    pub force_shrink_candidate_slots: Mutex<ShrinkCandidates>,
+
     pub write_version: AtomicU64,
 
     /// Set of storage paths to pick from
@@ -2510,6 +2512,7 @@ impl AccountsDb {
             uncleaned_pubkeys: DashMap::new(),
             next_id: AtomicAccountsFileId::new(0),
             shrink_candidate_slots: Mutex::new(ShrinkCandidates::default()),
+            force_shrink_candidate_slots: Mutex::new(ShrinkCandidates::default()),
             write_cache_limit_bytes: None,
             write_version: AtomicU64::new(0),
             paths: vec![],
@@ -5061,7 +5064,7 @@ impl AccountsDb {
         let shrink_candidates_slots =
             std::mem::take(&mut *self.shrink_candidate_slots.lock().unwrap());
 
-        let (shrink_slots, shrink_slots_next_batch) = {
+        let (mut shrink_slots, shrink_slots_next_batch) = {
             if let AccountShrinkThreshold::TotalSpace { shrink_ratio } = self.shrink_ratio {
                 let (shrink_slots, shrink_slots_next_batch) =
                     self.select_candidates_by_total_usage(&shrink_candidates_slots, shrink_ratio);
@@ -5081,6 +5084,21 @@ impl AccountsDb {
                 )
             }
         };
+
+        let force_shrink_candidates_slots =
+            std::mem::take(&mut *self.shrink_candidate_slots.lock().unwrap());
+
+        if !force_shrink_candidates_slots.is_empty() {
+            shrink_slots.extend(
+                force_shrink_candidates_slots
+                    .into_iter()
+                    .filter_map(|slot| {
+                        self.storage
+                            .get_slot_storage_entry(slot)
+                            .map(|storage| (slot, storage))
+                    }),
+            )
+        }
 
         if shrink_slots.is_empty()
             && shrink_slots_next_batch
@@ -8869,7 +8887,10 @@ impl AccountsDb {
                 // this whole slot can likely be marked dead and dropped. Clean has to determine that. There could be an older non-zero account for any of these zero lamport accounts.
                 self.dirty_stores.insert(slot, Arc::clone(storage));
                 self.accounts_index.add_uncleaned_roots([slot].into_iter());
-                self.shrink_candidate_slots.lock().unwrap().insert(slot);
+                self.force_shrink_candidate_slots
+                    .lock()
+                    .unwrap()
+                    .insert(slot);
             }
             let items = items_local.into_iter().map(|info| {
                 if let Some(amount_to_top_off_rent_this_account) = Self::stats_for_rent_payers(
