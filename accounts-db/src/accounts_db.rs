@@ -2059,12 +2059,14 @@ impl ShrinkStats {
                 "shrink_stats",
                 (
                     "ancient_slots_added_to_shrink",
-                    self.ancient_slots_added_to_shrink.swap(0, Ordering::Relaxed) as i64,
+                    self.ancient_slots_added_to_shrink
+                        .swap(0, Ordering::Relaxed) as i64,
                     i64
                 ),
                 (
                     "ancient_bytes_added_to_shrink",
-                    self.ancient_bytes_added_to_shrink.swap(0, Ordering::Relaxed) as i64,
+                    self.ancient_bytes_added_to_shrink
+                        .swap(0, Ordering::Relaxed) as i64,
                     i64
                 ),
                 (
@@ -5113,44 +5115,35 @@ impl AccountsDb {
             }
         };
 
-        let mut limit = 2;
-        let mut added = 0;
-        if shrink_slots.len() >= limit {
-            limit = shrink_slots.len() + 1;
-        }
-        let mut num_found = 0;
-        if shrink_slots.len() < limit {
+        let mut ancient_slots_added = 0;
+        // If there are too few slots to shrink, add an ancient slot
+        // for shrinking.
+        if shrink_slots.len() < 10 {
             let mut ancients = self.best_ancient_slots_to_shrink.write().unwrap();
-            num_found = ancients.len();
-
-            for (slot, capacity) in ancients.iter_mut() {
-                if *capacity == 0 || shrink_slots.contains(slot) {
-                    // already dealt with
-                    continue;
-                }
-                // we will be done processing this suggestion no matter what
+            if let Some((slot, capacity)) = ancients.first_mut() {
                 if let Some(store) = self.storage.get_slot_storage_entry(*slot) {
-                    if *capacity != store.capacity()
-                        || !Self::is_candidate_for_shrink(&self, &store)
+                    if !shrink_slots.contains(slot)
+                        && *capacity == store.capacity()
+                        && Self::is_candidate_for_shrink(self, &store)
                     {
                         *capacity = 0;
-                        // ignore this one
-                        continue;
-                    }
-                    *capacity = 0;
-                    added += 1;
-                    self.shrink_stats.ancient_bytes_added_to_shrink.fetch_add(store.alive_bytes() as u64, Ordering::Relaxed);
-                    shrink_slots.insert(*slot, store);
-
-                    if shrink_slots.len() >= limit {
-                        break;
+                        ancient_slots_added += 1;
+                        self.shrink_stats
+                            .ancient_bytes_added_to_shrink
+                            .fetch_add(store.alive_bytes() as u64, Ordering::Relaxed);
+                        shrink_slots.insert(*slot, store);
                     }
                 }
             }
+            log::debug!(
+                "ancient_slots_added: {ancient_slots_added}, {}, avail: {}",
+                shrink_slots.len(),
+                ancients.len()
+            );
         }
-        log::error!("added: {added}, {}, avail: {num_found}", shrink_slots.len());
-        self.shrink_stats.ancient_slots_added_to_shrink.fetch_add(added, Ordering::Relaxed);
-
+        self.shrink_stats
+            .ancient_slots_added_to_shrink
+            .fetch_add(ancient_slots_added, Ordering::Relaxed);
         if shrink_slots.is_empty()
             && shrink_slots_next_batch
                 .as_ref()

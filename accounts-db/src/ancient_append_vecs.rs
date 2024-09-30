@@ -194,7 +194,6 @@ impl AncientSlotInfos {
                     / 100,
             );
         self.best_slots_to_shrink = Vec::with_capacity(self.shrink_indexes.len());
-        log::error!("slots to shrink: {}", self.shrink_indexes.len());
         for info_index in &self.shrink_indexes {
             let info = &mut self.all_infos[*info_index];
             self.best_slots_to_shrink.push((info.slot, info.capacity));
@@ -440,7 +439,10 @@ impl AccountsDb {
             .fetch_add(sorted_slots.len() as u64, Ordering::Relaxed);
         let mut ancient_slot_infos = self.collect_sort_filter_ancient_slots(sorted_slots, &mut tuning);
 
-        std::mem::swap(&mut *self.best_ancient_slots_to_shrink.write().unwrap(), &mut ancient_slot_infos.best_slots_to_shrink);
+        std::mem::swap(
+            &mut *self.best_ancient_slots_to_shrink.write().unwrap(),
+            &mut ancient_slot_infos.best_slots_to_shrink,
+        );
 
         if ancient_slot_infos.all_infos.is_empty() {
             return; // nothing to do
