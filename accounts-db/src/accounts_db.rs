@@ -5119,10 +5119,7 @@ impl AccountsDb {
         // If there are too few slots to shrink, add an ancient slot
         // for shrinking.
         if shrink_slots.len() < 10 {
-            let mut added = 0;
-            let mut num_found = 0;
             let mut ancients = self.best_ancient_slots_to_shrink.write().unwrap();
-            num_found = ancients.len();
 
             for (slot, capacity) in ancients.iter_mut() {
                 if *capacity == 0 || shrink_slots.contains(slot) {
@@ -5139,7 +5136,7 @@ impl AccountsDb {
                         continue;
                     }
                     *capacity = 0;
-                    added += 1;
+                    ancient_slots_added += 1;
                     self.shrink_stats
                         .ancient_bytes_added_to_shrink
                         .fetch_add(store.alive_bytes() as u64, Ordering::Relaxed);
