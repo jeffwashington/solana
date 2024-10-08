@@ -5120,6 +5120,7 @@ impl AccountsDb {
         // for shrinking.
         if shrink_slots.len() < 10 {
             let mut ancients = self.best_ancient_slots_to_shrink.write().unwrap();
+            let mut done = false;
 
             for (slot, capacity) in ancients.iter_mut() {
                 if *capacity == 0 || shrink_slots.contains(slot) {
@@ -5135,15 +5136,21 @@ impl AccountsDb {
                         // ignore this one
                         continue;
                     }
+                    if done {
+                        log::error!("next ancient storage to shrink: {}, alive: {}, capacity: {}", slot, store.alive_bytes(), store.capacity());
+                        break;
+                    }
                     *capacity = 0;
                     ancient_slots_added += 1;
                     self.shrink_stats
                         .ancient_bytes_added_to_shrink
                         .fetch_add(store.alive_bytes() as u64, Ordering::Relaxed);
                     shrink_slots.insert(*slot, store);
-
-                    break;
+                    done = true;
                 }
+            }
+            if !done {
+                log::error!("nothing found to shrink");
             }
         }
         self.shrink_stats
