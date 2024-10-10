@@ -5118,6 +5118,7 @@ impl AccountsDb {
         let mut ancient_slots_added = 0;
         // If there are too few slots to shrink, add an ancient slot
         // for shrinking.
+        let mut count = 0;
         if shrink_slots.len() < 10 {
             let mut ancients = self.best_ancient_slots_to_shrink.write().unwrap();
             let mut done = false;
@@ -5137,7 +5138,7 @@ impl AccountsDb {
                         continue;
                     }
                     if done {
-                        log::error!("next ancient storage to shrink: {}, alive: {}, capacity: {}", slot, store.alive_bytes(), store.capacity());
+                        log::error!("next ancient storage to shrink: {}, alive: {}, capacity: {}, root age from max: {}", slot, store.alive_bytes(), store.capacity(), self.accounts_index.roots_tracker.read().unwrap().alive_roots.max_exclusive() - *slot);
                         break;
                     }
                     *capacity = 0;
@@ -5146,7 +5147,10 @@ impl AccountsDb {
                         .ancient_bytes_added_to_shrink
                         .fetch_add(store.alive_bytes() as u64, Ordering::Relaxed);
                     shrink_slots.insert(*slot, store);
-                    done = true;
+                    count += 1;
+                    if count >= 10 {
+                        done = true;
+                    }
                 }
             }
             if !done {
