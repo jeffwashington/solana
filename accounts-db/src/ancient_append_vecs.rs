@@ -98,18 +98,8 @@ impl AncientSlotInfos {
         is_high_slot: bool,
         db: &AccountsDb,
     ) -> bool {
-        let slots = [
-            287302120,
-287344734,
-287344738,
-287332411,
-        ];
-
         let mut was_randomly_shrunk = false;
         let alive_bytes = storage.alive_bytes() as u64;
-        if slots.contains(&slot) {
-            log::error!("ancient.add? slot: {slot}, alive: {alive_bytes}, cap: {}, count: {}", storage.capacity(), storage.approx_stored_count());
-        }
         if alive_bytes > 0 {
             let capacity = storage.accounts.capacity();
             let should_shrink = if capacity > 0 {
