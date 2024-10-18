@@ -146,6 +146,10 @@ const SHRINK_COLLECT_CHUNK_SIZE: usize = 50;
 /// candidates for shrinking.
 const SHRINK_INSERT_ANCIENT_THRESHOLD: usize = 10;
 
+/// Default value for the number of ancient storages the ancient slot
+/// combining should converge to.
+pub const MAX_ANCIENT_SLOTS_DEFAULT: usize = 100_000;
+
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum CreateAncientStorage {
     /// ancient storages are created by appending
@@ -15884,16 +15888,19 @@ pub mod tests {
         assert!(db
             .get_sorted_potential_ancient_slots(oldest_non_ancient_slot)
             .is_empty());
-        let root0 = 0;
+        let root0 = MAX_ANCIENT_SLOTS_DEFAULT as u64 + ancient_append_vec_offset as u64 + 1;
         db.add_root(root0);
-        let root1 = 1;
+        let root1 = root0 + 1;
         db.add_root(root1);
         let oldest_non_ancient_slot = db.get_oldest_non_ancient_slot(&epoch_schedule);
         assert!(db
             .get_sorted_potential_ancient_slots(oldest_non_ancient_slot)
             .is_empty());
         let completed_slot = epoch_schedule.slots_per_epoch;
-        db.accounts_index.add_root(completed_slot);
+        db.accounts_index.add_root(AccountsDb::apply_offset_to_slot(
+            completed_slot,
+            ancient_append_vec_offset,
+        ));
         let oldest_non_ancient_slot = db.get_oldest_non_ancient_slot(&epoch_schedule);
         // get_sorted_potential_ancient_slots uses 'less than' as opposed to 'less or equal'
         // so, we need to get more than an epoch away to get the first valid root
@@ -15903,17 +15910,17 @@ pub mod tests {
         let completed_slot = epoch_schedule.slots_per_epoch + root0;
         db.accounts_index.add_root(AccountsDb::apply_offset_to_slot(
             completed_slot,
-            -ancient_append_vec_offset,
+            ancient_append_vec_offset,
         ));
         let oldest_non_ancient_slot = db.get_oldest_non_ancient_slot(&epoch_schedule);
         assert_eq!(
             db.get_sorted_potential_ancient_slots(oldest_non_ancient_slot),
-            vec![root0]
+            vec![root0, root1]
         );
         let completed_slot = epoch_schedule.slots_per_epoch + root1;
         db.accounts_index.add_root(AccountsDb::apply_offset_to_slot(
             completed_slot,
-            -ancient_append_vec_offset,
+            ancient_append_vec_offset,
         ));
         let oldest_non_ancient_slot = db.get_oldest_non_ancient_slot(&epoch_schedule);
         assert_eq!(

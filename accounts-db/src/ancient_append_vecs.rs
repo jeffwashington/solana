@@ -11,6 +11,7 @@ use {
             stats::{ShrinkAncientStats, ShrinkStatsSub},
             AccountFromStorage, AccountStorageEntry, AccountsDb, AliveAccounts,
             GetUniqueAccountsResult, ShrinkCollect, ShrinkCollectAliveSeparatedByRefs,
+            MAX_ANCIENT_SLOTS_DEFAULT,
         },
         accounts_file::AccountsFile,
         active_stats::ActiveStatItem,
@@ -344,7 +345,7 @@ impl AccountsDb {
         let tuning = PackedAncientStorageTuning {
             // Slots old enough to be ancient.  Setting this parameter
             // to 100k makes ancient storages to be approx 5M.
-            max_ancient_slots: 100_000,
+            max_ancient_slots: MAX_ANCIENT_SLOTS_DEFAULT,
             // Don't re-pack anything just to shrink.
             // shrink_candidate_slots will handle these old storages.
             percent_of_alive_shrunk_data: 0,
