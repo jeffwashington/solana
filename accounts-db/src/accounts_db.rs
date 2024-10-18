@@ -15154,10 +15154,9 @@ pub mod tests {
         let slots_per_epoch = config.epoch_schedule.slots_per_epoch;
         assert_ne!(slot, 0);
         let offset = 10;
-        // no ancient append vecs, so always 0
         assert_eq!(
             db.get_oldest_non_ancient_slot_for_hash_calc_scan(slots_per_epoch + offset, &config),
-            expected(0)
+            expected(db.ancient_append_vec_offset.unwrap() as u64 + offset + 1)
         );
         // ancient append vecs enabled (but at 0 offset), so can be non-zero
         db.ancient_append_vec_offset = Some(0);
