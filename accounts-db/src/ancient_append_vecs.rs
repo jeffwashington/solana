@@ -252,6 +252,7 @@ impl AncientSlotInfos {
                 && (storages_remaining + ancient_storages_required < low_threshold
                     || ancient_storages_required as u64 > u64::from(tuning.max_resulting_storages))
             {
+                log::error!("truncating: {i}, ancient_storages_required: {ancient_storages_required}, max_resulting: {}, cum_bytes: {}, ideal_size: {}", tuning.max_resulting_storages, cumulative_bytes.0, tuning.ideal_storage_size);
                 self.all_infos.truncate(i);
                 break;
             }
@@ -767,7 +768,7 @@ impl AccountsDb {
         tuning: &PackedAncientStorageTuning,
         mut many_ref_slots: IncludeManyRefSlots,
     ) -> AccountsToCombine<'a> {
-        let alive_bytes = accounts_per_storage
+        let mut alive_bytes = accounts_per_storage
             .iter()
             .map(|a| a.0.alive_bytes)
             .sum::<u64>();
@@ -801,8 +802,6 @@ impl AccountsDb {
         // We want ceiling, so we add 1.
         // 0 < alive_bytes < `ideal_storage_size`, then `min_resulting_packed_slots` = 0.
         // We obviously require 1 packed slot if we have at 1 alive byte.
-        let min_resulting_packed_slots =
-            alive_bytes.saturating_sub(1) / u64::from(tuning.ideal_storage_size) + 1;
         let total = accounts_to_combine.len();
         let mut remove = Vec::default();
         let mut last_slot = None;
@@ -812,6 +811,9 @@ impl AccountsDb {
             .zip(accounts_per_storage.iter())
             .enumerate()
         {
+            let min_resulting_packed_slots =
+            alive_bytes.saturating_sub(1) / u64::from(tuning.ideal_storage_size) + 1;
+
             // assert that iteration is in descending slot order since the code below relies on this.
             if let Some(last_slot) = last_slot {
                 assert!(last_slot > info.slot);
@@ -845,7 +847,7 @@ impl AccountsDb {
                     self.shrink_ancient_stats
                         .many_ref_slots_skipped
                         .fetch_add(1, Ordering::Relaxed);
-                    log::error!("many ref skipped. i: {}, slot: {} ({}), high_slot: {}, should_shrink: {}, target slots: {}, required packed slots: {required_packed_slots}, # many ref accounts: {}, first: {}, last: {}, cap: {}, alive: {}, dead: {}, first: {:?}, slots: {}, {}, removed: {}, # storages considering: {}, ideal: {}, alive: {}, many_refs_old_alive_count: {}",
+                    log::error!("many ref skipped. i: {}, slot: {} ({}), high_slot: {}, should_shrink: {}, target slots: {}, required packed slots: {required_packed_slots}, # many ref accounts: {}, first: {}, last: {}, cap: {}, alive: {}, dead: {}, first: {:?}, removed: {}, # storages considering: {}, ideal: {}, alive: {}, many_refs_old_alive_count: {}, alive bytes this one: {}",
                     i,
                     info.slot,
                     first_last.0-info.slot,
@@ -863,14 +865,15 @@ impl AccountsDb {
                     shrink_collect
                     .alive_accounts
                     .many_refs_this_is_newest_alive.accounts.first().map(|i| i.pubkey()),
-                    first_last.0,
-                    first_last.1,
                     remove.len(),
                     total,
                     tuning.ideal_storage_size,
                     alive_bytes,
                     many_refs_old_alive_count,
+                    info.alive_bytes,
                     );
+                    // since we're skipping this one, we don't count it as required target storages
+                    alive_bytes = alive_bytes.saturating_sub(info.alive_bytes);
                     remove.push(i);
                     continue;
                 }
