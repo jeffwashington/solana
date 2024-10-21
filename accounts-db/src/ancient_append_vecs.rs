@@ -287,6 +287,11 @@ impl AncientSlotInfos {
         stats: &ShrinkAncientStats,
     ) {
         let total_storages = self.all_infos.len();
+        log::error!(
+            "total: {total_storages}, max: {}, quit: {}",
+            tuning.max_ancient_slots,
+            total_storages <= tuning.max_ancient_slots
+        );
         if total_storages <= tuning.max_ancient_slots {
             // currently fewer storages than max, so nothing to shrink
             self.shrink_indexes.clear();
@@ -409,6 +414,10 @@ impl AccountsDb {
         mut tuning: PackedAncientStorageTuning,
         metrics: &mut ShrinkStatsSub,
     ) {
+        log::error!(
+            "first/last: {:?}",
+            (sorted_slots.first(), sorted_slots.last())
+        );
         self.shrink_ancient_stats
             .slots_considered
             .fetch_add(sorted_slots.len() as u64, Ordering::Relaxed);
@@ -834,6 +843,21 @@ impl AccountsDb {
                     self.shrink_ancient_stats
                         .many_ref_slots_skipped
                         .fetch_add(1, Ordering::Relaxed);
+                    log::info!("many ref skipped. slot: {}, target slots: {}, required packed slots: {required_packed_slots}, # many ref accounts: {}, first: {}, last: {}, cap: {}, alive: {}, dead: {}, first: {:?}",
+                    info.slot,
+                    target_slots_sorted.len(),
+                    shrink_collect
+                    .alive_accounts
+                    .many_refs_this_is_newest_alive.accounts.len(),
+                    accounts_per_storage.first().map(|a| a.0.slot).unwrap_or_default(),
+                    accounts_per_storage.last().map(|a| a.0.slot).unwrap_or_default(),
+                    shrink_collect.capacity,
+                    shrink_collect.alive_total_bytes,
+                    shrink_collect.capacity as usize - shrink_collect.alive_total_bytes,
+                    shrink_collect
+                    .alive_accounts
+                    .many_refs_this_is_newest_alive.accounts.first().map(|i| i.pubkey())
+                    );
                     remove.push(i);
                     continue;
                 }
