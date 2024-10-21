@@ -99,14 +99,15 @@ impl AncientSlotInfos {
         can_randomly_shrink: bool,
         ideal_size: NonZeroU64,
         is_high_slot: bool,
+        db: &AccountsDb,
     ) -> bool {
         let mut was_randomly_shrunk = false;
         let alive_bytes = storage.alive_bytes() as u64;
         if alive_bytes > 0 {
             let capacity = storage.accounts.capacity();
             let should_shrink = if capacity > 0 {
-                let alive_ratio = alive_bytes * 100 / capacity;
-                alive_ratio < 90
+                let candidate_for_shrink = db.is_candidate_for_shrink(&storage);
+                candidate_for_shrink
                     || if can_randomly_shrink && thread_rng().gen_range(0..10000) == 0 {
                         was_randomly_shrunk = true;
                         true
@@ -596,6 +597,7 @@ impl AccountsDb {
                     tuning.can_randomly_shrink,
                     tuning.ideal_storage_size,
                     is_high_slot(*slot),
+                    &self,
                 ) {
                     randoms += 1;
                 }
