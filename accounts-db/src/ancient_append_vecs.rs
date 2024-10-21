@@ -803,8 +803,10 @@ impl AccountsDb {
         // We obviously require 1 packed slot if we have at 1 alive byte.
         let min_resulting_packed_slots =
             alive_bytes.saturating_sub(1) / u64::from(tuning.ideal_storage_size) + 1;
+        let total = accounts_to_combine.len();
         let mut remove = Vec::default();
         let mut last_slot = None;
+        let first_last = (accounts_to_combine.first().map(|x: &ShrinkCollect<'_, ShrinkCollectAliveSeparatedByRefs<'_>>| x.slot).unwrap(), accounts_to_combine.last().map(|x| x.slot).unwrap());
         for (i, (shrink_collect, (info, _unique_accounts))) in accounts_to_combine
             .iter_mut()
             .zip(accounts_per_storage.iter())
@@ -843,8 +845,12 @@ impl AccountsDb {
                     self.shrink_ancient_stats
                         .many_ref_slots_skipped
                         .fetch_add(1, Ordering::Relaxed);
-                    log::info!("many ref skipped. slot: {}, target slots: {}, required packed slots: {required_packed_slots}, # many ref accounts: {}, first: {}, last: {}, cap: {}, alive: {}, dead: {}, first: {:?}",
+                    log::error!("many ref skipped. i: {}, slot: {} ({}), high_slot: {}, should_shrink: {}, target slots: {}, required packed slots: {required_packed_slots}, # many ref accounts: {}, first: {}, last: {}, cap: {}, alive: {}, dead: {}, first: {:?}, slots: {}, {}, removed: {}, # storages considering: {}, ideal: {}, alive: {}, many_refs_old_alive_count: {}",
+                    i,
                     info.slot,
+                    first_last.0-info.slot,
+                    info.is_high_slot,
+                    info.should_shrink,
                     target_slots_sorted.len(),
                     shrink_collect
                     .alive_accounts
@@ -856,7 +862,14 @@ impl AccountsDb {
                     shrink_collect.capacity as usize - shrink_collect.alive_total_bytes,
                     shrink_collect
                     .alive_accounts
-                    .many_refs_this_is_newest_alive.accounts.first().map(|i| i.pubkey())
+                    .many_refs_this_is_newest_alive.accounts.first().map(|i| i.pubkey()),
+                    first_last.0,
+                    first_last.1,
+                    remove.len(),
+                    total,
+                    tuning.ideal_storage_size,
+                    alive_bytes,
+                    many_refs_old_alive_count,
                     );
                     remove.push(i);
                     continue;
