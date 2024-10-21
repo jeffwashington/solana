@@ -107,10 +107,6 @@ impl AncientSlotInfos {
             let capacity = storage.accounts.capacity();
             let should_shrink = if capacity > 0 {
                 let candidate_for_shrink = db.is_candidate_for_shrink(&storage);
-                if candidate_for_shrink {
-                    // shrink should run on this
-                    db.shrink_candidate_slots.lock().unwrap().insert(slot);
-                }
                 candidate_for_shrink
                     || if can_randomly_shrink && thread_rng().gen_range(0..80000) == 0 {
                         was_randomly_shrunk = true;

@@ -1396,7 +1396,7 @@ pub struct AccountsDb {
     pub next_id: AtomicAccountsFileId,
 
     /// Set of shrinkable stores organized by map of slot to storage id
-    pub shrink_candidate_slots: Mutex<ShrinkCandidates>,
+    shrink_candidate_slots: Mutex<ShrinkCandidates>,
 
     pub write_version: AtomicU64,
 
@@ -4421,7 +4421,7 @@ impl AccountsDb {
         uncleaned_pubkeys.extend(pubkeys);
     }
 
-    pub fn shrink_candidate_slots(&self, epoch_schedule: &EpochSchedule) -> usize {
+    fn shrink_candidate_slots(&self, epoch_schedule: &EpochSchedule) -> usize {
         let oldest_non_ancient_slot = self.get_oldest_non_ancient_slot(epoch_schedule);
 
         let shrink_candidates_slots =
