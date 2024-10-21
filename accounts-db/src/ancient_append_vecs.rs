@@ -99,15 +99,20 @@ impl AncientSlotInfos {
         can_randomly_shrink: bool,
         ideal_size: NonZeroU64,
         is_high_slot: bool,
+        db: &AccountsDb,
     ) -> bool {
         let mut was_randomly_shrunk = false;
         let alive_bytes = storage.alive_bytes() as u64;
         if alive_bytes > 0 {
             let capacity = storage.accounts.capacity();
             let should_shrink = if capacity > 0 {
-                let alive_ratio = alive_bytes * 100 / capacity;
-                alive_ratio < 90
-                    || if can_randomly_shrink && thread_rng().gen_range(0..10000) == 0 {
+                let candidate_for_shrink = db.is_candidate_for_shrink(&storage);
+                if candidate_for_shrink {
+                    // shrink should run on this
+                    db.shrink_candidate_slots.lock().unwrap().insert(slot);
+                }
+                candidate_for_shrink
+                    || if can_randomly_shrink && thread_rng().gen_range(0..80000) == 0 {
                         was_randomly_shrunk = true;
                         true
                     } else {
@@ -232,6 +237,9 @@ impl AncientSlotInfos {
         let mut bytes_from_must_shrink = 0;
         let mut bytes_from_smallest_storages = 0;
         let mut bytes_from_newest_storages = 0;
+        // make sure we are always including some smallest. We are alrady making sure we include some newest.
+        const MIN_SMALLEST_INCLUDED_COUNT: u64 = 0;
+        let mut smallest_included = 0;
         for (i, info) in self.all_infos.iter().enumerate() {
             cumulative_bytes += info.alive_bytes;
             let ancient_storages_required =
@@ -249,6 +257,7 @@ impl AncientSlotInfos {
             // to make progress each time it is called. There are exceptions that can cause the pack to fail, such as accounts with multiple
             // refs.
             if !info.is_high_slot
+                && smallest_included > MIN_SMALLEST_INCLUDED_COUNT
                 && (storages_remaining + ancient_storages_required < low_threshold
                     || ancient_storages_required as u64 > u64::from(tuning.max_resulting_storages))
             {
@@ -261,6 +270,7 @@ impl AncientSlotInfos {
                 bytes_from_newest_storages += info.alive_bytes;
             } else {
                 bytes_from_smallest_storages += info.alive_bytes;
+                smallest_included += 1;
             }
         }
         stats
@@ -585,7 +595,7 @@ impl AccountsDb {
         let max_slot = slots.iter().max().cloned().unwrap_or_default();
         // heuristic to include some # of newly eligible ancient slots so that the pack algorithm always makes progress
         let high_slot_boundary = max_slot.saturating_sub(HIGH_SLOT_OFFSET);
-        let is_high_slot = |slot| slot >= high_slot_boundary;
+        let is_high_slot = |slot| false; // nothign is high slot slot >= high_slot_boundary;
 
         for slot in &slots {
             if let Some(storage) = self.storage.get_slot_storage_entry(*slot) {
@@ -595,6 +605,7 @@ impl AccountsDb {
                     tuning.can_randomly_shrink,
                     tuning.ideal_storage_size,
                     is_high_slot(*slot),
+                    &self,
                 ) {
                     randoms += 1;
                 }
