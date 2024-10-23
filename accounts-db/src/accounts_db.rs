@@ -613,7 +613,7 @@ pub struct AccountsAddRootTiming {
 /// the distance from the max root slot beyond which storages holding
 /// the account data for the slots are considered ancient by the
 /// shrinking algorithm.
-const ANCIENT_APPEND_VEC_DEFAULT_OFFSET: Option<i64> = Some(100_000);
+const ANCIENT_APPEND_VEC_DEFAULT_OFFSET: Option<i64> = Some(200_000);
 
 #[derive(Debug, Default, Clone)]
 pub struct AccountsDbConfig {
