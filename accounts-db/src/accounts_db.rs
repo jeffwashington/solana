@@ -8584,6 +8584,7 @@ impl AccountsDb {
                     num_accounts_rent_paying += 1;
                     // remember this rent-paying account pubkey
                     rent_paying_accounts_by_partition.push(info.pubkey);
+                    log::error!("rent paying account,{},{}", info.pubkey, amount_to_top_off_rent_this_account);
                 }
 
                 (
