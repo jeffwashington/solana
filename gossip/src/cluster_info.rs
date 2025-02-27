@@ -2163,7 +2163,8 @@ impl ClusterInfo {
                         .collect()
                 } else {
                     packets
-                        .par_iter()
+                        .par_drain(..)
+                        .into_par_iter()
                         .flatten()
                         .filter_map(|packet| verify_packet(packet, &stakes, &self.stats))
                         .collect()
