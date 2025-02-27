@@ -2150,7 +2150,7 @@ impl ClusterInfo {
             .map(EpochSpecs::current_epoch_staked_nodes)
             .cloned()
             .unwrap_or_default();
-        let packets: Vec<_> = {
+        let packets2: Vec<_> = {
             let _st = ScopedTimer::from(&self.stats.verify_gossip_packets_time);
             thread_pool.install(|| {
                 if packets.len() == 1 {
@@ -2167,7 +2167,7 @@ impl ClusterInfo {
                 }
             })
         };
-        Ok(sender.send(packets)?)
+        Ok(sender.send(packets2)?)
     }
 
     /// Process messages from the network
